@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	const ENDPOINT = 'https://joi-20b.ngrok.io/generate_stream';
+
 	type Message =
 		| {
 				from: 'user';
@@ -58,7 +59,7 @@
 	}
 </script>
 
-<div class="grid h-screen w-screen md:grid-cols-[256px,1fr] overflow-hidden text-smd">
+<div class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd">
 	<nav class="max-md:hidden bg-gradient-to-l from-gray-800/10  p-4 flex flex-col gap-2">
 		<button
 			class="border px-12 py-2.5 rounded-lg bg-gray-800/20 border border-gray-800/50 shadow w-full"
@@ -104,7 +105,7 @@
 		</div>
 	</div>
 	<div
-		class="flex items-center justify-center absolute left-0 md:left-[256px] right-0 px-8 md:px-24 bottom-0 h-32 bg-gradient-to-t from-gray-900/50 to-black/0"
+		class="flex items-center justify-center absolute left-0 md:left-[280px] right-0 px-8 md:px-24 bottom-0 h-32 bg-gradient-to-t from-gray-900/50 to-black/0"
 	>
 		<form
 			on:submit={onWrite}
