@@ -59,12 +59,22 @@
 </script>
 
 <div class="grid h-screen w-screen md:grid-cols-[256px,1fr] overflow-hidden text-smd">
-	<div class="max-md:hidden bg-gray-900/20 pt-6 px-6">
+	<nav class="max-md:hidden bg-gradient-to-l from-gray-800/10  p-4 flex flex-col gap-2">
 		<button
 			class="border px-12 py-2.5 rounded-lg bg-gray-800/20 border border-gray-800/50 shadow w-full"
 			>New Chat</button
 		>
-	</div>
+		<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg">
+			sit amet consectetur adipisicing elit. Eos dolorum nihil alias.
+		</a>
+
+		<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg mt-auto">
+			Appearance
+		</a>
+		<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg">
+			Settings
+		</a>
+	</nav>
 	<div class="overflow-y-auto">
 		<div class="max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8">
 			{#each messages as { from, content }}
@@ -72,7 +82,7 @@
 					<div class="flex items-start justify-start gap-4 leading-relaxed">
 						<img
 							src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-							class="mt-4 w-3 h-3 flex-none rounded-full shadow-lg shadow-white/40"
+							class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg shadow-white/40"
 						/>
 						<div
 							class="group relative rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-800/20 px-5 py-3.5"
@@ -83,7 +93,7 @@
 				{/if}
 				{#if from === 'user'}
 					<div class="flex items-start justify-start gap-4 text-gray-300/80">
-						<div class="mt-4 w-3 h-3 flex-none rounded-full" />
+						<div class="mt-5 w-3 h-3 flex-none rounded-full" />
 						<div class="rounded-2xl px-5 py-3.5">
 							{content}
 						</div>
@@ -94,11 +104,11 @@
 		</div>
 	</div>
 	<div
-		class="flex items-center justify-center absolute left-[256px] right-0 px-24 bottom-0 h-32 bg-gradient-to-t from-gray-900/50 to-black/0"
+		class="flex items-center justify-center absolute left-0 md:left-[256px] right-0 px-8 md:px-24 bottom-0 h-32 bg-gradient-to-t from-gray-900/50 to-black/0"
 	>
 		<form
 			on:submit={onWrite}
-			class="shadow-alternate relative flex items-center rounded-xl border border-gray-900 bg-black shadow-xl flex-1 max-w-4xl"
+			class="shadow-alternate relative flex items-center rounded-xl border border-gray-900 bg-black shadow-xl flex-1 max-w-4xl mx-4"
 		>
 			<svg
 				class="absolute left-3 text-gray-300 top-1/2 transform -translate-y-1/2 pointer-events-none"
