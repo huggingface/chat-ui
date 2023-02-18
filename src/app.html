@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-black/95 text-gray-200">
+<html lang="en" class="bg-gray-950 text-gray-200">
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
@@ -10,6 +10,11 @@
 			tailwind.config = {
 				theme: {
 					extend: {
+						colors: {
+							gray: {
+								950: '#0b0f19'
+							}
+						},
 						fontSize: {
 							smd: '0.94rem'
 						}
