@@ -1,17 +1,17 @@
 <div class="grid h-screen w-screen md:grid-cols-[256px,1fr] overflow-hidden text-smd">
-	<div class="max-md:hidden bg-gray-900/20 pt-12 px-6">
+	<div class="max-md:hidden bg-gray-900/20 pt-6 px-6">
 		<button
 			class="border px-12 py-2.5 rounded-lg bg-gray-800/20 border border-gray-800/50 shadow w-full"
 			>New Chat</button
 		>
 	</div>
 	<div class="overflow-y-auto">
-		<div class="max-w-4xl mx-auto px-5 pt-12 flex flex-col gap-8">
+		<div class="max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8">
 			{#each Array(4) as _}
 				<div class="flex items-start justify-start gap-4 leading-relaxed">
 					<img
 						src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-						class="mt-5 h-3.5 w-3.5 flex-none rounded-full shadow-lg shadow-white/40"
+						class="mt-4 w-3 h-3 flex-none rounded-full shadow-lg shadow-white/40"
 					/>
 					<div
 						class="group relative rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-800/20 px-5 py-3.5"
@@ -24,7 +24,7 @@
 					</div>
 				</div>
 				<div class="mb-2 flex items-start justify-start gap-4 text-gray-300/80">
-					<div class="mt-4 h-3.5 w-3.5 flex-none rounded-full" />
+					<div class="mt-4 w-3 h-3 flex-none rounded-full" />
 					<div class="rounded-2xl px-5 py-3.5">
 						Lorem ipsum, dolor sit amet consectetur adipisicing eLorem ipsum, dolor sit amet
 						consectetur adipisicing eLorem ipsum
@@ -35,10 +35,10 @@
 		</div>
 	</div>
 	<div
-		class="flex items-center justify-center absolute left-[256px] right-0  px-5 bottom-0 h-32 bg-gradient-to-t from-black to-black/0"
+		class="flex items-center justify-center absolute left-[256px] right-0 px-24 bottom-0 h-32 bg-gradient-to-t from-gray-900/50 to-black/0"
 	>
 		<div
-			class="shadow-alternate relative flex items-center rounded-xl border border-gray-100 dark:bg-gray-950"
+			class="shadow-alternate relative flex items-center rounded-xl border border-gray-900 bg-black shadow-xl flex-1 max-w-4xl"
 		>
 			<svg
 				class="absolute left-3 text-gray-300 top-1/2 transform -translate-y-1/2 pointer-events-none"
@@ -57,8 +57,8 @@
 				/></svg
 			>
 			<input
-				class="flex-1 border-none bg-transparent px-1 py-2 pr-3 pl-10 outline-none placeholder:text-gray-400"
-				placeholder="Search anything on the Hub"
+				class="flex-1 border-none bg-transparent px-1 py-3 pr-3 pl-10 outline-none placeholder:text-gray-400"
+				placeholder="Ask anything..."
 			/>
 		</div>
 		<!-- <input
