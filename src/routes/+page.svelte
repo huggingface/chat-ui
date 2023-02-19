@@ -12,8 +12,27 @@
 				content: string;
 		  };
 
-	let messages: Message[] = [];
+	let messages: Message[] = [
+		{
+			from: 'user',
+			content: 'hello bot'
+		},
+		{
+			from: 'bot',
+			content: " Hello! I'm a conversational chatbot. What can I help you with today?<|endoftext|>"
+		},
+		{
+			from: 'user',
+			content: 'how are you?'
+		},
+		{
+			from: 'bot',
+			content: " I'm fine, thank you for asking. How are you?<|endoftext|>"
+		}
+	];
 	let message = '';
+
+	$: console.log(messages);
 
 	function onWrite() {
 		messages = [...messages, { from: 'user', content: message }];
@@ -60,53 +79,43 @@
 </script>
 
 <div class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd">
-	<nav
-		class="max-md:hidden bg-gradient-to-l from-gray-800/10 grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen"
-	>
-		<div class="flex-none sticky top-0 relative p-3 flex flex-col bg-black">
-			<button class="border px-12 py-2.5 rounded-lg bg-gray-800/20 border border-gray-800/50 shadow"
-				>New Chat</button
-			>
+	<nav class="max-md:hidden  grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gray-50">
+		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
+			<button class="border px-12 py-2.5 rounded-lg border shadow bg-white">New Chat</button>
 		</div>
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
-			{#each Array(4) as _}
-				<a
-					href=""
-					class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg flex-none"
-				>
-					sit amet consectetur adipisicing elit. Eos dolorum nihil alias.
+			{#each Array(5) as _}
+				<a href="" class="truncate py-3 px-3 rounded-lg flex-none text-gray-400 hover:bg-gray-100">
+					Amet consectetur adipisicing elit. Eos dolorum nihil alias.
 				</a>
 			{/each}
 		</div>
 		<div class="flex flex-col p-3 gap-2">
-			<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg mt-auto">
-				Appearance
-			</a>
-			<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg">
-				Settings
-			</a>
+			<a href="" class="truncate  py-3 px-3 rounded-lg mt-auto"> Appearance </a>
+			<a href="" class="truncate  py-3 px-3 rounded-lg"> Settings </a>
 		</div>
 	</nav>
 	<div class="overflow-y-auto">
-		<div class="max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8">
+		<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8">
 			{#each messages as { from, content }}
 				{#if from === 'bot'}
 					<div class="flex items-start justify-start gap-4 leading-relaxed">
 						<img
+							alt=""
 							src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-							class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg shadow-white/40"
+							class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 						/>
 						<div
-							class="group relative rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-800/20 px-5 py-3.5"
+							class="group relative rounded-2xl px-5 py-3.5 border border-gray-100  bg-gradient-to-br from-gray-50"
 						>
 							{content}
 						</div>
 					</div>
 				{/if}
 				{#if from === 'user'}
-					<div class="flex items-start justify-start gap-4 text-gray-300/80">
+					<div class="flex items-start justify-start gap-4">
 						<div class="mt-5 w-3 h-3 flex-none rounded-full" />
-						<div class="rounded-2xl px-5 py-3.5">
+						<div class="rounded-2xl px-5 py-3.5 text-gray-500">
 							{content}
 						</div>
 					</div>
@@ -116,11 +125,11 @@
 		</div>
 	</div>
 	<div
-		class="flex items-center justify-center absolute left-0 md:left-[280px] right-0 px-8 md:px-24 bottom-0 h-32 bg-gradient-to-t from-gray-900/50 to-black/0"
+		class="flex items-center justify-center absolute left-0 md:left-[280px] right-0 px-8 md:px-24 bottom-0 h-32"
 	>
 		<form
 			on:submit={onWrite}
-			class="shadow-alternate relative flex items-center rounded-xl border border-gray-900 bg-black shadow-xl flex-1 max-w-4xl mx-4"
+			class="shadow-alternate relative flex items-center rounded-xl flex-1 max-w-4xl mx-4 border bg-gray-100"
 		>
 			<svg
 				class="absolute left-3 text-gray-300 top-1/2 transform -translate-y-1/2 pointer-events-none"
@@ -139,7 +148,7 @@
 				/></svg
 			>
 			<input
-				class="flex-1 border-none bg-transparent px-1 py-3 pr-3 pl-10 outline-none placeholder:text-gray-400"
+				class="flex-1 border-none bg-transparent px-1 py-3 pr-3 pl-10 outline-none"
 				bind:value={message}
 				on:submit={onWrite}
 				placeholder="Ask anything"
