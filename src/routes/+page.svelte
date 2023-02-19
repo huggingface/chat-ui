@@ -60,21 +60,32 @@
 </script>
 
 <div class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd">
-	<nav class="max-md:hidden bg-gradient-to-l from-gray-800/10  p-4 flex flex-col gap-2">
-		<button
-			class="border px-12 py-2.5 rounded-lg bg-gray-800/20 border border-gray-800/50 shadow w-full"
-			>New Chat</button
-		>
-		<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg">
-			sit amet consectetur adipisicing elit. Eos dolorum nihil alias.
-		</a>
-
-		<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg mt-auto">
-			Appearance
-		</a>
-		<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg">
-			Settings
-		</a>
+	<nav
+		class="max-md:hidden bg-gradient-to-l from-gray-800/10 grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen"
+	>
+		<div class="flex-none sticky top-0 relative p-3 flex flex-col bg-black">
+			<button class="border px-12 py-2.5 rounded-lg bg-gray-800/20 border border-gray-800/50 shadow"
+				>New Chat</button
+			>
+		</div>
+		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
+			{#each Array(4) as _}
+				<a
+					href=""
+					class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg flex-none"
+				>
+					sit amet consectetur adipisicing elit. Eos dolorum nihil alias.
+				</a>
+			{/each}
+		</div>
+		<div class="flex flex-col p-3 gap-2">
+			<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg mt-auto">
+				Appearance
+			</a>
+			<a href="" class="truncate text-gray-400 hover:bg-gray-800/50 py-3 px-3 rounded-lg">
+				Settings
+			</a>
+		</div>
 	</nav>
 	<div class="overflow-y-auto">
 		<div class="max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8">
