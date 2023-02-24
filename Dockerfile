@@ -9,6 +9,8 @@ COPY . .
 
 RUN npm i
 
+RUN chown -R 1000:1000 /code
+
 # RUN npm run build
 
 CMD ["npm", "run", "preview", "--", "--port", "7860"]
