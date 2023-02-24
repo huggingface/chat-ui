@@ -13,4 +13,6 @@ RUN chown -R 1000:1000 /app
 
 RUN npm run build
 
-CMD ["PORT=7860", "node", "build"]
+ENV PORT 7860
+
+CMD ["node", "build"]
