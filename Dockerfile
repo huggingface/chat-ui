@@ -9,8 +9,6 @@ COPY . .
 
 RUN npm i
 
-RUN npm run build
+# RUN npm run build
 
-ENV PORT=7860
-
-CMD ["node", "build"]
+CMD ["npm", "run", "preview", "--", "--port", "7860"]
