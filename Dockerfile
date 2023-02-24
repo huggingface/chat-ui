@@ -11,6 +11,6 @@ RUN npm i
 
 RUN chown -R 1000:1000 /app
 
-# RUN npm run build
+RUN npm run build
 
-CMD ["npm", "run", "preview", "--", "--port", "7860"]
+CMD ["PORT=7860", "node", "build"]
