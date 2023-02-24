@@ -3,7 +3,7 @@
 
 FROM node:19
 
-WORKDIR /code
+WORKDIR /app
 
 COPY . .
 
@@ -11,8 +11,6 @@ RUN npm i
 
 RUN npm run build
 
-COPY . .
-
-ARG PORT=7860
+ENV PORT=7860
 
 CMD ["node", "build"]
