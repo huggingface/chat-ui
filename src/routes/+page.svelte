@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
-	import ChatBox from '$lib/chat/Chatbox.svelte';
+	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
 	const ENDPOINT = 'https://joi-20b.ngrok.io/generate_stream';
 
