@@ -10,7 +10,7 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100  bg-gradient-to-br from-gray-50"
+			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800"
 		>
 			{message.content}
 		</div>
@@ -19,7 +19,7 @@
 {#if message.from === 'user'}
 	<div class="flex items-start justify-start gap-4">
 		<div class="mt-5 w-3 h-3 flex-none rounded-full" />
-		<div class="rounded-2xl px-5 py-3.5 text-gray-500">
+		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
 			{message.content}
 		</div>
 	</div>
