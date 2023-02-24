@@ -11,6 +11,8 @@ RUN npm i
 
 RUN npm run build
 
+COPY . .
+
 ARG PORT=7860
 
 CMD ["node", "build"]
