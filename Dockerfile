@@ -9,7 +9,7 @@ COPY . .
 
 RUN npm i
 
-RUN chown -R 1000:1000 /code
+RUN chown -R 1000:1000 /app
 
 # RUN npm run build
 
