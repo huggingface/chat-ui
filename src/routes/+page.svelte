@@ -61,25 +61,39 @@
 	}
 </script>
 
-<div class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd">
+<div
+	class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
+>
 	<nav
-		class="max-md:hidden  grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50"
+		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30"
 	>
 		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
-			<button class="border px-12 py-2.5 rounded-lg border shadow bg-white">New Chat</button>
+			<button
+				class="border px-12 py-2.5 rounded-lg border shadow bg-white dark:bg-gray-700 dark:border-gray-600"
+				>New Chat</button
+			>
 		</div>
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
 			{#each Array(5) as _}
-				<a href="/" class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 hover:bg-gray-100">
+				<a
+					href="/"
+					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+				>
 					Amet consectetur adipisicing elit. Eos dolorum nihil alias.
 				</a>
 			{/each}
 		</div>
 		<div class="flex flex-col p-3 gap-2">
-			<a href="/" class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 hover:bg-gray-100">
+			<a
+				href="/"
+				class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+			>
 				Appearance
 			</a>
-			<a href="/" class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 hover:bg-gray-100">
+			<a
+				href="/"
+				class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+			>
 				Settings
 			</a>
 		</div>
@@ -92,15 +106,15 @@
 				{:else}
 					<ChatIntroduction title="Joi 20B Instruct" />
 				{/each}
-				<div class="h-32" />
+				<div class="h-32 flex-none" />
 			</div>
 		</div>
 		<div
-			class="flex items-center bg-gradient-to-t from-white via-white to-white/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 h-32 w-full bg-white"
+			class="flex items-center bg-gradient-to-t from-white dark:from-gray-900 to-transparent justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 h-32 w-full"
 		>
 			<form
 				on:submit={onWrite}
-				class="shadow-alternate relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100"
+				class="shadow-alternate relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 dark:bg-gray-700 dark:border-gray-600"
 			>
 				<svg
 					class="absolute left-3 text-gray-300 top-1/2 transform -translate-y-1/2 pointer-events-none"
