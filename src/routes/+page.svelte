@@ -2,17 +2,10 @@
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
+	import type { Message } from '$lib/Types';
+	
 	const ENDPOINT = 'https://joi-20b.ngrok.io/generate_stream';
 
-	type Message =
-		| {
-				from: 'user';
-				content: string;
-		  }
-		| {
-				from: 'bot';
-				content: string;
-		  };
 
 	let messages: Message[] = [];
 	let message = '';
@@ -104,7 +97,7 @@
 				{#each messages as message}
 					<ChatBox {message} />
 				{:else}
-					<ChatIntroduction title="Joi 20B Instruct" />
+					<ChatIntroduction />
 				{/each}
 				<div class="h-32 flex-none" />
 			</div>
