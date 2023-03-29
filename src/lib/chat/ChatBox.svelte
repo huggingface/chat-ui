@@ -1,5 +1,7 @@
 <script lang="ts">
-	export let message;
+	import type { Message } from '$lib/Types';
+
+	export let message: Message;
 </script>
 
 {#if message.from === 'bot'}

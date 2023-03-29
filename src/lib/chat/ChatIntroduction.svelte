@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME, PUBLIC_MODEL_TAGLINE } from '$env/static/public';
 	
-	export let title: string = '';
+	export let title: string = 'Joi 20B Instruct';
 </script>
 
 <div class="grid grid-cols-3 gap-3 my-auto">
