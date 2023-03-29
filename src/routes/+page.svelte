@@ -3,9 +3,11 @@
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
 	import type { Message } from '$lib/Types';
-	
-	const ENDPOINT = 'https://joi-20b.ngrok.io/generate_stream';
+	import { PUBLIC_ASSISTANT_MESSAGE_TOKEN, PUBLIC_ENDPOINT, PUBLIC_HF_TOKEN, PUBLIC_SEP_TOKEN, PUBLIC_USER_MESSAGE_TOKEN } from '$env/static/public';
 
+	const userToken = PUBLIC_USER_MESSAGE_TOKEN || "<|prompter|>";
+	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || "<|assistant|>";
+	const sepToken = PUBLIC_SEP_TOKEN || "<|endoftext|>";
 
 	let messages: Message[] = [];
 	let message = '';
@@ -13,33 +15,37 @@
 	function onWrite() {
 		messages = [...messages, { from: 'user', content: message }];
 		message = '';
-		let incoming = '';
 		const inputs =
 			messages
-				.map((m) => (m.from === 'user' ? `User: ${m.content}\n` : `Joi:${m.content}\n`))
-				.join('\n') + '\nJoi:';
+				.map((m) => (
+					(m.from === 'user' ? userToken + m.content : assistantToken + m.content))
+					+ (m.content.endsWith(sepToken) ? "" : sepToken))
+				.join('') + assistantToken;
 
-		fetchEventSource(ENDPOINT, {
+		fetchEventSource(PUBLIC_ENDPOINT, {
 			method: 'POST',
 			headers: {
 				Accept: 'text/event-stream',
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
+				"user-agent": "text-generation/0.3.0; hf_hub/0.12.1; python/3.10.10",
+				"authorization": `Bearer ${PUBLIC_HF_TOKEN}`,
 			},
 			body: JSON.stringify({
 				inputs: inputs,
 				parameters: {
-					temperature: 0.5,
-					top_p: 0.95,
-					do_sample: true,
-					max_new_tokens: 512,
-					top_k: 4,
-					repetition_penalty: 1.03,
-					stop: ['User:']
+					do_sample: false,
+					max_new_tokens: 500,
+					return_full_text: false,
+					stop: [],
+					truncate: 1000,
+					typical_p: 0.2,
+					watermark: false,
+					details: true,
 				}
 			}),
 			async onopen(response) {
 				if (response.ok && response.headers.get('content-type') === 'text/event-stream') {
-					messages = [...messages, { from: 'bot', content: incoming }];
+					messages = [...messages, { from: 'bot', content: "" }];
 				} else {
 					console.error('error opening the SSE endpoint');
 				}
