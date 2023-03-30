@@ -2,7 +2,7 @@
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
-	import type { Message } from '$lib/Types';
+	import type { Message, StreamResponse } from '$lib/Types';
 	import { PUBLIC_ASSISTANT_MESSAGE_TOKEN, PUBLIC_ENDPOINT, PUBLIC_HF_TOKEN, PUBLIC_SEP_TOKEN, PUBLIC_USER_MESSAGE_TOKEN } from '$env/static/public';
 
 	const userToken = PUBLIC_USER_MESSAGE_TOKEN || "<|prompter|>";
@@ -22,12 +22,13 @@
 					+ (m.content.endsWith(sepToken) ? "" : sepToken))
 				.join('') + assistantToken;
 
+		console.log(inputs);
 		fetchEventSource(PUBLIC_ENDPOINT, {
 			method: 'POST',
 			headers: {
 				Accept: 'text/event-stream',
 				'Content-Type': 'application/json',
-				"user-agent": "text-generation/0.3.0; hf_hub/0.12.1; python/3.10.10",
+				"user-agent": "chat-ui/0.0.1",
 				"authorization": `Bearer ${PUBLIC_HF_TOKEN}`,
 			},
 			body: JSON.stringify({
@@ -52,10 +53,12 @@
 				}
 			},
 			onmessage(msg) {
-				const data = JSON.parse(msg.data);
+				const data = JSON.parse(msg.data) as StreamResponse;
 				// console.log(data);
-				messages.at(-1)!.content += data.token.text;
-				messages = messages;
+				if (!data.token.special) {
+					messages.at(-1)!.content += data.token.text;
+					messages = messages;
+				}
 			}
 		});
 	}
