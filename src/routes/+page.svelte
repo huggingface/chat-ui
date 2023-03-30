@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterUpdate } from 'svelte'
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
@@ -11,6 +12,12 @@
 
 	let messages: Message[] = [];
 	let message = '';
+
+	let messagesContainer: HTMLElement;
+
+	afterUpdate(() => {
+		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
+	});
 
 	function onWrite() {
 		messages = [...messages, { from: 'user', content: message }];
@@ -74,6 +81,7 @@
 	>
 		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
 			<button
+				on:click={() => {location.reload}}
 				class="border px-12 py-2.5 rounded-lg border shadow bg-white dark:bg-gray-700 dark:border-gray-600"
 				>New Chat</button
 			>
@@ -104,7 +112,7 @@
 		</div>
 	</nav>
 	<div class="relative h-screen">
-		<div class="overflow-y-auto h-full">
+		<div class="overflow-y-auto h-full" bind:this={messagesContainer}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
 					<ChatBox {message} />
