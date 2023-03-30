@@ -32,6 +32,7 @@
 			},
 			body: JSON.stringify({
 				inputs: inputs,
+				stream: true,
 				parameters: {
 					do_sample: false,
 					max_new_tokens: 500,
