@@ -81,7 +81,7 @@
 	>
 		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
 			<button
-				on:click={() => {location.reload}}
+				on:click={() => {location.reload()}}
 				class="border px-12 py-2.5 rounded-lg border shadow bg-white dark:bg-gray-700 dark:border-gray-600"
 				>New Chat</button
 			>
