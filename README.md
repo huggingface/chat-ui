@@ -1,5 +1,5 @@
 ---
-title: OpenAssistant/oasst-sft-1-pythia-12b
+title: oasst-sft-1-pythia-12b
 emoji: 🔥
 colorFrom: purple
 colorTo: purple

@@ -29,7 +29,9 @@
 				Accept: 'text/event-stream',
 				'Content-Type': 'application/json',
 				"user-agent": "chat-ui/0.0.1",
-				"authorization": `Bearer ${PUBLIC_HF_TOKEN}`,
+				...(PUBLIC_HF_TOKEN ? {
+					"authorization": `Bearer ${PUBLIC_HF_TOKEN}`,
+				} : {}),
 			},
 			body: JSON.stringify({
 				inputs: inputs,
