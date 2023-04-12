@@ -26,6 +26,8 @@
 	});
 
 	function onWrite() {
+		if (!message) return;
+
 		messages = [...messages, { from: 'user', content: message }];
 		message = '';
 		const inputs =
