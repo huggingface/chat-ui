@@ -1,61 +1,83 @@
 <script lang="ts">
+	import { afterUpdate } from 'svelte';
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
-	const ENDPOINT = 'https://joi-20b.ngrok.io/generate_stream';
+	import type { Message, StreamResponse } from '$lib/Types';
+	import {
+		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
+		PUBLIC_ENDPOINT,
+		PUBLIC_HF_TOKEN,
+		PUBLIC_SEP_TOKEN,
+		PUBLIC_USER_MESSAGE_TOKEN
+	} from '$env/static/public';
 
-	type Message =
-		| {
-				from: 'user';
-				content: string;
-		  }
-		| {
-				from: 'bot';
-				content: string;
-		  };
+	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
+	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
+	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
 
 	let messages: Message[] = [];
 	let message = '';
 
+	let messagesContainer: HTMLElement;
+
+	afterUpdate(() => {
+		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
+	});
+
 	function onWrite() {
 		messages = [...messages, { from: 'user', content: message }];
 		message = '';
-		let incoming = '';
 		const inputs =
 			messages
-				.map((m) => (m.from === 'user' ? `User: ${m.content}\n` : `Joi:${m.content}\n`))
-				.join('\n') + '\nJoi:';
+				.map(
+					(m) =>
+						(m.from === 'user' ? userToken + m.content : assistantToken + m.content) +
+						(m.content.endsWith(sepToken) ? '' : sepToken)
+				)
+				.join('') + assistantToken;
 
-		fetchEventSource(ENDPOINT, {
+		console.log(inputs);
+		fetchEventSource(PUBLIC_ENDPOINT, {
 			method: 'POST',
 			headers: {
 				Accept: 'text/event-stream',
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
+				'user-agent': 'chat-ui/0.0.1',
+				...(PUBLIC_HF_TOKEN
+					? {
+							authorization: `Bearer ${PUBLIC_HF_TOKEN}`
+					  }
+					: {})
 			},
 			body: JSON.stringify({
 				inputs: inputs,
+				stream: true,
 				parameters: {
-					temperature: 0.5,
-					top_p: 0.95,
-					do_sample: true,
-					max_new_tokens: 512,
-					top_k: 4,
-					repetition_penalty: 1.03,
-					stop: ['User:']
+					do_sample: false,
+					max_new_tokens: 500,
+					return_full_text: false,
+					stop: [],
+					truncate: 1000,
+					typical_p: 0.2,
+					watermark: false,
+					details: true
 				}
 			}),
 			async onopen(response) {
 				if (response.ok && response.headers.get('content-type') === 'text/event-stream') {
-					messages = [...messages, { from: 'bot', content: incoming }];
+					messages = [...messages, { from: 'bot', content: '' }];
 				} else {
 					console.error('error opening the SSE endpoint');
 				}
 			},
 			onmessage(msg) {
-				const data = JSON.parse(msg.data);
+				const data = JSON.parse(msg.data) as StreamResponse;
 				// console.log(data);
-				messages.at(-1)!.content += data.token.text;
-				messages = messages;
+				if (!data.token.special) {
+					messages.at(-1)!.content += data.token.text;
+					messages = messages;
+				}
 			}
 		});
 	}
@@ -69,6 +91,7 @@
 	>
 		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
 			<button
+				on:click={() => location.reload()}
 				class="border px-12 py-2.5 rounded-lg border shadow bg-white dark:bg-gray-700 dark:border-gray-600"
 				>New Chat</button
 			>
@@ -99,12 +122,12 @@
 		</div>
 	</nav>
 	<div class="relative h-screen">
-		<div class="overflow-y-auto h-full">
+		<div class="overflow-y-auto h-full" bind:this={messagesContainer}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
 					<ChatBox {message} />
 				{:else}
-					<ChatIntroduction title="Joi 20B Instruct" />
+					<ChatIntroduction />
 				{/each}
 				<div class="h-32 flex-none" />
 			</div>
