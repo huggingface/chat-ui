@@ -3,6 +3,7 @@
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
+	import UserInput from '$lib/components/UserInput.svelte';
 	import type { Message, StreamResponse } from '$lib/Types';
 	import {
 		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
@@ -142,7 +143,7 @@
 				class="shadow-alternate relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 dark:bg-gray-700 dark:border-gray-600"
 			>
 				<div class="flex flex-1 border-none bg-transparent">
-					<TextArea
+					<UserInput
 						placeholder="Ask anything"
 						bind:value={message}
 						on:submit={onWrite}
