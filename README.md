@@ -1,5 +1,5 @@
 ---
-title: chat-ui
+title: oasst-sft-1-pythia-12b
 emoji: 🔥
 colorFrom: purple
 colorTo: purple
