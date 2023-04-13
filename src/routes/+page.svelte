@@ -1,14 +1,20 @@
 <script lang="ts">
-	import { afterUpdate } from 'svelte'
+	import { afterUpdate } from 'svelte';
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
 	import type { Message, StreamResponse } from '$lib/Types';
-	import { PUBLIC_ASSISTANT_MESSAGE_TOKEN, PUBLIC_ENDPOINT, PUBLIC_HF_TOKEN, PUBLIC_SEP_TOKEN, PUBLIC_USER_MESSAGE_TOKEN } from '$env/static/public';
+	import {
+		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
+		PUBLIC_ENDPOINT,
+		PUBLIC_HF_TOKEN,
+		PUBLIC_SEP_TOKEN,
+		PUBLIC_USER_MESSAGE_TOKEN
+	} from '$env/static/public';
 
-	const userToken = PUBLIC_USER_MESSAGE_TOKEN || "<|prompter|>";
-	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || "<|assistant|>";
-	const sepToken = PUBLIC_SEP_TOKEN || "<|endoftext|>";
+	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
+	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
+	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
 
 	let messages: Message[] = [];
 	let message = '';
@@ -24,9 +30,11 @@
 		message = '';
 		const inputs =
 			messages
-				.map((m) => (
-					(m.from === 'user' ? userToken + m.content : assistantToken + m.content))
-					+ (m.content.endsWith(sepToken) ? "" : sepToken))
+				.map(
+					(m) =>
+						(m.from === 'user' ? userToken + m.content : assistantToken + m.content) +
+						(m.content.endsWith(sepToken) ? '' : sepToken)
+				)
 				.join('') + assistantToken;
 
 		console.log(inputs);
@@ -35,10 +43,12 @@
 			headers: {
 				Accept: 'text/event-stream',
 				'Content-Type': 'application/json',
-				"user-agent": "chat-ui/0.0.1",
-				...(PUBLIC_HF_TOKEN ? {
-					"authorization": `Bearer ${PUBLIC_HF_TOKEN}`,
-				} : {}),
+				'user-agent': 'chat-ui/0.0.1',
+				...(PUBLIC_HF_TOKEN
+					? {
+							authorization: `Bearer ${PUBLIC_HF_TOKEN}`
+					  }
+					: {})
 			},
 			body: JSON.stringify({
 				inputs: inputs,
@@ -51,12 +61,12 @@
 					truncate: 1000,
 					typical_p: 0.2,
 					watermark: false,
-					details: true,
+					details: true
 				}
 			}),
 			async onopen(response) {
 				if (response.ok && response.headers.get('content-type') === 'text/event-stream') {
-					messages = [...messages, { from: 'bot', content: "" }];
+					messages = [...messages, { from: 'bot', content: '' }];
 				} else {
 					console.error('error opening the SSE endpoint');
 				}
@@ -81,7 +91,7 @@
 	>
 		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
 			<button
-				on:click={() => {location.reload()}}
+				on:click={() => location.reload()}
 				class="border px-12 py-2.5 rounded-lg border shadow bg-white dark:bg-gray-700 dark:border-gray-600"
 				>New Chat</button
 			>
