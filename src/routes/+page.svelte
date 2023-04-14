@@ -1,14 +1,11 @@
 <script lang="ts">
 	import { afterUpdate } from 'svelte';
-	import { fetchEventSource } from '@microsoft/fetch-event-source';
 	import ChatBox from '$lib/chat/ChatBox.svelte';
 	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
 	import UserInput from '$lib/components/UserInput.svelte';
 	import type { Message, StreamResponse } from '$lib/Types';
 	import {
 		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
-		PUBLIC_ENDPOINT,
-		PUBLIC_HF_TOKEN,
 		PUBLIC_SEP_TOKEN,
 		PUBLIC_USER_MESSAGE_TOKEN
 	} from '$env/static/public';
@@ -21,10 +18,39 @@
 	let message = '';
 
 	let messagesContainer: HTMLElement;
+	async function getTextGenerationStream(inputs: string) {
+		const response = await fetch('/api/conversation', {
+			method: 'POST',
+			headers: {
+				Accept: 'text/event-stream',
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ inputs })
+		});
+
+		const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+
+		while (reader && true) {
+			const { value, done } = await reader.read();
 
 	afterUpdate(() => {
 		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
 	});
+			if (done || !value) break;
+
+			try {
+				const data = JSON.parse(value) as StreamResponse;
+
+				if (!data.token.special) {
+					messages.at(-1)!.content += data.token.text;
+					messages = messages;
+				}
+			} catch (error) {
+				console.error(error);
+				break;
+			}
+		}
+	}
 
 	function onWrite() {
 		if (!message) return;
@@ -40,49 +66,7 @@
 				)
 				.join('') + assistantToken;
 
-		console.log(inputs);
-		fetchEventSource(PUBLIC_ENDPOINT, {
-			method: 'POST',
-			headers: {
-				Accept: 'text/event-stream',
-				'Content-Type': 'application/json',
-				'user-agent': 'chat-ui/0.0.1',
-				...(PUBLIC_HF_TOKEN
-					? {
-							authorization: `Bearer ${PUBLIC_HF_TOKEN}`
-					  }
-					: {})
-			},
-			body: JSON.stringify({
-				inputs: inputs,
-				stream: true,
-				parameters: {
-					do_sample: false,
-					max_new_tokens: 500,
-					return_full_text: false,
-					stop: [],
-					truncate: 1000,
-					typical_p: 0.2,
-					watermark: false,
-					details: true
-				}
-			}),
-			async onopen(response) {
-				if (response.ok && response.headers.get('content-type') === 'text/event-stream') {
-					messages = [...messages, { from: 'bot', content: '' }];
-				} else {
-					console.error('error opening the SSE endpoint');
-				}
-			},
-			onmessage(msg) {
-				const data = JSON.parse(msg.data) as StreamResponse;
-				// console.log(data);
-				if (!data.token.special) {
-					messages.at(-1)!.content += data.token.text;
-					messages = messages;
-				}
-			}
-		});
+		getTextGenerationStream(inputs);
 	}
 </script>
 
