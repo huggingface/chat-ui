@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { afterUpdate } from 'svelte';
 	import { fetchEventSource } from '@microsoft/fetch-event-source';
-	import ChatBox from '$lib/chat/ChatBox.svelte';
-	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
-	import UserInput from '$lib/components/UserInput.svelte';
+	import ChatBox from '$lib/components/chat/ChatMessage.svelte';
+	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
+	import UserInput from '$lib/components/chat/ChatInput.svelte';
 	import type { Message, StreamResponse } from '$lib/Types';
 	import {
 		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
@@ -92,7 +92,7 @@
 	<nav
 		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
-		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
+		<div class="flex-none sticky top-0 p-3 flex flex-col">
 			<button
 				on:click={() => location.reload()}
 				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600"
