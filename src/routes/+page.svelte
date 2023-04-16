@@ -140,6 +140,13 @@
 		</div>
 	</nav>
 	<div class="relative h-screen">
+		<nav
+			class="sm:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800"
+		>
+			<button>[ ]</button>
+			<button>New Chat</button>
+			<button>+</button>
+		</nav>
 		<div class="overflow-y-auto h-full" bind:this={messagesContainer}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
