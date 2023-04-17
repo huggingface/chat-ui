@@ -9,4 +9,7 @@
 	<body data-sveltekit-preload-data="hover" class="dark:bg-gray-900">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
+	<script>
+		localStorage.theme === 'dark' && document.documentElement.classList.add('dark');
+	</script>
 </html>
