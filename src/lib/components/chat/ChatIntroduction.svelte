@@ -19,7 +19,7 @@
 	<div class="lg:col-span-2 lg:pl-24">
 		<div class="border dark:border-gray-800 rounded-xl overflow-hidden">
 			<div class="p-3">
-				<div class="text-sm text-gray-600 dark:text-gray-300">Current Model</div>
+				<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
 				<div class="font-semibold">{PUBLIC_MODEL_NAME}</div>
 			</div>
 			<div
