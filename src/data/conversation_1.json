@@ -1,0 +1,289 @@
+{
+	"title": "Node.js & Server-Sent Events.",
+	"create_time": 1681404355.272037,
+	"update_time": 1681479310.0,
+	"mapping": {
+		"99a16e33-2952-4eec-b3c9-c8d17dfdf8cc": {
+			"id": "99a16e33-2952-4eec-b3c9-c8d17dfdf8cc",
+			"message": {
+				"id": "99a16e33-2952-4eec-b3c9-c8d17dfdf8cc",
+				"author": { "role": "system", "metadata": {} },
+				"create_time": 1681404355.272037,
+				"content": { "content_type": "text", "parts": [""] },
+				"end_turn": true,
+				"weight": 1.0,
+				"metadata": {},
+				"recipient": "all"
+			},
+			"parent": "812e5294-75d2-44a2-9af4-608763fbc9f9",
+			"children": ["3595fd48-1f85-40c9-8884-9772df56ce66"]
+		},
+		"812e5294-75d2-44a2-9af4-608763fbc9f9": {
+			"id": "812e5294-75d2-44a2-9af4-608763fbc9f9",
+			"children": ["99a16e33-2952-4eec-b3c9-c8d17dfdf8cc"]
+		},
+		"3595fd48-1f85-40c9-8884-9772df56ce66": {
+			"id": "3595fd48-1f85-40c9-8884-9772df56ce66",
+			"message": {
+				"id": "3595fd48-1f85-40c9-8884-9772df56ce66",
+				"author": { "role": "user", "metadata": {} },
+				"create_time": 1681404355.274462,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"give me an example of communication between client and node.js server with server-sent events"
+					]
+				},
+				"weight": 1.0,
+				"metadata": { "timestamp_": "absolute" },
+				"recipient": "all"
+			},
+			"parent": "99a16e33-2952-4eec-b3c9-c8d17dfdf8cc",
+			"children": ["32fd9960-9671-487a-a2eb-1bea3ad3a704"]
+		},
+		"32fd9960-9671-487a-a2eb-1bea3ad3a704": {
+			"id": "32fd9960-9671-487a-a2eb-1bea3ad3a704",
+			"message": {
+				"id": "32fd9960-9671-487a-a2eb-1bea3ad3a704",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681404387.145936,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"Sure, here is an example of how client-side JavaScript code can communicate with a Node.js server using server-sent events:\n\nClient-side JavaScript code:\n\n```javascript\nconst source = new EventSource('/events');\n\nsource.addEventListener('message', function(event) {\n  console.log(event.data);\n});\n```\n\nIn the above code, we create a new `EventSource` object and specify the URL of the server endpoint `/events`. We then add an event listener to the `message` event, which will be triggered whenever the server sends a message to the client.\n\nNode.js server-side code:\n\n```javascript\nconst http = require('http');\n\nconst server = http.createServer((req, res) => {\n  if (req.url === '/events') {\n    res.writeHead(200, {\n      'Content-Type': 'text/event-stream',\n      'Cache-Control': 'no-cache',\n      'Connection': 'keep-alive'\n    });\n\n    setInterval(() => {\n      const data = new Date().toLocaleTimeString();\n      res.write(`data: ${data}\\n\\n`);\n    }, 1000);\n  } else {\n    res.writeHead(404);\n    res.end();\n  }\n});\n\nserver.listen(3000);\n```\n\nIn the above code, we create an HTTP server and check if the incoming request URL matches `/events`. If it does, we set the response headers to indicate that we are sending an event stream and establish a long-lived HTTP connection by setting the `Connection` header to `keep-alive`. We then use `setInterval` to send a message to the client every second. Each message is wrapped in an event and sent using the `write` method on the response object.\n\nThis example demonstrates how server-sent events can be used to send real-time updates from a server to a client using a simple and efficient protocol."
+					]
+				},
+				"end_turn": true,
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "stop", "stop": "<|im_end|>" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "3595fd48-1f85-40c9-8884-9772df56ce66",
+			"children": ["199fb51f-8f64-4a0e-9a9d-accb5d81ec75"]
+		},
+		"199fb51f-8f64-4a0e-9a9d-accb5d81ec75": {
+			"id": "199fb51f-8f64-4a0e-9a9d-accb5d81ec75",
+			"message": {
+				"id": "199fb51f-8f64-4a0e-9a9d-accb5d81ec75",
+				"author": { "role": "user", "metadata": {} },
+				"create_time": 1681467681.154148,
+				"content": { "content_type": "text", "parts": ["give me an example on reading req.body"] },
+				"weight": 1.0,
+				"metadata": { "timestamp_": "absolute" },
+				"recipient": "all"
+			},
+			"parent": "32fd9960-9671-487a-a2eb-1bea3ad3a704",
+			"children": ["ab414601-8334-4812-9d65-9f1e91a878c0"]
+		},
+		"ab414601-8334-4812-9d65-9f1e91a878c0": {
+			"id": "ab414601-8334-4812-9d65-9f1e91a878c0",
+			"message": {
+				"id": "ab414601-8334-4812-9d65-9f1e91a878c0",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681467704.260291,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"Sure, here's an example of reading `req.body` in a Node.js application using the Express framework:\n\n```\nconst express = require('express');\nconst app = express();\n\napp.use(express.urlencoded({ extended: true }));\napp.use(express.json());\n\napp.post('/api/user', (req, res) => {\n  const { name, email, password } = req.body;\n\n  // Do something with the data\n  console.log(`Name: ${name}`);\n  console.log(`Email: ${email}`);\n  console.log(`Password: ${password}`);\n\n  res.send('User created successfully');\n});\n\napp.listen(3000, () => {\n  console.log('Server running on port 3000');\n});\n```\n\nIn the above example, we create an Express application that listens for HTTP POST requests to the `/api/user` endpoint. We then use the `express.urlencoded()` and `express.json()` middleware functions to parse the request body.\n\nWhen a POST request is received, we extract the `name`, `email`, and `password` properties from `req.body` using destructuring. We then do something with the data (in this case, just print it to the console) and send a response back to the client.\n\nNote that in order to use `req.body`, we need to include the `body-parser` middleware in our Express application. In this example, we use the `express.urlencoded()` function to parse URL-encoded request bodies, and the `express.json()` function to parse JSON request bodies. If the request body is in a different format (e.g. XML), we would need to use a different middleware function to parse it."
+					]
+				},
+				"end_turn": true,
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "stop", "stop": "<|im_end|>" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "199fb51f-8f64-4a0e-9a9d-accb5d81ec75",
+			"children": ["860dadde-53b2-4b4f-9af7-fefcd784310b", "0d2c4d28-7ac7-46e3-8105-25a4227aac3c"]
+		},
+		"860dadde-53b2-4b4f-9af7-fefcd784310b": {
+			"id": "860dadde-53b2-4b4f-9af7-fefcd784310b",
+			"message": {
+				"id": "860dadde-53b2-4b4f-9af7-fefcd784310b",
+				"author": { "role": "user", "metadata": {} },
+				"create_time": 1681472643.561328,
+				"content": {
+					"content_type": "text",
+					"parts": ["give me an example of ReadableStream in node.js"]
+				},
+				"weight": 1.0,
+				"metadata": { "timestamp_": "absolute" },
+				"recipient": "all"
+			},
+			"parent": "ab414601-8334-4812-9d65-9f1e91a878c0",
+			"children": ["bfb6ac68-3bee-4e43-a13c-a1aecb6356b5"]
+		},
+		"bfb6ac68-3bee-4e43-a13c-a1aecb6356b5": {
+			"id": "bfb6ac68-3bee-4e43-a13c-a1aecb6356b5",
+			"message": {
+				"id": "bfb6ac68-3bee-4e43-a13c-a1aecb6356b5",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681472670.603225,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"Sure, here's an example of using a ReadableStream in Node.js:\n\n```javascript\nconst { Readable } = require('stream');\n\n// Create a custom ReadableStream\nclass MyReadableStream extends Readable {\n  constructor(options) {\n    super(options);\n    this.index = 1;\n  }\n\n  // Implement the _read method to generate data\n  _read(size) {\n    const data = `Item ${this.index++}\\n`;\n    console.log(`Pushing data: ${data}`);\n    this.push(data);\n    if (this.index > 10) {\n      this.push(null); // End the stream\n    }\n  }\n}\n\n// Use the custom ReadableStream\nconst myStream = new MyReadableStream();\nmyStream.on('data', chunk => {\n  console.log(`Received data: ${chunk}`);\n});\nmyStream.on('end', () => {\n  console.log('Stream ended');\n});\n```\n\nIn this example, we create a custom `MyReadableStream` class that extends the built-in `Readable` class from the `stream` module. We override the `_read` method to generate data and push it to the stream using the `push` method. When the index reaches 10, we push `null` to signal the end of the stream.\n\nWe then create a new instance of `MyReadableStream` and listen for the `data` event to receive chunks of data from the stream. We also listen for the `end` event to know when the stream has ended.\n\nWhen we run this code, we should see output similar to the following:\n\n```\nPushing data: Item 1\nReceived data: Item 1\n\nPushing data: Item 2\nReceived data: Item 2\n\nPushing data: Item 3\nReceived data: Item 3\n\n...\n\nPush"
+					]
+				},
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "interrupted" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "860dadde-53b2-4b4f-9af7-fefcd784310b",
+			"children": []
+		},
+		"0d2c4d28-7ac7-46e3-8105-25a4227aac3c": {
+			"id": "0d2c4d28-7ac7-46e3-8105-25a4227aac3c",
+			"message": {
+				"id": "0d2c4d28-7ac7-46e3-8105-25a4227aac3c",
+				"author": { "role": "user", "metadata": {} },
+				"create_time": 1681472675.080041,
+				"content": {
+					"content_type": "text",
+					"parts": ["give me an example of ReadableStream in js"]
+				},
+				"weight": 1.0,
+				"metadata": { "timestamp_": "absolute" },
+				"recipient": "all"
+			},
+			"parent": "ab414601-8334-4812-9d65-9f1e91a878c0",
+			"children": ["3a51d20d-8d70-46b7-9154-85f21fed0e0b"]
+		},
+		"3a51d20d-8d70-46b7-9154-85f21fed0e0b": {
+			"id": "3a51d20d-8d70-46b7-9154-85f21fed0e0b",
+			"message": {
+				"id": "3a51d20d-8d70-46b7-9154-85f21fed0e0b",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681472707.218609,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"Sure! Here is an example of a simple `ReadableStream` in JavaScript:\n\n```javascript\nconst stream = new ReadableStream({\n  start(controller) {\n    const data = ['hello', 'world', '!'];\n    let index = 0;\n    \n    const pushData = () => {\n      if (index < data.length) {\n        controller.enqueue(data[index]);\n        index++;\n        setTimeout(pushData, 1000);\n      } else {\n        controller.close();\n      }\n    }\n    \n    pushData();\n  }\n});\n\nconst reader = stream.getReader();\n\nreader.read().then(function processResult(result) {\n  if (result.done) {\n    console.log('Stream is closed');\n    return;\n  }\n  \n  console.log(result.value);\n  return reader.read().then(processResult);\n});\n```\n\nIn the above code, we create a new `ReadableStream` with a `start()` method. Inside the `start()` method, we define a data array and an index variable to keep track of which element to push next. We then define a `pushData()` function that enqueues the next element in the data array to the stream and schedules the next call to `pushData()` using `setTimeout()`. When all elements have been pushed to the stream, we call `controller.close()` to indicate that the stream has ended.\n\nAfter creating the stream, we get a `Reader` object by calling `stream.getReader()`. We then use the `read()` method to read each chunk of data from the stream. In the `processResult()` function, we check if the `result` is `done` to see if the stream has ended. If the stream has not ended, we log the value of the chunk to the console and call `read()` again to read the next chunk.\n\nWhen we run the code, we should see the strings \"hello\", \"world\", and \"!\" logged to the console with a one-second delay between each string. Once all elements have been pushed to the stream and read by the `Reader`, we should see the message \"Stream is closed\" logged to the console."
+					]
+				},
+				"end_turn": true,
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "stop", "stop": "<|im_end|>" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "0d2c4d28-7ac7-46e3-8105-25a4227aac3c",
+			"children": ["02e396c0-60a2-46e4-8666-07d149b33669"]
+		},
+		"02e396c0-60a2-46e4-8666-07d149b33669": {
+			"id": "02e396c0-60a2-46e4-8666-07d149b33669",
+			"message": {
+				"id": "02e396c0-60a2-46e4-8666-07d149b33669",
+				"author": { "role": "user", "metadata": {} },
+				"create_time": 1681478150.561533,
+				"content": { "content_type": "text", "parts": ["can you repeat please?"] },
+				"weight": 1.0,
+				"metadata": { "timestamp_": "absolute" },
+				"recipient": "all"
+			},
+			"parent": "3a51d20d-8d70-46b7-9154-85f21fed0e0b",
+			"children": ["7f20faf2-dc35-4068-bb3e-3468f3dea46b", "3446f79b-62ee-4f1f-ab16-434a46f11667"]
+		},
+		"7f20faf2-dc35-4068-bb3e-3468f3dea46b": {
+			"id": "7f20faf2-dc35-4068-bb3e-3468f3dea46b",
+			"message": {
+				"id": "7f20faf2-dc35-4068-bb3e-3468f3dea46b",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681478159.59616,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"Sure, here is the example of a `ReadableStream` in JavaScript again:\n\n```javascript\nconst stream = new ReadableStream({\n  start(controller) {\n    const data = ['hello', 'world', '!'];\n    let index = 0;\n    \n    const pushData = () => {\n      if (index < data.length) {\n        controller.enqueue(data[index]);\n        index++;\n        setTimeout(pushData, 1000);\n      } else {\n        controller.close();\n      }\n    }\n    \n   "
+					]
+				},
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "interrupted" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "02e396c0-60a2-46e4-8666-07d149b33669",
+			"children": []
+		},
+		"3446f79b-62ee-4f1f-ab16-434a46f11667": {
+			"id": "3446f79b-62ee-4f1f-ab16-434a46f11667",
+			"message": {
+				"id": "3446f79b-62ee-4f1f-ab16-434a46f11667",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681478336.664986,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"Sure, here's the example of a simple `ReadableStream` in JavaScript again:\n\n```javascript\nconst stream = new ReadableStream({\n  start(controller) {\n    const data = ['hello', 'world', '!'];\n    let index = 0;\n    \n    const pushData = () => {\n      if (index < data.length) {\n        controller.enqueue(data[index]);\n        index++;\n        setTimeout(pushData, 1000);\n      } else {\n        controller.close();\n      }\n    }\n    \n    pushData();\n  }\n});\n\nconst reader = stream.getReader();\n\nreader.read().then(function processResult(result) {\n  if (result.done) {\n    console.log('Stream is closed');\n    return;\n  }\n  \n  console.log(result.value);\n  return reader.read().then(processResult);\n});\n```\n\nIn this example, we create a `ReadableStream` with a `start()` method that pushes three strings ('hello', 'world', and '!') to the stream with a one-second delay between each string. When all elements have been pushed, the `start()` method calls `controller.close()` to indicate that the stream has ended.\n\nWe then get a `Reader` object from the stream and read each chunk of data using the `read()` method. In the `processResult()` function, we check if the `result` is `done` to see if the stream has ended. If the stream has not ended, we log the value of the chunk to the console and call `read()` again to read the next chunk.\n\nWhen we run this code, we should see the strings \"hello\", \"world\", and \"!\" logged to the console with a one-second delay between each string. Once all elements have been pushed to the stream and read by the `Reader`, we should see the message \"Stream is closed\" logged to the console."
+					]
+				},
+				"end_turn": true,
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "stop", "stop": "<|im_end|>" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "02e396c0-60a2-46e4-8666-07d149b33669",
+			"children": ["43e043c6-c5d9-4b59-94e3-046307817bb6"]
+		},
+		"43e043c6-c5d9-4b59-94e3-046307817bb6": {
+			"id": "43e043c6-c5d9-4b59-94e3-046307817bb6",
+			"message": {
+				"id": "43e043c6-c5d9-4b59-94e3-046307817bb6",
+				"author": { "role": "user", "metadata": {} },
+				"create_time": 1681479306.659167,
+				"content": { "content_type": "text", "parts": ["what time is it?"] },
+				"weight": 1.0,
+				"metadata": { "timestamp_": "absolute" },
+				"recipient": "all"
+			},
+			"parent": "3446f79b-62ee-4f1f-ab16-434a46f11667",
+			"children": ["59ccdc6e-0e08-4da9-a4a2-1f150a977bc9"]
+		},
+		"59ccdc6e-0e08-4da9-a4a2-1f150a977bc9": {
+			"id": "59ccdc6e-0e08-4da9-a4a2-1f150a977bc9",
+			"message": {
+				"id": "59ccdc6e-0e08-4da9-a4a2-1f150a977bc9",
+				"author": { "role": "assistant", "metadata": {} },
+				"create_time": 1681479310.035566,
+				"content": {
+					"content_type": "text",
+					"parts": [
+						"I'm sorry, as an AI language model, I don't have access to real-time information or the ability to track time. Is there anything else I can assist you with?"
+					]
+				},
+				"end_turn": true,
+				"weight": 1.0,
+				"metadata": {
+					"model_slug": "text-davinci-002-render-sha",
+					"finish_details": { "type": "stop", "stop": "<|im_end|>" },
+					"timestamp_": "absolute"
+				},
+				"recipient": "all"
+			},
+			"parent": "43e043c6-c5d9-4b59-94e3-046307817bb6",
+			"children": []
+		}
+	},
+	"moderation_results": [],
+	"current_node": "59ccdc6e-0e08-4da9-a4a2-1f150a977bc9"
+}
