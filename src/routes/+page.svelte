@@ -1,10 +1,14 @@
 <script lang="ts">
-	import { afterUpdate } from 'svelte';
-	import { fetchEventSource } from '@microsoft/fetch-event-source';
-	import ChatBox from '$lib/chat/ChatBox.svelte';
-	import ChatIntroduction from '$lib/chat/ChatIntroduction.svelte';
-	import UserInput from '$lib/components/UserInput.svelte';
 	import type { Message, StreamResponse } from '$lib/Types';
+
+	import { afterUpdate } from 'svelte';
+
+	import { fetchEventSource } from '@microsoft/fetch-event-source';
+
+	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
+	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
+	import ChatInput from '$lib/components/chat/ChatInput.svelte';
+
 	import {
 		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
 		PUBLIC_ENDPOINT,
@@ -25,6 +29,17 @@
 	afterUpdate(() => {
 		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
 	});
+
+	function switchTheme() {
+		const { classList } = document.querySelector('html') as HTMLElement;
+		if (classList.contains('dark')) {
+			classList.remove('dark');
+			localStorage.theme = 'light';
+		} else {
+			classList.add('dark');
+			localStorage.theme = 'dark';
+		}
+	}
 
 	function onWrite() {
 		if (!message) return;
@@ -90,12 +105,12 @@
 	class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
 >
 	<nav
-		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30"
+		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
-		<div class="flex-none sticky top-0 relative p-3 flex flex-col">
+		<div class="flex-none sticky top-0 p-3 flex flex-col">
 			<button
 				on:click={() => location.reload()}
-				class="border px-12 py-2.5 rounded-lg border shadow bg-white dark:bg-gray-700 dark:border-gray-600"
+				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600"
 				>New Chat</button
 			>
 		</div>
@@ -110,12 +125,12 @@
 			{/each}
 		</div>
 		<div class="flex flex-col p-3 gap-2">
-			<a
-				href="/"
-				class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+			<button
+				on:click={switchTheme}
+				class="text-left flex items-center first-letter:capitalize truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
 			>
-				Appearance
-			</a>
+				Theme
+			</button>
 			<a
 				href="/"
 				class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -125,10 +140,17 @@
 		</div>
 	</nav>
 	<div class="relative h-screen">
+		<nav
+			class="sm:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800"
+		>
+			<button>[ ]</button>
+			<button>New Chat</button>
+			<button>+</button>
+		</nav>
 		<div class="overflow-y-auto h-full" bind:this={messagesContainer}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
-					<ChatBox {message} />
+					<ChatMessage {message} />
 				{:else}
 					<ChatIntroduction />
 				{/each}
@@ -136,14 +158,14 @@
 			</div>
 		</div>
 		<div
-			class="flex items-center bg-gradient-to-t from-white dark:from-gray-900 to-transparent justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-8 w-full"
+			class="flex max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white dark:from-gray-900 to-transparent justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-4 md:py-8 w-full"
 		>
 			<form
 				on:submit={onWrite}
 				class="shadow-alternate relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 dark:bg-gray-700 dark:border-gray-600"
 			>
 				<div class="flex flex-1 border-none bg-transparent">
-					<UserInput
+					<ChatInput
 						placeholder="Ask anything"
 						bind:value={message}
 						on:submit={onWrite}
