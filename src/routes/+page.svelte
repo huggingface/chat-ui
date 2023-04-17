@@ -51,7 +51,18 @@
 			messages = [...messages, { from: 'bot', content: '' }];
 		}
 
-		const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+		const reader = response.body
+			?.pipeThrough(new TextDecoderStream())
+			// The response is not necessarily split by tokens, so we need to split it
+			.pipeThrough(
+				new TransformStream({
+					transform(chunk, controller) {
+						const splitChunks = chunk.replace(/}{/g, '}\n{');
+						controller.enqueue(splitChunks.split('\n'));
+					}
+				})
+			)
+			.getReader();
 
 		while (reader && true) {
 			const { value, done } = await reader.read();
