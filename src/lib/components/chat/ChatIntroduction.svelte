@@ -32,7 +32,7 @@
 					>Dataset page</a
 				>
 				<a href="https://open-assistant.io/" target="_blank" class="ml-auto"
-					>Open assistant website</a
+					>Open Assistant website</a
 				>
 			</div>
 		</div>
