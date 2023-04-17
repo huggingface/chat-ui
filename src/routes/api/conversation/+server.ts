@@ -1,5 +1,5 @@
 import { HfInference } from '@huggingface/inference';
-import { PUBLIC_HF_TOKEN } from '$env/static/public';
+import { PUBLIC_ENDPOINT, PUBLIC_HF_TOKEN } from '$env/static/public';
 
 const hf = new HfInference(
 	undefined,
@@ -8,7 +8,7 @@ const hf = new HfInference(
 			Authorization: `Basic ${PUBLIC_HF_TOKEN}`
 		}
 	},
-	'https://open-assistant.ngrok.io'
+	PUBLIC_ENDPOINT
 );
 
 function iteratorToStream(iterator: AsyncGenerator) {
