@@ -8,10 +8,12 @@ const now = () => (Date.now() / 1000) | 0;
 export const load = (async ({ cookies }) => {
 	const encryptionSecret = jose.base64url.decode(AUTH_SECRET);
 
-	// Check if UUID already exists in Local Storage
 	let jwt = cookies.get('session');
 
+	// If there is no session cookie, create one
 	if (!jwt) {
+		// Create a new encrypted JWT with jose
+		// TODO: migrate this to something like Auth.js when we have a proper signin process https://github.com/nextauthjs/next-auth/blob/main/packages/core/src/jwt.ts#L50
 		jwt = await new jose.EncryptJWT({ id: crypto.randomUUID() })
 			.setProtectedHeader({ alg: 'dir', enc: 'A128CBC-HS256' })
 			.setIssuedAt()
