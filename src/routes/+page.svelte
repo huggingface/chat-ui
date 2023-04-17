@@ -18,6 +18,11 @@
 	let message = '';
 
 	let messagesContainer: HTMLElement;
+
+	afterUpdate(() => {
+		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
+	});
+
 	async function getTextGenerationStream(inputs: string) {
 		const response = await fetch('/api/conversation', {
 			method: 'POST',
@@ -33,9 +38,6 @@
 		while (reader && true) {
 			const { value, done } = await reader.read();
 
-	afterUpdate(() => {
-		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
-	});
 			if (done || !value) break;
 
 			try {
