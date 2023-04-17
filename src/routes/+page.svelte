@@ -162,9 +162,9 @@
 		>
 			<form
 				on:submit={onWrite}
-				class="shadow-alternate relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 dark:bg-gray-700 dark:border-gray-600"
+				class="w-full relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 focus-within:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:focus-within:border-gray-500 transition-all"
 			>
-				<div class="flex flex-1 border-none bg-transparent">
+				<div class="w-full flex flex-1 border-none bg-transparent">
 					<ChatInput
 						placeholder="Ask anything"
 						bind:value={message}
@@ -173,10 +173,12 @@
 						maxRows={10}
 					/>
 					<button
-						class="p-1 px-[0.7rem] self-end my-1 h-[2.4rem] rounded-lg text-gray-500 hover:bg-gray-100 enabled:dark:hover:text-gray-400 dark:hover:bg-gray-900 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent disabled:opacity-40 mr-1"
+						class="p-1 px-[0.7rem] self-end my-1 h-[2.4rem] rounded-lg hover:bg-gray-100 enabled:dark:hover:text-gray-400 dark:hover:bg-gray-900 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent disabled:opacity-60 dark:disabled:opacity-40 flex-shrink-0 transition-all mx-1"
+						disabled={!message}
+						type="submit"
 					>
 						<svg
-							class="text-gray-300 pointer-events-none"
+							class="text-gray-500 dark:text-gray-300 pointer-events-none"
 							xmlns="http://www.w3.org/2000/svg"
 							xmlns:xlink="http://www.w3.org/1999/xlink"
 							aria-hidden="true"

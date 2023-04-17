@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer utilities {
-	.scrollbar {
+	.scrollbar-custom {
 		@apply !scrollbar-thin !scrollbar-w-1 !scrollbar-thumb-rounded-full !scrollbar-track-transparent !scrollbar-thumb-black/10 dark:!scrollbar-thumb-white/10;
 	}
 }
