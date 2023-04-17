@@ -3,8 +3,6 @@
 
 	import { afterUpdate } from 'svelte';
 
-	import { fetchEventSource } from '@microsoft/fetch-event-source';
-
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
 	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
@@ -48,6 +46,10 @@
 			},
 			body: JSON.stringify({ inputs })
 		});
+
+		if (response.body) {
+			messages = [...messages, { from: 'bot', content: '' }];
+		}
 
 		const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
 
