@@ -33,7 +33,6 @@
 	"type": "module",
 	"dependencies": {
 		"@huggingface/inference": "^1.8.0",
-		"@microsoft/fetch-event-source": "^2.0.1",
 		"autoprefixer": "^10.4.14",
 		"postcss": "^8.4.21",
 		"tailwind-scrollbar": "^3.0.0",
