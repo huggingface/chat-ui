@@ -73,7 +73,9 @@
 				const data = JSON.parse(value) as StreamResponse;
 
 				if (!data.token.special) {
-					messages.at(-1)!.content += data.token.text;
+					// In some cases the model returns "<|endoftext|>" as part of the token text
+					const cleanText = data.token.text.replace('<|endoftext|>', '');
+					messages.at(-1)!.content += cleanText;
 					messages = messages;
 				}
 			} catch (error) {
