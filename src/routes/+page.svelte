@@ -64,7 +64,7 @@
 			)
 			.getReader();
 
-		while (reader && true) {
+		while (reader) {
 			const { value, done } = await reader.read();
 
 			if (done || !value) break;
