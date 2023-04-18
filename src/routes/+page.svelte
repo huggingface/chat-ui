@@ -58,7 +58,7 @@
 				new TransformStream({
 					transform(chunk, controller) {
 						const splitChunks = chunk.replace(/}{/g, '}\n{');
-						controller.enqueue(splitChunks.split('\n'));
+						splitChunks.split('\n').forEach((chunk) => controller.enqueue(chunk));
 					}
 				})
 			)
