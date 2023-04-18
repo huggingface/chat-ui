@@ -53,7 +53,7 @@
 
 		const reader = response.body
 			?.pipeThrough(new TextDecoderStream())
-			// The response is not necessarily split by tokens, so we need to split it
+			// The server stream is not necessarily split by message word (there can be multiple words by stream chunk), so we need to split them
 			.pipeThrough(
 				new TransformStream({
 					transform(chunk, controller) {
