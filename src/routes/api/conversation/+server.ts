@@ -27,10 +27,9 @@ function iteratorToStream(iterator: AsyncGenerator) {
 
 export async function POST({ request }) {
 	const body = await request.json();
-	let hfRes;
 
 	try {
-		hfRes = hf.textGenerationStream(
+		const hfRes = hf.textGenerationStream(
 			{
 				inputs: body.inputs,
 				parameters: {
@@ -46,17 +45,17 @@ export async function POST({ request }) {
 				use_cache: false
 			}
 		);
+
+		const stream = iteratorToStream(hfRes);
+
+		return new Response(stream, {
+			headers: {
+				'content-type': 'text/event-stream'
+			}
+		});
 	} catch (e) {
 		return new Response('Error', {
 			status: 500
 		});
 	}
-
-	const stream = iteratorToStream(hfRes);
-
-	return new Response(stream, {
-		headers: {
-			'content-type': 'text/event-stream'
-		}
-	});
 }
