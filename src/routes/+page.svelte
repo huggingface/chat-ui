@@ -1,7 +1,8 @@
 <script lang="ts">
-	import type { Message, StreamResponse } from '$lib/Types';
+	import type { Message } from '$lib/Types';
 
 	import { afterUpdate } from 'svelte';
+	import { HfInference } from '@huggingface/inference';
 
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
 	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
@@ -12,10 +13,14 @@
 		PUBLIC_SEP_TOKEN,
 		PUBLIC_USER_MESSAGE_TOKEN
 	} from '$env/static/public';
+	import { page } from '$app/stores';
 
 	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
 	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
 	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
+
+	const hf = new HfInference();
+	const model = hf.endpoint(`${$page.url.origin}/api/conversation`);
 
 	let messages: Message[] = [];
 	let message = '';
@@ -38,45 +43,37 @@
 	}
 
 	async function getTextGenerationStream(inputs: string) {
-		const response = await fetch('/api/conversation', {
-			method: 'POST',
-			headers: {
-				Accept: 'text/event-stream',
-				'Content-Type': 'application/json'
+		const response = model.textGenerationStream(
+			{
+				inputs,
+				parameters: {
+					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
+					// @ts-ignore
+					stop: ['<|endoftext|>'],
+					max_new_tokens: 1024,
+					truncate: 1024,
+					typical_p: 0.2
+				}
 			},
-			body: JSON.stringify({ inputs })
-		});
+			{
+				use_cache: false
+			}
+		);
 
-		if (response.body) {
-			messages = [...messages, { from: 'bot', content: '' }];
-		}
-
-		const reader = response.body
-			?.pipeThrough(new TextDecoderStream())
-			// The server stream is not necessarily split by message word (there can be multiple words by stream chunk), so we need to split them
-			.pipeThrough(
-				new TransformStream({
-					transform(chunk, controller) {
-						const splitChunks = chunk.replace(/}{/g, '}\n{');
-						splitChunks.split('\n').forEach((chunk) => controller.enqueue(chunk));
-					}
-				})
-			)
-			.getReader();
-
-		while (reader) {
-			const { value, done } = await reader.read();
-
-			if (done || !value) break;
+		for await (const data of response) {
+			if (!data) break;
 
 			try {
-				const data = JSON.parse(value) as StreamResponse;
-
 				if (!data.token.special) {
 					// In some cases the model returns "<|endoftext|>" as part of the token text
 					const cleanText = data.token.text.replace('<|endoftext|>', '');
-					messages.at(-1)!.content += cleanText;
-					messages = messages;
+
+					if (messages.at(-1)?.from !== 'bot') {
+						messages = [...messages, { from: 'bot', content: cleanText }];
+					} else {
+						messages.at(-1)!.content += cleanText;
+						messages = messages;
+					}
 				}
 			} catch (error) {
 				console.error(error);
