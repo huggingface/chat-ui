@@ -18,7 +18,7 @@
 	}
 </script>
 
-<div class="relative w-full">
+<div class="relative flex-1 min-w-0">
 	<pre
 		class="invisible py-3"
 		aria-hidden="true"
@@ -27,7 +27,7 @@
 	<textarea
 		tabindex="0"
 		rows="1"
-		class="absolute m-0 w-full h-full top-0 resize-none border-0 bg-transparent p-3 focus:ring-0 focus-visible:ring-0 dark:bg-transparent outline-none scrollbar"
+		class="absolute m-0 w-full h-full top-0 resize-none border-0 bg-transparent p-3 focus:ring-0 focus-visible:ring-0 dark:bg-transparent outline-none scrollbar-custom overflow-x-hidden overflow-y-scroll"
 		bind:value
 		on:keydown={handleKeydown}
 		{placeholder}
