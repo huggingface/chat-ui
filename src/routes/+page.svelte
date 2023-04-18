@@ -8,6 +8,7 @@
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
 	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
+	import NewChatBtn from '$lib/components/NewChatBtn.svelte';
 
 	import { mappingToMessages } from '$lib/utils/chat';
 
@@ -84,11 +85,7 @@
 		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
 		<div class="flex-none sticky top-0 p-3 flex flex-col">
-			<button
-				on:click={() => location.reload()}
-				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600"
-				>New Chat</button
-			>
+			<NewChatBtn />
 		</div>
 		<div class="flex flex-col scrollbar-custom overflow-y-auto p-3 -mt-3 gap-2">
 			{#each data.conversations.items as conversation}
