@@ -60,19 +60,26 @@
 			}
 		);
 
+		// Regex to check if the text finishes by "<" but is not a piece of code like "`<img>`"
+		const endOfTextRegex = /(?<!`)<(?!`)/;
+
 		for await (const data of response) {
 			if (!data) break;
 
 			try {
 				if (!data.token.special) {
-					// In some cases the model returns "<|endoftext|>" as part of the token text
-					const cleanText = data.token.text.replace('<|endoftext|>', '');
-
 					if (messages.at(-1)?.from !== 'bot') {
-						messages = [...messages, { from: 'bot', content: cleanText }];
+						// First token has a space at the beginning, trim it
+						messages = [...messages, { from: 'bot', content: data.token.text.trimStart() }];
 					} else {
-						messages.at(-1)!.content += cleanText;
+						const isEndOfText = endOfTextRegex.test(data.token.text);
+
+						messages.at(-1)!.content += isEndOfText
+							? data.token.text.replace('<', '')
+							: data.token.text;
 						messages = messages;
+
+						if (isEndOfText) break;
 					}
 				}
 			} catch (error) {
