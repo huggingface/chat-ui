@@ -1,14 +1,14 @@
 import { HfInference } from '@huggingface/inference';
-import { PUBLIC_ENDPOINT, PUBLIC_HF_TOKEN } from '$env/static/public';
+import { MODEL_ENDPOINT, HF_TOKEN } from '$env/static/private';
 
 const hf = new HfInference(
 	undefined,
 	{
 		headers: {
-			Authorization: `Basic ${PUBLIC_HF_TOKEN}`
+			Authorization: `Basic ${HF_TOKEN}`
 		}
 	},
-	PUBLIC_ENDPOINT
+	MODEL_ENDPOINT
 );
 
 function iteratorToStream(iterator: AsyncGenerator) {
