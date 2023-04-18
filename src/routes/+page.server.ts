@@ -15,7 +15,7 @@ export const load = (async ({ fetch, parent, url }) => {
 	if (conversationId) {
 		const response = await fetch(`/api/conversation/${conversationId}`);
 		const data = await response.json();
-		console.log(mappingToMessages(data.mapping));
+
 		conversation = {
 			id: conversationId,
 			title: data.title,
