@@ -25,7 +25,7 @@
 	<pre
 		class="invisible py-3"
 		aria-hidden="true"
-		style="min-height: {minHeight}; max-height: {maxHeight}">{value + '\n'}</pre>
+		style="min-height: {minHeight}; max-height: {maxHeight}">{value + '&nbsp;\n'}</pre>
 
 	<textarea
 		tabindex="0"
