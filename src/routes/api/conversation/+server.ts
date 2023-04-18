@@ -1,6 +1,6 @@
 import { HfInference } from '@huggingface/inference';
 import { env } from '$env/dynamic/private';
-import { PUBLIC_MODEL_ENDPOINT } from '$env/static/private';
+import { PUBLIC_MODEL_ENDPOINT } from '$env/static/public';
 
 const hf = new HfInference(
 	undefined,
