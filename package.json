@@ -31,7 +31,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@huggingface/inference": "^1.8.0",
+		"@huggingface/inference": "^2.0.0-rc1",
 		"autoprefixer": "^10.4.14",
 		"postcss": "^8.4.21",
 		"tailwind-scrollbar": "^3.0.0",
