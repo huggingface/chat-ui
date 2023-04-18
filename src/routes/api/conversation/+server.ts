@@ -1,12 +1,12 @@
 import { HfInference } from '@huggingface/inference';
-import { HF_TOKEN } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { PUBLIC_MODEL_ENDPOINT } from '$env/static/private';
 
 const hf = new HfInference(
 	undefined,
 	{
 		headers: {
-			Authorization: `Basic ${HF_TOKEN}`
+			Authorization: `Basic ${env.HF_TOKEN}`
 		}
 	},
 	PUBLIC_MODEL_ENDPOINT
