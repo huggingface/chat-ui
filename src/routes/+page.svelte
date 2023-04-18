@@ -1,26 +1,22 @@
 <script lang="ts">
-	import type { Message, StreamResponse } from '$lib/Types';
-
 	import { afterUpdate } from 'svelte';
-
-	import { fetchEventSource } from '@microsoft/fetch-event-source';
+	import { page } from '$app/stores';
+	import type { PageData } from './$types';
+	import type { StreamResponse } from '$lib/Types';
+	import clsx from 'clsx';
 
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
 	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 
-	import {
-		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
-		PUBLIC_SEP_TOKEN,
-		PUBLIC_USER_MESSAGE_TOKEN
-	} from '$env/static/public';
+	import { mappingToMessages } from '$lib/utils/chat';
 
-	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
-	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
-	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
+	export let data: PageData;
 
-	let messages: Message[] = [];
+	let messages = data.conversation ? data.conversation.messages : [];
 	let message = '';
+
+	$: console.log(messages);
 
 	let messagesContainer: HTMLElement;
 
@@ -39,14 +35,14 @@
 		}
 	}
 
-	async function getTextGenerationStream(inputs: string) {
+	async function getTextGenerationStream(message: string) {
 		const response = await fetch('/api/conversation', {
 			method: 'POST',
 			headers: {
 				Accept: 'text/event-stream',
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({ inputs })
+			body: JSON.stringify({ conversation_id: data.conversation?.id, message })
 		});
 
 		const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
@@ -74,17 +70,10 @@
 		if (!message) return;
 
 		messages = [...messages, { from: 'user', content: message }];
-		message = '';
-		const inputs =
-			messages
-				.map(
-					(m) =>
-						(m.from === 'user' ? userToken + m.content : assistantToken + m.content) +
-						(m.content.endsWith(sepToken) ? '' : sepToken)
-				)
-				.join('') + assistantToken;
 
-		getTextGenerationStream(inputs);
+		getTextGenerationStream(message);
+
+		message = '';
 	}
 </script>
 
@@ -101,13 +90,17 @@
 				>New Chat</button
 			>
 		</div>
-		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
-			{#each Array(5) as _}
+		<div class="flex flex-col scrollbar-custom overflow-y-auto p-3 -mt-3 gap-2">
+			{#each data.conversations.items as conversation}
 				<a
-					href="/"
-					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+					data-sveltekit-noscroll
+					href={`?id=${conversation.id}`}
+					class={clsx(
+						'truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700',
+						$page.url.searchParams.get('id') === conversation.id && 'bg-gray-100 dark:bg-gray-700'
+					)}
 				>
-					Amet consectetur adipisicing elit. Eos dolorum nihil alias.
+					{conversation.title}
 				</a>
 			{/each}
 		</div>

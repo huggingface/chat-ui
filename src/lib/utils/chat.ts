@@ -12,7 +12,6 @@ export function mappingToMessages(mapping: Record<string, ApiMessage>) {
 	// Recursively add objects to the sorted list
 	function traverse(item: ApiMessage) {
 		sortedMessages.push(item.message);
-		console.log(item.message);
 
 		if (item.children.length) {
 			// Only take first child for now until we support editing
