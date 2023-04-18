@@ -34,15 +34,12 @@ export async function POST({ request }) {
 			{
 				inputs: body.inputs,
 				parameters: {
-					max_new_tokens: 250,
+					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
 					// @ts-ignore
-					stop_sequences: ['<|endoftext|>'],
-					truncate: 1024
-					// do_sample: false,
-					// return_full_text: false,
-					// typical_p: 0.2,
-					// watermark: false,
-					// details: true
+					stop: ['<|endoftext|>'],
+					max_new_tokens: 1024,
+					truncate: 1024,
+					typical_p: 0.2
 				}
 			},
 			{
