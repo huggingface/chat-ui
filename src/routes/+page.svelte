@@ -18,6 +18,7 @@
 	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
 	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
 	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
+	import { scrollToBottom } from '$lib/utils/scrollToBottom';
 
 	const hf = new HfInference();
 	const model = hf.endpoint(`${$page.url.origin}/api/conversation`);
@@ -25,11 +26,6 @@
 	let messages: Message[] = [];
 	let message = '';
 
-	let messagesContainer: HTMLElement;
-
-	afterUpdate(() => {
-		messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
-	});
 
 	function switchTheme() {
 		const { classList } = document.querySelector('html') as HTMLElement;
@@ -153,7 +149,7 @@
 			<button>New Chat</button>
 			<button>+</button>
 		</nav>
-		<div class="overflow-y-auto h-full" bind:this={messagesContainer}>
+		<div class="overflow-y-auto h-full" use:scrollToBottom={messages}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
 					<ChatMessage {message} />
