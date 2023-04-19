@@ -1,7 +1,7 @@
 import { HF_TOKEN } from '$env/static/private';
 import { PUBLIC_MODEL_ENDPOINT } from '$env/static/public';
 
-export async function POST({ request }) {
+export async function POST({ request, fetch }) {
 	return await fetch(PUBLIC_MODEL_ENDPOINT, {
 		headers: {
 			...request.headers,
