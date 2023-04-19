@@ -1,4 +1,8 @@
-export const scrollToBottom = (node: any, _: any) => {
+/**
+ * @param node element to snap scroll to bottom
+ * @param dependency pass in a dependency to update scroll on changes.
+ */
+export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 	let prevScrollValue = node.scrollTop;
 	let isDetached = false;
 
@@ -16,22 +20,21 @@ export const scrollToBottom = (node: any, _: any) => {
 		prevScrollValue = node.scrollTop;
 	};
 
-	const updateScroll = (_options: { withAnim?: boolean; force?: boolean } = {}) => {
-		const defaultOptions = { withAnim: true, force: false };
+	const updateScroll = (_options: { force?: boolean } = {}) => {
+		const defaultOptions = { force: false };
 		const options = { ...defaultOptions, ..._options };
-		const { withAnim, force } = options;
+		const { force } = options;
 
 		if (!force && isDetached) return;
 
 		node.scroll({
-			top: node.scrollHeight,
-			behavior: withAnim ? 'smooth' : 'auto'
+			top: node.scrollHeight
 		});
 	};
 
 	node.addEventListener('scroll', handleScroll);
 
-	updateScroll({ withAnim: false, force: true });
+	updateScroll({ force: true });
 
 	return {
 		update: updateScroll,

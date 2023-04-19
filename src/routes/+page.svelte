@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Message } from '$lib/Types';
 
-	import { afterUpdate } from 'svelte';
 	import { HfInference } from '@huggingface/inference';
 
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
@@ -18,7 +17,7 @@
 	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
 	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
 	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
-	import { scrollToBottom } from '$lib/utils/scrollToBottom';
+	import { snapScrollToBottom } from '$lib/actions/snapScrollToBottom';
 	import ScrollToBottomBtn from '$lib/components/ScrollToBottomBtn.svelte';
 
 	const hf = new HfInference();
@@ -27,7 +26,6 @@
 	let messages: Message[] = [];
 	let message = '';
 	let chatContainer: HTMLElement;
-
 
 	function switchTheme() {
 		const { classList } = document.querySelector('html') as HTMLElement;
@@ -151,7 +149,7 @@
 			<button>New Chat</button>
 			<button>+</button>
 		</nav>
-		<div class="overflow-y-auto h-full" use:scrollToBottom={messages} bind:this={chatContainer}>
+		<div class="overflow-y-auto h-full" use:snapScrollToBottom={messages} bind:this={chatContainer}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
 					<ChatMessage {message} />
