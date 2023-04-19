@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import { HF_TOKEN } from '$env/static/private';
 import { PUBLIC_MODEL_ENDPOINT } from '$env/static/public';
 
 export async function POST({ request }) {
@@ -6,7 +6,7 @@ export async function POST({ request }) {
 		headers: {
 			...request.headers,
 			'Content-Type': 'application/json',
-			Authorization: `Basic ${env.HF_TOKEN}`
+			Authorization: `Basic ${HF_TOKEN}`
 		},
 		method: 'POST',
 		body: await request.text()
