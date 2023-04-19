@@ -1,21 +1,19 @@
 export type Message =
-| {
-	from: 'user';
-	content: string;
-}
-| {
-	from: 'bot';
-	content: string;
-};
-
+	| {
+			from: 'user';
+			content: string;
+	  }
+	| {
+			from: 'bot';
+			content: string;
+	  };
 
 export interface Token {
-	id:      number;
-	text:    string;
+	id: number;
+	text: string;
 	logprob: number;
 	special: boolean;
 }
-
 
 export interface StreamResponse {
 	/**
