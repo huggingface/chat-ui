@@ -14,6 +14,9 @@
 		PUBLIC_USER_MESSAGE_TOKEN
 	} from '$env/static/public';
 	import { page } from '$app/stores';
+	import type { PageData } from './$types';
+
+	export let data: PageData;
 
 	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
 	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
@@ -121,12 +124,12 @@
 			>
 		</div>
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
-			{#each Array(5) as _}
+			{#each data.conversations as conv}
 				<a
-					href="/"
+					href="/conversation/{conv.id}"
 					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
 				>
-					Amet consectetur adipisicing elit. Eos dolorum nihil alias.
+					{conv.title}
 				</a>
 			{/each}
 		</div>
