@@ -19,12 +19,14 @@
 	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
 	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
 	import { scrollToBottom } from '$lib/utils/scrollToBottom';
+	import ScrollToBottomBtn from '$lib/components/ScrollToBottomBtn.svelte';
 
 	const hf = new HfInference();
 	const model = hf.endpoint(`${$page.url.origin}/api/conversation`);
 
 	let messages: Message[] = [];
 	let message = '';
+	let chatContainer: HTMLElement;
 
 
 	function switchTheme() {
@@ -149,7 +151,7 @@
 			<button>New Chat</button>
 			<button>+</button>
 		</nav>
-		<div class="overflow-y-auto h-full" use:scrollToBottom={messages}>
+		<div class="overflow-y-auto h-full" use:scrollToBottom={messages} bind:this={chatContainer}>
 			<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-8 h-full">
 				{#each messages as message}
 					<ChatMessage {message} />
@@ -158,6 +160,7 @@
 				{/each}
 				<div class="h-32 flex-none" />
 			</div>
+			<ScrollToBottomBtn class="bottom-10 right-12" scrollNode={chatContainer} />
 		</div>
 		<div
 			class="flex max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white dark:from-gray-900 to-transparent justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-4 md:py-8 w-full"
