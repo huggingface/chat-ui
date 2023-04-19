@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { marked } from 'marked';
 	import type { Message } from '$lib/types/Message';
 
 	export let message: Message;
@@ -14,7 +15,7 @@
 		<div
 			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800"
 		>
-			{message.content}
+			{@html marked(message.content, { gfm: true })}
 		</div>
 	</div>
 {/if}
