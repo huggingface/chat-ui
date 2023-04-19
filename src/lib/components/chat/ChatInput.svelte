@@ -1,9 +1,13 @@
 <script lang="ts">
+	import { createEventDispatcher } from 'svelte';
+
 	export let value = '';
 	export let minRows = 1;
 	export let maxRows: null | number = null;
 	export let placeholder = '';
 	export let autofocus = false;
+
+	const dispatch = createEventDispatcher();
 
 	$: minHeight = `${1 + minRows * 1.5}em`;
 	$: maxHeight = maxRows ? `${1 + maxRows * 1.5}em` : `auto`;
@@ -11,9 +15,8 @@
 	function handleKeydown(event: KeyboardEvent) {
 		// submit on enter
 		if (event.key === 'Enter' && !event.shiftKey) {
+			dispatch('submit');
 			event.preventDefault();
-			// @ts-ignore - requestSubmit is not in the DOM typings
-			event.target?.form?.requestSubmit();
 		}
 	}
 </script>
@@ -22,7 +25,7 @@
 	<pre
 		class="invisible py-3"
 		aria-hidden="true"
-		style="min-height: {minHeight}; max-height: {maxHeight}">{value + '\n'}</pre>
+		style="min-height: {minHeight}; max-height: {maxHeight}">{value + '&nbsp;\n'}</pre>
 
 	<textarea
 		tabindex="0"
