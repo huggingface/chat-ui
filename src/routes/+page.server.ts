@@ -2,12 +2,14 @@ import type { PageServerLoad } from './$types';
 import { collections } from '$lib/server/database';
 import type { Conversation } from '$lib/types/Conversation';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async (event) => {
 	const { conversations } = collections;
 
 	return {
 		conversations: await conversations
-			.find()
+			.find({
+				sessionId: event.locals.sessionId
+			})
 			.sort({ updatedAt: -1 })
 			.project<Pick<Conversation, 'title' | '_id' | 'updatedAt' | 'createdAt'>>({
 				title: 1,
