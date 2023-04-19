@@ -2,16 +2,16 @@
 	import { afterUpdate } from 'svelte';
 	import { page } from '$app/stores';
 	import type { PageData } from './$types';
-	import type { StreamResponse } from '$lib/Types';
 	import clsx from 'clsx';
+	import { HfInference } from '@huggingface/inference';
 
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
 	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import NewChatBtn from '$lib/components/NewChatBtn.svelte';
 
-	import { mappingToMessages } from '$lib/utils/chat';
-
+	const hf = new HfInference();
+	const model = hf.endpoint(`${$page.url.origin}/api/conversation`);
 	export let data: PageData;
 
 	let messages = data.conversation ? data.conversation.messages : [];
@@ -36,29 +36,45 @@
 		}
 	}
 
-	async function getTextGenerationStream(message: string) {
-		const response = await fetch('/api/conversation', {
-			method: 'POST',
-			headers: {
-				Accept: 'text/event-stream',
-				'Content-Type': 'application/json'
+	async function getTextGenerationStream(inputs: string) {
+		const response = model.textGenerationStream(
+			{
+				inputs,
+				parameters: {
+					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
+					// @ts-ignore
+					stop: ['<|endoftext|>'],
+					max_new_tokens: 1024,
+					truncate: 1024,
+					typical_p: 0.2
+				}
 			},
-			body: JSON.stringify({ conversation_id: data.conversation?.id, message })
-		});
+			{
+				use_cache: false
+			}
+		);
 
-		const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
+		// Regex to check if the text finishes by "<" but is not a piece of code like "`<img>`"
+		const endOfTextRegex = /(?<!`)<(?!`)/;
 
-		while (reader && true) {
-			const { value, done } = await reader.read();
-
-			if (done || !value) break;
+		for await (const data of response) {
+			if (!data) break;
 
 			try {
-				const data = JSON.parse(value) as StreamResponse;
-
 				if (!data.token.special) {
-					messages.at(-1)!.content += data.token.text;
-					messages = messages;
+					if (messages.at(-1)?.from !== 'bot') {
+						// First token has a space at the beginning, trim it
+						messages = [...messages, { from: 'bot', content: data.token.text.trimStart() }];
+					} else {
+						const isEndOfText = endOfTextRegex.test(data.token.text);
+
+						messages.at(-1)!.content += isEndOfText
+							? data.token.text.replace('<', '')
+							: data.token.text;
+						messages = messages;
+
+						if (isEndOfText) break;
+					}
 				}
 			} catch (error) {
 				console.error(error);
@@ -71,10 +87,17 @@
 		if (!message) return;
 
 		messages = [...messages, { from: 'user', content: message }];
-
-		getTextGenerationStream(message);
-
 		message = '';
+		const inputs =
+			messages
+				.map(
+					(m) =>
+						(m.from === 'user' ? userToken + m.content : assistantToken + m.content) +
+						(m.content.endsWith(sepToken) ? '' : sepToken)
+				)
+				.join('') + assistantToken;
+
+		getTextGenerationStream(inputs);
 	}
 </script>
 
