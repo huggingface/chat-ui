@@ -1,8 +1,69 @@
 <script lang="ts">
 	import { marked } from 'marked';
-	import type { Message } from '$lib/types/Message';
+	import type { Message } from '$lib/Types';
+	import { afterUpdate } from 'svelte';
+
+	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
 
 	export let message: Message;
+	let html = '';
+	let el: HTMLElement;
+
+	const renderer = new marked.Renderer();
+
+	// Add copy to clipboard button
+	renderer.code = (code, lang) => {
+		return `
+			<div class='code'>
+				<div class="relative">
+					<pre class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
+						<code class="language-${lang}">${code}</code>
+					</pre>
+				</div>
+			</div>
+		`.replaceAll('\t', '');
+	};
+
+	const handleParsed = (err: Error | null, parsedHtml: string) => {
+		if (err) {
+			console.error(err);
+		} else {
+			html = parsedHtml;
+		}
+	};
+
+	const options: marked.MarkedOptions = {
+		...marked.getDefaults(),
+		gfm: true,
+		highlight: (code, lang, callback) => {
+			import('highlight.js').then(
+				({ default: hljs }) => {
+					const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+					callback?.(null, hljs.highlight(code, { language }, true).value);
+				},
+				(err) => {
+					console.error(err);
+					callback?.(err);
+				}
+			);
+		},
+		renderer
+	};
+
+	$: marked(message.content, options, handleParsed);
+
+	afterUpdate(() => {
+		if (el) {
+			const codeBlocks = el.querySelectorAll('pre code');
+
+			codeBlocks.forEach((block) => {
+				new CopyToClipBoardBtn({
+					target: block,
+					props: { code: (block as HTMLElement).innerText ?? '' }
+				});
+			});
+		}
+	});
 </script>
 
 {#if message.from === 'assistant'}
@@ -14,8 +75,9 @@
 		/>
 		<div
 			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800"
+			bind:this={el}
 		>
-			{@html marked(message.content, { gfm: true })}
+			{@html html}
 		</div>
 	</div>
 {/if}
