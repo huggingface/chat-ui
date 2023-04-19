@@ -49,16 +49,16 @@
 			if (!data) break;
 
 			if (!data.token.special) {
-				if (messages.at(-1)?.from !== 'assistant') {
+				const lastMessage = messages.at(-1);
+
+				if (lastMessage?.from !== 'assistant') {
 					// First token has a space at the beginning, trim it
 					messages = [...messages, { from: 'assistant', content: data.token.text.trimStart() }];
 				} else {
 					const isEndOfText = endOfTextRegex.test(data.token.text);
 
-					messages.at(-1)!.content += isEndOfText
-						? data.token.text.replace('<', '')
-						: data.token.text;
-					messages = messages;
+					lastMessage.content += isEndOfText ? data.token.text.replace('<', '') : data.token.text;
+					messages = [...messages];
 
 					if (isEndOfText) break;
 				}
@@ -75,7 +75,7 @@
 			loading = true;
 
 			messages = [...messages, { from: 'user', content: message }];
-			message = '';
+
 			const inputs =
 				messages
 					.map(
