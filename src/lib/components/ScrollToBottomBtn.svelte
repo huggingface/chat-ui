@@ -4,9 +4,10 @@
 	import { onDestroy } from 'svelte';
 
 	export let scrollNode: HTMLElement;
-	export let visible: boolean = false;
-	let class_name = '';
-	export { class_name as class };
+	export { className as class };
+
+	let visible: boolean = false;
+	let className = '';
 
 	$: if (scrollNode) {
 		scrollNode.addEventListener('scroll', onScroll);
@@ -27,7 +28,7 @@
 	<button
 		transition:fade={{ duration: 150 }}
 		on:click={() => scrollNode.scrollTo({ top: scrollNode.scrollHeight, behavior: 'smooth' })}
-		class="absolute flex rounded-full border w-10 h-10 items-center justify-center shadow bg-white dark:bg-gray-700 dark:border-gray-600 {class_name}"
+		class="absolute flex rounded-full border w-10 h-10 items-center justify-center shadow bg-white dark:bg-gray-700 dark:border-gray-600 {className}"
 		><Chevron /></button
 	>
 {/if}
