@@ -1,8 +1,8 @@
-import type { PageServerLoad } from './$types';
+import type { LayoutServerLoad } from './$types';
 import { collections } from '$lib/server/database';
 import type { Conversation } from '$lib/types/Conversation';
 
-export const load: PageServerLoad = async (event) => {
+export const load: LayoutServerLoad = async (event) => {
 	const { conversations } = collections;
 
 	return {
