@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { marked } from 'marked';
-	import type { Message } from '$lib/Types';
+	import type { Message } from '$lib/types/Message';
 
 	export let message: Message;
 </script>
 
-{#if message.from === 'bot'}
+{#if message.from === 'assistant'}
 	<div class="flex items-start justify-start gap-4 leading-relaxed">
 		<img
 			alt=""
