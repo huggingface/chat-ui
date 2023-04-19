@@ -30,7 +30,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@microsoft/fetch-event-source": "^2.0.1",
+		"@huggingface/inference": "^2.0.0-rc2",
 		"autoprefixer": "^10.4.14",
 		"postcss": "^8.4.21",
 		"tailwind-scrollbar": "^3.0.0",
