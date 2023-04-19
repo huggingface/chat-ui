@@ -1,9 +1,8 @@
 <script lang="ts">
-	import type { Message, StreamResponse } from '$lib/Types';
+	import type { Message } from '$lib/Types';
 
 	import { afterUpdate } from 'svelte';
-
-	import { fetchEventSource } from '@microsoft/fetch-event-source';
+	import { HfInference } from '@huggingface/inference';
 
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
 	import ChatIntroduction from '$lib/components/chat/ChatIntroduction.svelte';
@@ -11,15 +10,17 @@
 
 	import {
 		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
-		PUBLIC_ENDPOINT,
-		PUBLIC_HF_TOKEN,
 		PUBLIC_SEP_TOKEN,
 		PUBLIC_USER_MESSAGE_TOKEN
 	} from '$env/static/public';
+	import { page } from '$app/stores';
 
 	const userToken = PUBLIC_USER_MESSAGE_TOKEN || '<|prompter|>';
 	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN || '<|assistant|>';
 	const sepToken = PUBLIC_SEP_TOKEN || '<|endoftext|>';
+
+	const hf = new HfInference();
+	const model = hf.endpoint(`${$page.url.origin}/api/conversation`);
 
 	let messages: Message[] = [];
 	let message = '';
@@ -41,6 +42,53 @@
 		}
 	}
 
+	async function getTextGenerationStream(inputs: string) {
+		const response = model.textGenerationStream(
+			{
+				inputs,
+				parameters: {
+					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
+					// @ts-ignore
+					stop: ['<|endoftext|>'],
+					max_new_tokens: 1024,
+					truncate: 1024,
+					typical_p: 0.2
+				}
+			},
+			{
+				use_cache: false
+			}
+		);
+
+		// Regex to check if the text finishes by "<" but is not a piece of code like "`<img>`"
+		const endOfTextRegex = /(?<!`)<(?!`)/;
+
+		for await (const data of response) {
+			if (!data) break;
+
+			try {
+				if (!data.token.special) {
+					if (messages.at(-1)?.from !== 'bot') {
+						// First token has a space at the beginning, trim it
+						messages = [...messages, { from: 'bot', content: data.token.text.trimStart() }];
+					} else {
+						const isEndOfText = endOfTextRegex.test(data.token.text);
+
+						messages.at(-1)!.content += isEndOfText
+							? data.token.text.replace('<', '')
+							: data.token.text;
+						messages = messages;
+
+						if (isEndOfText) break;
+					}
+				}
+			} catch (error) {
+				console.error(error);
+				break;
+			}
+		}
+	}
+
 	function onWrite() {
 		if (!message) return;
 
@@ -55,49 +103,7 @@
 				)
 				.join('') + assistantToken;
 
-		console.log(inputs);
-		fetchEventSource(PUBLIC_ENDPOINT, {
-			method: 'POST',
-			headers: {
-				Accept: 'text/event-stream',
-				'Content-Type': 'application/json',
-				'user-agent': 'chat-ui/0.0.1',
-				...(PUBLIC_HF_TOKEN
-					? {
-							authorization: `Bearer ${PUBLIC_HF_TOKEN}`
-					  }
-					: {})
-			},
-			body: JSON.stringify({
-				inputs: inputs,
-				stream: true,
-				parameters: {
-					do_sample: false,
-					max_new_tokens: 500,
-					return_full_text: false,
-					stop: [],
-					truncate: 1000,
-					typical_p: 0.2,
-					watermark: false,
-					details: true
-				}
-			}),
-			async onopen(response) {
-				if (response.ok && response.headers.get('content-type') === 'text/event-stream') {
-					messages = [...messages, { from: 'bot', content: '' }];
-				} else {
-					console.error('error opening the SSE endpoint');
-				}
-			},
-			onmessage(msg) {
-				const data = JSON.parse(msg.data) as StreamResponse;
-				// console.log(data);
-				if (!data.token.special) {
-					messages.at(-1)!.content += data.token.text;
-					messages = messages;
-				}
-			}
-		});
+		getTextGenerationStream(inputs);
 	}
 </script>
 
