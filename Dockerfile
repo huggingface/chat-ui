@@ -11,8 +11,9 @@ RUN npm i
 
 RUN chown -R 1000:1000 /app
 
-RUN --mount=type=secret,id=PUBLIC_MODEL_ENDPOINT,mode=0444,required=true \
-   PUBLIC_MODEL_ENDPOINT=$(cat /run/secrets/PUBLIC_MODEL_ENDPOINT) npm run build
+RUN --mount=type=secret,id=DOTENV_LOCAL,mode=0444,required=true cat /run/secrets/DOTENV_LOCAL > .env.local
+   
+RUN npm run build
 
 ENV PORT 7860
 

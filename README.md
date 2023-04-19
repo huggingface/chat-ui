@@ -23,6 +23,8 @@ npm run dev
 
 Default configuration is in `.env`. Put custom config and secrets in `.env.local`, it will override the values in `.env`.
 
+Check out [.env](./.env) to see what needs to be set.
+
 ## Building
 
 To create a production version of your app:
