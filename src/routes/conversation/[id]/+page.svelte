@@ -63,8 +63,8 @@
 
 			await getTextGenerationStream(message);
 
-			// Reload conversation order
-			await invalidate('/');
+			// Reload conversation order - doesn't seem to work
+			// await invalidate('/');
 		} finally {
 			loading = false;
 		}
