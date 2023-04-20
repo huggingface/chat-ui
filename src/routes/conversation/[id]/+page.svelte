@@ -46,12 +46,8 @@
 					// First token has a space at the beginning, trim it
 					messages = [...messages, { from: 'assistant', content: data.token.text.trimStart() }];
 				} else {
-					const isEndOfText = endOfTextRegex.test(data.token.text);
-
-					lastMessage.content += isEndOfText ? data.token.text.replace('<', '') : data.token.text;
+					lastMessage.content += data.token.text;
 					messages = [...messages];
-
-					if (isEndOfText) break;
 				}
 			}
 		}
