@@ -8,6 +8,8 @@ export interface Conversation {
 	title: string;
 	messages: Message[];
 
+	shares?: Array<{ id: string; msgCount: number }>;
+
 	createdAt: Date;
 	updatedAt: Date;
 }
