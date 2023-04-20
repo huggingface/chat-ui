@@ -6,11 +6,13 @@
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
 
+	function sanitizeMd(md: string) {
+		return md.replaceAll('<', '&lt;');
+	}
+
 	export let message: Message;
 	let html = '';
 	let el: HTMLElement;
-
-	$: sanitizedContent = message.content.replaceAll('<', '&lt;');
 
 	const renderer = new marked.Renderer();
 
@@ -51,9 +53,9 @@
 		renderer
 	};
 
-	$: browser && marked(sanitizedContent, options, handleParsed);
+	$: browser && marked(sanitizeMd(message.content), options, handleParsed);
 
-	html = marked(sanitizedContent, options);
+	html = marked(sanitizeMd(message.content), options);
 
 	afterUpdate(() => {
 		if (el) {
