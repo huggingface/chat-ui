@@ -5,6 +5,7 @@
 	import { browser } from '$app/environment';
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
+	import { sanitize } from '$lib/utils/sanitizer';
 
 	export let message: Message;
 	let html = '';
@@ -23,11 +24,12 @@
 		`.replaceAll('\t', '');
 	};
 
-	const handleParsed = (err: Error | null, parsedHtml: string) => {
+	const handleParsed = async (err: Error | null, parsedHtml: string) => {
 		if (err) {
 			console.error(err);
 		} else {
-			html = parsedHtml;
+			const sanitizedHtml = await sanitize(parsedHtml);
+			html = sanitizedHtml;
 		}
 	};
 
