@@ -23,11 +23,12 @@
 		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
 		<div class="flex-none sticky top-0 p-3 flex flex-col">
-			<button
-				on:click={() => location.reload()}
+			<a
+				href="/"
 				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600"
-				>New Chat</button
 			>
+				New Chat
+			</a>
 		</div>
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
 			{#each data.conversations as conv}
