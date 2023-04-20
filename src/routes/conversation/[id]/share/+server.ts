@@ -1,3 +1,4 @@
+import { base } from '$app/paths';
 import { collections } from '$lib/server/database.js';
 import type { SharedConversation } from '$lib/types/SharedConversation.js';
 import { sha256 } from '$lib/utils/sha256.js';
@@ -22,7 +23,7 @@ export async function POST({ params, url, locals }) {
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: url.origin + `/r/${existingShare._id}`
+				url: url.origin + `${base}/r/${existingShare._id}`
 			}),
 			{ headers: { 'Content-Type': 'application/json' } }
 		);
@@ -41,7 +42,7 @@ export async function POST({ params, url, locals }) {
 
 	return new Response(
 		JSON.stringify({
-			url: url.origin.replace('huggingface.co', 'hf.co') + `/r/${shared._id}`
+			url: url.origin.replace('huggingface.co', 'hf.co') + `${base}/r/${shared._id}`
 		}),
 		{ headers: { 'Content-Type': 'application/json' } }
 	);
