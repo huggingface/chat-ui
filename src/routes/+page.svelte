@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import ChatWindow from '$lib/components/chat/ChatWindow.svelte';
 	import { pendingMessage } from '$lib/stores/pendingMessage';
 
@@ -8,7 +9,7 @@
 	async function createConversation(message: string) {
 		try {
 			loading = true;
-			const res = await fetch('/conversation', {
+			const res = await fetch(`${base}/conversation`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -26,7 +27,7 @@
 			pendingMessage.set(message);
 
 			// invalidateAll to update list of conversations
-			await goto(`/conversation/${conversationId}`, { invalidateAll: true });
+			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} finally {
 			loading = false;
 		}
