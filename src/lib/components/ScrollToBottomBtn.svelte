@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
-	import Chevron from './icons/Chevron.svelte';
+	import IconChevron from './icons/IconChevron.svelte';
 	import { onDestroy } from 'svelte';
 
 	export let scrollNode: HTMLElement;
@@ -29,6 +29,6 @@
 		transition:fade={{ duration: 150 }}
 		on:click={() => scrollNode.scrollTo({ top: scrollNode.scrollHeight, behavior: 'smooth' })}
 		class="absolute flex rounded-full border w-10 h-10 items-center justify-center shadow bg-white dark:bg-gray-700 dark:border-gray-600 {className}"
-		><Chevron /></button
+		><IconChevron /></button
 	>
 {/if}
