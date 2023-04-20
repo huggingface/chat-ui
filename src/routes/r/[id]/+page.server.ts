@@ -1,9 +1,10 @@
-import { collections } from '$lib/server/database.js';
+import type { PageServerLoad } from './$types';
+import { collections } from '$lib/server/database';
 import { error } from '@sveltejs/kit';
 
-export async function load({ params }) {
-	const conversation = await collections.conversations.findOne({
-		'shares.id': params.id
+export const load: PageServerLoad = async ({ params }) => {
+	const conversation = await collections.sharedConversations.findOne({
+		_id: params.id
 	});
 
 	if (!conversation) {
@@ -13,4 +14,4 @@ export async function load({ params }) {
 	return {
 		messages: conversation.messages
 	};
-}
+};

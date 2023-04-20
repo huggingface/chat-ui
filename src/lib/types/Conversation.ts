@@ -5,12 +5,10 @@ export interface Conversation {
 	_id: ObjectId;
 
 	// Can be undefined for shared convo then deleted
-	sessionId?: string;
+	sessionId: string;
 
 	title: string;
 	messages: Message[];
-
-	shares?: Array<{ id: string; msgCount: number }>;
 
 	createdAt: Date;
 	updatedAt: Date;
