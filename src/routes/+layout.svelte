@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '../styles.css';
+	import '../styles/main.css';
 	import type { LayoutData } from './$types';
 
 	export let data: LayoutData;
