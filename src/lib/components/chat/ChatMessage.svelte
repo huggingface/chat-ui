@@ -10,7 +10,7 @@
 	let html = '';
 	let el: HTMLElement;
 
-	const sanitizedContent = message.content.replaceAll('<', '&lt;');
+	$: sanitizedContent = message.content.replaceAll('<', '&lt;');
 
 	const renderer = new marked.Renderer();
 
