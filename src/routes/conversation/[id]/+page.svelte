@@ -55,8 +55,6 @@
 				}
 			}
 		}
-
-		// todo: if everything went well, store message + response in DB
 	}
 
 	async function writeMessage(message: string) {
