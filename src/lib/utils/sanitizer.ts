@@ -1,4 +1,4 @@
-import createDOMPurify from 'dompurify';
+import type { Config, DOMPurifyI } from 'dompurify';
 import { browser } from '$app/environment';
 
 export const CONTENT_TRUSTED_ORGS = ['huggingface'];
@@ -13,7 +13,7 @@ const FORBIDDEN_CSS_CLASSES = ['fixed', 'sticky'];
 
 export async function sanitize(
 	content: string,
-	sanitizeConfig?: createDOMPurify.Config & {
+	sanitizeConfig?: Config & {
 		RETURN_DOM_FRAGMENT?: false | undefined;
 		RETURN_DOM?: false | undefined;
 	}
@@ -30,12 +30,15 @@ export async function sanitize(
 	return sanitizedContent;
 }
 
-let purify: createDOMPurify.DOMPurifyI;
+let purify: DOMPurifyI;
 
 async function loadDOMPurify() {
 	if (purify) {
 		return;
 	}
+
+	const { default: createDOMPurify } = await import('dompurify');
+
 	if (!browser) {
 		/// To avoid needing the dependency on the frontend, we load it dynamically on the backend
 		// eslint-disable-next-line @typescript-eslint/no-shadow
