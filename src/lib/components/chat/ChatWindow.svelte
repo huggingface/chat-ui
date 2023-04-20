@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Message } from '$lib/types/Message';
 	import { createEventDispatcher } from 'svelte';
+
+	import CarbonSendAltFilled from '~icons/carbon/send-alt-filled';
+
 	import ChatMessages from './ChatMessages.svelte';
 	import ChatInput from './ChatInput.svelte';
 
@@ -38,26 +41,13 @@
 					maxRows={10}
 				/>
 				<button
-					class="p-1 px-[0.7rem] self-end my-1 h-[2.4rem] rounded-lg hover:bg-gray-100 enabled:dark:hover:text-gray-400 dark:hover:bg-gray-900 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent disabled:opacity-60 dark:disabled:opacity-40 flex-shrink-0 transition-all mx-1"
+					class="p-1 px-[0.7rem] group self-end my-1 h-[2.4rem] rounded-lg hover:bg-gray-100 enabled:dark:hover:text-gray-400 dark:hover:bg-gray-900 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent disabled:opacity-60 dark:disabled:opacity-40 flex-shrink-0 transition-all mx-1"
 					disabled={!message || disabled}
 					type="submit"
 				>
-					<svg
-						class="text-gray-500 dark:text-gray-300 pointer-events-none"
-						xmlns="http://www.w3.org/2000/svg"
-						xmlns:xlink="http://www.w3.org/1999/xlink"
-						aria-hidden="true"
-						focusable="false"
-						role="img"
-						width="1em"
-						height="1em"
-						preserveAspectRatio="xMidYMid meet"
-						viewBox="0 0 32 32"
-						><path
-							d="M30 28.59L22.45 21A11 11 0 1 0 21 22.45L28.59 30zM5 14a9 9 0 1 1 9 9a9 9 0 0 1-9-9z"
-							fill="currentColor"
-						/></svg
-					>
+					<CarbonSendAltFilled
+						class="text-gray-400 group-hover:text-gray-800 group-disabled:text-gray-300"
+					/>
 				</button>
 			</div>
 		</form>

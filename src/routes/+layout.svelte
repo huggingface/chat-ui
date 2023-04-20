@@ -4,6 +4,9 @@
 	import '../styles/main.css';
 	import type { LayoutData } from './$types';
 
+	import CarbonTrashCan from '~icons/carbon/trash-can';
+	import CarbonExport from '~icons/carbon/export';
+
 	export let data: LayoutData;
 
 	function switchTheme() {
@@ -83,7 +86,7 @@
 		<div class="flex-none sticky top-0 p-3 flex flex-col">
 			<a
 				href="/"
-				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600"
+				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
 			>
 				New Chat
 			</a>
@@ -92,27 +95,29 @@
 			{#each data.conversations as conv}
 				<a
 					href="/conversation/{conv.id}"
-					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center {conv.id ===
+					class="pl-3 pr-2 h-12 group rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1 {conv.id ===
 					$page.params.id
 						? 'bg-gray-100 dark:bg-gray-700'
 						: ''}"
 				>
-					{conv.title}
+					<div class="flex-1 truncate">{conv.title}</div>
 
-					<span class="grow" />
 					<button
 						type="button"
-						class="bg-white rounded border-black px-2 py-1 border-[1px] border-solid"
-						on:click|preventDefault={() => deleteConversation(conv.id)}
-					>
-						Delele
-					</button>
-					<button
-						type="button"
-						class="bg-white rounded border-black px-2 py-1 border-[1px] border-solid"
+						class="w-6 h-6 items-center justify-center hidden group-hover:flex hover:bg-gray-100"
+						title="Share conversation"
 						on:click|preventDefault={() => shareConversation(conv.id, conv.title)}
 					>
-						Share
+						<CarbonExport class="text-gray-400 hover:text-gray-600" />
+					</button>
+
+					<button
+						type="button"
+						class="w-6 h-6 items-center justify-center hidden group-hover:flex hover:bg-gray-100"
+						title="Delete conversation"
+						on:click|preventDefault={() => deleteConversation(conv.id)}
+					>
+						<CarbonTrashCan class="text-gray-400 hover:text-gray-600" />
 					</button>
 				</a>
 			{/each}
