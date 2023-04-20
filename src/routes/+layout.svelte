@@ -14,6 +14,37 @@
 			localStorage.theme = 'dark';
 		}
 	}
+
+	async function shareConversation(id: string, title: string) {
+		try {
+			const res = await fetch(`/conversation/${id}/share`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!res.ok) {
+				alert('Error while sharing conversation: ' + (await res.text()));
+				return;
+			}
+
+			const { url } = await res.json();
+
+			if (navigator.share) {
+				navigator.share({
+					title,
+					text: 'Share this chat with others',
+					url
+				});
+			} else {
+				prompt('Share this link with your friends:', url);
+			}
+		} catch (err) {
+			console.error(err);
+			alert('Error while sharing conversation: ' + err);
+		}
+	}
 </script>
 
 <div
@@ -34,9 +65,16 @@
 			{#each data.conversations as conv}
 				<a
 					href="/conversation/{conv.id}"
-					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-between items-center"
 				>
 					{conv.title}
+
+					<button
+						class="bg-white rounded border-black px-2 py-1 border-[1px] border-solid"
+						on:click|preventDefault={() => shareConversation(conv.id, conv.title)}
+					>
+						Share
+					</button>
 				</a>
 			{/each}
 		</div>

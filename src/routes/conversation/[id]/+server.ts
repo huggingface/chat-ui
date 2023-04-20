@@ -44,8 +44,6 @@ export async function POST({ request, fetch, locals, params }) {
 
 		messages.push({ from: 'assistant', content: generated_text });
 
-		console.log('updating conversation', convId, messages);
-
 		await collections.conversations.updateOne(
 			{
 				_id: convId

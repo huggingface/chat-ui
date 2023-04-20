@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { marked } from 'marked';
-	import type { Message } from '$lib/Types';
+	import type { Message } from '$lib/types/Message';
 	import { afterUpdate } from 'svelte';
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
@@ -80,7 +80,7 @@
 		/>
 		<div
 			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 prose text-gray-600 dark:text-gray-300"
-      bind:this={el}
+			bind:this={el}
 		>
 			{@html html}
 		</div>
