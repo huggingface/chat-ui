@@ -15,7 +15,7 @@
 		{#each messages as message}
 			<ChatMessage {message} />
 		{:else}
-			<ChatIntroduction />
+			<ChatIntroduction on:message />
 		{/each}
 		<div class="h-32 flex-none" />
 	</div>

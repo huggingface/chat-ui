@@ -6,6 +6,10 @@
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
 
+	function sanitizeMd(md: string) {
+		return md.replaceAll('<', '&lt;');
+	}
+
 	export let message: Message;
 	let html = '';
 	let el: HTMLElement;
@@ -49,10 +53,10 @@
 		renderer
 	};
 
-	$: browser && message.from === 'assistant' && marked(message.content, options, handleParsed);
+	$: browser && message.from === 'assistant' && marked(sanitizeMd(message.content), options, handleParsed);
 
 	if (message.from === 'assistant') {
-		html = marked(message.content, options);
+		html = marked(sanitizeMd(message.content), options);
 	}
 
 	afterUpdate(() => {
@@ -85,7 +89,7 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 prose text-gray-600 dark:text-gray-300"
+			class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300"
 			bind:this={el}
 		>
 			{@html html}
