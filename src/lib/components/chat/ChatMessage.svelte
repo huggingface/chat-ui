@@ -2,6 +2,7 @@
 	import { marked } from 'marked';
 	import type { Message } from '$lib/Types';
 	import { afterUpdate } from 'svelte';
+	import { browser } from '$app/environment';
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
 
@@ -48,7 +49,9 @@
 		renderer
 	};
 
-	$: marked(message.content, options, handleParsed);
+	$: browser && marked(message.content, options, handleParsed);
+
+	html = marked(message.content, options);
 
 	afterUpdate(() => {
 		if (el) {
