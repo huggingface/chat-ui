@@ -4,23 +4,14 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { page } from '$app/stores';
-	import {
-		PUBLIC_ASSISTANT_MESSAGE_TOKEN,
-		PUBLIC_SEP_TOKEN,
-		PUBLIC_USER_MESSAGE_TOKEN
-	} from '$env/static/public';
 	import { HfInference } from '@huggingface/inference';
 
 	export let data: PageData;
 
 	$: messages = data.messages;
 
-	const userToken = PUBLIC_USER_MESSAGE_TOKEN;
-	const assistantToken = PUBLIC_ASSISTANT_MESSAGE_TOKEN;
-	const sepToken = PUBLIC_SEP_TOKEN;
-
 	const hf = new HfInference();
-	const model = hf.endpoint(`${$page.url.origin}/api/conversation`);
+	const model = hf.endpoint($page.url.href);
 
 	let loading = false;
 
@@ -76,16 +67,7 @@
 
 			messages = [...messages, { from: 'user', content: message }];
 
-			const inputs =
-				messages
-					.map(
-						(m) =>
-							(m.from === 'user' ? userToken + m.content : assistantToken + m.content) +
-							(m.content.endsWith(sepToken) ? '' : sepToken)
-					)
-					.join('') + assistantToken;
-
-			await getTextGenerationStream(inputs);
+			await getTextGenerationStream(message);
 		} finally {
 			loading = false;
 		}
