@@ -16,7 +16,7 @@
 	}
 
 	.code-block {
-		@apply relative bg-gray-100 dark:bg-gray-950 rounded-lg my-4;
+		@apply relative rounded-lg my-4;
 	}
 
 	.code-block > pre {

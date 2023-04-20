@@ -85,7 +85,7 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 prose text-gray-600 dark:text-gray-300"
+			class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300"
 			bind:this={el}
 		>
 			{@html html}
