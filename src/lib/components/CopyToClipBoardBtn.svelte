@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	import IconCopy from './icons/Copy.svelte';
+	import IconCopy from './icons/IconCopy.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	export let classNames = '';
