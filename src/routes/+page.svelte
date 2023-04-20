@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, invalidate, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import ChatWindow from '$lib/components/chat/ChatWindow.svelte';
 	import { pendingMessage } from '$lib/stores/pendingMessage';
 
