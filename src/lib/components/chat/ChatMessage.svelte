@@ -53,7 +53,9 @@
 		renderer
 	};
 
-	$: browser && message.from === 'assistant' && marked(sanitizeMd(message.content), options, handleParsed);
+	$: browser &&
+		message.from === 'assistant' &&
+		marked(sanitizeMd(message.content), options, handleParsed);
 
 	if (message.from === 'assistant') {
 		html = marked(sanitizeMd(message.content), options);
