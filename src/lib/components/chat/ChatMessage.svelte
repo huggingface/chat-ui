@@ -49,9 +49,11 @@
 		renderer
 	};
 
-	$: browser && marked(message.content, options, handleParsed);
+	$: browser && message.from === 'assistant' && marked(message.content, options, handleParsed);
 
-	html = marked(message.content, options);
+	if (message.from === 'assistant') {
+		html = marked(message.content, options);
+	}
 
 	afterUpdate(() => {
 		if (el) {
@@ -93,8 +95,8 @@
 {#if message.from === 'user'}
 	<div class="flex items-start justify-start gap-4">
 		<div class="mt-5 w-3 h-3 flex-none rounded-full" />
-		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
-			{message.content}
+		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400 whitespace-break-spaces">
+			{message.content.trim()}
 		</div>
 	</div>
 {/if}
