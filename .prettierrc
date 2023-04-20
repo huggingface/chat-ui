@@ -1,6 +1,6 @@
 {
 	"useTabs": true,
-	"trailingComma": "all",
+	"trailingComma": "es5",
 	"printWidth": 100,
 	"plugins": ["prettier-plugin-svelte"],
 	"pluginSearchDirs": ["."],

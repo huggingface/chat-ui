@@ -47,7 +47,7 @@
 				(err) => {
 					console.error(err);
 					callback?.(err);
-				},
+				}
 			);
 		},
 		renderer,

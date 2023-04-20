@@ -18,6 +18,6 @@ export const POST: RequestHandler = async (input) => {
 		JSON.stringify({
 			conversationId: res.insertedId.toString(),
 		}),
-		{ headers: { "Content-Type": "application/json" } },
+		{ headers: { "Content-Type": "application/json" } }
 	);
 };

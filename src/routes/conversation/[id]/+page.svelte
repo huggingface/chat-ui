@@ -35,7 +35,7 @@
 			},
 			{
 				use_cache: false,
-			},
+			}
 		);
 
 		for await (const data of response) {

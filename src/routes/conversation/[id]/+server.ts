@@ -60,7 +60,7 @@ export async function POST({ request, fetch, locals, params }) {
 					messages,
 					updatedAt: new Date(),
 				},
-			},
+			}
 		);
 	}
 

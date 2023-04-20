@@ -24,7 +24,7 @@ export async function POST({ params, url, locals }) {
 			JSON.stringify({
 				url: url.origin + `/r/${existingShare._id}`,
 			}),
-			{ headers: { "Content-Type": "application/json" } },
+			{ headers: { "Content-Type": "application/json" } }
 		);
 	}
 
@@ -43,6 +43,6 @@ export async function POST({ params, url, locals }) {
 		JSON.stringify({
 			url: url.origin.replace("huggingface.co", "hf.co") + `/r/${shared._id}`,
 		}),
-		{ headers: { "Content-Type": "application/json" } },
+		{ headers: { "Content-Type": "application/json" } }
 	);
 }

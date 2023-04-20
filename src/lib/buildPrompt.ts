@@ -18,7 +18,7 @@ export function buildPrompt(messages: Message[]): string {
 					(m.from === "user"
 						? PUBLIC_USER_MESSAGE_TOKEN + m.content
 						: PUBLIC_ASSISTANT_MESSAGE_TOKEN + m.content) +
-					(m.content.endsWith(PUBLIC_SEP_TOKEN) ? "" : PUBLIC_SEP_TOKEN),
+					(m.content.endsWith(PUBLIC_SEP_TOKEN) ? "" : PUBLIC_SEP_TOKEN)
 			)
 			.join("") + PUBLIC_ASSISTANT_MESSAGE_TOKEN
 	);
