@@ -30,6 +30,7 @@
 					watermark: false,
 					max_new_tokens: 1024,
 					stop: ['<|endoftext|>'],
+					return_full_text: false
 				}
 			},
 			{
