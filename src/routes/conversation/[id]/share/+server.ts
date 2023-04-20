@@ -1,4 +1,5 @@
 import { base } from '$app/paths';
+import { SHARE_BASE_URL } from '$env/static/private';
 import { collections } from '$lib/server/database.js';
 import type { SharedConversation } from '$lib/types/SharedConversation.js';
 import { sha256 } from '$lib/utils/sha256.js';
@@ -42,7 +43,7 @@ export async function POST({ params, url, locals }) {
 
 	return new Response(
 		JSON.stringify({
-			url: url.origin.replace('huggingface.co', 'hf.co') + `${base}/r/${shared._id}`
+			url: (SHARE_BASE_URL || `${url.origin}${base}`) + `/r/${shared._id}`
 		}),
 		{ headers: { 'Content-Type': 'application/json' } }
 	);
