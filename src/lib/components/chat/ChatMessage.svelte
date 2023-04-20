@@ -36,8 +36,8 @@
 		highlight: (code, lang, callback) => {
 			import('highlight.js').then(
 				({ default: hljs }) => {
-					const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-					callback?.(null, hljs.highlight(code, { language }, true).value);
+					const language = hljs.getLanguage(lang);
+					callback?.(null, hljs.highlightAuto(code, language?.aliases).value);
 				},
 				(err) => {
 					console.error(err);
