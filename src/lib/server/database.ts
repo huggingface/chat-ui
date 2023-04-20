@@ -17,4 +17,5 @@ export const collections = { conversations };
 
 client.on('open', () => {
 	conversations.createIndex({ sessionId: 1, updatedAt: -1 });
+	conversations.createIndex({ 'shares.id': 1 }, { unique: true, sparse: true });
 });
