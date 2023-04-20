@@ -12,12 +12,11 @@
 	$: messages = data.messages;
 
 	const hf = new HfInference();
-	const model = hf.endpoint($page.url.href);
 
 	let loading = false;
 
 	async function getTextGenerationStream(inputs: string) {
-		const response = model.textGenerationStream(
+		const response = hf.endpoint($page.url.href).textGenerationStream(
 			{
 				inputs,
 				parameters: {
