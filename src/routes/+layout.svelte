@@ -6,6 +6,7 @@
 
 	import CarbonTrashCan from '~icons/carbon/trash-can';
 	import CarbonExport from '~icons/carbon/export';
+	import { base } from '$app/paths';
 
 	export let data: LayoutData;
 
@@ -22,7 +23,7 @@
 
 	async function shareConversation(id: string, title: string) {
 		try {
-			const res = await fetch(`/conversation/${id}/share`, {
+			const res = await fetch(`${base}/conversation/${id}/share`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -53,7 +54,7 @@
 
 	async function deleteConversation(id: string) {
 		try {
-			const res = await fetch(`/conversation/${id}`, {
+			const res = await fetch(`${base}/conversation/${id}`, {
 				method: 'DELETE',
 				headers: {
 					'Content-Type': 'application/json'
@@ -85,7 +86,7 @@
 	>
 		<div class="flex-none sticky top-0 p-3 flex flex-col">
 			<a
-				href="/"
+				href={base}
 				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
 			>
 				New Chat
@@ -94,7 +95,7 @@
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
 			{#each data.conversations as conv}
 				<a
-					href="/conversation/{conv.id}"
+					href="{base}/conversation/{conv.id}"
 					class="pl-3 pr-2 h-12 group rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1 {conv.id ===
 					$page.params.id
 						? 'bg-gray-100 dark:bg-gray-700'
@@ -125,12 +126,13 @@
 		<div class="flex flex-col p-3 gap-2">
 			<button
 				on:click={switchTheme}
+				type="button"
 				class="text-left flex items-center first-letter:capitalize truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
 			>
 				Theme
 			</button>
 			<a
-				href="/"
+				href={base}
 				class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
 			>
 				Settings
