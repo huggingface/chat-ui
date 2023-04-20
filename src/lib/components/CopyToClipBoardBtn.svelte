@@ -38,7 +38,7 @@
 </script>
 
 <button
-	class="relative 'inline-flex cursor-pointer items-center text-sm focus:outline-none rounded-lg border py-1 px-2 shadow-sm' {classNames}
+	class="btn text-sm rounded-lg border py-2 px-2 shadow-sm text-gray-800 border-gray-200 active:shadow-inner dark:text-gray-200 dark:border-gray-800 {classNames}
 		{!isSuccess && 'text-gray-600'}
 		{isSuccess && 'text-green-500'}
 	"
@@ -47,6 +47,8 @@
 	bind:this={el}
 	data-clipboard-text={value}
 >
-	<IconCopy />
-	<Tooltip classNames={isSuccess ? 'opacity-100' : 'opacity-0'} />
+	<span class="relative">
+		<IconCopy />
+		<Tooltip classNames={isSuccess ? 'opacity-100' : 'opacity-0'} />
+	</span>
 </button>

@@ -14,8 +14,8 @@
 	// Add wrapper to code blocks
 	renderer.code = (code, lang) => {
 		return `
-			<div class="code relative">
-				<pre class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
+			<div class="code-block">
+				<pre>
 					<code class="language-${lang}">${code}</code>
 				</pre>
 			</div>
@@ -52,7 +52,7 @@
 
 	afterUpdate(() => {
 		if (el) {
-			const codeBlocks = el.querySelectorAll('pre code');
+			const codeBlocks = el.querySelectorAll('.code-block');
 
 			// Add copy to clipboard button to each code block
 			codeBlocks.forEach((block) => {
@@ -60,7 +60,10 @@
 
 				new CopyToClipBoardBtn({
 					target: block,
-					props: { code: (block as HTMLElement).innerText ?? '' }
+					props: {
+						value: (block as HTMLElement).innerText ?? '',
+						classNames: 'absolute top-2 right-2'
+					}
 				});
 				block.classList.add('has-copy-btn');
 			});
@@ -76,7 +79,7 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800"
+			class="group relative w-full rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800"
 			bind:this={el}
 		>
 			{@html html}
