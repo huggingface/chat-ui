@@ -25,8 +25,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 
 	const messages = [...conv.messages, { from: 'user', content: json.inputs }] satisfies Message[];
-
-	json.inputs = buildPrompt(messages);
+	const prompt = buildPrompt(messages);
 
 	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
 		headers: {
@@ -34,13 +33,21 @@ export async function POST({ request, fetch, locals, params }) {
 			Authorization: `Basic ${HF_TOKEN}`
 		},
 		method: 'POST',
-		body: JSON.stringify(json)
+		body: JSON.stringify({
+			...json,
+			inputs: prompt
+		})
 	});
 
 	const [stream1, stream2] = resp.body!.tee();
 
 	async function saveMessage() {
-		const generated_text = await parseGeneratedText(stream2);
+		let generated_text = await parseGeneratedText(stream2);
+
+		// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
+		if (generated_text.startsWith(prompt)) {
+			generated_text = generated_text.slice(prompt.length);
+		}
 
 		messages.push({ from: 'assistant', content: generated_text });
 
