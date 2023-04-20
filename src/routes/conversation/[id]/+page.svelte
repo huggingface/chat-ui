@@ -5,18 +5,18 @@
 	import type { PageData } from './$types';
 	import { page } from '$app/stores';
 	import { HfInference } from '@huggingface/inference';
+	import { invalidate } from '$app/navigation';
 
 	export let data: PageData;
 
 	$: messages = data.messages;
 
 	const hf = new HfInference();
-	const model = hf.endpoint($page.url.href);
 
 	let loading = false;
 
 	async function getTextGenerationStream(inputs: string) {
-		const response = model.textGenerationStream(
+		const response = hf.endpoint($page.url.href).textGenerationStream(
 			{
 				inputs,
 				parameters: {
@@ -63,6 +63,9 @@
 			messages = [...messages, { from: 'user', content: message }];
 
 			await getTextGenerationStream(message);
+
+			// Reload conversation order - doesn't seem to work
+			// await invalidate('/');
 		} finally {
 			loading = false;
 		}
