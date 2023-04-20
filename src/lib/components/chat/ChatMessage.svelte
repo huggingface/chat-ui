@@ -5,11 +5,12 @@
 	import { browser } from '$app/environment';
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
-	import { sanitize } from '$lib/utils/sanitizer';
 
 	export let message: Message;
 	let html = '';
 	let el: HTMLElement;
+
+	const sanitizedContent = message.content.replaceAll('<', '&lt;');
 
 	const renderer = new marked.Renderer();
 
@@ -24,12 +25,11 @@
 		`.replaceAll('\t', '');
 	};
 
-	const handleParsed = async (err: Error | null, parsedHtml: string) => {
+	const handleParsed = (err: Error | null, parsedHtml: string) => {
 		if (err) {
 			console.error(err);
 		} else {
-			const sanitizedHtml = await sanitize(parsedHtml);
-			html = sanitizedHtml;
+			html = parsedHtml;
 		}
 	};
 
@@ -51,9 +51,9 @@
 		renderer
 	};
 
-	$: browser && marked(message.content, options, handleParsed);
+	$: browser && marked(sanitizedContent, options, handleParsed);
 
-	html = marked(message.content, options);
+	html = marked(sanitizedContent, options);
 
 	afterUpdate(() => {
 		if (el) {
