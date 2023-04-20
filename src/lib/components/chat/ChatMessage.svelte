@@ -2,6 +2,7 @@
 	import { marked } from 'marked';
 	import type { Message } from '$lib/types/Message';
 	import { afterUpdate } from 'svelte';
+	import { browser } from '$app/environment';
 
 	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
 
@@ -14,7 +15,7 @@
 	// Add wrapper to code blocks
 	renderer.code = (code, lang) => {
 		return `
-			<div class="code-block">
+			<div class="group code-block">
 				<pre>
 					<code class="language-${lang}">${code}</code>
 				</pre>
@@ -48,7 +49,9 @@
 		renderer
 	};
 
-	$: marked(message.content, options, handleParsed);
+	$: browser && marked(message.content, options, handleParsed);
+
+	html = marked(message.content, options);
 
 	afterUpdate(() => {
 		if (el) {
@@ -62,7 +65,8 @@
 					target: block,
 					props: {
 						value: (block as HTMLElement).innerText ?? '',
-						classNames: 'absolute top-2 right-2'
+						classNames:
+							'absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100'
 					}
 				});
 				block.classList.add('has-copy-btn');
@@ -79,7 +83,7 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="group relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 prose text-gray-600 dark:text-gray-300"
+			class="relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 prose text-gray-600 dark:text-gray-300"
 			bind:this={el}
 		>
 			{@html html}
