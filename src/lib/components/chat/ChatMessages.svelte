@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Message } from '$lib/types/Message';
-	import { snapScrollToBottom } from '$lib/actions/snapScrollToBottom';
-	import ScrollToBottomBtn from '$lib/components/ScrollToBottomBtn.svelte';
-	import ChatIntroduction from './ChatIntroduction.svelte';
-	import ChatMessage from './ChatMessage.svelte';
+	import type { Message } from "$lib/types/Message";
+	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
+	import ScrollToBottomBtn from "$lib/components/ScrollToBottomBtn.svelte";
+	import ChatIntroduction from "./ChatIntroduction.svelte";
+	import ChatMessage from "./ChatMessage.svelte";
 
 	export let messages: Message[];
 

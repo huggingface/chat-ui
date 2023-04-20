@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import ChatWindow from '$lib/components/chat/ChatWindow.svelte';
-	import { pendingMessage } from '$lib/stores/pendingMessage';
+	import { goto } from "$app/navigation";
+	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
 
 	let loading = false;
 
 	async function createConversation(message: string) {
 		try {
 			loading = true;
-			const res = await fetch('/conversation', {
-				method: 'POST',
+			const res = await fetch("/conversation", {
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json'
-				}
+					"Content-Type": "application/json",
+				},
 			});
 
 			if (!res.ok) {
-				alert('Error while creating conversation: ' + (await res.text()));
+				alert("Error while creating conversation: " + (await res.text()));
 				return;
 			}
 

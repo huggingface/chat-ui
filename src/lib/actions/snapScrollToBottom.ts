@@ -28,18 +28,18 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 		if (!force && isDetached) return;
 
 		node.scroll({
-			top: node.scrollHeight
+			top: node.scrollHeight,
 		});
 	};
 
-	node.addEventListener('scroll', handleScroll);
+	node.addEventListener("scroll", handleScroll);
 
 	updateScroll({ force: true });
 
 	return {
 		update: updateScroll,
 		destroy: () => {
-			node.removeEventListener('scroll', handleScroll);
-		}
+			node.removeEventListener("scroll", handleScroll);
+		},
 	};
 };

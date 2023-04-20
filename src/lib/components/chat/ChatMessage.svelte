@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { marked } from 'marked';
-	import type { Message } from '$lib/types/Message';
-	import { afterUpdate } from 'svelte';
-	import { browser } from '$app/environment';
+	import { marked } from "marked";
+	import type { Message } from "$lib/types/Message";
+	import { afterUpdate } from "svelte";
+	import { browser } from "$app/environment";
 
-	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
+	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 
 	function sanitizeMd(md: string) {
-		return md.replaceAll('<', '&lt;');
+		return md.replaceAll("<", "&lt;");
 	}
 
 	export let message: Message;
-	let html = '';
+	let html = "";
 	let el: HTMLElement;
 
 	const renderer = new marked.Renderer();
@@ -24,7 +24,7 @@
 					<code class="language-${lang}">${code}</code>
 				</pre>
 			</div>
-		`.replaceAll('\t', '');
+		`.replaceAll("\t", "");
 	};
 
 	const handleParsed = (err: Error | null, parsedHtml: string) => {
@@ -39,7 +39,7 @@
 		...marked.getDefaults(),
 		gfm: true,
 		highlight: (code, lang, callback) => {
-			import('highlight.js').then(
+			import("highlight.js").then(
 				({ default: hljs }) => {
 					const language = hljs.getLanguage(lang);
 					callback?.(null, hljs.highlightAuto(code, language?.aliases).value);
@@ -47,43 +47,43 @@
 				(err) => {
 					console.error(err);
 					callback?.(err);
-				}
+				},
 			);
 		},
-		renderer
+		renderer,
 	};
 
 	$: browser &&
-		message.from === 'assistant' &&
+		message.from === "assistant" &&
 		marked(sanitizeMd(message.content), options, handleParsed);
 
-	if (message.from === 'assistant') {
+	if (message.from === "assistant") {
 		html = marked(sanitizeMd(message.content), options);
 	}
 
 	afterUpdate(() => {
 		if (el) {
-			const codeBlocks = el.querySelectorAll('.code-block');
+			const codeBlocks = el.querySelectorAll(".code-block");
 
 			// Add copy to clipboard button to each code block
 			codeBlocks.forEach((block) => {
-				if (block.classList.contains('has-copy-btn')) return;
+				if (block.classList.contains("has-copy-btn")) return;
 
 				new CopyToClipBoardBtn({
 					target: block,
 					props: {
-						value: (block as HTMLElement).innerText ?? '',
+						value: (block as HTMLElement).innerText ?? "",
 						classNames:
-							'absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100'
-					}
+							"absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100",
+					},
 				});
-				block.classList.add('has-copy-btn');
+				block.classList.add("has-copy-btn");
 			});
 		}
 	});
 </script>
 
-{#if message.from === 'assistant'}
+{#if message.from === "assistant"}
 	<div class="flex items-start justify-start gap-4 leading-relaxed">
 		<img
 			alt=""
@@ -98,7 +98,7 @@
 		</div>
 	</div>
 {/if}
-{#if message.from === 'user'}
+{#if message.from === "user"}
 	<div class="flex items-start justify-start gap-4">
 		<div class="mt-5 w-3 h-3 flex-none rounded-full" />
 		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400 whitespace-break-spaces">

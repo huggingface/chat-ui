@@ -1,18 +1,18 @@
-import { collections } from '$lib/server/database.js';
-import type { SharedConversation } from '$lib/types/SharedConversation.js';
-import { sha256 } from '$lib/utils/sha256.js';
-import { error } from '@sveltejs/kit';
-import { ObjectId } from 'mongodb';
-import { nanoid } from 'nanoid';
+import { collections } from "$lib/server/database.js";
+import type { SharedConversation } from "$lib/types/SharedConversation.js";
+import { sha256 } from "$lib/utils/sha256.js";
+import { error } from "@sveltejs/kit";
+import { ObjectId } from "mongodb";
+import { nanoid } from "nanoid";
 
 export async function POST({ params, url, locals }) {
 	const conversation = await collections.conversations.findOne({
 		_id: new ObjectId(params.id),
-		sessionId: locals.sessionId
+		sessionId: locals.sessionId,
 	});
 
 	if (!conversation) {
-		throw error(404, 'Conversation not found');
+		throw error(404, "Conversation not found");
 	}
 
 	const hash = await sha256(JSON.stringify(conversation.messages));
@@ -22,9 +22,9 @@ export async function POST({ params, url, locals }) {
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: url.origin + `/r/${existingShare._id}`
+				url: url.origin + `/r/${existingShare._id}`,
 			}),
-			{ headers: { 'Content-Type': 'application/json' } }
+			{ headers: { "Content-Type": "application/json" } },
 		);
 	}
 
@@ -34,15 +34,15 @@ export async function POST({ params, url, locals }) {
 		messages: conversation.messages,
 		hash,
 		updatedAt: new Date(),
-		title: conversation.title
+		title: conversation.title,
 	};
 
 	await collections.sharedConversations.insertOne(shared);
 
 	return new Response(
 		JSON.stringify({
-			url: url.origin.replace('huggingface.co', 'hf.co') + `/r/${shared._id}`
+			url: url.origin.replace("huggingface.co", "hf.co") + `/r/${shared._id}`,
 		}),
-		{ headers: { 'Content-Type': 'application/json' } }
+		{ headers: { "Content-Type": "application/json" } },
 	);
 }
