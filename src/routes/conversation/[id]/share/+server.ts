@@ -1,4 +1,6 @@
 import { collections } from '$lib/server/database.js';
+import type { SharedConversation } from '$lib/types/SharedConversation.js';
+import { sha256 } from '$lib/utils/sha256.js';
 import { error } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
 import { nanoid } from 'nanoid';
@@ -13,39 +15,33 @@ export async function POST({ params, url, locals }) {
 		throw error(404, 'Conversation not found');
 	}
 
-	const shares = conversation.shares || [];
+	const hash = await sha256(JSON.stringify(conversation.messages));
 
-	const existingShare = shares.find((share) => share.msgCount === conversation.messages.length);
+	const existingShare = await collections.sharedConversations.findOne({ hash });
 
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: url.origin + `/r/${existingShare.id}`
+				url: url.origin + `/r/${existingShare._id}`
 			}),
 			{ headers: { 'Content-Type': 'application/json' } }
 		);
 	}
 
-	const share = {
-		id: nanoid(7),
-		msgCount: conversation.messages.length
+	const shared: SharedConversation = {
+		_id: nanoid(7),
+		createdAt: new Date(),
+		messages: conversation.messages,
+		hash,
+		updatedAt: new Date(),
+		title: conversation.title
 	};
 
-	await collections.conversations.updateOne(
-		{
-			_id: conversation._id
-		},
-		{
-			$set: {
-				shares: [...shares, share],
-				updatedAt: new Date()
-			}
-		}
-	);
+	await collections.sharedConversations.insertOne(shared);
 
 	return new Response(
 		JSON.stringify({
-			url: url.origin.replace('huggingface.co', 'hf.co') + `/r/${share.id}`
+			url: url.origin.replace('huggingface.co', 'hf.co') + `/r/${shared._id}`
 		}),
 		{ headers: { 'Content-Type': 'application/json' } }
 	);
