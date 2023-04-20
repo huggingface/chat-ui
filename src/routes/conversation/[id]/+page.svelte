@@ -5,6 +5,7 @@
 	import type { PageData } from './$types';
 	import { page } from '$app/stores';
 	import { HfInference } from '@huggingface/inference';
+	import { invalidate } from '$app/navigation';
 
 	export let data: PageData;
 
@@ -62,6 +63,9 @@
 			messages = [...messages, { from: 'user', content: message }];
 
 			await getTextGenerationStream(message);
+
+			// Reload conversation order
+			await invalidate('/');
 		} finally {
 			loading = false;
 		}
