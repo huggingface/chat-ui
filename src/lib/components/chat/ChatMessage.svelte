@@ -11,15 +11,13 @@
 
 	const renderer = new marked.Renderer();
 
-	// Add copy to clipboard button
+	// Add wrapper to code blocks
 	renderer.code = (code, lang) => {
 		return `
-			<div class='code'>
-				<div class="relative">
-					<pre class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
-						<code class="language-${lang}">${code}</code>
-					</pre>
-				</div>
+			<div class="code relative">
+				<pre class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
+					<code class="language-${lang}">${code}</code>
+				</pre>
 			</div>
 		`.replaceAll('\t', '');
 	};
@@ -56,11 +54,15 @@
 		if (el) {
 			const codeBlocks = el.querySelectorAll('pre code');
 
+			// Add copy to clipboard button to each code block
 			codeBlocks.forEach((block) => {
+				if (block.classList.contains('has-copy-btn')) return;
+
 				new CopyToClipBoardBtn({
 					target: block,
 					props: { code: (block as HTMLElement).innerText ?? '' }
 				});
+				block.classList.add('has-copy-btn');
 			});
 		}
 	});
