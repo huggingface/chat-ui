@@ -92,7 +92,10 @@
 			{#each data.conversations as conv}
 				<a
 					href="/conversation/{conv.id}"
-					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center {conv.id ===
+					$page.params.id
+						? 'bg-gray-100 dark:bg-gray-700'
+						: ''}"
 				>
 					{conv.title}
 
