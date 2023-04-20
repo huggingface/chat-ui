@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { marked } from 'marked';
-	import type { Message } from '$lib/Types';
+	import type { Message } from '$lib/types/Message';
 	import { afterUpdate } from 'svelte';
 	import { browser } from '$app/environment';
 

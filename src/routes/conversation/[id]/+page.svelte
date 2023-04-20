@@ -21,20 +21,21 @@
 				inputs,
 				parameters: {
 					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
+					temperature: 0.9,
+					top_p: 0.95,
+					repetition_penalty: 1.2,
+					top_k: 50,
 					// @ts-ignore
-					stop: ['<|endoftext|>'],
-					max_new_tokens: 1024,
 					truncate: 1024,
-					typical_p: 0.2
+					watermark: false,
+					max_new_tokens: 1024,
+					stop: ['<|endoftext|>'],
 				}
 			},
 			{
 				use_cache: false
 			}
 		);
-
-		// Regex to check if the text finishes by "<" but is not a piece of code like "`<img>`"
-		const endOfTextRegex = /(?<!`)<(?!`)/;
 
 		for await (const data of response) {
 			if (!data) break;

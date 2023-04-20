@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
 	import '../styles/main.css';
 	import type { LayoutData } from './$types';
 
@@ -12,6 +14,62 @@
 		} else {
 			classList.add('dark');
 			localStorage.theme = 'dark';
+		}
+	}
+
+	async function shareConversation(id: string, title: string) {
+		try {
+			const res = await fetch(`/conversation/${id}/share`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!res.ok) {
+				alert('Error while sharing conversation: ' + (await res.text()));
+				return;
+			}
+
+			const { url } = await res.json();
+
+			if (navigator.share) {
+				navigator.share({
+					title,
+					text: 'Share this chat with others',
+					url
+				});
+			} else {
+				prompt('Share this link with your friends:', url);
+			}
+		} catch (err) {
+			console.error(err);
+			alert('Error while sharing conversation: ' + err);
+		}
+	}
+
+	async function deleteConversation(id: string) {
+		try {
+			const res = await fetch(`/conversation/${id}`, {
+				method: 'DELETE',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!res.ok) {
+				alert('Error while deleting conversation: ' + (await res.text()));
+				return;
+			}
+
+			if ($page.params.id !== id) {
+				await invalidateAll();
+			} else {
+				await goto(`/`, { invalidateAll: true });
+			}
+		} catch (err) {
+			console.error(err);
+			alert('Error while deleting conversation: ' + err);
 		}
 	}
 </script>
@@ -34,9 +92,25 @@
 			{#each data.conversations as conv}
 				<a
 					href="/conversation/{conv.id}"
-					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+					class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
 				>
 					{conv.title}
+
+					<span class="grow" />
+					<button
+						type="button"
+						class="bg-white rounded border-black px-2 py-1 border-[1px] border-solid"
+						on:click|preventDefault={() => deleteConversation(conv.id)}
+					>
+						Delele
+					</button>
+					<button
+						type="button"
+						class="bg-white rounded border-black px-2 py-1 border-[1px] border-solid"
+						on:click|preventDefault={() => shareConversation(conv.id, conv.title)}
+					>
+						Share
+					</button>
 				</a>
 			{/each}
 		</div>
