@@ -33,7 +33,6 @@
 	"dependencies": {
 		"@huggingface/inference": "^2.0.0-rc2",
 		"autoprefixer": "^10.4.14",
-		"clipboard": "^2.0.11",
 		"date-fns": "^2.29.3",
 		"highlight.js": "^11.7.0",
 		"marked": "^4.3.0",

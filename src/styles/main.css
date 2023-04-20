@@ -20,6 +20,6 @@
 	}
 
 	.code-block > pre {
-		@apply overflow-auto rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400;
+		@apply overflow-auto px-5 py-3.5 text-gray-500 dark:text-gray-400;
 	}
 }
