@@ -21,7 +21,7 @@
 		<button>New Chat</button>
 		<button>+</button>
 	</nav>
-	<ChatMessages {messages} />
+	<ChatMessages {messages} on:message />
 	<div
 		class="flex max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white dark:from-gray-900 to-transparent justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-4 md:py-8 w-full"
 	>
