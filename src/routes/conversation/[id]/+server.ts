@@ -1,12 +1,12 @@
-import { HF_TOKEN } from '$env/static/private';
-import { PUBLIC_MODEL_ENDPOINT } from '$env/static/public';
-import { buildPrompt } from '$lib/buildPrompt.js';
-import { collections } from '$lib/server/database.js';
-import type { Message } from '$lib/types/Message.js';
-import { streamToAsyncIterable } from '$lib/utils/streamToAsyncIterable';
-import { sum } from '$lib/utils/sum';
-import { error } from '@sveltejs/kit';
-import { ObjectId } from 'mongodb';
+import { HF_TOKEN } from "$env/static/private";
+import { PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
+import { buildPrompt } from "$lib/buildPrompt.js";
+import { collections } from "$lib/server/database.js";
+import type { Message } from "$lib/types/Message.js";
+import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
+import { sum } from "$lib/utils/sum";
+import { error } from "@sveltejs/kit";
+import { ObjectId } from "mongodb";
 
 export async function POST({ request, fetch, locals, params }) {
 	// todo: add validation on params.id
@@ -14,29 +14,29 @@ export async function POST({ request, fetch, locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId
+		sessionId: locals.sessionId,
 	});
 
 	if (!conv) {
-		throw error(404, 'Conversation not found');
+		throw error(404, "Conversation not found");
 	}
 
 	// Todo: validate prompt with zod? or aktype
 	const json = await request.json();
 
-	const messages = [...conv.messages, { from: 'user', content: json.inputs }] satisfies Message[];
+	const messages = [...conv.messages, { from: "user", content: json.inputs }] satisfies Message[];
 	const prompt = buildPrompt(messages);
 
 	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
 		headers: {
-			'Content-Type': request.headers.get('Content-Type') ?? 'application/json',
-			Authorization: `Basic ${HF_TOKEN}`
+			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
+			Authorization: `Basic ${HF_TOKEN}`,
 		},
-		method: 'POST',
+		method: "POST",
 		body: JSON.stringify({
 			...json,
-			inputs: prompt
-		})
+			inputs: prompt,
+		}),
 	});
 
 	const [stream1, stream2] = resp.body!.tee();
@@ -49,17 +49,17 @@ export async function POST({ request, fetch, locals, params }) {
 			generated_text = generated_text.slice(prompt.length);
 		}
 
-		messages.push({ from: 'assistant', content: generated_text });
+		messages.push({ from: "assistant", content: generated_text });
 
 		await collections.conversations.updateOne(
 			{
-				_id: convId
+				_id: convId,
 			},
 			{
 				$set: {
 					messages,
-					updatedAt: new Date()
-				}
+					updatedAt: new Date(),
+				},
 			}
 		);
 	}
@@ -70,7 +70,7 @@ export async function POST({ request, fetch, locals, params }) {
 	return new Response(stream1, {
 		headers: Object.fromEntries(resp.headers.entries()),
 		status: resp.status,
-		statusText: resp.statusText
+		statusText: resp.statusText,
 	});
 }
 
@@ -79,11 +79,11 @@ export async function DELETE({ locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId
+		sessionId: locals.sessionId,
 	});
 
 	if (!conv) {
-		throw error(404, 'Conversation not found');
+		throw error(404, "Conversation not found");
 	}
 
 	if (conv.shares?.length) {
@@ -113,24 +113,24 @@ async function parseGeneratedText(stream: ReadableStream): Promise<string> {
 	// Get last line starting with "data:" and parse it as JSON to get the generated text
 	const message = new TextDecoder().decode(completeInput);
 
-	let lastIndex = message.lastIndexOf('\ndata:');
+	let lastIndex = message.lastIndexOf("\ndata:");
 	if (lastIndex === -1) {
-		lastIndex = message.indexOf('data');
+		lastIndex = message.indexOf("data");
 	}
 
 	if (lastIndex === -1) {
-		console.error('Could not parse in last message');
+		console.error("Could not parse in last message");
 	}
 
-	let lastMessage = message.slice(lastIndex).trim().slice('data:'.length);
-	if (lastMessage.includes('\n')) {
-		lastMessage = lastMessage.slice(0, lastMessage.indexOf('\n'));
+	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);
+	if (lastMessage.includes("\n")) {
+		lastMessage = lastMessage.slice(0, lastMessage.indexOf("\n"));
 	}
 
 	const res = JSON.parse(lastMessage).generated_text;
 
-	if (typeof res !== 'string') {
-		throw new Error('Could not parse generated text');
+	if (typeof res !== "string") {
+		throw new Error("Could not parse generated text");
 	}
 
 	return res;

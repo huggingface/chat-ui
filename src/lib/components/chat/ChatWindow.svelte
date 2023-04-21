@@ -1,13 +1,13 @@
 <script lang="ts">
-	import type { Message } from '$lib/types/Message';
-	import { createEventDispatcher } from 'svelte';
+	import type { Message } from "$lib/types/Message";
+	import { createEventDispatcher } from "svelte";
 
-	import CarbonAdd from '~icons/carbon/add';
-	import CarbonSendAltFilled from '~icons/carbon/send-alt-filled';
-	import CarbonTextAlignJustify from '~icons/carbon/text-align-justify';
+	import CarbonAdd from "~icons/carbon/add";
+	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
+	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 
-	import ChatMessages from './ChatMessages.svelte';
-	import ChatInput from './ChatInput.svelte';
+	import ChatMessages from "./ChatMessages.svelte";
+	import ChatInput from "./ChatInput.svelte";
 
 	export let messages: Message[] = [];
 	export let disabled: boolean = false;
@@ -32,8 +32,8 @@
 		<form
 			on:submit|preventDefault={() => {
 				if (loading) return;
-				dispatch('message', message);
-				message = '';
+				dispatch("message", message);
+				message = "";
 			}}
 			class="w-full relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 focus-within:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:focus-within:border-gray-500 "
 		>

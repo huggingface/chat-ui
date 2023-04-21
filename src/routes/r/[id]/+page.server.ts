@@ -1,17 +1,17 @@
-import type { PageServerLoad } from './$types';
-import { collections } from '$lib/server/database';
-import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from "./$types";
+import { collections } from "$lib/server/database";
+import { error } from "@sveltejs/kit";
 
 export const load: PageServerLoad = async ({ params }) => {
 	const conversation = await collections.sharedConversations.findOne({
-		_id: params.id
+		_id: params.id,
 	});
 
 	if (!conversation) {
-		throw error(404, 'Conversation not found');
+		throw error(404, "Conversation not found");
 	}
 
 	return {
-		messages: conversation.messages
+		messages: conversation.messages,
 	};
 };

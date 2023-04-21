@@ -1,4 +1,4 @@
 export interface Message {
-	from: 'user' | 'assistant';
+	from: "user" | "assistant";
 	content: string;
 }
