@@ -28,12 +28,7 @@
 			<div
 				class="flex items-center gap-4 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
 			>
-				<!-- need to change link to a public model before launch -->
-				<a
-					href="https://huggingface.co/OpenAssistant/llama_30b_oasst_latcyr_1000"
-					target="_blank"
-					rel="noreferrer"
-				>
+				<a href="https://huggingface.co/{PUBLIC_MODEL_NAME}" target="_blank" rel="noreferrer">
 					Model page
 				</a>
 				<a
