@@ -57,7 +57,7 @@
 				<IconLoading classNames="absolute inset-0 m-auto" />
 			{/if}
 			<div
-				class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-h1:font-semibold prose-h2:font-semibold prose-h3:font-semibold"
+				class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-headings:font-semibold max-w-none"
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
