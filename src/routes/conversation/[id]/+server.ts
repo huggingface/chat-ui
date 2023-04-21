@@ -96,6 +96,71 @@ export async function DELETE({ locals, params }) {
 	return new Response();
 }
 
+export async function PATCH({ request, locals, params }) {
+	const convId = new ObjectId(params.id);
+	const json = (await request.json()) as { messages: string[] };
+
+	const userPrompt =
+		`You are a summarizing assistant. Please summarize the following messages as a single sentence between 3 and 10 words:\n` +
+		json.messages.join("\n");
+
+	const prompt = buildPrompt([{ from: "user", content: userPrompt }]);
+
+	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Basic ${HF_TOKEN}`,
+		},
+		method: "POST",
+		body: JSON.stringify({
+			inputs: prompt,
+			parameters: {
+				temperature: 0.9,
+				top_p: 0.95,
+				repetition_penalty: 1.2,
+				top_k: 50,
+				watermark: false,
+				max_new_tokens: 1024,
+				stop: ["<|endoftext|>"],
+				return_full_text: false,
+			},
+		}),
+	});
+
+	const response = await resp.json();
+	let generatedTitle: string | undefined;
+	try {
+		if (typeof response[0].generated_text === "string") {
+			generatedTitle = response[0].generated_text;
+		}
+	} catch {
+		console.error("summarization failed");
+	}
+
+	if (generatedTitle) {
+		await collections.conversations.updateOne(
+			{
+				_id: convId,
+				sessionId: locals.sessionId,
+			},
+			{
+				$set: { title: generatedTitle },
+			}
+		);
+	}
+
+	return new Response(
+		JSON.stringify(
+			generatedTitle
+				? {
+						title: generatedTitle,
+				  }
+				: {}
+		),
+		{ headers: { "Content-Type": "application/json" } }
+	);
+}
+
 async function parseGeneratedText(stream: ReadableStream): Promise<string> {
 	const inputs: Uint8Array[] = [];
 	for await (const input of streamToAsyncIterable(stream)) {

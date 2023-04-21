@@ -58,6 +58,21 @@
 		}
 	}
 
+	async function summarizeTitle() {
+		const response = await fetch($page.url.href, {
+			method: "PATCH",
+			body: JSON.stringify({
+				messages: messages.filter((m) => m.from === "user").map((m) => m.content),
+			}),
+		});
+		const title = (await response.json()).title;
+		const conv = data.conversations.find((conv) => conv.id === $page.params.id);
+		if (conv) {
+			conv.title = title;
+			/// TODO(does not seem to be reactive)
+		}
+	}
+
 	async function writeMessage(message: string) {
 		if (!message.trim()) return;
 
@@ -68,6 +83,10 @@
 			messages = [...messages, { from: "user", content: message }];
 
 			await getTextGenerationStream(message);
+
+			if (messages.filter((m) => m.from === "user").length <= 10) {
+				summarizeTitle().catch(console.error);
+			}
 
 			// Reload conversation order - doesn't seem to work
 			// await invalidate('/');
