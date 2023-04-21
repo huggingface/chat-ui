@@ -1,86 +1,22 @@
 <script lang="ts">
 	import { marked } from 'marked';
 	import type { Message } from '$lib/types/Message';
-	import { afterUpdate } from 'svelte';
-	import { browser } from '$app/environment';
 
-	import CopyToClipBoardBtn from '../CopyToClipBoardBtn.svelte';
+	import CodeBlock from '../CodeBlock.svelte';
 
 	function sanitizeMd(md: string) {
 		return md.replaceAll('<', '&lt;');
 	}
 
 	export let message: Message;
-	let html = '';
 	let el: HTMLElement;
-
-	const renderer = new marked.Renderer();
-
-	// Add wrapper to code blocks
-	renderer.code = (code, lang) => {
-		return `
-			<div class="group code-block">
-				<pre>
-					<code class="language-${lang}">${code}</code>
-				</pre>
-			</div>
-		`.replaceAll('\t', '');
-	};
-
-	const handleParsed = (err: Error | null, parsedHtml: string) => {
-		if (err) {
-			console.error(err);
-		} else {
-			html = parsedHtml;
-		}
-	};
 
 	const options: marked.MarkedOptions = {
 		...marked.getDefaults(),
-		gfm: true,
-		highlight: (code, lang, callback) => {
-			import('highlight.js').then(
-				({ default: hljs }) => {
-					const language = hljs.getLanguage(lang);
-					callback?.(null, hljs.highlightAuto(code, language?.aliases).value);
-				},
-				(err) => {
-					console.error(err);
-					callback?.(err);
-				}
-			);
-		},
-		renderer
+		gfm: true
 	};
 
-	$: browser &&
-		message.from === 'assistant' &&
-		marked(sanitizeMd(message.content), options, handleParsed);
-
-	if (message.from === 'assistant') {
-		html = marked(sanitizeMd(message.content), options);
-	}
-
-	afterUpdate(() => {
-		if (el) {
-			const codeBlocks = el.querySelectorAll('.code-block');
-
-			// Add copy to clipboard button to each code block
-			codeBlocks.forEach((block) => {
-				if (block.classList.contains('has-copy-btn')) return;
-
-				new CopyToClipBoardBtn({
-					target: block,
-					props: {
-						value: (block as HTMLElement).innerText ?? '',
-						classNames:
-							'absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100'
-					}
-				});
-				block.classList.add('has-copy-btn');
-			});
-		}
-	});
+	$: tokens = marked.lexer(sanitizeMd(message.content));
 </script>
 
 {#if message.from === 'assistant'}
@@ -94,7 +30,13 @@
 			class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300"
 			bind:this={el}
 		>
-			{@html html}
+			{#each tokens as token}
+				{#if token.type === 'code'}
+					<CodeBlock lang={token.lang} code={token.text} />
+				{:else}
+					{@html marked.parser([token], options)}
+				{/if}
+			{/each}
 		</div>
 	</div>
 {/if}
