@@ -14,11 +14,12 @@
 
 	const hf = new HfInference();
 
-	let conversationId = $page.params.id;
 	let loading = false;
 	let pending = false;
 
 	async function getTextGenerationStream(inputs: string) {
+		let conversationId = $page.params.id;
+
 		const response = hf.endpoint($page.url.href).textGenerationStream(
 			{
 				inputs,
