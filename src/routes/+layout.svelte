@@ -95,6 +95,7 @@
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
 			{#each data.conversations as conv}
 				<a
+					data-sveltekit-noscroll
 					href="{base}/conversation/{conv.id}"
 					class="pl-3 pr-2 h-12 group rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1 {conv.id ===
 					$page.params.id

@@ -1,3 +1,6 @@
+import { navigating } from '$app/stores';
+import { get } from 'svelte/store';
+
 /**
  * @param node element to snap scroll to bottom
  * @param dependency pass in a dependency to update scroll on changes.
@@ -25,7 +28,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 		const options = { ...defaultOptions, ..._options };
 		const { force } = options;
 
-		if (!force && isDetached) return;
+		if (!force && isDetached && !get(navigating)) return;
 
 		node.scroll({
 			top: node.scrollHeight
