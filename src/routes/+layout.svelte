@@ -102,7 +102,7 @@
 						? 'bg-gray-100 dark:bg-gray-700'
 						: ''}"
 				>
-					<div class="flex-1 truncate">azeza aze a ea zeazeazazeae</div>
+					<div class="flex-1 truncate">{conv.title}</div>
 
 					<button
 						type="button"
