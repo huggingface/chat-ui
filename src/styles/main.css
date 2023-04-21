@@ -14,12 +14,4 @@
 	.scrollbar-custom {
 		@apply !scrollbar-thin !scrollbar-w-1 !scrollbar-thumb-rounded-full !scrollbar-track-transparent !scrollbar-thumb-black/10 dark:!scrollbar-thumb-white/10;
 	}
-
-	.code-block {
-		@apply relative rounded-lg my-4;
-	}
-
-	.code-block > pre {
-		@apply overflow-auto px-5 py-3.5 text-gray-500 dark:text-gray-400;
-	}
 }
