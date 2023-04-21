@@ -67,6 +67,7 @@
 			/// TODO(actually invalidate)
 			await invalidate("/");
 			await invalidate((url) => url.pathname === "/" || url.pathname === base);
+			location.reload();
 		}
 	}
 
