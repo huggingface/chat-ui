@@ -11,9 +11,7 @@
 
 	let loading = false;
 
-	const handleMessage = async (ev: CustomEvent<string>) => {
-		const message = ev.detail;
-
+	const handleMessage = async (message: string) => {
 		try {
 			loading = true;
 
@@ -32,4 +30,4 @@
 	};
 </script>
 
-<ChatWindow on:message={handleMessage} messages={data.messages} {loading} />
+<ChatWindow on:message={(ev) => handleMessage(ev.detail)} messages={data.messages} {loading} />
