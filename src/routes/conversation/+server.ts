@@ -24,6 +24,6 @@ export const POST: RequestHandler = async (input) => {
 	);
 };
 
-export const GET: RequestHandler = async ({ url }) => {
-	throw redirect(301, url.origin + base);
+export const GET: RequestHandler = async () => {
+	throw redirect(301, base || '/');
 };
