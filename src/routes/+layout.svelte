@@ -4,22 +4,18 @@
 	import "../styles/main.css";
 	import type { LayoutData } from "./$types";
 
+	import CarbonAdd from "~icons/carbon/add";
+	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
 	import { base } from "$app/paths";
+	import Modal from "$lib/components/Modal.svelte";
+	import MobileNav from "$lib/components/MobileNav.svelte";
+	import { switchTheme } from "$lib/switchTheme";
 
 	export let data: LayoutData;
 
-	function switchTheme() {
-		const { classList } = document.querySelector("html") as HTMLElement;
-		if (classList.contains("dark")) {
-			classList.remove("dark");
-			localStorage.theme = "light";
-		} else {
-			classList.add("dark");
-			localStorage.theme = "dark";
-		}
-	}
+	let isNavOpen = false;
 
 	async function shareConversation(id: string, title: string) {
 		try {
@@ -79,8 +75,20 @@
 </script>
 
 <div
-	class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
+	class="grid h-screen w-screen grid-rows-[auto,1fr] md:grid-rows-[1fr] md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
 >
+	<nav class="sm:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800">
+		<button on:click={() => (isNavOpen = true)}><CarbonTextAlignJustify /></button>
+		<button>New Chat</button>
+		<button><CarbonAdd /></button>
+	</nav>
+	<MobileNav
+		isOpen={isNavOpen}
+		onClose={() => (isNavOpen = false)}
+		{shareConversation}
+		{deleteConversation}
+		{data}
+	/>
 	<nav
 		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
