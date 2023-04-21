@@ -5,6 +5,8 @@ import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
+import type { Conversation } from "$lib/types/Conversation";
+import { listConversations } from "$lib/server/listConversations";
 
 export const POST: RequestHandler = async (input) => {
 	const body = await input.request.text();
@@ -52,6 +54,15 @@ export const POST: RequestHandler = async (input) => {
 	);
 };
 
-export const GET: RequestHandler = async () => {
-	throw redirect(301, base || "/");
+export const GET: RequestHandler = async (event) => {
+	return new Response(
+		JSON.stringify({
+			conversations: await listConversations(event.locals.sessionId),
+		}),
+		{
+			headers: {
+				"Content-Type": "application/json",
+			},
+		}
+	);
 };
