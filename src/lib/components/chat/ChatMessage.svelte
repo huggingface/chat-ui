@@ -8,7 +8,10 @@
 	import IconLoading from "../icons/IconLoading.svelte";
 
 	function sanitizeMd(md: string) {
-		return md.replaceAll("<", "&lt;");
+		return md.replaceAll("&", "&amp;").replaceAll("<", "&lt;");
+	}
+	function unsanitizeMd(md: string) {
+		return md.replaceAll("&lt;", "<").replaceAll("&amp;", "&");
 	}
 
 	export let message: Message;
@@ -18,9 +21,18 @@
 	let loadingEl: any;
 	let pendingTimeout: NodeJS.Timeout;
 
+	const renderer = new marked.Renderer();
+
+	// For code blocks with simple backticks
+	renderer.codespan = (code) => {
+		// Unsanitize double-sanitized code
+		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
+	};
+
 	const options: marked.MarkedOptions = {
 		...marked.getDefaults(),
 		gfm: true,
+		renderer,
 	};
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
@@ -62,7 +74,7 @@
 			>
 				{#each tokens as token}
 					{#if token.type === "code"}
-						<CodeBlock lang={token.lang} code={token.text} />
+						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
 						{@html marked.parser([token], options)}
 					{/if}
