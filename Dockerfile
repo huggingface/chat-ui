@@ -3,6 +3,8 @@
 
 FROM node:19
 
+RUN npm install -g pm2
+
 WORKDIR /app
 
 COPY . .
@@ -17,4 +19,4 @@ RUN npm run build
 
 ENV PORT 7860
 
-CMD ["node", "build"]
+CMD ["pm2", "start", "build/index.js" ,"-i", "2", "--no-daemon"]
