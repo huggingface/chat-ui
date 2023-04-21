@@ -84,7 +84,7 @@
 
 			await getTextGenerationStream(message);
 
-			if (messages.filter((m) => m.from === "user").length <= 10) {
+			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle().catch(console.error);
 			}
 
