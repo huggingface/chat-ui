@@ -117,6 +117,7 @@
 	>
 		<div class="flex-none sticky top-0 p-3 flex flex-col">
 			<button
+				type="button"
 				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
 				on:click={handleNewChat}
 				disabled={isCreatingNewChat}
