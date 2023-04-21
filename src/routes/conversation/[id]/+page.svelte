@@ -81,9 +81,7 @@
 			const val = $pendingMessage;
 			$pendingMessage = "";
 
-			if (messages.length === 0) {
-				writeMessage(val);
-			}
+			writeMessage(val);
 		}
 	});
 </script>

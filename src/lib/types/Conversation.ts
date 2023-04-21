@@ -12,4 +12,8 @@ export interface Conversation {
 
 	createdAt: Date;
 	updatedAt: Date;
+
+	meta?: {
+		fromShareId?: string;
+	};
 }
