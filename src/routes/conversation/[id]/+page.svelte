@@ -6,6 +6,7 @@
 	import { page } from "$app/stores";
 	import { HfInference } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
+	import { base } from "$app/paths";
 
 	export let data: PageData;
 
@@ -58,18 +59,14 @@
 		}
 	}
 
-	async function summarizeTitle() {
-		const response = await fetch($page.url.href, {
-			method: "PATCH",
-			body: JSON.stringify({
-				messages: messages.filter((m) => m.from === "user").map((m) => m.content),
-			}),
+	async function summarizeTitle(id: string) {
+		const response = await fetch(`${base}/conversation/${id}/summarize`, {
+			method: "POST",
 		});
-		const title = (await response.json()).title;
-		const conv = data.conversations.find((conv) => conv.id === $page.params.id);
-		if (conv) {
-			conv.title = title;
-			/// TODO(does not seem to be reactive)
+		if (response.ok) {
+			/// TODO(actually invalidate)
+			await invalidate("/");
+			await invalidate((url) => url.pathname === "/" || url.pathname === base);
 		}
 	}
 
@@ -85,7 +82,7 @@
 			await getTextGenerationStream(message);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
-				summarizeTitle().catch(console.error);
+				summarizeTitle($page.params.id).catch(console.error);
 			}
 
 			// Reload conversation order - doesn't seem to work
