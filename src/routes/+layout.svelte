@@ -137,6 +137,12 @@
 				Theme
 			</button>
 			<a
+				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
+				class="text-left flex items-center first-letter:capitalize truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+			>
+				Community feedback
+			</a>
+			<a
 				href={base}
 				class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
 			>
