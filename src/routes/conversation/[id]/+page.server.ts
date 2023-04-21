@@ -1,6 +1,5 @@
 import type { PageServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
-import type { Conversation } from "$lib/types/Conversation";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
 
