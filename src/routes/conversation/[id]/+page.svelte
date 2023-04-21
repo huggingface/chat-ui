@@ -5,8 +5,8 @@
 	import type { PageData } from "./$types";
 	import { page } from "$app/stores";
 	import { HfInference } from "@huggingface/inference";
-	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
+	import { triggerConversationsReload } from "$lib/stores/reloadConversations";
 
 	export let data: PageData;
 
@@ -66,10 +66,7 @@
 			method: "POST",
 		});
 		if (response.ok) {
-			/// TODO(actually invalidate)
-			await invalidate("/");
-			await invalidate((url) => url.pathname === "/" || url.pathname === base);
-			location.reload();
+			triggerConversationsReload();
 		}
 	}
 

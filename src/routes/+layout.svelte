@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from "$app/navigation";
 	import { page } from "$app/stores";
+	import { reloadConversationsNotifier } from "$lib/stores/reloadConversations";
 	import "../styles/main.css";
 	import type { LayoutData } from "./$types";
 
@@ -9,6 +10,8 @@
 	import { base } from "$app/paths";
 
 	export let data: LayoutData;
+
+	$: conversations = data.conversations;
 
 	function switchTheme() {
 		const { classList } = document.querySelector("html") as HTMLElement;
@@ -76,6 +79,14 @@
 			alert("Error while deleting conversation: " + err);
 		}
 	}
+
+	$: if ($reloadConversationsNotifier) {
+		fetch(`${base}/conversation`, { headers: { Accept: "application/json" } })
+			.then((res) => res.json())
+			.then((data) => {
+				conversations = data.conversations;
+			});
+	}
 </script>
 
 <div
@@ -93,7 +104,7 @@
 			</a>
 		</div>
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
-			{#each data.conversations as conv}
+			{#each conversations as conv}
 				<a
 					data-sveltekit-noscroll
 					href="{base}/conversation/{conv.id}"
