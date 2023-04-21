@@ -2,7 +2,9 @@
 	import type { Message } from '$lib/types/Message';
 	import { createEventDispatcher } from 'svelte';
 
+	import CarbonAdd from '~icons/carbon/add';
 	import CarbonSendAltFilled from '~icons/carbon/send-alt-filled';
+	import CarbonTextAlignJustify from '~icons/carbon/text-align-justify';
 
 	import ChatMessages from './ChatMessages.svelte';
 	import ChatInput from './ChatInput.svelte';
@@ -19,9 +21,9 @@
 
 <div class="relative h-screen">
 	<nav class="sm:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800">
-		<button>[ ]</button>
+		<button><CarbonTextAlignJustify /></button>
 		<button>New Chat</button>
-		<button>+</button>
+		<button><CarbonAdd /></button>
 	</nav>
 	<ChatMessages {loading} {pending} {messages} on:message />
 	<div
@@ -33,7 +35,7 @@
 				dispatch('message', message);
 				message = '';
 			}}
-			class="w-full relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 focus-within:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:focus-within:border-gray-500 transition-all"
+			class="w-full relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 focus-within:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:focus-within:border-gray-500 "
 		>
 			<div class="w-full flex flex-1 border-none bg-transparent">
 				<ChatInput placeholder="Ask anything" bind:value={message} autofocus maxRows={10} />

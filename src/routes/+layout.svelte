@@ -92,34 +92,38 @@
 				New Chat
 			</a>
 		</div>
-		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-2">
+		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
 			{#each data.conversations as conv}
 				<a
 					data-sveltekit-noscroll
 					href="{base}/conversation/{conv.id}"
-					class="pl-3 pr-2 h-12 group rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1 {conv.id ===
+					class="pl-3 pr-2 h-12 group rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5 {conv.id ===
 					$page.params.id
 						? 'bg-gray-100 dark:bg-gray-700'
 						: ''}"
 				>
-					<div class="flex-1 truncate">{conv.title}</div>
+					<div class="flex-1 truncate">azeza aze a ea zeazeazazeae</div>
 
 					<button
 						type="button"
-						class="w-6 h-6 items-center justify-center hidden group-hover:flex hover:bg-gray-100"
+						class="w-5 h-5 items-center justify-center hidden group-hover:flex rounded"
 						title="Share conversation"
 						on:click|preventDefault={() => shareConversation(conv.id, conv.title)}
 					>
-						<CarbonExport class="text-gray-400 hover:text-gray-600" />
+						<CarbonExport
+							class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
+						/>
 					</button>
 
 					<button
 						type="button"
-						class="w-6 h-6 items-center justify-center hidden group-hover:flex hover:bg-gray-100"
+						class="w-5 h-5 items-center justify-center hidden group-hover:flex rounded"
 						title="Delete conversation"
 						on:click|preventDefault={() => deleteConversation(conv.id)}
 					>
-						<CarbonTrashCan class="text-gray-400 hover:text-gray-600" />
+						<CarbonTrashCan
+							class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
+						/>
 					</button>
 				</a>
 			{/each}

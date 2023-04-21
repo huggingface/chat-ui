@@ -2,6 +2,8 @@
 	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from '$env/static/public';
 
 	import Logo from '$lib/components/icons/Logo.svelte';
+	import CarbonArrowUpRight from '~icons/carbon/arrow-up-right';
+	import CarbonEarth from '~icons/carbon/earth';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher<{ message: string }>();
@@ -11,7 +13,7 @@
 	<div class="lg:col-span-1">
 		<div>
 			<div class="text-2xl font-bold mb-3 flex items-center">
-				<Logo classNames="mr-2 text-yellow-400 text-3xl" />
+				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
 			</div>
 			<p class="text-lg text-gray-600 dark:text-gray-400">
@@ -26,20 +28,36 @@
 				<div class="font-semibold">{PUBLIC_MODEL_NAME}</div>
 			</div>
 			<div
-				class="flex items-center gap-4 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
+				class="flex items-center gap-5 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
 			>
-				<a href="https://huggingface.co/{PUBLIC_MODEL_NAME}" target="_blank" rel="noreferrer">
-					Model page
+				<a
+					href="https://huggingface.co/{PUBLIC_MODEL_NAME}"
+					target="_blank"
+					rel="noreferrer"
+					class="flex items-center hover:underline"
+				>
+					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
+					Model
+					<div class="max-sm:hidden">&nbsp;page</div>
 				</a>
 				<a
 					href="https://huggingface.co/datasets/OpenAssistant/oasst1"
 					target="_blank"
 					rel="noreferrer"
+					class="flex items-center hover:underline"
 				>
-					Dataset page
+					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
+					Dataset
+					<div class="max-sm:hidden">&nbsp;page</div>
 				</a>
-				<a href="https://open-assistant.io/" target="_blank" class="ml-auto" rel="noreferrer">
-					Open Assistant website
+				<a
+					href="https://open-assistant.io/"
+					target="_blank"
+					class="flex items-center hover:underline ml-auto"
+					rel="noreferrer"
+				>
+					<CarbonEarth class="text-xs mr-1.5 text-gray-400" />
+					Open Assistant Website
 				</a>
 			</div>
 		</div>
