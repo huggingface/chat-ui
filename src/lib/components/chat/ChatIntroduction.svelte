@@ -2,6 +2,8 @@
 	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from '$env/static/public';
 
 	import Logo from '$lib/components/icons/Logo.svelte';
+	import CarbonArrowUpRight from '~icons/carbon/arrow-up-right';
+	import CarbonEarth from '~icons/carbon/earth';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher<{ message: string }>();
@@ -26,19 +28,33 @@
 				<div class="font-semibold">{PUBLIC_MODEL_NAME}</div>
 			</div>
 			<div
-				class="flex items-center gap-4 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
+				class="flex items-center gap-5 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
 			>
-				<a href="https://huggingface.co/{PUBLIC_MODEL_NAME}" target="_blank" rel="noreferrer">
+				<a
+					href="https://huggingface.co/{PUBLIC_MODEL_NAME}"
+					target="_blank"
+					rel="noreferrer"
+					class="flex items-center hover:underline"
+				>
+					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
 					Model page
 				</a>
 				<a
 					href="https://huggingface.co/datasets/OpenAssistant/oasst1"
 					target="_blank"
 					rel="noreferrer"
+					class="flex items-center hover:underline"
 				>
+					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
 					Dataset page
 				</a>
-				<a href="https://open-assistant.io/" target="_blank" class="ml-auto" rel="noreferrer">
+				<a
+					href="https://open-assistant.io/"
+					target="_blank"
+					class="flex items-center hover:underline ml-auto"
+					rel="noreferrer"
+				>
+					<CarbonEarth class="text-xs mr-1.5 text-gray-400" />
 					Open Assistant website
 				</a>
 			</div>
