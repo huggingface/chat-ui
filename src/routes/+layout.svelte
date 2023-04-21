@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { goto, invalidateAll } from "$app/navigation";
+	import { goto } from "$app/navigation";
 	import { page } from "$app/stores";
-	import { reloadConversationsNotifier } from "$lib/stores/reloadConversations";
+	import {
+		reloadConversationsNotifier,
+		triggerConversationsReload,
+	} from "$lib/stores/reloadConversations";
 	import "../styles/main.css";
 	import type { LayoutData } from "./$types";
 
@@ -70,7 +73,7 @@
 			}
 
 			if ($page.params.id !== id) {
-				await invalidateAll();
+				triggerConversationsReload();
 			} else {
 				await goto(`/`, { invalidateAll: true });
 			}

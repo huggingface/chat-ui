@@ -83,10 +83,10 @@
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id).catch(console.error);
+			} else {
+				// update conversation order
+				triggerConversationsReload();
 			}
-
-			// Reload conversation order - doesn't seem to work
-			// await invalidate('/');
 		} finally {
 			loading = false;
 		}

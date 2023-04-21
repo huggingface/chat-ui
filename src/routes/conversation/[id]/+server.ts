@@ -39,6 +39,20 @@ export async function POST({ request, fetch, locals, params }) {
 		}),
 	});
 
+	// Pre-emptively update (may even add a state "generating" in DB) so that frontend can reload conversation order
+	collections.conversations
+		.updateOne(
+			{
+				_id: convId,
+			},
+			{
+				$set: {
+					updatedAt: new Date(),
+				},
+			}
+		)
+		.catch(console.error);
+
 	const [stream1, stream2] = resp.body!.tee();
 
 	async function saveMessage() {
