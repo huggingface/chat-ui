@@ -1,5 +1,5 @@
-import type { ObjectId } from 'mongodb';
-import type { Message } from './Message';
+import type { ObjectId } from "mongodb";
+import type { Message } from "./Message";
 
 export interface Conversation {
 	_id: ObjectId;

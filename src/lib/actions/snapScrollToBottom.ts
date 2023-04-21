@@ -1,5 +1,5 @@
-import { navigating } from '$app/stores';
-import { get } from 'svelte/store';
+import { navigating } from "$app/stores";
+import { get } from "svelte/store";
 
 /**
  * @param node element to snap scroll to bottom
@@ -31,18 +31,18 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 		if (!force && isDetached && !get(navigating)) return;
 
 		node.scroll({
-			top: node.scrollHeight
+			top: node.scrollHeight,
 		});
 	};
 
-	node.addEventListener('scroll', handleScroll);
+	node.addEventListener("scroll", handleScroll);
 
 	updateScroll({ force: true });
 
 	return {
 		update: updateScroll,
 		destroy: () => {
-			node.removeEventListener('scroll', handleScroll);
-		}
+			node.removeEventListener("scroll", handleScroll);
+		},
 	};
 };

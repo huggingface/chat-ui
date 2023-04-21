@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from '$env/static/public';
+	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from "$env/static/public";
 
-	import Logo from '$lib/components/icons/Logo.svelte';
-	import CarbonArrowUpRight from '~icons/carbon/arrow-up-right';
-	import CarbonEarth from '~icons/carbon/earth';
-	import { createEventDispatcher } from 'svelte';
+	import Logo from "$lib/components/icons/Logo.svelte";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import CarbonEarth from "~icons/carbon/earth";
+	import { createEventDispatcher } from "svelte";
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
@@ -62,7 +62,7 @@
 			</div>
 		</div>
 	</div>
-	{#if PUBLIC_DISABLE_INTRO_TILES !== 'true'}
+	{#if PUBLIC_DISABLE_INTRO_TILES !== "true"}
 		<div class="lg:col-span-3 lg:mt-12">
 			<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
 			<div class="grid lg:grid-cols-3 gap-3 lg:gap-5">
@@ -71,8 +71,8 @@
 					class="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
 					on:click={() =>
 						dispatch(
-							'message',
-							'Write an email from bullet list: \n\n- Buy milk\n- Buy eggs\n- Buy bread'
+							"message",
+							"Write an email from bullet list: \n\n- Buy milk\n- Buy eggs\n- Buy bread"
 						)}
 				>
 					"Write an email from bullet list"
@@ -81,14 +81,14 @@
 					type="button"
 					class="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
 					on:click={() =>
-						dispatch('message', 'Code a snake game in python, the snake should be red')}
+						dispatch("message", "Code a snake game in python, the snake should be red")}
 				>
 					"Code a snake game"
 				</button>
 				<button
 					type="button"
 					class="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
-					on:click={() => dispatch('message', 'How do I make a lemon cheesecake?')}
+					on:click={() => dispatch("message", "How do I make a lemon cheesecake?")}
 				>
 					"Assist in a task"
 				</button>

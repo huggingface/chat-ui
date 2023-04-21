@@ -1,8 +1,8 @@
 <script lang="ts">
-	export let value = '';
+	export let value = "";
 	export let minRows = 1;
 	export let maxRows: null | number = null;
-	export let placeholder = '';
+	export let placeholder = "";
 	export let disabled = false;
 	export let autofocus = false;
 
@@ -11,10 +11,10 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		// submit on enter
-		if (event.key === 'Enter' && !event.shiftKey) {
+		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
 
-			textareaElement.closest('form')?.requestSubmit();
+			textareaElement.closest("form")?.requestSubmit();
 		}
 	}
 
@@ -25,7 +25,7 @@
 	<pre
 		class="invisible py-3"
 		aria-hidden="true"
-		style="min-height: {minHeight}; max-height: {maxHeight}">{value + '&nbsp;\n'}</pre>
+		style="min-height: {minHeight}; max-height: {maxHeight}">{value + "&nbsp;\n"}</pre>
 
 	<textarea
 		tabindex="0"
