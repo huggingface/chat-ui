@@ -9,7 +9,6 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
 	import { base } from "$app/paths";
-	import Modal from "$lib/components/Modal.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 
