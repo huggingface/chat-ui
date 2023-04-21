@@ -14,6 +14,7 @@
 	const hf = new HfInference();
 
 	let loading = false;
+	let pending = false;
 
 	async function getTextGenerationStream(inputs: string) {
 		const response = hf.endpoint($page.url.href).textGenerationStream(
@@ -39,6 +40,8 @@
 		);
 
 		for await (const data of response) {
+			pending = false;
+
 			if (!data) break;
 
 			if (!data.token.special) {
@@ -60,6 +63,7 @@
 
 		try {
 			loading = true;
+			pending = true;
 
 			messages = [...messages, { from: 'user', content: message }];
 
@@ -84,4 +88,4 @@
 	});
 </script>
 
-<ChatWindow disabled={loading} {messages} on:message={(message) => writeMessage(message.detail)} />
+<ChatWindow {loading} {pending} {messages} on:message={(message) => writeMessage(message.detail)} />

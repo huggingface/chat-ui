@@ -1,15 +1,22 @@
 <script lang="ts">
 	import { marked } from 'marked';
 	import type { Message } from '$lib/types/Message';
+	import { afterUpdate } from 'svelte';
+	import { deepestChild } from '$lib/utils/dom';
 
 	import CodeBlock from '../CodeBlock.svelte';
+	import IconLoading from '../icons/IconLoading.svelte';
 
 	function sanitizeMd(md: string) {
 		return md.replaceAll('<', '&lt;');
 	}
 
 	export let message: Message;
-	let el: HTMLElement;
+	export let loading: boolean = false;
+
+	let contentEl: HTMLElement;
+	let loadingEl: any;
+	let pendingTimeout: NodeJS.Timeout;
 
 	const options: marked.MarkedOptions = {
 		...marked.getDefaults(),
@@ -17,6 +24,23 @@
 	};
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
+
+	afterUpdate(() => {
+		loadingEl?.$destroy();
+		clearTimeout(pendingTimeout);
+
+		// Add loading animation to the last message if update takes more than 600ms
+		if (loading) {
+			pendingTimeout = setTimeout(() => {
+				if (contentEl) {
+					loadingEl = new IconLoading({
+						target: deepestChild(contentEl),
+						props: { classNames: 'loading inline ml-2' }
+					});
+				}
+			}, 600);
+		}
+	});
 </script>
 
 {#if message.from === 'assistant'}
@@ -27,16 +51,23 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300"
-			bind:this={el}
+			class="relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300 min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px]"
 		>
-			{#each tokens as token}
-				{#if token.type === 'code'}
-					<CodeBlock lang={token.lang} code={token.text} />
-				{:else}
-					{@html marked.parser([token], options)}
-				{/if}
-			{/each}
+			{#if !message.content}
+				<IconLoading classNames="absolute inset-0 m-auto" />
+			{/if}
+			<div
+				class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950"
+				bind:this={contentEl}
+			>
+				{#each tokens as token}
+					{#if token.type === 'code'}
+						<CodeBlock lang={token.lang} code={token.text} />
+					{:else}
+						{@html marked.parser([token], options)}
+					{/if}
+				{/each}
+			</div>
 		</div>
 	</div>
 {/if}

@@ -34,4 +34,4 @@
 	}
 </script>
 
-<ChatWindow on:message={(ev) => createConversation(ev.detail)} disabled={loading} />
+<ChatWindow on:message={(ev) => createConversation(ev.detail)} {loading} />
