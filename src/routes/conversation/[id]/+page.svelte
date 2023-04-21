@@ -14,6 +14,7 @@
 
 	const hf = new HfInference();
 
+	let conversationId = $page.params.id;
 	let loading = false;
 	let pending = false;
 
@@ -43,7 +44,7 @@
 		for await (const data of response) {
 			pending = false;
 
-			if (!data) break;
+			if (!data || conversationId !== $page.params.id) break;
 
 			if (!data.token.special) {
 				const lastMessage = messages.at(-1);
