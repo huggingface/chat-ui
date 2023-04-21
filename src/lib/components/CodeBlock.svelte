@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { afterUpdate } from 'svelte';
-	import CopyToClipBoardBtn from './CopyToClipBoardBtn.svelte';
+	import { afterUpdate } from "svelte";
+	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
 
-	export let code = '';
-	export let lang = '';
+	export let code = "";
+	export let lang = "";
 
-	$: highlightedCode = '';
+	$: highlightedCode = "";
 
 	afterUpdate(async () => {
-		const { default: hljs } = await import('highlight.js');
+		const { default: hljs } = await import("highlight.js");
 		const language = hljs.getLanguage(lang);
 
 		highlightedCode = hljs.highlightAuto(code, language?.aliases).value;

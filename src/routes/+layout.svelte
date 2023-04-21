@@ -1,37 +1,37 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
-	import { page } from '$app/stores';
-	import '../styles/main.css';
-	import type { LayoutData } from './$types';
+	import { goto, invalidateAll } from "$app/navigation";
+	import { page } from "$app/stores";
+	import "../styles/main.css";
+	import type { LayoutData } from "./$types";
 
-	import CarbonTrashCan from '~icons/carbon/trash-can';
-	import CarbonExport from '~icons/carbon/export';
-	import { base } from '$app/paths';
+	import CarbonTrashCan from "~icons/carbon/trash-can";
+	import CarbonExport from "~icons/carbon/export";
+	import { base } from "$app/paths";
 
 	export let data: LayoutData;
 
 	function switchTheme() {
-		const { classList } = document.querySelector('html') as HTMLElement;
-		if (classList.contains('dark')) {
-			classList.remove('dark');
-			localStorage.theme = 'light';
+		const { classList } = document.querySelector("html") as HTMLElement;
+		if (classList.contains("dark")) {
+			classList.remove("dark");
+			localStorage.theme = "light";
 		} else {
-			classList.add('dark');
-			localStorage.theme = 'dark';
+			classList.add("dark");
+			localStorage.theme = "dark";
 		}
 	}
 
 	async function shareConversation(id: string, title: string) {
 		try {
 			const res = await fetch(`${base}/conversation/${id}/share`, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json'
-				}
+					"Content-Type": "application/json",
+				},
 			});
 
 			if (!res.ok) {
-				alert('Error while sharing conversation: ' + (await res.text()));
+				alert("Error while sharing conversation: " + (await res.text()));
 				return;
 			}
 
@@ -40,29 +40,29 @@
 			if (navigator.share) {
 				navigator.share({
 					title,
-					text: 'Share this chat with others',
-					url
+					text: "Share this chat with others",
+					url,
 				});
 			} else {
-				prompt('Share this link with your friends:', url);
+				prompt("Share this link with your friends:", url);
 			}
 		} catch (err) {
 			console.error(err);
-			alert('Error while sharing conversation: ' + err);
+			alert("Error while sharing conversation: " + err);
 		}
 	}
 
 	async function deleteConversation(id: string) {
 		try {
 			const res = await fetch(`${base}/conversation/${id}`, {
-				method: 'DELETE',
+				method: "DELETE",
 				headers: {
-					'Content-Type': 'application/json'
-				}
+					"Content-Type": "application/json",
+				},
 			});
 
 			if (!res.ok) {
-				alert('Error while deleting conversation: ' + (await res.text()));
+				alert("Error while deleting conversation: " + (await res.text()));
 				return;
 			}
 
@@ -73,7 +73,7 @@
 			}
 		} catch (err) {
 			console.error(err);
-			alert('Error while deleting conversation: ' + err);
+			alert("Error while deleting conversation: " + err);
 		}
 	}
 </script>

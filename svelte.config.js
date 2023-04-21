@@ -1,9 +1,9 @@
-import adapter from '@sveltejs/adapter-node';
-import { vitePreprocess } from '@sveltejs/kit/vite';
-import dotenv from 'dotenv';
+import adapter from "@sveltejs/adapter-node";
+import { vitePreprocess } from "@sveltejs/kit/vite";
+import dotenv from "dotenv";
 
-dotenv.config({ path: './.env.local' });
-dotenv.config({ path: './.env' });
+dotenv.config({ path: "./.env.local" });
+dotenv.config({ path: "./.env" });
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -15,9 +15,9 @@ const config = {
 		adapter: adapter(),
 
 		paths: {
-			base: process.env.APP_BASE || ''
-		}
-	}
+			base: process.env.APP_BASE || "",
+		},
+	},
 };
 
 export default config;

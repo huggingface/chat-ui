@@ -1,11 +1,11 @@
 <script lang="ts">
-	import ChatWindow from '$lib/components/chat/ChatWindow.svelte';
-	import { pendingMessage } from '$lib/stores/pendingMessage';
-	import { onMount } from 'svelte';
-	import type { PageData } from './$types';
-	import { page } from '$app/stores';
-	import { HfInference } from '@huggingface/inference';
-	import { invalidate } from '$app/navigation';
+	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { onMount } from "svelte";
+	import type { PageData } from "./$types";
+	import { page } from "$app/stores";
+	import { HfInference } from "@huggingface/inference";
+	import { invalidate } from "$app/navigation";
 
 	export let data: PageData;
 
@@ -30,12 +30,12 @@
 					truncate: 1024,
 					watermark: false,
 					max_new_tokens: 1024,
-					stop: ['<|endoftext|>'],
-					return_full_text: false
-				}
+					stop: ["<|endoftext|>"],
+					return_full_text: false,
+				},
 			},
 			{
-				use_cache: false
+				use_cache: false,
 			}
 		);
 
@@ -47,9 +47,9 @@
 			if (!data.token.special) {
 				const lastMessage = messages.at(-1);
 
-				if (lastMessage?.from !== 'assistant') {
+				if (lastMessage?.from !== "assistant") {
 					// First token has a space at the beginning, trim it
-					messages = [...messages, { from: 'assistant', content: data.token.text.trimStart() }];
+					messages = [...messages, { from: "assistant", content: data.token.text.trimStart() }];
 				} else {
 					lastMessage.content += data.token.text;
 					messages = [...messages];
@@ -65,7 +65,7 @@
 			loading = true;
 			pending = true;
 
-			messages = [...messages, { from: 'user', content: message }];
+			messages = [...messages, { from: "user", content: message }];
 
 			await getTextGenerationStream(message);
 
@@ -79,7 +79,7 @@
 	onMount(async () => {
 		if ($pendingMessage) {
 			const val = $pendingMessage;
-			$pendingMessage = '';
+			$pendingMessage = "";
 
 			if (messages.length === 0) {
 				writeMessage(val);

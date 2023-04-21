@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { marked } from 'marked';
-	import type { Message } from '$lib/types/Message';
-	import { afterUpdate } from 'svelte';
-	import { deepestChild } from '$lib/utils/dom';
+	import { marked } from "marked";
+	import type { Message } from "$lib/types/Message";
+	import { afterUpdate } from "svelte";
+	import { deepestChild } from "$lib/utils/dom";
 
-	import CodeBlock from '../CodeBlock.svelte';
-	import IconLoading from '../icons/IconLoading.svelte';
+	import CodeBlock from "../CodeBlock.svelte";
+	import IconLoading from "../icons/IconLoading.svelte";
 
 	function sanitizeMd(md: string) {
-		return md.replaceAll('<', '&lt;');
+		return md.replaceAll("<", "&lt;");
 	}
 
 	export let message: Message;
@@ -20,7 +20,7 @@
 
 	const options: marked.MarkedOptions = {
 		...marked.getDefaults(),
-		gfm: true
+		gfm: true,
 	};
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
@@ -35,7 +35,7 @@
 				if (contentEl) {
 					loadingEl = new IconLoading({
 						target: deepestChild(contentEl),
-						props: { classNames: 'loading inline ml-2' }
+						props: { classNames: "loading inline ml-2" },
 					});
 				}
 			}, 600);
@@ -43,7 +43,7 @@
 	});
 </script>
 
-{#if message.from === 'assistant'}
+{#if message.from === "assistant"}
 	<div class="flex items-start justify-start gap-4 leading-relaxed">
 		<img
 			alt=""
@@ -61,7 +61,7 @@
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
-					{#if token.type === 'code'}
+					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={token.text} />
 					{:else}
 						{@html marked.parser([token], options)}
@@ -71,7 +71,7 @@
 		</div>
 	</div>
 {/if}
-{#if message.from === 'user'}
+{#if message.from === "user"}
 	<div class="flex items-start justify-start gap-4">
 		<div class="mt-5 w-3 h-3 flex-none rounded-full" />
 		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400 whitespace-break-spaces">

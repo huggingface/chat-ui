@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy } from "svelte";
 
-	import IconCopy from './icons/IconCopy.svelte';
-	import Tooltip from './Tooltip.svelte';
+	import IconCopy from "./icons/IconCopy.svelte";
+	import Tooltip from "./Tooltip.svelte";
 
-	export let classNames = '';
+	export let classNames = "";
 	export let value: string;
 
 	let isSuccess = false;
@@ -39,12 +39,12 @@
 		{!isSuccess && 'text-gray-200 dark:text-gray-200'}
 		{isSuccess && 'text-green-500'}
 	"
-	title={'Copy to clipboard'}
+	title={"Copy to clipboard"}
 	type="button"
 	on:click={handleClick}
 >
 	<span class="relative">
 		<IconCopy />
-		<Tooltip classNames={isSuccess ? 'opacity-100' : 'opacity-0'} />
+		<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
 	</span>
 </button>
