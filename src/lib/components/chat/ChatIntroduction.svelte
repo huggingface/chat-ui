@@ -37,7 +37,8 @@
 					class="flex items-center hover:underline"
 				>
 					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
-					Model page
+					Model
+					<div class="max-sm:hidden">&nbsp;page</div>
 				</a>
 				<a
 					href="https://huggingface.co/datasets/OpenAssistant/oasst1"
@@ -46,7 +47,8 @@
 					class="flex items-center hover:underline"
 				>
 					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
-					Dataset page
+					Dataset
+					<div class="max-sm:hidden">&nbsp;page</div>
 				</a>
 				<a
 					href="https://open-assistant.io/"
@@ -55,7 +57,7 @@
 					rel="noreferrer"
 				>
 					<CarbonEarth class="text-xs mr-1.5 text-gray-400" />
-					Open Assistant website
+					Open Assistant Website
 				</a>
 			</div>
 		</div>

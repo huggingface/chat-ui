@@ -109,7 +109,9 @@
 						title="Share conversation"
 						on:click|preventDefault={() => shareConversation(conv.id, conv.title)}
 					>
-						<CarbonExport class="text-gray-400 hover:text-gray-300 text-xs" />
+						<CarbonExport
+							class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
+						/>
 					</button>
 
 					<button
@@ -118,7 +120,9 @@
 						title="Delete conversation"
 						on:click|preventDefault={() => deleteConversation(conv.id)}
 					>
-						<CarbonTrashCan class="text-gray-400 hover:text-gray-300 text-xs" />
+						<CarbonTrashCan
+							class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
+						/>
 					</button>
 				</a>
 			{/each}
