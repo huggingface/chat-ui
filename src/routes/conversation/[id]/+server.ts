@@ -1,5 +1,5 @@
 import { HF_TOKEN } from "$env/static/private";
-import { PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
+import { MODEL_ENDPOINT } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt.js";
 import { collections } from "$lib/server/database.js";
 import type { Message } from "$lib/types/Message.js";
@@ -27,7 +27,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const messages = [...conv.messages, { from: "user", content: json.inputs }] satisfies Message[];
 	const prompt = buildPrompt(messages);
 
-	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
+	const resp = await fetch(MODEL_ENDPOINT, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
 			Authorization: `Basic ${HF_TOKEN}`,
