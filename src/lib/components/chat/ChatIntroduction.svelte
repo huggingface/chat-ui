@@ -11,7 +11,7 @@
 	<div class="lg:col-span-1">
 		<div>
 			<div class="text-2xl font-bold mb-3 flex items-center">
-				<Logo classNames="mr-2 text-yellow-400 text-3xl" />
+				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
 			</div>
 			<p class="text-lg text-gray-600 dark:text-gray-400">
