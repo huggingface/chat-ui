@@ -6,7 +6,7 @@ colorTo: purple
 sdk: docker
 pinned: false
 license: other
-base_url: /chat
+base_path: /chat
 ---
 
 # Chat UI
