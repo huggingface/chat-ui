@@ -79,7 +79,7 @@
 	}
 
 	onMount(async () => {
-		if ($pendingMessage?.message) {
+		if ($pendingMessage?.message && $pendingMessage.conversationId === $page.params.id) {
 			const val = $pendingMessage.message;
 			$pendingMessage = null;
 

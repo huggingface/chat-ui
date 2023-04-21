@@ -97,18 +97,16 @@
 
 			const conversationId = await createConversation();
 
-			isCreatingNewChat = false;
-
 			pendingMessage.set({ conversationId, message: "" });
 
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (e: any) {
 			alert("Error while creating conversation: " + e.message);
+		} finally {
+			isCreatingNewChat = false;
 		}
 	}
-
-	console.log(isCreatingNewChat);
 </script>
 
 <div
