@@ -24,7 +24,7 @@ export async function POST({ params, url, locals }) {
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: url.origin + `${base}/r/${existingShare._id}`,
+				url: (SHARE_BASE_URL || `${url.origin}${base}`) + `/r/${existingShare._id}`,
 			}),
 			{ headers: { "Content-Type": "application/json" } }
 		);
