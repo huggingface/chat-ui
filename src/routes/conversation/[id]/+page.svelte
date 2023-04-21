@@ -65,6 +65,8 @@
 			loading = true;
 			pending = true;
 
+			$pendingMessage = null;
+
 			messages = [...messages, { from: "user", content: message }];
 
 			await getTextGenerationStream(message);
@@ -77,9 +79,9 @@
 	}
 
 	onMount(async () => {
-		if ($pendingMessage) {
-			const val = $pendingMessage;
-			$pendingMessage = "";
+		if ($pendingMessage?.message) {
+			const val = $pendingMessage.message;
+			$pendingMessage = null;
 
 			writeMessage(val);
 		}

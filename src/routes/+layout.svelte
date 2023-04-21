@@ -7,8 +7,13 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
 	import { base } from "$app/paths";
+	import { createConversation } from "$lib/api";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { get } from "svelte/store";
 
 	export let data: LayoutData;
+
+	let isCreatingNewChat: boolean = false;
 
 	function switchTheme() {
 		const { classList } = document.querySelector("html") as HTMLElement;
@@ -76,6 +81,34 @@
 			alert("Error while deleting conversation: " + err);
 		}
 	}
+
+	async function handleNewChat() {
+		if ($pendingMessage !== null) {
+			await goto(`${base}/conversation/${$pendingMessage.conversationId}`, {
+				invalidateAll: true,
+			});
+			return;
+		}
+
+		try {
+			if (isCreatingNewChat) return;
+
+			isCreatingNewChat = true;
+
+			const conversationId = await createConversation();
+
+			isCreatingNewChat = false;
+
+			pendingMessage.set({ conversationId, message: "" });
+
+			// invalidateAll to update list of conversations
+			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+		} catch (e: any) {
+			alert("Error while creating conversation: " + e.message);
+		}
+	}
+
+	console.log(isCreatingNewChat);
 </script>
 
 <div
@@ -85,12 +118,13 @@
 		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
 		<div class="flex-none sticky top-0 p-3 flex flex-col">
-			<a
-				href={base}
+			<button
 				class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
+				on:click={handleNewChat}
+				disabled={isCreatingNewChat}
 			>
 				New Chat
-			</a>
+			</button>
 		</div>
 		<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
 			{#each data.conversations as conv}

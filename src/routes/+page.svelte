@@ -1,37 +1,31 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
+	import { createConversation } from "$lib/api";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 
 	let loading = false;
 
-	async function createConversation(message: string) {
+	const handleMessage = async (ev: CustomEvent<string>) => {
+		const message = ev.detail;
+
 		try {
 			loading = true;
-			const res = await fetch(`${base}/conversation`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
 
-			if (!res.ok) {
-				alert("Error while creating conversation: " + (await res.text()));
-				return;
-			}
-
-			const { conversationId } = await res.json();
+			const conversationId = await createConversation();
 
 			// Ugly hack to use a store as temp storage, feel free to improve ^^
-			pendingMessage.set(message);
+			pendingMessage.set({ message, conversationId });
 
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+		} catch (e: any) {
+			alert("Error while creating conversation: " + e.message);
 		} finally {
 			loading = false;
 		}
-	}
+	};
 </script>
 
-<ChatWindow on:message={(ev) => createConversation(ev.detail)} {loading} />
+<ChatWindow on:message={handleMessage} {loading} />
