@@ -1,6 +1,8 @@
 import type { RequestHandler } from './$types';
 import { collections } from '$lib/server/database';
 import { ObjectId } from 'mongodb';
+import { redirect } from '@sveltejs/kit';
+import { base } from '$app/paths';
 
 export const POST: RequestHandler = async (input) => {
 	const res = await collections.conversations.insertOne({
@@ -20,4 +22,8 @@ export const POST: RequestHandler = async (input) => {
 		}),
 		{ headers: { 'Content-Type': 'application/json' } }
 	);
+};
+
+export const GET: RequestHandler = async () => {
+	throw redirect(301, base || '/');
 };
