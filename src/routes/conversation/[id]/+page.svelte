@@ -7,6 +7,9 @@
 	import { HfInference } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
+	import { trimSuffix } from "$lib/utils/trimSuffix";
+	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
+	import { trimPrefix } from "$lib/utils/trimPrefix";
 
 	export let data: PageData;
 
@@ -46,6 +49,19 @@
 			pending = false;
 
 			if (!data || conversationId !== $page.params.id) break;
+
+			// final message
+			if (data.generated_text) {
+				const lastMessage = messages.at(-1);
+				if (lastMessage) {
+					lastMessage.content = trimPrefix(
+						trimSuffix(data.generated_text, PUBLIC_SEP_TOKEN),
+						"<|startoftext|>"
+					);
+					messages = [...messages];
+				}
+				break;
+			}
 
 			if (!data.token.special) {
 				const lastMessage = messages.at(-1);

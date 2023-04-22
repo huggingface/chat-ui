@@ -1,10 +1,12 @@
 import { HF_TOKEN } from "$env/static/private";
-import { PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
+import { PUBLIC_MODEL_ENDPOINT, PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt.js";
 import { collections } from "$lib/server/database.js";
 import type { Message } from "$lib/types/Message.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
 import { sum } from "$lib/utils/sum";
+import { trimPrefix } from "$lib/utils/trimPrefix.js";
+import { trimSuffix } from "$lib/utils/trimSuffix.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -48,6 +50,8 @@ export async function POST({ request, fetch, locals, params }) {
 		if (generated_text.startsWith(prompt)) {
 			generated_text = generated_text.slice(prompt.length);
 		}
+
+		generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
 
 		messages.push({ from: "assistant", content: generated_text });
 
