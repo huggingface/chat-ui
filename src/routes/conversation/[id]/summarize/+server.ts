@@ -5,7 +5,7 @@ import { collections } from "$lib/server/database.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
-export async function POST({ params, locals }) {
+export async function POST({ params, locals, fetch }) {
 	const convId = new ObjectId(params.id);
 
 	const conversation = await collections.conversations.findOne({
