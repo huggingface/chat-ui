@@ -69,7 +69,7 @@
 			if ($page.params.id !== id) {
 				await invalidateAll();
 			} else {
-				await goto(`/`, { invalidateAll: true });
+				await goto(base || "/", { invalidateAll: true });
 			}
 		} catch (err) {
 			console.error(err);
