@@ -53,5 +53,5 @@ export const POST: RequestHandler = async (input) => {
 };
 
 export const GET: RequestHandler = async () => {
-	throw redirect(301, base || "/");
+	throw redirect(302, base || "/");
 };
