@@ -2,7 +2,7 @@
 	import { marked } from "marked";
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate } from "svelte";
-	import { deepestChild } from "$lib/utils/dom";
+	import { deepestChild } from "$lib/utils/deepestChild";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
