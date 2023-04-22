@@ -75,7 +75,7 @@
 			if ($page.params.id !== id) {
 				triggerConversationsReload();
 			} else {
-				await goto(`/`, { invalidateAll: true });
+				await goto(base || "/", { invalidateAll: true });
 			}
 		} catch (err) {
 			console.error(err);
