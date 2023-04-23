@@ -84,26 +84,33 @@
 	class="grid h-screen w-screen md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
 >
 	<nav
-		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen  bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
+		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 	>
-		<div class="flex-none sticky top-0 px-3 py-4 flex justify-between items-center">
-			<Logo classNames="text-3xl translate-y-[2.5px]" />
+		<div class="flex-none sticky top-0 gap-2 px-3 py-4 flex justify-between items-center">
+			<div class="flex items-center font-bold gap-0.5 text-lg">
+				<Logo
+					classNames="text-3xl translate-y-[2.5px] {$page.url.pathname == '/'
+						? 'grayscale opacity-50'
+						: ''}"
+				/>
+			</div>
 			<a
 				href={base || "/"}
-				class="border flex items-center text-gray-600  pl-1.5 pr-2 leading-loose justify-center shadow rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 text-center text-sm"
+				class="{$page.url.pathname == '/'
+					? 'opacity-50'
+					: ''} border flex items-center text-gray-600  pl-1.5 pr-2 py-1.5 w-full justify-center shadow hover:shadow-sm rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 text-center text-sm"
 			>
-				<CarbonAdd class="text-xs mr-0.5 text-gray-600" />
-				New
+				New Chat
 			</a>
 		</div>
-		<div class="flex flex-col overflow-y-auto p-3 gap-1">
+		<div class="flex flex-col overflow-y-auto px-3 pb-3 gap-1">
 			{#each data.conversations as conv}
 				<a
 					data-sveltekit-noscroll
 					href="{base}/conversation/{conv.id}"
 					class="pl-3 pr-2 h-11 group rounded-lg flex-none flex items-center gap-1.5 {conv.id ===
 					$page.params.id
-						? 'bg-gray-100 dark:bg-gray-700 text-gray-800'
+						? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
 						: 'text-gray-500 dark:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-gray-700 '}"
 				>
 					<div class="flex-1 truncate">{conv.title}</div>
