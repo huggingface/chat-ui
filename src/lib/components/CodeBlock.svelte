@@ -16,7 +16,7 @@
 </script>
 
 <div class="group relative rounded-lg my-4">
-	<pre class="overflow-auto px-5 py-3.5"><code class="language-{lang}"
+	<pre class="overflow-auto px-5"><code class="language-{lang}"
 			>{@html highlightedCode || code.replaceAll("<", "&lt;")}</code
 		></pre>
 	<CopyToClipBoardBtn
