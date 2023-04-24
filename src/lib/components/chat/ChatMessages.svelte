@@ -2,7 +2,7 @@
 	import type { Message } from "$lib/types/Message";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import ScrollToBottomBtn from "$lib/components/ScrollToBottomBtn.svelte";
-	import { afterUpdate } from "svelte";
+	import { tick } from "svelte";
 
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
@@ -13,12 +13,15 @@
 
 	let chatContainer: HTMLElement;
 
+	async function scrollToBottom() {
+		await tick();
+		chatContainer.scrollTop = chatContainer.scrollHeight;
+	}
+
 	// If last message is from user, scroll to bottom
-	afterUpdate(() => {
-		if (messages.at(-1)?.from === "user") {
-			chatContainer?.scrollTo({ top: chatContainer.scrollHeight });
-		}
-	});
+	$: if (messages.at(-1)?.from === "user") {
+		scrollToBottom();
+	}
 </script>
 
 <div class="overflow-y-auto h-full" use:snapScrollToBottom={messages} bind:this={chatContainer}>
