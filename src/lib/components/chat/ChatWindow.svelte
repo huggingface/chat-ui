@@ -58,6 +58,7 @@
 			{#if messages.length}
 				<button
 					class="flex items-center hover:underline hover:text-gray-400"
+					type="button"
 					on:click={() => dispatch("share")}
 				>
 					<CarbonExport class="text-[.6rem] mr-1.5 text-yellow-500" />Share this conversation
