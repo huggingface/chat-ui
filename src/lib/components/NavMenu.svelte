@@ -27,43 +27,39 @@
 	</a>
 </div>
 <div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
-	<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
-		{#each conversations as conv}
-			<a
-				data-sveltekit-noscroll
-				href="{base}/conversation/{conv.id}"
-				class="group pl-3 pr-2 h-11 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5 {conv.id ===
-				$page.params.id
-					? 'bg-gray-100 dark:bg-gray-700'
-					: ''}"
+	{#each conversations as conv}
+		<a
+			data-sveltekit-noscroll
+			href="{base}/conversation/{conv.id}"
+			class="group pl-3 pr-2 h-11 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5 {conv.id ===
+			$page.params.id
+				? 'bg-gray-100 dark:bg-gray-700'
+				: ''}"
+		>
+			<div class="flex-1 truncate">{conv.title}</div>
+
+			<button
+				type="button"
+				class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center  rounded"
+				title="Share conversation"
+				on:click|preventDefault={() =>
+					dispatch("shareConversation", { id: conv.id, title: conv.title })}
 			>
-				<div class="flex-1 truncate">{conv.title}</div>
+				<CarbonExport class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs" />
+			</button>
 
-				<button
-					type="button"
-					class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center  rounded"
-					title="Share conversation"
-					on:click|preventDefault={() =>
-						dispatch("shareConversation", { id: conv.id, title: conv.title })}
-				>
-					<CarbonExport
-						class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
-					/>
-				</button>
-
-				<button
-					type="button"
-					class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center rounded"
-					title="Delete conversation"
-					on:click|preventDefault={() => dispatch("deleteConversation", conv.id)}
-				>
-					<CarbonTrashCan
-						class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
-					/>
-				</button>
-			</a>
-		{/each}
-	</div>
+			<button
+				type="button"
+				class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center rounded"
+				title="Delete conversation"
+				on:click|preventDefault={() => dispatch("deleteConversation", conv.id)}
+			>
+				<CarbonTrashCan
+					class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
+				/>
+			</button>
+		</a>
+	{/each}
 </div>
 <div class="flex flex-col p-3 gap-2">
 	<button
