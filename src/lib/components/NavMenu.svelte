@@ -19,7 +19,7 @@
 	}> = [];
 </script>
 
-<div class="flex-none max-sm:pt-0 sticky top-0 p-3 flex items-center justify-between">
+<div class="flex-none max-sm:pt-0 sticky top-0 px-3 py-3.5 flex items-center justify-between">
 	<div class="rounded-xl font-semibold text-lg flex items-center">
 		<Logo classNames="mr-1 text-3xl" />
 		HuggingChat
