@@ -18,7 +18,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 			isDetached = true;
 		}
 
-		// if user scrolled back to bottom, we reattach
+		// if user scrolled back to within 10px of bottom, we reattach
 		if (node.scrollTop - (node.scrollHeight - node.clientHeight) >= -detachedOffset) {
 			isDetached = false;
 		}
