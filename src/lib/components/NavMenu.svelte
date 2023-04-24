@@ -26,7 +26,7 @@
 		New Chat
 	</a>
 </div>
-<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
+<div class="flex flex-col overflow-y-auto scrollbar-custom p-3 -mt-3 gap-1">
 	{#each conversations as conv}
 		<a
 			data-sveltekit-noscroll
