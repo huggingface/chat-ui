@@ -63,13 +63,13 @@
 			class="mt-5 w-3 h-3 flex-none rounded-full shadow-lg"
 		/>
 		<div
-			class="relative rounded-2xl px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300 min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px]"
+			class="relative rounded-2xl prose-pre:my-2 px-5 py-3.5 border border-gray-100 bg-gradient-to-br from-gray-50 dark:from-gray-800/40 dark:border-gray-800 text-gray-600 dark:text-gray-300 min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px]"
 		>
 			{#if !message.content}
 				<IconLoading classNames="absolute inset-0 m-auto" />
 			{/if}
 			<div
-				class="prose dark:prose-invert :prose-pre:bg-gray-100 dark:prose-pre:bg-gray-950 prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-headings:font-semibold max-w-none"
+				class="prose dark:prose-invert prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900 prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-headings:font-semibold max-w-none"
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
