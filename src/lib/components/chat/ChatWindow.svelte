@@ -22,7 +22,7 @@
 <div class="relative min-h-0">
 	<ChatMessages {loading} {pending} {messages} on:message />
 	<div
-		class="flex flex-col max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-4 md:py-8 w-full"
+		class="flex flex-col max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-3.5 sm:px-5 bottom-0 py-4 md:py-8 w-full"
 	>
 		<form
 			on:submit|preventDefault={() => {
@@ -45,17 +45,19 @@
 				</button>
 			</div>
 		</form>
-		<div class="flex text-xs text-gray-400/80 mt-2 justify-between self-stretch px-1">
+		<div class="flex text-xs text-gray-400/90 mt-2 justify-between self-stretch px-1 max-sm:gap-2">
 			<p>
-				Model: {PUBLIC_MODEL_NAME} · Generated content may be inaccurate or false.
+				Model: {PUBLIC_MODEL_NAME} <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated
+				content may be inaccurate or false.
 			</p>
 			{#if messages.length}
 				<button
-					class="flex items-center hover:underline hover:text-gray-400"
+					class="flex flex-none items-center hover:underline hover:text-gray-400 dark:max-sm:bg-gray-800 max-sm:bg-gray-50  max-sm:px-2.5 max-sm:rounded-lg"
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] mr-1.5 text-yellow-500" />Share this conversation
+					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-yellow-500" />
+					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}
 		</div>
