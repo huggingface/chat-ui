@@ -8,6 +8,7 @@
 
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
+	import CarbonExport from "~icons/carbon/export";
 
 	export let messages: Message[] = [];
 	export let disabled: boolean = false;
@@ -16,7 +17,7 @@
 
 	let message: string;
 
-	const dispatch = createEventDispatcher<{ message: string }>();
+	const dispatch = createEventDispatcher<{ message: string; share: void }>();
 </script>
 
 <div class="relative h-screen">
@@ -27,7 +28,7 @@
 	</nav>
 	<ChatMessages {loading} {pending} {messages} on:message />
 	<div
-		class="flex max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white dark:from-gray-900 to-transparent justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-4 md:py-8 w-full"
+		class="flex flex-col max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white to-white/0 dark:from-gray-900 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-5 bottom-0 py-4 md:py-8 w-full"
 	>
 		<form
 			on:submit|preventDefault={() => {
@@ -50,5 +51,19 @@
 				</button>
 			</div>
 		</form>
+		<div class="flex text-xs text-gray-400/80 mt-2 justify-between self-stretch px-1">
+			<p>
+				Model: OpenAssistant/oasst-sft-1-pythia-12b · Generated content may be inaccurate or false.
+			</p>
+			{#if messages.length}
+				<button
+					class="flex items-center hover:underline hover:text-gray-400"
+					type="button"
+					on:click={() => dispatch("share")}
+				>
+					<CarbonExport class="text-[.6rem] mr-1.5 text-yellow-500" />Share this conversation
+				</button>
+			{/if}
+		</div>
 	</div>
 </div>

@@ -39,6 +39,25 @@
 			loading = false;
 		}
 	}
+
+	async function shareConversation() {
+		const url = `${window.location.origin}${window.location.pathname}`;
+
+		if (navigator.share) {
+			navigator.share({
+				title: data.title,
+				text: "Share this chat with others",
+				url,
+			});
+		} else {
+			prompt("Share this link with your friends:", url);
+		}
+	}
 </script>
 
-<ChatWindow on:message={(ev) => createConversation(ev.detail)} messages={data.messages} {loading} />
+<ChatWindow
+	on:message={(ev) => createConversation(ev.detail)}
+	on:share={shareConversation}
+	messages={data.messages}
+	{loading}
+/>

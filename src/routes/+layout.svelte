@@ -7,6 +7,7 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
 	import { base } from "$app/paths";
+	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	export let data: LayoutData;
@@ -19,37 +20,6 @@
 		} else {
 			classList.add("dark");
 			localStorage.theme = "dark";
-		}
-	}
-
-	async function shareConversation(id: string, title: string) {
-		try {
-			const res = await fetch(`${base}/conversation/${id}/share`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
-
-			if (!res.ok) {
-				alert("Error while sharing conversation: " + (await res.text()));
-				return;
-			}
-
-			const { url } = await res.json();
-
-			if (navigator.share) {
-				navigator.share({
-					title,
-					text: "Share this chat with others",
-					url,
-				});
-			} else {
-				prompt("Share this link with your friends:", url);
-			}
-		} catch (err) {
-			console.error(err);
-			alert("Error while sharing conversation: " + err);
 		}
 	}
 
