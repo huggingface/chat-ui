@@ -11,10 +11,18 @@
 	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { trimPrefix } from "$lib/utils/trimPrefix";
 	import { shareConversation } from "$lib/shareConversation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	export let data: PageData;
 
-	$: messages = data.messages;
+	let messages = data.messages;
+	let lastLoadedMessages = data.messages;
+
+	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
+	$: if (data.messages !== lastLoadedMessages) {
+		messages = data.messages;
+		lastLoadedMessages = data.messages;
+	}
 
 	const hf = new HfInference();
 
@@ -79,15 +87,9 @@
 	}
 
 	async function summarizeTitle(id: string) {
-		const response = await fetch(`${base}/conversation/${id}/summarize`, {
+		await fetch(`${base}/conversation/${id}/summarize`, {
 			method: "POST",
 		});
-		if (response.ok) {
-			/// TODO(actually invalidate)
-			await invalidate("/");
-			await invalidate((url) => url.pathname === "/" || url.pathname === base);
-			location.reload();
-		}
 	}
 
 	async function writeMessage(message: string) {
@@ -102,11 +104,12 @@
 			await getTextGenerationStream(message);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
-				summarizeTitle($page.params.id).catch(console.error);
+				summarizeTitle($page.params.id)
+					.then(() => invalidate(UrlDependency.ConversationList))
+					.catch(console.error);
+			} else {
+				await invalidate(UrlDependency.ConversationList);
 			}
-
-			// Reload conversation order - doesn't seem to work
-			// await invalidate('/');
 		} finally {
 			loading = false;
 		}

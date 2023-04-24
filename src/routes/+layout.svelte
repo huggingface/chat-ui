@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, invalidateAll } from "$app/navigation";
+	import { goto, invalidate } from "$app/navigation";
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import type { LayoutData } from "./$types";
@@ -8,6 +8,7 @@
 	import CarbonExport from "~icons/carbon/export";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	export let data: LayoutData;
 
@@ -37,7 +38,7 @@
 			}
 
 			if ($page.params.id !== id) {
-				await invalidateAll();
+				await invalidate(UrlDependency.ConversationList);
 			} else {
 				await goto(base || "/", { invalidateAll: true });
 			}
