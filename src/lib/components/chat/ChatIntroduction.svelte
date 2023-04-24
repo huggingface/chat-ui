@@ -16,8 +16,8 @@
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
 			</div>
-			<p class="text-lg text-gray-600 dark:text-gray-400">
-				Making the best open AI chat models available to everyone.
+			<p class="text-base text-gray-600 dark:text-gray-400">
+				Making the best open source AI chat models available to everyone.
 			</p>
 		</div>
 	</div>
