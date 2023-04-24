@@ -44,7 +44,7 @@ export async function POST({ params, locals, fetch }) {
 			parameters,
 		},
 		{
-			custom_fetch: (url, options) =>
+			fetch: (url, options) =>
 				fetch(url, {
 					...options,
 					headers: {
