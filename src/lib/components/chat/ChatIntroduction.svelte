@@ -12,7 +12,7 @@
 <div class="grid lg:grid-cols-3 gap-8 my-auto">
 	<div class="lg:col-span-1">
 		<div>
-			<div class="text-2xl font-bold mb-3 flex items-center">
+			<div class="text-2xl font-semibold mb-3 flex items-center">
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
 			</div>

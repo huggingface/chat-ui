@@ -3,6 +3,7 @@
 	import { page } from "$app/stores";
 	import { createEventDispatcher } from "svelte";
 
+	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
 	import { switchTheme } from "$lib/switchTheme";
@@ -18,15 +19,21 @@
 	}> = [];
 </script>
 
-<div class="flex-none sticky top-0 p-3 flex flex-col">
+<div class="flex-none max-sm:pt-0 sticky top-0 px-3 py-3.5 flex items-center justify-between">
+	<div class="rounded-xl font-semibold text-lg flex items-center">
+		<Logo classNames="mr-1 text-3xl" />
+		HuggingChat
+	</div>
 	<a
 		href={base || "/"}
-		class="border px-12 py-2.5 rounded-lg shadow bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
+		class="flex border py-0.5 px-2 rounded-lg shadow-sm hover:shadow-none bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
 	>
 		New Chat
 	</a>
 </div>
-<div class="flex flex-col overflow-y-auto p-3 -mt-3 gap-1">
+<div
+	class="flex flex-col overflow-y-auto px-3 pb-3 pt-2 gap-1  bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
+>
 	{#each conversations as conv}
 		<a
 			data-sveltekit-noscroll
@@ -61,7 +68,9 @@
 		</a>
 	{/each}
 </div>
-<div class="flex flex-col p-3 gap-2">
+<div
+	class="flex flex-col p-3 gap-2 bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
+>
 	<button
 		on:click={switchTheme}
 		type="button"
