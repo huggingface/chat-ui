@@ -2,6 +2,7 @@ import { HF_TOKEN } from "$env/static/private";
 import { PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database.js";
+import { textGeneration } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -25,54 +26,52 @@ export async function POST({ params, locals, fetch }) {
 
 	const prompt = buildPrompt([{ from: "user", content: userPrompt }]);
 
-	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Basic ${HF_TOKEN}`,
-		},
-		method: "POST",
-		body: JSON.stringify({
+	const parameters = {
+		temperature: 0.9,
+		top_p: 0.95,
+		repetition_penalty: 1.2,
+		top_k: 50,
+		watermark: false,
+		max_new_tokens: 1024,
+		stop: ["<|endoftext|>"],
+		return_full_text: false,
+	};
+
+	const { generated_text } = await textGeneration(
+		{
+			model: PUBLIC_MODEL_ENDPOINT,
 			inputs: prompt,
-			parameters: {
-				temperature: 0.9,
-				top_p: 0.95,
-				repetition_penalty: 1.2,
-				top_k: 50,
-				watermark: false,
-				max_new_tokens: 1024,
-				stop: ["<|endoftext|>"],
-				return_full_text: false,
-			},
-		}),
-	});
-
-	const response = await resp.json();
-	let generatedTitle: string | undefined;
-	try {
-		if (typeof response[0].generated_text === "string") {
-			generatedTitle = response[0].generated_text;
+			parameters,
+		},
+		{
+			fetch: (url, options) =>
+				fetch(url, {
+					...options,
+					headers: {
+						...options?.headers,
+						Authorization: `Basic ${HF_TOKEN}`,
+					},
+				}),
 		}
-	} catch {
-		console.error("summarization failed");
-	}
+	);
 
-	if (generatedTitle) {
+	if (generated_text) {
 		await collections.conversations.updateOne(
 			{
 				_id: convId,
 				sessionId: locals.sessionId,
 			},
 			{
-				$set: { title: generatedTitle },
+				$set: { title: generated_text },
 			}
 		);
 	}
 
 	return new Response(
 		JSON.stringify(
-			generatedTitle
+			generated_text
 				? {
-						title: generatedTitle,
+						title: generated_text,
 				  }
 				: {}
 		),
