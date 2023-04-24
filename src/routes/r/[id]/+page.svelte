@@ -58,6 +58,7 @@
 <ChatWindow
 	on:message={(ev) => createConversation(ev.detail)}
 	on:share={shareConversation}
+	on:stop={shareConversation}
 	messages={data.messages}
 	{loading}
 />

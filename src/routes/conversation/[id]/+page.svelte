@@ -17,6 +17,7 @@
 
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
+	let isAborted = false;
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -57,6 +58,10 @@
 			pending = false;
 
 			if (!data || conversationId !== $page.params.id) break;
+			if (isAborted) {
+				isAborted = false;
+				break;
+			}
 
 			// final message
 			if (data.generated_text) {
@@ -130,4 +135,5 @@
 	{messages}
 	on:message={(message) => writeMessage(message.detail)}
 	on:share={() => shareConversation($page.params.id, data.title)}
+	on:stop={() => (isAborted = true)}
 />
