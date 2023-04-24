@@ -12,6 +12,6 @@
 
 @layer utilities {
 	.scrollbar-custom {
-		@apply !scrollbar-thin !scrollbar-w-1 !scrollbar-thumb-rounded-full !scrollbar-track-transparent !scrollbar-thumb-black/10 dark:!scrollbar-thumb-white/10;
+		@apply scrollbar-thin scrollbar-w-1 scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10 hover:scrollbar-thumb-black/20 dark:hover:scrollbar-thumb-white/20;
 	}
 }
