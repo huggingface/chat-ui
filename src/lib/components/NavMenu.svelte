@@ -7,10 +7,10 @@
 	import CarbonExport from "~icons/carbon/export";
 	import { switchTheme } from "$lib/switchTheme";
 
-	const dispatchShareConv = createEventDispatcher<{
+	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
+		deleteConversation: string;
 	}>();
-	const dispatchDeleteConv = createEventDispatcher<{ deleteConversation: string }>();
 
 	export let conversations: Array<{
 		id: string;
@@ -44,7 +44,7 @@
 					class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center  rounded"
 					title="Share conversation"
 					on:click|preventDefault={() =>
-						dispatchShareConv("shareConversation", { id: conv.id, title: conv.title })}
+						dispatch("shareConversation", { id: conv.id, title: conv.title })}
 				>
 					<CarbonExport
 						class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
@@ -55,7 +55,7 @@
 					type="button"
 					class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center rounded"
 					title="Delete conversation"
-					on:click|preventDefault={() => dispatchDeleteConv("deleteConversation", conv.id)}
+					on:click|preventDefault={() => dispatch("deleteConversation", conv.id)}
 				>
 					<CarbonTrashCan
 						class="text-gray-400 hover:text-gray-500  dark:hover:text-gray-300 text-xs"
