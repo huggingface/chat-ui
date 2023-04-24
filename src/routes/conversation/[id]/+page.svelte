@@ -10,6 +10,7 @@
 	import { trimSuffix } from "$lib/utils/trimSuffix";
 	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { trimPrefix } from "$lib/utils/trimPrefix";
+	import { shareConversation } from "$lib/shareConversation";
 
 	export let data: PageData;
 
@@ -121,4 +122,10 @@
 	});
 </script>
 
-<ChatWindow {loading} {pending} {messages} on:message={(message) => writeMessage(message.detail)} />
+<ChatWindow
+	{loading}
+	{pending}
+	{messages}
+	on:message={(message) => writeMessage(message.detail)}
+	on:share={() => shareConversation($page.params.id, data.title)}
+/>

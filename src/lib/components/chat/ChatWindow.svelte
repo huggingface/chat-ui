@@ -17,7 +17,7 @@
 
 	let message: string;
 
-	const dispatch = createEventDispatcher<{ message: string }>();
+	const dispatch = createEventDispatcher<{ message: string; share: void }>();
 </script>
 
 <div class="relative h-screen">
@@ -58,7 +58,7 @@
 			{#if messages.length}
 				<button
 					class="flex items-center hover:underline hover:text-gray-400"
-					on:click={() => dispatch("message", "share")}
+					on:click={() => dispatch("share")}
 				>
 					<CarbonExport class="text-[.6rem] mr-1.5 text-yellow-500" />Share this conversation
 				</button>
