@@ -29,7 +29,7 @@
 	}
 </script>
 
-<nav class="sm:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800">
+<nav class="md:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800">
 	<button
 		class="flex items-center justify-center w-9 h-9 -ml-3"
 		on:click={() => dispatch("toggle", true)}

@@ -32,7 +32,7 @@
 			<a
 				data-sveltekit-noscroll
 				href="{base}/conversation/{conv.id}"
-				class="pl-3 pr-2 h-11 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5 {conv.id ===
+				class="group pl-3 pr-2 h-11 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5 {conv.id ===
 				$page.params.id
 					? 'bg-gray-100 dark:bg-gray-700'
 					: ''}"
@@ -41,7 +41,7 @@
 
 				<button
 					type="button"
-					class="w-5 h-5 items-center justify-center flex rounded"
+					class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center  rounded"
 					title="Share conversation"
 					on:click|preventDefault={() =>
 						dispatchShareConv("shareConversation", { id: conv.id, title: conv.title })}
@@ -53,7 +53,7 @@
 
 				<button
 					type="button"
-					class="w-5 h-5 items-center justify-center flex rounded"
+					class="flex md:hidden md:group-hover:flex w-5 h-5 items-center justify-center rounded"
 					title="Delete conversation"
 					on:click|preventDefault={() => dispatchDeleteConv("deleteConversation", conv.id)}
 				>
