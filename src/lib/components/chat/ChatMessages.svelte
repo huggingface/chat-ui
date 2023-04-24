@@ -28,5 +28,8 @@
 		{/if}
 		<div class="h-32 flex-none" />
 	</div>
-	<ScrollToBottomBtn class="bottom-10 right-12" scrollNode={chatContainer} />
+	<ScrollToBottomBtn
+		class="max-md:hidden bottom-36 right-4 lg:right-10"
+		scrollNode={chatContainer}
+	/>
 </div>
