@@ -52,7 +52,7 @@
 			</p>
 			{#if messages.length}
 				<button
-					class="flex flex-none items-center hover:underline hover:text-gray-400 dark:max-sm:bg-gray-800 max-sm:bg-gray-50  max-sm:px-2.5 max-sm:rounded-lg"
+					class="flex flex-none items-center hover:underline hover:text-gray-400 dark:max-sm:bg-gray-800 max-sm:bg-gray-50 max-sm:px-2.5 max-sm:rounded-lg"
 					type="button"
 					on:click={() => dispatch("share")}
 				>
