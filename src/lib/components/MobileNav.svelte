@@ -31,13 +31,15 @@
 
 <nav class="md:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800">
 	<button
-		class="flex items-center justify-center w-9 h-9 -ml-3"
+		class="flex items-center justify-center w-9 h-9 -ml-3 shrink-0"
 		on:click={() => dispatch("toggle", true)}
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
-	<span>{title}</span>
-	<a href={base || "/"} class="flex items-center justify-center w-9 h-9 -mr-3"><CarbonAdd /></a>
+	<span class="px-4 truncate">{title}</span>
+	<a href={base || "/"} class="flex items-center justify-center w-9 h-9 -mr-3 shrink-0"
+		><CarbonAdd /></a
+	>
 </nav>
 <nav
 	class="fixed inset-0 z-50 grid grid-rows-[auto,auto,1fr,auto] grid-cols-1 max-h-screen bg-white dark:bg-gray-900 bg-gradient-to-l from-gray-50 dark:from-gray-800/30 {isOpen
