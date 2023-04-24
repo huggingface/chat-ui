@@ -68,7 +68,7 @@
 			<div class="grid lg:grid-cols-3 gap-3 lg:gap-5">
 				<button
 					type="button"
-					class="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
+					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
 					on:click={() =>
 						dispatch(
 							"message",
@@ -79,7 +79,7 @@
 				</button>
 				<button
 					type="button"
-					class="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
+					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
 					on:click={() =>
 						dispatch("message", "Code a snake game in python, the snake should be red")}
 				>
@@ -87,7 +87,7 @@
 				</button>
 				<button
 					type="button"
-					class="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
+					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
 					on:click={() => dispatch("message", "How do I make a lemon cheesecake?")}
 				>
 					"Assist in a task"

@@ -28,6 +28,7 @@
 		style="min-height: {minHeight}; max-height: {maxHeight}">{value + "&nbsp;\n"}</pre>
 
 	<textarea
+		enterkeyhint="send"
 		tabindex="0"
 		rows="1"
 		class="absolute m-0 w-full h-full top-0 resize-none border-0 bg-transparent p-3 focus:ring-0 focus-visible:ring-0 dark:bg-transparent outline-none scrollbar-custom overflow-x-hidden overflow-y-scroll"
