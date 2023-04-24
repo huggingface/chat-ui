@@ -2,13 +2,12 @@
 	import type { Message } from "$lib/types/Message";
 	import { createEventDispatcher } from "svelte";
 
-	import CarbonAdd from "~icons/carbon/add";
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
-	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import CarbonExport from "~icons/carbon/export";
+	import { PUBLIC_MODEL_NAME } from "$env/static/public";
 
 	export let messages: Message[] = [];
 	export let disabled: boolean = false;
@@ -48,7 +47,7 @@
 		</form>
 		<div class="flex text-xs text-gray-400/80 mt-2 justify-between self-stretch px-1">
 			<p>
-				Model: OpenAssistant/oasst-sft-1-pythia-12b · Generated content may be inaccurate or false.
+				Model: {PUBLIC_MODEL_NAME} · Generated content may be inaccurate or false.
 			</p>
 			{#if messages.length}
 				<button
