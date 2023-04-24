@@ -23,7 +23,7 @@ export async function shareConversation(id: string, title: string) {
 				url,
 			});
 		} else {
-			prompt("Share this link with your friends:", url);
+			prompt("Copy this public url to share:", url);
 		}
 	} catch (err) {
 		console.error(err);
