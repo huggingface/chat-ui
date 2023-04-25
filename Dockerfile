@@ -19,4 +19,4 @@ RUN npm run build
 
 ENV PORT 7860
 
-CMD ["pm2", "start", "build/index.js" ,"-i", "2", "--no-daemon"]
+CMD pm2 start build/index.js -i $CPU_CORES --no-daemon
