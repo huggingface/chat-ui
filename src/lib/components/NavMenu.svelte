@@ -32,7 +32,7 @@
 	</a>
 </div>
 <div
-	class="flex flex-col overflow-y-auto px-3 pb-3 pt-2 gap-1  bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
+	class="flex flex-col overflow-y-auto scrollbar-custom px-3 pb-3 pt-2 gap-1  bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
 >
 	{#each conversations as conv}
 		<a

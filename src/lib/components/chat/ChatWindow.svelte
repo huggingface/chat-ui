@@ -19,10 +19,10 @@
 	const dispatch = createEventDispatcher<{ message: string; share: void }>();
 </script>
 
-<div class="relative min-h-0">
+<div class="relative min-h-0 min-w-0">
 	<ChatMessages {loading} {pending} {messages} on:message />
 	<div
-		class="flex flex-col max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-3.5 sm:px-5 bottom-0 py-4 md:py-8 w-full"
+		class="flex flex-col pointer-events-none [&>*]:pointer-events-auto max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-3.5 sm:px-5 bottom-0 py-4 md:py-8 w-full"
 	>
 		<form
 			on:submit|preventDefault={() => {
@@ -35,13 +35,11 @@
 			<div class="w-full flex flex-1 border-none bg-transparent">
 				<ChatInput placeholder="Ask anything" bind:value={message} autofocus maxRows={10} />
 				<button
-					class="p-1 px-[0.7rem] group self-end my-1 h-[2.4rem] rounded-lg hover:bg-gray-100 enabled:dark:hover:text-gray-400 dark:hover:bg-gray-900 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent disabled:opacity-60 dark:disabled:opacity-40 flex-shrink-0 transition-all mx-1"
+					class="btn p-1 px-[0.7rem] self-end bg-transparent my-1 h-[2.4rem] text-gray-400 rounded-lg enabled:dark:hover:text-gray-100 enabled:hover:text-gray-700 disabled:opacity-60 dark:disabled:opacity-40 mx-1"
 					disabled={!message || loading || disabled}
 					type="submit"
 				>
-					<CarbonSendAltFilled
-						class="text-gray-400 group-hover:text-gray-800 group-disabled:text-gray-300"
-					/>
+					<CarbonSendAltFilled />
 				</button>
 			</div>
 		</form>
