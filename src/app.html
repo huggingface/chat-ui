@@ -5,17 +5,17 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<title>HuggingChat</title>
+		<script>
+			if (
+				localStorage.theme === "dark" ||
+				(!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
+			) {
+				document.documentElement.classList.add("dark");
+			}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="dark:bg-gray-900 h-full">
 		<div class="contents h-full">%sveltekit.body%</div>
 	</body>
-	<script>
-		if (
-			localStorage.theme === "dark" ||
-			(!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
-		) {
-			document.documentElement.classList.add("dark");
-		}
-	</script>
 </html>
