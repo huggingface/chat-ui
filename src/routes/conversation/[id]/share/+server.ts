@@ -24,7 +24,7 @@ export async function POST({ params, url, locals }) {
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: (PUBLIC_ORIGIN || `${url.origin}${base}`) + `/r/${existingShare._id}`,
+				url: getShareUrl(url, existingShare._id),
 			}),
 			{ headers: { "Content-Type": "application/json" } }
 		);
@@ -43,8 +43,12 @@ export async function POST({ params, url, locals }) {
 
 	return new Response(
 		JSON.stringify({
-			url: `${PUBLIC_ORIGIN || url.origin}${base}/r/${shared._id}`,
+			url: getShareUrl(url, shared._id),
 		}),
 		{ headers: { "Content-Type": "application/json" } }
 	);
+}
+
+function getShareUrl(url: URL, shareId: string): string {
+	return `${PUBLIC_ORIGIN || url.origin}${base}/r/${shareId}`;
 }
