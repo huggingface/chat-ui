@@ -1,5 +1,5 @@
 import { HF_TOKEN } from "$env/static/private";
-import { PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
+import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database.js";
 import { textGeneration } from "@huggingface/inference";
@@ -33,6 +33,7 @@ export async function POST({ params, locals, fetch }) {
 		top_k: 50,
 		watermark: false,
 		max_new_tokens: 1024,
+		truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
 		stop: ["<|endoftext|>"],
 		return_full_text: false,
 	};
