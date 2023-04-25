@@ -35,6 +35,8 @@
 
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+		} catch (err) {
+			alert(String(err));
 		} finally {
 			loading = false;
 		}

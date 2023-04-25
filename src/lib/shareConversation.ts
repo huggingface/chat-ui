@@ -27,6 +27,6 @@ export async function shareConversation(id: string, title: string) {
 		}
 	} catch (err) {
 		console.error(err);
-		alert("Error while sharing conversation: " + err);
+		alert(String(err));
 	}
 }

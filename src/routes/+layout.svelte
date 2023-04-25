@@ -35,7 +35,7 @@
 			}
 		} catch (err) {
 			console.error(err);
-			alert("Error while deleting conversation: " + err);
+			alert(String(err));
 		}
 	}
 </script>
