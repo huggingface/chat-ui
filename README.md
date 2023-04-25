@@ -5,7 +5,7 @@ colorFrom: purple
 colorTo: purple
 sdk: docker
 pinned: false
-license: other
+license: apache-2.0
 base_path: /chat
 ---
 
