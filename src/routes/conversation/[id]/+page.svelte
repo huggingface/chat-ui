@@ -8,7 +8,7 @@
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { trimSuffix } from "$lib/utils/trimSuffix";
-	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
+	import { PUBLIC_SEP_TOKEN, PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
 	import { trimPrefix } from "$lib/utils/trimPrefix";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -41,7 +41,7 @@
 					repetition_penalty: 1.2,
 					top_k: 50,
 					// @ts-ignore
-					truncate: 1024,
+					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
 					watermark: false,
 					max_new_tokens: 1024,
 					stop: ["<|endoftext|>"],
