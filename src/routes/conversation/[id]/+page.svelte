@@ -4,7 +4,7 @@
 	import { onMount } from "svelte";
 	import type { PageData } from "./$types";
 	import { page } from "$app/stores";
-	import { HfInference } from "@huggingface/inference";
+	import { textGenerationStream } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { trimSuffix } from "$lib/utils/trimSuffix";
@@ -24,16 +24,15 @@
 		lastLoadedMessages = data.messages;
 	}
 
-	const hf = new HfInference();
-
 	let loading = false;
 	let pending = false;
 
 	async function getTextGenerationStream(inputs: string) {
 		let conversationId = $page.params.id;
 
-		const response = hf.endpoint($page.url.href).textGenerationStream(
+		const response = textGenerationStream(
 			{
+				model: $page.url.href,
 				inputs,
 				parameters: {
 					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54

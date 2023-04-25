@@ -1,5 +1,8 @@
 import { navigating } from "$app/stores";
+import { tick } from "svelte";
 import { get } from "svelte/store";
+
+const detachedOffset = 10;
 
 /**
  * @param node element to snap scroll to bottom
@@ -15,24 +18,25 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 			isDetached = true;
 		}
 
-		// if user scrolled back to bottom, we reattach
-		if (node.scrollTop === node.scrollHeight - node.clientHeight) {
+		// if user scrolled back to within 10px of bottom, we reattach
+		if (node.scrollTop - (node.scrollHeight - node.clientHeight) >= -detachedOffset) {
 			isDetached = false;
 		}
 
 		prevScrollValue = node.scrollTop;
 	};
 
-	const updateScroll = (_options: { force?: boolean } = {}) => {
+	const updateScroll = async (_options: { force?: boolean } = {}) => {
 		const defaultOptions = { force: false };
 		const options = { ...defaultOptions, ..._options };
 		const { force } = options;
 
 		if (!force && isDetached && !get(navigating)) return;
 
-		node.scroll({
-			top: node.scrollHeight,
-		});
+		// wait for next tick to ensure that the DOM is updated
+		await tick();
+
+		node.scrollTo({ top: node.scrollHeight });
 	};
 
 	node.addEventListener("scroll", handleScroll);

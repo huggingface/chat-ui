@@ -54,9 +54,7 @@
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 		/>
 	</MobileNav>
-	<nav
-		class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
-	>
+	<nav class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen">
 		<NavMenu
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
