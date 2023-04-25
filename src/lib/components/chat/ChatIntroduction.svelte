@@ -81,7 +81,7 @@
 					on:click={() =>
 						dispatch(
 							"message",
-							"As a restaurant owner, write a formatted email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+							"As a restaurant owner, write a well formatted email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
 						)}
 				>
 					"Write an email from bullet list"
