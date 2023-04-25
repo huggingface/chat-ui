@@ -9,6 +9,7 @@
 
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
 
 	export let data: LayoutData;
 
@@ -39,6 +40,14 @@
 		}
 	}
 </script>
+
+<svelte:head>
+	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
+	<meta property="og:title" content="HuggingChat" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
+	<meta property="og:image" content="{PUBLIC_ORIGIN || $page.url.origin}{base}/thumbnail.png" />
+</svelte:head>
 
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] md:grid-rows-[1fr] md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
