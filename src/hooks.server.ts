@@ -11,7 +11,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Refresh cookie expiration date
 	event.cookies.set(COOKIE_NAME, event.locals.sessionId, {
 		path: "/",
-		sameSite: "lax",
+		// So that it works inside the space's iframe
+		sameSite: "none",
 		secure: !dev,
 		httpOnly: true,
 		expires: addYears(new Date(), 1),
