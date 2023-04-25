@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from "$env/static/public";
+	import {
+		PUBLIC_DISABLE_INTRO_TILES,
+		PUBLIC_MODEL_ID,
+		PUBLIC_MODEL_NAME,
+	} from "$env/static/public";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
@@ -36,7 +40,7 @@
 				class="flex items-center gap-5 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
 			>
 				<a
-					href="https://huggingface.co/{PUBLIC_MODEL_NAME}"
+					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
 					target="_blank"
 					rel="noreferrer"
 					class="flex items-center hover:underline"
@@ -77,7 +81,7 @@
 					on:click={() =>
 						dispatch(
 							"message",
-							"Write an email from bullet list: \n\n- Buy milk\n- Buy eggs\n- Buy bread"
+							"As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
 						)}
 				>
 					"Write an email from bullet list"
@@ -86,14 +90,17 @@
 					type="button"
 					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
 					on:click={() =>
-						dispatch("message", "Code a snake game in python, the snake should be red")}
+						dispatch(
+							"message",
+							"Code a basic snake game in python, give explanations for each step."
+						)}
 				>
 					"Code a snake game"
 				</button>
 				<button
 					type="button"
 					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
-					on:click={() => dispatch("message", "How do I make a lemon cheesecake?")}
+					on:click={() => dispatch("message", "How do I make a delicious lemon cheesecake?")}
 				>
 					"Assist in a task"
 				</button>

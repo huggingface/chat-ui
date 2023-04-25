@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { onDestroy } from "svelte";
 	import { goto, invalidate } from "$app/navigation";
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import type { LayoutData } from "./$types";
 	import { base } from "$app/paths";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
+
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { error } from "$lib/stores/errors";
@@ -11,7 +14,6 @@
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
-	import { onDestroy } from "svelte";
 
 	export let data: LayoutData;
 
@@ -66,6 +68,14 @@
 
 	$: if ($error) onError();
 </script>
+
+<svelte:head>
+	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
+	<meta property="og:title" content="HuggingChat" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
+	<meta property="og:image" content="{PUBLIC_ORIGIN || $page.url.origin}{base}/thumbnail.png" />
+</svelte:head>
 
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] md:grid-rows-[1fr] md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
