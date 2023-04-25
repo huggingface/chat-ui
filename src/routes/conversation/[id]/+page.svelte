@@ -109,6 +109,9 @@
 			} else {
 				await invalidate(UrlDependency.ConversationList);
 			}
+		} catch (err) {
+			console.error(err);
+			alert(String(err));
 		} finally {
 			loading = false;
 		}
