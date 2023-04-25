@@ -6,12 +6,12 @@
 
 @layer components {
 	.btn {
-		@apply cursor-pointer select-none inline-flex justify-center items-center whitespace-nowrap border focus:outline-none focus:ring;
+		@apply cursor-pointer disabled:cursor-default select-none inline-flex flex-shrink-0 justify-center items-center whitespace-nowrap outline-none focus:ring transition-all;
 	}
 }
 
 @layer utilities {
 	.scrollbar-custom {
-		@apply !scrollbar-thin !scrollbar-w-1 !scrollbar-thumb-rounded-full !scrollbar-track-transparent !scrollbar-thumb-black/10 dark:!scrollbar-thumb-white/10;
+		@apply scrollbar-thin scrollbar-w-1 scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10 hover:scrollbar-thumb-black/20 dark:hover:scrollbar-thumb-white/20;
 	}
 }
