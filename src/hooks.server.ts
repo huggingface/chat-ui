@@ -1,3 +1,4 @@
+import { dev } from "$app/environment";
 import { COOKIE_NAME } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import { addYears } from "date-fns";
@@ -11,7 +12,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.cookies.set(COOKIE_NAME, event.locals.sessionId, {
 		path: "/",
 		sameSite: "lax",
-		secure: true,
+		secure: !dev,
 		httpOnly: true,
 		expires: addYears(new Date(), 1),
 	});
