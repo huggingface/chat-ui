@@ -33,7 +33,7 @@ export async function POST({ params, locals, fetch }) {
 		top_k: 50,
 		watermark: false,
 		max_new_tokens: 1024,
-		truncate: PUBLIC_MAX_INPUT_TOKENS,
+		truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
 		stop: ["<|endoftext|>"],
 		return_full_text: false,
 	};

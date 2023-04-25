@@ -41,7 +41,7 @@
 					repetition_penalty: 1.2,
 					top_k: 50,
 					// @ts-ignore
-					truncate: PUBLIC_MAX_INPUT_TOKENS,
+					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
 					watermark: false,
 					max_new_tokens: 1024,
 					stop: ["<|endoftext|>"],
