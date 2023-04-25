@@ -9,8 +9,8 @@
 
 	function sanitizeMd(md: string) {
 		return md
-			.replaceAll(/^(<\|startoftext\|>|<\|startoftext\|$|<\|startoftext$|<\|$|<$)/, "")
-			.replaceAll(/^(<\|endoftext\|>|<\|endoftext\|$|<\|endoftext$)/, "")
+			.replaceAll(/^(<\|startoftext\|>|<\|startoftext\|$|<\|startoftext$|<\|$|<$)/g, "")
+			.replaceAll(/^(<\|endoftext\|>|<\|endoftext\|$|<\|endoftext$)/g, "")
 			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;");
 	}
