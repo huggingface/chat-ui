@@ -25,7 +25,7 @@
 	<div
 		class="flex flex-col pointer-events-none [&>*]:pointer-events-auto max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-3.5 sm:px-5 bottom-0 py-4 md:py-8 w-full"
 	>
-		<StopGeneratingBtn visible={loading} className="-top-6" on:stop />
+		<StopGeneratingBtn visible={loading} className="right-7 top-10 z-10" on:stop />
 		<form
 			on:submit|preventDefault={() => {
 				if (loading) return;
