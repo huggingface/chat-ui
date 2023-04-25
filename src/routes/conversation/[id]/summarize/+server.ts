@@ -43,17 +43,9 @@ export async function POST({ params, locals, fetch }) {
 			model: PUBLIC_MODEL_ENDPOINT,
 			inputs: prompt,
 			parameters,
+			accessToken: HF_TOKEN,
 		},
-		{
-			fetch: (url, options) =>
-				fetch(url, {
-					...options,
-					headers: {
-						...options?.headers,
-						Authorization: `Basic ${HF_TOKEN}`,
-					},
-				}),
-		}
+		{ fetch }
 	);
 
 	if (generated_text) {
