@@ -7,6 +7,7 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
 	import { switchTheme } from "$lib/switchTheme";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
 
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
@@ -20,10 +21,10 @@
 </script>
 
 <div class="flex-none max-sm:pt-0 sticky top-0 px-3 py-3.5 flex items-center justify-between">
-	<div class="rounded-xl font-semibold text-lg flex items-center">
+	<a class="rounded-xl font-semibold text-lg flex items-center" href="{PUBLIC_ORIGIN}{base}/">
 		<Logo classNames="mr-1 text-3xl" />
 		HuggingChat
-	</div>
+	</a>
 	<a
 		href={base || "/"}
 		class="flex border py-0.5 px-2 rounded-lg shadow-sm hover:shadow-none bg-white dark:bg-gray-700 dark:border-gray-600 text-center"
