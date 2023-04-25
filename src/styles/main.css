@@ -6,7 +6,7 @@
 
 @layer components {
 	.btn {
-		@apply cursor-pointer select-none inline-flex justify-center items-center whitespace-nowrap border focus:outline-none focus:ring;
+		@apply cursor-pointer disabled:cursor-default select-none inline-flex flex-shrink-0 justify-center items-center whitespace-nowrap outline-none focus:ring transition-all;
 	}
 }
 

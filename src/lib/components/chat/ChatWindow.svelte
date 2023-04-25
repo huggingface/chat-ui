@@ -35,13 +35,11 @@
 			<div class="w-full flex flex-1 border-none bg-transparent">
 				<ChatInput placeholder="Ask anything" bind:value={message} autofocus maxRows={10} />
 				<button
-					class="p-1 px-[0.7rem] group self-end my-1 h-[2.4rem] rounded-lg hover:bg-gray-100 enabled:dark:hover:text-gray-400 dark:hover:bg-gray-900 disabled:hover:bg-transparent dark:disabled:hover:bg-transparent disabled:opacity-60 dark:disabled:opacity-40 flex-shrink-0 transition-all mx-1"
+					class="btn p-1 px-[0.7rem] self-end bg-transparent my-1 h-[2.4rem] text-gray-400 rounded-lg enabled:dark:hover:text-gray-100 enabled:hover:text-gray-700 disabled:opacity-60 dark:disabled:opacity-40 mx-1"
 					disabled={!message || loading || disabled}
 					type="submit"
 				>
-					<CarbonSendAltFilled
-						class="text-gray-400 group-hover:text-gray-800 group-disabled:text-gray-300"
-					/>
+					<CarbonSendAltFilled />
 				</button>
 			</div>
 		</form>
