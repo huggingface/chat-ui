@@ -21,7 +21,7 @@ It is therefore possible to deploy a copy of this app to a Space and customize i
 
 We welcome any feedback on this app: please participate to the public discussion at https://huggingface.co/spaces/huggingchat/chat-ui/discussions
 
-[![open a discussion](https://huggingface.co/datasets/huggingface/badges/raw/main/open-a-discussion-xl.svg)](https://huggingface.co/spaces/huggingchat/chat-ui/discussions)
+<a target="_blank" href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"><img src="https://huggingface.co/datasets/huggingface/badges/raw/main/open-a-discussion-xl.svg" title="open a discussion"></a>
 
 ## Coming soon
 
