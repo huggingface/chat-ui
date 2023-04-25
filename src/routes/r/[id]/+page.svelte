@@ -3,6 +3,7 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import type { PageData } from "./$types";
 
@@ -24,7 +25,8 @@
 			});
 
 			if (!res.ok) {
-				alert("Error while creating conversation: " + (await res.text()));
+				error.set("Error while creating conversation, try again.");
+				console.error("Error while creating conversation: " + (await res.text()));
 				return;
 			}
 
@@ -36,7 +38,8 @@
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (err) {
-			alert(String(err));
+			error.set(ERROR_MESSAGES.default);
+			console.error(String(err));
 		} finally {
 			loading = false;
 		}
