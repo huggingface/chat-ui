@@ -32,7 +32,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
-			Authorization: `Basic ${HF_TOKEN}`,
+			Authorization: `Bearer ${HF_TOKEN}`,
 		},
 		method: "POST",
 		body: JSON.stringify({
