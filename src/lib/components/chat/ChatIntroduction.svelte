@@ -71,11 +71,6 @@
 			</div>
 		</div>
 	</div>
-	<div class="lg:col-span-3">
-		<p class="text-base text-gray-600 dark:text-gray-400">
-			This is a demonstration of the state of the art in language model chat using the <a href="https://open-assistant.io/"><u>Open Assistant</u></a> chat model. Chat based on large language models is an area of active research with known issues. For more details, see __link__
-		</p>
-	</div>
 	{#if PUBLIC_DISABLE_INTRO_TILES !== "true"}
 		<div class="lg:col-span-3 lg:mt-12">
 			<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
