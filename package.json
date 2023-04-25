@@ -13,7 +13,6 @@
 	},
 	"devDependencies": {
 		"@iconify-json/carbon": "^1.1.16",
-		"@iconify-json/uim": "^1.1.5",
 		"@sveltejs/adapter-node": "^1.2.0",
 		"@sveltejs/kit": "^1.5.0",
 		"@tailwindcss/typography": "^0.5.9",
