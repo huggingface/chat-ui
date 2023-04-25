@@ -6,9 +6,6 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
-	import UimCommentMessage from "~icons/uim/comment-message";
-	import UimLockAlt from "~icons/uim/lock-alt";
-	import UimImageV from "~icons/uim/image-v";
 
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
@@ -81,9 +78,6 @@
 		type="button"
 		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
-		<UimImageV
-			class="group-hover:text-gray-400 mr-0.5 text-gray-400/40 dark:text-gray-500 text-[.7rem]"
-		/>
 		Theme
 	</button>
 	<a
@@ -92,18 +86,12 @@
 		rel="noreferrer"
 		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
-		<UimCommentMessage
-			class="group-hover:text-gray-400 mr-0.5 text-gray-400/40 dark:text-gray-500 text-[.8rem]"
-		/>
 		Feedback
 	</a>
 	<a
 		href={base}
 		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
-		<UimLockAlt
-			class="group-hover:text-gray-400 mr-0.5 text-gray-400/40 dark:text-gray-500 text-[.8rem]"
-		/>
 		Privacy
 	</a>
 </div>
