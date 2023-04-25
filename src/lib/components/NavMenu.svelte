@@ -6,6 +6,7 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonExport from "~icons/carbon/export";
+
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
 
@@ -70,25 +71,27 @@
 	{/each}
 </div>
 <div
-	class="flex flex-col p-3 gap-2 bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl"
+	class="flex flex-col p-3 gap-2 bg-gradient-to-l from-gray-50 dark:from-gray-800/30 rounded-r-xl mt-0.5 text-sm"
 >
 	<button
 		on:click={switchTheme}
 		type="button"
-		class="text-left flex items-center first-letter:capitalize truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
 		Theme
 	</button>
 	<a
 		href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
-		class="text-left flex items-center first-letter:capitalize truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+		target="_blank"
+		rel="noreferrer"
+		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
-		Community feedback
+		Feedback
 	</a>
 	<a
 		href={base}
-		class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
-		Settings
+		Privacy
 	</a>
 </div>
