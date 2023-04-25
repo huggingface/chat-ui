@@ -6,7 +6,7 @@
 	let html = data.html;
 </script>
 
-<div class="mx-auto w-40 prose">
+<div class="my-6 mt-12 mx-auto overflow-auto prose">
 	<h1>Hello</h1>
 	{@html html}
 </div>
