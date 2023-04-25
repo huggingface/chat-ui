@@ -1,7 +1,7 @@
-import { HF_TOKEN } from "$env/static/private";
-import { PUBLIC_MODEL_ENDPOINT, PUBLIC_SEP_TOKEN } from "$env/static/public";
+import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt.js";
 import { collections } from "$lib/server/database.js";
+import { modelEndpoint } from "$lib/server/modelEndpoint.js";
 import type { Message } from "$lib/types/Message.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
 import { sum } from "$lib/utils/sum";
@@ -29,10 +29,12 @@ export async function POST({ request, fetch, locals, params }) {
 	const messages = [...conv.messages, { from: "user", content: json.inputs }] satisfies Message[];
 	const prompt = buildPrompt(messages);
 
-	const resp = await fetch(PUBLIC_MODEL_ENDPOINT, {
+	const randomEndpoint = modelEndpoint();
+
+	const resp = await fetch(randomEndpoint.endpoint, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
-			Authorization: `Bearer ${HF_TOKEN}`,
+			Authorization: randomEndpoint.authorization,
 		},
 		method: "POST",
 		body: JSON.stringify({
