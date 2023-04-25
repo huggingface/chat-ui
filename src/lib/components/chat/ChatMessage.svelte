@@ -10,6 +10,8 @@
 	function sanitizeMd(md: string) {
 		return md
 			.replace(/<\|[a-z]*$/, "")
+			.replace(/<\|[a-z]+\|$/, "")
+			.replace(/<$/, "")
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
 			.trim()
 			.replaceAll("&", "&amp;")
