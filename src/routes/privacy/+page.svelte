@@ -4,6 +4,5 @@
 </script>
 
 <div class="my-6 mt-12 mx-auto overflow-auto prose">
-	<h1>Hello</h1>
-	{@html marked(privacy)}
+	{@html marked(privacy, { gfm: true })}
 </div>
