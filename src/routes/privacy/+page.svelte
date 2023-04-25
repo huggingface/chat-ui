@@ -3,8 +3,8 @@
 	import privacy from "../../../PRIVACY.md?raw";
 </script>
 
-<div class="my-6 overflow-auto">
-	<div class="mx-auto pt-12 prose">
+<div class="overflow-auto">
+	<div class="mx-auto py-12 prose dark:prose-invert">
 		<h1>Hello</h1>
 		{@html marked(privacy, { gfm: true })}
 	</div>
