@@ -11,7 +11,8 @@
 		return md
 			.replaceAll(/^(<\|startoftext\|$|<\|startoftext$|<\|$|<$)/g, "")
 			.replaceAll(/(<\|endoftext\|$|<\|endoftext$)/g, "")
-			.replaceAll(/<\|[a-z]+\|>/g, "")
+			.replaceAll(/<\|[a-z]+\|>/g, " ")
+			.trim()
 			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;");
 	}
