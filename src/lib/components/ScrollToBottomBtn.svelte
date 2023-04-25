@@ -28,7 +28,7 @@
 	<button
 		transition:fade={{ duration: 150 }}
 		on:click={() => scrollNode.scrollTo({ top: scrollNode.scrollHeight, behavior: "smooth" })}
-		class="absolute flex rounded-full border w-10 h-10 items-center justify-center shadow bg-white dark:bg-gray-700 dark:border-gray-600 {className}"
-		><IconChevron /></button
+		class="btn absolute flex rounded-full border w-[41px] h-[41px] shadow-md dark:shadow-gray-950 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 transition-all {className}"
+		><IconChevron classNames="mt-[2px]" /></button
 	>
 {/if}

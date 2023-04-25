@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from "$env/static/public";
+	import {
+		PUBLIC_DISABLE_INTRO_TILES,
+		PUBLIC_MODEL_ID,
+		PUBLIC_MODEL_NAME,
+	} from "$env/static/public";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
@@ -15,6 +19,11 @@
 			<div class="text-2xl font-semibold mb-3 flex items-center">
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
+				<div
+					class="text-base h-6 px-2 rounded-lg text-gray-400 bg-gray-50 ml-3 flex items-center border border-gray-100 dark:bg-gray-800 dark:border-gray-700/60"
+				>
+					v0
+				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
 				Making the best open source AI chat models available to everyone.
@@ -31,7 +40,7 @@
 				class="flex items-center gap-5 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
 			>
 				<a
-					href="https://huggingface.co/{PUBLIC_MODEL_NAME}"
+					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
 					target="_blank"
 					rel="noreferrer"
 					class="flex items-center hover:underline"
