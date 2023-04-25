@@ -1,4 +1,4 @@
-# Privacy & About this app
+## Privacy
 
 In this `v0` of HuggingChat, we only store messages to display them to the user, not for any other usage (including for research or model training purposes).
 
@@ -26,4 +26,4 @@ We welcome any feedback on this app: please participate to the public discussion
 ## Coming soon
 
 - LLM watermarking
-- user setting to share conversations with model authors.
+- User setting to share conversations with model authors
