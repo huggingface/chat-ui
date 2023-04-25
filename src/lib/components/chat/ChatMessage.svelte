@@ -69,7 +69,7 @@
 				<IconLoading classNames="absolute inset-0 m-auto" />
 			{/if}
 			<div
-				class="prose dark:prose-invert prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900 prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-headings:font-semibold max-w-none"
+				class="prose max-sm:prose-sm dark:prose-invert prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900 prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-headings:font-semibold max-w-none"
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
@@ -84,7 +84,7 @@
 	</div>
 {/if}
 {#if message.from === "user"}
-	<div class="flex items-start justify-start gap-4">
+	<div class="flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 w-3 h-3 flex-none rounded-full" />
 		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400 whitespace-break-spaces">
 			{message.content.trim()}
