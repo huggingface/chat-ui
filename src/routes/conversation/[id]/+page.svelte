@@ -12,6 +12,7 @@
 	import { trimPrefix } from "$lib/utils/trimPrefix";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { error } from "$lib/stores/errors";
 
 	export let data: PageData;
 
@@ -110,8 +111,8 @@
 				await invalidate(UrlDependency.ConversationList);
 			}
 		} catch (err) {
+			$error = "Server is overloaded";
 			console.error(err);
-			alert(String(err));
 		} finally {
 			loading = false;
 		}

@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
-	import ChatWindow from '$lib/components/chat/ChatWindow.svelte';
-	import { pendingMessage } from '$lib/stores/pendingMessage';
+	import { goto } from "$app/navigation";
+	import { base } from "$app/paths";
+	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
 
 	let loading = false;
 
@@ -17,7 +18,8 @@
 			});
 
 			if (!res.ok) {
-				alert('Error while creating conversation: ' + (await res.text()));
+				error.set("Error while creating conversation, try again.");
+				console.error("Error while creating conversation: " + (await res.text()));
 				return;
 			}
 
@@ -29,7 +31,8 @@
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (err) {
-			alert(String(err));
+			error.set(ERROR_MESSAGES.default);
+			console.error(err);
 		} finally {
 			loading = false;
 		}

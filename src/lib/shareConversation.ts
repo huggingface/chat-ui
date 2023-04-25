@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { error } from "$lib/stores/errors";
+import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 
 export async function shareConversation(id: string, title: string) {
 	try {
@@ -28,8 +28,7 @@ export async function shareConversation(id: string, title: string) {
 			prompt("Copy this public url to share:", url);
 		}
 	} catch (err) {
-		error.set("Oops, something went wrong.");
+		error.set(ERROR_MESSAGES.default);
 		console.error(err);
-		alert(String(err));
 	}
 }
