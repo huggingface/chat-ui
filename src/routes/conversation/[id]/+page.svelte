@@ -7,9 +7,7 @@
 	import { textGenerationStream } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { trimSuffix } from "$lib/utils/trimSuffix";
-	import { PUBLIC_SEP_TOKEN, PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
-	import { trimPrefix } from "$lib/utils/trimPrefix";
+	import { PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 
@@ -62,10 +60,7 @@
 			if (data.generated_text) {
 				const lastMessage = messages.at(-1);
 				if (lastMessage) {
-					lastMessage.content = trimPrefix(
-						trimSuffix(data.generated_text, PUBLIC_SEP_TOKEN),
-						"<|startoftext|>"
-					);
+					lastMessage.content = data.generated_text;
 					messages = [...messages];
 				}
 				break;
