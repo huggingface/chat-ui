@@ -9,6 +9,6 @@
 		class="flex items-center bg-white/90 dark:bg-gray-900/80 rounded-full py-1 px-3 shadow-sm pointer-events-auto"
 	>
 		<IconDazzled classNames="text-2xl mr-2" />
-		<h2 class="font-semibold">Server is overloaded, retry later.</h2>
+		<h2 class="font-semibold">Too much traffic, please try again.</h2>
 	</div>
 </div>
