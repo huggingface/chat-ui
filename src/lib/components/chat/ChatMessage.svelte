@@ -6,11 +6,13 @@
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
+	import { throttle } from "$lib/utils/throttle";
 
 	function sanitizeMd(md: string) {
+		console.log(md);
 		return md
 			.replaceAll(/^(<\|startoftext\|>|<\|startoftext\|$|<\|startoftext$|<\|$|<$)/g, "")
-			.replaceAll(/^(<\|endoftext\|>|<\|endoftext\|$|<\|endoftext$)/g, "")
+			.replaceAll(/(<\|endoftext\|>|<\|endoftext\|$|<\|endoftext$)/g, "")
 			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;");
 	}
@@ -39,7 +41,13 @@
 		renderer,
 	};
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	let tokens: any = [];
+
+	const parse = throttle((str: string) => {
+		tokens = marked.lexer(sanitizeMd(str));
+	}, 100);
+
+	$: parse(message.content);
 
 	afterUpdate(() => {
 		loadingEl?.$destroy();
