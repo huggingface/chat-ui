@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_MODEL_NAME } from "$env/static/public";
+	import {
+		PUBLIC_DISABLE_INTRO_TILES,
+		PUBLIC_MODEL_ID,
+		PUBLIC_MODEL_NAME,
+	} from "$env/static/public";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
@@ -36,7 +40,7 @@
 				class="flex items-center gap-5 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
 			>
 				<a
-					href="https://huggingface.co/{PUBLIC_MODEL_NAME}"
+					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
 					target="_blank"
 					rel="noreferrer"
 					class="flex items-center hover:underline"
