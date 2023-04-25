@@ -8,7 +8,11 @@
 	import IconLoading from "../icons/IconLoading.svelte";
 
 	function sanitizeMd(md: string) {
-		return md.replaceAll("&", "&amp;").replaceAll("<", "&lt;");
+		return md
+			.replaceAll(/^(<\|startoftext\|>|<\|startoftext\|$|<\|startoftext$|<\|$|<$)/, "")
+			.replaceAll(/^(<\|endoftext\|>|<\|endoftext\|$|<\|endoftext$)/, "")
+			.replaceAll("&", "&amp;")
+			.replaceAll("<", "&lt;");
 	}
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<").replaceAll("&amp;", "&");
