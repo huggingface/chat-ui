@@ -10,6 +10,7 @@
 	import { PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { error } from "$lib/stores/errors";
 
 	export let data: PageData;
 
@@ -105,8 +106,9 @@
 				await invalidate(UrlDependency.ConversationList);
 			}
 		} catch (err) {
+			// TODO: Should prob check if this is really a TooManyRequests error
+			$error = "Too much traffic, please try again.";
 			console.error(err);
-			alert(String(err));
 		} finally {
 			loading = false;
 		}
