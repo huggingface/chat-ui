@@ -34,7 +34,6 @@
 			<ChatMessage loading={loading && i === messages.length - 1} {message} />
 		{:else}
 			<ChatIntroduction on:message />
-			<ChatMessage message={{ from: "assistant", content: "This is a demonstration of the state of the art in language model chat using the Open Assistant chat model. Chat based on large language models is an area of active research with known issues. For more details, see __link__" }} />
 		{/each}
 		{#if pending}
 			<ChatMessage message={{ from: "assistant", content: "" }} />

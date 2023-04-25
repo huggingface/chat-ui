@@ -14,6 +14,11 @@
 </script>
 
 <div class="grid lg:grid-cols-3 gap-8 my-auto">
+	<div class="lg:col-span-3">
+		<p class="text-base text-gray-600 dark:text-gray-400">
+			This is a demonstration of the state of the art in language model chat using the <a href="https://open-assistant.io/"><u>Open Assistant</u></a> chat model. Chat based on large language models is an area of active research with known issues, such as biased generations and misinformation. Do not use this tool for high-stakes decisions or advice.
+		</p>
+	</div>
 	<div class="lg:col-span-1">
 		<div>
 			<div class="text-2xl font-semibold mb-3 flex items-center">
