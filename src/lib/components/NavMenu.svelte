@@ -92,6 +92,6 @@
 		href="{base}/privacy"
 		class="group pl-3 pr-2 h-9 rounded-lg flex-none text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1.5 hover:bg-gray-100"
 	>
-		Privacy
+		About & Privacy
 	</a>
 </div>
