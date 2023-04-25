@@ -6,13 +6,34 @@
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { error } from "$lib/stores/errors";
 
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
+	import Toast from "$lib/components/Toast.svelte";
+	import { onDestroy } from "svelte";
 
 	export let data: LayoutData;
 
 	let isNavOpen = false;
+	let errorToastTimeout: NodeJS.Timeout;
+	let currentError: string | null;
+
+	async function onError() {
+		// If a new different error comes, wait for the current error to hide first
+		if ($error && currentError && $error !== currentError) {
+			clearTimeout(errorToastTimeout);
+			currentError = null;
+			await new Promise((resolve) => setTimeout(resolve, 300));
+		}
+
+		currentError = $error;
+
+		errorToastTimeout = setTimeout(() => {
+			$error = null;
+			currentError = null;
+		}, 3000);
+	}
 
 	async function deleteConversation(id: string) {
 		try {
@@ -24,7 +45,7 @@
 			});
 
 			if (!res.ok) {
-				alert("Error while deleting conversation: " + (await res.text()));
+				$error = "Error while deleting conversation, try again.";
 				return;
 			}
 
@@ -35,9 +56,15 @@
 			}
 		} catch (err) {
 			console.error(err);
-			alert(String(err));
+			$error = String(err);
 		}
 	}
+
+	onDestroy(() => {
+		clearTimeout(errorToastTimeout);
+	});
+
+	$: if ($error) onError();
 </script>
 
 <div
@@ -61,5 +88,8 @@
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 		/>
 	</nav>
+	{#if currentError}
+		<Toast message={currentError} />
+	{/if}
 	<slot />
 </div>
