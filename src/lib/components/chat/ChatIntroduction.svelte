@@ -15,6 +15,11 @@
 			<div class="text-2xl font-semibold mb-3 flex items-center">
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
+				<div
+					class="text-base h-6 px-2 rounded-lg text-gray-400 bg-gray-50 ml-3 flex items-center border border-gray-100 dark:bg-gray-800 dark:border-gray-700/60"
+				>
+					v0
+				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
 				Making the best open source AI chat models available to everyone.
