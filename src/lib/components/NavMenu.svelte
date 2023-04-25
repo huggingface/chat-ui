@@ -86,9 +86,9 @@
 		Community feedback
 	</a>
 	<a
-		href={base}
+		href="{base}/privacy"
 		class="truncate py-3 px-3 rounded-lg flex-none text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
 	>
-		Settings
+		Privacy
 	</a>
 </div>
