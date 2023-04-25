@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { PUBLIC_ORIGIN } from "$env/static/private";
+import { PUBLIC_ORIGIN } from "$env/static/public";
 import { collections } from "$lib/server/database.js";
 import type { SharedConversation } from "$lib/types/SharedConversation.js";
 import { sha256 } from "$lib/utils/sha256.js";
