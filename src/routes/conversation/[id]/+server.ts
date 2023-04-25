@@ -90,12 +90,7 @@ export async function DELETE({ locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	if (conv.shares?.length) {
-		// Keep the convo, as it's been shared we don't want to invalidate share links
-		await collections.conversations.updateOne({ _id: conv._id }, { $unset: { sessionId: 1 } });
-	} else {
-		await collections.conversations.deleteOne({ _id: conv._id });
-	}
+	await collections.conversations.deleteOne({ _id: conv._id });
 
 	return new Response();
 }
