@@ -1,7 +1,7 @@
-import { HF_TOKEN } from "$env/static/private";
-import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_MODEL_ENDPOINT } from "$env/static/public";
+import { PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database.js";
+import { modelEndpoint } from "$lib/server/modelEndpoint.js";
 import { textGeneration } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -38,14 +38,20 @@ export async function POST({ params, locals, fetch }) {
 		return_full_text: false,
 	};
 
+	const endpoint = modelEndpoint();
 	const { generated_text } = await textGeneration(
 		{
-			model: PUBLIC_MODEL_ENDPOINT,
+			model: endpoint.endpoint,
 			inputs: prompt,
 			parameters,
-			accessToken: HF_TOKEN,
 		},
-		{ fetch }
+		{
+			fetch: (url, options) =>
+				fetch(url, {
+					...options,
+					headers: { ...options?.headers, Authorization: endpoint.authorization },
+				}),
+		}
 	);
 
 	if (generated_text) {
