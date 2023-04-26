@@ -39,6 +39,7 @@
 	const options: marked.MarkedOptions = {
 		...marked.getDefaults(),
 		gfm: true,
+		breaks: true,
 		renderer,
 	};
 
