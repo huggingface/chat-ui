@@ -24,7 +24,7 @@
 </script>
 
 <div
-	class="overflow-y-auto flex-grow scrollbar-custom mr-1"
+	class="overflow-y-auto h-full scrollbar-custom mr-1"
 	use:snapScrollToBottom={messages}
 	bind:this={chatContainer}
 >
@@ -35,7 +35,7 @@
 		{#if pending}
 			<ChatMessage message={{ from: "assistant", content: "" }} />
 		{/if}
-		<div class="hidden md:block h-32 flex-none" />
+		<div class="h-32 flex-none" />
 	</div>
 	<ScrollToBottomBtn
 		class="max-md:hidden bottom-36 right-4 lg:right-10"
