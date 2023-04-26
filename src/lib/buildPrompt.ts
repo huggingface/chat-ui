@@ -27,7 +27,7 @@ export function buildPrompt(messages: Message[]): string {
 	// Not super precise, but it's truncated in the model's backend anyway
 	return (
 		PUBLIC_PREPROMPT +
-		"\n-----" +
+		"\n-----\n" +
 		prompt.split(" ").slice(-parseInt(PUBLIC_MAX_INPUT_TOKENS)).join(" ")
 	);
 }
