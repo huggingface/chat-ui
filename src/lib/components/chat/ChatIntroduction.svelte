@@ -35,7 +35,7 @@
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
-				Making the best open source AI chat models available to everyone.
+				Making the community’s best<br />open source AI chat models available to everyone.
 			</p>
 		</div>
 	</div>
