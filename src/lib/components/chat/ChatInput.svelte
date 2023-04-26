@@ -8,7 +8,7 @@
 	export let disabled = false;
 	export let autofocus = false;
 
-	const dispatch = createEventDispatcher<{submit: void}>();
+	const dispatch = createEventDispatcher<{ submit: void }>();
 
 	$: minHeight = `${1 + minRows * 1.5}em`;
 	$: maxHeight = maxRows ? `${1 + maxRows * 1.5}em` : `auto`;
@@ -24,7 +24,7 @@
 	let textareaElement: HTMLTextAreaElement;
 </script>
 
-<div class="relative flex-1 min-w-0">
+<div class="relative min-w-0 flex-1">
 	<pre
 		class="invisible py-3"
 		aria-hidden="true"
@@ -34,7 +34,7 @@
 		enterkeyhint="send"
 		tabindex="0"
 		rows="1"
-		class="absolute m-0 w-full h-full top-0 resize-none border-0 bg-transparent p-3 focus:ring-0 focus-visible:ring-0 dark:bg-transparent outline-none scrollbar-custom overflow-x-hidden overflow-y-scroll"
+		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0 dark:bg-transparent"
 		bind:value
 		bind:this={textareaElement}
 		{disabled}

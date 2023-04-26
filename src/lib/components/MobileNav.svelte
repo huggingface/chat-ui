@@ -30,29 +30,29 @@
 </script>
 
 <nav
-	class="md:hidden flex items-center h-12 border-b px-4 justify-between dark:border-gray-800 bg-gray-50 dark:bg-gray-800/70"
+	class="flex h-12 items-center justify-between border-b bg-gray-50 px-4 dark:border-gray-800 dark:bg-gray-800/70 md:hidden"
 >
 	<button
 		type="button"
-		class="flex items-center justify-center w-9 h-9 -ml-3 shrink-0"
+		class="-ml-3 flex h-9 w-9 shrink-0 items-center justify-center"
 		on:click={() => dispatch("toggle", true)}
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
-	<span class="px-4 truncate">{title}</span>
-	<a href={base || "/"} class="flex items-center justify-center w-9 h-9 -mr-3 shrink-0"
+	<span class="truncate px-4">{title}</span>
+	<a href={base || "/"} class="-mr-3 flex h-9 w-9 shrink-0 items-center justify-center"
 		><CarbonAdd /></a
 	>
 </nav>
 <nav
-	class="fixed inset-0 z-50 grid grid-rows-[auto,auto,1fr,auto] grid-cols-1 max-h-screen bg-white dark:bg-gray-900 bg-gradient-to-l from-gray-50 dark:from-gray-800/30 {isOpen
+	class="fixed inset-0 z-50 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white bg-gradient-to-l from-gray-50 dark:bg-gray-900 dark:from-gray-800/30 {isOpen
 		? 'block'
 		: 'hidden'}"
 >
-	<div class="flex items-center px-4 h-12">
+	<div class="flex h-12 items-center px-4">
 		<button
 			type="button"
-			class="flex items-center justify-center ml-auto w-9 h-9 -mr-3"
+			class="-mr-3 ml-auto flex h-9 w-9 items-center justify-center"
 			on:click={() => dispatch("toggle", false)}
 			aria-label="Close menu"
 			bind:this={closeEl}><CarbonClose /></button
