@@ -2,10 +2,12 @@
 	import type { Message } from "$lib/types/Message";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import ScrollToBottomBtn from "$lib/components/ScrollToBottomBtn.svelte";
-	import { tick } from "svelte";
+	import { createEventDispatcher, tick } from "svelte";
 
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
+
+	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -31,12 +33,16 @@
 >
 	<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-5 sm:gap-8 h-full">
 		{#each messages as message, i}
-			<ChatMessage loading={loading && i === messages.length - 1} {message} />
+			<ChatMessage
+				loading={loading && i === messages.length - 1}
+				{message}
+				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
+			/>
 		{:else}
 			<ChatIntroduction on:message />
 		{/each}
 		{#if pending}
-			<ChatMessage message={{ from: "assistant", content: "" }} />
+			<ChatMessage message={{ from: "assistant", content: "", id: crypto.randomUUID() }} />
 		{/if}
 		<div class="h-32 flex-none" />
 	</div>

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { marked } from "marked";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate } from "svelte";
+	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
+	import CarbonRetryFailed from "~icons/carbon/retry-failed";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
@@ -23,6 +24,8 @@
 
 	export let message: Message;
 	export let loading: boolean = false;
+
+	const dispatch = createEventDispatcher<{ retry: void }>();
 
 	let contentEl: HTMLElement;
 	let loadingEl: any;
@@ -91,10 +94,19 @@
 	</div>
 {/if}
 {#if message.from === "user"}
-	<div class="flex items-start justify-start gap-4 max-sm:text-sm">
+	<div class="flex items-start justify-start gap-4 max-sm:text-sm relative">
 		<div class="mt-5 w-3 h-3 flex-none rounded-full" />
 		<div class="rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400 whitespace-break-spaces">
 			{message.content.trim()}
 		</div>
+		{#if !loading && message.id}
+			<div
+				class="contents cursor-pointer text-gray-500 dark:text-gray-400"
+				title="Retry"
+				on:click={() => dispatch("retry")}
+			>
+				<CarbonRetryFailed class="w-4 h-4 absolute right-0 bottom-0 mr-2 mb-2" />
+			</div>
+		{/if}
 	</div>
 {/if}
