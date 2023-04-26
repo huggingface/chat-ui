@@ -3,7 +3,6 @@
 	import { goto, invalidate } from "$app/navigation";
 	import { page } from "$app/stores";
 	import "../styles/main.css";
-	import type { LayoutData } from "./$types";
 	import { base } from "$app/paths";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
 
@@ -15,7 +14,7 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
 
-	export let data: LayoutData;
+	export let data;
 
 	let isNavOpen = false;
 	let errorToastTimeout: NodeJS.Timeout;
