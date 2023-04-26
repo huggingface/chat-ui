@@ -79,7 +79,7 @@
 </svelte:head>
 
 <div
-	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] md:grid-rows-[1fr] md:grid-cols-[280px,1fr] overflow-hidden text-smd dark:text-gray-300"
+	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd dark:text-gray-300 md:grid-cols-[280px,1fr] md:grid-rows-[1fr]"
 >
 	<MobileNav
 		isOpen={isNavOpen}
@@ -92,7 +92,7 @@
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 		/>
 	</MobileNav>
-	<nav class="max-md:hidden grid grid-rows-[auto,1fr,auto] grid-cols-1 max-h-screen">
+	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
 		<NavMenu
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}

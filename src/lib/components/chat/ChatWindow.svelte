@@ -29,7 +29,7 @@
 <div class="relative min-h-0 min-w-0">
 	<ChatMessages {loading} {pending} {messages} on:message />
 	<div
-		class="flex flex-col pointer-events-none [&>*]:pointer-events-auto max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-3.5 sm:px-5 bottom-0 py-4 md:py-8 w-full z-0"
+		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		<StopGeneratingBtn
 			visible={loading}
@@ -38,9 +38,9 @@
 		/>
 		<form
 			on:submit|preventDefault={handleSubmit}
-			class="w-full relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 focus-within:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:focus-within:border-gray-500 "
+			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500 "
 		>
-			<div class="w-full flex flex-1 border-none bg-transparent">
+			<div class="flex w-full flex-1 border-none bg-transparent">
 				<ChatInput
 					placeholder="Ask anything"
 					bind:value={message}
@@ -49,7 +49,7 @@
 					maxRows={10}
 				/>
 				<button
-					class="btn p-1 px-[0.7rem] self-end bg-transparent my-1 h-[2.4rem] text-gray-400 rounded-lg enabled:dark:hover:text-gray-100 enabled:hover:text-gray-700 disabled:opacity-60 dark:disabled:opacity-40 mx-1"
+					class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
 					disabled={!message || loading || disabled}
 					type="submit"
 				>
@@ -57,7 +57,7 @@
 				</button>
 			</div>
 		</form>
-		<div class="flex text-xs text-gray-400/90 mt-2 justify-between self-stretch px-1 max-sm:gap-2">
+		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
 					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
@@ -69,7 +69,7 @@
 			</p>
 			{#if messages.length}
 				<button
-					class="flex flex-none items-center hover:underline hover:text-gray-400 dark:max-sm:bg-gray-800 max-sm:bg-gray-50 max-sm:px-2.5 max-sm:rounded-lg"
+					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 					type="button"
 					on:click={() => dispatch("share")}
 				>
