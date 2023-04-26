@@ -11,7 +11,7 @@ base_path: /chat
 
 # Chat UI
 
-A chat interface using open source models, eg OpenAssistant. abc
+A chat interface using open source models, eg OpenAssistant.
 
 ## Launch
 
