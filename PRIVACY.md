@@ -6,11 +6,15 @@ Please note that in `v0`, users are not authenticated in any way, i.e. this app 
 
 In a future version, we are considering exposing a setting for users to share their conversations with the model authors (here OpenAssistant) to improve their training data and their model over time. In other terms, model authors are the custodians of the data collected by their model, even if it's hosted on our platform.
 
+🗓 Please also consult huggingface.co's main privacy policy at https://huggingface.co/privacy. To exercise any of your legal privacy rights, please send an email to privacy@huggingface.co.
+
 ## About available LLMs
 
 The goal of this app is to showcase that it is now (April 2023) possible to build an open source alternative to ChatGPT. 💪
 
 For now, it's running OpenAssistant's [latest LLaMA based model](https://huggingface.co/OpenAssistant/oasst-sft-6-llama-30b-xor) (which is one of the current best open source chat models), but the plan in the longer-term is to expose all good-quality chat models from the Hub.
+
+We are not affiliated with Open Assistant, but if you want to contribute to the training data for the next generation of open models, please consider contributing to https://open-assistant.io/ ❤️
 
 ## Technical details
 
