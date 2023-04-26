@@ -26,7 +26,7 @@
 
 <div
 	class="overflow-y-auto h-full scrollbar-custom mr-1"
-	use:snapScrollToBottom={messages}
+	use:snapScrollToBottom={messages.length ? messages : false}
 	bind:this={chatContainer}
 >
 	<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-5 sm:gap-8 h-full">
