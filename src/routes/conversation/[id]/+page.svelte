@@ -56,9 +56,22 @@
 		for await (const data of response) {
 			pending = false;
 
-			if (!data || conversationId !== $page.params.id) break;
+			if (!data) {
+				break;
+			}
+
+			if (conversationId !== $page.params.id) {
+				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
+					method: "POST",
+				}).catch(console.error);
+				break;
+			}
+
 			if (isAborted) {
 				isAborted = false;
+				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
+					method: "POST",
+				}).catch(console.error);
 				break;
 			}
 
@@ -96,6 +109,7 @@
 		if (!message.trim()) return;
 
 		try {
+			isAborted = false;
 			loading = true;
 			pending = true;
 
