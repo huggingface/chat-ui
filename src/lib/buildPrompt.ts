@@ -1,6 +1,7 @@
 import {
 	PUBLIC_ASSISTANT_MESSAGE_TOKEN,
 	PUBLIC_MAX_INPUT_TOKENS,
+	PUBLIC_PREPROMPT,
 	PUBLIC_SEP_TOKEN,
 	PUBLIC_USER_MESSAGE_TOKEN,
 } from "$env/static/public";
@@ -24,5 +25,9 @@ export function buildPrompt(messages: Message[]): string {
 			.join("") + PUBLIC_ASSISTANT_MESSAGE_TOKEN;
 
 	// Not super precise, but it's truncated in the model's backend anyway
-	return prompt.split(" ").slice(-parseInt(PUBLIC_MAX_INPUT_TOKENS)).join(" ");
+	return (
+		PUBLIC_PREPROMPT +
+		"\n-----\n" +
+		prompt.split(" ").slice(-parseInt(PUBLIC_MAX_INPUT_TOKENS)).join(" ")
+	);
 }

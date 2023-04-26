@@ -21,7 +21,7 @@ export async function POST({ params, locals, fetch }) {
 	const firstMessage = conversation.messages.find((m) => m.from === "user");
 
 	const userPrompt =
-		`You are a summarizing assistant. Please summarize the following message as a single sentence of less than 5 words:\n` +
+		`Please summarize the following message as a single sentence of less than 5 words:\n` +
 		firstMessage?.content;
 
 	const prompt = buildPrompt([{ from: "user", content: userPrompt }]);
