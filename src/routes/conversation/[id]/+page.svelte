@@ -16,6 +16,7 @@
 
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
+	let isAborted = false;
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -55,7 +56,24 @@
 		for await (const data of response) {
 			pending = false;
 
-			if (!data || conversationId !== $page.params.id) break;
+			if (!data) {
+				break;
+			}
+
+			if (conversationId !== $page.params.id) {
+				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
+					method: "POST",
+				}).catch(console.error);
+				break;
+			}
+
+			if (isAborted) {
+				isAborted = false;
+				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
+					method: "POST",
+				}).catch(console.error);
+				break;
+			}
 
 			// final message
 			if (data.generated_text) {
@@ -91,6 +109,7 @@
 		if (!message.trim()) return;
 
 		try {
+			isAborted = false;
 			loading = true;
 			pending = true;
 
@@ -130,4 +149,5 @@
 	{messages}
 	on:message={(message) => writeMessage(message.detail)}
 	on:share={() => shareConversation($page.params.id, data.title)}
+	on:stop={() => (isAborted = true)}
 />
