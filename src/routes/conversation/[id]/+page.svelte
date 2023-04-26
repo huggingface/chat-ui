@@ -2,7 +2,6 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { onMount } from "svelte";
-	import type { PageData } from "./$types";
 	import { page } from "$app/stores";
 	import { textGenerationStream } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
@@ -12,7 +11,7 @@
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { error } from "$lib/stores/errors";
 
-	export let data: PageData;
+	export let data;
 
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
@@ -141,7 +140,13 @@
 			writeMessage(val);
 		}
 	});
+
+	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 </script>
+
+<svelte:head>
+	<title>{title}</title>
+</svelte:head>
 
 <ChatWindow
 	{loading}
