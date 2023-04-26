@@ -1,10 +1,14 @@
 <script lang="ts">
+	import { createEventDispatcher } from "svelte";
+
 	export let value = "";
 	export let minRows = 1;
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
 	export let autofocus = false;
+
+	const dispatch = createEventDispatcher<{submit: void}>();
 
 	$: minHeight = `${1 + minRows * 1.5}em`;
 	$: maxHeight = maxRows ? `${1 + maxRows * 1.5}em` : `auto`;
@@ -13,8 +17,7 @@
 		// submit on enter
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
-
-			textareaElement.closest("form")?.requestSubmit();
+			dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 		}
 	}
 
