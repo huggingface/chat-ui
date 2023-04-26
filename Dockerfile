@@ -13,10 +13,8 @@ RUN npm i
 
 RUN chown -R 1000:1000 /app
 
-RUN --mount=type=secret,id=DOTENV_LOCAL,mode=0444,required=true cat /run/secrets/DOTENV_LOCAL > .env.local
-   
-RUN npm run build
-
 ENV PORT 7860
+
+RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local npm run build
 
 CMD pm2 start build/index.js -i $CPU_CORES --no-daemon
