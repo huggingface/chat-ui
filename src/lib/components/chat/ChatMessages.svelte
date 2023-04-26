@@ -25,11 +25,11 @@
 </script>
 
 <div
-	class="overflow-y-auto h-full scrollbar-custom mr-1"
+	class="scrollbar-custom mr-1 h-full overflow-y-auto"
 	use:snapScrollToBottom={messages.length ? messages : false}
 	bind:this={chatContainer}
 >
-	<div class="max-w-3xl xl:max-w-4xl mx-auto px-5 pt-6 flex flex-col gap-5 sm:gap-8 h-full">
+	<div class="mx-auto flex h-full max-w-3xl flex-col gap-5 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
 			<ChatMessage loading={loading && i === messages.length - 1} {message} />
 		{:else}
@@ -41,7 +41,7 @@
 		<div class="h-32 flex-none" />
 	</div>
 	<ScrollToBottomBtn
-		class="max-md:hidden bottom-36 right-4 lg:right-10"
+		class="bottom-36 right-4 max-md:hidden lg:right-10"
 		scrollNode={chatContainer}
 	/>
 </div>

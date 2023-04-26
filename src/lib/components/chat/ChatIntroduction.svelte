@@ -13,14 +13,14 @@
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
-<div class="grid lg:grid-cols-3 gap-8 my-auto">
+<div class="my-auto grid gap-8 lg:grid-cols-3">
 	<div class="lg:col-span-1">
 		<div>
-			<div class="text-2xl font-semibold mb-3 flex items-center">
+			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
 				<div
-					class="text-base h-6 px-2 rounded-lg text-gray-400 bg-gray-50 ml-3 flex items-center border border-gray-100 dark:bg-gray-800 dark:border-gray-700/60"
+					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
 					v0
 				</div>
@@ -31,13 +31,13 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		<div class="border dark:border-gray-800 rounded-xl overflow-hidden">
+		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="p-3">
 				<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
 				<div class="font-semibold">{PUBLIC_MODEL_NAME}</div>
 			</div>
 			<div
-				class="flex items-center gap-5 px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-600 dark:text-gray-300 dark:bg-gray-800"
+				class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300"
 			>
 				<a
 					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
@@ -45,7 +45,7 @@
 					rel="noreferrer"
 					class="flex items-center hover:underline"
 				>
-					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
+					<CarbonArrowUpRight class="mr-1.5 text-xs text-gray-400" />
 					Model
 					<div class="max-sm:hidden">&nbsp;page</div>
 				</a>
@@ -55,17 +55,17 @@
 					rel="noreferrer"
 					class="flex items-center hover:underline"
 				>
-					<CarbonArrowUpRight class="text-xs mr-1.5 text-gray-400" />
+					<CarbonArrowUpRight class="mr-1.5 text-xs text-gray-400" />
 					Dataset
 					<div class="max-sm:hidden">&nbsp;page</div>
 				</a>
 				<a
 					href="https://open-assistant.io/"
 					target="_blank"
-					class="flex items-center hover:underline ml-auto"
+					class="ml-auto flex items-center hover:underline"
 					rel="noreferrer"
 				>
-					<CarbonEarth class="text-xs mr-1.5 text-gray-400" />
+					<CarbonEarth class="mr-1.5 text-xs text-gray-400" />
 					Open Assistant Website
 				</a>
 			</div>
@@ -74,10 +74,10 @@
 	{#if PUBLIC_DISABLE_INTRO_TILES !== "true"}
 		<div class="lg:col-span-3 lg:mt-12">
 			<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
-			<div class="grid lg:grid-cols-3 gap-3 lg:gap-5">
+			<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
 				<button
 					type="button"
-					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
+					class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
 					on:click={() =>
 						dispatch(
 							"message",
@@ -88,7 +88,7 @@
 				</button>
 				<button
 					type="button"
-					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
+					class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
 					on:click={() =>
 						dispatch(
 							"message",
@@ -99,7 +99,7 @@
 				</button>
 				<button
 					type="button"
-					class="text-gray-600 dark:text-gray-300 p-2.5 sm:p-4 bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 hover:bg-gray-100 border dark:border-gray-800 rounded-xl"
+					class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
 					on:click={() => dispatch("message", "How do I make a delicious lemon cheesecake?")}
 				>
 					"Assist in a task"

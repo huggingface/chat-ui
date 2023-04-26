@@ -11,10 +11,10 @@
 		try {
 			loading = true;
 			const res = await fetch(`${base}/conversation`, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json'
-				}
+					"Content-Type": "application/json",
+				},
 			});
 
 			if (!res.ok) {
