@@ -29,8 +29,6 @@
 
 	async function getTextGenerationStream(inputs: string) {
 		let conversationId = $page.params.id;
-		const controller = new AbortController();
-		const abortSignal = controller.signal;
 
 		const response = textGenerationStream(
 			{
@@ -52,24 +50,17 @@
 			},
 			{
 				use_cache: false,
-				fetch: (url: string, info: any) =>
-					fetch(url, { ...info, signal: abortSignal }).catch((err) => {
-						console.error(err);
-					}),
 			}
 		);
 
 		for await (const data of response) {
 			pending = false;
 
-			if (!data || conversationId !== $page.params.id) break;
-
 			if (!data) {
 				break;
 			}
 
 			if (conversationId !== $page.params.id) {
-				controller.abort();
 				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
 					method: "POST",
 				}).catch(console.error);
@@ -77,7 +68,6 @@
 			}
 
 			if (isAborted) {
-				controller.abort();
 				isAborted = false;
 				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
 					method: "POST",
