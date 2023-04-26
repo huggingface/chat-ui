@@ -28,7 +28,7 @@
 	let loading = false;
 	let pending = false;
 
-	async function getTextGenerationStream(inputs: string, messageId: string) {
+	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
 		let conversationId = $page.params.id;
 
 		const response = textGenerationStream(
@@ -51,6 +51,7 @@
 			},
 			{
 				id: messageId,
+				is_retry: isRetry,
 				use_cache: false,
 			}
 		);
@@ -120,7 +121,8 @@
 			pending = true;
 
 			let retryMessageIndex = messages.findIndex((msg) => msg.id === messageId);
-			if (retryMessageIndex === -1) {
+			const isRetry = retryMessageIndex !== -1;
+			if (!isRetry) {
 				retryMessageIndex = messages.length;
 			}
 
@@ -129,7 +131,7 @@
 				{ from: "user", content: message, id: messageId },
 			];
 
-			await getTextGenerationStream(message, messageId);
+			await getTextGenerationStream(message, messageId, isRetry);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)

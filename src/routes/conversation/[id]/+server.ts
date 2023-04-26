@@ -49,12 +49,12 @@ export async function POST({ request, fetch, locals, params }) {
 			}
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
-				{ content: newPrompt, from: "user", id: messageId },
+				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
 			];
 		}
 		return [
 			...conv.messages,
-			{ content: newPrompt, from: "user", id: messageId || crypto.randomUUID() },
+			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
 		];
 	})() satisfies Message[];
 
