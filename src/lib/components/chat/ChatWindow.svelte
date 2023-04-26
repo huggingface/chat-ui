@@ -17,6 +17,12 @@
 	let message: string;
 
 	const dispatch = createEventDispatcher<{ message: string; share: void }>();
+
+	const handleSubmit = () => {
+		if (loading) return;
+		dispatch("message", message);
+		message = "";
+	};
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -25,15 +31,17 @@
 		class="flex flex-col pointer-events-none [&>*]:pointer-events-auto max-md:border-t dark:border-gray-800 items-center max-md:dark:bg-gray-900 max-md:bg-white bg-gradient-to-t from-white via-white/80 to-white/0 dark:from-gray-900 dark:via-gray-80 dark:to-gray-900/0 justify-center absolute inset-x-0 max-w-3xl xl:max-w-4xl mx-auto px-3.5 sm:px-5 bottom-0 py-4 md:py-8 w-full"
 	>
 		<form
-			on:submit|preventDefault={() => {
-				if (loading) return;
-				dispatch("message", message);
-				message = "";
-			}}
+			on:submit|preventDefault={handleSubmit}
 			class="w-full relative flex items-center rounded-xl flex-1 max-w-4xl border bg-gray-100 focus-within:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:focus-within:border-gray-500 "
 		>
 			<div class="w-full flex flex-1 border-none bg-transparent">
-				<ChatInput placeholder="Ask anything" bind:value={message} autofocus maxRows={10} />
+				<ChatInput
+					placeholder="Ask anything"
+					bind:value={message}
+					on:submit={handleSubmit}
+					autofocus
+					maxRows={10}
+				/>
 				<button
 					class="btn p-1 px-[0.7rem] self-end bg-transparent my-1 h-[2.4rem] text-gray-400 rounded-lg enabled:dark:hover:text-gray-100 enabled:hover:text-gray-700 disabled:opacity-60 dark:disabled:opacity-40 mx-1"
 					disabled={!message || loading || disabled}
