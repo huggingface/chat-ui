@@ -41,7 +41,9 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
 
 	node.addEventListener("scroll", handleScroll);
 
-	updateScroll({ force: true });
+	if (dependency) {
+		updateScroll({ force: true });
+	}
 
 	return {
 		update: updateScroll,
