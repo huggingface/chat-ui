@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
-	import ChatWindow from '$lib/components/chat/ChatWindow.svelte';
-	import { ERROR_MESSAGES, error } from '$lib/stores/errors';
-	import { pendingMessage } from '$lib/stores/pendingMessage';
+	import { goto } from "$app/navigation";
+	import { base } from "$app/paths";
+	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
 
 	let loading = false;
 
@@ -11,15 +11,15 @@
 		try {
 			loading = true;
 			const res = await fetch(`${base}/conversation`, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json'
-				}
+					"Content-Type": "application/json",
+				},
 			});
 
 			if (!res.ok) {
-				error.set('Error while creating conversation, try again.');
-				console.error('Error while creating conversation: ' + (await res.text()));
+				error.set("Error while creating conversation, try again.");
+				console.error("Error while creating conversation: " + (await res.text()));
 				return;
 			}
 

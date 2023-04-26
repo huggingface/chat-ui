@@ -8,7 +8,7 @@
 	export let disabled = false;
 	export let autofocus = false;
 
-	const dispatch = createEventDispatcher<{submit: void}>();
+	const dispatch = createEventDispatcher<{ submit: void }>();
 
 	$: minHeight = `${1 + minRows * 1.5}em`;
 	$: maxHeight = maxRows ? `${1 + maxRows * 1.5}em` : `auto`;
