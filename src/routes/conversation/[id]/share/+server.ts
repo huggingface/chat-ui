@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { SHARE_BASE_URL } from "$env/static/private";
+import { PUBLIC_ORIGIN } from "$env/static/public";
 import { collections } from "$lib/server/database.js";
 import type { SharedConversation } from "$lib/types/SharedConversation.js";
 import { sha256 } from "$lib/utils/sha256.js";
@@ -24,7 +24,7 @@ export async function POST({ params, url, locals }) {
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: (SHARE_BASE_URL || `${url.origin}${base}`) + `/r/${existingShare._id}`,
+				url: getShareUrl(url, existingShare._id),
 			}),
 			{ headers: { "Content-Type": "application/json" } }
 		);
@@ -43,8 +43,12 @@ export async function POST({ params, url, locals }) {
 
 	return new Response(
 		JSON.stringify({
-			url: (SHARE_BASE_URL || `${url.origin}${base}`) + `/r/${shared._id}`,
+			url: getShareUrl(url, shared._id),
 		}),
 		{ headers: { "Content-Type": "application/json" } }
 	);
+}
+
+function getShareUrl(url: URL, shareId: string): string {
+	return `${PUBLIC_ORIGIN || url.origin}${base}/r/${shareId}`;
 }

@@ -8,7 +8,14 @@
 	import IconLoading from "../icons/IconLoading.svelte";
 
 	function sanitizeMd(md: string) {
-		return md.replaceAll("&", "&amp;").replaceAll("<", "&lt;");
+		return md
+			.replace(/<\|[a-z]*$/, "")
+			.replace(/<\|[a-z]+\|$/, "")
+			.replace(/<$/, "")
+			.replaceAll(/<\|[a-z]+\|>/g, " ")
+			.trim()
+			.replaceAll("&", "&amp;")
+			.replaceAll("<", "&lt;");
 	}
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<").replaceAll("&amp;", "&");
