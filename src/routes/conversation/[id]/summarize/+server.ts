@@ -1,4 +1,4 @@
-import { PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
+import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
@@ -34,7 +34,7 @@ export async function POST({ params, locals, fetch }) {
 		watermark: false,
 		max_new_tokens: 1024,
 		truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
-		stop: ["<|endoftext|>"],
+		stop: [PUBLIC_SEP_TOKEN],
 		return_full_text: false,
 	};
 

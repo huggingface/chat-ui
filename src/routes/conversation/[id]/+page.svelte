@@ -6,7 +6,7 @@
 	import { textGenerationStream } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { PUBLIC_MAX_INPUT_TOKENS } from "$env/static/public";
+	import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { error } from "$lib/stores/errors";
@@ -43,7 +43,7 @@
 					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
 					watermark: false,
 					max_new_tokens: 1024,
-					stop: ["<|endoftext|>"],
+					stop: [PUBLIC_SEP_TOKEN],
 					return_full_text: false,
 				},
 			},
