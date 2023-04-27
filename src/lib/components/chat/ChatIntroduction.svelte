@@ -3,6 +3,7 @@
 		PUBLIC_DISABLE_INTRO_TILES,
 		PUBLIC_MODEL_ID,
 		PUBLIC_MODEL_NAME,
+		PUBLIC_VERSION,
 	} from "$env/static/public";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
@@ -22,7 +23,7 @@
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
-					v0
+					v{PUBLIC_VERSION}
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">

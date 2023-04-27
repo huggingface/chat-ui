@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import { onMount } from "svelte";
@@ -27,7 +28,7 @@
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
 				>
-					v0
+					v{PUBLIC_VERSION}
 				</div>
 			</h2>
 			<p class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12">
