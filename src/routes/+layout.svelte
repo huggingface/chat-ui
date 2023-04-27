@@ -12,7 +12,10 @@
 
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
+	import Logo from "$lib/components/icons/Logo.svelte";
+	import Modal from "$lib/components/Modal.svelte";
 	import Toast from "$lib/components/Toast.svelte";
+	import EthicsModal from "$lib/components/EthicsModal.svelte";
 
 	export let data;
 
@@ -102,5 +105,6 @@
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
+	<EthicsModal />
 	<slot />
 </div>

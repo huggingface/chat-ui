@@ -3,13 +3,14 @@
 		PUBLIC_DISABLE_INTRO_TILES,
 		PUBLIC_MODEL_ID,
 		PUBLIC_MODEL_NAME,
+		PUBLIC_VERSION,
 	} from "$env/static/public";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarth from "~icons/carbon/earth";
 	import { createEventDispatcher } from "svelte";
-
+	console.log(PUBLIC_VERSION);
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
@@ -19,11 +20,13 @@
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
-				<div
-					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
-				>
-					v0
-				</div>
+				{#if typeof PUBLIC_VERSION !== "undefined"}
+					<div
+						class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
+					>
+						v{PUBLIC_VERSION}
+					</div>
+				{/if}
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
 				Making the community's best AI chat models available to everyone.
