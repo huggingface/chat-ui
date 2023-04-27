@@ -9,7 +9,7 @@
 	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 
 	export let isOpen = false;
-	export let title: string;
+	export let title: string | undefined;
 
 	$: title = title || "New Chat";
 
