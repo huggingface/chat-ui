@@ -15,11 +15,11 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import Toast from "$lib/components/Toast.svelte";
+	import EthicsModal from "$lib/components/EthicsModal.svelte";
 
 	export let data;
 
 	let isNavOpen = false;
-	let ethicsModal = true;
 	let errorToastTimeout: NodeJS.Timeout;
 	let currentError: string | null;
 
@@ -105,33 +105,6 @@
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
-	{#if ethicsModal}
-		<Modal>
-			<div
-				class="flex w-full flex-col items-center gap-6 bg-gradient-to-t from-yellow-500/40 via-yellow-500/10 to-yellow-500/0 px-4 pb-10 pt-9 text-center"
-			>
-				<h2 class="flex items-center text-2xl font-semibold">
-					<Logo classNames="text-3xl mr-1.5" />HuggingChat
-					<div
-						class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
-					>
-						v0
-					</div>
-				</h2>
-				<p class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12">
-					This application is for demonstration purposes only.
-				</p>
-				<p class="text-gray-800">
-					AI is an area of active research with known problems such as biased generation and
-					misinformation. Do not use this application for high-stakes decisions or advice.
-				</p>
-				<a
-					href="/chat"
-					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
-					>Start chatting</a
-				>
-			</div>
-		</Modal>
-	{/if}
+	<EthicsModal />
 	<slot />
 </div>
