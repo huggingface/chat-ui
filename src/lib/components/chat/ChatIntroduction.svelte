@@ -10,7 +10,7 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarth from "~icons/carbon/earth";
 	import { createEventDispatcher } from "svelte";
-
+	console.log(PUBLIC_VERSION);
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
@@ -20,11 +20,13 @@
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
 				HuggingChat
-				<div
-					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
-				>
-					v{PUBLIC_VERSION}
-				</div>
+				{#if typeof PUBLIC_VERSION !== "undefined"}
+					<div
+						class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
+					>
+						v{PUBLIC_VERSION}
+					</div>
+				{/if}
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
 				Making the best open source AI chat models available to everyone.

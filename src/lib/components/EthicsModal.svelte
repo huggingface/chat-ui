@@ -25,11 +25,13 @@
 		>
 			<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 				<Logo classNames="text-3xl mr-1.5" />HuggingChat
-				<div
-					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
-				>
-					v{PUBLIC_VERSION}
-				</div>
+				{#if typeof PUBLIC_VERSION !== "undefined"}
+					<div
+						class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
+					>
+						v{PUBLIC_VERSION}
+					</div>
+				{/if}
 			</h2>
 			<p class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12">
 				This application is for demonstration purposes only.
