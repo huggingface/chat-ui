@@ -52,7 +52,7 @@
 			<button
 				type="button"
 				class="flex h-5 w-5 items-center justify-center rounded md:hidden  md:group-hover:flex"
-				title="Share conversation"
+				title="Edit conversation title"
 				on:click|preventDefault={() => {
 					const newTitle = prompt("Enter new title:", conv.title);
 					if (!newTitle) return;
