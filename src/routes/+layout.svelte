@@ -93,22 +93,22 @@
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:clickSettings={() => isSettingsOpen = true}
-			/>
-		</MobileNav>
-		<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
-			<NavMenu
+			on:clickSettings={() => (isSettingsOpen = true)}
+		/>
+	</MobileNav>
+	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
+		<NavMenu
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:clickSettings={() => isSettingsOpen = true}
+			on:clickSettings={() => (isSettingsOpen = true)}
 		/>
 	</nav>
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
 	{#if isSettingsOpen}
-		<SettingsModal on:close={() => isSettingsOpen = false} />
+		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
 	{/if}
 	<EthicsModal />
 	<slot />

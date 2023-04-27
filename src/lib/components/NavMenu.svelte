@@ -13,7 +13,7 @@
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
 		deleteConversation: string;
-		clickSettings: void
+		clickSettings: void;
 	}>();
 
 	export let conversations: Array<{
@@ -82,7 +82,7 @@
 		Theme
 	</button>
 	<button
-		on:click={() => dispatch('clickSettings')}
+		on:click={() => dispatch("clickSettings")}
 		type="button"
 		class="group flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
