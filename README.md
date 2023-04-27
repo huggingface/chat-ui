@@ -7,6 +7,7 @@ sdk: docker
 pinned: false
 license: apache-2.0
 base_path: /chat
+app_port: 3000
 ---
 
 # Chat UI

@@ -64,6 +64,28 @@
 		}
 	}
 
+	async function editConversationTitle(id: string, title: string) {
+		try {
+			const res = await fetch(`${base}/conversation/${id}`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ title }),
+			});
+
+			if (!res.ok) {
+				$error = "Error while editing title, try again.";
+				return;
+			}
+
+			await invalidate(UrlDependency.ConversationList);
+		} catch (err) {
+			console.error(err);
+			$error = String(err);
+		}
+	}
+
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
 	});
@@ -94,6 +116,7 @@
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
+			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</MobileNav>
 	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
@@ -102,6 +125,7 @@
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
+			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</nav>
 	{#if currentError}

@@ -11,6 +11,7 @@ import { trimSuffix } from "$lib/utils/trimSuffix.js";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
+import { z } from "zod";
 
 export async function POST({ request, fetch, locals, params }) {
 	// todo: add validation on params.id
@@ -163,4 +164,29 @@ async function parseGeneratedText(
 	}
 
 	return res;
+}
+
+export async function PATCH({request, locals, params}) {
+	const {title} = z.object({title: z.string().trim().min(1).max(100)}).parse(await request.json())
+
+	const convId = new ObjectId(params.id);
+
+	const conv = await collections.conversations.findOne({
+		_id: convId,
+		sessionId: locals.sessionId,
+	});
+
+	if (!conv) {
+		throw error(404, "Conversation not found");
+	}
+
+	await collections.conversations.updateOne({
+		_id: convId,
+	}, {
+		$set: {
+			title,
+		}
+	});
+
+	return new Response();
 }
