@@ -56,6 +56,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>{data.title}</title>
+</svelte:head>
+
 <ChatWindow
 	on:message={(ev) =>
 		createConversation()

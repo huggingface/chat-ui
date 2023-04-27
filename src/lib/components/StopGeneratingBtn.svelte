@@ -8,10 +8,10 @@
 <button
 	type="button"
 	on:click
-	class="absolute btn flex rounded-lg border py-1 px-3 shadow-sm bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 transition-all 
+	class="btn absolute flex rounded-lg border bg-white px-3 py-1 shadow-sm transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 
     {className}
-    {visible ? 'opacity-100 visible' : 'opacity-0 invisible'}
+    {visible ? 'visible opacity-100' : 'invisible opacity-0'}
     "
 >
-	<CarbonPause class="mr-1 -ml-1 w-[1.1875rem] h-[1.25rem] text-gray-400" /> Stop generating
+	<CarbonPause class="-ml-1 mr-1 h-[1.25rem] w-[1.1875rem] text-gray-400" /> Stop generating
 </button>

@@ -35,7 +35,7 @@
 </script>
 
 <button
-	class="btn text-sm rounded-lg border py-2 px-2 shadow-sm border-gray-200 active:shadow-inner dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-400 transition-all {classNames}
+	class="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 {classNames}
 		{!isSuccess && 'text-gray-200 dark:text-gray-200'}
 		{isSuccess && 'text-green-500'}
 	"
