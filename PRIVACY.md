@@ -4,7 +4,7 @@ In this `v0` of HuggingChat, we only store messages to display them to the user,
 
 Please note that in `v0`, users are not authenticated in any way, i.e. this app doesn't have access to your HF user account even if you're logged in to huggingface.co. The app is only using an anonymous session cookie. ❗️ Warning ❗️ this means if you switch browsers or clear cookies, you will currently lose your conversations.
 
-In a future version, we are considering exposing a setting for users to share their conversations with the model authors (here OpenAssistant) to improve their training data and their model over time. In other terms, model authors are the custodians of the data collected by their model, even if it's hosted on our platform.
+By default, your conversations are shared with model authors (<a target="_blank" href="https://open-assistant.io/dashboard">Open Assistant</a>) to improve their training data and model over time. Model authors are the custodians of the data collected by their model, even if it's hosted on our platform. It's possible to disable data sharing in your settings.
 
 🗓 Please also consult huggingface.co's main privacy policy at https://huggingface.co/privacy. To exercise any of your legal privacy rights, please send an email to privacy@huggingface.co.
 
