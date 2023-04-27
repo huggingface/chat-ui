@@ -5,7 +5,7 @@
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
-	import CarbonEdit from '~icons/carbon/edit'
+	import CarbonEdit from "~icons/carbon/edit";
 
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
@@ -60,18 +60,6 @@
 			>
 				<CarbonEdit class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
 			</button>
-
-			<!--
-			<button
-				type="button"
-				class="flex h-5 w-5 items-center justify-center rounded md:hidden  md:group-hover:flex"
-				title="Share conversation"
-				on:click|preventDefault={() =>
-					dispatch("shareConversation", { id: conv.id, title: conv.title })}
-			>
-				<CarbonExport class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
-			</button>
--->
 
 			<button
 				type="button"
