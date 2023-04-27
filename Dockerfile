@@ -7,13 +7,9 @@ RUN npm install -g pm2
 
 WORKDIR /app
 
-COPY . .
+COPY --link --chown=1000 . .
 
 RUN npm i
-
-RUN chown -R 1000:1000 /app
-
-ENV PORT 7860
 
 RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local npm run build
 
