@@ -5,7 +5,7 @@
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
-	import CarbonExport from "~icons/carbon/export";
+	import CarbonEdit from "~icons/carbon/edit";
 
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
@@ -13,6 +13,7 @@
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
 		deleteConversation: string;
+		editConversationTitle: { id: string; title: string };
 	}>();
 
 	export let conversations: Array<{
@@ -36,7 +37,7 @@
 <div
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl bg-gradient-to-l from-gray-50  px-3 pb-3 pt-2 dark:from-gray-800/30"
 >
-	{#each conversations as conv}
+	{#each conversations as conv (conv.id)}
 		<a
 			data-sveltekit-noscroll
 			href="{base}/conversation/{conv.id}"
@@ -50,11 +51,14 @@
 			<button
 				type="button"
 				class="flex h-5 w-5 items-center justify-center rounded md:hidden  md:group-hover:flex"
-				title="Share conversation"
-				on:click|preventDefault={() =>
-					dispatch("shareConversation", { id: conv.id, title: conv.title })}
+				title="Edit conversation title"
+				on:click|preventDefault={() => {
+					const newTitle = prompt("Edit this conversation title:", conv.title);
+					if (!newTitle) return;
+					dispatch("editConversationTitle", { id: conv.id, title: newTitle });
+				}}
 			>
-				<CarbonExport class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
+				<CarbonEdit class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
 			</button>
 
 			<button
