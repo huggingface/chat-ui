@@ -3,6 +3,7 @@
 
 	import Modal from "$lib/components/Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
+	import Switch from "$lib/components/Switch.svelte";
 	import type { Settings } from "$lib/types/Settings";
 	import { error } from "$lib/stores/errors";
 	import { base } from "$app/paths";
@@ -39,19 +40,18 @@
 			</button>
 		</div>
 
-		<label class="flex items-center gap-2 text-gray-900 sm:text-base cursor-pointer">
-			<input
-				type="checkbox"
-				bind:checked={settings.shareConversationsWithModelAuthors}
-				class="h-4 w-4 cursor-pointer"
-			/>
+		<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500" for="switch">
+			<Switch name="switch" bind:checked={settings.shareConversationsWithModelAuthors} />
 			Share conversations with model authors
 		</label>
 
 		<p class="text-gray-800">
 			Sharing your data will help improve the training data and make open models better over time.
 		</p>
-		<p class=" text-gray-500">
+		<p class="text-gray-800">
+			Changing this setting will apply to all your conversations, past and future.
+		</p>
+		<p class="text-gray-800">
 			Read more about Open Assistant
 			<a href="/" target="_blank" class="underline decoration-gray-300 hover:decoration-gray-700"
 				>here</a
