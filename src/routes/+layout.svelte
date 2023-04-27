@@ -4,7 +4,7 @@
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import { base } from "$app/paths";
-	import { PUBLIC_ORIGIN } from "$env/static/public";
+	import { PUBLIC_ORIGIN, PUBLIC_GOOGLE_ANALYTICS_ID } from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -67,6 +67,8 @@
 	});
 
 	$: if ($error) onError();
+
+	console.log(PUBLIC_GOOGLE_ANALYTICS_ID);
 </script>
 
 <svelte:head>
