@@ -1,5 +1,6 @@
 import { dev } from "$app/environment";
 import { COOKIE_NAME } from "$env/static/private";
+import { PUBLIC_GOOGLE_ANALYTICS_ID } from "$env/static/public";
 import type { Handle } from "@sveltejs/kit";
 import { addYears } from "date-fns";
 
@@ -18,7 +19,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 		expires: addYears(new Date(), 1),
 	});
 
-	const response = await resolve(event);
+	let replaced = false;
+
+	const response = await resolve(event, {transformPageChunk: (chunk) => {
+		if ((replaced || !chunk.html.includes("%gaId%"))) {
+			return chunk.html;
+		}
+		replaced = true;
+
+		return chunk.html.replace("%gaId%", PUBLIC_GOOGLE_ANALYTICS_ID)}
+	});
 
 	return response;
 };

@@ -4,7 +4,6 @@
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<title>HuggingChat</title>
 		<script>
 			if (
 				localStorage.theme === "dark" ||
@@ -12,7 +11,9 @@
 			) {
 				document.documentElement.classList.add("dark");
 			}
+			window.gaId = "%gaId%";
 		</script>
+		<title>HuggingChat</title>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">
@@ -20,9 +21,9 @@
 
 		<!-- Google Tag Manager -->
 		<script>
-			if (["hf.co", "huggingface.co"].includes(window.location.hostname)) {
+			if (window.gaId) {
 				const script = document.createElement("script");
-				script.src = "https://www.googletagmanager.com/gtag/js?id=G-8Q63TH4CSL";
+				script.src = "https://www.googletagmanager.com/gtag/js?id=" + window.gaId;
 				script.async = true;
 				document.head.appendChild(script);
 
