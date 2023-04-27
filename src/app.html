@@ -12,6 +12,9 @@
 			) {
 				document.documentElement.classList.add("dark");
 			}
+
+			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
+			window.gaId = "%gaId%";
 		</script>
 		%sveltekit.head%
 	</head>
@@ -20,9 +23,9 @@
 
 		<!-- Google Tag Manager -->
 		<script>
-			if ("%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%") {
+			if (window.gaId) {
 				const script = document.createElement("script");
-				script.src = "https://www.googletagmanager.com/gtag/js?id=%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%";
+				script.src = "https://www.googletagmanager.com/gtag/js?id=" + window.gaId;
 				script.async = true;
 				document.head.appendChild(script);
 
@@ -32,7 +35,7 @@
 				}
 				gtag("js", new Date());
 				/// ^ See https://developers.google.com/tag-platform/gtagjs/install
-				gtag("config", "%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%");
+				gtag("config", window.gaId);
 				gtag("consent", "default", { ad_storage: "denied", analytics_storage: "denied" });
 				/// ^ See https://developers.google.com/tag-platform/gtagjs/reference#consent
 				/// TODO: ask the user for their consent and update this with gtag('consent', 'update')
