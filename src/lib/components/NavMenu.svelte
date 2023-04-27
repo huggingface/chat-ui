@@ -5,8 +5,7 @@
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
-	// import CarbonExport from "~icons/carbon/export";
-	import CarbonPen from "~icons/carbon/pen";
+	import CarbonEdit from '~icons/carbon/edit'
 
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
@@ -59,7 +58,7 @@
 					dispatch("editConversationTitle", { id: conv.id, title: newTitle });
 				}}
 			>
-				<CarbonPen class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
+				<CarbonEdit class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
 			</button>
 
 			<!--
