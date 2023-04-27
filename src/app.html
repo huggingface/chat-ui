@@ -17,5 +17,25 @@
 	</head>
 	<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">
 		<div class="contents h-full">%sveltekit.body%</div>
+
+		<!-- Google Tag Manager -->
+		<script>
+			if (["hf.co", "huggingface.co"].includes(window.location.hostname)) {
+				const script = document.createElement("script");
+				script.src = "https://www.googletagmanager.com/gtag/js?id=G-8Q63TH4CSL";
+				script.async = true;
+				document.head.appendChild(script);
+
+				window.dataLayer = window.dataLayer || [];
+				function gtag() {
+					dataLayer.push(arguments);
+				}
+				gtag("js", new Date());
+				/// ^ See https://developers.google.com/tag-platform/gtagjs/install
+				gtag("consent", "default", { ad_storage: "denied", analytics_storage: "denied" });
+				/// ^ See https://developers.google.com/tag-platform/gtagjs/reference#consent
+				/// TODO: ask the user for their consent and update this with gtag('consent', 'update')
+			}
+		</script>
 	</body>
 </html>
