@@ -6,6 +6,7 @@
 
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
+	import { randomUUID } from "$lib/utils/randomUuid";
 
 	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
@@ -42,7 +43,7 @@
 			<ChatIntroduction on:message />
 		{/each}
 		{#if pending}
-			<ChatMessage message={{ from: "assistant", content: "", id: crypto.randomUUID() }} />
+			<ChatMessage message={{ from: "assistant", content: "", id: randomUUID() }} />
 		{/if}
 		<div class="h-32 flex-none" />
 	</div>

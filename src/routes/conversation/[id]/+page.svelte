@@ -12,6 +12,7 @@
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { error } from "$lib/stores/errors";
+	import { randomUUID } from "$lib/utils/randomUuid";
 
 	export let data: PageData;
 
@@ -96,7 +97,7 @@
 					messages = [
 						...messages,
 						// id doesn't match the backend id but it's not important for assistant messages
-						{ from: "assistant", content: data.token.text.trimStart(), id: crypto.randomUUID() },
+						{ from: "assistant", content: data.token.text.trimStart(), id: randomUUID() },
 					];
 				} else {
 					lastMessage.content += data.token.text;
