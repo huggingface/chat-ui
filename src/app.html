@@ -20,9 +20,9 @@
 
 		<!-- Google Tag Manager -->
 		<script>
-			if (%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%) {
+			if ("%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%") {
 				const script = document.createElement("script");
-				script.src = `https://www.googletagmanager.com/gtag/js?id=${%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%}`;
+				script.src = "https://www.googletagmanager.com/gtag/js?id=${%sveltekit.env.PUBLIC_GOOGLE_ANALYTICS_ID%";
 				script.async = true;
 				document.head.appendChild(script);
 
