@@ -16,6 +16,6 @@
 		class="peer absolute inset-0 cursor-pointer opacity-0"
 	/>
 	<div
-		class="bg-blue h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all peer-checked:translate-x-3.5"
+		class="h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all peer-checked:translate-x-3.5"
 	/>
 </div>
