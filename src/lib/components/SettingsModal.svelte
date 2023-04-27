@@ -5,30 +5,11 @@
 	import CarbonClose from "~icons/carbon/close";
 	import Switch from "$lib/components/Switch.svelte";
 	import type { Settings } from "$lib/types/Settings";
-	import { error } from "$lib/stores/errors";
-	import { base } from "$app/paths";
+	import { updateSettings } from "$lib/updateSettings";
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
 
 	const dispatch = createEventDispatcher<{ close: void }>();
-
-	async function updateSettings() {
-		try {
-			const res = await fetch(`${base}/settings`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(settings),
-			});
-			if (!res.ok) {
-				$error = "Error while updating settings, try again.";
-				return;
-			}
-			dispatch("close");
-		} catch (err) {
-			console.error(err);
-			$error = String(err);
-		}
-	}
 </script>
 
 <Modal>
@@ -60,7 +41,12 @@
 		<button
 			type="button"
 			class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-colors hover:ring"
-			on:click={updateSettings}
+			on:click={() =>
+				updateSettings(settings).then((res) => {
+					if (res) {
+						dispatch("close");
+					}
+				})}
 		>
 			Apply
 		</button>

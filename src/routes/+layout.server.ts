@@ -26,7 +26,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			.map((conv) => ({ id: conv._id.toString(), title: conv.title }))
 			.toArray(),
 		settings: settings
-			? { shareConversationsWithModelAuthors: settings.shareConversationsWithModelAuthors }
-			: { shareConversationsWithModelAuthors: true },
+			? {
+					shareConversationsWithModelAuthors: settings.shareConversationsWithModelAuthors,
+					set: true,
+			  }
+			: { shareConversationsWithModelAuthors: true, set: false },
 	};
 };
