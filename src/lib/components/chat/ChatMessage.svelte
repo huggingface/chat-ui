@@ -13,6 +13,7 @@
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
+			.replaceAll(/<br\s?\/?>/gi, "\n")
 			.trim()
 			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;");
@@ -39,6 +40,7 @@
 	const options: marked.MarkedOptions = {
 		...marked.getDefaults(),
 		gfm: true,
+		breaks: true,
 		renderer,
 	};
 
@@ -83,7 +85,7 @@
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
-						{@html marked.parser([token], options)}
+						{@html marked(token.raw, options)}
 					{/if}
 				{/each}
 			</div>
