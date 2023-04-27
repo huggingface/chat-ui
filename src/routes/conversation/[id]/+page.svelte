@@ -43,7 +43,7 @@
 					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
 					watermark: false,
 					max_new_tokens: 1024,
-					stop: PUBLIC_SEP_TOKEN,
+					stop: [PUBLIC_SEP_TOKEN],
 					return_full_text: false,
 				},
 			},
