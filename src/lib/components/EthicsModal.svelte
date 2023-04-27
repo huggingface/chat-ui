@@ -40,6 +40,10 @@
 				AI is an area of active research with known problems such as biased generation and
 				misinformation. Do not use this application for high-stakes decisions or advice.
 			</p>
+			<p class="px-2 text-sm text-gray-500">
+				Your conversations will be shared with model authors unless you disable it from your
+				settings.
+			</p>
 			<button
 				type="button"
 				on:click={handleClick}
