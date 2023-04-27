@@ -13,7 +13,7 @@
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
-			.replaceAll(/<br\s?\/?>/g, "\n")
+			.replaceAll(/<br\s?\/?>/gi, "\n")
 			.trim()
 			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;");
