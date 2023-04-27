@@ -82,7 +82,11 @@
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd dark:text-gray-300 md:grid-cols-[280px,1fr] md:grid-rows-[1fr]"
 >
-	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title="Navigation menu">
+	<MobileNav
+		isOpen={isNavOpen}
+		on:toggle={(ev) => (isNavOpen = ev.detail)}
+		title={data.conversations.find((conv) => conv.id === $page.params.id)?.title}
+	>
 		<NavMenu
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
