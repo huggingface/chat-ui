@@ -10,7 +10,6 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarth from "~icons/carbon/earth";
 	import { createEventDispatcher } from "svelte";
-	console.log(PUBLIC_VERSION);
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
