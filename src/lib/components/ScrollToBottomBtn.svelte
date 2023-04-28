@@ -1,27 +1,39 @@
 <script lang="ts">
 	import { fade } from "svelte/transition";
-	import IconChevron from "./icons/IconChevron.svelte";
 	import { onDestroy } from "svelte";
+	import IconChevron from "./icons/IconChevron.svelte";
 
 	export let scrollNode: HTMLElement;
 	export { className as class };
 
 	let visible: boolean = false;
 	let className = "";
+	let observer: ResizeObserver | null = null;
 
 	$: if (scrollNode) {
-		scrollNode.addEventListener("scroll", onScroll);
+		destroy();
+
+		if (window.ResizeObserver) {
+			observer = new ResizeObserver(() => {
+				updateVisibility();
+			});
+			observer.observe(scrollNode);
+		}
+		scrollNode.addEventListener("scroll", updateVisibility);
 	}
 
-	function onScroll() {
+	function updateVisibility() {
+		if (!scrollNode) return;
 		visible =
 			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight;
 	}
 
-	onDestroy(() => {
-		if (!scrollNode) return;
-		scrollNode.removeEventListener("scroll", onScroll);
-	});
+	function destroy() {
+		observer?.disconnect();
+		scrollNode?.removeEventListener("scroll", updateVisibility);
+	}
+
+	onDestroy(destroy);
 </script>
 
 {#if visible}
