@@ -55,6 +55,8 @@ export async function POST({ request }) {
 		});
 	}
 
+	await writer.close();
+
 	await uploadFile({
 		file: pathToFileURL("conversations.parquet"),
 		credentials: { accessToken: PARQUET_EXPORT_HF_TOKEN },
