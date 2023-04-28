@@ -1,5 +1,4 @@
 <script lang="ts">
-	import "core-js/actual/array/at";
 	import "core-js/actual/string/replace-all";
 	import { onDestroy } from "svelte";
 	import { goto, invalidate } from "$app/navigation";
