@@ -17,11 +17,7 @@
 			});
 			observer.observe(scrollNode);
 		}
-		scrollNode.addEventListener("scroll", handleScroll);
-	}
-
-	function handleScroll() {
-		updateVisibility();
+		scrollNode.addEventListener("scroll", updateVisibility);
 	}
 
 	function updateVisibility() {
@@ -33,7 +29,7 @@
 	onDestroy(() => {
 		if (observer) observer.disconnect();
 		if (!scrollNode) return;
-		scrollNode.removeEventListener("scroll", handleScroll);
+		scrollNode.removeEventListener("scroll", updateVisibility);
 	});
 </script>
 
