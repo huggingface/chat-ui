@@ -33,9 +33,12 @@
 			Changing this setting will apply to all your conversations, past and future.
 		</p>
 		<p class="text-gray-800">
-			Read more about Open Assistant
-			<a href="/" target="_blank" class="underline decoration-gray-300 hover:decoration-gray-700"
-				>here</a
+			Read more about this model's authors,
+			<a
+				href="https://open-assistant.io/"
+				target="_blank"
+				rel="noreferrer"
+				class="underline decoration-gray-300 hover:decoration-gray-700">Open Assistant</a
 			>.
 		</p>
 		<button
