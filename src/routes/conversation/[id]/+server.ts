@@ -166,8 +166,10 @@ async function parseGeneratedText(
 	return res;
 }
 
-export async function PATCH({request, locals, params}) {
-	const {title} = z.object({title: z.string().trim().min(1).max(100)}).parse(await request.json())
+export async function PATCH({ request, locals, params }) {
+	const { title } = z
+		.object({ title: z.string().trim().min(1).max(100) })
+		.parse(await request.json());
 
 	const convId = new ObjectId(params.id);
 
@@ -180,13 +182,16 @@ export async function PATCH({request, locals, params}) {
 		throw error(404, "Conversation not found");
 	}
 
-	await collections.conversations.updateOne({
-		_id: convId,
-	}, {
-		$set: {
-			title,
+	await collections.conversations.updateOne(
+		{
+			_id: convId,
+		},
+		{
+			$set: {
+				title,
+			},
 		}
-	});
+	);
 
 	return new Response();
 }
