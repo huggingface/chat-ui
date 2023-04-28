@@ -1,4 +1,6 @@
-export interface Settings {
+import type { Timestamps } from "./Timestamps";
+
+export interface Settings extends Timestamps {
 	sessionId: string;
 
 	/**
@@ -7,4 +9,5 @@ export interface Settings {
 	 * This setting is explicitly set to true when users accept the ethics modal.
 	 * */
 	shareConversationsWithModelAuthors: boolean;
+	ethicsModalAcceptedAt: Date | null;
 }

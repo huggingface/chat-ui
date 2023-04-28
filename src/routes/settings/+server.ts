@@ -1,20 +1,34 @@
-import { collections } from '$lib/server/database.js';
-import { z } from 'zod';
+import { collections } from "$lib/server/database.js";
+import { subMinutes } from "date-fns";
+import { z } from "zod";
 
-export async function POST({locals, request}) {
-  const json = await request.json();
+export async function PATCH({ locals, request }) {
+	const json = await request.json();
 
-  const settings = z.object({
-    shareConversationsWithModelAuthors: z.boolean().default(true),
-  }).parse(json);
+	const settings = z
+		.object({
+			shareConversationsWithModelAuthors: z.boolean().default(true),
+			ethicsModalAcceptedAt: z.optional(z.date({ coerce: true }).min(subMinutes(new Date(), 5))),
+		})
+		.parse(json);
 
-  await collections.settings.updateOne({
-    sessionId: locals.sessionId,
-  }, {
-    $set: settings,
-  }, {
-    upsert: true,
-  });
+	await collections.settings.updateOne(
+		{
+			sessionId: locals.sessionId,
+		},
+		{
+			$set: {
+				...settings,
+				updatedAt: new Date(),
+			},
+			$setOnInsert: {
+				createdAt: new Date(),
+			},
+		},
+		{
+			upsert: true,
+		}
+	);
 
-  return new Response()
+	return new Response();
 }

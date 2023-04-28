@@ -4,10 +4,12 @@ import { error } from "$lib/stores/errors";
 import type { Settings } from "./types/Settings";
 import { UrlDependency } from "./types/UrlDependency";
 
-export async function updateSettings(settings: Omit<Settings, "sessionId">): Promise<boolean> {
+export async function updateSettings(
+	settings: Partial<Omit<Settings, "sessionId">>
+): Promise<boolean> {
 	try {
 		const res = await fetch(`${base}/settings`, {
-			method: "POST",
+			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(settings),
 		});

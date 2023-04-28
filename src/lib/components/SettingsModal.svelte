@@ -42,7 +42,9 @@
 			type="button"
 			class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-colors hover:ring"
 			on:click={() =>
-				updateSettings(settings).then((res) => {
+				updateSettings({
+					shareConversationsWithModelAuthors: settings.shareConversationsWithModelAuthors,
+				}).then((res) => {
 					if (res) {
 						dispatch("close");
 					}
