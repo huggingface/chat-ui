@@ -11,6 +11,8 @@
 	let observer: ResizeObserver | null = null;
 
 	$: if (scrollNode) {
+		destroy();
+
 		if (window.ResizeObserver) {
 			observer = new ResizeObserver(() => {
 				updateVisibility();
@@ -26,11 +28,12 @@
 			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight;
 	}
 
-	onDestroy(() => {
-		if (observer) observer.disconnect();
-		if (!scrollNode) return;
-		scrollNode.removeEventListener("scroll", updateVisibility);
-	});
+	function destroy() {
+		observer?.disconnect();
+		scrollNode?.removeEventListener("scroll", updateVisibility);
+	}
+
+	onDestroy(destroy);
 </script>
 
 {#if visible}
