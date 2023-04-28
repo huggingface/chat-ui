@@ -124,8 +124,13 @@
 				await invalidate(UrlDependency.ConversationList);
 			}
 		} catch (err) {
-			// TODO: Should prob check if this is really a TooManyRequests error
-			$error = "Too much traffic, please try again.";
+			if (err instanceof Error && err.message.includes("overloaded")) {
+				$error = "Too much traffic, please try again.";
+			} else if (err instanceof Error) {
+				$error = err.message;
+			} else {
+				$error = String(err);
+			}
 			console.error(err);
 		} finally {
 			loading = false;
