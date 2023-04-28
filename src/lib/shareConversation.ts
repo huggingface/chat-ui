@@ -21,7 +21,6 @@ export async function shareConversation(id: string, title: string) {
 		if (navigator.share) {
 			navigator.share({
 				title,
-				text: "Share this chat with others",
 				url,
 			});
 		} else {
