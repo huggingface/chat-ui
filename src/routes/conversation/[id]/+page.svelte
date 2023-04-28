@@ -113,7 +113,7 @@
 		});
 	}
 
-	async function writeMessage(message: string, messageId = crypto.randomUUID()) {
+	async function writeMessage(message: string, messageId = randomUUID()) {
 		if (!message.trim()) return;
 
 		try {
