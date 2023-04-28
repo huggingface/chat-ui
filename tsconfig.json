@@ -9,7 +9,7 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"target": "ES2015"
+		"target": "ES2018"
 	}
 	// Path aliases are handled by https://kit.svelte.dev/docs/configuration#alias
 	//
