@@ -19,7 +19,7 @@ export const load: PageServerLoad = async (event) => {
 		if (conversationExists) {
 			throw error(
 				403,
-				"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' functionality instead."
+				"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' feature instead."
 			);
 		}
 
