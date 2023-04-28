@@ -101,7 +101,7 @@
 		</div>
 		{#if !loading && message.id}
 			<button
-				class="absolute right-0 top-3.5 cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
+				class="absolute right-0 top-3.5 cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
 				title="Retry"
 				type="button"
 				on:click={() => dispatch("retry")}
