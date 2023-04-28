@@ -27,10 +27,43 @@ export async function POST({ request, fetch, locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	// Todo: validate prompt with zod? or aktype
 	const json = await request.json();
+	const {
+		inputs: newPrompt,
+		options: { id: messageId, is_retry },
+	} = z
+		.object({
+			inputs: z.string().trim().min(1),
+			options: z.object({
+				id: z.optional(z.string().uuid()),
+				is_retry: z.optional(z.boolean()),
+			}),
+		})
+		.parse(json);
 
-	const messages = [...conv.messages, { from: "user", content: json.inputs }] satisfies Message[];
+	const messages = (() => {
+		if (is_retry && messageId) {
+			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
+			if (retryMessageIdx === -1) {
+				retryMessageIdx = conv.messages.length;
+			}
+			return [
+				...conv.messages.slice(0, retryMessageIdx),
+				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
+			];
+		}
+		return [
+			...conv.messages,
+			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
+		];
+	})() satisfies Message[];
+
+	// Todo: on-the-fly migration, remove later
+	for (const message of messages) {
+		if (!message.id) {
+			message.id = crypto.randomUUID();
+		}
+	}
 	const prompt = buildPrompt(messages);
 
 	const randomEndpoint = modelEndpoint();
@@ -62,7 +95,7 @@ export async function POST({ request, fetch, locals, params }) {
 
 		generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
 
-		messages.push({ from: "assistant", content: generated_text });
+		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
 
 		await collections.conversations.updateOne(
 			{

@@ -5,13 +5,14 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
 	import type { PageData } from "./$types";
 
 	export let data: PageData;
 
 	let loading = false;
 
-	async function createConversation(message: string) {
+	async function createConversation() {
 		try {
 			loading = true;
 			const res = await fetch(`${base}/conversation`, {
@@ -32,16 +33,11 @@
 
 			const { conversationId } = await res.json();
 
-			// Ugly hack to use a store as temp storage, feel free to improve ^^
-			pendingMessage.set(message);
-
-			// invalidateAll to update list of conversations
-			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
+			return conversationId;
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(String(err));
-		} finally {
-			loading = false;
+			throw err;
 		}
 	}
 
@@ -65,8 +61,22 @@
 </svelte:head>
 
 <ChatWindow
-	on:message={(ev) => createConversation(ev.detail)}
+	on:message={(ev) =>
+		createConversation()
+			.then((convId) => {
+				$pendingMessage = ev.detail;
+				return goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+			})
+			.finally(() => (loading = false))}
 	on:share={shareConversation}
+	on:retry={(ev) =>
+		createConversation()
+			.then((convId) => {
+				$pendingMessageIdToRetry = ev.detail.id;
+				$pendingMessage = ev.detail.content;
+				return goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+			})
+			.finally(() => (loading = false))}
 	messages={data.messages}
 	{loading}
 />
