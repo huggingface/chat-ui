@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { navigating } from "$app/stores";
 	import { fade } from "svelte/transition";
-	import IconChevron from "./icons/IconChevron.svelte";
 	import { onDestroy } from "svelte";
+	import IconChevron from "./icons/IconChevron.svelte";
 
 	export let scrollNode: HTMLElement;
 	export { className as class };
@@ -10,17 +11,26 @@
 	let className = "";
 
 	$: if (scrollNode) {
-		scrollNode.addEventListener("scroll", onScroll);
+		scrollNode.addEventListener("scroll", handleScroll);
 	}
 
-	function onScroll() {
+	$: if ($navigating) {
+		updateVisibility();
+	}
+
+	function handleScroll() {
+		updateVisibility();
+	}
+
+	function updateVisibility() {
+		if (!scrollNode) return;
 		visible =
 			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight;
 	}
 
 	onDestroy(() => {
 		if (!scrollNode) return;
-		scrollNode.removeEventListener("scroll", onScroll);
+		scrollNode.removeEventListener("scroll", handleScroll);
 	});
 </script>
 
