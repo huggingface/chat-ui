@@ -3,10 +3,10 @@
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
-	import CarbonRetryFailed from "~icons/carbon/retry-failed";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
+	import CarbonRotate360 from "~icons/carbon/rotate-360";
 
 	function sanitizeMd(md: string) {
 		return md
@@ -70,7 +70,7 @@
 		<img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-			class="mt-5 h-3 w-3 flex-none rounded-full shadow-lg"
+			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 		/>
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px] rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
@@ -94,19 +94,19 @@
 	</div>
 {/if}
 {#if message.from === "user"}
-	<div class="relative flex items-start justify-start gap-4 max-sm:text-sm">
+	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
 		<div class="whitespace-break-spaces rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
 			{message.content.trim()}
 		</div>
 		{#if !loading && message.id}
 			<button
-				class="contents cursor-pointer text-gray-500 dark:text-gray-400"
+				class="absolute right-0 top-3.5 cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
 				title="Retry"
 				type="button"
 				on:click={() => dispatch("retry")}
 			>
-				<CarbonRetryFailed class="absolute bottom-0 right-0 mb-2 mr-2 h-4 w-4" />
+				<CarbonRotate360 />
 			</button>
 		{/if}
 	</div>
