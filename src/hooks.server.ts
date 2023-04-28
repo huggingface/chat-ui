@@ -13,7 +13,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.cookies.set(COOKIE_NAME, event.locals.sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite: "none",
+		sameSite: dev ? "lax" : "none",
 		secure: !dev,
 		httpOnly: true,
 		expires: addYears(new Date(), 1),
