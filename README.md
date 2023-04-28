@@ -27,6 +27,11 @@ Default configuration is in `.env`. Put custom config and secrets in `.env.local
 
 Check out [.env](./.env) to see what needs to be set.
 
+Basically you need to:
+
+- fill in a Mongo URL
+- fill in your HF token
+
 ## Building
 
 To create a production version of your app:
