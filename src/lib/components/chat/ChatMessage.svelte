@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { marked } from "marked";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate } from "svelte";
+	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
+	import CarbonRotate360 from "~icons/carbon/rotate-360";
 
 	function sanitizeMd(md: string) {
 		return md
@@ -24,6 +25,8 @@
 
 	export let message: Message;
 	export let loading: boolean = false;
+
+	const dispatch = createEventDispatcher<{ retry: void }>();
 
 	let contentEl: HTMLElement;
 	let loadingEl: any;
@@ -69,7 +72,7 @@
 		<img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-			class="mt-5 h-3 w-3 flex-none rounded-full shadow-lg"
+			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 		/>
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px] rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
@@ -93,10 +96,20 @@
 	</div>
 {/if}
 {#if message.from === "user"}
-	<div class="flex items-start justify-start gap-4 max-sm:text-sm">
+	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
 		<div class="whitespace-break-spaces rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
 			{message.content.trim()}
 		</div>
+		{#if !loading && message.id}
+			<button
+				class="absolute right-0 top-3.5 cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+				title="Retry"
+				type="button"
+				on:click={() => dispatch("retry")}
+			>
+				<CarbonRotate360 />
+			</button>
+		{/if}
 	</div>
 {/if}

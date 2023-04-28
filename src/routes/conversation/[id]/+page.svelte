@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { textGenerationStream } from "@huggingface/inference";
@@ -10,6 +11,7 @@
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { error } from "$lib/stores/errors";
+	import { randomUUID } from "$lib/utils/randomUuid";
 
 	export let data;
 
@@ -26,7 +28,7 @@
 	let loading = false;
 	let pending = false;
 
-	async function getTextGenerationStream(inputs: string) {
+	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
 		let conversationId = $page.params.id;
 
 		const response = textGenerationStream(
@@ -48,6 +50,8 @@
 				},
 			},
 			{
+				id: messageId,
+				is_retry: isRetry,
 				use_cache: false,
 			}
 		);
@@ -89,7 +93,11 @@
 
 				if (lastMessage?.from !== "assistant") {
 					// First token has a space at the beginning, trim it
-					messages = [...messages, { from: "assistant", content: data.token.text.trimStart() }];
+					messages = [
+						...messages,
+						// id doesn't match the backend id but it's not important for assistant messages
+						{ from: "assistant", content: data.token.text.trimStart(), id: randomUUID() },
+					];
 				} else {
 					lastMessage.content += data.token.text;
 					messages = [...messages];
@@ -104,7 +112,7 @@
 		});
 	}
 
-	async function writeMessage(message: string) {
+	async function writeMessage(message: string, messageId = crypto.randomUUID()) {
 		if (!message.trim()) return;
 
 		try {
@@ -112,9 +120,18 @@
 			loading = true;
 			pending = true;
 
-			messages = [...messages, { from: "user", content: message }];
+			let retryMessageIndex = messages.findIndex((msg) => msg.id === messageId);
+			const isRetry = retryMessageIndex !== -1;
+			if (!isRetry) {
+				retryMessageIndex = messages.length;
+			}
 
-			await getTextGenerationStream(message);
+			messages = [
+				...messages.slice(0, retryMessageIndex),
+				{ from: "user", content: message, id: messageId },
+			];
+
+			await getTextGenerationStream(message, messageId, isRetry);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
@@ -135,9 +152,11 @@
 	onMount(async () => {
 		if ($pendingMessage) {
 			const val = $pendingMessage;
+			const messageId = $pendingMessageIdToRetry || undefined;
 			$pendingMessage = "";
+			$pendingMessageIdToRetry = null;
 
-			writeMessage(val);
+			writeMessage(val, messageId);
 		}
 	});
 
@@ -153,6 +172,7 @@
 	{pending}
 	{messages}
 	on:message={(message) => writeMessage(message.detail)}
+	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
 />
