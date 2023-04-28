@@ -9,7 +9,7 @@
 	import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { error } from "$lib/stores/errors";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 
 	export let data;
 
@@ -129,7 +129,7 @@
 			} else if (err instanceof Error) {
 				$error = err.message;
 			} else {
-				$error = String(err);
+				$error = ERROR_MESSAGES.default;
 			}
 			console.error(err);
 		} finally {
