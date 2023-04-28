@@ -6,6 +6,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
+	import { share } from "$lib/utils/share";
 	import type { PageData } from "./$types";
 
 	export let data: PageData;
@@ -44,15 +45,7 @@
 	async function shareConversation() {
 		const url = `${window.location.origin}${window.location.pathname}`;
 
-		if (navigator.share) {
-			navigator.share({
-				title: data.title,
-				text: "Share this chat with others",
-				url,
-			});
-		} else {
-			prompt("Share this link with your friends:", url);
-		}
+		share(url, data.title);
 	}
 </script>
 
