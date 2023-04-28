@@ -27,10 +27,33 @@ Default configuration is in `.env`. Put custom config and secrets in `.env.local
 
 Check out [.env](./.env) to see what needs to be set.
 
-Basically you need to:
+Basically you need to create a `.env.local` with the following contents:
 
-- fill in a Mongo URL
-- fill in your HF token
+```
+MONGODB_URL=<url to mongo, for example a free MongoDB Atlas sandbox instance>
+MODEL_ENDPOINTS=`[{
+  "endpoint": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
+  "authorization": "Bearer <hf_token>",
+  "weight": 1
+}]`
+```
+
+Where the contents in `<...>` are replaced by the MongoDB URL and your [HF Access Token](https://huggingface.co/settings/tokens).
+
+## Duplicating to a Space
+
+Create a `DOTENV_LOCAL` secret to your space with the following contents:
+
+```
+MONGODB_URL=<url to mongo, for example a free MongoDB Atlas sandbox instance>
+MODEL_ENDPOINTS=`[{
+  "endpoint": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
+  "authorization": "Bearer <hf_token>",
+  "weight": 1
+}]`
+```
+
+Where the contents in `<...>` are replaced by the MongoDB URL and your [HF Access Token](https://huggingface.co/settings/tokens).
 
 ## Building
 
