@@ -10,7 +10,7 @@
 	import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { error } from "$lib/stores/errors";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
 
 	export let data;
@@ -141,8 +141,13 @@
 				await invalidate(UrlDependency.ConversationList);
 			}
 		} catch (err) {
-			// TODO: Should prob check if this is really a TooManyRequests error
-			$error = "Too much traffic, please try again.";
+			if (err instanceof Error && err.message.includes("overloaded")) {
+				$error = "Too much traffic, please try again.";
+			} else if (err instanceof Error) {
+				$error = err.message;
+			} else {
+				$error = ERROR_MESSAGES.default;
+			}
 			console.error(err);
 		} finally {
 			loading = false;
