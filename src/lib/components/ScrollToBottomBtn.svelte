@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { navigating } from "$app/stores";
 	import { fade } from "svelte/transition";
 	import { onDestroy } from "svelte";
 	import IconChevron from "./icons/IconChevron.svelte";
@@ -9,13 +8,16 @@
 
 	let visible: boolean = false;
 	let className = "";
+	let observer: ResizeObserver | null = null;
 
 	$: if (scrollNode) {
+		if (window.ResizeObserver) {
+			observer = new ResizeObserver(() => {
+				updateVisibility();
+			});
+			observer.observe(scrollNode);
+		}
 		scrollNode.addEventListener("scroll", handleScroll);
-	}
-
-	$: if ($navigating) {
-		updateVisibility();
 	}
 
 	function handleScroll() {
@@ -29,6 +31,7 @@
 	}
 
 	onDestroy(() => {
+		if (observer) observer.disconnect();
 		if (!scrollNode) return;
 		scrollNode.removeEventListener("scroll", handleScroll);
 	});
