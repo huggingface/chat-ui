@@ -7,12 +7,14 @@
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
+	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 
 	function sanitizeMd(md: string) {
 		return md
 			.replace(/<\|[a-z]*$/, "")
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
+			.replaceAll(PUBLIC_SEP_TOKEN, " ")
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
 			.replaceAll(/<br\s?\/?>/gi, "\n")
 			.trim()

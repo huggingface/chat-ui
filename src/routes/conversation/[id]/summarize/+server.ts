@@ -2,6 +2,8 @@ import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
+import { trimPrefix } from "$lib/utils/trimPrefix.js";
+import { trimSuffix } from "$lib/utils/trimSuffix.js";
 import { textGeneration } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -39,7 +41,7 @@ export async function POST({ params, locals, fetch }) {
 	};
 
 	const endpoint = modelEndpoint();
-	const { generated_text } = await textGeneration(
+	let { generated_text } = await textGeneration(
 		{
 			model: endpoint.endpoint,
 			inputs: prompt,
@@ -53,6 +55,8 @@ export async function POST({ params, locals, fetch }) {
 				}),
 		}
 	);
+
+	generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
 
 	if (generated_text) {
 		await collections.conversations.updateOne(
