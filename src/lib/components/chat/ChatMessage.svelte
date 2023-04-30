@@ -18,11 +18,10 @@
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
 			.replaceAll(/<br\s?\/?>/gi, "\n")
 			.trim()
-			.replaceAll("&", "&amp;")
 			.replaceAll("<", "&lt;");
 	}
 	function unsanitizeMd(md: string) {
-		return md.replaceAll("&lt;", "<").replaceAll("&amp;", "&");
+		return md.replaceAll("&lt;", "<");
 	}
 
 	export let message: Message;
