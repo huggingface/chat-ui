@@ -190,7 +190,13 @@ async function parseGeneratedText(
 		lastMessage = lastMessage.slice(0, lastMessage.indexOf("\n"));
 	}
 
-	const res = JSON.parse(lastMessage).generated_text;
+	const lastMessageJSON = JSON.parse(lastMessage);
+
+	if (lastMessageJSON.error) {
+		throw new Error(lastMessageJSON.error);
+	}
+
+	const res = lastMessageJSON.generated_text;
 
 	if (typeof res !== "string") {
 		throw new Error("Could not parse generated text");

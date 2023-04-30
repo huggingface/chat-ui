@@ -34,7 +34,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@huggingface/inference": "^2.1.2",
+		"@huggingface/inference": "^2.2.0",
 		"autoprefixer": "^10.4.14",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
