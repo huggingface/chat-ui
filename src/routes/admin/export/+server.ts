@@ -50,7 +50,7 @@ export async function POST({ request }) {
 			updated_at: conversation.updated_at,
 			messages: conversation.messages.map((message: Message) => ({
 				from: message.from,
-				message: message.content,
+				content: message.content,
 			})),
 		});
 	}
