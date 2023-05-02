@@ -19,7 +19,7 @@ export async function shareConversation(id: string, title: string) {
 
 		const { url } = await res.json();
 
-		share(url, title);
+		await share(url, title);
 	} catch (err) {
 		error.set(ERROR_MESSAGES.default);
 		console.error(err);
