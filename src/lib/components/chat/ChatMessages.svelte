@@ -22,7 +22,7 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	$: if (messages.at(-1)?.from === "user") {
+	$: if (messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
 </script>
