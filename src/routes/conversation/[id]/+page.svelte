@@ -80,7 +80,8 @@
 
 			// final message
 			if (data.generated_text) {
-				const lastMessage = messages.at(-1);
+				const lastMessage = messages[messages.length - 1];
+
 				if (lastMessage) {
 					lastMessage.content = data.generated_text;
 					messages = [...messages];
@@ -89,7 +90,7 @@
 			}
 
 			if (!data.token.special) {
-				const lastMessage = messages.at(-1);
+				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage?.from !== "assistant") {
 					// First token has a space at the beginning, trim it
@@ -112,7 +113,7 @@
 		});
 	}
 
-	async function writeMessage(message: string, messageId = crypto.randomUUID()) {
+	async function writeMessage(message: string, messageId = randomUUID()) {
 		if (!message.trim()) return;
 
 		try {
