@@ -7,6 +7,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
 
 	depends(UrlDependency.ConversationList);
+	depends(UrlDependency.Settings);
+
+	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
 
 	return {
 		conversations: await conversations
@@ -22,5 +25,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			})
 			.map((conv) => ({ id: conv._id.toString(), title: conv.title }))
 			.toArray(),
+		settings: {
+			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
+			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
+		},
 	};
 };
