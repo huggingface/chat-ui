@@ -30,7 +30,7 @@
 			Sharing your data will help improve the training data and make open models better over time.
 		</p>
 		<p class="text-gray-800">
-			Changing this setting will apply to all your conversations, past and future.
+			You can change this setting at any time, it applies to all your conversations.
 		</p>
 		<p class="text-gray-800">
 			Read more about this model's authors,
