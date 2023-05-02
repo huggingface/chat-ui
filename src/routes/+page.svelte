@@ -5,6 +5,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 
+	export let data;
 	let loading = false;
 
 	async function createConversation(message: string) {
@@ -39,4 +40,8 @@
 	}
 </script>
 
-<ChatWindow on:message={(ev) => createConversation(ev.detail)} {loading} />
+<ChatWindow
+	on:message={(ev) => createConversation(ev.detail)}
+	{loading}
+	currentModel={data.models[0]}
+/>
