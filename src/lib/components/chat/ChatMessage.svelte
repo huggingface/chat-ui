@@ -74,7 +74,7 @@
 </script>
 
 {#if message.from === "assistant"}
-	<div class="group relative flex items-start justify-start gap-4 leading-relaxed">
+	<div class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed">
 		<img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
@@ -99,25 +99,32 @@
 				{/each}
 			</div>
 		</div>
-		{#if !loading && message.id}
-			<div class="absolute right-0 top-3.5 flex  lg:-right-2">
+		{#if !loading && message.id && message.content}
+			<div
+				class="absolute bottom-2 right-0 flex transition-opacity group-hover:visible group-hover:opacity-100 md:invisible md:opacity-0 lg:bottom-1"
+			>
 				<button
-					class="btn rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden
-					{message.score && message.score > 0 && 'text-green-500 dark:text-green-400'}"
-					title="+1"
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					{message.score &&
+						message.score > 0 &&
+						'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'}"
+					title={message.score === 1 ? "Remove +1" : "+1"}
 					type="button"
-					on:click={() => dispatch("vote", { score: 1, id: message.id })}
+					on:click={() => dispatch("vote", { score: message.score === 1 ? 0 : 1, id: message.id })}
 				>
-					<CarbonThumbsUp />
+					<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
 				</button>
 				<button
-					class="btn rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden
-					{message.score && message.score < 0 && 'text-red-500 dark:text-red-400'}"
-					title="-1"
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					{message.score &&
+						message.score < 0 &&
+						'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'}"
+					title={message.score === -1 ? "Remove -1" : "-1"}
 					type="button"
-					on:click={() => dispatch("vote", { score: -1, id: message.id })}
+					on:click={() =>
+						dispatch("vote", { score: message.score === -1 ? 0 : -1, id: message.id })}
 				>
-					<CarbonThumbsDown />
+					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 				</button>
 			</div>
 		{/if}

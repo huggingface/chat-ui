@@ -157,14 +157,31 @@
 
 	async function voteMessage(score: number, messageId: string) {
 		let conversationId = $page.params.id;
+		let oldScore: number | undefined;
 
-		await fetch(`${base}/conversation/${conversationId}/vote`, {
-			method: "POST",
-			body: JSON.stringify({
-				score,
-				message_id: messageId,
-			}),
+		// optimistic update to avoid waiting for the server
+		messages = messages.map((message) => {
+			if (message.id === messageId) {
+				oldScore = message.score;
+				return { ...message, score: score };
+			}
+			return message;
 		});
+
+		try {
+			await fetch(`${base}/conversation/${conversationId}/vote`, {
+				method: "POST",
+				body: JSON.stringify({
+					score,
+					message_id: messageId,
+				}),
+			});
+		} catch {
+			// revert score on any error
+			messages = messages.map((message) => {
+				return message.id !== messageId ? message : { ...message, score: oldScore };
+			});
+		}
 	}
 
 	onMount(async () => {
