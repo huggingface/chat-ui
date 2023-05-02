@@ -1,14 +1,14 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
 	import { createEventDispatcher } from "svelte";
+	import { PUBLIC_MODEL_ID, PUBLIC_MODEL_NAME } from "$env/static/public";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
-	import CarbonExport from "~icons/carbon/export";
 
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
-	import { PUBLIC_MODEL_ID, PUBLIC_MODEL_NAME } from "$env/static/public";
+	import ChatShare from "./ChatShare.svelte";
 
 	export let messages: Message[] = [];
 	export let disabled: boolean = false;
@@ -81,14 +81,7 @@
 				or false.
 			</p>
 			{#if messages.length}
-				<button
-					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
-					type="button"
-					on:click={() => dispatch("share")}
-				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-yellow-500" />
-					<div class="max-sm:hidden">Share this conversation</div>
-				</button>
+				<ChatShare on:share />
 			{/if}
 		</div>
 	</div>

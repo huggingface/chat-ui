@@ -2,6 +2,7 @@
 	export let classNames = "";
 	export let label = "Copied";
 	export let position = "left-1/2 top-full transform -translate-x-1/2 translate-y-2";
+	export let arrowPosition = "bottom-full left-1/2 -translate-x-1/2";
 </script>
 
 <div
@@ -12,11 +13,13 @@
 	"
 >
 	<div
-		class="absolute bottom-full left-1/2 h-0 w-0 -translate-x-1/2 transform border-4 border-t-0 border-black"
+		class="absolute h-0 w-0 transform border-4 border-t-0 border-black
+			{arrowPosition}
+		"
 		style="
 				border-left-color: transparent;
 				border-right-color: transparent;
 			"
 	/>
-	{label}
+	<slot />
 </div>
