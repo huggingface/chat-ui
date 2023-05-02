@@ -1,6 +1,6 @@
 import { HF_ACCESS_TOKEN, MODEL_ENDPOINTS } from "$env/static/private";
 import { sum } from "$lib/utils/sum";
-import { models } from "./models";
+import { modelNames, models } from "./models";
 
 const endpoints: Array<{ endpoint: string; authorization: string; weight: number }> =
 	JSON.parse(MODEL_ENDPOINTS);
@@ -15,7 +15,7 @@ export function modelEndpoint(model: string): {
 	weight: number;
 } {
 	const modelDefinition = models.find(
-		(m) => m === "model" || (typeof m === "object" && m.name === model)
+		(m) => m === model || (typeof m === "object" && m.name === model)
 	);
 	if (!modelDefinition) {
 		throw new Error(`Invalid model: ${model}`);
