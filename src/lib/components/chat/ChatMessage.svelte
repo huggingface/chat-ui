@@ -7,6 +7,8 @@
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
+	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
+	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 
 	function sanitizeMd(md: string) {
@@ -27,7 +29,10 @@
 	export let message: Message;
 	export let loading: boolean = false;
 
-	const dispatch = createEventDispatcher<{ retry: void }>();
+	const dispatch = createEventDispatcher<{
+		retry: void;
+		vote: { score: number; id: Message["id"] };
+	}>();
 
 	let contentEl: HTMLElement;
 	let loadingEl: any;
@@ -69,7 +74,7 @@
 </script>
 
 {#if message.from === "assistant"}
-	<div class="flex items-start justify-start gap-4 leading-relaxed">
+	<div class="group relative flex items-start justify-start gap-4 leading-relaxed">
 		<img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
@@ -94,6 +99,28 @@
 				{/each}
 			</div>
 		</div>
+		{#if !loading && message.id}
+			<div class="absolute right-0 top-3.5 flex  lg:-right-2">
+				<button
+					class="btn rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden
+					{message.score && message.score > 0 && 'text-green-500 dark:text-green-400'}"
+					title="+1"
+					type="button"
+					on:click={() => dispatch("vote", { score: 1, id: message.id })}
+				>
+					<CarbonThumbsUp />
+				</button>
+				<button
+					class="btn rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden
+					{message.score && message.score < 0 && 'text-red-500 dark:text-red-400'}"
+					title="-1"
+					type="button"
+					on:click={() => dispatch("vote", { score: -1, id: message.id })}
+				>
+					<CarbonThumbsDown />
+				</button>
+			</div>
+		{/if}
 	</div>
 {/if}
 {#if message.from === "user"}

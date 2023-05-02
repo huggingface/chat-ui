@@ -8,7 +8,9 @@
 	import ChatMessage from "./ChatMessage.svelte";
 	import { randomUUID } from "$lib/utils/randomUuid";
 
-	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
+	const dispatch = createEventDispatcher<{
+		retry: { id: Message["id"]; content: string };
+	}>();
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -38,6 +40,7 @@
 				loading={loading && i === messages.length - 1}
 				{message}
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
+				on:vote
 			/>
 		{:else}
 			<ChatIntroduction on:message />

@@ -37,6 +37,7 @@
 		{pending}
 		{messages}
 		on:message
+		on:vote
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);
 		}}

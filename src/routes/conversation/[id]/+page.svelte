@@ -29,7 +29,7 @@
 	let pending = false;
 
 	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
-		let conversationId = $page.params.id;
+		const conversationId = $page.params.id;
 
 		const response = textGenerationStream(
 			{
@@ -155,6 +155,18 @@
 		}
 	}
 
+	async function voteMessage(score: number, messageId: string) {
+		let conversationId = $page.params.id;
+
+		await fetch(`${base}/conversation/${conversationId}/vote`, {
+			method: "POST",
+			body: JSON.stringify({
+				score,
+				message_id: messageId,
+			}),
+		});
+	}
+
 	onMount(async () => {
 		if ($pendingMessage) {
 			const val = $pendingMessage;
@@ -177,8 +189,9 @@
 	{loading}
 	{pending}
 	{messages}
-	on:message={(message) => writeMessage(message.detail)}
-	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
+	on:message={(event) => writeMessage(event.detail)}
+	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
+	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
 />
