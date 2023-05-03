@@ -23,7 +23,6 @@ export async function PATCH({ locals, request }) {
 			},
 			$setOnInsert: {
 				createdAt: new Date(),
-				ethicsModalAcceptedAt: ethicsModalAccepted ? new Date() : null,
 			},
 		},
 		{
