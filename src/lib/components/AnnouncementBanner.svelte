@@ -9,7 +9,7 @@
 		>New</span
 	>
 	{title}
-	<div class="ml-auto">
+	<div class="ml-auto shrink-0">
 		<slot />
 	</div>
 </div>
