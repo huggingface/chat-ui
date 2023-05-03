@@ -41,8 +41,8 @@
 					top_p: 0.95,
 					repetition_penalty: 1.2,
 					top_k: 50,
-					// @ts-ignore
 					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
+					// @ts-expect-error this param is not available in @huggingface/inference
 					watermark: false,
 					max_new_tokens: 1024,
 					stop: [PUBLIC_SEP_TOKEN],
@@ -56,10 +56,10 @@
 			}
 		);
 
-		for await (const data of response) {
+		for await (const output of response) {
 			pending = false;
 
-			if (!data) {
+			if (!output) {
 				break;
 			}
 
@@ -79,17 +79,17 @@
 			}
 
 			// final message
-			if (data.generated_text) {
+			if (output.generated_text) {
 				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage) {
-					lastMessage.content = data.generated_text;
+					lastMessage.content = output.generated_text;
 					messages = [...messages];
 				}
 				break;
 			}
 
-			if (!data.token.special) {
+			if (!output.token.special) {
 				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage?.from !== "assistant") {
@@ -97,10 +97,10 @@
 					messages = [
 						...messages,
 						// id doesn't match the backend id but it's not important for assistant messages
-						{ from: "assistant", content: data.token.text.trimStart(), id: randomUUID() },
+						{ from: "assistant", content: output.token.text.trimStart(), id: randomUUID() },
 					];
 				} else {
-					lastMessage.content += data.token.text;
+					lastMessage.content += output.token.text;
 					messages = [...messages];
 				}
 			}

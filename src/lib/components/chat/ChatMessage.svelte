@@ -27,7 +27,7 @@
 	}
 
 	export let message: Message;
-	export let loading: boolean = false;
+	export let loading = false;
 
 	const dispatch = createEventDispatcher<{
 		retry: void;
@@ -35,8 +35,8 @@
 	}>();
 
 	let contentEl: HTMLElement;
-	let loadingEl: any;
-	let pendingTimeout: NodeJS.Timeout;
+	let loadingEl: IconLoading;
+	let pendingTimeout: ReturnType<typeof setTimeout>;
 
 	const renderer = new marked.Renderer();
 

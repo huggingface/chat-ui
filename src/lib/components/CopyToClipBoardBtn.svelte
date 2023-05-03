@@ -8,7 +8,7 @@
 	export let value: string;
 
 	let isSuccess = false;
-	let timeout: any;
+	let timeout: ReturnType<typeof setTimeout>;
 
 	const handleClick = async () => {
 		// writeText() can be unavailable or fail in some cases (iframe, etc) so we try/catch

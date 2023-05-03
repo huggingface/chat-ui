@@ -14,11 +14,13 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
 	import EthicsModal from "$lib/components/EthicsModal.svelte";
+	import SettingsModal from "$lib/components/SettingsModal.svelte";
 
 	export let data;
 
 	let isNavOpen = false;
-	let errorToastTimeout: NodeJS.Timeout;
+	let isSettingsOpen = false;
+	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
 	async function onError() {
@@ -113,6 +115,7 @@
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
+			on:clickSettings={() => (isSettingsOpen = true)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</MobileNav>
@@ -121,12 +124,18 @@
 			conversations={data.conversations}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
+			on:clickSettings={() => (isSettingsOpen = true)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</nav>
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
-	<EthicsModal />
+	{#if isSettingsOpen}
+		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
+	{/if}
+	{#if !data.settings.ethicsModalAcceptedAt}
+		<EthicsModal settings={data.settings} />
+	{/if}
 	<slot />
 </div>
