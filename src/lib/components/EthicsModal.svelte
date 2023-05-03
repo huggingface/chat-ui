@@ -35,7 +35,7 @@
 		<!-- The updateSettings call will invalidate the settings, which will reload the page without the modal -->
 		<button
 			type="button"
-			on:click={() => updateSettings({ ...settings, ethicsModalAcceptedAt: new Date() })}
+			on:click={() => updateSettings({ ...settings, ethicsModalAccepted: true })}
 			class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 		>
 			Start chatting
