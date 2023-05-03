@@ -8,7 +8,7 @@ const detachedOffset = 10;
  * @param node element to snap scroll to bottom
  * @param dependency pass in a dependency to update scroll on changes.
  */
-export const snapScrollToBottom = (node: HTMLElement, dependency: any) => {
+export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 	let prevScrollValue = node.scrollTop;
 	let isDetached = false;
 

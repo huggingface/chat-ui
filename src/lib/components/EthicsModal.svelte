@@ -5,7 +5,7 @@
 	import type { Settings } from "$lib/types/Settings";
 	import { updateSettings } from "$lib/updateSettings";
 
-	export let settings: Omit<Settings, "sessionId">;
+	export let settings: Omit<Settings, "sessionId" | "createdAt" | "updatedAt">;
 </script>
 
 <Modal>
