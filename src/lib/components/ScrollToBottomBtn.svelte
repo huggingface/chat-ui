@@ -6,7 +6,7 @@
 	export let scrollNode: HTMLElement;
 	export { className as class };
 
-	let visible: boolean = false;
+	let visible = false;
 	let className = "";
 	let observer: ResizeObserver | null = null;
 

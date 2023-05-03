@@ -83,7 +83,11 @@ export async function POST({ request, fetch, locals, params }) {
 		signal: abortController.signal,
 	});
 
-	const [stream1, stream2] = resp.body!.tee();
+	if (!resp.body) {
+		throw new Error("Response body is empty");
+	}
+
+	const [stream1, stream2] = resp.body.tee();
 
 	async function saveMessage() {
 		let generated_text = await parseGeneratedText(stream2, convId, date, abortController);
