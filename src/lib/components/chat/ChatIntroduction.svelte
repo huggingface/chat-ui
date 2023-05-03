@@ -1,11 +1,18 @@
 <script lang="ts">
 	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
-	import CarbonEarth from "~icons/carbon/earth";
 	import { createEventDispatcher } from "svelte";
+	import CarbonEarth from "~icons/carbon/earth";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import IconChevron from "$lib/components/icons/IconChevron.svelte";
+	import AnnouncementBanner from "../AnnouncementBanner.svelte";
+	import ModelsModal from "../ModelsModal.svelte";
 
 	export let currentModel: { name: string; displayName: string };
+	export let models: Array<{ name: string; displayName: string }>;
+
+	let isModelsModalOpen = false;
+
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
@@ -37,10 +44,21 @@
 				><IconChevron classNames="mr-1" /> Switch model</button
 			>
 		</AnnouncementBanner>
+		{#if isModelsModalOpen}
+			<ModelsModal {currentModel} {models} on:close={() => (isModelsModalOpen = false)} />
+		{/if}
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
-			<div class="p-3">
-				<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
-				<div class="font-semibold">{currentModel.displayName}</div>
+			<div class="flex p-3">
+				<div>
+					<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
+					<div class="font-semibold">{currentModel.displayName}</div>
+				</div>
+				<button
+					type="button"
+					on:click={() => (isModelsModalOpen = true)}
+					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-white p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
+					><IconChevron /></button
+				>
 			</div>
 			<div
 				class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300"
