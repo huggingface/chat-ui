@@ -4,14 +4,13 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 
 export async function POST({ params, request, locals }) {
-	const { message_id, score } = z
+	const { score } = z
 		.object({
-			message_id: z.optional(z.string().uuid()),
 			score: z.number().int().min(-1).max(1),
 		})
 		.parse(await request.json());
-
 	const conversationId = new ObjectId(params.id);
+	const messageId = params.messageId;
 
 	const conversation = await collections.conversations.findOne({
 		_id: conversationId,
@@ -23,7 +22,7 @@ export async function POST({ params, request, locals }) {
 	}
 
 	const messages = conversation.messages.map((message) => {
-		if (message.id === message_id) {
+		if (message.id === messageId) {
 			return {
 				...message,
 				score,

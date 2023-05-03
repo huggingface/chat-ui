@@ -169,12 +169,9 @@
 		});
 
 		try {
-			await fetch(`${base}/conversation/${conversationId}/vote`, {
+			await fetch(`${base}/conversation/${conversationId}/message/${messageId}/vote`, {
 				method: "POST",
-				body: JSON.stringify({
-					score,
-					message_id: messageId,
-				}),
+				body: JSON.stringify({ score }),
 			});
 		} catch {
 			// revert score on any error
