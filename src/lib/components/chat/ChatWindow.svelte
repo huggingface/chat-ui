@@ -59,7 +59,7 @@
 					bind:value={message}
 					on:submit={handleSubmit}
 					autofocus
-					maxRows={10}
+					maxRows={4}
 				/>
 				<button
 					class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
