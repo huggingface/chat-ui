@@ -14,6 +14,8 @@ module.exports = {
 	},
 	rules: {
 		"no-shadow": ["error"],
+		"@typescript-eslint/no-explicit-any": "error",
+		"@typescript-eslint/no-non-null-assertion": "error",
 	},
 	env: {
 		browser: true,

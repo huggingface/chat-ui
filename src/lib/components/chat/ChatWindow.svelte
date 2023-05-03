@@ -10,9 +10,9 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 
 	export let messages: Message[] = [];
-	export let disabled: boolean = false;
-	export let loading: boolean = false;
-	export let pending: boolean = false;
+	export let disabled = false;
+	export let loading = false;
+	export let pending = false;
 	export let currentModel: { name: string; displayName: string };
 
 	let message: string;

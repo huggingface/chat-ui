@@ -12,7 +12,7 @@ import type { Message } from "./types/Message";
  *
  * <|assistant|>hi<|endoftext|><|prompter|>hello<|endoftext|><|assistant|>
  */
-export function buildPrompt(messages: Pick<Message, "content" | "from">[]): string {
+export function buildPrompt(messages: Pick<Message, "from" | "content">[]): string {
 	const prompt =
 		messages
 			.map(
