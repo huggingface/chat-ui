@@ -5,29 +5,35 @@ import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
+import { defaultModel, modelNames } from "$lib/server/models";
 
 export const POST: RequestHandler = async (input) => {
 	const body = await input.request.text();
 
 	let title = "";
 	let messages: Message[] = [];
-	let fromShareId: string | undefined;
 
-	if (body) {
-		fromShareId = z.object({ fromShare: z.string().optional() }).parse(JSON.parse(body)).fromShare;
+	const values = z
+		.object({
+			fromShare: z.string().optional(),
+			model: z
+				.enum([modelNames[0].name, ...modelNames.slice(1).map((m) => m.name)])
+				.default(defaultModel.name),
+		})
+		.parse(JSON.parse(body));
 
-		if (fromShareId) {
-			const conversation = await collections.sharedConversations.findOne({
-				_id: fromShareId,
-			});
+	if (values.fromShare) {
+		const conversation = await collections.sharedConversations.findOne({
+			_id: values.fromShare,
+		});
 
-			if (!conversation) {
-				throw error(404, "Conversation not found");
-			}
-
-			title = conversation.title;
-			messages = conversation.messages;
+		if (!conversation) {
+			throw error(404, "Conversation not found");
 		}
+
+		title = conversation.title;
+		messages = conversation.messages;
+		values.model = conversation.model;
 	}
 
 	const res = await collections.conversations.insertOne({
@@ -38,10 +44,11 @@ export const POST: RequestHandler = async (input) => {
 				((await collections.conversations.countDocuments({ sessionId: input.locals.sessionId })) +
 					1),
 		messages,
+		model: values.model,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		sessionId: input.locals.sessionId,
-		...(fromShareId ? { meta: { fromShareId } } : {}),
+		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 
 	return new Response(
