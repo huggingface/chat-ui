@@ -73,7 +73,7 @@ export async function POST({ request, fetch, locals, params }) {
 
 	const abortController = new AbortController();
 
-	const resp = await fetch(randomEndpoint.endpoint, {
+	const resp = await fetch(randomEndpoint.url, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
 			Authorization: randomEndpoint.authorization,

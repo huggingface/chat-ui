@@ -7,13 +7,16 @@ export const models = z
 			z.string().min(1),
 			z.object({
 				name: z.string().min(1),
-				endpoints: z.array(
-					z.object({
-						url: z.string().url(),
-						authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
-						weight: z.number().int().positive().default(1),
-					})
-				),
+				displayName: z.string().min(1).optional(),
+				endpoints: z
+					.array(
+						z.object({
+							url: z.string().url(),
+							authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
+							weight: z.number().int().positive().default(1),
+						})
+					)
+					.optional(),
 			}),
 		])
 	)
