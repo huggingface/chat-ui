@@ -25,7 +25,7 @@ export async function POST({ params, request, locals }) {
 		if (message.id === messageId) {
 			return {
 				...message,
-				score,
+				score: score === 0 ? undefined : score,
 			};
 		}
 		return message;
