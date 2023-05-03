@@ -26,15 +26,15 @@
 
 <div class="relative min-w-0 flex-1">
 	<pre
-		class="invisible py-3"
+		class="invisible whitespace-pre-wrap p-3"
 		aria-hidden="true"
-		style="min-height: {minHeight}; max-height: {maxHeight}">{value + "&nbsp;\n"}</pre>
+		style="min-height: {minHeight}; max-height: {maxHeight}">{value + "\n"}</pre>
 
 	<textarea
 		enterkeyhint="send"
 		tabindex="0"
 		rows="1"
-		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0 dark:bg-transparent"
+		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0"
 		bind:value
 		bind:this={textareaElement}
 		{disabled}
