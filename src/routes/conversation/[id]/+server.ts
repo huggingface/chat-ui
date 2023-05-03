@@ -3,6 +3,7 @@ import { buildPrompt } from "$lib/buildPrompt.js";
 import { abortedGenerations } from "$lib/server/abortedGenerations.js";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
+import { defaultModel, modelNames } from "$lib/server/models.js";
 import type { Message } from "$lib/types/Message.js";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -30,10 +31,14 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 	const {
 		inputs: newPrompt,
+		model,
 		options: { id: messageId, is_retry },
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
+			model: z
+				.enum([modelNames[0].name, ...modelNames.slice(1).map((m) => m.name)])
+				.default(defaultModel.name),
 			options: z.object({
 				id: z.optional(z.string().uuid()),
 				is_retry: z.optional(z.boolean()),
@@ -66,11 +71,11 @@ export async function POST({ request, fetch, locals, params }) {
 	}
 	const prompt = buildPrompt(messages);
 
-	const randomEndpoint = modelEndpoint();
+	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
 
-	const resp = await fetch(randomEndpoint.endpoint, {
+	const resp = await fetch(randomEndpoint.url, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
 			Authorization: randomEndpoint.authorization,
@@ -99,7 +104,7 @@ export async function POST({ request, fetch, locals, params }) {
 
 		generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
 
-		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
+		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID(), model });
 
 		await collections.conversations.updateOne(
 			{

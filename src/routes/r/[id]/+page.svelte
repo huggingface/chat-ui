@@ -71,5 +71,6 @@
 			})
 			.finally(() => (loading = false))}
 	messages={data.messages}
+	currentModel={data.models[0]}
 	{loading}
 />

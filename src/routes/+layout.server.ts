@@ -2,6 +2,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
+import { modelNames } from "$lib/server/models";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
@@ -29,5 +30,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 		},
+		models: modelNames,
 	};
 };

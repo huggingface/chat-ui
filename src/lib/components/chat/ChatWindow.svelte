@@ -8,12 +8,12 @@
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
-	import { PUBLIC_MODEL_ID, PUBLIC_MODEL_NAME } from "$env/static/public";
 
 	export let messages: Message[] = [];
 	export let disabled = false;
 	export let loading = false;
 	export let pending = false;
+	export let currentModel: { name: string; displayName: string };
 
 	let message: string;
 
@@ -35,6 +35,7 @@
 	<ChatMessages
 		{loading}
 		{pending}
+		{currentModel}
 		{messages}
 		on:message
 		on:retry={(ev) => {
@@ -73,10 +74,10 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
-					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
-					class="hover:underline">{PUBLIC_MODEL_NAME}</a
+					class="hover:underline">{currentModel.displayName}</a
 				> <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 				or false.
 			</p>

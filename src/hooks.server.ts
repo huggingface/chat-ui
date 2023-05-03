@@ -6,6 +6,7 @@ import {
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
 } from "$env/static/public";
 import { addYears } from "date-fns";
+import { inspect } from "node:util";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);

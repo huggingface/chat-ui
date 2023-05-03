@@ -31,14 +31,8 @@ Basically you need to create a `.env.local` with the following contents:
 
 ```
 MONGODB_URL=<url to mongo, for example a free MongoDB Atlas sandbox instance>
-MODEL_ENDPOINTS=`[{
-  "endpoint": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
-  "authorization": "Bearer <hf_token>",
-  "weight": 1
-}]`
+HF_ACCESS_TOKEN=<your HF access token from https://huggingface.co/settings/tokens>
 ```
-
-Where the contents in `<...>` are replaced by the MongoDB URL and your [HF Access Token](https://huggingface.co/settings/tokens).
 
 ## Duplicating to a Space
 
@@ -46,14 +40,22 @@ Create a `DOTENV_LOCAL` secret to your space with the following contents:
 
 ```
 MONGODB_URL=<url to mongo, for example a free MongoDB Atlas sandbox instance>
-MODEL_ENDPOINTS=`[{
-  "endpoint": "https://api-inference.huggingface.co/models/OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
-  "authorization": "Bearer <hf_token>",
-  "weight": 1
-}]`
+HF_ACCESS_TOKEN=<your HF access token from https://huggingface.co/settings/tokens>
 ```
 
 Where the contents in `<...>` are replaced by the MongoDB URL and your [HF Access Token](https://huggingface.co/settings/tokens).
+
+## Running Local Inference
+
+Both the example above use the HF Inference API or HF Endpoints API.
+
+If you want to run the model locally, you need to run this inference server locally: https://github.com/huggingface/text-generation-inference
+
+And add this to your `.env.local`:
+
+```
+MODELS=`[{"name": "...", "endpoints": [{"url": "127.0.0.1:8080/generate_stream"}]}]`
+```
 
 ## Building
 
