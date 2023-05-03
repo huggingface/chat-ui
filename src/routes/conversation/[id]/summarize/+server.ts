@@ -41,7 +41,7 @@ export async function POST({ params, locals, fetch }) {
 		return_full_text: false,
 	};
 
-	const endpoint = modelEndpoint(defaultModel);
+	const endpoint = modelEndpoint(defaultModel.name);
 	let { generated_text } = await textGeneration(
 		{
 			model: endpoint.url,
