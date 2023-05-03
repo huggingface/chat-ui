@@ -2,10 +2,7 @@
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import type { Settings } from "$lib/types/Settings";
 	import { updateSettings } from "$lib/updateSettings";
-
-	export let settings: Omit<Settings, "sessionId" | "createdAt" | "updatedAt">;
 </script>
 
 <Modal>
@@ -35,7 +32,7 @@
 		<!-- The updateSettings call will invalidate the settings, which will reload the page without the modal -->
 		<button
 			type="button"
-			on:click={() => updateSettings({ ...settings, ethicsModalAccepted: true })}
+			on:click={() => updateSettings({ ethicsModalAccepted: true })}
 			class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 		>
 			Start chatting
