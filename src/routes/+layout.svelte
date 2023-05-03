@@ -20,7 +20,7 @@
 
 	let isNavOpen = false;
 	let isSettingsOpen = false;
-	let errorToastTimeout: NodeJS.Timeout;
+	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
 	async function onError() {
