@@ -22,5 +22,9 @@ export const models = z
 	)
 	.parse(JSON.parse(MODELS));
 
-export const modelNames = models.map((m) => (typeof m === "string" ? m : m.name));
+export const modelNames: Array<{ name: string; displayName: string }> = models.map((m) =>
+	typeof m === "string"
+		? { name: m, displayName: m }
+		: { name: m.name, displayName: m.displayName ?? m.name }
+);
 export const defaultModel = modelNames[0];

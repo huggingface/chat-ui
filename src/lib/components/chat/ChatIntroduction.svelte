@@ -5,7 +5,7 @@
 	import CarbonEarth from "~icons/carbon/earth";
 	import { createEventDispatcher } from "svelte";
 
-	export let currentModel: string;
+	export let currentModel: { name: string; displayName: string };
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
@@ -32,13 +32,13 @@
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="p-3">
 				<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
-				<div class="font-semibold">{currentModel}</div>
+				<div class="font-semibold">{currentModel.displayName}</div>
 			</div>
 			<div
 				class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300"
 			>
 				<a
-					href="https://huggingface.co/{currentModel}"
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
 					class="flex items-center hover:underline"

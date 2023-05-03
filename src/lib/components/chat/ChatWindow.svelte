@@ -13,7 +13,7 @@
 	export let disabled: boolean = false;
 	export let loading: boolean = false;
 	export let pending: boolean = false;
-	export let currentModel: string;
+	export let currentModel: { name: string; displayName: string };
 
 	let message: string;
 
@@ -74,10 +74,10 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
-					href="https://huggingface.co/{currentModel}"
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
-					class="hover:underline">{currentModel}</a
+					class="hover:underline">{currentModel.displayName}</a
 				> <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 				or false.
 			</p>

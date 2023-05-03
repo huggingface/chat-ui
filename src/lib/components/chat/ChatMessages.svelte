@@ -13,7 +13,7 @@
 	export let messages: Message[];
 	export let loading: boolean;
 	export let pending: boolean;
-	export let currentModel: string;
+	export let currentModel: { name: string; displayName: string };
 
 	let chatContainer: HTMLElement;
 
