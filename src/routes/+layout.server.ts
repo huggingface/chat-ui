@@ -29,6 +29,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
+			currentModel:
+				modelNames.find((modelName) => modelName.name === settings?.activeModelName) ??
+				modelNames[0],
 		},
 		models: modelNames,
 	};

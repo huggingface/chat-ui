@@ -14,6 +14,7 @@
 	export let loading = false;
 	export let pending = false;
 	export let currentModel: { name: string; displayName: string };
+	export let models: any;
 
 	let message: string;
 
@@ -36,6 +37,7 @@
 		{loading}
 		{pending}
 		{currentModel}
+		{models}
 		{messages}
 		on:message
 		on:retry={(ev) => {

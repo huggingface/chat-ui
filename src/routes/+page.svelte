@@ -44,4 +44,5 @@
 	on:message={(ev) => createConversation(ev.detail)}
 	{loading}
 	currentModel={data.models[0]}
+	models={data.models}
 />

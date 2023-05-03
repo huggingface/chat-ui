@@ -22,6 +22,7 @@ export const models = z
 	)
 	.parse(JSON.parse(MODELS));
 
+// TODO: Once we have all the model data in there, rename this so it's not confusing with only the model name string
 export const modelNames: Array<{ name: string; displayName: string }> = models.map((m) =>
 	typeof m === "string"
 		? { name: m, displayName: m }
