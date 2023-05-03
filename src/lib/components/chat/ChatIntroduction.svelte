@@ -29,6 +29,14 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
+		<AnnouncementBanner classNames="mb-4" title="bigcode/starmodel is now available">
+			<button
+				type="button"
+				on:click={() => (isModelsModalOpen = true)}
+				class="mr-2 flex items-center underline hover:no-underline"
+				><IconChevron classNames="mr-1" /> Switch model</button
+			>
+		</AnnouncementBanner>
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="p-3">
 				<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
