@@ -10,6 +10,7 @@ export default {
 			// 	sans: ['"Inter"', ...defaultTheme.fontFamily.sans]
 			// },
 			fontSize: {
+				xxs: "0.625rem",
 				smd: "0.94rem",
 			},
 		},
