@@ -1,15 +1,11 @@
 <script lang="ts">
-	import {
-		PUBLIC_DISABLE_INTRO_TILES,
-		PUBLIC_MODEL_ID,
-		PUBLIC_MODEL_NAME,
-		PUBLIC_VERSION,
-	} from "$env/static/public";
-
+	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarth from "~icons/carbon/earth";
 	import { createEventDispatcher } from "svelte";
+
+	export let currentModel: { name: string; displayName: string };
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
@@ -36,13 +32,13 @@
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="p-3">
 				<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
-				<div class="font-semibold">{PUBLIC_MODEL_NAME}</div>
+				<div class="font-semibold">{currentModel.displayName}</div>
 			</div>
 			<div
 				class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300"
 			>
 				<a
-					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
 					class="flex items-center hover:underline"

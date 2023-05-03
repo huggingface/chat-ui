@@ -2,6 +2,7 @@ import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
+import { defaultModel } from "$lib/server/models.js";
 import { trimPrefix } from "$lib/utils/trimPrefix.js";
 import { trimSuffix } from "$lib/utils/trimSuffix.js";
 import { textGeneration } from "@huggingface/inference";
@@ -40,10 +41,10 @@ export async function POST({ params, locals, fetch }) {
 		return_full_text: false,
 	};
 
-	const endpoint = modelEndpoint();
+	const endpoint = modelEndpoint(defaultModel.name);
 	let { generated_text } = await textGeneration(
 		{
-			model: endpoint.endpoint,
+			model: endpoint.url,
 			inputs: prompt,
 			parameters,
 		},
