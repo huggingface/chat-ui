@@ -1,7 +1,10 @@
 import { dev } from "$app/environment";
 import { COOKIE_NAME } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
-import { PUBLIC_GOOGLE_ANALYTICS_ID } from "$env/static/public";
+import {
+	PUBLIC_GOOGLE_ANALYTICS_ID,
+	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
+} from "$env/static/public";
 import { addYears } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -24,12 +27,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event, {
 		transformPageChunk: (chunk) => {
 			// For some reason, Sveltekit doesn't let us load env variables from .env in the app.html template
-			if (replaced || !chunk.html.includes("%gaId%")) {
+			if (replaced || !chunk.html.includes("%gaId%") || !chunk.html.includes("%gaIdDeprecated%")) {
 				return chunk.html;
 			}
 			replaced = true;
 
-			return chunk.html.replace("%gaId%", PUBLIC_GOOGLE_ANALYTICS_ID);
+			return chunk.html
+				.replace("%gaId%", PUBLIC_GOOGLE_ANALYTICS_ID)
+				.replace("%gaIdDeprecated%", PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID);
 		},
 	});
 
