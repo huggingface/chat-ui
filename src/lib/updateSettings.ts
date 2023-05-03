@@ -5,7 +5,9 @@ import type { Settings } from "./types/Settings";
 import { UrlDependency } from "./types/UrlDependency";
 
 export async function updateSettings(
-	settings: Partial<Omit<Settings, "sessionId">>
+	settings: Partial<
+		Omit<Settings, "sessionId" | "ethicsModalAcceptedAt"> & { ethicsModalAccepted?: boolean }
+	>
 ): Promise<boolean> {
 	try {
 		const res = await fetch(`${base}/settings`, {
