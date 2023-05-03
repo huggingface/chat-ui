@@ -36,7 +36,9 @@ export async function POST({ request, fetch, locals, params }) {
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
-			model: z.enum([modelNames[0], ...modelNames.slice(1)]).default(defaultModel),
+			model: z
+				.enum([modelNames[0].name, ...modelNames.slice(1).map((m) => m.name)])
+				.default(defaultModel.name),
 			options: z.object({
 				id: z.optional(z.string().uuid()),
 				is_retry: z.optional(z.boolean()),
