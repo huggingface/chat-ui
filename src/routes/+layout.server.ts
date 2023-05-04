@@ -1,13 +1,31 @@
+import { base } from "$app/paths";
+import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models } from "$lib/server/models";
+import { validateModel } from "$lib/utils/models";
 
-export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
+export const load: LayoutServerLoad = async ({ locals, depends, url, request }) => {
 	const { conversations } = collections;
+	const urlModel = url.searchParams.get("model");
 
 	depends(UrlDependency.ConversationList);
+
+	if (urlModel) {
+		const isValidModel = validateModel(models).safeParse(urlModel).success;
+
+		if (isValidModel) {
+			await collections.settings.updateOne(
+				{ sessionId: locals.sessionId },
+				{ $set: { activeModel: urlModel } },
+				{ upsert: true }
+			);
+		}
+
+		throw redirect(303, request.headers.get("referer") || base || "/");
+	}
 
 	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
 
@@ -33,7 +51,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			activeModel: url.searchParams.get("model") ?? settings?.activeModel ?? defaultModel.name,
+			activeModel: settings?.activeModel ?? defaultModel.name,
 		},
 		models: models.map((model) => ({
 			name: model.name,
