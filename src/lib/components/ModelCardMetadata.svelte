@@ -15,7 +15,7 @@
 		: 'text-gray-800 dark:bg-gray-100 dark:text-gray-600'}"
 >
 	<a
-		href="https://huggingface.co/datasets/{model.name}"
+		href="https://huggingface.co/{model.name}"
 		target="_blank"
 		rel="noreferrer"
 		class="flex items-center hover:underline"
