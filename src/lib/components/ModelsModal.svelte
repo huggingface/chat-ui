@@ -56,7 +56,9 @@
 							<span class="text-md block font-semibold leading-tight text-gray-800"
 								>{model.displayName}</span
 							>
-							<span class="text-xs text-[#9FA8B5]">A good alternative to ChatGPT</span>
+							{#if model.description}
+								<span class="text-xs text-[#9FA8B5]">{model.description}</span>
+							{/if}
 						</span>
 						<CarbonCheckmark
 							class="-mr-1 -mt-1 ml-auto shrink-0 text-xl {model.name === selectedModelName
