@@ -8,6 +8,7 @@
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../routes/$types";
 	import { enhance } from "$app/forms";
+	import { base } from "$app/paths";
 
 	export let settings: LayoutData["settings"];
 	export let models: Array<Model>;
@@ -19,7 +20,7 @@
 
 <Modal width="max-w-lg">
 	<form
-		action="/settings"
+		action="{base}/settings"
 		method="post"
 		use:enhance={() => {
 			dispatch("close");
