@@ -22,7 +22,7 @@ const config = {
 		},
 		csrf: {
 			// todo: fix
-			enabled: false,
+			checkOrigin: false,
 		},
 	},
 };
