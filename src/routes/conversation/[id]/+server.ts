@@ -112,7 +112,7 @@ export async function POST({ request, fetch, locals, params }) {
 			PUBLIC_SEP_TOKEN
 		).trim();
 
-		for (const stop of modelInfo?.parameters?.stop ?? []) {
+		for (const stop of [...(modelInfo?.parameters?.stop ?? []), "<|endoftext|>"]) {
 			if (generated_text.endsWith(stop)) {
 				generated_text = generated_text.slice(0, -stop.length).trim();
 			}
