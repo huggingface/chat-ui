@@ -8,12 +8,15 @@
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
+	import { findCurrentModel } from "$lib/utils/models";
 
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
 	export let models: Model[];
 
 	let isModelsModalOpen = false;
+
+	$: currentModelMetadata = findCurrentModel(models, settings.currentModel);
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
@@ -63,38 +66,19 @@
 			<ModelCardMetadata variant="dark" model={currentModel} />
 		</div>
 	</div>
-	<div class="lg:col-span-3 lg:mt-12">
-		<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
-		<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
-			<button
-				type="button"
-				class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
-				on:click={() =>
-					dispatch(
-						"message",
-						"As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-					)}
-			>
-				"Write an email from bullet list"
-			</button>
-			<button
-				type="button"
-				class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
-				on:click={() =>
-					dispatch(
-						"message",
-						"Code a basic snake game in python, give explanations for each step."
-					)}
-			>
-				"Code a snake game"
-			</button>
-			<button
-				type="button"
-				class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
-				on:click={() => dispatch("message", "How do I make a delicious lemon cheesecake?")}
-			>
-				"Assist in a task"
-			</button>
-		</div>
-	</div>
+	{#if currentModelMetadata.promptExamples}
+		<div class="lg:col-span-3 lg:mt-12">
+			<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
+			<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
+				{#each currentModelMetadata.promptExamples as example}
+					<button
+						type="button"
+						class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
+						on:click={() => dispatch("message", example.prompt)}
+					>
+						{example.title}
+					</button>
+				{/each}
+			</div>
+		</div>{/if}
 </div>

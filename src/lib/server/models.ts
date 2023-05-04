@@ -12,6 +12,14 @@ const modelsRaw = z
 			assistantMessageToken: z.string().min(1),
 			preprompt: z.string().default(""),
 			prepromptUrl: z.string().url().optional(),
+			promptExamples: z
+				.array(
+					z.object({
+						title: z.string().min(1),
+						prompt: z.string().min(1),
+					})
+				)
+				.optional(),
 			endpoints: z
 				.array(
 					z.object({
@@ -38,6 +46,7 @@ export const models = await Promise.all(
 		...m,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
+		promptExamples: m.promptExamples || [],
 	}))
 );
 
