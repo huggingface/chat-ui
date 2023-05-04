@@ -20,6 +20,10 @@ const config = {
 		paths: {
 			base: process.env.APP_BASE || "",
 		},
+		csrf: {
+			// todo: fix
+			enabled: false,
+		},
 	},
 };
 
