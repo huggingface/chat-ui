@@ -1,4 +1,3 @@
-import { PUBLIC_SEP_TOKEN } from "./constants/publicSepToken";
 import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 

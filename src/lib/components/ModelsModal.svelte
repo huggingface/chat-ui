@@ -27,7 +27,7 @@
 		}}
 		class="flex w-full flex-col gap-5 p-6"
 	>
-		{#each Object.entries(settings).filter((settings) => settings[0] !== "activeModel") as [key, val]}
+		{#each Object.entries(settings).filter(([key]) => key !== "activeModel") as [key, val]}
 			<input type="hidden" name={key} value={val} />
 		{/each}
 		<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
