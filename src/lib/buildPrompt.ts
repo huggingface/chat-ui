@@ -1,4 +1,4 @@
-import { PUBLIC_SEP_TOKEN } from "$env/static/public";
+import { PUBLIC_SEP_TOKEN } from "./constants/publicSepToken";
 import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 
@@ -23,8 +23,5 @@ export function buildPrompt(
 			.join("") + model.assistantMessageToken;
 
 	// Not super precise, but it's truncated in the model's backend anyway
-	return (
-		model.preprompt +
-		(model.maxInputTokens ? prompt.split(" ").slice(-model.maxInputTokens).join(" ") : prompt)
-	);
+	return model.preprompt + prompt.split(" ").slice(-model.parameters.truncate).join(" ");
 }

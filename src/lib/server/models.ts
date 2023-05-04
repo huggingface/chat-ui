@@ -11,7 +11,6 @@ const modelsRaw = z
 			userMessageToken: z.string().min(1),
 			assistantMessageToken: z.string().min(1),
 			preprompt: z.string().default(""),
-			maxInputTokens: z.number().int().positive().optional(),
 			prepromptUrl: z.string().url().optional(),
 			endpoints: z
 				.array(
@@ -22,6 +21,12 @@ const modelsRaw = z
 					})
 				)
 				.optional(),
+			parameters: z
+				.object({
+					temperature: z.number().min(0).max(1),
+					truncate: z.number().int().positive(),
+				})
+				.passthrough(),
 		})
 	)
 	.parse(JSON.parse(MODELS));

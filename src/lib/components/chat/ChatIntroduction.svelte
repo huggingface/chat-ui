@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
@@ -61,40 +61,38 @@
 			<ModelCardMetadata variant="dark" model={currentModel} />
 		</div>
 	</div>
-	{#if PUBLIC_DISABLE_INTRO_TILES !== "true"}
-		<div class="lg:col-span-3 lg:mt-12">
-			<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
-			<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
-				<button
-					type="button"
-					class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
-					on:click={() =>
-						dispatch(
-							"message",
-							"As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-						)}
-				>
-					"Write an email from bullet list"
-				</button>
-				<button
-					type="button"
-					class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
-					on:click={() =>
-						dispatch(
-							"message",
-							"Code a basic snake game in python, give explanations for each step."
-						)}
-				>
-					"Code a snake game"
-				</button>
-				<button
-					type="button"
-					class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
-					on:click={() => dispatch("message", "How do I make a delicious lemon cheesecake?")}
-				>
-					"Assist in a task"
-				</button>
-			</div>
+	<div class="lg:col-span-3 lg:mt-12">
+		<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
+		<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
+			<button
+				type="button"
+				class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
+				on:click={() =>
+					dispatch(
+						"message",
+						"As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+					)}
+			>
+				"Write an email from bullet list"
+			</button>
+			<button
+				type="button"
+				class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
+				on:click={() =>
+					dispatch(
+						"message",
+						"Code a basic snake game in python, give explanations for each step."
+					)}
+			>
+				"Code a snake game"
+			</button>
+			<button
+				type="button"
+				class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
+				on:click={() => dispatch("message", "How do I make a delicious lemon cheesecake?")}
+			>
+				"Assist in a task"
+			</button>
 		</div>
-	{/if}
+	</div>
 </div>

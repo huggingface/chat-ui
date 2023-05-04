@@ -40,6 +40,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			websiteUrl: model.websiteUrl,
 			datasetName: model.datasetName,
 			displayName: model.displayName,
+			parameters: model.parameters,
 		})),
 	};
 };
