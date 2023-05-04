@@ -8,22 +8,32 @@
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+	import type { Model } from "$lib/types/Model";
 
 	function sanitizeMd(md: string) {
-		return md
+		let ret = md
 			.replace(/<\|[a-z]*$/, "")
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
 			.replaceAll(PUBLIC_SEP_TOKEN, " ")
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
 			.replaceAll(/<br\s?\/?>/gi, "\n")
-			.trim()
-			.replaceAll("<", "&lt;");
+			.replaceAll("<", "&lt;")
+			.trim();
+
+		for (const stop of model.parameters.stop ?? []) {
+			if (ret.endsWith(stop)) {
+				ret = ret.slice(0, -stop.length).trim();
+			}
+		}
+
+		return ret;
 	}
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<");
 	}
 
+	export let model: Model;
 	export let message: Message;
 	export let loading = false;
 

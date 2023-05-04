@@ -1,7 +1,6 @@
-export interface Model {
-	name: string;
-	displayName?: string;
-	websiteUrl?: string;
-	datasetName?: string;
-	promptExamples?: Array<{ title: string; prompt: string }>;
-}
+import type { BackendModel } from "$lib/server/models";
+
+export type Model = Pick<
+	BackendModel,
+	"name" | "displayName" | "websiteUrl" | "datasetName" | "promptExamples" | "parameters"
+>;
