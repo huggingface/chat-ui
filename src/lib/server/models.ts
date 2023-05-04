@@ -25,6 +25,7 @@ const modelsRaw = z
 				.object({
 					temperature: z.number().min(0).max(1),
 					truncate: z.number().int().positive(),
+					max_new_tokens: z.number().int().positive(),
 				})
 				.passthrough(),
 		})
