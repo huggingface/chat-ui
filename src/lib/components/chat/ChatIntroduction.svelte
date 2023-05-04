@@ -58,7 +58,7 @@
 				<button
 					type="button"
 					on:click={() => (isModelsModalOpen = true)}
-					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-white p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
+					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-gray-100 p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
 					><IconChevron /></button
 				>
 			</div>
