@@ -12,7 +12,7 @@
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
-	import { findConvModelName, findCurrentModel } from "$lib/utils/models.js";
+	import { findCurrentModel } from "$lib/utils/models.js";
 
 	export let data;
 
@@ -182,5 +182,5 @@
 	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
-	currentModel={findCurrentModel(data.models, findConvModelName(data.conversations))}
+	currentModel={findCurrentModel(data.models, data.model)}
 />

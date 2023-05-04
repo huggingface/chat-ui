@@ -14,5 +14,6 @@ export const load: PageServerLoad = async ({ params }) => {
 	return {
 		messages: conversation.messages,
 		title: conversation.title,
+		model: conversation.model,
 	};
 };

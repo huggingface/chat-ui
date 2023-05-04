@@ -6,6 +6,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
+	import { findCurrentModel } from "$lib/utils/models";
 	import { share } from "$lib/utils/share";
 	import type { PageData } from "./$types";
 
@@ -71,6 +72,6 @@
 			})
 			.finally(() => (loading = false))}
 	messages={data.messages}
-	currentModel={data.settings.currentModel}
+	currentModel={findCurrentModel(data.models, data.model)}
 	{loading}
 />
