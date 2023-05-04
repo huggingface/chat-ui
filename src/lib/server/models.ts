@@ -6,6 +6,7 @@ const modelsRaw = z
 		z.object({
 			name: z.string().min(1),
 			displayName: z.string().min(1).optional(),
+			description: z.string().min(1).optional(),
 			websiteUrl: z.string().url().optional(),
 			datasetName: z.string().min(1).optional(),
 			userMessageToken: z.string().min(1),
@@ -47,7 +48,6 @@ export const models = await Promise.all(
 		...m,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
-		promptExamples: m.promptExamples || [],
 	}))
 );
 
