@@ -1,5 +1,6 @@
-import { collections } from "$lib/server/database.js";
 import { z } from "zod";
+import { collections } from "$lib/server/database.js";
+import { defaultModel, modelsPublicData } from "$lib/server/models";
 
 export async function PATCH({ locals, request }) {
 	const json = await request.json();
@@ -8,6 +9,9 @@ export async function PATCH({ locals, request }) {
 		.object({
 			shareConversationsWithModelAuthors: z.boolean().default(true),
 			ethicsModalAccepted: z.boolean().optional(),
+			activeModel: z
+				.enum([modelsPublicData[0].name, ...modelsPublicData.slice(1).map((m) => m.name)])
+				.default(defaultModel.name),
 		})
 		.parse(json);
 

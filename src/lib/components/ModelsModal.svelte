@@ -17,7 +17,7 @@
 
 	const handleSubmit = () => {
 		updateSettings({
-			activeModelName: selectedModelName,
+			activeModel: selectedModelName,
 		}).then((res) => {
 			if (res) {
 				dispatch("close");
@@ -30,7 +30,7 @@
 	<form on:submit|preventDefault={handleSubmit} class="flex w-full flex-col gap-5 p-6">
 		<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
 			<h2>Models</h2>
-			<button class="group" on:click={() => dispatch("close")}>
+			<button type="button" class="group" on:click={() => dispatch("close")}>
 				<CarbonClose class="text-gray-900 group-hover:text-gray-500" />
 			</button>
 		</div>
@@ -62,7 +62,11 @@
 								: 'text-transparent group-hover:text-gray-200'}"
 						/>
 					</label>
-					<ModelCardMetadata modelUrl={model.modelUrl} datasetUrl={model.datasetUrl} websiteUrl={model.websiteUrl} />
+					<ModelCardMetadata
+						modelUrl={model.modelUrl}
+						datasetUrl={model.datasetUrl}
+						websiteUrl={model.websiteUrl}
+					/>
 				</div>
 			{/each}
 		</div>
