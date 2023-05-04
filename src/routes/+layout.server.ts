@@ -24,7 +24,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url, request }) 
 			);
 		}
 
-		throw redirect(303, request.headers.get("referer") || base || "/");
+		throw redirect(303, request.headers.get("referer")?.split("?")[0] || base || "/");
 	}
 
 	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
