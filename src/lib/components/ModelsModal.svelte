@@ -2,32 +2,33 @@
 	import { createEventDispatcher } from "svelte";
 
 	import Modal from "$lib/components/Modal.svelte";
-	import { updateSettings } from "$lib/updateSettings";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
 	import ModelCardMetadata from "./ModelCardMetadata.svelte";
 	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../routes/$types";
+	import { enhance } from "$app/forms";
 
-	export let currentModel: Model;
+	export let settings: LayoutData["settings"];
 	export let models: Array<Model>;
 
-	let selectedModelName = currentModel.name;
+	let selectedModelName = settings.currentModel;
 
 	const dispatch = createEventDispatcher<{ close: void }>();
-
-	const handleSubmit = () => {
-		updateSettings({
-			activeModel: selectedModelName,
-		}).then((res) => {
-			if (res) {
-				dispatch("close");
-			}
-		});
-	};
 </script>
 
 <Modal width="max-w-lg">
-	<form on:submit|preventDefault={handleSubmit} class="flex w-full flex-col gap-5 p-6">
+	<form
+		action="/settings"
+		method="post"
+		use:enhance={() => {
+			dispatch("close");
+		}}
+		class="flex w-full flex-col gap-5 p-6"
+	>
+		{#each Object.entries(settings).filter((settings) => settings[0] !== "currentModel") as [key, val]}
+			<input type="hidden" name={key} value={val} />
+		{/each}
 		<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
 			<h2>Models</h2>
 			<button type="button" class="group" on:click={() => dispatch("close")}>
@@ -62,11 +63,7 @@
 								: 'text-transparent group-hover:text-gray-200'}"
 						/>
 					</label>
-					<ModelCardMetadata
-						modelUrl={model.modelUrl}
-						datasetUrl={model.datasetUrl}
-						websiteUrl={model.websiteUrl}
-					/>
+					<ModelCardMetadata {model} />
 				</div>
 			{/each}
 		</div>
