@@ -17,8 +17,10 @@ export const actions = {
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
 			})
 			.parse({
-				shareConversationsWithModelAuthors: formData.get("shareConversationsWithModelAuthors"),
-				ethicsModalAccepted: formData.get("ethicsModalAccepted"),
+				// `undefined` is important here vs `null`, otherwise `.default()` will not work
+				shareConversationsWithModelAuthors:
+					formData.get("shareConversationsWithModelAuthors") ?? undefined,
+				ethicsModalAccepted: formData.get("ethicsModalAccepted") ?? undefined,
 			});
 
 		await collections.settings.updateOne(
