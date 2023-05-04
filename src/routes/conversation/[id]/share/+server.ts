@@ -37,6 +37,7 @@ export async function POST({ params, url, locals }) {
 		hash,
 		updatedAt: new Date(),
 		title: conversation.title,
+		model: conversation.model,
 	};
 
 	await collections.sharedConversations.insertOne(shared);
