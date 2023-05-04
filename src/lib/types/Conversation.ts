@@ -8,6 +8,8 @@ export interface Conversation extends Timestamps {
 	// Can be undefined for shared convo then deleted
 	sessionId: string;
 
+	model: string;
+
 	title: string;
 	messages: Message[];
 

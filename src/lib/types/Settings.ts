@@ -10,4 +10,5 @@ export interface Settings extends Timestamps {
 	 * */
 	shareConversationsWithModelAuthors: boolean;
 	ethicsModalAcceptedAt: Date | null;
+	activeModel: string;
 }

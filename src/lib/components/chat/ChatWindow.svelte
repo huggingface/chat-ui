@@ -8,12 +8,16 @@
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
-	import { PUBLIC_MODEL_ID, PUBLIC_MODEL_NAME } from "$env/static/public";
+	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../../routes/$types";
 
 	export let messages: Message[] = [];
 	export let disabled = false;
 	export let loading = false;
 	export let pending = false;
+	export let currentModel: Model;
+	export let models: Model[] | undefined = undefined;
+	export let settings: LayoutData["settings"];
 
 	let message: string;
 
@@ -35,6 +39,9 @@
 	<ChatMessages
 		{loading}
 		{pending}
+		{settings}
+		{currentModel}
+		{models}
 		{messages}
 		on:message
 		on:vote
@@ -60,7 +67,7 @@
 					bind:value={message}
 					on:submit={handleSubmit}
 					autofocus
-					maxRows={10}
+					maxRows={4}
 				/>
 				<button
 					class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
@@ -74,10 +81,10 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
-					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
-					class="hover:underline">{PUBLIC_MODEL_NAME}</a
+					class="hover:underline">{currentModel.displayName}</a
 				> <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 				or false.
 			</p>

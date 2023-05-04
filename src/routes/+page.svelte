@@ -4,7 +4,9 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { findCurrentModel } from "$lib/utils/models.js";
 
+	export let data;
 	let loading = false;
 
 	async function createConversation(message: string) {
@@ -15,6 +17,7 @@
 				headers: {
 					"Content-Type": "application/json",
 				},
+				body: JSON.stringify({ model: data.settings.activeModel }),
 			});
 
 			if (!res.ok) {
@@ -39,4 +42,10 @@
 	}
 </script>
 
-<ChatWindow on:message={(ev) => createConversation(ev.detail)} {loading} />
+<ChatWindow
+	on:message={(ev) => createConversation(ev.detail)}
+	{loading}
+	currentModel={findCurrentModel(data.models, data.settings.activeModel)}
+	models={data.models}
+	settings={data.settings}
+/>

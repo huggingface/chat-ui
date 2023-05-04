@@ -1,8 +1,9 @@
-import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt.js";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
 import { abortedGenerations } from "$lib/server/abortedGenerations.js";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
+import { defaultModel, models } from "$lib/server/models.js";
 import type { Message } from "$lib/types/Message.js";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -26,6 +27,8 @@ export async function POST({ request, fetch, locals, params }) {
 	if (!conv) {
 		throw error(404, "Conversation not found");
 	}
+
+	const model = conv.model ?? defaultModel.name;
 
 	const json = await request.json();
 	const {
@@ -64,13 +67,20 @@ export async function POST({ request, fetch, locals, params }) {
 			message.id = crypto.randomUUID();
 		}
 	}
-	const prompt = buildPrompt(messages);
 
-	const randomEndpoint = modelEndpoint();
+	const modelInfo = models.find((m) => m.name === model);
+
+	if (!modelInfo) {
+		throw error(400, "Model not availalbe anymore");
+	}
+
+	const prompt = buildPrompt(messages, modelInfo);
+
+	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
 
-	const resp = await fetch(randomEndpoint.endpoint, {
+	const resp = await fetch(randomEndpoint.url, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
 			Authorization: randomEndpoint.authorization,
@@ -97,7 +107,16 @@ export async function POST({ request, fetch, locals, params }) {
 			generated_text = generated_text.slice(prompt.length);
 		}
 
-		generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
+		generated_text = trimSuffix(
+			trimPrefix(generated_text, "<|startoftext|>"),
+			PUBLIC_SEP_TOKEN
+		).trim();
+
+		for (const stop of [...(modelInfo?.parameters?.stop ?? []), "<|endoftext|>"]) {
+			if (generated_text.endsWith(stop)) {
+				generated_text = generated_text.slice(0, -stop.length).trim();
+			}
+		}
 
 		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
 
@@ -186,7 +205,7 @@ async function parseGeneratedText(
 	}
 
 	if (lastIndex === -1) {
-		console.error("Could not parse in last message");
+		console.error("Could not parse last message", message);
 	}
 
 	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);
