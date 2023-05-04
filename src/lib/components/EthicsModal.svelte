@@ -1,11 +1,9 @@
 <script lang="ts">
+	import { enhance } from "$app/forms";
+	import { base } from "$app/paths";
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import type { Settings } from "$lib/types/Settings";
-	import { updateSettings } from "$lib/updateSettings";
-
-	export let settings: Omit<Settings, "sessionId" | "createdAt" | "updatedAt">;
 </script>
 
 <Modal>
@@ -14,13 +12,11 @@
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="text-3xl mr-1.5" />HuggingChat
-			{#if typeof PUBLIC_VERSION !== "undefined"}
-				<div
-					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
-				>
-					v{PUBLIC_VERSION}
-				</div>
-			{/if}
+			<div
+				class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
+			>
+				v{PUBLIC_VERSION}
+			</div>
 		</h2>
 		<p class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12">
 			This application is for demonstration purposes only.
@@ -32,13 +28,14 @@
 		<p class="px-2 text-sm text-gray-500">
 			Your conversations will be shared with model authors unless you disable it from your settings.
 		</p>
-		<!-- The updateSettings call will invalidate the settings, which will reload the page without the modal -->
-		<button
-			type="button"
-			on:click={() => updateSettings({ ...settings, ethicsModalAccepted: true })}
-			class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
-		>
-			Start chatting
-		</button>
+		<form action="{base}/settings" use:enhance method="POST">
+			<input type="hidden" name="ethicsModalAccepted" value={true} />
+			<button
+				type="submit"
+				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+			>
+				Start chatting
+			</button>
+		</form>
 	</div>
 </Modal>
