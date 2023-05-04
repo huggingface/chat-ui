@@ -7,14 +7,15 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import { randomUUID } from "$lib/utils/randomUuid";
+	import type { Model } from "$lib/types/Model";
 
 	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
 	export let messages: Message[];
 	export let loading: boolean;
 	export let pending: boolean;
-	export let currentModel: { name: string; displayName: string };
-	export let models: any;
+	export let currentModel: Model;
+	export let models: Model[];
 
 	let chatContainer: HTMLElement;
 

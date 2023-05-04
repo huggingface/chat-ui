@@ -8,13 +8,14 @@
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
+	import type { Model } from "$lib/types/Model";
 
 	export let messages: Message[] = [];
 	export let disabled = false;
 	export let loading = false;
 	export let pending = false;
-	export let currentModel: { name: string; displayName: string };
-	export let models: any;
+	export let currentModel: Model;
+	export let models: Model[];
 
 	let message: string;
 
