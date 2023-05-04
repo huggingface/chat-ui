@@ -4,12 +4,12 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import { updateSettings } from "$lib/updateSettings";
 	import CarbonClose from "~icons/carbon/close";
-	import CarbonEarth from "~icons/carbon/earth";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
+	import ModelCardMetadata from "./ModelCardMetadata.svelte";
+	import type { Model } from "$lib/types/Model";
 
-	export let currentModel: { name: string; displayName: string };
-	export let models: Array<{ name: string; displayName: string }>;
+	export let currentModel: Model;
+	export let models: Array<Model>;
 
 	let selectedModelName = currentModel.name;
 
@@ -57,41 +57,12 @@
 							<span class="text-xs text-[#9FA8B5]">A good alternative to ChatGPT</span>
 						</span>
 						<CarbonCheckmark
-							class="-mr-1 -mt-1 ml-auto text-xl {model.name === selectedModelName
+							class="-mr-1 -mt-1 ml-auto shrink-0 text-xl {model.name === selectedModelName
 								? 'text-yellow-400'
 								: 'text-transparent group-hover:text-gray-200'}"
 						/>
 					</label>
-					<div
-						class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-800 dark:bg-gray-100 dark:text-gray-600"
-					>
-						<a
-							href="https://huggingface.co/OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5"
-							target="_blank"
-							rel="noreferrer"
-							class="flex items-center hover:underline"
-							><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-							Model
-							<div class="max-sm:hidden">&nbsp;page</div></a
-						>
-						<a
-							href="https://huggingface.co/datasets/OpenAssistant/oasst1"
-							target="_blank"
-							rel="noreferrer"
-							class="flex items-center hover:underline"
-							><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-							Dataset
-							<div class="max-sm:hidden">&nbsp;page</div></a
-						>
-						<a
-							href="https://open-assistant.io/"
-							target="_blank"
-							class="ml-auto flex items-center hover:underline"
-							rel="noreferrer"
-							><CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
-							Open Assistant Website</a
-						>
-					</div>
+					<ModelCardMetadata modelUrl={model.modelUrl} datasetUrl={model.datasetUrl} websiteUrl={model.websiteUrl} />
 				</div>
 			{/each}
 		</div>

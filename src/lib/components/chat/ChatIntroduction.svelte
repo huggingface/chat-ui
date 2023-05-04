@@ -7,9 +7,11 @@
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import ModelsModal from "../ModelsModal.svelte";
+	import type { Model } from "$lib/types/Model";
+	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 
-	export let currentModel: { name: string; displayName: string };
-	export let models: Array<{ name: string; displayName: string }>;
+	export let currentModel: Model;
+	export let models: Array<Model>;
 
 	let isModelsModalOpen = false;
 
@@ -60,39 +62,12 @@
 					><IconChevron /></button
 				>
 			</div>
-			<div
-				class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-			>
-				<a
-					href="https://huggingface.co/{currentModel.name}"
-					target="_blank"
-					rel="noreferrer"
-					class="flex items-center hover:underline"
-				>
-					<CarbonArrowUpRight class="mr-1.5 text-xs text-gray-400" />
-					Model
-					<div class="max-sm:hidden">&nbsp;page</div>
-				</a>
-				<a
-					href="https://huggingface.co/datasets/OpenAssistant/oasst1"
-					target="_blank"
-					rel="noreferrer"
-					class="flex items-center hover:underline"
-				>
-					<CarbonArrowUpRight class="mr-1.5 text-xs text-gray-400" />
-					Dataset
-					<div class="max-sm:hidden">&nbsp;page</div>
-				</a>
-				<a
-					href="https://open-assistant.io/"
-					target="_blank"
-					class="ml-auto flex items-center hover:underline"
-					rel="noreferrer"
-				>
-					<CarbonEarth class="mr-1.5 text-xs text-gray-400" />
-					Open Assistant Website
-				</a>
-			</div>
+			<ModelCardMetadata
+				variant="dark"
+				modelUrl={currentModel.modelUrl}
+				datasetUrl={currentModel.datasetUrl}
+				websiteUrl={currentModel.websiteUrl}
+			/>
 		</div>
 	</div>
 	{#if PUBLIC_DISABLE_INTRO_TILES !== "true"}
