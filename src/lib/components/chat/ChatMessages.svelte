@@ -7,13 +7,17 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import { randomUUID } from "$lib/utils/randomUuid";
+	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../../routes/$types";
 
 	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
 	export let messages: Message[];
 	export let loading: boolean;
 	export let pending: boolean;
-	export let currentModel: { name: string; displayName: string };
+	export let currentModel: Model;
+	export let settings: LayoutData["settings"];
+	export let models: Model[] | undefined;
 
 	let chatContainer: HTMLElement;
 
@@ -41,7 +45,9 @@
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
 			/>
 		{:else}
-			<ChatIntroduction on:message {currentModel} />
+			{#if models}
+				<ChatIntroduction {settings} {models} {currentModel} on:message />
+			{/if}
 		{/each}
 		{#if pending}
 			<ChatMessage message={{ from: "assistant", content: "", id: randomUUID() }} />

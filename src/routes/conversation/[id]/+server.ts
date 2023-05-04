@@ -1,9 +1,9 @@
-import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt.js";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
 import { abortedGenerations } from "$lib/server/abortedGenerations.js";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
-import { defaultModel } from "$lib/server/models.js";
+import { defaultModel, models } from "$lib/server/models.js";
 import type { Message } from "$lib/types/Message.js";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -67,7 +67,14 @@ export async function POST({ request, fetch, locals, params }) {
 			message.id = crypto.randomUUID();
 		}
 	}
-	const prompt = buildPrompt(messages);
+
+	const modelInfo = models.find((m) => m.name === model);
+
+	if (!modelInfo) {
+		throw error(400, "Model not availalbe anymore");
+	}
+
+	const prompt = buildPrompt(messages, modelInfo);
 
 	const randomEndpoint = modelEndpoint(model);
 
@@ -189,7 +196,7 @@ async function parseGeneratedText(
 	}
 
 	if (lastIndex === -1) {
-		console.error("Could not parse in last message");
+		console.error("Could not parse last message", message);
 	}
 
 	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);

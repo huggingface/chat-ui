@@ -7,7 +7,7 @@
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
-	import { PUBLIC_SEP_TOKEN } from "$env/static/public";
+	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 
 	function sanitizeMd(md: string) {
 		return md

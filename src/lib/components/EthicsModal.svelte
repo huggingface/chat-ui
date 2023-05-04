@@ -4,9 +4,9 @@
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import type { Settings } from "$lib/types/Settings";
+	import type { LayoutData } from "../../routes/$types";
 
-	export let settings: Omit<Settings, "sessionId" | "createdAt" | "updatedAt">;
+	export let settings: LayoutData["settings"];
 </script>
 
 <Modal>
