@@ -73,5 +73,6 @@
 			.finally(() => (loading = false))}
 	messages={data.messages}
 	currentModel={findCurrentModel(data.models, data.model)}
+	settings={data.settings}
 	{loading}
 />

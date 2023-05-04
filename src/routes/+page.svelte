@@ -47,4 +47,5 @@
 	{loading}
 	currentModel={findCurrentModel(data.models, data.settings.currentModel)}
 	models={data.models}
+	settings={data.settings}
 />

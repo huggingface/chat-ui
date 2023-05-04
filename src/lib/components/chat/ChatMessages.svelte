@@ -8,6 +8,7 @@
 	import ChatMessage from "./ChatMessage.svelte";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../../routes/$types";
 
 	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
@@ -15,6 +16,7 @@
 	export let loading: boolean;
 	export let pending: boolean;
 	export let currentModel: Model;
+	export let settings: LayoutData["settings"];
 	export let models: Model[] | undefined;
 
 	let chatContainer: HTMLElement;
@@ -44,7 +46,7 @@
 			/>
 		{:else}
 			{#if models}
-				<ChatIntroduction {models} {currentModel} on:message />
+				<ChatIntroduction {settings} {models} {currentModel} on:message />
 			{/if}
 		{/each}
 		{#if pending}

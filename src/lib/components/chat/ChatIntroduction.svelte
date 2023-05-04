@@ -7,8 +7,10 @@
 	import ModelsModal from "../ModelsModal.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
+	import type { LayoutData } from "../../../routes/$types";
 
 	export let currentModel: Model;
+	export let settings: LayoutData["settings"];
 	export let models: Model[];
 
 	let isModelsModalOpen = false;
@@ -43,7 +45,7 @@
 			>
 		</AnnouncementBanner>
 		{#if isModelsModalOpen}
-			<ModelsModal {currentModel} {models} on:close={() => (isModelsModalOpen = false)} />
+			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
 		{/if}
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="flex p-3">

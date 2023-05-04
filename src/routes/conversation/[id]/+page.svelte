@@ -173,4 +173,5 @@
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
 	currentModel={findCurrentModel(data.models, data.model)}
+	settings={data.settings}
 />
