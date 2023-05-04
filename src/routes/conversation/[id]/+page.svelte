@@ -4,14 +4,14 @@
 	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { textGenerationStream } from "@huggingface/inference";
+	import { textGenerationStream, type Options } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
+	import { findCurrentModel } from "$lib/utils/models.js";
 
 	export let data;
 
@@ -36,16 +36,7 @@
 				model: $page.url.href,
 				inputs,
 				parameters: {
-					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
-					temperature: 0.9,
-					top_p: 0.95,
-					repetition_penalty: 1.2,
-					top_k: 50,
-					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
-					// @ts-expect-error this param is not available in @huggingface/inference
-					watermark: false,
-					max_new_tokens: 1024,
-					stop: [PUBLIC_SEP_TOKEN],
+					...data.models.find((m) => m.name === data.model)?.parameters,
 					return_full_text: false,
 				},
 			},
@@ -53,7 +44,7 @@
 				id: messageId,
 				is_retry: isRetry,
 				use_cache: false,
-			}
+			} as Options
 		);
 
 		for await (const output of response) {
@@ -181,5 +172,6 @@
 	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
-	currentModel={data.models[0]}
+	currentModel={findCurrentModel(data.models, data.model)}
+	settings={data.settings}
 />

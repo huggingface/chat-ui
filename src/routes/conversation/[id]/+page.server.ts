@@ -29,5 +29,6 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		messages: conversation.messages,
 		title: conversation.title,
+		model: conversation.model,
 	};
 };

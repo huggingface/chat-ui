@@ -1,5 +1,5 @@
-import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
 import { defaultModel } from "$lib/server/models.js";
@@ -27,17 +27,10 @@ export async function POST({ params, locals, fetch }) {
 		`Please summarize the following message as a single sentence of less than 5 words:\n` +
 		firstMessage?.content;
 
-	const prompt = buildPrompt([{ from: "user", content: userPrompt }]);
+	const prompt = buildPrompt([{ from: "user", content: userPrompt }], defaultModel);
 
 	const parameters = {
-		temperature: 0.9,
-		top_p: 0.95,
-		repetition_penalty: 1.2,
-		top_k: 50,
-		watermark: false,
-		max_new_tokens: 1024,
-		truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
-		stop: [PUBLIC_SEP_TOKEN],
+		...defaultModel.parameters,
 		return_full_text: false,
 	};
 

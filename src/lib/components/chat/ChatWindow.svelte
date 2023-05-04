@@ -8,12 +8,16 @@
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
+	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../../routes/$types";
 
 	export let messages: Message[] = [];
 	export let disabled = false;
 	export let loading = false;
 	export let pending = false;
-	export let currentModel: { name: string; displayName: string };
+	export let currentModel: Model;
+	export let models: Model[] | undefined = undefined;
+	export let settings: LayoutData["settings"];
 
 	let message: string;
 
@@ -35,7 +39,9 @@
 	<ChatMessages
 		{loading}
 		{pending}
+		{settings}
 		{currentModel}
+		{models}
 		{messages}
 		on:message
 		on:retry={(ev) => {

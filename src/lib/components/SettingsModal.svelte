@@ -30,6 +30,9 @@
 		</div>
 
 		<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500">
+			{#each Object.entries(settings).filter(([k]) => k !== "shareConversationsWithModelAuthors") as [key, val]}
+				<input type="hidden" name={key} value={val} />
+			{/each}
 			<Switch
 				name="shareConversationsWithModelAuthors"
 				bind:checked={settings.shareConversationsWithModelAuthors}

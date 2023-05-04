@@ -10,9 +10,7 @@ export function modelEndpoint(model: string): {
 	authorization: string;
 	weight: number;
 } {
-	const modelDefinition = models.find(
-		(m) => m === model || (typeof m === "object" && m.name === model)
-	);
+	const modelDefinition = models.find((m) => m.name === model);
 	if (!modelDefinition) {
 		throw new Error(`Invalid model: ${model}`);
 	}
