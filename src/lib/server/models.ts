@@ -33,6 +33,3 @@ export const modelsPublicData: Model[] = models.map((m) =>
 		: { ...m, displayName: m.displayName ?? m.name, endpoints: undefined }
 );
 export const defaultModel = modelsPublicData[0];
-
-export const getCurrentModel = (name?: string) =>
-	modelsPublicData.find((m) => m.name === name) ?? defaultModel;

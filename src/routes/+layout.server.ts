@@ -2,7 +2,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { getCurrentModel, modelsPublicData } from "$lib/server/models";
+import { modelsPublicData } from "$lib/server/models";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
@@ -18,18 +18,24 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				sessionId: locals.sessionId,
 			})
 			.sort({ updatedAt: -1 })
-			.project<Pick<Conversation, "title" | "_id" | "updatedAt" | "createdAt">>({
+			.project<Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt">>({
 				title: 1,
 				_id: 1,
 				updatedAt: 1,
 				createdAt: 1,
 			})
-			.map((conv) => ({ id: conv._id.toString(), title: conv.title }))
+			.map((conv) => {
+				return {
+					id: conv._id.toString(),
+					title: conv.title,
+					model: conv.model ?? modelsPublicData[0].name,
+				};
+			})
 			.toArray(),
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			currentModel: getCurrentModel(settings?.activeModel),
+			currentModel: settings?.activeModel ?? modelsPublicData[0].name,
 		},
 		models: modelsPublicData,
 	};
