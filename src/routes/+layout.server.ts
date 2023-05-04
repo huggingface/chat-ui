@@ -15,7 +15,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url, request }) 
 
 	if (urlModel) {
 		try {
-			z.enum([models[0].name, ...models.slice(1).map((m) => m.name)]).safeParse(urlModel);
+			z.enum([models[0].name, ...models.slice(1).map((m) => m.name)]).parse(urlModel);
 
 			await collections.settings.updateOne(
 				{ sessionId: locals.sessionId },
