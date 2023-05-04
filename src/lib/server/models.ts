@@ -10,6 +10,7 @@ const modelsRaw = z
 			datasetName: z.string().min(1).optional(),
 			userMessageToken: z.string().min(1),
 			assistantMessageToken: z.string().min(1),
+			messageEndToken: z.string().min(1).optional(),
 			preprompt: z.string().default(""),
 			prepromptUrl: z.string().url().optional(),
 			promptExamples: z
@@ -34,7 +35,7 @@ const modelsRaw = z
 					temperature: z.number().min(0).max(1),
 					truncate: z.number().int().positive(),
 					max_new_tokens: z.number().int().positive(),
-					stop: z.array(z.string()).min(1).optional(),
+					stop: z.array(z.string()).optional(),
 				})
 				.passthrough(),
 		})

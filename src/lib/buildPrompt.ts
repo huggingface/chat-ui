@@ -17,10 +17,10 @@ export function buildPrompt(
 					(m.from === "user"
 						? model.userMessageToken + m.content
 						: model.assistantMessageToken + m.content) +
-					(model.parameters.stop
-						? m.content.endsWith(model.parameters.stop[0])
+					(model.messageEndToken
+						? m.content.endsWith(model.messageEndToken)
 							? ""
-							: model.parameters.stop[0]
+							: model.messageEndToken
 						: "")
 			)
 			.join("") + model.assistantMessageToken;

@@ -42,6 +42,7 @@
 			<ChatMessage
 				loading={loading && i === messages.length - 1}
 				{message}
+				model={currentModel}
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
 			/>
 		{:else}
@@ -50,7 +51,10 @@
 			{/if}
 		{/each}
 		{#if pending}
-			<ChatMessage message={{ from: "assistant", content: "", id: randomUUID() }} />
+			<ChatMessage
+				message={{ from: "assistant", content: "", id: randomUUID() }}
+				model={currentModel}
+			/>
 		{/if}
 		<div class="h-32 flex-none" />
 	</div>
