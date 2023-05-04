@@ -1,10 +1,10 @@
 <script lang="ts">
 	import CarbonEarth from "~icons/carbon/earth";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import type { Model } from "$lib/types/Model";
 
-	export let modelUrl = "";
-	export let datasetUrl = "";
-	export let websiteUrl = "";
+	export let model: Pick<Model, "name" | "datasetName" | "websiteUrl">;
+
 	export let variant: "light" | "dark" = "light";
 </script>
 
@@ -14,23 +14,29 @@
 		? 'text-gray-600 dark:bg-gray-800 dark:text-gray-300'
 		: 'text-gray-800 dark:bg-gray-100 dark:text-gray-600'}"
 >
-	{#if modelUrl}
-		<a href={modelUrl} target="_blank" rel="noreferrer" class="flex items-center hover:underline"
-			><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-			Model
-			<div class="max-sm:hidden">&nbsp;page</div></a
-		>
-	{/if}
-	{#if datasetUrl}
-		<a href={datasetUrl} target="_blank" rel="noreferrer" class="flex items-center hover:underline"
+	<a
+		href="https://huggingface.co/datasets/{model.name}"
+		target="_blank"
+		rel="noreferrer"
+		class="flex items-center hover:underline"
+		><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+		Model
+		<div class="max-sm:hidden">&nbsp;page</div></a
+	>
+	{#if model.datasetName}
+		<a
+			href="https://huggingface.co/datasets/{model.datasetName}"
+			target="_blank"
+			rel="noreferrer"
+			class="flex items-center hover:underline"
 			><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
 			Dataset
 			<div class="max-sm:hidden">&nbsp;page</div></a
 		>
 	{/if}
-	{#if websiteUrl}
+	{#if model.websiteUrl}
 		<a
-			href={websiteUrl}
+			href={model.websiteUrl}
 			target="_blank"
 			class="ml-auto flex items-center hover:underline"
 			rel="noreferrer"

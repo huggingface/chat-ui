@@ -2,7 +2,7 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
-import { defaultModel, modelsPublicData } from "$lib/server/models";
+import { defaultModel, models } from "$lib/server/models";
 
 export const actions = {
 	default: async function ({ request, locals }) {
@@ -13,7 +13,7 @@ export const actions = {
 				shareConversationsWithModelAuthors: z.boolean({ coerce: true }).default(true),
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
 				activeModel: z
-					.enum([modelsPublicData[0].name, ...modelsPublicData.slice(1).map((m) => m.name)])
+					.enum([models[0].name, ...models.slice(1).map((m) => m.name)])
 					.default(defaultModel.name),
 			})
 			.parse({

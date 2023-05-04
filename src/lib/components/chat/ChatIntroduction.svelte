@@ -2,8 +2,6 @@
 	import { PUBLIC_DISABLE_INTRO_TILES, PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
-	import CarbonEarth from "~icons/carbon/earth";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import ModelsModal from "../ModelsModal.svelte";
@@ -11,7 +9,7 @@
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 
 	export let currentModel: Model;
-	export let models: Array<Model>;
+	export let models: Model[];
 
 	let isModelsModalOpen = false;
 
@@ -60,12 +58,7 @@
 					><IconChevron /></button
 				>
 			</div>
-			<ModelCardMetadata
-				variant="dark"
-				modelUrl={currentModel.modelUrl}
-				datasetUrl={currentModel.datasetUrl}
-				websiteUrl={currentModel.websiteUrl}
-			/>
+			<ModelCardMetadata variant="dark" model={currentModel} />
 		</div>
 	</div>
 	{#if PUBLIC_DISABLE_INTRO_TILES !== "true"}

@@ -1,10 +1,5 @@
-import {
-	PUBLIC_ASSISTANT_MESSAGE_TOKEN,
-	PUBLIC_MAX_INPUT_TOKENS,
-	PUBLIC_PREPROMPT,
-	PUBLIC_SEP_TOKEN,
-	PUBLIC_USER_MESSAGE_TOKEN,
-} from "$env/static/public";
+import { PUBLIC_SEP_TOKEN } from "$env/static/public";
+import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 
 /**
@@ -12,22 +7,24 @@ import type { Message } from "./types/Message";
  *
  * <|assistant|>hi<|endoftext|><|prompter|>hello<|endoftext|><|assistant|>
  */
-export function buildPrompt(messages: Pick<Message, "from" | "content">[]): string {
+export function buildPrompt(
+	messages: Pick<Message, "from" | "content">[],
+	model: BackendModel
+): string {
 	const prompt =
 		messages
 			.map(
 				(m) =>
 					(m.from === "user"
-						? PUBLIC_USER_MESSAGE_TOKEN + m.content
-						: PUBLIC_ASSISTANT_MESSAGE_TOKEN + m.content) +
+						? model.userMessageToken + m.content
+						: model.assistantMessageToken + m.content) +
 					(m.content.endsWith(PUBLIC_SEP_TOKEN) ? "" : PUBLIC_SEP_TOKEN)
 			)
-			.join("") + PUBLIC_ASSISTANT_MESSAGE_TOKEN;
+			.join("") + model.assistantMessageToken;
 
 	// Not super precise, but it's truncated in the model's backend anyway
 	return (
-		PUBLIC_PREPROMPT +
-		"\n-----\n" +
-		prompt.split(" ").slice(-parseInt(PUBLIC_MAX_INPUT_TOKENS)).join(" ")
+		model.preprompt +
+		(model.maxInputTokens ? prompt.split(" ").slice(-model.maxInputTokens).join(" ") : prompt)
 	);
 }

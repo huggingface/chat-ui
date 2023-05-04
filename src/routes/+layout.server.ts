@@ -2,7 +2,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { defaultModel, modelsPublicData } from "$lib/server/models";
+import { defaultModel, models } from "$lib/server/models";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
@@ -35,6 +35,11 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			currentModel: settings?.activeModel ?? defaultModel,
 		},
-		models: modelsPublicData,
+		models: models.map((model) => ({
+			name: model.name,
+			websiteUrl: model.websiteUrl,
+			datasetName: model.datasetName,
+			displayName: model.displayName,
+		})),
 	};
 };
