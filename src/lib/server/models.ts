@@ -32,10 +32,10 @@ const modelsRaw = z
 	.parse(JSON.parse(MODELS));
 
 export const models = await Promise.all(
-	modelsRaw.map((m) => ({
+	modelsRaw.map(async (m) => ({
 		...m,
 		displayName: m.displayName || m.name,
-		preprompt: m.prepromptUrl ? fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
+		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	}))
 );
 

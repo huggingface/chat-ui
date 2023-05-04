@@ -13,12 +13,15 @@ export function buildPrompt(
 ): string {
 	const prompt =
 		messages
-			.map(
-				(m) =>
-					(m.from === "user"
-						? model.userMessageToken + m.content
-						: model.assistantMessageToken + m.content) +
-					(m.content.endsWith(PUBLIC_SEP_TOKEN) ? "" : PUBLIC_SEP_TOKEN)
+			.map((m) =>
+				(m.from === "user"
+					? model.userMessageToken + m.content
+					: // todo: fix, remove this hack
+					  model.assistantMessageToken + m.content) + model.name.includes("OpenAssistant")
+					? m.content.endsWith(PUBLIC_SEP_TOKEN)
+						? ""
+						: PUBLIC_SEP_TOKEN
+					: ""
 			)
 			.join("") + model.assistantMessageToken;
 
