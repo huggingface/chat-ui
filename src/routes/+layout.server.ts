@@ -33,8 +33,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			activeModel:
-				url.searchParams.get("model") ?? settings?.activeModel ?? defaultModel.name,
+			activeModel: url.searchParams.get("model") ?? settings?.activeModel ?? defaultModel.name,
 		},
 		models: models.map((model) => ({
 			name: model.name,
