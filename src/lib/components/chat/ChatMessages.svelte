@@ -2,17 +2,12 @@
 	import type { Message } from "$lib/types/Message";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import ScrollToBottomBtn from "$lib/components/ScrollToBottomBtn.svelte";
-	import { createEventDispatcher, tick } from "svelte";
-
-	import ChatIntroduction from "./ChatIntroduction.svelte";
-	import ChatMessage from "./ChatMessage.svelte";
+	import { tick } from "svelte";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
-
-	const dispatch = createEventDispatcher<{
-		retry: { id: Message["id"]; content: string };
-	}>();
+	import ChatIntroduction from "./ChatIntroduction.svelte";
+	import ChatMessage from "./ChatMessage.svelte";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -45,7 +40,7 @@
 				loading={loading && i === messages.length - 1}
 				{message}
 				model={currentModel}
-				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
+				on:retry
 				on:vote
 			/>
 		{:else}

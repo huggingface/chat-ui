@@ -21,6 +21,10 @@ export async function POST({ params, request, locals }) {
 		throw error(404, "Conversation not found");
 	}
 
+	if (!conversation.messages.find((message) => message.id === messageId)) {
+		throw error(404, "Message not found");
+	}
+
 	const messages = conversation.messages.map((message) => {
 		if (message.id === messageId) {
 			return {
