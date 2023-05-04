@@ -135,7 +135,7 @@
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
 	{/if}
 	{#if !data.settings.ethicsModalAcceptedAt}
-		<EthicsModal />
+		<EthicsModal settings={data.settings} />
 	{/if}
 	<slot />
 </div>

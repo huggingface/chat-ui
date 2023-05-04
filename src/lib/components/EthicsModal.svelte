@@ -4,6 +4,9 @@
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
+	import type { Settings } from "$lib/types/Settings";
+
+	export let settings: Omit<Settings, "sessionId" | "createdAt" | "updatedAt">;
 </script>
 
 <Modal>
@@ -30,6 +33,9 @@
 		</p>
 		<form action="{base}/settings" use:enhance method="POST">
 			<input type="hidden" name="ethicsModalAccepted" value={true} />
+			{#each Object.entries(settings) as [key, val]}
+				<input type="hidden" name={key} value={val} />
+			{/each}
 			<button
 				type="submit"
 				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
