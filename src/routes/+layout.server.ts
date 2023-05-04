@@ -8,7 +8,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
 
 	depends(UrlDependency.ConversationList);
-	depends(UrlDependency.Settings);
 
 	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
 
