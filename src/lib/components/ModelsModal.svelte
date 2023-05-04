@@ -13,7 +13,7 @@
 	export let settings: LayoutData["settings"];
 	export let models: Array<Model>;
 
-	let selectedModelName = settings.currentModel;
+	let selectedModelName = settings.activeModel;
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 </script>

@@ -4,7 +4,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models } from "$lib/server/models";
 
-export const load: LayoutServerLoad = async ({ locals, depends }) => {
+export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
 
 	depends(UrlDependency.ConversationList);
@@ -33,7 +33,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			currentModel: settings?.activeModel ?? defaultModel.name,
+			activeModel:
+				url.searchParams.get("activeModel") ?? settings?.activeModel ?? defaultModel.name,
 		},
 		models: models.map((model) => ({
 			name: model.name,

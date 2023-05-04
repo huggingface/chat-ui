@@ -16,7 +16,7 @@
 
 	let isModelsModalOpen = false;
 
-	$: currentModelMetadata = findCurrentModel(models, settings.currentModel);
+	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>

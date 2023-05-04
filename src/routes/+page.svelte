@@ -17,7 +17,7 @@
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ model: data.settings.currentModel }),
+				body: JSON.stringify({ model: data.settings.activeModel }),
 			});
 
 			if (!res.ok) {
@@ -45,7 +45,7 @@
 <ChatWindow
 	on:message={(ev) => createConversation(ev.detail)}
 	{loading}
-	currentModel={findCurrentModel(data.models, data.settings.currentModel)}
+	currentModel={findCurrentModel(data.models, data.settings.activeModel)}
 	models={data.models}
 	settings={data.settings}
 />
