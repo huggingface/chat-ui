@@ -26,7 +26,7 @@
 		}}
 		class="flex w-full flex-col gap-5 p-6"
 	>
-		{#each Object.entries(settings).filter((settings) => settings[0] !== "currentModel") as [key, val]}
+		{#each Object.entries(settings).filter((settings) => settings[0] !== "activeModel") as [key, val]}
 			<input type="hidden" name={key} value={val} />
 		{/each}
 		<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
@@ -47,7 +47,7 @@
 						<input
 							type="radio"
 							class="sr-only"
-							name="models"
+							name="activeModel"
 							value={model.name}
 							bind:group={selectedModelName}
 						/>

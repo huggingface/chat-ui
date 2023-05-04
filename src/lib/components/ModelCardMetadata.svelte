@@ -40,8 +40,9 @@
 			target="_blank"
 			class="ml-auto flex items-center hover:underline"
 			rel="noreferrer"
-			><CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
-			Open Assistant Website</a
 		>
+			<CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
+			Website
+		</a>
 	{/if}
 </div>
