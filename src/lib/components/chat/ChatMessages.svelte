@@ -15,7 +15,7 @@
 	export let loading: boolean;
 	export let pending: boolean;
 	export let currentModel: Model;
-	export let models: Model[];
+	export let models: Model[] | undefined;
 
 	let chatContainer: HTMLElement;
 
@@ -43,7 +43,9 @@
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
 			/>
 		{:else}
-			<ChatIntroduction {models} {currentModel} on:message />
+			{#if models}
+				<ChatIntroduction {models} {currentModel} on:message />
+			{/if}
 		{/each}
 		{#if pending}
 			<ChatMessage message={{ from: "assistant", content: "", id: randomUUID() }} />

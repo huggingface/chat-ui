@@ -16,7 +16,7 @@
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ model: data.models[0].name }),
+				body: JSON.stringify({ model: data.settings.currentModel.name }),
 			});
 
 			if (!res.ok) {

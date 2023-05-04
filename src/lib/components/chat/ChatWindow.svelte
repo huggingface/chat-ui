@@ -15,7 +15,7 @@
 	export let loading = false;
 	export let pending = false;
 	export let currentModel: Model;
-	export let models: Model[];
+	export let models: Model[] | undefined = undefined;
 
 	let message: string;
 
