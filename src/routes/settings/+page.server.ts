@@ -7,13 +7,9 @@ export const actions = {
 	default: async function ({ request, locals }) {
 		const formData = await request.formData();
 
-		const existingSettings = await collections.settings.findOne({ sessionId: locals.sessionId });
-
 		const { ethicsModalAccepted, ...settings } = z
 			.object({
-				shareConversationsWithModelAuthors: z
-					.boolean({ coerce: true })
-					.default(existingSettings?.shareConversationsWithModelAuthors ?? true),
+				shareConversationsWithModelAuthors: z.boolean({ coerce: true }).default(true),
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
 			})
 			.parse({
