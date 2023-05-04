@@ -2,7 +2,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { modelNames } from "$lib/server/models";
+import { getCurrentModel, modelsPublicData } from "$lib/server/models";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
@@ -29,10 +29,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			currentModel:
-				modelNames.find((modelName) => modelName.name === settings?.activeModelName) ??
-				modelNames[0],
+			currentModel: getCurrentModel(settings?.activeModelName),
 		},
-		models: modelNames,
+		models: modelsPublicData,
 	};
 };
