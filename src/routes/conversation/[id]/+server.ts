@@ -107,7 +107,16 @@ export async function POST({ request, fetch, locals, params }) {
 			generated_text = generated_text.slice(prompt.length);
 		}
 
-		generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
+		generated_text = trimSuffix(
+			trimPrefix(generated_text, "<|startoftext|>"),
+			PUBLIC_SEP_TOKEN
+		).trim();
+
+		for (const stop of modelInfo?.parameters?.stop ?? []) {
+			if (generated_text.endsWith(stop)) {
+				generated_text = generated_text.slice(0, -stop.length).trim();
+			}
+		}
 
 		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
 
