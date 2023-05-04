@@ -196,7 +196,7 @@ async function parseGeneratedText(
 	}
 
 	if (lastIndex === -1) {
-		console.error("Could not parse in last message");
+		console.error("Could not parse last message", message);
 	}
 
 	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);
