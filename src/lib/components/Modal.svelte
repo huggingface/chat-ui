@@ -27,10 +27,7 @@
 	}
 
 	onMount(() => {
-		// Focus trap ("inert" only works on supported browsers)
-		if ("inert" in HTMLElement.prototype) {
-			document.getElementById("app")?.setAttribute("inert", "true");
-		}
+		document.getElementById("app")?.setAttribute("inert", "true");
 		modalEl.focus();
 	});
 
