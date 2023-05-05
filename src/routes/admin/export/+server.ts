@@ -99,6 +99,8 @@ export async function POST({ request }) {
 		},
 	});
 
+	console.log("Upload done");
+
 	await unlink(fileName);
 
 	return new Response();
