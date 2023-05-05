@@ -110,11 +110,11 @@ export async function POST({ request, fetch, locals, params }) {
 		generated_text = trimSuffix(
 			trimPrefix(generated_text, "<|startoftext|>"),
 			PUBLIC_SEP_TOKEN
-		).trim();
+		).trimEnd();
 
 		for (const stop of [...(modelInfo?.parameters?.stop ?? []), "<|endoftext|>"]) {
 			if (generated_text.endsWith(stop)) {
-				generated_text = generated_text.slice(0, -stop.length).trim();
+				generated_text = generated_text.slice(0, -stop.length).trimEnd();
 			}
 		}
 
