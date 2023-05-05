@@ -1,4 +1,3 @@
-import { base } from "$app/paths";
 import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
@@ -7,7 +6,7 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models } from "$lib/server/models";
 import { validateModel } from "$lib/utils/models";
 
-export const load: LayoutServerLoad = async ({ locals, depends, url, request }) => {
+export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
 	const urlModel = url.searchParams.get("model");
 
