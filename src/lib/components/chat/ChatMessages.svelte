@@ -12,6 +12,7 @@
 	export let messages: Message[];
 	export let loading: boolean;
 	export let pending: boolean;
+	export let isAuthor: boolean;
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
 	export let models: Model[] | undefined;
@@ -39,6 +40,7 @@
 			<ChatMessage
 				loading={loading && i === messages.length - 1}
 				{message}
+				{isAuthor}
 				model={currentModel}
 				on:retry
 				on:vote

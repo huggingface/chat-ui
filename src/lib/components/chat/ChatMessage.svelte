@@ -38,6 +38,7 @@
 	export let model: Model;
 	export let message: Message;
 	export let loading = false;
+	export let isAuthor = true;
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
@@ -109,9 +110,11 @@
 				{/each}
 			</div>
 		</div>
-		{#if !loading && message.id && message.content}
+		{#if isAuthor && !loading && message.content}
 			<div
-				class="absolute bottom-2 right-0 flex transition-opacity group-hover:visible group-hover:opacity-100 {message.score ? "" : "md:invisible"} md:opacity-0 lg:bottom-1"
+				class="absolute bottom-2 right-0 flex transition-opacity group-hover:visible group-hover:opacity-100 {message.score
+					? ''
+					: 'md:invisible'} md:opacity-0 lg:bottom-1"
 			>
 				<button
 					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300

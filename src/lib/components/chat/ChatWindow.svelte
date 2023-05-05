@@ -15,6 +15,7 @@
 	export let disabled = false;
 	export let loading = false;
 	export let pending = false;
+	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[] | undefined = undefined;
 	export let settings: LayoutData["settings"];
@@ -43,6 +44,7 @@
 		{currentModel}
 		{models}
 		{messages}
+		isAuthor={!shared}
 		on:message
 		on:vote
 		on:retry={(ev) => {
