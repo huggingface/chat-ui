@@ -7,9 +7,13 @@ import { collections } from "$lib/server/database.js";
 import type { Message } from "$lib/types/Message.js";
 import { error } from "@sveltejs/kit";
 import { pathToFileURL } from "node:url";
+import { unlink, writeFile } from "node:fs/promises";
 import { uploadFile } from "@huggingface/hub";
 import parquet from "parquetjs";
 import { z } from "zod";
+
+// Triger like this:
+// curl -X POST "http://localhost:5173/chat/admin/export" -H "Authorization: Bearer <PARQUET_EXPORT_SECRET>" -H "Content-Type: application/json" -d '{"model": "OpenAssistant/oasst-sft-6-llama-30b-xor"}'
 
 export async function POST({ request }) {
 	if (!PARQUET_EXPORT_SECRET || !PARQUET_EXPORT_DATASET || !PARQUET_EXPORT_HF_TOKEN) {
@@ -28,16 +32,24 @@ export async function POST({ request }) {
 
 	const schema = new parquet.ParquetSchema({
 		title: { type: "UTF8" },
-		created_at: { type: "TIME_MILLIS" },
-		updated_at: { type: "TIME_MILLIS" },
+		created_at: { type: "TIMESTAMP_MILLIS" },
+		updated_at: { type: "TIMESTAMP_MILLIS" },
 		messages: { repeated: true, fields: { from: { type: "UTF8" }, content: { type: "UTF8" } } },
 	});
 
-	const fileName = `"/tmp/conversations-${new Date()}.parquet`;
+	const fileName = `/tmp/conversations-${new Date().toJSON().slice(0, 10)}-${Date.now()}.parquet`;
 
 	const writer = await parquet.ParquetWriter.openFile(schema, fileName);
 
-	for await (const conversation of collections.settings.aggregate([
+	let count = 0;
+	console.log("Exporting conversations for model", model);
+
+	for await (const conversation of collections.settings.aggregate<{
+		title: string;
+		created_at: Date;
+		updated_at: Date;
+		messages: Message[];
+	}>([
 		{ $match: { shareConversationsWithModelAuthors: true } },
 		{
 			$lookup: {
@@ -67,9 +79,16 @@ export async function POST({ request }) {
 				content: message.content,
 			})),
 		});
+		++count;
+
+		if (count % 1_000 === 0) {
+			console.log("Exported", count, "conversations");
+		}
 	}
 
 	await writer.close();
+
+	console.log("Uploading", fileName, "to Hugging Face Hub");
 
 	await uploadFile({
 		file: pathToFileURL(fileName),
@@ -79,6 +98,8 @@ export async function POST({ request }) {
 			name: PARQUET_EXPORT_DATASET,
 		},
 	});
+
+	await unlink(fileName);
 
 	return new Response();
 }

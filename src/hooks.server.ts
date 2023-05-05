@@ -14,7 +14,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	event.locals.sessionId = token || crypto.randomUUID();
 
-	if (event.request.method === "POST" && !event.url.pathname.startsWith(`${base}/settings`)) {
+	if (
+		event.request.method === "POST" &&
+		!event.url.pathname.startsWith(`${base}/settings`) &&
+		!event.url.pathname.startsWith(`${base}/admin`)
+	) {
 		const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 			sessionId: event.locals.sessionId,
 			ethicsModalAcceptedAt: { $exists: true },
