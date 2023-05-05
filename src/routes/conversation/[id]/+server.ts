@@ -3,7 +3,7 @@ import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
 import { abortedGenerations } from "$lib/server/abortedGenerations.js";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
-import { defaultModel, models } from "$lib/server/models.js";
+import { models } from "$lib/server/models.js";
 import type { Message } from "$lib/types/Message.js";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -28,7 +28,11 @@ export async function POST({ request, fetch, locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	const model = conv.model ?? defaultModel.name;
+	const model = models.find((m) => m.id === conv.model);
+
+	if (!model) {
+		throw error(400, "Model not availalbe anymore");
+	}
 
 	const json = await request.json();
 	const {
@@ -61,20 +65,7 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	// Todo: on-the-fly migration, remove later
-	for (const message of messages) {
-		if (!message.id) {
-			message.id = crypto.randomUUID();
-		}
-	}
-
-	const modelInfo = models.find((m) => m.name === model);
-
-	if (!modelInfo) {
-		throw error(400, "Model not availalbe anymore");
-	}
-
-	const prompt = buildPrompt(messages, modelInfo);
+	const prompt = buildPrompt(messages, model);
 
 	const randomEndpoint = modelEndpoint(model);
 
@@ -112,7 +103,7 @@ export async function POST({ request, fetch, locals, params }) {
 			PUBLIC_SEP_TOKEN
 		).trimEnd();
 
-		for (const stop of [...(modelInfo?.parameters?.stop ?? []), "<|endoftext|>"]) {
+		for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
 			if (generated_text.endsWith(stop)) {
 				generated_text = generated_text.slice(0, -stop.length).trimEnd();
 			}

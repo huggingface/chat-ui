@@ -20,7 +20,7 @@ export async function GET({ params }) {
 		throw error(404, "Message not found");
 	}
 
-	const model = models.find((m) => m.name === conv.model);
+	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
 		throw error(404, "Conversation model not found");
@@ -33,7 +33,7 @@ export async function GET({ params }) {
 			{
 				note: "This is a preview of the prompt that will be sent to the model when retrying the message. It may differ from what was sent in the past if the parameters have been updated since",
 				prompt,
-				model: model.name,
+				model: model.id,
 				parameters: {
 					...model.parameters,
 					return_full_text: false,

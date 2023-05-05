@@ -17,7 +17,7 @@ export const POST: RequestHandler = async (input) => {
 	const values = z
 		.object({
 			fromShare: z.string().optional(),
-			model: validateModel(models).default(defaultModel.name),
+			model: validateModel(models).default(defaultModel.id),
 		})
 		.parse(JSON.parse(body));
 
