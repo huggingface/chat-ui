@@ -18,7 +18,7 @@ export const actions = {
 			.parse({
 				shareConversationsWithModelAuthors: formData.get("shareConversationsWithModelAuthors"),
 				ethicsModalAccepted: formData.get("ethicsModalAccepted"),
-				activeModel: formData.get("activeModel") ?? defaultModel.name,
+				activeModel: formData.get("activeModel") ?? defaultModel.id,
 			});
 
 		await collections.settings.updateOne(

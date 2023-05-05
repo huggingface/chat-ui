@@ -50,9 +50,10 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		settings: {
 			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			activeModel: settings?.activeModel ?? defaultModel.name,
+			activeModel: settings?.activeModel ?? defaultModel.id,
 		},
 		models: models.map((model) => ({
+			id: model.id,
 			name: model.name,
 			websiteUrl: model.websiteUrl,
 			datasetName: model.datasetName,
