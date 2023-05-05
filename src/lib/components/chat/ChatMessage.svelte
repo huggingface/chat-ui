@@ -3,10 +3,12 @@
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
+	import { page } from "$app/stores";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
+	import CarbonDownload from "~icons/carbon/download";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
 
@@ -76,6 +78,9 @@
 			}, 600);
 		}
 	});
+
+	$: downloadLink =
+		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 </script>
 
 {#if message.from === "assistant"}
@@ -112,15 +117,28 @@
 		<div class="whitespace-break-spaces rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
 			{message.content.trim()}
 		</div>
-		{#if !loading && message.id}
-			<button
-				class="absolute right-0 top-3.5 cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-				title="Retry"
-				type="button"
-				on:click={() => dispatch("retry")}
-			>
-				<CarbonRotate360 />
-			</button>
+		{#if !loading}
+			<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
+				{#if downloadLink}
+					<a
+						class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
+						title="Download prompt and parameters"
+						type="button"
+						target="_blank"
+						href={downloadLink}
+					>
+						<CarbonDownload />
+					</a>
+				{/if}
+				<button
+					class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+					title="Retry"
+					type="button"
+					on:click={() => dispatch("retry")}
+				>
+					<CarbonRotate360 />
+				</button>
+			</div>
 		{/if}
 	</div>
 {/if}
