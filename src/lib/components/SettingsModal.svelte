@@ -13,7 +13,7 @@
 	const dispatch = createEventDispatcher<{ close: void }>();
 </script>
 
-<Modal>
+<Modal on:close>
 	<form
 		class="flex w-full flex-col gap-5 p-6"
 		use:enhance={() => {
@@ -24,7 +24,7 @@
 	>
 		<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
 			<h2>Settings</h2>
-			<button class="group" on:click={() => dispatch("close")}>
+			<button type="button" class="group" on:click={() => dispatch("close")}>
 				<CarbonClose class="text-gray-900 group-hover:text-gray-500" />
 			</button>
 		</div>

@@ -18,7 +18,7 @@
 	const dispatch = createEventDispatcher<{ close: void }>();
 </script>
 
-<Modal width="max-w-lg">
+<Modal width="max-w-lg" on:close>
 	<form
 		action="{base}/settings"
 		method="post"
