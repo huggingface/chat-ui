@@ -1,6 +1,6 @@
 ## Privacy
 
-> Last updated: April 28, 2023
+> Last updated: May 2nd, 2023
 
 In this `v0.1` of HuggingChat, users are not authenticated in any way, i.e. this app doesn't have access to your HF user account even if you're logged in to huggingface.co. The app is only using an anonymous session cookie. ❗️ Warning ❗️ this means if you switch browsers or clear cookies, you will currently lose your conversations.
 

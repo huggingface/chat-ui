@@ -8,16 +8,25 @@
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
-	import { PUBLIC_MODEL_ID, PUBLIC_MODEL_NAME } from "$env/static/public";
+	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../../routes/$types";
 
 	export let messages: Message[] = [];
-	export let disabled: boolean = false;
-	export let loading: boolean = false;
-	export let pending: boolean = false;
+	export let disabled = false;
+	export let loading = false;
+	export let pending = false;
+	export let currentModel: Model;
+	export let models: Model[] | undefined = undefined;
+	export let settings: LayoutData["settings"];
 
 	let message: string;
 
-	const dispatch = createEventDispatcher<{ message: string; share: void; stop: void }>();
+	const dispatch = createEventDispatcher<{
+		message: string;
+		share: void;
+		stop: void;
+		retry: { id: Message["id"]; content: string };
+	}>();
 
 	const handleSubmit = () => {
 		if (loading) return;
@@ -27,7 +36,18 @@
 </script>
 
 <div class="relative min-h-0 min-w-0">
-	<ChatMessages {loading} {pending} {messages} on:message />
+	<ChatMessages
+		{loading}
+		{pending}
+		{settings}
+		{currentModel}
+		{models}
+		{messages}
+		on:message
+		on:retry={(ev) => {
+			if (!loading) dispatch("retry", ev.detail);
+		}}
+	/>
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
@@ -46,7 +66,7 @@
 					bind:value={message}
 					on:submit={handleSubmit}
 					autofocus
-					maxRows={10}
+					maxRows={4}
 				/>
 				<button
 					class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
@@ -60,10 +80,10 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
-					href="https://huggingface.co/{PUBLIC_MODEL_ID}"
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
-					class="hover:underline">{PUBLIC_MODEL_NAME}</a
+					class="hover:underline">{currentModel.displayName}</a
 				> <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 				or false.
 			</p>

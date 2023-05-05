@@ -1,11 +1,11 @@
 <script lang="ts">
-	export let classNames: string = "";
+	export let classNames = "";
 </script>
 
 <svg
-	width="15"
-	height="8"
-	viewBox="0 0 15 8"
+	width="1em"
+	height="1em"
+	viewBox="0 0 15 6"
 	class={classNames}
 	fill="none"
 	xmlns="http://www.w3.org/2000/svg"

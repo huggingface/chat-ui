@@ -11,11 +11,24 @@ export const load: PageServerLoad = async (event) => {
 	});
 
 	if (!conversation) {
-		throw error(404, "Conversation not found");
+		const conversationExists =
+			(await collections.conversations.countDocuments({
+				_id: new ObjectId(event.params.id),
+			})) !== 0;
+
+		if (conversationExists) {
+			throw error(
+				403,
+				"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' feature instead."
+			);
+		}
+
+		throw error(404, "Conversation not found.");
 	}
 
 	return {
 		messages: conversation.messages,
 		title: conversation.title,
+		model: conversation.model,
 	};
 };

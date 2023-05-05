@@ -1,7 +1,7 @@
 <script lang="ts">
 	import CarbonPause from "~icons/carbon/pause-filled";
 
-	export let visible: boolean = false;
+	export let visible = false;
 	export let className = "";
 </script>
 

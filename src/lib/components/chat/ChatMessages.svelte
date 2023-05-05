@@ -2,14 +2,22 @@
 	import type { Message } from "$lib/types/Message";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import ScrollToBottomBtn from "$lib/components/ScrollToBottomBtn.svelte";
-	import { tick } from "svelte";
+	import { createEventDispatcher, tick } from "svelte";
 
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
+	import { randomUUID } from "$lib/utils/randomUuid";
+	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../../routes/$types";
+
+	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
 	export let messages: Message[];
 	export let loading: boolean;
 	export let pending: boolean;
+	export let currentModel: Model;
+	export let settings: LayoutData["settings"];
+	export let models: Model[] | undefined;
 
 	let chatContainer: HTMLElement;
 
@@ -19,7 +27,7 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	$: if (messages.at(-1)?.from === "user") {
+	$: if (messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
 </script>
@@ -31,12 +39,22 @@
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-5 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
-			<ChatMessage loading={loading && i === messages.length - 1} {message} />
+			<ChatMessage
+				loading={loading && i === messages.length - 1}
+				{message}
+				model={currentModel}
+				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
+			/>
 		{:else}
-			<ChatIntroduction on:message />
+			{#if models}
+				<ChatIntroduction {settings} {models} {currentModel} on:message />
+			{/if}
 		{/each}
 		{#if pending}
-			<ChatMessage message={{ from: "assistant", content: "" }} />
+			<ChatMessage
+				message={{ from: "assistant", content: "", id: randomUUID() }}
+				model={currentModel}
+			/>
 		{/if}
 		<div class="h-32 flex-none" />
 	</div>

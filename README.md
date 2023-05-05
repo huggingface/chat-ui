@@ -27,6 +27,36 @@ Default configuration is in `.env`. Put custom config and secrets in `.env.local
 
 Check out [.env](./.env) to see what needs to be set.
 
+Basically you need to create a `.env.local` with the following contents:
+
+```
+MONGODB_URL=<url to mongo, for example a free MongoDB Atlas sandbox instance>
+HF_ACCESS_TOKEN=<your HF access token from https://huggingface.co/settings/tokens>
+```
+
+## Duplicating to a Space
+
+Create a `DOTENV_LOCAL` secret to your space with the following contents:
+
+```
+MONGODB_URL=<url to mongo, for example a free MongoDB Atlas sandbox instance>
+HF_ACCESS_TOKEN=<your HF access token from https://huggingface.co/settings/tokens>
+```
+
+Where the contents in `<...>` are replaced by the MongoDB URL and your [HF Access Token](https://huggingface.co/settings/tokens).
+
+## Running Local Inference
+
+Both the example above use the HF Inference API or HF Endpoints API.
+
+If you want to run the model locally, you need to run this inference server locally: https://github.com/huggingface/text-generation-inference
+
+And add this to your `.env.local`:
+
+```
+MODELS=`[{"name": "...", "endpoints": [{"url": "127.0.0.1:8080/generate_stream"}]}]`
+```
+
 ## Building
 
 To create a production version of your app:

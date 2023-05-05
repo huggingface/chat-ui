@@ -1,15 +1,17 @@
 <script lang="ts">
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { textGenerationStream } from "@huggingface/inference";
+	import { textGenerationStream, type Options } from "@huggingface/inference";
 	import { invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { PUBLIC_MAX_INPUT_TOKENS, PUBLIC_SEP_TOKEN } from "$env/static/public";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { error } from "$lib/stores/errors";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+	import { randomUUID } from "$lib/utils/randomUuid";
+	import { findCurrentModel } from "$lib/utils/models.js";
 
 	export let data;
 
@@ -26,7 +28,7 @@
 	let loading = false;
 	let pending = false;
 
-	async function getTextGenerationStream(inputs: string) {
+	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
 		let conversationId = $page.params.id;
 
 		const response = textGenerationStream(
@@ -34,28 +36,21 @@
 				model: $page.url.href,
 				inputs,
 				parameters: {
-					// Taken from https://huggingface.co/spaces/huggingface/open-assistant-private-testing/blob/main/app.py#L54
-					temperature: 0.9,
-					top_p: 0.95,
-					repetition_penalty: 1.2,
-					top_k: 50,
-					// @ts-ignore
-					truncate: parseInt(PUBLIC_MAX_INPUT_TOKENS),
-					watermark: false,
-					max_new_tokens: 1024,
-					stop: [PUBLIC_SEP_TOKEN],
+					...data.models.find((m) => m.name === data.model)?.parameters,
 					return_full_text: false,
 				},
 			},
 			{
+				id: messageId,
+				is_retry: isRetry,
 				use_cache: false,
-			}
+			} as Options
 		);
 
-		for await (const data of response) {
+		for await (const output of response) {
 			pending = false;
 
-			if (!data) {
+			if (!output) {
 				break;
 			}
 
@@ -75,23 +70,28 @@
 			}
 
 			// final message
-			if (data.generated_text) {
-				const lastMessage = messages.at(-1);
+			if (output.generated_text) {
+				const lastMessage = messages[messages.length - 1];
+
 				if (lastMessage) {
-					lastMessage.content = data.generated_text;
+					lastMessage.content = output.generated_text;
 					messages = [...messages];
 				}
 				break;
 			}
 
-			if (!data.token.special) {
-				const lastMessage = messages.at(-1);
+			if (!output.token.special) {
+				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage?.from !== "assistant") {
 					// First token has a space at the beginning, trim it
-					messages = [...messages, { from: "assistant", content: data.token.text.trimStart() }];
+					messages = [
+						...messages,
+						// id doesn't match the backend id but it's not important for assistant messages
+						{ from: "assistant", content: output.token.text.trimStart(), id: randomUUID() },
+					];
 				} else {
-					lastMessage.content += data.token.text;
+					lastMessage.content += output.token.text;
 					messages = [...messages];
 				}
 			}
@@ -104,7 +104,7 @@
 		});
 	}
 
-	async function writeMessage(message: string) {
+	async function writeMessage(message: string, messageId = randomUUID()) {
 		if (!message.trim()) return;
 
 		try {
@@ -112,9 +112,18 @@
 			loading = true;
 			pending = true;
 
-			messages = [...messages, { from: "user", content: message }];
+			let retryMessageIndex = messages.findIndex((msg) => msg.id === messageId);
+			const isRetry = retryMessageIndex !== -1;
+			if (!isRetry) {
+				retryMessageIndex = messages.length;
+			}
 
-			await getTextGenerationStream(message);
+			messages = [
+				...messages.slice(0, retryMessageIndex),
+				{ from: "user", content: message, id: messageId },
+			];
+
+			await getTextGenerationStream(message, messageId, isRetry);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
@@ -124,8 +133,13 @@
 				await invalidate(UrlDependency.ConversationList);
 			}
 		} catch (err) {
-			// TODO: Should prob check if this is really a TooManyRequests error
-			$error = "Too much traffic, please try again.";
+			if (err instanceof Error && err.message.includes("overloaded")) {
+				$error = "Too much traffic, please try again.";
+			} else if (err instanceof Error) {
+				$error = err.message;
+			} else {
+				$error = ERROR_MESSAGES.default;
+			}
 			console.error(err);
 		} finally {
 			loading = false;
@@ -135,9 +149,11 @@
 	onMount(async () => {
 		if ($pendingMessage) {
 			const val = $pendingMessage;
+			const messageId = $pendingMessageIdToRetry || undefined;
 			$pendingMessage = "";
+			$pendingMessageIdToRetry = null;
 
-			writeMessage(val);
+			writeMessage(val, messageId);
 		}
 	});
 
@@ -153,6 +169,9 @@
 	{pending}
 	{messages}
 	on:message={(message) => writeMessage(message.detail)}
+	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
+	currentModel={findCurrentModel(data.models, data.model)}
+	settings={data.settings}
 />

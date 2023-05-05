@@ -1,8 +1,9 @@
-import { PUBLIC_SEP_TOKEN } from "$env/static/public";
 import { buildPrompt } from "$lib/buildPrompt.js";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
 import { abortedGenerations } from "$lib/server/abortedGenerations.js";
 import { collections } from "$lib/server/database.js";
 import { modelEndpoint } from "$lib/server/modelEndpoint.js";
+import { defaultModel, models } from "$lib/server/models.js";
 import type { Message } from "$lib/types/Message.js";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -27,17 +28,59 @@ export async function POST({ request, fetch, locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	// Todo: validate prompt with zod? or aktype
+	const model = conv.model ?? defaultModel.name;
+
 	const json = await request.json();
+	const {
+		inputs: newPrompt,
+		options: { id: messageId, is_retry },
+	} = z
+		.object({
+			inputs: z.string().trim().min(1),
+			options: z.object({
+				id: z.optional(z.string().uuid()),
+				is_retry: z.optional(z.boolean()),
+			}),
+		})
+		.parse(json);
 
-	const messages = [...conv.messages, { from: "user", content: json.inputs }] satisfies Message[];
-	const prompt = buildPrompt(messages);
+	const messages = (() => {
+		if (is_retry && messageId) {
+			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
+			if (retryMessageIdx === -1) {
+				retryMessageIdx = conv.messages.length;
+			}
+			return [
+				...conv.messages.slice(0, retryMessageIdx),
+				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
+			];
+		}
+		return [
+			...conv.messages,
+			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
+		];
+	})() satisfies Message[];
 
-	const randomEndpoint = modelEndpoint();
+	// Todo: on-the-fly migration, remove later
+	for (const message of messages) {
+		if (!message.id) {
+			message.id = crypto.randomUUID();
+		}
+	}
+
+	const modelInfo = models.find((m) => m.name === model);
+
+	if (!modelInfo) {
+		throw error(400, "Model not availalbe anymore");
+	}
+
+	const prompt = buildPrompt(messages, modelInfo);
+
+	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
 
-	const resp = await fetch(randomEndpoint.endpoint, {
+	const resp = await fetch(randomEndpoint.url, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
 			Authorization: randomEndpoint.authorization,
@@ -50,7 +93,11 @@ export async function POST({ request, fetch, locals, params }) {
 		signal: abortController.signal,
 	});
 
-	const [stream1, stream2] = resp.body!.tee();
+	if (!resp.body) {
+		throw new Error("Response body is empty");
+	}
+
+	const [stream1, stream2] = resp.body.tee();
 
 	async function saveMessage() {
 		let generated_text = await parseGeneratedText(stream2, convId, date, abortController);
@@ -60,9 +107,18 @@ export async function POST({ request, fetch, locals, params }) {
 			generated_text = generated_text.slice(prompt.length);
 		}
 
-		generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
+		generated_text = trimSuffix(
+			trimPrefix(generated_text, "<|startoftext|>"),
+			PUBLIC_SEP_TOKEN
+		).trim();
 
-		messages.push({ from: "assistant", content: generated_text });
+		for (const stop of [...(modelInfo?.parameters?.stop ?? []), "<|endoftext|>"]) {
+			if (generated_text.endsWith(stop)) {
+				generated_text = generated_text.slice(0, -stop.length).trim();
+			}
+		}
+
+		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
 
 		await collections.conversations.updateOne(
 			{
@@ -149,7 +205,7 @@ async function parseGeneratedText(
 	}
 
 	if (lastIndex === -1) {
-		console.error("Could not parse in last message");
+		console.error("Could not parse last message", message);
 	}
 
 	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);
@@ -157,7 +213,13 @@ async function parseGeneratedText(
 		lastMessage = lastMessage.slice(0, lastMessage.indexOf("\n"));
 	}
 
-	const res = JSON.parse(lastMessage).generated_text;
+	const lastMessageJSON = JSON.parse(lastMessage);
+
+	if (lastMessageJSON.error) {
+		throw new Error(lastMessageJSON.error);
+	}
+
+	const res = lastMessageJSON.generated_text;
 
 	if (typeof res !== "string") {
 		throw new Error("Could not parse generated text");
@@ -166,8 +228,10 @@ async function parseGeneratedText(
 	return res;
 }
 
-export async function PATCH({request, locals, params}) {
-	const {title} = z.object({title: z.string().trim().min(1).max(100)}).parse(await request.json())
+export async function PATCH({ request, locals, params }) {
+	const { title } = z
+		.object({ title: z.string().trim().min(1).max(100) })
+		.parse(await request.json());
 
 	const convId = new ObjectId(params.id);
 
@@ -180,13 +244,16 @@ export async function PATCH({request, locals, params}) {
 		throw error(404, "Conversation not found");
 	}
 
-	await collections.conversations.updateOne({
-		_id: convId,
-	}, {
-		$set: {
-			title,
+	await collections.conversations.updateOne(
+		{
+			_id: convId,
+		},
+		{
+			$set: {
+				title,
+			},
 		}
-	});
+	);
 
 	return new Response();
 }
