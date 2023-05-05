@@ -6,6 +6,7 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { defaultModel, models } from "$lib/server/models";
+import { validateModel } from "$lib/utils/models";
 
 export const POST: RequestHandler = async (input) => {
 	const body = await input.request.text();
@@ -16,9 +17,7 @@ export const POST: RequestHandler = async (input) => {
 	const values = z
 		.object({
 			fromShare: z.string().optional(),
-			model: z
-				.enum([models[0].name, ...models.slice(1).map((m) => m.name)])
-				.default(defaultModel.name),
+			model: validateModel(models).default(defaultModel.name),
 		})
 		.parse(JSON.parse(body));
 

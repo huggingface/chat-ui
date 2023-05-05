@@ -3,6 +3,7 @@ import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
 import { defaultModel, models } from "$lib/server/models";
+import { validateModel } from "$lib/utils/models.js";
 
 export const actions = {
 	default: async function ({ request, locals }) {
@@ -12,7 +13,7 @@ export const actions = {
 			.object({
 				shareConversationsWithModelAuthors: z.boolean({ coerce: true }).default(true),
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
-				activeModel: z.enum([models[0].name, ...models.slice(1).map((m) => m.name)]),
+				activeModel: validateModel(models),
 			})
 			.parse({
 				shareConversationsWithModelAuthors: formData.get("shareConversationsWithModelAuthors"),
