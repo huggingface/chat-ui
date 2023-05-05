@@ -7,7 +7,7 @@ import { collections } from "$lib/server/database.js";
 import type { Message } from "$lib/types/Message.js";
 import { error } from "@sveltejs/kit";
 import { pathToFileURL } from "node:url";
-import { unlink, writeFile } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { uploadFile } from "@huggingface/hub";
 import parquet from "parquetjs";
 import { z } from "zod";
