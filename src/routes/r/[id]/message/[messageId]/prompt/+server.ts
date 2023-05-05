@@ -33,7 +33,7 @@ export async function GET({ params }) {
 			{
 				note: "This is a preview of the prompt that will be sent to the model when retrying the message. It may differ from what was sent in the past if the parameters have been updated since",
 				prompt,
-				model: model.id,
+				model: model.name,
 				parameters: {
 					...model.parameters,
 					return_full_text: false,
