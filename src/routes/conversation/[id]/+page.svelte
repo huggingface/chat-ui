@@ -36,7 +36,7 @@
 				model: $page.url.href,
 				inputs,
 				parameters: {
-					...data.models.find((m) => m.name === data.model)?.parameters,
+					...data.models.find((m) => m.id === data.model)?.parameters,
 					return_full_text: false,
 				},
 			},

@@ -13,7 +13,7 @@
 	export let settings: LayoutData["settings"];
 	export let models: Array<Model>;
 
-	let selectedModelName = settings.activeModel;
+	let selectedModelId = settings.activeModel;
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 </script>
@@ -40,7 +40,7 @@
 		<div class="space-y-4">
 			{#each models as model}
 				<div
-					class="rounded-xl border border-gray-100 {model.name === selectedModelName
+					class="rounded-xl border border-gray-100 {model.id === selectedModelId
 						? 'bg-gradient-to-r from-yellow-200/40 via-yellow-500/10'
 						: ''}"
 				>
@@ -49,8 +49,8 @@
 							type="radio"
 							class="sr-only"
 							name="activeModel"
-							value={model.name}
-							bind:group={selectedModelName}
+							value={model.id}
+							bind:group={selectedModelId}
 						/>
 						<span>
 							<span class="text-md block font-semibold leading-tight text-gray-800"
@@ -61,7 +61,7 @@
 							{/if}
 						</span>
 						<CarbonCheckmark
-							class="-mr-1 -mt-1 ml-auto shrink-0 text-xl {model.name === selectedModelName
+							class="-mr-1 -mt-1 ml-auto shrink-0 text-xl {model.id === selectedModelId
 								? 'text-yellow-400'
 								: 'text-transparent group-hover:text-gray-200'}"
 						/>
