@@ -61,6 +61,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			description: model.description,
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
+			disabled: model.disabled,
 		})),
 	};
 };

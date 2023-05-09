@@ -10,4 +10,5 @@ export type Model = Pick<
 	| "promptExamples"
 	| "parameters"
 	| "description"
+	| "disabled"
 >;

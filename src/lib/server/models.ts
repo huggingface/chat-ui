@@ -8,6 +8,8 @@ const modelsRaw = z
 			id: z.string().optional(),
 			/** Used to link to the model page, and for inference */
 			name: z.string().min(1),
+			/** Model can be disabled post-launch, this ensure created conversations are read-only */
+			disabled: z.boolean().optional(),
 			displayName: z.string().min(1).optional(),
 			description: z.string().min(1).optional(),
 			websiteUrl: z.string().url().optional(),
