@@ -143,6 +143,7 @@
 			console.error(err);
 		} finally {
 			loading = false;
+			pending = false;
 		}
 	}
 
