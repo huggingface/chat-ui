@@ -104,6 +104,7 @@
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html marked(token.raw, options)}
 					{/if}
 				{/each}

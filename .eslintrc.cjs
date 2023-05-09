@@ -27,6 +27,13 @@ module.exports = {
 		"no-shadow": ["error"],
 		"@typescript-eslint/no-explicit-any": "error",
 		"@typescript-eslint/no-non-null-assertion": "error",
+		"@typescript-eslint/no-unused-vars": [
+			// prevent variables with a _ prefix from being marked as unused
+			"warn",
+			{
+				argsIgnorePattern: "^_",
+			},
+		],
 	},
 	env: {
 		browser: true,
