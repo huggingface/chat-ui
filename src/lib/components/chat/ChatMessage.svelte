@@ -40,6 +40,7 @@
 	export let loading = false;
 
 	const dispatch = createEventDispatcher<{ retry: void }>();
+	const isReadOnly = model.disabled;
 
 	let contentEl: HTMLElement;
 	let loadingEl: IconLoading;
@@ -131,14 +132,16 @@
 						<CarbonDownload />
 					</a>
 				{/if}
-				<button
-					class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-					title="Retry"
-					type="button"
-					on:click={() => dispatch("retry")}
-				>
-					<CarbonRotate360 />
-				</button>
+				{#if !isReadOnly}
+					<button
+						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+						title="Retry"
+						type="button"
+						on:click={() => dispatch("retry")}
+					>
+						<CarbonRotate360 />
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>

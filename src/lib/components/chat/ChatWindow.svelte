@@ -12,12 +12,13 @@
 	import type { LayoutData } from "../../../routes/$types";
 
 	export let messages: Message[] = [];
-	export let disabled = false;
 	export let loading = false;
 	export let pending = false;
 	export let currentModel: Model;
 	export let models: Model[] | undefined = undefined;
 	export let settings: LayoutData["settings"];
+
+	const isReadOnly = currentModel.disabled;
 
 	let message: string;
 
@@ -66,10 +67,11 @@
 					bind:value={message}
 					on:submit={handleSubmit}
 					maxRows={4}
+					disabled={isReadOnly}
 				/>
 				<button
 					class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
-					disabled={!message || loading || disabled}
+					disabled={!message || loading || isReadOnly}
 					type="submit"
 				>
 					<CarbonSendAltFilled />
