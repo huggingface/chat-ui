@@ -29,7 +29,7 @@ module.exports = {
 		"@typescript-eslint/no-non-null-assertion": "error",
 		"@typescript-eslint/no-unused-vars": [
 			// prevent variables with a _ prefix from being marked as unused
-			"warn",
+			"error",
 			{
 				argsIgnorePattern: "^_",
 			},
