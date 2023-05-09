@@ -65,7 +65,6 @@
 					placeholder="Ask anything"
 					bind:value={message}
 					on:submit={handleSubmit}
-					autofocus
 					maxRows={4}
 				/>
 				<button
