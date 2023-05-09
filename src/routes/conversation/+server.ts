@@ -5,7 +5,7 @@ import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
-import { defaultModel, models } from "$lib/server/models";
+import { models } from "$lib/server/models";
 import { validateModel } from "$lib/utils/models";
 
 export const POST: RequestHandler = async (input) => {
@@ -17,7 +17,7 @@ export const POST: RequestHandler = async (input) => {
 	const values = z
 		.object({
 			fromShare: z.string().optional(),
-			model: validateModel(models).default(defaultModel.name),
+			model: validateModel(models),
 		})
 		.parse(JSON.parse(body));
 

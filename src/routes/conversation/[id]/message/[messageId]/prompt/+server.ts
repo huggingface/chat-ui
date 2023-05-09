@@ -24,7 +24,7 @@ export async function GET({ params, locals }) {
 		throw error(404, "Message not found");
 	}
 
-	const model = models.find((m) => m.name === conv.model);
+	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
 		throw error(404, "Conversation model not found");

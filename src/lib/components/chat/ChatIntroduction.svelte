@@ -39,7 +39,7 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		<AnnouncementBanner classNames="mb-4" title="BigCode/StarCoder is now available">
+		<AnnouncementBanner classNames="mb-4" title="BigCode/StarCoderBase is now available">
 			<button
 				type="button"
 				on:click={() => (isModelsModalOpen = true)}

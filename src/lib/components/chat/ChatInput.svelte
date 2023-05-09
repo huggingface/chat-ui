@@ -41,6 +41,7 @@
 		aria-hidden="true"
 		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
+	<!-- svelte-ignore a11y-autofocus -->
 	<textarea
 		enterkeyhint="send"
 		tabindex="0"
