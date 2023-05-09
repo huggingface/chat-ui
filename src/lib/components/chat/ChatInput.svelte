@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 
 	export let value = "";
 	export let minRows = 1;
@@ -26,9 +26,11 @@
 		}
 	}
 
-	$: if (innerWidth > TABLET_VIEWPORT_WIDTH) {
-		textareaElement.focus();
-	}
+	onMount(() => {
+		if (innerWidth > TABLET_VIEWPORT_WIDTH) {
+			textareaElement.focus();
+		}
+	});
 </script>
 
 <svelte:window bind:innerWidth />
