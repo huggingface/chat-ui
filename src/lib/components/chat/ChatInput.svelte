@@ -1,12 +1,17 @@
 <script lang="ts">
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 
 	export let value = "";
 	export let minRows = 1;
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
-	export let autofocus = false;
+
+	// Approximate width from which we disable autofocus
+	const TABLET_VIEWPORT_WIDTH = 768;
+
+	let innerWidth = 0;
+	let textareaElement: HTMLTextAreaElement;
 
 	const dispatch = createEventDispatcher<{ submit: void }>();
 
@@ -21,16 +26,21 @@
 		}
 	}
 
-	let textareaElement: HTMLTextAreaElement;
+	onMount(() => {
+		if (innerWidth > TABLET_VIEWPORT_WIDTH) {
+			textareaElement.focus();
+		}
+	});
 </script>
+
+<svelte:window bind:innerWidth />
 
 <div class="relative min-w-0 flex-1">
 	<pre
 		class="invisible whitespace-pre-wrap p-3"
 		aria-hidden="true"
-		style="min-height: {minHeight}; max-height: {maxHeight}">{value + "\n"}</pre>
+		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
-	<!-- svelte-ignore a11y-autofocus -->
 	<textarea
 		enterkeyhint="send"
 		tabindex="0"
@@ -41,7 +51,6 @@
 		{disabled}
 		on:keydown={handleKeydown}
 		{placeholder}
-		{autofocus}
 	/>
 </div>
 
