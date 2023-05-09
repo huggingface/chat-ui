@@ -28,6 +28,14 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 
 	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
 
+	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
+	if (settings && validateModel(models).safeParse(settings?.activeModel).success) {
+		await collections.settings.updateOne(
+			{ sessionId: locals.sessionId },
+			{ $set: { activeModel: defaultModel.id } }
+		);
+	}
+
 	return {
 		conversations: await conversations
 			.find({
