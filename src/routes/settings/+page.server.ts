@@ -2,8 +2,7 @@ import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
-import { defaultModel, models } from "$lib/server/models";
-import { validateModel } from "$lib/utils/models.js";
+import { defaultModel, models, validateModel } from "$lib/server/models";
 
 export const actions = {
 	default: async function ({ request, locals }) {

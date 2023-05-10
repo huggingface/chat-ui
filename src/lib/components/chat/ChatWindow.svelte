@@ -10,7 +10,7 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
-	import { validateModel } from "$lib/utils/models";
+	import { isDisabledModel } from "$lib/utils/models";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -19,7 +19,7 @@
 	export let models: Model[] | undefined = undefined;
 	export let settings: LayoutData["settings"];
 
-	$: isReadOnly = models && !validateModel(models).safeParse(currentModel.id).success;
+	$: isReadOnly = models && isDisabledModel(models, currentModel);
 
 	let message: string;
 

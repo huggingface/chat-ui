@@ -73,3 +73,8 @@ export const oldModels = OLD_MODELS
 export type BackendModel = (typeof models)[0];
 
 export const defaultModel = models[0];
+
+export const validateModel = (_models: BackendModel[]) => {
+	// Zod enum function requires 2 parameters
+	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
+};

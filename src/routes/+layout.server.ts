@@ -3,8 +3,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { defaultModel, models, oldModels } from "$lib/server/models";
-import { validateModel } from "$lib/utils/models";
+import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
