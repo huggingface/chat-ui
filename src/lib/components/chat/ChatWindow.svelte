@@ -10,16 +10,15 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
-	import { isDisabledModel } from "$lib/utils/models";
 
 	export let messages: Message[] = [];
 	export let loading = false;
 	export let pending = false;
 	export let currentModel: Model;
-	export let models: Model[] | undefined = undefined;
+	export let models: Model[];
 	export let settings: LayoutData["settings"];
 
-	$: isReadOnly = models && isDisabledModel(models, currentModel);
+	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
 	let message: string;
 
@@ -45,6 +44,7 @@
 		{currentModel}
 		{models}
 		{messages}
+		readOnly={isReadOnly}
 		on:message
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);

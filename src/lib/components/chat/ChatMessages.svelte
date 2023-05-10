@@ -9,7 +9,6 @@
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
-	import { isDisabledModel } from "$lib/utils/models";
 
 	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
@@ -18,7 +17,8 @@
 	export let pending: boolean;
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
-	export let models: Model[] | undefined;
+	export let models: Model[];
+	export let readOnly: boolean;
 
 	let chatContainer: HTMLElement;
 
@@ -44,13 +44,11 @@
 				loading={loading && i === messages.length - 1}
 				{message}
 				model={currentModel}
-				readOnly={models && isDisabledModel(models, currentModel)}
+				{readOnly}
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
 			/>
 		{:else}
-			{#if models}
-				<ChatIntroduction {settings} {models} {currentModel} on:message />
-			{/if}
+			<ChatIntroduction {settings} {models} {currentModel} on:message />
 		{/each}
 		{#if pending}
 			<ChatMessage
