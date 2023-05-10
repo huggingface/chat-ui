@@ -57,16 +57,18 @@ export const models = await Promise.all(
 );
 
 // Models that have been deprecated
-export const oldModels = z
-	.array(
-		z.object({
-			id: z.string().optional(),
-			name: z.string().min(1),
-			displayName: z.string().min(1),
-		})
-	)
-	.parse(JSON.parse(OLD_MODELS))
-	.map((m) => ({ ...m, id: m.id || m.name }));
+export const oldModels = OLD_MODELS
+	? z
+			.array(
+				z.object({
+					id: z.string().optional(),
+					name: z.string().min(1),
+					displayName: z.string().min(1),
+				})
+			)
+			.parse(JSON.parse(OLD_MODELS))
+			.map((m) => ({ ...m, id: m.id || m.name }))
+	: [];
 
 export type BackendModel = (typeof models)[0];
 
