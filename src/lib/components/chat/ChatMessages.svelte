@@ -31,8 +31,6 @@
 	$: if (messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
-
-	console.log(models && isDisabledModel(models, currentModel));
 </script>
 
 <div
