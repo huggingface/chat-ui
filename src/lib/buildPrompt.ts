@@ -26,5 +26,11 @@ export function buildPrompt(
 			.join("") + model.assistantMessageToken;
 
 	// Not super precise, but it's truncated in the model's backend anyway
-	return model.preprompt + prompt.split(" ").slice(-model.parameters.truncate).join(" ");
+	return (
+		model.preprompt +
+		prompt
+			.split(" ")
+			.slice(-(model.parameters?.truncate ?? 0))
+			.join(" ")
+	);
 }
