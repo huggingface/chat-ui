@@ -1,6 +1,6 @@
-import { buildPrompt } from "$lib/buildPrompt.js";
+import { buildPrompt } from "$lib/buildPrompt";
 import { collections } from "$lib/server/database";
-import { models } from "$lib/server/models.js";
+import { models } from "$lib/server/models";
 import { error } from "@sveltejs/kit";
 
 export async function GET({ params }) {

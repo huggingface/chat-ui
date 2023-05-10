@@ -11,7 +11,7 @@
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
-	import { findCurrentModel } from "$lib/utils/models.js";
+	import { findCurrentModel } from "$lib/utils/models";
 
 	export let data;
 
