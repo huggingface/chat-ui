@@ -30,19 +30,23 @@ export const collections = {
 };
 
 client.on("open", () => {
-	conversations.createIndex(
-		{ sessionId: 1, updatedAt: -1 },
-		{ partialFilterExpression: { sessionId: { $exists: true } } }
-	);
-	conversations.createIndex(
-		{ userId: 1, updatedAt: -1 },
-		{ partialFilterExpression: { userId: { $exists: true } } }
-	);
-	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 });
-	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true });
-	sharedConversations.createIndex({ hash: 1 }, { unique: true });
-	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true });
-	settings.createIndex({ userId: 1 }, { unique: true, sparse: true });
-	users.createIndex({ hfUserId: 1 }, { unique: true });
-	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true });
+	conversations
+		.createIndex(
+			{ sessionId: 1, updatedAt: -1 },
+			{ partialFilterExpression: { sessionId: { $exists: true } } }
+		)
+		.catch(console.error);
+	conversations
+		.createIndex(
+			{ userId: 1, updatedAt: -1 },
+			{ partialFilterExpression: { userId: { $exists: true } } }
+		)
+		.catch(console.error);
+	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
+	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
+	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
+	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
+	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 });
