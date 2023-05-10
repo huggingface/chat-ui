@@ -31,7 +31,7 @@
 	</a>
 </div>
 <div
-	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl bg-gradient-to-l from-gray-50  px-3 pb-3 pt-2 dark:from-gray-800/30"
+	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl bg-gradient-to-l from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30"
 >
 	{#each conversations as conv (conv.id)}
 		<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />

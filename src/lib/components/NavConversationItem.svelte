@@ -44,23 +44,23 @@
 			on:click|preventDefault={() => dispatch("deleteConversation", conv.id)}
 		>
 			<CarbonCheckmark
-				class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300"
+				class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
 			/>
 		</button>
 		<button
 			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden  md:group-hover:flex"
+			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Cancel delete action"
 			on:click|preventDefault={() => {
 				confirmDelete = false;
 			}}
 		>
-			<CarbonClose class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
+			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
 	{:else}
 		<button
 			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden  md:group-hover:flex"
+			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Edit conversation title"
 			on:click|preventDefault={() => {
 				const newTitle = prompt("Edit this conversation title:", conv.title);
