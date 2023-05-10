@@ -1,4 +1,3 @@
-import type { PageServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
