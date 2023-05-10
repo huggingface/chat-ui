@@ -5,7 +5,7 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
-	import NavElement from "./NavElement.svelte";
+	import NavConversationItem from "./NavConversationItem.svelte";
 
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
@@ -34,7 +34,7 @@
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl bg-gradient-to-l from-gray-50  px-3 pb-3 pt-2 dark:from-gray-800/30"
 >
 	{#each conversations as conv (conv.id)}
-		<NavElement on:editConversationTitle on:deleteConversation {conv} />
+		<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
 	{/each}
 </div>
 <div

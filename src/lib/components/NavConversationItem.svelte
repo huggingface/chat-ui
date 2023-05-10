@@ -3,10 +3,10 @@
 	import { page } from "$app/stores";
 	import { createEventDispatcher } from "svelte";
 
-	import CarbonTrashCan from "~icons/carbon/trash-can";
-	import CarbonEdit from "~icons/carbon/edit";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonEdit from "~icons/carbon/edit";
 
 	export let conv: { id: string; title: string };
 
