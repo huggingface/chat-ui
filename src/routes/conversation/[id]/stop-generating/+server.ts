@@ -1,3 +1,4 @@
+import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -10,7 +11,7 @@ export async function POST({ params, locals }) {
 
 	const conversation = await collections.conversations.findOne({
 		_id: conversationId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conversation) {

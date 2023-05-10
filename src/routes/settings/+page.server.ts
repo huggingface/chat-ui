@@ -3,7 +3,8 @@ import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
 import { defaultModel, models } from "$lib/server/models";
-import { validateModel } from "$lib/utils/models.js";
+import { validateModel } from "$lib/utils/models";
+import { authCondition } from "$lib/server/auth";
 
 export const actions = {
 	default: async function ({ request, locals }) {
@@ -18,13 +19,11 @@ export const actions = {
 			.parse({
 				shareConversationsWithModelAuthors: formData.get("shareConversationsWithModelAuthors"),
 				ethicsModalAccepted: formData.get("ethicsModalAccepted"),
-				activeModel: formData.get("activeModel") ?? defaultModel.name,
+				activeModel: formData.get("activeModel") ?? defaultModel.id,
 			});
 
 		await collections.settings.updateOne(
-			{
-				sessionId: locals.sessionId,
-			},
+			authCondition(locals),
 			{
 				$set: {
 					...settings,

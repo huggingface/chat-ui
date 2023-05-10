@@ -4,6 +4,9 @@ import { z } from "zod";
 const modelsRaw = z
 	.array(
 		z.object({
+			/** Used as an identifier in DB */
+			id: z.string().optional(),
+			/** Used to link to the model page, and for inference */
 			name: z.string().min(1),
 			displayName: z.string().min(1).optional(),
 			description: z.string().min(1).optional(),
@@ -46,6 +49,7 @@ const modelsRaw = z
 export const models = await Promise.all(
 	modelsRaw.map(async (m) => ({
 		...m,
+		id: m.id || m.name,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	}))

@@ -5,11 +5,12 @@ import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
-import { defaultModel, models } from "$lib/server/models";
+import { models } from "$lib/server/models";
 import { validateModel } from "$lib/utils/models";
+import { authCondition } from "$lib/server/auth";
 
-export const POST: RequestHandler = async (input) => {
-	const body = await input.request.text();
+export const POST: RequestHandler = async ({ locals, request }) => {
+	const body = await request.text();
 
 	let title = "";
 	let messages: Message[] = [];
@@ -17,7 +18,7 @@ export const POST: RequestHandler = async (input) => {
 	const values = z
 		.object({
 			fromShare: z.string().optional(),
-			model: validateModel(models).default(defaultModel.name),
+			model: validateModel(models),
 		})
 		.parse(JSON.parse(body));
 
@@ -39,14 +40,12 @@ export const POST: RequestHandler = async (input) => {
 		_id: new ObjectId(),
 		title:
 			title ||
-			"Untitled " +
-				((await collections.conversations.countDocuments({ sessionId: input.locals.sessionId })) +
-					1),
+			"Untitled " + ((await collections.conversations.countDocuments(authCondition(locals))) + 1),
 		messages,
 		model: values.model,
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		sessionId: input.locals.sessionId,
+		...(locals.userId ? { userId: locals.userId } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 

@@ -1,14 +1,15 @@
-import { buildPrompt } from "$lib/buildPrompt.js";
-import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
-import { abortedGenerations } from "$lib/server/abortedGenerations.js";
-import { collections } from "$lib/server/database.js";
-import { modelEndpoint } from "$lib/server/modelEndpoint.js";
-import { defaultModel, models } from "$lib/server/models.js";
-import type { Message } from "$lib/types/Message.js";
-import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
+import { buildPrompt } from "$lib/buildPrompt";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { authCondition } from "$lib/server/auth";
+import { collections } from "$lib/server/database";
+import { modelEndpoint } from "$lib/server/modelEndpoint";
+import { models } from "$lib/server/models";
+import type { Message } from "$lib/types/Message";
+import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
-import { trimPrefix } from "$lib/utils/trimPrefix.js";
-import { trimSuffix } from "$lib/utils/trimSuffix.js";
+import { trimPrefix } from "$lib/utils/trimPrefix";
+import { trimSuffix } from "$lib/utils/trimSuffix";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -21,14 +22,18 @@ export async function POST({ request, fetch, locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
 	}
 
-	const model = conv.model ?? defaultModel.name;
+	const model = models.find((m) => m.id === conv.model);
+
+	if (!model) {
+		throw error(400, "Model not availalbe anymore");
+	}
 
 	const json = await request.json();
 	const {
@@ -61,20 +66,7 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	// Todo: on-the-fly migration, remove later
-	for (const message of messages) {
-		if (!message.id) {
-			message.id = crypto.randomUUID();
-		}
-	}
-
-	const modelInfo = models.find((m) => m.name === model);
-
-	if (!modelInfo) {
-		throw error(400, "Model not availalbe anymore");
-	}
-
-	const prompt = buildPrompt(messages, modelInfo);
+	const prompt = buildPrompt(messages, model);
 
 	const randomEndpoint = modelEndpoint(model);
 
@@ -110,11 +102,11 @@ export async function POST({ request, fetch, locals, params }) {
 		generated_text = trimSuffix(
 			trimPrefix(generated_text, "<|startoftext|>"),
 			PUBLIC_SEP_TOKEN
-		).trim();
+		).trimEnd();
 
-		for (const stop of [...(modelInfo?.parameters?.stop ?? []), "<|endoftext|>"]) {
+		for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
 			if (generated_text.endsWith(stop)) {
-				generated_text = generated_text.slice(0, -stop.length).trim();
+				generated_text = generated_text.slice(0, -stop.length).trimEnd();
 			}
 		}
 
@@ -148,7 +140,7 @@ export async function DELETE({ locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {
@@ -237,7 +229,7 @@ export async function PATCH({ request, locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {

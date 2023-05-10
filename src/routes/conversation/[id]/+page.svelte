@@ -11,8 +11,8 @@
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
-	import { findCurrentModel } from "$lib/utils/models.js";
-	import type { Message } from "$lib/types/Message.js";
+	import { findCurrentModel } from "$lib/utils/models";
+	import type { Message } from "$lib/types/Message";
 
 	export let data;
 
@@ -37,7 +37,7 @@
 				model: $page.url.href,
 				inputs,
 				parameters: {
-					...data.models.find((m) => m.name === data.model)?.parameters,
+					...data.models.find((m) => m.id === data.model)?.parameters,
 					return_full_text: false,
 				},
 			},
@@ -144,6 +144,7 @@
 			console.error(err);
 		} finally {
 			loading = false;
+			pending = false;
 		}
 	}
 
