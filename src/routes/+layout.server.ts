@@ -3,7 +3,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { defaultModel, models } from "$lib/server/models";
+import { defaultModel, models, oldModels } from "$lib/server/models";
 import { validateModel } from "$lib/utils/models";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
@@ -70,7 +70,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			description: model.description,
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
-			disabled: model.disabled,
 		})),
+		oldModels,
 	};
 };

@@ -23,7 +23,7 @@
 			.replaceAll("<", "&lt;")
 			.trim();
 
-		for (const stop of [...(model.parameters.stop ?? []), "<|endoftext|>"]) {
+		for (const stop of [...(model.parameters?.stop ?? []), "<|endoftext|>"]) {
 			if (ret.endsWith(stop)) {
 				ret = ret.slice(0, -stop.length).trim();
 			}
@@ -38,9 +38,9 @@
 	export let model: Model;
 	export let message: Message;
 	export let loading = false;
+	export let readOnly = false;
 
 	const dispatch = createEventDispatcher<{ retry: void }>();
-	const isReadOnly = model.disabled;
 
 	let contentEl: HTMLElement;
 	let loadingEl: IconLoading;
@@ -132,7 +132,7 @@
 						<CarbonDownload />
 					</a>
 				{/if}
-				{#if !isReadOnly}
+				{#if !readOnly}
 					<button
 						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
 						title="Retry"

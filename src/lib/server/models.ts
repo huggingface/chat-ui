@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN, MODELS } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import { z } from "zod";
 
 const modelsRaw = z
@@ -8,8 +8,6 @@ const modelsRaw = z
 			id: z.string().optional(),
 			/** Used to link to the model page, and for inference */
 			name: z.string().min(1),
-			/** Model can be disabled post-launch, this ensure created conversations are read-only */
-			disabled: z.boolean().optional(),
 			displayName: z.string().min(1).optional(),
 			description: z.string().min(1).optional(),
 			websiteUrl: z.string().url().optional(),
@@ -43,7 +41,8 @@ const modelsRaw = z
 					max_new_tokens: z.number().int().positive(),
 					stop: z.array(z.string()).optional(),
 				})
-				.passthrough(),
+				.passthrough()
+				.optional(),
 		})
 	)
 	.parse(JSON.parse(MODELS));
@@ -56,6 +55,18 @@ export const models = await Promise.all(
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	}))
 );
+
+// Models that have been deprecated
+export const oldModels = z
+	.array(
+		z.object({
+			id: z.string().optional(),
+			name: z.string().min(1),
+			displayName: z.string().min(1),
+		})
+	)
+	.parse(JSON.parse(OLD_MODELS))
+	.map((m) => ({ ...m, id: m.id || m.name }));
 
 export type BackendModel = (typeof models)[0];
 

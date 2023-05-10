@@ -9,6 +9,7 @@
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
+	import { validateModel } from "$lib/utils/models";
 
 	const dispatch = createEventDispatcher<{ retry: { id: Message["id"]; content: string } }>();
 
@@ -54,6 +55,7 @@
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
+				readOnly={models && validateModel(models).safeParse(currentModel.id).success}
 			/>
 		{/if}
 		<div class="h-32 flex-none" />

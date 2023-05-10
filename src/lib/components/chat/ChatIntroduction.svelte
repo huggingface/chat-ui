@@ -47,7 +47,7 @@
 					<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
 					<div class="font-semibold">{currentModel.displayName}</div>
 				</div>
-				{#if models.filter((model) => !model.disabled).length > 1}
+				{#if models.length > 1}
 					<button
 						type="button"
 						on:click={() => (isModelsModalOpen = true)}
