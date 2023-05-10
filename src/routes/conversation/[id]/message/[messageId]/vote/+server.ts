@@ -1,3 +1,4 @@
+import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -15,7 +16,7 @@ export async function POST({ params, request, locals }) {
 	const document = await collections.conversations.updateOne(
 		{
 			_id: conversationId,
-			sessionId: locals.sessionId,
+			...authCondition(locals),
 			"messages.id": messageId,
 		},
 		{
