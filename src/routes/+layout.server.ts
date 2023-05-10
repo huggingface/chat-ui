@@ -5,6 +5,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models } from "$lib/server/models";
 import { validateModel } from "$lib/utils/models";
+import { authCondition } from "$lib/server/auth";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
@@ -17,7 +18,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 
 		if (isValidModel) {
 			await collections.settings.updateOne(
-				{ sessionId: locals.sessionId },
+				authCondition(locals),
 				{ $set: { activeModel: urlModel } },
 				{ upsert: true }
 			);
@@ -26,13 +27,11 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		throw redirect(302, url.pathname);
 	}
 
-	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
+	const settings = await collections.settings.findOne(authCondition(locals));
 
 	return {
 		conversations: await conversations
-			.find({
-				sessionId: locals.sessionId,
-			})
+			.find(authCondition(locals))
 			.sort({ updatedAt: -1 })
 			.project<Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt">>({
 				title: 1,

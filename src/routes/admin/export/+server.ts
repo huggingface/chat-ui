@@ -3,8 +3,8 @@ import {
 	PARQUET_EXPORT_HF_TOKEN,
 	PARQUET_EXPORT_SECRET,
 } from "$env/static/private";
-import { collections } from "$lib/server/database.js";
-import type { Message } from "$lib/types/Message.js";
+import { collections } from "$lib/server/database";
+import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { pathToFileURL } from "node:url";
 import { unlink } from "node:fs/promises";

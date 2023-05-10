@@ -1,8 +1,9 @@
 import { base } from "$app/paths";
 import { PUBLIC_ORIGIN } from "$env/static/public";
-import { collections } from "$lib/server/database.js";
-import type { SharedConversation } from "$lib/types/SharedConversation.js";
-import { sha256 } from "$lib/utils/sha256.js";
+import { authCondition } from "$lib/server/auth";
+import { collections } from "$lib/server/database";
+import type { SharedConversation } from "$lib/types/SharedConversation";
+import { sha256 } from "$lib/utils/sha256";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { nanoid } from "nanoid";
@@ -10,7 +11,7 @@ import { nanoid } from "nanoid";
 export async function POST({ params, url, locals }) {
 	const conversation = await collections.conversations.findOne({
 		_id: new ObjectId(params.id),
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conversation) {
