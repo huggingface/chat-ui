@@ -31,7 +31,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
-		throw error(400, "Model not available anymore");
+		throw error(410, "Model not available anymore");
 	}
 
 	const json = await request.json();
