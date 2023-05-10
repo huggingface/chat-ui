@@ -31,6 +31,8 @@
 	$: if (messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
+
+	console.log(models && isDisabledModel(models, currentModel));
 </script>
 
 <div
@@ -44,6 +46,7 @@
 				loading={loading && i === messages.length - 1}
 				{message}
 				model={currentModel}
+				readOnly={models && isDisabledModel(models, currentModel)}
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
 			/>
 		{:else}
@@ -55,7 +58,6 @@
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
-				readOnly={models && isDisabledModel(models, currentModel)}
 			/>
 		{/if}
 		<div class="h-32 flex-none" />
