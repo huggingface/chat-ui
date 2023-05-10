@@ -1,6 +1,7 @@
-import { buildPrompt } from "$lib/buildPrompt.js";
+import { buildPrompt } from "$lib/buildPrompt";
+import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { models } from "$lib/server/models.js";
+import { models } from "$lib/server/models";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -9,7 +10,7 @@ export async function GET({ params, locals }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {

@@ -4,7 +4,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
-	import { findCurrentModel } from "$lib/utils/models.js";
+	import { findCurrentModel } from "$lib/utils/models";
 
 	export let data;
 	let loading = false;

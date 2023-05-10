@@ -3,7 +3,8 @@ import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
 import { defaultModel, models } from "$lib/server/models";
-import { validateModel } from "$lib/utils/models.js";
+import { validateModel } from "$lib/utils/models";
+import { authCondition } from "$lib/server/auth";
 
 export const actions = {
 	default: async function ({ request, locals }) {
@@ -22,9 +23,7 @@ export const actions = {
 			});
 
 		await collections.settings.updateOne(
-			{
-				sessionId: locals.sessionId,
-			},
+			authCondition(locals),
 			{
 				$set: {
 					...settings,

@@ -1,10 +1,11 @@
 import { buildPrompt } from "$lib/buildPrompt";
-import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
-import { collections } from "$lib/server/database.js";
-import { modelEndpoint } from "$lib/server/modelEndpoint.js";
-import { defaultModel } from "$lib/server/models.js";
-import { trimPrefix } from "$lib/utils/trimPrefix.js";
-import { trimSuffix } from "$lib/utils/trimSuffix.js";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+import { authCondition } from "$lib/server/auth";
+import { collections } from "$lib/server/database";
+import { modelEndpoint } from "$lib/server/modelEndpoint";
+import { defaultModel } from "$lib/server/models";
+import { trimPrefix } from "$lib/utils/trimPrefix";
+import { trimSuffix } from "$lib/utils/trimSuffix";
 import { textGeneration } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -14,7 +15,7 @@ export async function POST({ params, locals, fetch }) {
 
 	const conversation = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conversation) {
@@ -56,7 +57,7 @@ export async function POST({ params, locals, fetch }) {
 		await collections.conversations.updateOne(
 			{
 				_id: convId,
-				sessionId: locals.sessionId,
+				...authCondition(locals),
 			},
 			{
 				$set: { title: generated_text },

@@ -1,7 +1,9 @@
 import type { Timestamps } from "./Timestamps";
+import type { User } from "./User";
 
 export interface Settings extends Timestamps {
-	sessionId: string;
+	userId?: User["_id"];
+	sessionId?: string;
 
 	/**
 	 * Note: Only conversations with this settings explictly set to true should be shared.
