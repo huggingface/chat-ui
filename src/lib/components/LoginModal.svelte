@@ -2,6 +2,7 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { PUBLIC_VERSION } from "$env/static/public";
+	import { signIn, signOut } from "@auth/sveltekit/client";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import type { LayoutData } from "../../routes/$types";
@@ -31,13 +32,11 @@
 		<p class="px-2 text-sm text-gray-500">
 			Your conversations will be shared with model authors unless you disable it from your settings.
 		</p>
-		<form action="{base}/settings" use:enhance method="POST">
-			<input type="hidden" name="ethicsModalAccepted" value={true} />
-			{#each Object.entries(settings) as [key, val]}
-				<input type="hidden" name={key} value={val} />
-			{/each}
+		<form action="{base}/login" use:enhance method="POST">
+			<input type="hidden" name="callbackUrl" value={base} />
 			<button
-				type="submit"
+				type="button"
+				on:click={() => signIn("github")}
 				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 			>
 				Sign In with Hugging Face

@@ -11,11 +11,6 @@
 	let loading = false;
 
 	async function createConversation(message: string) {
-		if (!$user?.id) {
-			error.set(ERROR_MESSAGES.authOnly);
-			return;
-		}
-
 		try {
 			loading = true;
 			const res = await fetch(`${base}/conversation`, {
@@ -27,8 +22,12 @@
 			});
 
 			if (!res.ok) {
-				error.set("Error while creating conversation, try again.");
-				console.error("Error while creating conversation: " + (await res.text()));
+				if (res.status === 401) {
+					error.set(ERROR_MESSAGES.authOnly);
+				} else {
+					error.set("Error while creating conversation, try again.");
+					console.error("Error while creating conversation: " + (await res.text()));
+				}
 				return;
 			}
 

@@ -35,8 +35,10 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@huggingface/inference": "^2.2.0",
+		"@auth/core": "^0.7.1",
+		"@auth/sveltekit": "^0.3.1",
 		"@huggingface/hub": "^0.5.1",
+		"@huggingface/inference": "^2.2.0",
 		"autoprefixer": "^10.4.14",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",

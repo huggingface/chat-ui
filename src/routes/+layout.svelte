@@ -94,7 +94,7 @@
 	});
 
 	$: if ($error && $error !== ERROR_MESSAGES.authOnly) onServerError();
-	$: if (!$user) {
+	$: if (!$user?.id) {
 		$error = ERROR_MESSAGES.authOnly;
 	}
 </script>
