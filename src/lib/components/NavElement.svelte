@@ -68,7 +68,7 @@
 				dispatch("editConversationTitle", { id: conv.id, title: newTitle });
 			}}
 		>
-			<CarbonEdit class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
+			<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
 
 		<button
