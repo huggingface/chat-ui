@@ -25,26 +25,28 @@ export async function POST({ params, request, locals }) {
 		throw error(404, "Message not found");
 	}
 
-	const messages = conversation.messages.map((message) => {
-		if (message.id === messageId) {
-			return {
-				...message,
-				score: score === 0 ? undefined : score,
-			};
-		}
-		return message;
-	});
-
-	await collections.conversations.updateOne(
-		{
-			_id: conversationId,
-		},
-		{
-			$set: {
-				messages,
+	if (score !== 0) {
+		await collections.conversations.updateOne(
+			{
+				_id: conversationId,
+				"messages.id": messageId,
 			},
-		}
-	);
+			{
+				$set: {
+					"messages.$.score": score,
+				},
+			}
+		),
+			{ upsert: true };
+	} else {
+		await collections.conversations.updateOne(
+			{
+				_id: conversationId,
+				"messages.id": messageId,
+			},
+			{ $unset: { "messages.$.score": "" } }
+		);
+	}
 
 	return new Response();
 }
