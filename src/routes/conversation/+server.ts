@@ -6,9 +6,10 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
+import { authCondition } from "$lib/server/auth";
 
-export const POST: RequestHandler = async (input) => {
-	const body = await input.request.text();
+export const POST: RequestHandler = async ({ locals, request }) => {
+	const body = await request.text();
 
 	let title = "";
 	let messages: Message[] = [];
@@ -38,14 +39,12 @@ export const POST: RequestHandler = async (input) => {
 		_id: new ObjectId(),
 		title:
 			title ||
-			"Untitled " +
-				((await collections.conversations.countDocuments({ sessionId: input.locals.sessionId })) +
-					1),
+			"Untitled " + ((await collections.conversations.countDocuments(authCondition(locals))) + 1),
 		messages,
 		model: values.model,
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		sessionId: input.locals.sessionId,
+		...(locals.userId ? { userId: locals.userId } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 

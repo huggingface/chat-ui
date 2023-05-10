@@ -8,37 +8,60 @@ import {
 import { addYears } from "date-fns";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
+import { requiresUser } from "$lib/server/auth";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
 
 	event.locals.sessionId = token || crypto.randomUUID();
 
-	if (
-		event.request.method === "POST" &&
-		!event.url.pathname.startsWith(`${base}/settings`) &&
-		!event.url.pathname.startsWith(`${base}/admin`)
-	) {
-		const hasAcceptedEthicsModal = await collections.settings.countDocuments({
-			sessionId: event.locals.sessionId,
-			ethicsModalAcceptedAt: { $exists: true },
-		});
+	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
 
-		if (!hasAcceptedEthicsModal) {
-			const sendJson =
-				event.request.headers.get("accept")?.includes("application/json") ||
-				event.request.headers.get("content-type")?.includes("application/json");
+	if (user) {
+		event.locals.userId = user._id;
+	}
+
+	if (
+		!event.url.pathname.startsWith(`${base}/admin`) &&
+		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
+	) {
+		const sendJson =
+			event.request.headers.get("accept")?.includes("application/json") ||
+			event.request.headers.get("content-type")?.includes("application/json");
+
+		if (!user && requiresUser) {
 			return new Response(
 				sendJson
-					? JSON.stringify({ error: "You need to accept the welcome modal first" })
-					: "You need to accept the welcome modal first",
+					? JSON.stringify({ error: "You need to be logged in first" })
+					: "You need to be logged in first",
 				{
-					status: 405,
+					status: 401,
 					headers: {
 						"content-type": sendJson ? "application/json" : "text/plain",
 					},
 				}
 			);
+		}
+
+		if (!event.url.pathname.startsWith(`${base}/settings`)) {
+			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
+				sessionId: event.locals.sessionId,
+				ethicsModalAcceptedAt: { $exists: true },
+			});
+
+			if (!hasAcceptedEthicsModal) {
+				return new Response(
+					sendJson
+						? JSON.stringify({ error: "You need to accept the welcome modal first" })
+						: "You need to accept the welcome modal first",
+					{
+						status: 405,
+						headers: {
+							"content-type": sendJson ? "application/json" : "text/plain",
+						},
+					}
+				);
+			}
 		}
 	}
 

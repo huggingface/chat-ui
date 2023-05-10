@@ -4,6 +4,7 @@ import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
+import { authCondition } from "$lib/server/auth";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
@@ -16,7 +17,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 
 		if (isValidModel) {
 			await collections.settings.updateOne(
-				{ sessionId: locals.sessionId },
+				authCondition(locals),
 				{ $set: { activeModel: urlModel } },
 				{ upsert: true }
 			);
@@ -25,7 +26,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		throw redirect(302, url.pathname);
 	}
 
-	const settings = await collections.settings.findOne({ sessionId: locals.sessionId });
+	const settings = await collections.settings.findOne(authCondition(locals));
 
 	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
 	if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
@@ -38,9 +39,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 
 	return {
 		conversations: await conversations
-			.find({
-				sessionId: locals.sessionId,
-			})
+			.find(authCondition(locals))
 			.sort({ updatedAt: -1 })
 			.project<Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt">>({
 				title: 1,

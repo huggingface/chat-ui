@@ -1,14 +1,15 @@
-import { buildPrompt } from "$lib/buildPrompt.js";
-import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken.js";
-import { abortedGenerations } from "$lib/server/abortedGenerations.js";
-import { collections } from "$lib/server/database.js";
-import { modelEndpoint } from "$lib/server/modelEndpoint.js";
-import { models } from "$lib/server/models.js";
-import type { Message } from "$lib/types/Message.js";
-import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays.js";
+import { buildPrompt } from "$lib/buildPrompt";
+import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { authCondition } from "$lib/server/auth";
+import { collections } from "$lib/server/database";
+import { modelEndpoint } from "$lib/server/modelEndpoint";
+import { models } from "$lib/server/models";
+import type { Message } from "$lib/types/Message";
+import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
-import { trimPrefix } from "$lib/utils/trimPrefix.js";
-import { trimSuffix } from "$lib/utils/trimSuffix.js";
+import { trimPrefix } from "$lib/utils/trimPrefix";
+import { trimSuffix } from "$lib/utils/trimSuffix";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -21,7 +22,7 @@ export async function POST({ request, fetch, locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {
@@ -139,7 +140,7 @@ export async function DELETE({ locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {
@@ -228,7 +229,7 @@ export async function PATCH({ request, locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		sessionId: locals.sessionId,
+		...authCondition(locals),
 	});
 
 	if (!conv) {
