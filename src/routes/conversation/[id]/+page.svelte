@@ -12,6 +12,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models.js";
+	import type { Message } from "$lib/types/Message.js";
 
 	export let data;
 
@@ -146,9 +147,9 @@
 		}
 	}
 
-	async function voteMessage(score: number, messageId: string) {
+	async function voteMessage(score: Message["score"], messageId: string) {
 		let conversationId = $page.params.id;
-		let oldScore: number | undefined;
+		let oldScore: Message["score"] | undefined;
 
 		// optimistic update to avoid waiting for the server
 		messages = messages.map((message) => {

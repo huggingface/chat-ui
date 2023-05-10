@@ -44,7 +44,7 @@
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
-		vote: { score: number; id: Message["id"] };
+		vote: { score: Message['score']; id: Message["id"] };
 	}>();
 
 	let contentEl: HTMLElement;
