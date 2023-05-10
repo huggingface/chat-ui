@@ -8,22 +8,25 @@
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { error } from "$lib/stores/errors";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
-	import EthicsModal from "$lib/components/EthicsModal.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
+	import { user } from "$lib/stores/user";
+	import LoginModal from "$lib/components/LoginModal.svelte";
 
 	export let data;
+
+	$user = data.user ?? null;
 
 	let isNavOpen = false;
 	let isSettingsOpen = false;
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
-	async function onError() {
+	async function onServerError() {
 		// If a new different error comes, wait for the current error to hide first
 		if ($error && currentError && $error !== currentError) {
 			clearTimeout(errorToastTimeout);
@@ -90,7 +93,10 @@
 		clearTimeout(errorToastTimeout);
 	});
 
-	$: if ($error) onError();
+	$: if ($error && $error !== ERROR_MESSAGES.authOnly) onServerError();
+	$: if (!$user) {
+		$error = ERROR_MESSAGES.authOnly;
+	}
 </script>
 
 <svelte:head>
@@ -128,14 +134,13 @@
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</nav>
-	{#if currentError}
+	{#if $error === ERROR_MESSAGES.authOnly}
+		<LoginModal settings={data.settings} />
+	{:else if currentError}
 		<Toast message={currentError} />
 	{/if}
 	{#if isSettingsOpen}
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
-	{/if}
-	{#if !data.settings.ethicsModalAcceptedAt}
-		<EthicsModal settings={data.settings} />
 	{/if}
 	<slot />
 </div>

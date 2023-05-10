@@ -4,12 +4,18 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { user } from "$lib/stores/user";
 	import { findCurrentModel } from "$lib/utils/models";
 
 	export let data;
 	let loading = false;
 
 	async function createConversation(message: string) {
+		if (!$user?.id) {
+			error.set(ERROR_MESSAGES.authOnly);
+			return;
+		}
+
 		try {
 			loading = true;
 			const res = await fetch(`${base}/conversation`, {

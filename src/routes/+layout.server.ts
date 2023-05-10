@@ -61,5 +61,8 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
 		})),
+		...((locals.userId || locals.sessionId) && {
+			user: { id: locals.userId?.toString(), sessionId: locals.sessionId },
+		}),
 	};
 };
