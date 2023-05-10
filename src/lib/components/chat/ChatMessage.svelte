@@ -25,7 +25,7 @@
 			.replaceAll("<", "&lt;")
 			.trim();
 
-		for (const stop of [...(model.parameters.stop ?? []), "<|endoftext|>"]) {
+		for (const stop of [...(model.parameters?.stop ?? []), "<|endoftext|>"]) {
 			if (ret.endsWith(stop)) {
 				ret = ret.slice(0, -stop.length).trim();
 			}
@@ -41,6 +41,7 @@
 	export let message: Message;
 	export let loading = false;
 	export let isAuthor = true;
+	export let readOnly = false;
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
@@ -168,14 +169,16 @@
 						<CarbonDownload />
 					</a>
 				{/if}
-				<button
-					class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-					title="Retry"
-					type="button"
-					on:click={() => dispatch("retry", { content: message.content, id: message.id })}
-				>
-					<CarbonRotate360 />
-				</button>
+				{#if !readOnly}
+					<button
+						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+						title="Retry"
+						type="button"
+						on:click={() => dispatch("retry")}
+					>
+						<CarbonRotate360 />
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>

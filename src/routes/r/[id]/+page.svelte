@@ -74,6 +74,8 @@
 				return goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 			})
 			.finally(() => (loading = false))}
+	messages={data.messages}
+	models={data.models}
 	currentModel={findCurrentModel(data.models, data.model)}
 	settings={data.settings}
 />
