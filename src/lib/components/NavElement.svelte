@@ -76,12 +76,12 @@
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Delete conversation"
 			on:click|preventDefault={(event) => {
-                if (event.shiftKey) {
-                    dispatch("deleteConversation", conv.id)
-                } else {
-                    confirmDelete = true
-                }
-            }}
+				if (event.shiftKey) {
+					dispatch("deleteConversation", conv.id);
+				} else {
+					confirmDelete = true;
+				}
+			}}
 		>
 			<CarbonTrashCan class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
