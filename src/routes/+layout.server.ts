@@ -3,8 +3,7 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { defaultModel, models } from "$lib/server/models";
-import { validateModel } from "$lib/utils/models";
+import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
@@ -28,6 +27,15 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	}
 
 	const settings = await collections.settings.findOne(authCondition(locals));
+
+	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
+	if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
+		settings.activeModel = defaultModel.id;
+		await collections.settings.updateOne(
+			{ sessionId: locals.sessionId },
+			{ $set: { activeModel: defaultModel.id } }
+		);
+	}
 
 	return {
 		conversations: await conversations
@@ -61,5 +69,6 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
 		})),
+		oldModels,
 	};
 };

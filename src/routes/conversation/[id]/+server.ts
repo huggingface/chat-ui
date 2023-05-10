@@ -16,8 +16,8 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 
 export async function POST({ request, fetch, locals, params }) {
-	// todo: add validation on params.id
-	const convId = new ObjectId(params.id);
+	const id = z.string().parse(params.id);
+	const convId = new ObjectId(id);
 	const date = new Date();
 
 	const conv = await collections.conversations.findOne({
@@ -32,7 +32,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
-		throw error(400, "Model not availalbe anymore");
+		throw error(410, "Model not available anymore");
 	}
 
 	const json = await request.json();

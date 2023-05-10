@@ -5,8 +5,7 @@ import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
-import { models } from "$lib/server/models";
-import { validateModel } from "$lib/utils/models";
+import { models, validateModel } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 
 export const POST: RequestHandler = async ({ locals, request }) => {

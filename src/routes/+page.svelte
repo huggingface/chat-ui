@@ -45,7 +45,7 @@
 <ChatWindow
 	on:message={(ev) => createConversation(ev.detail)}
 	{loading}
-	currentModel={findCurrentModel(data.models, data.settings.activeModel)}
+	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.settings.activeModel)}
 	models={data.models}
 	settings={data.settings}
 />
