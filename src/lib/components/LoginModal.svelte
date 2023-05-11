@@ -2,12 +2,8 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { PUBLIC_VERSION } from "$env/static/public";
-	import { signIn, signOut } from "@auth/sveltekit/client";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import type { LayoutData } from "../../routes/$types";
-
-	export let settings: LayoutData["settings"];
 </script>
 
 <Modal>
@@ -35,8 +31,7 @@
 		<form action="{base}/login" use:enhance method="POST">
 			<input type="hidden" name="callbackUrl" value={base} />
 			<button
-				type="button"
-				on:click={() => signIn("github")}
+				type="submit"
 				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 			>
 				Sign In with Hugging Face

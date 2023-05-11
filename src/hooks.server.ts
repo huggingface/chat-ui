@@ -5,15 +5,11 @@ import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
 } from "$env/static/public";
-import GitHub from "@auth/core/providers/github";
-import { HF_CLIENT_ID, HF_CLIENT_SECRET } from "$env/static/private";
 import { addYears } from "date-fns";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { requiresUser } from "$lib/server/auth";
-import { SvelteKitAuth } from "@auth/sveltekit";
 import { sequence } from "@sveltejs/kit/hooks";
-import type { JWT } from "@auth/core/jwt";
 
 const authorization: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
@@ -31,9 +27,7 @@ const authorization: Handle = async ({ event, resolve }) => {
 			event.request.headers.get("accept")?.includes("application/json") ||
 			event.request.headers.get("content-type")?.includes("application/json");
 
-		const session = await event.locals.getSession();
-
-		if (!session && requiresUser) {
+		if (!user && requiresUser) {
 			return new Response(
 				sendJson
 					? JSON.stringify({ error: "You need to be logged in first" })
@@ -98,9 +92,4 @@ const authorization: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-export const handle: Handle = sequence(
-	SvelteKitAuth({
-		providers: [GitHub({ clientId: HF_CLIENT_ID, clientSecret: HF_CLIENT_SECRET }) as any],
-	}),
-	authorization
-);
+export const handle: Handle = sequence(authorization);

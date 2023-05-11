@@ -35,8 +35,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@auth/core": "^0.7.1",
-		"@auth/sveltekit": "^0.3.1",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.2.0",
 		"autoprefixer": "^10.4.14",
@@ -46,6 +44,7 @@
 		"marked": "^4.3.0",
 		"mongodb": "^5.3.0",
 		"nanoid": "^4.0.2",
+		"openid-client": "^5.4.2",
 		"parquetjs": "^0.11.2",
 		"postcss": "^8.4.21",
 		"tailwind-scrollbar": "^3.0.0",
