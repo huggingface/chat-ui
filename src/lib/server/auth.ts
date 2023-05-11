@@ -52,7 +52,7 @@ export function generateCsrfToken(sessionId: string): string {
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 	const issuer = await Issuer.discover(HF_HUB_URL);
 	return new issuer.Client({
-		client_id: HF_CLIENT_ID,
+		client_id: PUBLIC_HF_CLIENT_ID,
 		client_secret: HF_CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
