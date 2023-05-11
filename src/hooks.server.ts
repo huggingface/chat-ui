@@ -8,7 +8,7 @@ import {
 import { addYears } from "date-fns";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { requiresUser } from "$lib/server/auth";
+import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { sequence } from "@sveltejs/kit/hooks";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 
@@ -46,14 +46,7 @@ const authorization: Handle = async ({ event, resolve }) => {
 	}
 
 	// Refresh cookie expiration date
-	event.cookies.set(COOKIE_NAME, event.locals.sessionId, {
-		path: "/",
-		// So that it works inside the space's iframe
-		sameSite: dev ? "lax" : "none",
-		secure: !dev,
-		httpOnly: true,
-		expires: addYears(new Date(), 1),
-	});
+	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
 

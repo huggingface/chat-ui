@@ -1,10 +1,12 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
-import { addDays } from "date-fns";
-import { HF_CLIENT_ID, HF_CLIENT_SECRET, HF_HUB_URL } from "$env/static/private";
+import { addDays, addYears } from "date-fns";
+import { COOKIE_NAME, HF_CLIENT_ID, HF_CLIENT_SECRET, HF_HUB_URL } from "$env/static/private";
 import { instantSha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { PUBLIC_ORIGIN } from "$env/static/public";
 import { base } from "$app/paths";
+import { dev } from "$app/environment";
+import type { Cookies } from "@sveltejs/kit";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -16,6 +18,17 @@ export interface SSOUserInformation {
 }
 
 export const requiresUser = !!HF_CLIENT_ID && !!HF_CLIENT_SECRET;
+
+export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
+	cookies.set(COOKIE_NAME, sessionId, {
+		path: "/",
+		// So that it works inside the space's iframe
+		sameSite: dev ? "lax" : "none",
+		secure: !dev,
+		httpOnly: true,
+		expires: addYears(new Date(), 1),
+	});
+}
 
 export const getRedirectURI = (url: URL) => `${PUBLIC_ORIGIN || url.origin}${base}/login/callback`;
 
