@@ -28,16 +28,18 @@
 		<p class="px-2 text-sm text-gray-500">
 			Your conversations will be shared with model authors unless you disable it from your settings.
 		</p>
-		<form action="{base}/{PUBLIC_HF_CLIENT_ID ? 'login' : 'settings'}" use:enhance method="POST">
-			{#if PUBLIC_HF_CLIENT_ID}
-				<button
-					type="submit"
-					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+		{#if PUBLIC_HF_CLIENT_ID}
+			<div>
+				<a
+					href="/login"
+					class="mt-2 block rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 				>
 					Sign In with Hugging Face
-				</button>
+				</a>
 				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
-			{:else}
+			</div>
+		{:else}
+			<form action="{base}/settings" use:enhance method="POST">
 				<input type="hidden" name="ethicsModalAccepted" value={true} />
 				<button
 					type="submit"
@@ -45,7 +47,7 @@
 				>
 					Start chatting
 				</button>
-			{/if}
-		</form>
+			</form>
+		{/if}
 	</div>
 </Modal>
