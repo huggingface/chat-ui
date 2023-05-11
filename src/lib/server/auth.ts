@@ -1,6 +1,6 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
 import { addDays } from "date-fns";
-import { HF_CLIENT_ID, HF_CLIENT_SECRET, AUTH_SECRET } from "$env/static/private";
+import { HF_CLIENT_ID, HF_CLIENT_SECRET, AUTH_SECRET, HF_HUB_URL } from "$env/static/private";
 import { instantSha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 
@@ -34,7 +34,7 @@ export function generateCsrfToken(sessionId: string): string {
 }
 
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
-	const issuer = await Issuer.discover("http://localhost:5564");
+	const issuer = await Issuer.discover(HF_HUB_URL);
 	return new issuer.Client({
 		client_id: HF_CLIENT_ID,
 		client_secret: HF_CLIENT_SECRET,
