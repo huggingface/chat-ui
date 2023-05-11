@@ -14,7 +14,7 @@ app_port: 3000
 
 ![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/raw/f038917dd40d711a72d654ab1abfc03ae9f177e6/chat-ui-repo-thumbnail.svg)
 
-A chat interface using open source models, eg OpenAssistant. It powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
+A chat interface using open source models, eg OpenAssistant. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
 ## Launch
 
