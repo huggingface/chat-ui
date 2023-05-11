@@ -17,7 +17,8 @@
 	export let pending: boolean;
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
-	export let models: Model[] | undefined;
+	export let models: Model[];
+	export let readOnly: boolean;
 
 	let chatContainer: HTMLElement;
 
@@ -43,12 +44,11 @@
 				loading={loading && i === messages.length - 1}
 				{message}
 				model={currentModel}
+				{readOnly}
 				on:retry={() => dispatch("retry", { id: message.id, content: message.content })}
 			/>
 		{:else}
-			{#if models}
-				<ChatIntroduction {settings} {models} {currentModel} on:message />
-			{/if}
+			<ChatIntroduction {settings} {models} {currentModel} on:message />
 		{/each}
 		{#if pending}
 			<ChatMessage

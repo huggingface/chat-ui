@@ -3,7 +3,6 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
-	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import ModelsModal from "../ModelsModal.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
@@ -39,14 +38,6 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		<AnnouncementBanner classNames="mb-4" title="BigCode/StarCoderBase is now available">
-			<button
-				type="button"
-				on:click={() => (isModelsModalOpen = true)}
-				class="mr-2 flex items-center underline hover:no-underline"
-				><IconChevron classNames="mr-1" /> Switch model</button
-			>
-		</AnnouncementBanner>
 		{#if isModelsModalOpen}
 			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
 		{/if}
@@ -56,12 +47,14 @@
 					<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
 					<div class="font-semibold">{currentModel.displayName}</div>
 				</div>
-				<button
-					type="button"
-					on:click={() => (isModelsModalOpen = true)}
-					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-gray-100 p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
-					><IconChevron /></button
-				>
+				{#if models.length > 1}
+					<button
+						type="button"
+						on:click={() => (isModelsModalOpen = true)}
+						class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-gray-100 p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
+						><IconChevron /></button
+					>
+				{/if}
 			</div>
 			<ModelCardMetadata variant="dark" model={currentModel} />
 		</div>

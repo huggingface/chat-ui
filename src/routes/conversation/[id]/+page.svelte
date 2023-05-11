@@ -173,6 +173,7 @@
 	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
-	currentModel={findCurrentModel(data.models, data.model)}
+	models={data.models}
+	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	settings={data.settings}
 />

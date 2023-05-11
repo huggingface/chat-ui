@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN, MODELS } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import { z } from "zod";
 
 const modelsRaw = z
@@ -41,7 +41,8 @@ const modelsRaw = z
 					max_new_tokens: z.number().int().positive(),
 					stop: z.array(z.string()).optional(),
 				})
-				.passthrough(),
+				.passthrough()
+				.optional(),
 		})
 	)
 	.parse(JSON.parse(MODELS));
@@ -55,6 +56,25 @@ export const models = await Promise.all(
 	}))
 );
 
+// Models that have been deprecated
+export const oldModels = OLD_MODELS
+	? z
+			.array(
+				z.object({
+					id: z.string().optional(),
+					name: z.string().min(1),
+					displayName: z.string().min(1).optional(),
+				})
+			)
+			.parse(JSON.parse(OLD_MODELS))
+			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
+	: [];
+
 export type BackendModel = (typeof models)[0];
 
 export const defaultModel = models[0];
+
+export const validateModel = (_models: BackendModel[]) => {
+	// Zod enum function requires 2 parameters
+	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
+};
