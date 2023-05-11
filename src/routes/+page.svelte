@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
+	import { authFetch } from "$lib/authFetch";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
@@ -12,7 +13,7 @@
 	async function createConversation(message: string) {
 		try {
 			loading = true;
-			const res = await fetch(`${base}/conversation`, {
+			const res = await authFetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -21,9 +22,7 @@
 			});
 
 			if (!res.ok) {
-				if (res.status === 401) {
-					error.set(ERROR_MESSAGES.authOnly);
-				} else {
+				if (res.status !== 401) {
 					error.set("Error while creating conversation, try again.");
 					console.error("Error while creating conversation: " + (await res.text()));
 				}

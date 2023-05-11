@@ -91,7 +91,7 @@
 	});
 
 	$: if ($error && $error !== ERROR_MESSAGES.authOnly) onServerError();
-	$: if (!data.user.id) {
+	$: if (!data.user.id && !data.settings.ethicsModalAcceptedAt) {
 		$error = ERROR_MESSAGES.authOnly;
 	}
 </script>

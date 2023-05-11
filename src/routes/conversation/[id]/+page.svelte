@@ -12,6 +12,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
+	import { authFetch } from "$lib/authFetch";
 
 	export let data;
 
@@ -44,6 +45,7 @@
 				id: messageId,
 				is_retry: isRetry,
 				use_cache: false,
+				fetch: authFetch,
 			} as Options
 		);
 
@@ -55,7 +57,7 @@
 			}
 
 			if (conversationId !== $page.params.id) {
-				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
+				authFetch(`${base}/conversation/${conversationId}/stop-generating`, {
 					method: "POST",
 				}).catch(console.error);
 				break;
@@ -63,7 +65,7 @@
 
 			if (isAborted) {
 				isAborted = false;
-				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
+				authFetch(`${base}/conversation/${conversationId}/stop-generating`, {
 					method: "POST",
 				}).catch(console.error);
 				break;
@@ -136,7 +138,9 @@
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
 			} else if (err instanceof Error) {
-				$error = err.message;
+				if (err.message !== ERROR_MESSAGES.authOnly) {
+					$error = err.message;
+				}
 			} else {
 				$error = ERROR_MESSAGES.default;
 			}

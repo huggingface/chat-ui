@@ -10,6 +10,7 @@ import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { requiresUser } from "$lib/server/auth";
 import { sequence } from "@sveltejs/kit/hooks";
+import { ERROR_MESSAGES } from "$lib/stores/errors";
 
 const authorization: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
@@ -31,11 +32,9 @@ const authorization: Handle = async ({ event, resolve }) => {
 			event.request.headers.get("accept")?.includes("application/json") ||
 			event.request.headers.get("content-type")?.includes("application/json");
 
-		if (!user && requiresUser) {
+		if (!user?.hfUserId && requiresUser) {
 			return new Response(
-				sendJson
-					? JSON.stringify({ error: "You need to be logged in first" })
-					: "You need to be logged in first",
+				sendJson ? JSON.stringify({ error: ERROR_MESSAGES.authOnly }) : ERROR_MESSAGES.authOnly,
 				{
 					status: 401,
 					headers: {
