@@ -15,7 +15,7 @@ export interface SSOUserInformation {
 
 export const requiresUser = !!HF_CLIENT_ID && !!HF_CLIENT_SECRET;
 
-export const OIDC_SCOPES = "openid profile email";
+export const OIDC_SCOPES = "openid profile";
 
 export const authCondition = (locals: App.Locals) => {
 	return locals.userId
