@@ -1,4 +1,5 @@
 name: Lint and test
+
 on:
   pull_request:
   push:
@@ -9,19 +10,32 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
           cache: "npm"
-      - run: |
-          npm install ci
-      - name: "Checking lint/format errors"
-        run: |
-          npm run lint
-      - name: "Checking type errors"
-        run: |
-          npm run check
+      - name: Install dependencies
+        run: npm install
+      - name: Check lint/format errors
+        working-directory: ./app # Specify the working directory
+        run: npm run lint
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm install
+      - name: Check type errors
+        working-directory: ./app # Specify the working directory
+        run: npm run check
+      - name: Run tests
+        working-directory: ./app # Specify the working directory
+        run: npm run test
+    # Add error handling and notifications here (e.g. using the `actions/github-script` action)
