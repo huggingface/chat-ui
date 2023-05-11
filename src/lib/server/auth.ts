@@ -1,12 +1,16 @@
-import { Issuer, BaseClient } from "openid-client";
+import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
 import { addDays } from "date-fns";
 import { HF_CLIENT_ID, HF_CLIENT_SECRET, AUTH_SECRET } from "$env/static/private";
-import { ObjectId } from "mongodb";
 import { instantSha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 
 export interface OIDCSettings {
 	redirectURI: string;
+}
+
+export interface SSOUserInformation {
+	token: TokenSet;
+	userData: UserinfoResponse;
 }
 
 export const requiresUser = !!HF_CLIENT_ID && !!HF_CLIENT_SECRET;
@@ -53,6 +57,17 @@ export async function getOIDCAuthorizationUrl(
 	return url;
 }
 
+export async function getOIDCUserData(
+	settings: OIDCSettings,
+	code: string
+): Promise<SSOUserInformation> {
+	const client = await getOIDCClient(settings);
+	const token = await client.callback(settings.redirectURI, { code });
+	const userData = await client.userinfo(token);
+
+	return { token, userData };
+}
+
 export function validateCsrfToken(token: string, sessionId: string): boolean {
 	try {
 		const { data, signature } = z
@@ -68,8 +83,7 @@ export function validateCsrfToken(token: string, sessionId: string): boolean {
 
 		return (
 			data.expiration > Date.now() &&
-			// or just data.sessionId === sessionId?
-			new ObjectId(sessionId).equals(data.sessionId) &&
+			sessionId === data.sessionId &&
 			signature === instantSha256(JSON.stringify(data) + "##" + AUTH_SECRET)
 		);
 	} catch {
