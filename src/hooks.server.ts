@@ -44,27 +44,6 @@ const authorization: Handle = async ({ event, resolve }) => {
 				}
 			);
 		}
-
-		if (!event.url.pathname.startsWith(`${base}/settings`)) {
-			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
-				sessionId: event.locals.sessionId,
-				ethicsModalAcceptedAt: { $exists: true },
-			});
-
-			if (!hasAcceptedEthicsModal) {
-				return new Response(
-					sendJson
-						? JSON.stringify({ error: "You need to accept the welcome modal first" })
-						: "You need to accept the welcome modal first",
-					{
-						status: 405,
-						headers: {
-							"content-type": sendJson ? "application/json" : "text/plain",
-						},
-					}
-				);
-			}
-		}
 	}
 
 	// Refresh cookie expiration date

@@ -37,7 +37,6 @@ export async function GET({ url, locals }) {
 
 	// find sessionId in db if existing and migrate it to a user
 	const anonymousUser = await collections.users.findOne({ sessionId: locals.sessionId });
-	let userId;
 
 	if (anonymousUser) {
 		await collections.users.updateOne(
@@ -48,7 +47,13 @@ export async function GET({ url, locals }) {
 		// migrate pre-existing conversations if any
 		await collections.conversations.updateMany(
 			{ sessionId: locals.sessionId },
-			{ $set: { userId }, $unset: { sessionId: "" } }
+			{ $set: { userId: anonymousUser._id }, $unset: { sessionId: "" } }
+		);
+
+		// update pre-existing settings
+		await collections.settings.updateOne(
+			{ sessionId: locals.sessionId },
+			{ $set: { userId: anonymousUser._id }, $unset: { sessionId: "" } }
 		);
 	} else {
 		const existingUser = await collections.users.findOne({ hfUserId });
@@ -59,10 +64,9 @@ export async function GET({ url, locals }) {
 				{ hfUserId },
 				{ $set: { username, name, avatarUrl, sessionId: locals.sessionId } }
 			);
-			userId = existingUser._id;
 		} else {
 			// user doesn't exist yet, create a new one
-			const res = await collections.users.insertOne({
+			const { insertedId } = await collections.users.insertOne({
 				_id: new ObjectId(),
 				createdAt: new Date(),
 				updatedAt: new Date(),
@@ -72,15 +76,14 @@ export async function GET({ url, locals }) {
 				hfUserId,
 				sessionId: locals.sessionId,
 			});
-			userId = res.insertedId;
+
+			// set default settings
+			await collections.settings.updateOne(
+				{ sessionId: locals.sessionId },
+				{ $set: { userId: insertedId, ethicsModalAcceptedAt: new Date() } }
+			);
 		}
 	}
-
-	// update pre-existing settings
-	await collections.settings.updateOne(
-		{ sessionId: locals.sessionId },
-		{ $set: { userId }, $unset: { sessionId: "" } }
-	);
 
 	throw redirect(303, "/");
 }
