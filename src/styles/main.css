@@ -1,17 +1,41 @@
+/* Import external stylesheet */
 @import "./highlight-js.css";
 
+/* Include tailwind styles */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles */
 @layer components {
-	.btn {
-		@apply inline-flex flex-shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap outline-none transition-all focus:ring disabled:cursor-default;
+	/* Custom button style */
+	.button {
+		@apply 
+			inline-flex 
+			flex-shrink-0 
+			cursor-pointer 
+			select-none 
+			items-center 
+			justify-center 
+			whitespace-nowrap 
+			outline-none 
+			transition-all 
+			focus:ring 
+			disabled:cursor-default;
 	}
 }
 
 @layer utilities {
+	/* Custom scrollbar style */
 	.scrollbar-custom {
-		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
+		@apply 
+			scrollbar-thin 
+			scrollbar-track-transparent 
+			scrollbar-thumb-black/10 
+			scrollbar-thumb-rounded-full 
+			scrollbar-w-1 
+			hover:scrollbar-thumb-black/20 
+			dark:scrollbar-thumb-white/10 
+			dark:hover:scrollbar-thumb-white/20;
 	}
 }
