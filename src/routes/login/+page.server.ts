@@ -1,12 +1,10 @@
 import { redirect } from "@sveltejs/kit";
-import { getOIDCAuthorizationUrl } from "$lib/server/auth";
-import { PUBLIC_ORIGIN } from "$env/static/public";
-import { base } from "$app/paths";
+import { getOIDCAuthorizationUrl, getRedirectURI } from "$lib/server/auth";
 
 export const actions = {
 	default: async function ({ url, locals }) {
 		const ssoAuthorizationUrl = await getOIDCAuthorizationUrl(
-			{ redirectURI: `${PUBLIC_ORIGIN || url.origin}${base}/login/callback` },
+			{ redirectURI: getRedirectURI(url) },
 			{ sessionId: locals.sessionId }
 		);
 

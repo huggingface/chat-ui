@@ -1,8 +1,10 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
 import { addDays } from "date-fns";
-import { HF_CLIENT_ID, HF_CLIENT_SECRET, AUTH_SECRET, HF_HUB_URL } from "$env/static/private";
+import { HF_CLIENT_ID, HF_CLIENT_SECRET, HF_HUB_URL } from "$env/static/private";
 import { instantSha256 } from "$lib/utils/sha256";
 import { z } from "zod";
+import { PUBLIC_ORIGIN } from "$env/static/public";
+import { base } from "$app/paths";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -15,6 +17,8 @@ export interface SSOUserInformation {
 
 export const requiresUser = !!HF_CLIENT_ID && !!HF_CLIENT_SECRET;
 
+export const getRedirectURI = (url: URL) => `${PUBLIC_ORIGIN || url.origin}${base}/login/callback`;
+
 export const OIDC_SCOPES = "openid profile";
 
 export const authCondition = (locals: App.Locals) => {
@@ -25,11 +29,10 @@ export const authCondition = (locals: App.Locals) => {
 
 // Mostly taken from https://github.com/huggingface/moon-landing/tree/main/server/lib/Auth.ts
 export function generateCsrfToken(sessionId: string): string {
-	const data = { expiration: addDays(new Date(), 1).getTime(), sessionId };
-	const token = JSON.stringify(data);
+	const data = { expiration: addDays(new Date(), 1).getTime() };
 
 	return Buffer.from(
-		JSON.stringify({ data, signature: instantSha256(token + "##" + AUTH_SECRET) })
+		JSON.stringify({ data, signature: instantSha256(JSON.stringify(data) + "##" + sessionId) })
 	).toString("base64");
 }
 
@@ -51,7 +54,7 @@ export async function getOIDCAuthorizationUrl(
 	const csrfToken = generateCsrfToken(params.sessionId);
 	const url = client.authorizationUrl({
 		scope: OIDC_SCOPES,
-		state: Buffer.from(`${settings.redirectURI}|${csrfToken}`, "utf8").toString("base64"),
+		state: csrfToken,
 	});
 
 	return url;
@@ -74,20 +77,17 @@ export function validateCsrfToken(token: string, sessionId: string): boolean {
 			.object({
 				data: z.object({
 					expiration: z.number().int(),
-					sessionId: z.string(),
 				}),
-				// TODO: check if we need Joi.hex() missing from original code
 				signature: z.string().length(64),
 			})
-			.parse(JSON.parse(Buffer.from(token, "base64").toString()));
+			.parse(JSON.parse(token));
 
 		return (
 			data.expiration > Date.now() &&
-			sessionId === data.sessionId &&
-			signature === instantSha256(JSON.stringify(data) + "##" + AUTH_SECRET)
+			signature === instantSha256(JSON.stringify(data) + "##" + sessionId)
 		);
-	} catch {
-		// In case of Zod error mostly
+	} catch (e) {
+		console.error(e);
 		return false;
 	}
 }
