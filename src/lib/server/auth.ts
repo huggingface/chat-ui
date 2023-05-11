@@ -34,7 +34,7 @@ export function generateCsrfToken(sessionId: string): string {
 }
 
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
-	const issuer = await Issuer.discover("http://localhost:5564/.well-known/openid-configuration");
+	const issuer = await Issuer.discover("http://localhost:5564");
 	return new issuer.Client({
 		client_id: HF_CLIENT_ID,
 		client_secret: HF_CLIENT_SECRET,
