@@ -10,8 +10,6 @@ export const actions = {
 			{ sessionId: locals.sessionId }
 		);
 
-		console.log(ssoAuthorizationUrl);
-
 		throw redirect(303, ssoAuthorizationUrl);
 	},
 };

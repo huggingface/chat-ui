@@ -14,12 +14,9 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
-	import { user } from "$lib/stores/user";
 	import LoginModal from "$lib/components/LoginModal.svelte";
 
 	export let data;
-
-	$user = data.user ?? null;
 
 	let isNavOpen = false;
 	let isSettingsOpen = false;
@@ -94,7 +91,7 @@
 	});
 
 	$: if ($error && $error !== ERROR_MESSAGES.authOnly) onServerError();
-	$: if (!$user?.id) {
+	$: if (!data.user.id) {
 		$error = ERROR_MESSAGES.authOnly;
 	}
 </script>
@@ -135,7 +132,7 @@
 		/>
 	</nav>
 	{#if $error === ERROR_MESSAGES.authOnly}
-		<LoginModal settings={data.settings} />
+		<LoginModal />
 	{:else if currentError}
 		<Toast message={currentError} />
 	{/if}

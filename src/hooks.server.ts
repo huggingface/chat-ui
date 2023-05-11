@@ -18,6 +18,10 @@ const authorization: Handle = async ({ event, resolve }) => {
 
 	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
 
+	if (user?.hfUserId) {
+		event.locals.userId = user._id;
+	}
+
 	if (
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
