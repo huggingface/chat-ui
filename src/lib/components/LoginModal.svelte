@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
-	import { PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_VERSION, PUBLIC_HF_CLIENT_ID } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 </script>
@@ -28,15 +28,24 @@
 		<p class="px-2 text-sm text-gray-500">
 			Your conversations will be shared with model authors unless you disable it from your settings.
 		</p>
-		<form action="{base}/login" use:enhance method="POST">
-			<input type="hidden" name="callbackUrl" value={base} />
-			<button
-				type="submit"
-				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
-			>
-				Sign In with Hugging Face
-			</button>
-			<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
+		<form action="{base}/{PUBLIC_HF_CLIENT_ID ? 'login' : 'settings'}" use:enhance method="POST">
+			{#if PUBLIC_HF_CLIENT_ID}
+				<button
+					type="submit"
+					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+				>
+					Sign In with Hugging Face
+				</button>
+				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
+			{:else}
+				<input type="hidden" name="ethicsModalAccepted" value={true} />
+				<button
+					type="submit"
+					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+				>
+					Start chatting
+				</button>
+			{/if}
 		</form>
 	</div>
 </Modal>

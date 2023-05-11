@@ -1,11 +1,9 @@
-import { dev } from "$app/environment";
 import { COOKIE_NAME } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
 } from "$env/static/public";
-import { addYears } from "date-fns";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
