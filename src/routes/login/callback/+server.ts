@@ -44,6 +44,12 @@ export async function GET({ url, locals }) {
 			{ sessionId: locals.sessionId },
 			{ $set: { hfUserId, username, name, avatarUrl } }
 		);
+
+		// migrate pre-existing conversations if any
+		await collections.conversations.updateMany(
+			{ sessionId: locals.sessionId },
+			{ $set: { userId }, $unset: { sessionId: "" } }
+		);
 	} else {
 		const existingUser = await collections.users.findOne({ hfUserId });
 
@@ -69,12 +75,6 @@ export async function GET({ url, locals }) {
 			userId = res.insertedId;
 		}
 	}
-
-	// migrate pre-existing conversations if any
-	await collections.conversations.updateMany(
-		{ sessionId: locals.sessionId },
-		{ $set: { userId }, $unset: { sessionId: "" } }
-	);
 
 	// update pre-existing settings
 	await collections.settings.updateOne(
