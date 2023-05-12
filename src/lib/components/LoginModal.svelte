@@ -5,6 +5,9 @@
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
+	import type { LayoutData } from "../../routes/$types";
+
+	export let settings: LayoutData["settings"];
 </script>
 
 <Modal>
@@ -44,6 +47,9 @@
 				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
 			{:else}
 				<input type="hidden" name="ethicsModalAccepted" value={true} />
+				{#each Object.entries(settings) as [key, val]}
+					<input type="hidden" name={key} value={val} />
+				{/each}
 				<button
 					type="submit"
 					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"

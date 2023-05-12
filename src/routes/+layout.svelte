@@ -135,7 +135,7 @@
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
 	{/if}
 	{#if data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt}
-		<LoginModal />
+		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />
 </div>
