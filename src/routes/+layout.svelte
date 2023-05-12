@@ -128,13 +128,14 @@
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</nav>
-	{#if data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt}
-		<LoginModal />
-	{:else if currentError}
+	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
 	{#if isSettingsOpen}
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
+	{/if}
+	{#if data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt}
+		<LoginModal />
 	{/if}
 	<slot />
 </div>
