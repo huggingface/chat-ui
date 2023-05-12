@@ -91,6 +91,7 @@ export async function GET({ url, locals, cookies }) {
 		} else {
 			// update settings if existing or create new default ones
 			await collections.settings.insertOne({
+				userId: insertedId,
 				ethicsModalAcceptedAt: new Date(),
 				updatedAt: new Date(),
 				shareConversationsWithModelAuthors: true,
