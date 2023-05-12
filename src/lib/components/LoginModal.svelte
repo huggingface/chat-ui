@@ -42,7 +42,7 @@
 					type="submit"
 					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 				>
-					Sign In with Hugging Face
+					Sign in with Hugging Face
 				</button>
 				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
 			{:else}
