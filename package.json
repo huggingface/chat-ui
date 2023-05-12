@@ -14,6 +14,8 @@
 	},
 	"devDependencies": {
 		"@iconify-json/carbon": "^1.1.16",
+		"@inlang/core": "^0.8.2",
+		"@inlang/sdk-js": "^0.4.4",
 		"@sveltejs/adapter-node": "^1.2.4",
 		"@sveltejs/kit": "^1.15.10",
 		"@tailwindcss/typography": "^0.5.9",
@@ -36,8 +38,8 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@huggingface/inference": "^2.2.0",
 		"@huggingface/hub": "^0.5.1",
+		"@huggingface/inference": "^2.2.0",
 		"autoprefixer": "^10.4.14",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
