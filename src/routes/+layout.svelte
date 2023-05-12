@@ -113,6 +113,7 @@
 	>
 		<NavMenu
 			conversations={data.conversations}
+			user={data.user}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -122,6 +123,7 @@
 	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
 		<NavMenu
 			conversations={data.conversations}
+			user={data.user}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
