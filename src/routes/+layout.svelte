@@ -8,7 +8,7 @@
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+	import { error } from "$lib/stores/errors";
 
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -90,12 +90,7 @@
 		clearTimeout(errorToastTimeout);
 	});
 
-	$: if ($error && $error !== ERROR_MESSAGES.authOnly) onServerError();
-	$: if (!data.user) {
-		$error = ERROR_MESSAGES.authOnly;
-	} else {
-		$error = null;
-	}
+	$: if ($error) onServerError();
 </script>
 
 <svelte:head>
@@ -133,7 +128,7 @@
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</nav>
-	{#if $error === ERROR_MESSAGES.authOnly}
+	{#if !data.user}
 		<LoginModal />
 	{:else if currentError}
 		<Toast message={currentError} />

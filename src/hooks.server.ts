@@ -41,6 +41,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 			);
 		}
 
+		// if login is not required and the call is not from /settings, we check if the user has accepted the ethics modal first.
+		// If login is required, `ethicsModalAcceptedAt` is already true at this point, so do not pass this condition. This saves a DB call.
 		if (!requiresUser && !event.url.pathname.startsWith(`${base}/settings`)) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,

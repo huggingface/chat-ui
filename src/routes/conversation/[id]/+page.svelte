@@ -136,9 +136,7 @@
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
 			} else if (err instanceof Error) {
-				if (err.message !== ERROR_MESSAGES.authOnly) {
-					$error = err.message;
-				}
+				$error = err.message;
 			} else {
 				$error = ERROR_MESSAGES.default;
 			}

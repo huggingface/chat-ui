@@ -40,7 +40,9 @@ export const authCondition = (locals: App.Locals) => {
 		: { sessionId: locals.sessionId, userId: { $exists: false } };
 };
 
-// Mostly taken from https://github.com/huggingface/moon-landing/tree/main/server/lib/Auth.ts
+/**
+ * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
+ */
 export function generateCsrfToken(sessionId: string): string {
 	const data = { expiration: addDays(new Date(), 1).getTime() };
 
