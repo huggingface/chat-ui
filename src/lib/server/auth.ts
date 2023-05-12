@@ -1,6 +1,11 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
 import { addDays, addYears } from "date-fns";
-import { COOKIE_NAME, HF_CLIENT_ID, HF_CLIENT_SECRET, HF_HUB_URL } from "$env/static/private";
+import {
+	COOKIE_NAME,
+	OPENID_CLIENT_ID,
+	OPENID_CLIENT_SECRET,
+	OPENID_PROVIDER_URL,
+} from "$env/static/private";
 import { PUBLIC_ORIGIN } from "$env/static/public";
 import { instantSha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -12,12 +17,12 @@ export interface OIDCSettings {
 	redirectURI: string;
 }
 
-export interface SSOUserInformation {
+export interface OIDCUserInfo {
 	token: TokenSet;
 	userData: UserinfoResponse;
 }
 
-export const requiresUser = !!HF_CLIENT_ID && !!HF_CLIENT_SECRET;
+export const requiresUser = !!OPENID_CLIENT_ID && !!OPENID_CLIENT_SECRET;
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(COOKIE_NAME, sessionId, {
@@ -52,10 +57,10 @@ export function generateCsrfToken(sessionId: string): string {
 }
 
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
-	const issuer = await Issuer.discover(HF_HUB_URL);
+	const issuer = await Issuer.discover(OPENID_PROVIDER_URL);
 	return new issuer.Client({
-		client_id: HF_CLIENT_ID,
-		client_secret: HF_CLIENT_SECRET,
+		client_id: OPENID_CLIENT_ID,
+		client_secret: OPENID_CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
 	});
@@ -75,10 +80,7 @@ export async function getOIDCAuthorizationUrl(
 	return url;
 }
 
-export async function getOIDCUserData(
-	settings: OIDCSettings,
-	code: string
-): Promise<SSOUserInformation> {
+export async function getOIDCUserData(settings: OIDCSettings, code: string): Promise<OIDCUserInfo> {
 	const client = await getOIDCClient(settings);
 	const token = await client.callback(settings.redirectURI, { code });
 	const userData = await client.userinfo(token);

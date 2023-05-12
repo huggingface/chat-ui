@@ -23,7 +23,7 @@
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
-	async function onServerError() {
+	async function onError() {
 		// If a new different error comes, wait for the current error to hide first
 		if ($error && currentError && $error !== currentError) {
 			clearTimeout(errorToastTimeout);
@@ -90,7 +90,7 @@
 		clearTimeout(errorToastTimeout);
 	});
 
-	$: if ($error) onServerError();
+	$: if ($error) onError();
 </script>
 
 <svelte:head>

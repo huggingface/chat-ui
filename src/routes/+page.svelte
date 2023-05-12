@@ -21,10 +21,8 @@
 			});
 
 			if (!res.ok) {
-				if (res.status !== 401) {
-					error.set("Error while creating conversation, try again.");
-					console.error("Error while creating conversation: " + (await res.text()));
-				}
+				error.set("Error while creating conversation, try again.");
+				console.error("Error while creating conversation: " + (await res.text()));
 				return;
 			}
 
