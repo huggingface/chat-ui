@@ -35,8 +35,8 @@ export const getRedirectURI = (url: URL) => `${PUBLIC_ORIGIN || url.origin}${bas
 export const OIDC_SCOPES = "openid profile";
 
 export const authCondition = (locals: App.Locals) => {
-	return locals.userId
-		? { userId: locals.userId }
+	return locals.user
+		? { userId: locals.user._id }
 		: { sessionId: locals.sessionId, userId: { $exists: false } };
 };
 

@@ -1,5 +1,6 @@
 import { redirect, error } from "@sveltejs/kit";
 import {
+	authCondition,
 	getOIDCUserData,
 	getRedirectURI,
 	refreshSessionCookie,
@@ -9,6 +10,7 @@ import { z } from "zod";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { base } from "$app/paths";
+import { defaultModel } from "$lib/server/models";
 
 export async function GET({ url, locals, cookies }) {
 	const { error: errorName } = z
@@ -51,51 +53,57 @@ export async function GET({ url, locals, cookies }) {
 		})
 		.parse(userData);
 
-	// find sessionId in db if existing and migrate it to a user
-	const anonymousUser = await collections.users.findOne({ sessionId: locals.sessionId });
+	const existingUser = await collections.users.findOne({ hfUserId });
 
-	if (anonymousUser) {
-		await collections.users.updateOne(
-			{ sessionId: locals.sessionId },
-			{ $set: { hfUserId, username, name, avatarUrl } }
-		);
-
-		// migrate pre-existing conversations if any
-		await collections.conversations.updateMany(
-			{ sessionId: locals.sessionId },
-			{ $set: { userId: anonymousUser._id }, $unset: { sessionId: "" } }
-		);
+	if (existingUser) {
+		// update existing user if any
+		await collections.users.updateOne({ hfUserId }, { $set: { username, name, avatarUrl } });
+		// refresh session cookie
+		refreshSessionCookie(cookies, existingUser.sessionId);
+	} else {
+		// user doesn't exist yet, create a new one
+		const { insertedId } = await collections.users.insertOne({
+			_id: new ObjectId(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			username,
+			name,
+			avatarUrl,
+			hfUserId,
+			sessionId: locals.sessionId,
+		});
 
 		// update pre-existing settings
-		await collections.settings.updateOne(
+		const { matchedCount } = await collections.settings.updateOne(
 			{ sessionId: locals.sessionId },
-			{ $set: { userId: anonymousUser._id }, $unset: { sessionId: "" } }
+			{ $set: { userId: insertedId }, $unset: { sessionId: "" } }
 		);
-	} else {
-		const existingUser = await collections.users.findOne({ hfUserId });
 
-		if (existingUser) {
-			// update existing user if any
-			await collections.users.updateOne({ hfUserId }, { $set: { username, name, avatarUrl } });
-			// refresh session cookie
-			refreshSessionCookie(cookies, existingUser.sessionId);
-		} else {
-			// user doesn't exist yet, create a new one
-			const { insertedId } = await collections.users.insertOne({
-				_id: new ObjectId(),
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				username,
-				name,
-				avatarUrl,
-				hfUserId,
-				sessionId: locals.sessionId,
-			});
-
-			// set default settings
-			await collections.settings.updateOne(
+		if (matchedCount) {
+			// migrate pre-existing conversations if any
+			await collections.conversations.updateMany(
 				{ sessionId: locals.sessionId },
-				{ $set: { userId: insertedId, ethicsModalAcceptedAt: new Date() } }
+				{ $set: { userId: insertedId }, $unset: { sessionId: "" } }
+			);
+		} else {
+			// update settings if existing or create new default ones
+			await collections.settings.updateOne(
+				authCondition(locals),
+				{
+					$set: {
+						ethicsModalAcceptedAt: new Date(),
+						updatedAt: new Date(),
+					},
+					$setOnInsert: {
+						shareConversationsWithModelAuthors: true,
+						activeModel: defaultModel.id,
+						createdAt: new Date(),
+					},
+					$unset: { sessionId: "" },
+				},
+				{
+					upsert: true,
+				}
 			);
 		}
 	}

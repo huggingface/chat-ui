@@ -1,7 +1,7 @@
 /// <reference types="@sveltejs/kit" />
 /// <reference types="unplugin-icons/types/svelte" />
 
-import type { ObjectId } from "mongodb";
+import type { User } from "$lib/types/User";
 
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
@@ -10,7 +10,7 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			sessionId: string;
-			userId?: ObjectId;
+			user?: User;
 		}
 		// interface PageData {}
 		// interface Platform {}

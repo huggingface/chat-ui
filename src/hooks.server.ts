@@ -16,8 +16,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
 
-	if (user?.hfUserId) {
-		event.locals.userId = user._id;
+	if (user) {
+		event.locals.user = user;
 	}
 
 	if (
@@ -29,7 +29,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.request.headers.get("accept")?.includes("application/json") ||
 			event.request.headers.get("content-type")?.includes("application/json");
 
-		if (!user?.hfUserId && requiresUser) {
+		if (!user && requiresUser) {
 			return new Response(
 				sendJson ? JSON.stringify({ error: ERROR_MESSAGES.authOnly }) : ERROR_MESSAGES.authOnly,
 				{
@@ -41,7 +41,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			);
 		}
 
-		if (!event.url.pathname.startsWith(`${base}/settings`)) {
+		if (!requiresUser && !event.url.pathname.startsWith(`${base}/settings`)) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },
