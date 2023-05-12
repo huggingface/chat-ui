@@ -57,7 +57,10 @@ export async function GET({ url, locals, cookies }) {
 
 	if (existingUser) {
 		// update existing user if any
-		await collections.users.updateOne({ hfUserId }, { $set: { username, name, avatarUrl } });
+		await collections.users.updateOne(
+			{ _id: existingUser._id },
+			{ $set: { username, name, avatarUrl } }
+		);
 		// refresh session cookie
 		refreshSessionCookie(cookies, existingUser.sessionId);
 	} else {
@@ -87,24 +90,13 @@ export async function GET({ url, locals, cookies }) {
 			);
 		} else {
 			// update settings if existing or create new default ones
-			await collections.settings.updateOne(
-				authCondition(locals),
-				{
-					$set: {
-						ethicsModalAcceptedAt: new Date(),
-						updatedAt: new Date(),
-					},
-					$setOnInsert: {
-						shareConversationsWithModelAuthors: true,
-						activeModel: defaultModel.id,
-						createdAt: new Date(),
-					},
-					$unset: { sessionId: "" },
-				},
-				{
-					upsert: true,
-				}
-			);
+			await collections.settings.insertOne({
+				ethicsModalAcceptedAt: new Date(),
+				updatedAt: new Date(),
+				shareConversationsWithModelAuthors: true,
+				activeModel: defaultModel.id,
+				createdAt: new Date(),
+			});
 		}
 	}
 
