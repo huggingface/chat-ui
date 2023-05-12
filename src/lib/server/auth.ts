@@ -48,7 +48,7 @@ export const authCondition = (locals: App.Locals) => {
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
  */
-export async function generateCsrfToken(sessionId: string): string {
+export async function generateCsrfToken(sessionId: string): Promise<string> {
 	const data = { expiration: addDays(new Date(), 1).getTime() };
 
 	return Buffer.from(
@@ -91,7 +91,7 @@ export async function getOIDCUserData(settings: OIDCSettings, code: string): Pro
 	return { token, userData };
 }
 
-export async function validateCsrfToken(token: string, sessionId: string): boolean {
+export async function validateCsrfToken(token: string, sessionId: string) {
 	try {
 		const { data, signature } = z
 			.object({
