@@ -7,7 +7,7 @@ import {
 	OPENID_PROVIDER_URL,
 } from "$env/static/private";
 import { PUBLIC_ORIGIN } from "$env/static/public";
-import { instantSha256 } from "$lib/utils/sha256";
+import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { base } from "$app/paths";
 import { dev } from "$app/environment";
@@ -48,11 +48,14 @@ export const authCondition = (locals: App.Locals) => {
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
  */
-export function generateCsrfToken(sessionId: string): string {
+export async function generateCsrfToken(sessionId: string): string {
 	const data = { expiration: addDays(new Date(), 1).getTime() };
 
 	return Buffer.from(
-		JSON.stringify({ data, signature: instantSha256(JSON.stringify(data) + "##" + sessionId) })
+		JSON.stringify({
+			data,
+			signature: await sha256(JSON.stringify(data) + "##" + sessionId),
+		})
 	).toString("base64");
 }
 
@@ -71,7 +74,7 @@ export async function getOIDCAuthorizationUrl(
 	params: { sessionId: string }
 ): Promise<string> {
 	const client = await getOIDCClient(settings);
-	const csrfToken = generateCsrfToken(params.sessionId);
+	const csrfToken = await generateCsrfToken(params.sessionId);
 	const url = client.authorizationUrl({
 		scope: OIDC_SCOPES,
 		state: csrfToken,
@@ -88,7 +91,7 @@ export async function getOIDCUserData(settings: OIDCSettings, code: string): Pro
 	return { token, userData };
 }
 
-export function validateCsrfToken(token: string, sessionId: string): boolean {
+export async function validateCsrfToken(token: string, sessionId: string): boolean {
 	try {
 		const { data, signature } = z
 			.object({
@@ -98,11 +101,9 @@ export function validateCsrfToken(token: string, sessionId: string): boolean {
 				signature: z.string().length(64),
 			})
 			.parse(JSON.parse(token));
+		const reconstructSign = await sha256(JSON.stringify(data) + "##" + sessionId);
 
-		return (
-			data.expiration > Date.now() &&
-			signature === instantSha256(JSON.stringify(data) + "##" + sessionId)
-		);
+		return data.expiration > Date.now() && signature === reconstructSign;
 	} catch (e) {
 		console.error(e);
 		return false;

@@ -7,9 +7,3 @@ export async function sha256(input: string): Promise<string> {
 	const hashHex = hashArray.map((bytes) => bytes.toString(16).padStart(2, "0")).join("");
 	return hashHex;
 }
-
-export function instantSha256(input: string | Buffer): string {
-	const sha256Stream = crypto.createHash("sha256");
-	sha256Stream.update(input);
-	return sha256Stream.digest().toString("hex");
-}
