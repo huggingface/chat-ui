@@ -79,7 +79,7 @@ export async function GET({ url, locals, cookies }) {
 		// update pre-existing settings
 		const { matchedCount } = await collections.settings.updateOne(
 			{ sessionId: locals.sessionId },
-			{ $set: { userId: insertedId }, $unset: { sessionId: "" } }
+			{ $set: { userId: insertedId, updatedAt: new Date() }, $unset: { sessionId: "" } }
 		);
 
 		if (matchedCount) {
