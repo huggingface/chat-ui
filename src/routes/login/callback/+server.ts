@@ -53,6 +53,7 @@ export async function GET({ url, locals, cookies }) {
 		.parse(userData);
 
 	const existingUser = await collections.users.findOne({ hfUserId });
+	let userId = existingUser?._id;
 
 	if (existingUser) {
 		// update existing user if any
@@ -75,22 +76,18 @@ export async function GET({ url, locals, cookies }) {
 			sessionId: locals.sessionId,
 		});
 
+		userId = insertedId;
+
 		// update pre-existing settings
 		const { matchedCount } = await collections.settings.updateOne(
 			{ sessionId: locals.sessionId },
-			{ $set: { userId: insertedId, updatedAt: new Date() }, $unset: { sessionId: "" } }
+			{ $set: { userId, updatedAt: new Date() }, $unset: { sessionId: "" } }
 		);
 
-		if (matchedCount) {
-			// migrate pre-existing conversations if any
-			await collections.conversations.updateMany(
-				{ sessionId: locals.sessionId },
-				{ $set: { userId: insertedId }, $unset: { sessionId: "" } }
-			);
-		} else {
+		if (!matchedCount) {
 			// update settings if existing or create new default ones
 			await collections.settings.insertOne({
-				userId: insertedId,
+				userId,
 				ethicsModalAcceptedAt: new Date(),
 				updatedAt: new Date(),
 				createdAt: new Date(),
@@ -98,6 +95,12 @@ export async function GET({ url, locals, cookies }) {
 			});
 		}
 	}
+
+	// migrate pre-existing conversations
+	await collections.conversations.updateMany(
+		{ sessionId: locals.sessionId, userId: { $exists: false } },
+		{ $set: { userId }, $unset: { sessionId: "" } }
+	);
 
 	throw redirect(302, base || "/");
 }
