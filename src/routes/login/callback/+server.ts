@@ -14,13 +14,11 @@ export async function GET({ url, locals, cookies }) {
 	const { error: errorName } = z
 		.object({
 			error: z.string().optional(),
-			error_description: z.string().optional(),
 		})
 		.parse(Object.fromEntries(url.searchParams.entries()));
 
 	if (errorName) {
 		// TODO: Display denied error on the UI
-		// throw error(404, error_description);
 		throw redirect(302, base || "/");
 	}
 

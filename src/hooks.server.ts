@@ -21,6 +21,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (
+		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
