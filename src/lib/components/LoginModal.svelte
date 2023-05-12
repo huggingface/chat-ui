@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
-	import { PUBLIC_VERSION, PUBLIC_HF_CLIENT_ID } from "$env/static/public";
+	import { page } from "$app/stores";
+	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 </script>
@@ -28,7 +29,7 @@
 		<p class="px-2 text-sm text-gray-500">
 			Your conversations will be shared with model authors unless you disable it from your settings.
 		</p>
-		{#if PUBLIC_HF_CLIENT_ID}
+		{#if $page.data.requiresLogin}
 			<div>
 				<a
 					href="/login"

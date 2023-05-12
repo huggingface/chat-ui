@@ -4,7 +4,7 @@ import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
-import { authCondition } from "$lib/server/auth";
+import { authCondition, requiresUser } from "$lib/server/auth";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
@@ -69,6 +69,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			parameters: model.parameters,
 		})),
 		oldModels,
-		user: { id: locals.userId?.toString(), sessionId: locals.sessionId },
+		user: { id: locals.userId?.toString() },
+		requiresLogin: requiresUser,
 	};
 };

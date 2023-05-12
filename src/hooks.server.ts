@@ -7,10 +7,9 @@ import {
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
-import { sequence } from "@sveltejs/kit/hooks";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 
-const authorization: Handle = async ({ event, resolve }) => {
+export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
 
 	event.locals.sessionId = token || crypto.randomUUID();
@@ -40,6 +39,27 @@ const authorization: Handle = async ({ event, resolve }) => {
 				}
 			);
 		}
+
+		if (!event.url.pathname.startsWith(`${base}/settings`)) {
+			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
+				sessionId: event.locals.sessionId,
+				ethicsModalAcceptedAt: { $exists: true },
+			});
+
+			if (!hasAcceptedEthicsModal) {
+				return new Response(
+					sendJson
+						? JSON.stringify({ error: "You need to accept the welcome modal first" })
+						: "You need to accept the welcome modal first",
+					{
+						status: 405,
+						headers: {
+							"content-type": sendJson ? "application/json" : "text/plain",
+						},
+					}
+				);
+			}
+		}
 	}
 
 	// Refresh cookie expiration date
@@ -63,5 +83,3 @@ const authorization: Handle = async ({ event, resolve }) => {
 
 	return response;
 };
-
-export const handle: Handle = sequence(authorization);
