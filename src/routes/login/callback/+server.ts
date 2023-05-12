@@ -1,5 +1,6 @@
 import { redirect, error } from "@sveltejs/kit";
 import {
+	authCondition,
 	getOIDCUserData,
 	getRedirectURI,
 	refreshSessionCookie,
@@ -81,10 +82,10 @@ export async function GET({ url, locals, cookies }) {
 		userId = insertedId;
 
 		// update pre-existing settings
-		const { matchedCount } = await collections.settings.updateOne(
-			{ sessionId: locals.sessionId },
-			{ $set: { userId, updatedAt: new Date() }, $unset: { sessionId: "" } }
-		);
+		const { matchedCount } = await collections.settings.updateOne(authCondition(locals), {
+			$set: { userId, updatedAt: new Date() },
+			$unset: { sessionId: "" },
+		});
 
 		if (!matchedCount) {
 			// update settings if existing or create new default ones
@@ -99,10 +100,10 @@ export async function GET({ url, locals, cookies }) {
 	}
 
 	// migrate pre-existing conversations
-	await collections.conversations.updateMany(
-		{ sessionId: locals.sessionId, userId: { $exists: false } },
-		{ $set: { userId }, $unset: { sessionId: "" } }
-	);
+	await collections.conversations.updateMany(authCondition(locals), {
+		$set: { userId },
+		$unset: { sessionId: "" },
+	});
 
 	throw redirect(302, base || "/");
 }
