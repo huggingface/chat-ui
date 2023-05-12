@@ -116,7 +116,9 @@
 {#if message.from === "user"}
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
-		<div class="whitespace-break-spaces rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400">
+		<div
+			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
+		>
 			{message.content.trim()}
 		</div>
 		{#if !loading}
