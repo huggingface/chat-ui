@@ -1,6 +1,5 @@
 import { redirect, error } from "@sveltejs/kit";
 import {
-	authCondition,
 	getOIDCUserData,
 	getRedirectURI,
 	refreshSessionCookie,
@@ -10,7 +9,7 @@ import { z } from "zod";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { base } from "$app/paths";
-import { defaultModel } from "$lib/server/models";
+import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
 export async function GET({ url, locals, cookies }) {
 	const { error: errorName } = z
@@ -94,9 +93,8 @@ export async function GET({ url, locals, cookies }) {
 				userId: insertedId,
 				ethicsModalAcceptedAt: new Date(),
 				updatedAt: new Date(),
-				shareConversationsWithModelAuthors: true,
-				activeModel: defaultModel.id,
 				createdAt: new Date(),
+				...DEFAULT_SETTINGS,
 			});
 		}
 	}
