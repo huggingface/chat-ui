@@ -10,6 +10,7 @@
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
+	import { env } from "$env/dynamic/public";
 
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
@@ -18,6 +19,11 @@
 	let isModelsModalOpen = false;
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
+
+	let announcementBanners = JSON.parse(env["PUBLIC_ANNOUNCEMENT_BANNERS"]);
+	let title = announcementBanners[0].title;
+	let linkTitle = announcementBanners[0].linkTitle;
+	let linkHref = announcementBanners[0].linkHref;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
@@ -40,12 +46,9 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		<AnnouncementBanner classNames="mb-4" title="Chat UI is now open sourced on GitHub">
-			<a
-				target="_blank"
-				href="https://github.com/huggingface/chat-ui"
-				class="mr-2 flex items-center underline hover:no-underline"
-				><CarbonArrowUpRight class="mr-1" /> GitHub repo</a
+		<AnnouncementBanner classNames="mb-4" {title}>
+			<a target="_blank" href={linkHref} class="mr-2 flex items-center underline hover:no-underline"
+				><CarbonArrowUpRight class="mr-1" /> {linkTitle}</a
 			>
 		</AnnouncementBanner>
 		{#if isModelsModalOpen}
