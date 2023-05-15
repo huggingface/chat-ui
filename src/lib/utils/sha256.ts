@@ -1,3 +1,5 @@
+import * as crypto from "crypto";
+
 export async function sha256(input: string): Promise<string> {
 	const utf8 = new TextEncoder().encode(input);
 	const hashBuffer = await crypto.subtle.digest("SHA-256", utf8);

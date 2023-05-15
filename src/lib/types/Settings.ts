@@ -1,3 +1,4 @@
+import { defaultModel } from "$lib/server/models";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
@@ -14,3 +15,9 @@ export interface Settings extends Timestamps {
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
 }
+
+// TODO: move this to a constant file along with other constants
+export const DEFAULT_SETTINGS = {
+	shareConversationsWithModelAuthors: true,
+	activeModel: defaultModel.id,
+};

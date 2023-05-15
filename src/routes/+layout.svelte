@@ -13,8 +13,8 @@
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
-	import EthicsModal from "$lib/components/EthicsModal.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
+	import LoginModal from "$lib/components/LoginModal.svelte";
 
 	export let data;
 
@@ -113,6 +113,7 @@
 	>
 		<NavMenu
 			conversations={data.conversations}
+			user={data.user}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -122,6 +123,7 @@
 	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
 		<NavMenu
 			conversations={data.conversations}
+			user={data.user}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -134,8 +136,8 @@
 	{#if isSettingsOpen}
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
 	{/if}
-	{#if !data.settings.ethicsModalAcceptedAt}
-		<EthicsModal settings={data.settings} />
+	{#if data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt}
+		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />
 </div>

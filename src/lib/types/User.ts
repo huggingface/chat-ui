@@ -10,5 +10,5 @@ export interface User extends Timestamps {
 	hfUserId: string;
 
 	// Session identifier, stored in the cookie
-	sessionId?: string;
+	sessionId: string;
 }
