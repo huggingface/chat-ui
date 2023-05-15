@@ -1,6 +1,6 @@
-import { assert, it, describe, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { assert, it, describe, afterEach, vi, expect } from "vitest";
 import type { Cookies } from "@sveltejs/kit";
-import { collections, db } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { login } from "./login";
 import { ObjectId } from "mongodb";
 import { defaultModel } from "./models";
@@ -18,11 +18,9 @@ const locals = {
 	sessionId: "1234567890",
 };
 
-// @ts-ignore
+// @ts-expect-error SvelteKit cookies dumb mock
 const cookiesMock: Cookies = {
-	set: () => {
-		return;
-	},
+	set: vi.fn(),
 };
 
 const insertRandomUser = async () => {
@@ -41,7 +39,7 @@ const insertRandomUser = async () => {
 };
 
 const insertRandomConversations = async (count: number) => {
-	return collections.conversations.insertMany(
+	const res = await collections.conversations.insertMany(
 		new Array(count).fill(0).map(() => ({
 			_id: new ObjectId(),
 			title: "random title",
@@ -52,11 +50,9 @@ const insertRandomConversations = async (count: number) => {
 			sessionId: locals.sessionId,
 		}))
 	);
-};
 
-beforeAll(async () => {
-	await collections.users.deleteMany({ hfUserId: userData.sub });
-});
+	return res.insertedIds;
+};
 
 describe("login", () => {
 	it("should update user if existing", async () => {
@@ -67,6 +63,8 @@ describe("login", () => {
 		const existingUser = await collections.users.findOne({ hfUserId: userData.sub });
 
 		assert.equal(existingUser?.name, userData.name);
+
+		expect(cookiesMock.set).toBeCalledTimes(1);
 	});
 
 	it("should migrate pre-existing conversations for new user", async () => {
@@ -106,7 +104,7 @@ describe("login", () => {
 		await collections.settings.deleteOne({ userId: user?._id });
 	});
 
-	it("should migrate pre-existing settings", async () => {
+	it("should migrate pre-existing settings for pre-existing user", async () => {
 		const { insertedId } = await collections.settings.insertOne({
 			sessionId: locals.sessionId,
 			ethicsModalAcceptedAt: new Date(),
@@ -142,8 +140,5 @@ describe("login", () => {
 
 afterEach(async () => {
 	await collections.users.deleteMany({ hfUserId: userData.sub });
+	vi.clearAllMocks();
 });
-
-// afterAll(async () => {
-// 	await collections.users.deleteMany({ hfUserId: userData.sub });
-// });
