@@ -42,5 +42,5 @@ jobs:
         run: |
           mv .env _.env
           docker-compose up -d 
-          npm run test
           mv _.env .env
+          npm run test
