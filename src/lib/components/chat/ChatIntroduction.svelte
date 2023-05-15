@@ -8,7 +8,6 @@
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import ModelsModal from "../ModelsModal.svelte";
 	import type { Model } from "$lib/types/Model";
-
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -21,9 +20,7 @@
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
 
-	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS
-		? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
-		: [];
+	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS ? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS) : [];
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
