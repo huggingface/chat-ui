@@ -8,8 +8,6 @@ dotenv.config({ path: "./.env" });
 
 process.env.PUBLIC_VERSION = pkg.version.replace(/\.0\b/g, "");
 
-
-
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	// Consult https://kit.svelte.dev/docs/integrations#preprocessors
