@@ -4,6 +4,7 @@
 	import { page } from "$app/stores";
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
+	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import type { LayoutData } from "../../routes/$types";
 
@@ -40,9 +41,9 @@
 			{#if $page.data.requiresLogin}
 				<button
 					type="submit"
-					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+					class="mt-2 flex items-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
 				>
-					Sign in with Hugging Face
+					Sign in with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 				</button>
 				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
 			{:else}
