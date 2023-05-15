@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
@@ -10,7 +11,6 @@
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { env } from "$env/dynamic/public";
 
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
@@ -20,7 +20,7 @@
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
 
-	let announcementBanners = JSON.parse(env["PUBLIC_ANNOUNCEMENT_BANNERS"]);
+	let announcementBanners = JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS);
 	let title = announcementBanners[0].title;
 	let linkTitle = announcementBanners[0].linkTitle;
 	let linkHref = announcementBanners[0].linkHref;
