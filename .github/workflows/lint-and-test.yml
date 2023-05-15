@@ -40,6 +40,7 @@ jobs:
           npm ci
       - name: "Tests"
         run: |
+          # Docker compose does not support some of the syntax we use in the .env and there is no option to disable automatic loading. See: https://github.com/docker/compose/issues/6741
           mv .env _.env
           docker-compose up -d 
           mv _.env .env
