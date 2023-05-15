@@ -47,7 +47,6 @@
 		<form
 			action="{base}/logout"
 			method="post"
-			use:enhance
 			class="group flex items-center gap-1.5 rounded-lg pl-3 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
 			<span class="flex h-9 flex-none items-center gap-1.5 pr-2 text-gray-500 dark:text-gray-400"

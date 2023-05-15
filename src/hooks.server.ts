@@ -65,7 +65,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	// Refresh cookie expiration date
 	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
