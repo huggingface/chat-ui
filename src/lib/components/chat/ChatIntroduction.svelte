@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
@@ -18,6 +19,10 @@
 	let isModelsModalOpen = false;
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
+
+	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS
+		? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
+		: [];
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
@@ -40,14 +45,17 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		<AnnouncementBanner classNames="mb-4" title="Chat UI is now open sourced on GitHub">
-			<a
-				target="_blank"
-				href="https://github.com/huggingface/chat-ui"
-				class="mr-2 flex items-center underline hover:no-underline"
-				><CarbonArrowUpRight class="mr-1" /> GitHub repo</a
-			>
-		</AnnouncementBanner>
+		{#each announcementBanners as banner}
+			<AnnouncementBanner classNames="mb-4" title={banner.title}>
+				<a
+					target="_blank"
+					href={banner.linkHref}
+					class="mr-2 flex items-center underline hover:no-underline"
+					><CarbonArrowUpRight class="mr-1" /> {banner.linkTitle}</a
+				>
+			</AnnouncementBanner>
+		{/each}
+
 		{#if isModelsModalOpen}
 			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
 		{/if}
