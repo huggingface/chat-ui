@@ -42,6 +42,7 @@
 	export let loading = false;
 	export let isAuthor = true;
 	export let readOnly = false;
+	export let isTapped = false;
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
@@ -91,7 +92,11 @@
 </script>
 
 {#if message.from === "assistant"}
-	<div class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed">
+	<div
+		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed"
+		on:click={() => (isTapped = !isTapped)}
+		on:keypress={() => (isTapped = !isTapped)}
+	>
 		<img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
@@ -119,8 +124,9 @@
 		</div>
 		{#if isAuthor && !loading && message.content}
 			<div
-				class="absolute bottom-2 right-0 flex transition-opacity group-hover:visible group-hover:opacity-100 lg:bottom-1 
-					{message.score ? 'visible opacity-100' : 'max-md:opacity-1 invisible max-md:visible'}
+				class="absolute bottom-1 right-0 flex group-hover:visible group-hover:opacity-100 max-md:transition-all md:bottom-0
+					{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
+					{isTapped ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 				"
 			>
 				<button
