@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { createEventDispatcher } from "svelte";
-	import { enhance } from "$app/forms";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
