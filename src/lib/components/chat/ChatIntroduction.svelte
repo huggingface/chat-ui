@@ -21,9 +21,6 @@
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
 
 	let announcementBanners = JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS);
-	let title = announcementBanners[0].title;
-	let linkTitle = announcementBanners[0].linkTitle;
-	let linkHref = announcementBanners[0].linkHref;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
@@ -46,11 +43,18 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		<AnnouncementBanner classNames="mb-4" {title}>
-			<a target="_blank" href={linkHref} class="mr-2 flex items-center underline hover:no-underline"
-				><CarbonArrowUpRight class="mr-1" /> {linkTitle}</a
-			>
-		</AnnouncementBanner>
+		{#if announcementBanners.length > 0}
+			{#each announcementBanners as banner}
+				<AnnouncementBanner classNames="mb-4" title={banner.title}>
+					<a
+						target="_blank"
+						href={banner.linkHref}
+						class="mr-2 flex items-center underline hover:no-underline"
+						><CarbonArrowUpRight class="mr-1" /> {banner.linkTitle}</a
+					>
+				</AnnouncementBanner>
+			{/each}
+		{:else}{/if}
 		{#if isModelsModalOpen}
 			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
 		{/if}
