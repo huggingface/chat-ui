@@ -43,18 +43,17 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		{#if announcementBanners.length > 0}
-			{#each announcementBanners as banner}
-				<AnnouncementBanner classNames="mb-4" title={banner.title}>
-					<a
-						target="_blank"
-						href={banner.linkHref}
-						class="mr-2 flex items-center underline hover:no-underline"
-						><CarbonArrowUpRight class="mr-1" /> {banner.linkTitle}</a
-					>
-				</AnnouncementBanner>
-			{/each}
-		{:else}{/if}
+		{#each announcementBanners as banner}
+			<AnnouncementBanner classNames="mb-4" title={banner.title}>
+				<a
+					target="_blank"
+					href={banner.linkHref}
+					class="mr-2 flex items-center underline hover:no-underline"
+					><CarbonArrowUpRight class="mr-1" /> {banner.linkTitle}</a
+				>
+			</AnnouncementBanner>
+		{/each}
+
 		{#if isModelsModalOpen}
 			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
 		{/if}
