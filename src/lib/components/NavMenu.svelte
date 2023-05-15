@@ -53,9 +53,9 @@
 			>
 			<button
 				type="submit"
-				class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md bg-gray-300 px-2.5 text-gray-700 group-hover:flex dark:bg-gray-900 dark:text-gray-400 md:hidden"
+				class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md border bg-white px-2 text-gray-700 shadow-sm group-hover:flex hover:shadow-none dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
 			>
-				Sign out
+				Sign Out
 			</button>
 		</form>
 	{/if}

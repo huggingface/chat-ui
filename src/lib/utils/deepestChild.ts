@@ -1,7 +1,6 @@
-export function deepestChild(el: HTMLElement) {
-	let newEl = el;
-	while (newEl.hasChildNodes()) {
-		newEl = newEl.lastElementChild as HTMLElement;
+export function deepestChild(el: HTMLElement): HTMLElement {
+	if (el.lastElementChild && el.lastElementChild.nodeType !== Node.TEXT_NODE) {
+		return deepestChild(el.lastElementChild as HTMLElement);
 	}
-	return newEl;
+	return el;
 }
