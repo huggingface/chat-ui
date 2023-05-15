@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
+	import { page } from "$app/stores";
 	import { PUBLIC_VERSION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
+	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import type { LayoutData } from "../../routes/$types";
 
@@ -31,17 +33,31 @@
 		<p class="px-2 text-sm text-gray-500">
 			Your conversations will be shared with model authors unless you disable it from your settings.
 		</p>
-		<form action="{base}/settings" use:enhance method="POST">
-			<input type="hidden" name="ethicsModalAccepted" value={true} />
-			{#each Object.entries(settings) as [key, val]}
-				<input type="hidden" name={key} value={val} />
-			{/each}
-			<button
-				type="submit"
-				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
-			>
-				Start chatting
-			</button>
+		<form
+			action="{base}/{$page.data.requiresLogin ? 'login' : 'settings'}"
+			use:enhance
+			method="POST"
+		>
+			{#if $page.data.requiresLogin}
+				<button
+					type="submit"
+					class="mt-2 flex items-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+				>
+					Sign in with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
+				</button>
+				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
+			{:else}
+				<input type="hidden" name="ethicsModalAccepted" value={true} />
+				{#each Object.entries(settings) as [key, val]}
+					<input type="hidden" name={key} value={val} />
+				{/each}
+				<button
+					type="submit"
+					class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-yellow-500"
+				>
+					Start chatting
+				</button>
+			{/if}
 		</form>
 	</div>
 </Modal>

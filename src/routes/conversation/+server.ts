@@ -44,7 +44,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		model: values.model,
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		...(locals.userId ? { userId: locals.userId } : { sessionId: locals.sessionId }),
+		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 

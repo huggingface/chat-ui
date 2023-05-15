@@ -1,14 +1,13 @@
-import { dev } from "$app/environment";
 import { COOKIE_NAME } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
 } from "$env/static/public";
-import { addYears } from "date-fns";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { requiresUser } from "$lib/server/auth";
+import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { ERROR_MESSAGES } from "$lib/stores/errors";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
@@ -18,10 +17,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
 
 	if (user) {
-		event.locals.userId = user._id;
+		event.locals.user = user;
 	}
 
 	if (
+		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
@@ -31,9 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		if (!user && requiresUser) {
 			return new Response(
-				sendJson
-					? JSON.stringify({ error: "You need to be logged in first" })
-					: "You need to be logged in first",
+				sendJson ? JSON.stringify({ error: ERROR_MESSAGES.authOnly }) : ERROR_MESSAGES.authOnly,
 				{
 					status: 401,
 					headers: {
@@ -43,7 +41,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 			);
 		}
 
-		if (!event.url.pathname.startsWith(`${base}/settings`)) {
+		// if login is not required and the call is not from /settings, we check if the user has accepted the ethics modal first.
+		// If login is required, `ethicsModalAcceptedAt` is already true at this point, so do not pass this condition. This saves a DB call.
+		if (!requiresUser && !event.url.pathname.startsWith(`${base}/settings`)) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },
@@ -65,15 +65,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	// Refresh cookie expiration date
-	event.cookies.set(COOKIE_NAME, event.locals.sessionId, {
-		path: "/",
-		// So that it works inside the space's iframe
-		sameSite: dev ? "lax" : "none",
-		secure: !dev,
-		httpOnly: true,
-		expires: addYears(new Date(), 1),
-	});
+	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
 

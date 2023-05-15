@@ -4,7 +4,8 @@ import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
-import { authCondition } from "$lib/server/auth";
+import { authCondition, requiresUser } from "$lib/server/auth";
+import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
@@ -54,9 +55,11 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			}))
 			.toArray(),
 		settings: {
-			shareConversationsWithModelAuthors: settings?.shareConversationsWithModelAuthors ?? true,
+			shareConversationsWithModelAuthors:
+				settings?.shareConversationsWithModelAuthors ??
+				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			activeModel: settings?.activeModel ?? defaultModel.id,
+			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -69,5 +72,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			parameters: model.parameters,
 		})),
 		oldModels,
+		user: locals.user && { username: locals.user.username, avatarUrl: locals.user.avatarUrl },
+		requiresLogin: requiresUser,
 	};
 };
