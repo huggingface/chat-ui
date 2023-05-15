@@ -41,6 +41,6 @@ jobs:
       - name: "Tests"
         run: |
           mv .env _.env
-          docker-compose --env-file=/dev/null up -d 
+          docker-compose up -d 
           npm run test
           mv _.env .env
