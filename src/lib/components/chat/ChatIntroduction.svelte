@@ -20,7 +20,7 @@
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
 
-	let announcementBanners = JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS);
+	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS ? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS) : [];
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
