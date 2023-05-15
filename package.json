@@ -11,7 +11,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write .",
-		"test": "MONGODB_URL=mongodb://0.0.0.0:27017/ MONGODB_DB_NAME=chat-ui-test vitest"
+		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest"
 	},
 	"devDependencies": {
 		"@iconify-json/carbon": "^1.1.16",
