@@ -25,3 +25,25 @@ jobs:
       - name: "Checking type errors"
         run: |
           npm run check
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mongodb:
+        image: mongo:6.0.5
+        ports:
+          - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+      - run: |
+          npm ci
+      - name: "Tests"
+        run: |
+          npm run test

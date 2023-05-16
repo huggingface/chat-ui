@@ -10,7 +10,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
-		"format": "prettier --plugin-search-dir . --write ."
+		"format": "prettier --plugin-search-dir . --write .",
+		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest"
 	},
 	"devDependencies": {
 		"@iconify-json/carbon": "^1.1.16",
@@ -32,7 +33,8 @@
 		"tslib": "^2.4.1",
 		"typescript": "^4.9.3",
 		"unplugin-icons": "^0.16.1",
-		"vite": "^4.0.0"
+		"vite": "^4.0.0",
+		"vitest": "^0.31.0"
 	},
 	"type": "module",
 	"dependencies": {

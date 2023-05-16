@@ -18,7 +18,7 @@ const client = new MongoClient(MONGODB_URL, {
 
 export const connectPromise = client.connect().catch(console.error);
 
-const db = client.db(MONGODB_DB_NAME);
+const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
 const conversations = db.collection<Conversation>("conversations");
 const sharedConversations = db.collection<SharedConversation>("sharedConversations");
