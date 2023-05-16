@@ -29,6 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      image: mongo:6.0.5
+      ports:
+        - 27017:27017
+
     steps:
       - uses: actions/checkout@v3
 
@@ -38,10 +43,9 @@ jobs:
           cache: "npm"
       - run: |
           npm ci
+      - name: "Wait for MongoDB"
+        run: |
+          while ! nc -z localhost 27017; do sleep 1; done
       - name: "Tests"
         run: |
-          # Docker compose does not support some of the syntax we use in the .env and there is no option to disable automatic loading. See: https://github.com/docker/compose/issues/6741
-          mv .env _.env
-          docker-compose up -d 
-          mv _.env .env
           npm run test
