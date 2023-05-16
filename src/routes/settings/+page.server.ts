@@ -41,6 +41,6 @@ export const actions = {
 			}
 		);
 
-		throw redirect(303, request.headers.get("referer") || base || "/");
+		throw redirect(303, request.headers.get("referer") || `${base}/`);
 	},
 };

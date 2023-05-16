@@ -13,7 +13,7 @@ export async function GET({ url, locals, cookies }) {
 
 	if (errorName) {
 		// TODO: Display denied error on the UI
-		throw redirect(302, base || "/");
+		throw redirect(302, `${base}/`);
 	}
 
 	const { code, state } = z
@@ -35,5 +35,5 @@ export async function GET({ url, locals, cookies }) {
 
 	await updateUser({ userData, locals, cookies });
 
-	throw redirect(302, base || "/");
+	throw redirect(302, `${base}/`);
 }

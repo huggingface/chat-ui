@@ -57,5 +57,5 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 };
 
 export const GET: RequestHandler = async () => {
-	throw redirect(302, base || "/");
+	throw redirect(302, `${base}/`);
 };
