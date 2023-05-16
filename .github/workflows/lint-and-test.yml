@@ -30,9 +30,10 @@ jobs:
     timeout-minutes: 10
 
     services:
-      image: mongo:6.0.5
-      ports:
-        - 27017:27017
+      mongodb:
+        image: mongo:6.0.5
+        ports:
+          - 27017:27017
 
     steps:
       - uses: actions/checkout@v3
