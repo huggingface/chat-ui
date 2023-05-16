@@ -37,7 +37,7 @@
 
 <div class="relative min-w-0 flex-1">
 	<pre
-		class="invisible whitespace-pre-wrap p-3"
+		class="scrollbar-custom invisible overflow-x-hidden overflow-y-scroll whitespace-pre-wrap break-words p-3"
 		aria-hidden="true"
 		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
