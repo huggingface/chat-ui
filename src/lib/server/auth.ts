@@ -1,15 +1,13 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
-import { addDays, addYears } from "date-fns";
+import { addHours, addYears } from "date-fns";
 import {
 	COOKIE_NAME,
 	OPENID_CLIENT_ID,
 	OPENID_CLIENT_SECRET,
 	OPENID_PROVIDER_URL,
 } from "$env/static/private";
-import { PUBLIC_ORIGIN } from "$env/static/public";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
-import { base } from "$app/paths";
 import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
 
@@ -35,8 +33,6 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	});
 }
 
-export const getRedirectURI = (url: URL) => `${PUBLIC_ORIGIN || url.origin}${base}/login/callback`;
-
 export const OIDC_SCOPES = "openid profile";
 
 export const authCondition = (locals: App.Locals) => {
@@ -48,8 +44,11 @@ export const authCondition = (locals: App.Locals) => {
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
  */
-export async function generateCsrfToken(sessionId: string): Promise<string> {
-	const data = { expiration: addDays(new Date(), 1).getTime() };
+export async function generateCsrfToken(sessionId: string, redirectUrl: string): Promise<string> {
+	const data = {
+		expiration: addHours(new Date(), 1).getTime(),
+		redirectUrl,
+	};
 
 	return Buffer.from(
 		JSON.stringify({
@@ -74,7 +73,7 @@ export async function getOIDCAuthorizationUrl(
 	params: { sessionId: string }
 ): Promise<string> {
 	const client = await getOIDCClient(settings);
-	const csrfToken = await generateCsrfToken(params.sessionId);
+	const csrfToken = await generateCsrfToken(params.sessionId, settings.redirectURI);
 	const url = client.authorizationUrl({
 		scope: OIDC_SCOPES,
 		state: csrfToken,
@@ -91,21 +90,30 @@ export async function getOIDCUserData(settings: OIDCSettings, code: string): Pro
 	return { token, userData };
 }
 
-export async function validateCsrfToken(token: string, sessionId: string) {
+export async function validateAndParseCsrfToken(
+	token: string,
+	sessionId: string
+): Promise<{
+	/** This is the redirect url that was passed to the OIDC provider */
+	redirectUrl: string;
+} | null> {
 	try {
 		const { data, signature } = z
 			.object({
 				data: z.object({
 					expiration: z.number().int(),
+					redirectUrl: z.string().url(),
 				}),
 				signature: z.string().length(64),
 			})
 			.parse(JSON.parse(token));
 		const reconstructSign = await sha256(JSON.stringify(data) + "##" + sessionId);
 
-		return data.expiration > Date.now() && signature === reconstructSign;
+		if (data.expiration > Date.now() && signature === reconstructSign) {
+			return { redirectUrl: data.redirectUrl };
+		}
 	} catch (e) {
 		console.error(e);
-		return false;
 	}
+	return null;
 }

@@ -56,7 +56,7 @@
 			if ($page.params.id !== id) {
 				await invalidate(UrlDependency.ConversationList);
 			} else {
-				await goto(base || "/", { invalidateAll: true });
+				await goto(`${base}/`, { invalidateAll: true });
 			}
 		} catch (err) {
 			console.error(err);

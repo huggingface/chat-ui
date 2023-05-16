@@ -21,7 +21,7 @@ const config = {
 			base: process.env.APP_BASE || "",
 		},
 		csrf: {
-			// todo: fix
+			// handled in hooks.server.ts, because we can have multiple valid origins
 			checkOrigin: false,
 		},
 	},

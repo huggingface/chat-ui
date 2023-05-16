@@ -26,7 +26,7 @@
 		HuggingChat
 	</a>
 	<a
-		href={base || "/"}
+		href={`${base}/`}
 		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700"
 	>
 		New Chat
