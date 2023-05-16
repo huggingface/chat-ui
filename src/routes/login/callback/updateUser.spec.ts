@@ -1,4 +1,4 @@
-import { assert, it, describe, afterEach, vi, expect, beforeAll } from "vitest";
+import { assert, it, describe, afterEach, vi, expect } from "vitest";
 import type { Cookies } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { updateUser } from "./updateUser";
