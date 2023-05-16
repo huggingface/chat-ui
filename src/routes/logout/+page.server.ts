@@ -12,6 +12,6 @@ export const actions = {
 			secure: !dev,
 			httpOnly: true,
 		});
-		throw redirect(303, base || "/");
+		throw redirect(303, `${base}/`);
 	},
 };

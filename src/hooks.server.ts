@@ -3,6 +3,7 @@ import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
+	PUBLIC_ORIGIN,
 } from "$env/static/public";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
@@ -20,25 +21,50 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.user = user;
 	}
 
+	function errorResponse(status: number, message: string) {
+		const sendJson =
+			event.request.headers.get("accept")?.includes("application/json") ||
+			event.request.headers.get("content-type")?.includes("application/json");
+		return new Response(sendJson ? JSON.stringify({ error: message }) : message, {
+			status,
+			headers: {
+				"content-type": sendJson ? "application/json" : "text/plain",
+			},
+		});
+	}
+
+	// CSRF protection
+	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
+	/** https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#attr-enctype */
+	const nativeFormContentTypes = [
+		"multipart/form-data",
+		"application/x-www-form-urlencoded",
+		"text/plain",
+	];
+	if (event.request.method === "POST" && nativeFormContentTypes.includes(requestContentType)) {
+		const referer = event.request.headers.get("referer");
+
+		if (!referer) {
+			return errorResponse(403, "Non-JSON form requests need to have a referer");
+		}
+
+		const validOrigins = [
+			new URL(event.request.url).origin,
+			...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
+		];
+
+		if (!validOrigins.includes(new URL(referer).origin)) {
+			return errorResponse(403, "Invalid referer for POST request");
+		}
+	}
+
 	if (
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
-		const sendJson =
-			event.request.headers.get("accept")?.includes("application/json") ||
-			event.request.headers.get("content-type")?.includes("application/json");
-
 		if (!user && requiresUser) {
-			return new Response(
-				sendJson ? JSON.stringify({ error: ERROR_MESSAGES.authOnly }) : ERROR_MESSAGES.authOnly,
-				{
-					status: 401,
-					headers: {
-						"content-type": sendJson ? "application/json" : "text/plain",
-					},
-				}
-			);
+			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
 
 		// if login is not required and the call is not from /settings, we check if the user has accepted the ethics modal first.
@@ -50,17 +76,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			});
 
 			if (!hasAcceptedEthicsModal) {
-				return new Response(
-					sendJson
-						? JSON.stringify({ error: "You need to accept the welcome modal first" })
-						: "You need to accept the welcome modal first",
-					{
-						status: 405,
-						headers: {
-							"content-type": sendJson ? "application/json" : "text/plain",
-						},
-					}
-				);
+				return errorResponse(405, "You need to accept the welcome modal first");
 			}
 		}
 	}
