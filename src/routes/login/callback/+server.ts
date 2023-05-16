@@ -2,7 +2,6 @@ import { redirect, error } from "@sveltejs/kit";
 import {
 	authCondition,
 	getOIDCUserData,
-	getRedirectURI,
 	refreshSessionCookie,
 	validateCsrfToken,
 } from "$lib/server/auth";
@@ -39,7 +38,7 @@ export async function GET({ url, locals, cookies }) {
 		throw error(403, "Invalid or expired CSRF token");
 	}
 
-	const { userData } = await getOIDCUserData({ redirectURI: getRedirectURI(url) }, code);
+	const { userData } = await getOIDCUserData({ redirectURI: isValidToken.redirectUrl }, code);
 
 	const {
 		preferred_username: username,

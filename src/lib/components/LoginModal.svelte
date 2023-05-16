@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { enhance } from "$app/forms";
+	import { browser } from "$app/environment";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { PUBLIC_VERSION } from "$env/static/public";
@@ -9,6 +9,8 @@
 	import type { LayoutData } from "../../routes/$types";
 
 	export let settings: LayoutData["settings"];
+
+	const isIframe = browser && window.self !== window.parent;
 </script>
 
 <Modal>
@@ -35,7 +37,7 @@
 		</p>
 		<form
 			action="{base}/{$page.data.requiresLogin ? 'login' : 'settings'}"
-			use:enhance
+			target={isIframe ? "_blank" : ""}
 			method="POST"
 		>
 			{#if $page.data.requiresLogin}
