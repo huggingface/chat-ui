@@ -1,5 +1,5 @@
 import { redirect, error } from "@sveltejs/kit";
-import { getOIDCUserData, validateCsrfToken } from "$lib/server/auth";
+import { getOIDCUserData, validateAndParseCsrfToken } from "$lib/server/auth";
 import { z } from "zod";
 import { base } from "$app/paths";
 import { updateUser } from "./updateUser";
@@ -25,13 +25,13 @@ export async function GET({ url, locals, cookies }) {
 
 	const csrfToken = Buffer.from(state, "base64").toString("utf-8");
 
-	const isValidToken = await validateCsrfToken(csrfToken, locals.sessionId);
+	const validatedToken = await validateAndParseCsrfToken(csrfToken, locals.sessionId);
 
-	if (!isValidToken) {
+	if (!validatedToken) {
 		throw error(403, "Invalid or expired CSRF token");
 	}
 
-	const { userData } = await getOIDCUserData({ redirectURI: isValidToken.redirectUrl }, code);
+	const { userData } = await getOIDCUserData({ redirectURI: validatedToken.redirectUrl }, code);
 
 	await updateUser({ userData, locals, cookies });
 

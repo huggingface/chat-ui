@@ -90,7 +90,7 @@ export async function getOIDCUserData(settings: OIDCSettings, code: string): Pro
 	return { token, userData };
 }
 
-export async function validateCsrfToken(
+export async function validateAndParseCsrfToken(
 	token: string,
 	sessionId: string
 ): Promise<{
