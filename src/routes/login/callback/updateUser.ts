@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { UserinfoResponse } from "openid-client";
 import type { Cookies } from "@sveltejs/kit";
 
-export async function login(params: {
+export async function updateUser(params: {
 	userData: UserinfoResponse;
 	locals: App.Locals;
 	cookies: Cookies;

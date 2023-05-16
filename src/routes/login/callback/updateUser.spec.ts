@@ -1,10 +1,10 @@
-import { assert, it, describe, afterEach, vi, expect } from "vitest";
+import { assert, it, describe, afterEach, vi, expect, beforeAll } from "vitest";
 import type { Cookies } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
-import { login } from "./login";
+import { updateUser } from "./updateUser";
 import { ObjectId } from "mongodb";
-import { defaultModel } from "./models";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
+import { defaultModel } from "$lib/server/models";
 
 const userData = {
 	preferred_username: "new-username",
@@ -58,7 +58,7 @@ describe("login", () => {
 	it("should update user if existing", async () => {
 		await insertRandomUser();
 
-		await login({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock });
 
 		const existingUser = await collections.users.findOne({ hfUserId: userData.sub });
 
@@ -72,7 +72,7 @@ describe("login", () => {
 
 		await insertRandomConversations(2);
 
-		await login({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock });
 
 		const conversationCount = await collections.conversations.countDocuments({
 			userId: insertedId,
@@ -85,7 +85,7 @@ describe("login", () => {
 	});
 
 	it("should create default settings for new user", async () => {
-		await login({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock });
 
 		const user = await collections.users.findOne({ sessionId: locals.sessionId });
 
@@ -114,7 +114,7 @@ describe("login", () => {
 			shareConversationsWithModelAuthors: false,
 		});
 
-		await login({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock });
 
 		const settings = await collections.settings.findOne({
 			_id: insertedId,

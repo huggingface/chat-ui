@@ -2,7 +2,7 @@ import { redirect, error } from "@sveltejs/kit";
 import { getOIDCUserData, getRedirectURI, validateCsrfToken } from "$lib/server/auth";
 import { z } from "zod";
 import { base } from "$app/paths";
-import { login } from "$lib/server/login";
+import { updateUser } from "./updateUser";
 
 export async function GET({ url, locals, cookies }) {
 	const { error: errorName } = z
@@ -33,7 +33,7 @@ export async function GET({ url, locals, cookies }) {
 
 	const { userData } = await getOIDCUserData({ redirectURI: getRedirectURI(url) }, code);
 
-	await login({ userData, locals, cookies });
+	await updateUser({ userData, locals, cookies });
 
 	throw redirect(302, base || "/");
 }
