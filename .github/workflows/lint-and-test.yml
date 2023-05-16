@@ -44,9 +44,6 @@ jobs:
           cache: "npm"
       - run: |
           npm ci
-      - name: "Wait for MongoDB"
-        run: |
-          while ! nc -z localhost 27017; do sleep 1; done
       - name: "Tests"
         run: |
           npm run test
