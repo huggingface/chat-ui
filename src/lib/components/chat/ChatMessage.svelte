@@ -124,7 +124,7 @@
 		</div>
 		{#if isAuthor && !loading && message.content}
 			<div
-				class="absolute bottom-1 right-0 flex group-hover:visible group-hover:opacity-100 max-md:transition-all md:bottom-0
+				class="absolute bottom-1 right-0 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
 					{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
 					{isTapped ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 				"
