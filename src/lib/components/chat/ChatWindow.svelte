@@ -14,6 +14,7 @@
 	export let messages: Message[] = [];
 	export let loading = false;
 	export let pending = false;
+	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
@@ -45,7 +46,9 @@
 		{models}
 		{messages}
 		readOnly={isReadOnly}
+		isAuthor={!shared}
 		on:message
+		on:vote
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);
 		}}
