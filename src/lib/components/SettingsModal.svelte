@@ -66,7 +66,7 @@
 		</form>
 		<button
 			type="button"
-			class="mt-2 rounded-full bg-gray-300 px-5 py-2 text-lg font-semibold text-gray-800 ring-gray-400 ring-offset-1 transition-all focus-visible:outline-none focus-visible:ring hover:ring"
+			class="text-lg text-gray-500 underline hover:no-underline"
 			on:click={() => (isConfirmingDeletion = true)}
 		>
 			Delete all conversations
