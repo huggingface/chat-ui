@@ -10,6 +10,8 @@
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
 
+	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
+
 	const dispatch = createEventDispatcher<{ close: void }>();
 </script>
 
@@ -35,7 +37,7 @@
 			{/each}
 			<Switch
 				name="shareConversationsWithModelAuthors"
-				bind:checked={settings.shareConversationsWithModelAuthors}
+				bind:checked={shareConversationsWithModelAuthors}
 			/>
 			Share conversations with model authors
 		</label>
