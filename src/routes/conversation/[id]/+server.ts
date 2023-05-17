@@ -38,13 +38,14 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 	const {
 		inputs: newPrompt,
-		options: { id: messageId, is_retry },
+		options: { id: messageId, is_retry, useSearch },
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
 			options: z.object({
 				id: z.optional(z.string().uuid()),
 				is_retry: z.optional(z.boolean()),
+				useSearch: z.optional(z.boolean()),
 			}),
 		})
 		.parse(json);
@@ -66,7 +67,8 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	const prompt = buildPrompt(messages, model);
+	console.log("use web search: ", useSearch);
+	const prompt = await buildPrompt(messages, model, useSearch ? true : undefined);
 
 	const randomEndpoint = modelEndpoint(model);
 

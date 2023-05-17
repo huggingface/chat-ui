@@ -12,6 +12,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
+	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 
 	export let data;
 
@@ -43,6 +44,7 @@
 			{
 				id: messageId,
 				is_retry: isRetry,
+				useSearch: $webSearchParameters.useSearch,
 				use_cache: false,
 			} as Options
 		);
