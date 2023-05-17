@@ -6,13 +6,19 @@ import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 
+if (!MONGODB_URL) {
+	throw new Error(
+		"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
+	);
+}
+
 const client = new MongoClient(MONGODB_URL, {
 	// directConnection: true
 });
 
 export const connectPromise = client.connect().catch(console.error);
 
-const db = client.db(MONGODB_DB_NAME);
+const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
 const conversations = db.collection<Conversation>("conversations");
 const sharedConversations = db.collection<SharedConversation>("sharedConversations");

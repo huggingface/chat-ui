@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import ModelsModal from "../ModelsModal.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
@@ -16,6 +19,10 @@
 	let isModelsModalOpen = false;
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
+
+	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS
+		? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
+		: [];
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
@@ -38,6 +45,17 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
+		{#each announcementBanners as banner}
+			<AnnouncementBanner classNames="mb-4" title={banner.title}>
+				<a
+					target="_blank"
+					href={banner.linkHref}
+					class="mr-2 flex items-center underline hover:no-underline"
+					><CarbonArrowUpRight class="mr-1" /> {banner.linkTitle}</a
+				>
+			</AnnouncementBanner>
+		{/each}
+
 		{#if isModelsModalOpen}
 			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
 		{/if}

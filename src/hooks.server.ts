@@ -1,14 +1,14 @@
-import { dev } from "$app/environment";
 import { COOKIE_NAME } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
+	PUBLIC_ORIGIN,
 } from "$env/static/public";
-import { addYears } from "date-fns";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { requiresUser } from "$lib/server/auth";
+import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { ERROR_MESSAGES } from "$lib/stores/errors";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
@@ -18,62 +18,70 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
 
 	if (user) {
-		event.locals.userId = user._id;
+		event.locals.user = user;
 	}
 
-	if (
-		!event.url.pathname.startsWith(`${base}/admin`) &&
-		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
-	) {
+	function errorResponse(status: number, message: string) {
 		const sendJson =
 			event.request.headers.get("accept")?.includes("application/json") ||
 			event.request.headers.get("content-type")?.includes("application/json");
+		return new Response(sendJson ? JSON.stringify({ error: message }) : message, {
+			status,
+			headers: {
+				"content-type": sendJson ? "application/json" : "text/plain",
+			},
+		});
+	}
 
-		if (!user && requiresUser) {
-			return new Response(
-				sendJson
-					? JSON.stringify({ error: "You need to be logged in first" })
-					: "You need to be logged in first",
-				{
-					status: 401,
-					headers: {
-						"content-type": sendJson ? "application/json" : "text/plain",
-					},
-				}
-			);
+	// CSRF protection
+	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
+	/** https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#attr-enctype */
+	const nativeFormContentTypes = [
+		"multipart/form-data",
+		"application/x-www-form-urlencoded",
+		"text/plain",
+	];
+	if (event.request.method === "POST" && nativeFormContentTypes.includes(requestContentType)) {
+		const referer = event.request.headers.get("referer");
+
+		if (!referer) {
+			return errorResponse(403, "Non-JSON form requests need to have a referer");
 		}
 
-		if (!event.url.pathname.startsWith(`${base}/settings`)) {
+		const validOrigins = [
+			new URL(event.request.url).origin,
+			...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
+		];
+
+		if (!validOrigins.includes(new URL(referer).origin)) {
+			return errorResponse(403, "Invalid referer for POST request");
+		}
+	}
+
+	if (
+		!event.url.pathname.startsWith(`${base}/login`) &&
+		!event.url.pathname.startsWith(`${base}/admin`) &&
+		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
+	) {
+		if (!user && requiresUser) {
+			return errorResponse(401, ERROR_MESSAGES.authOnly);
+		}
+
+		// if login is not required and the call is not from /settings, we check if the user has accepted the ethics modal first.
+		// If login is required, `ethicsModalAcceptedAt` is already true at this point, so do not pass this condition. This saves a DB call.
+		if (!requiresUser && !event.url.pathname.startsWith(`${base}/settings`)) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },
 			});
 
 			if (!hasAcceptedEthicsModal) {
-				return new Response(
-					sendJson
-						? JSON.stringify({ error: "You need to accept the welcome modal first" })
-						: "You need to accept the welcome modal first",
-					{
-						status: 405,
-						headers: {
-							"content-type": sendJson ? "application/json" : "text/plain",
-						},
-					}
-				);
+				return errorResponse(405, "You need to accept the welcome modal first");
 			}
 		}
 	}
 
-	// Refresh cookie expiration date
-	event.cookies.set(COOKIE_NAME, event.locals.sessionId, {
-		path: "/",
-		// So that it works inside the space's iframe
-		sameSite: dev ? "lax" : "none",
-		secure: !dev,
-		httpOnly: true,
-		expires: addYears(new Date(), 1),
-	});
+	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
 

@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { PUBLIC_ORIGIN } from "$env/static/public";
+import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import type { SharedConversation } from "$lib/types/SharedConversation";
@@ -52,5 +52,5 @@ export async function POST({ params, url, locals }) {
 }
 
 function getShareUrl(url: URL, shareId: string): string {
-	return `${PUBLIC_ORIGIN || url.origin}${base}/r/${shareId}`;
+	return `${PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`}/r/${shareId}`;
 }

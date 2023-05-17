@@ -40,7 +40,7 @@
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
 	<span class="truncate px-4">{title}</span>
-	<a href={base || "/"} class="-mr-3 flex h-9 w-9 shrink-0 items-center justify-center"
+	<a href={`${base}/`} class="-mr-3 flex h-9 w-9 shrink-0 items-center justify-center"
 		><CarbonAdd /></a
 	>
 </nav>
