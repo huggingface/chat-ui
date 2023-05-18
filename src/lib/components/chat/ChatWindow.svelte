@@ -10,6 +10,9 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
+	import { browser } from "$app/environment";
+	import { enhance } from "$app/forms";
+	import { base } from "$app/paths";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -62,7 +65,9 @@
 			on:click={() => dispatch("stop")}
 		/>
 		<form
-			on:submit|preventDefault={handleSubmit}
+			action="?/post"
+			method="POST"
+			use:enhance
 			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500 
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
@@ -76,7 +81,7 @@
 				/>
 				<button
 					class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
-					disabled={!message || loading || isReadOnly}
+					disabled={browser && (!message || loading || isReadOnly)}
 					type="submit"
 				>
 					<CarbonSendAltFilled />

@@ -42,6 +42,7 @@
 		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
 	<textarea
+		name="inputs"
 		enterkeyhint="send"
 		tabindex="0"
 		rows="1"
