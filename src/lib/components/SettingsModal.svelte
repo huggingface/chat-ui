@@ -64,13 +64,16 @@
 				Apply
 			</button>
 		</form>
-		<button
-			type="button"
-			class="text-lg text-gray-500 underline hover:no-underline"
-			on:click={() => (isConfirmingDeletion = true)}
+		<form
+			method="post"
+			action="{base}/conversations?/delete"
+			on:submit|preventDefault={() => (isConfirmingDeletion = true)}
+			class='text-center'
 		>
-			Delete all conversations
-		</button>
+			<button type="submit" class="text-lg text-gray-500 underline hover:no-underline">
+				Delete all conversations
+			</button>
+		</form>
 		{#if isConfirmingDeletion}
 			<Modal on:close={() => (isConfirmingDeletion = false)}>
 				<form
