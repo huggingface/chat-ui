@@ -10,6 +10,7 @@
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
 
+	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
 	let isConfirmingDeletion = false;
 
 	const dispatch = createEventDispatcher<{ close: void }>();
@@ -37,7 +38,7 @@
 				{/each}
 				<Switch
 					name="shareConversationsWithModelAuthors"
-					bind:checked={settings.shareConversationsWithModelAuthors}
+					bind:checked={shareConversationsWithModelAuthors}
 				/>
 				Share conversations with model authors
 			</label>
@@ -68,7 +69,7 @@
 			method="post"
 			action="{base}/conversations?/delete"
 			on:submit|preventDefault={() => (isConfirmingDeletion = true)}
-			class='text-center'
+			class="text-center"
 		>
 			<button type="submit" class="text-lg text-gray-500 underline hover:no-underline">
 				Delete all conversations
