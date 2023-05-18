@@ -10,7 +10,7 @@
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
 
-	$: shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
+	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 </script>
