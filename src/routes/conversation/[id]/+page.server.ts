@@ -2,19 +2,9 @@ import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
 import { authCondition } from "$lib/server/auth";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { buildPrompt } from "$lib/buildPrompt";
-import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
-import { modelEndpoint } from "$lib/server/modelEndpoint";
-import { models } from "$lib/server/models";
-import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
-import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
-import { trimPrefix } from "$lib/utils/trimPrefix";
-import { trimSuffix } from "$lib/utils/trimSuffix";
 import { z } from "zod";
+import { generateMessage } from "$lib/server/message";
 import type { Message } from "$lib/types/Message";
-import type { Model } from "$lib/types/Model.js";
 
 export const load = async ({ params, locals }) => {
 	// todo: add validation on params.id
@@ -47,219 +37,18 @@ export const load = async ({ params, locals }) => {
 };
 
 export const actions = {
-	post: async function ({ request, locals, params }) {
-		const id = z.string().parse(params.id);
-		const convId = new ObjectId(id);
-		const date = new Date();
+	post: async function (actionParams) {
+		const { request } = actionParams;
 
-		const conv = await collections.conversations.findOne({
-			_id: convId,
-			...authCondition(locals),
-		});
+		const formData = await request.formData();
 
-		if (!conv) {
-			throw error(404, "Conversation not found");
-		}
+		const { messages } = await generateMessage(
+			Object.fromEntries(formData.entries()),
+			actionParams
+		);
 
-		const model = models.find((m) => m.id === conv.model);
-
-		if (!model) {
-			throw error(410, "Model not available anymore");
-		}
-
-		let body: { stream: boolean; inputs: string; parameters?: Partial<Model["parameters"]> };
-
-		try {
-			body = await request.json();
-
-			if (!body.stream) {
-				throw new Error("Not a stream");
-			}
-		} catch (e) {
-			const formData = await request.formData();
-			const parameters = {
-				...model.parameters,
-				return_full_text: false,
-			};
-			body = { inputs: formData.get("inputs") as string, parameters, stream: true };
-		}
-
-		const {
-			inputs: newPrompt,
-			options: { id: messageId, is_retry },
-		} = z
-			.object({
-				inputs: z.string().trim().min(1),
-				options: z
-					.object({
-						id: z.optional(z.string().uuid()),
-						is_retry: z.optional(z.boolean()),
-					})
-					.optional()
-					.default({}),
-			})
-			.parse(body);
-
-		const messages = (() => {
-			if (is_retry && messageId) {
-				let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
-				if (retryMessageIdx === -1) {
-					retryMessageIdx = conv.messages.length;
-				}
-				return [
-					...conv.messages.slice(0, retryMessageIdx),
-					{ content: newPrompt, from: "user", id: messageId as Message["id"] },
-				];
-			}
-			return [
-				...conv.messages,
-				{
-					content: newPrompt,
-					from: "user",
-					id: (messageId as Message["id"]) || crypto.randomUUID(),
-				},
-			];
-		})() satisfies Message[];
-
-		const prompt = buildPrompt(messages, model);
-
-		const randomEndpoint = modelEndpoint(model);
-
-		const abortController = new AbortController();
-
-		const resp = await fetch(randomEndpoint.url, {
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: randomEndpoint.authorization,
-			},
-			method: "POST",
-			body: JSON.stringify({
-				...body,
-				inputs: prompt,
-			}),
-			signal: abortController.signal,
-		});
-
-		if (!resp.body) {
-			throw new Error("Response body is empty");
-		}
-
-		const [stream1, stream2] = resp.body.tee();
-
-		async function saveMessage() {
-			let generated_text = await parseGeneratedText(stream2, convId, date, abortController);
-
-			// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
-			if (generated_text.startsWith(prompt)) {
-				generated_text = generated_text.slice(prompt.length);
-			}
-
-			generated_text = trimSuffix(
-				trimPrefix(generated_text, "<|startoftext|>"),
-				PUBLIC_SEP_TOKEN
-			).trimEnd();
-
-			for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
-				if (generated_text.endsWith(stop)) {
-					generated_text = generated_text.slice(0, -stop.length).trimEnd();
-				}
-			}
-
-			messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
-
-			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						messages,
-						updatedAt: new Date(),
-					},
-				}
-			);
-		}
-
-		saveMessage().catch(console.error);
-
-		// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
-		if (body.stream) {
-			return new Response(stream1, {
-				headers: Object.fromEntries(resp.headers.entries()),
-				status: resp.status,
-				statusText: resp.statusText,
-			});
-		} else {
-			return {
-				messages,
-			};
-		}
+		return {
+			messages: await messages,
+		};
 	},
 };
-
-async function parseGeneratedText(
-	stream: ReadableStream,
-	conversationId: ObjectId,
-	promptedAt: Date,
-	abortController: AbortController
-): Promise<string> {
-	const inputs: Uint8Array[] = [];
-	for await (const input of streamToAsyncIterable(stream)) {
-		inputs.push(input);
-
-		const date = abortedGenerations.get(conversationId.toString());
-
-		if (date && date > promptedAt) {
-			abortController.abort("Cancelled by user");
-			const completeInput = concatUint8Arrays(inputs);
-
-			const lines = new TextDecoder()
-				.decode(completeInput)
-				.split("\n")
-				.filter((line) => line.startsWith("data:"));
-
-			const tokens = lines.map((line) => {
-				try {
-					const json: TextGenerationStreamOutput = JSON.parse(line.slice("data:".length));
-					return json.token.text;
-				} catch {
-					return "";
-				}
-			});
-			return tokens.join("");
-		}
-	}
-
-	// Merge inputs into a single Uint8Array
-	const completeInput = concatUint8Arrays(inputs);
-	// Get last line starting with "data:" and parse it as JSON to get the generated text
-	const message = new TextDecoder().decode(completeInput);
-
-	let lastIndex = message.lastIndexOf("\ndata:");
-	if (lastIndex === -1) {
-		lastIndex = message.indexOf("data");
-	}
-
-	if (lastIndex === -1) {
-		console.error("Could not parse last message", message);
-	}
-
-	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);
-	if (lastMessage.includes("\n")) {
-		lastMessage = lastMessage.slice(0, lastMessage.indexOf("\n"));
-	}
-
-	const lastMessageJSON = JSON.parse(lastMessage);
-
-	if (lastMessageJSON.error) {
-		throw new Error(lastMessageJSON.error);
-	}
-
-	const res = lastMessageJSON.generated_text;
-
-	if (typeof res !== "string") {
-		throw new Error("Could not parse generated text");
-	}
-
-	return res;
-}

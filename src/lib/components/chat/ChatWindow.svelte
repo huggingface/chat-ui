@@ -11,8 +11,6 @@
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
 	import { browser } from "$app/environment";
-	import { enhance } from "$app/forms";
-	import { base } from "$app/paths";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -32,12 +30,6 @@
 		stop: void;
 		retry: { id: Message["id"]; content: string };
 	}>();
-
-	const handleSubmit = () => {
-		if (loading) return;
-		dispatch("message", message);
-		message = "";
-	};
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -64,10 +56,7 @@
 			className="right-5 mr-[1px] md:mr-0 md:right-7 top-6 md:top-10 z-10"
 			on:click={() => dispatch("stop")}
 		/>
-		<form
-			action="?/post"
-			method="POST"
-			use:enhance
+		<div
 			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500 
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
@@ -75,7 +64,7 @@
 				<ChatInput
 					placeholder="Ask anything"
 					bind:value={message}
-					on:submit={handleSubmit}
+					on:submit={() => dispatch("message", message)}
 					maxRows={4}
 					disabled={isReadOnly}
 				/>
@@ -87,7 +76,7 @@
 					<CarbonSendAltFilled />
 				</button>
 			</div>
-		</form>
+		</div>
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a

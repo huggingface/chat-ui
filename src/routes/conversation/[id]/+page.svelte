@@ -29,21 +29,16 @@
 	let loading = false;
 	let pending = false;
 
-	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
+	async function getTextGenerationStream(inputs: string, messageId?: Message["id"]) {
 		const conversationId = $page.params.id;
 
 		const response = textGenerationStream(
 			{
 				model: $page.url.href,
 				inputs,
-				parameters: {
-					...data.models.find((m) => m.id === data.model)?.parameters,
-					return_full_text: false,
-				},
 			},
 			{
 				id: messageId,
-				is_retry: isRetry,
 				use_cache: false,
 			} as Options
 		);
@@ -105,7 +100,7 @@
 		});
 	}
 
-	async function writeMessage(message: string, messageId = randomUUID()) {
+	async function writeMessage(message: string, messageId?: Message["id"]) {
 		if (!message.trim()) return;
 
 		try {
@@ -114,17 +109,17 @@
 			pending = true;
 
 			let retryMessageIndex = messages.findIndex((msg) => msg.id === messageId);
-			const isRetry = retryMessageIndex !== -1;
-			if (!isRetry) {
+
+			if (retryMessageIndex === -1) {
 				retryMessageIndex = messages.length;
 			}
 
 			messages = [
 				...messages.slice(0, retryMessageIndex),
-				{ from: "user", content: message, id: messageId },
+				{ from: "user", content: message, id: messageId ?? randomUUID() },
 			];
 
-			await getTextGenerationStream(message, messageId, isRetry);
+			await getTextGenerationStream(message, messageId);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
@@ -174,6 +169,11 @@
 		}
 	}
 
+	function handleSubmit(e: SubmitEvent) {
+		const formData = new FormData(e.currentTarget as HTMLFormElement);
+		writeMessage(formData.get("inputs") as string);
+	}
+
 	onMount(async () => {
 		if ($pendingMessage) {
 			const val = $pendingMessage;
@@ -192,16 +192,18 @@
 	<title>{title}</title>
 </svelte:head>
 
-<ChatWindow
-	{loading}
-	{pending}
-	{messages}
-	on:message={(event) => writeMessage(event.detail)}
-	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
-	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation($page.params.id, data.title)}
-	on:stop={() => (isAborted = true)}
-	models={data.models}
-	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
-	settings={data.settings}
-/>
+<form action="?/post" method="POST" on:submit|preventDefault={handleSubmit} class="contents">
+	<ChatWindow
+		{loading}
+		{pending}
+		{messages}
+		on:message={(event) => writeMessage(event.detail)}
+		on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
+		on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
+		on:share={() => shareConversation($page.params.id, data.title)}
+		on:stop={() => (isAborted = true)}
+		models={data.models}
+		currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
+		settings={data.settings}
+	/>
+</form>
