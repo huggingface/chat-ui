@@ -33,7 +33,10 @@
 
 	onDestroy(() => {
 		if (!browser) return;
-		document.getElementById("app")?.removeAttribute("inert");
+		// remove inert attribute if this is the last modal
+		if (document.querySelectorAll('[role="dialog"]:not(#app *)').length === 1) {
+			document.getElementById("app")?.removeAttribute("inert");
+		}
 	});
 </script>
 
