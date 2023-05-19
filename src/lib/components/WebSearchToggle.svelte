@@ -9,7 +9,6 @@
 		class="peer sr-only"
 		on:click={() => {
 			webSearchParameters.update((value) => ({ ...value, useSearch: !value.useSearch }));
-			console.log($webSearchParameters.useSearch);
 		}}
 		checked={$webSearchParameters.useSearch}
 	/>

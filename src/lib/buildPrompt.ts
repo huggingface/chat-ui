@@ -7,6 +7,13 @@ import type { Message } from "./types/Message";
  *
  * <|assistant|>hi<|endoftext|><|prompter|>hello<|endoftext|><|assistant|>
  */
+
+interface SearchResult {
+	title: string;
+	snippet: string;
+	link: string;
+}
+
 export async function buildPrompt(
 	messages: Pick<Message, "from" | "content">[],
 	model: BackendModel,
@@ -36,19 +43,25 @@ export async function buildPrompt(
 
 		webPrompt = "<|context|>";
 
-		results.organic_results.forEach((element) => {
-			webPrompt += `\n- ${element.snippet}`;
-		});
-		console.log(webPrompt);
+		if (results.organic_results === undefined) {
+			webPrompt += "No results found.";
+		} else {
+			results.organic_results.forEach((element: SearchResult) => {
+				webPrompt += `\n- ${element.snippet}`;
+			});
+		}
+
+		webPrompt += model.messageEndToken;
 	}
 
-	// Not super precise, but it's truncated in the model's backend anyway
-	return (
+	const finalPrompt =
 		model.preprompt +
 		webPrompt +
 		prompt
 			.split(" ")
 			.slice(-(model.parameters?.truncate ?? 0))
-			.join(" ")
-	);
+			.join(" ");
+
+	// Not super precise, but it's truncated in the model's backend anyway
+	return finalPrompt;
 }

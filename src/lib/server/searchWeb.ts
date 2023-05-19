@@ -22,13 +22,18 @@ export async function searchWeb(query: string) {
 }
 
 export async function getQueryFromPrompt(messages: Pick<Message, "from" | "content">[]) {
-	let prompt = "What query would you ask Google to answer this question?\n\n";
+	let prompt =
+		"<|prompter|>The following messages were written by a user, trying to answer a question.\n";
 
-	messages.forEach((message) => {
-		prompt += `${message.from}: ${message.content}\n`;
-	});
+	messages
+		.filter((message) => message.from === "user")
+		.forEach((message) => {
+			prompt += `<|${message.from}|> ${message.content}</s>`;
+		});
 
-	prompt += "\nQuery:";
+	prompt +=
+		"<|prompter|>What plain-text short (less than 10 words) sentence would you input into Google to answer the last question? Answer with just the query.\n</s>";
+	prompt += "<|assistant|>";
 
 	return await generateFromDefaultEndpoint(prompt);
 }
