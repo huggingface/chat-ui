@@ -3,8 +3,6 @@ import type { Timestamps } from "./Timestamps";
 
 export interface User extends Timestamps {
 	_id: ObjectId;
-	lastSeenAt: Date;
-	requestCount: number;
 
 	username: string;
 	name: string;

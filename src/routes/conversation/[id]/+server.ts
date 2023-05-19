@@ -14,11 +14,23 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { MESSAGES_RATE_LIMIT } from "$env/static/private";
+import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 
 export async function POST({ request, fetch, locals, params }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const date = new Date();
+
+	// rate limit users by messages per day
+	if (locals.user) {
+		const messagesCount = await collections.messageEvents.countDocuments({
+			userId: locals.user._id,
+		});
+		if (messagesCount > parseInt(MESSAGES_RATE_LIMIT ?? 0)) {
+			throw error(429, ERROR_MESSAGES.overRateLimit);
+		}
+	}
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
@@ -38,7 +50,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 	const {
 		inputs: newPrompt,
-		options: { id: messageId, is_retry, response_id: responseId },
+		options: { id: retryMessageId, is_retry, response_id: responseId },
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
@@ -50,8 +62,10 @@ export async function POST({ request, fetch, locals, params }) {
 		})
 		.parse(json);
 
+	const messageId = (retryMessageId as Message["id"]) ?? crypto.randomUUID();
+
 	const messages = (() => {
-		if (is_retry && messageId) {
+		if (is_retry && retryMessageId) {
 			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
 			if (retryMessageIdx === -1) {
 				retryMessageIdx = conv.messages.length;
@@ -61,10 +75,7 @@ export async function POST({ request, fetch, locals, params }) {
 				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
 			];
 		}
-		return [
-			...conv.messages,
-			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
-		];
+		return [...conv.messages, { content: newPrompt, from: "user", id: messageId }];
 	})() satisfies Message[];
 
 	const prompt = buildPrompt(messages, model);
@@ -128,6 +139,16 @@ export async function POST({ request, fetch, locals, params }) {
 				},
 			}
 		);
+
+		// if messages API rate is limited, save message event
+		if (locals.user && typeof MESSAGES_RATE_LIMIT !== "undefined") {
+			await collections.messageEvents.insertOne({
+				_id: new ObjectId(),
+				createdAt: new Date(),
+				messageId: messageId,
+				userId: locals.user?._id,
+			});
+		}
 	}
 
 	saveMessage().catch(console.error);

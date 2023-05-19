@@ -5,6 +5,7 @@ import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
+import type { MessageEvents } from "$lib/types/MessageEvents";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -25,6 +26,7 @@ const sharedConversations = db.collection<SharedConversation>("sharedConversatio
 const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
+const messageEvents = db.collection<MessageEvents>("messageEvents");
 
 export { client, db };
 export const collections = {
@@ -33,6 +35,7 @@ export const collections = {
 	abortedGenerations,
 	settings,
 	users,
+	messageEvents,
 };
 
 client.on("open", () => {
@@ -55,4 +58,5 @@ client.on("open", () => {
 	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	users.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 * 24 }).catch(console.error);
 });
