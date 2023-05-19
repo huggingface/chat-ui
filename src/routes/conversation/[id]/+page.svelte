@@ -126,9 +126,6 @@
 
 			await getTextGenerationStream(message, messageId, isRetry);
 
-			// So we get the latest message id
-			await invalidate(UrlDependency.Conversation);
-
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
 					.then(() => invalidate(UrlDependency.ConversationList))
