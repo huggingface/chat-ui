@@ -61,7 +61,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
-			searchEnabled: SERPAPI_KEY !== "",
+			searchEnabled: !!SERPAPI_KEY,
 		},
 		models: models.map((model) => ({
 			id: model.id,
