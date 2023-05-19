@@ -11,13 +11,15 @@ export async function updateUser(params: {
 	locals: App.Locals;
 	cookies: Cookies;
 }) {
+	console.log("updateUser");
 	const { userData, locals, cookies } = params;
-
+	userData["preferred_username"] =
+		userData["preferred_username"] || userData["email"]?.split("@")[0];
 	const {
 		preferred_username: username,
 		name,
 		picture: avatarUrl,
-		sub: hfUserId,
+		sub: providerUserId,
 	} = z
 		.object({
 			preferred_username: z.string(),
@@ -27,7 +29,7 @@ export async function updateUser(params: {
 		})
 		.parse(userData);
 
-	const existingUser = await collections.users.findOne({ hfUserId });
+	const existingUser = await collections.users.findOne({ providerUserId });
 	let userId = existingUser?._id;
 
 	if (existingUser) {
@@ -47,7 +49,7 @@ export async function updateUser(params: {
 			username,
 			name,
 			avatarUrl,
-			hfUserId,
+			providerUserId,
 			sessionId: locals.sessionId,
 		});
 

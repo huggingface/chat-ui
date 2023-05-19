@@ -33,7 +33,7 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	});
 }
 
-export const OIDC_SCOPES = "openid profile";
+export const OIDC_SCOPES = "openid profile email";
 
 export const authCondition = (locals: App.Locals) => {
 	return locals.user

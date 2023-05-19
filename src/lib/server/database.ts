@@ -53,6 +53,6 @@ client.on("open", () => {
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
 	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
-	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
+	users.createIndex({ providerUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 });
