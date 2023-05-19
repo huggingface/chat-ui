@@ -41,15 +41,11 @@ export async function buildPrompt(
 		console.log(query);
 		const results = await searchWeb(query);
 
-		webPrompt = "<|context|>";
-
-		if (results.organic_results === undefined) {
-			webPrompt += "No results found.";
-		} else {
-			results.organic_results.forEach((element: SearchResult) => {
-				webPrompt += `\n- ${element.snippet}`;
-			});
-		}
+		webPrompt = "<|context|>" + (
+		  results.organic_results ?
+		  results.organic_results.map(element => `- ${element.snippet}`).join("\n") 
+		  : "No results found."
+		) + model.messageEndToken;
 
 		webPrompt += model.messageEndToken;
 	}
