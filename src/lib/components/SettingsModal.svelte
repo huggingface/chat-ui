@@ -58,6 +58,15 @@
 					class="underline decoration-gray-300 hover:decoration-gray-700">Open Assistant</a
 				>.
 			</p>
+			<form
+				method="post"
+				action="{base}/conversations?/delete"
+				on:submit|preventDefault={() => (isConfirmingDeletion = true)}
+			>
+				<button type="submit" class="underline decoration-gray-300 hover:decoration-gray-700">
+					Delete all conversations
+				</button>
+			</form>
 			<button
 				type="submit"
 				class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-all focus-visible:outline-none focus-visible:ring hover:ring"
@@ -65,16 +74,7 @@
 				Apply
 			</button>
 		</form>
-		<form
-			method="post"
-			action="{base}/conversations?/delete"
-			on:submit|preventDefault={() => (isConfirmingDeletion = true)}
-			class="text-center"
-		>
-			<button type="submit" class="text-lg text-gray-500 underline hover:no-underline">
-				Delete all conversations
-			</button>
-		</form>
+
 		{#if isConfirmingDeletion}
 			<Modal on:close={() => (isConfirmingDeletion = false)}>
 				<form
