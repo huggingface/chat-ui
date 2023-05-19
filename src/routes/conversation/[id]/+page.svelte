@@ -31,6 +31,7 @@
 
 	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
 		const conversationId = $page.params.id;
+		const responseId = randomUUID();
 
 		const response = textGenerationStream(
 			{
@@ -43,6 +44,7 @@
 			},
 			{
 				id: messageId,
+				response_id: responseId,
 				is_retry: isRetry,
 				use_cache: false,
 			} as Options
@@ -89,7 +91,7 @@
 					messages = [
 						...messages,
 						// id doesn't match the backend id but it's not important for assistant messages
-						{ from: "assistant", content: output.token.text.trimStart(), id: randomUUID() },
+						{ from: "assistant", content: output.token.text.trimStart(), id: responseId },
 					];
 				} else {
 					lastMessage.content += output.token.text;
@@ -125,9 +127,6 @@
 			];
 
 			await getTextGenerationStream(message, messageId, isRetry);
-
-			// So we get the latest message id
-			await invalidate(UrlDependency.Conversation);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
