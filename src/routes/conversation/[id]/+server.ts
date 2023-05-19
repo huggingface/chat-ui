@@ -23,12 +23,16 @@ export async function POST({ request, fetch, locals, params }) {
 	const date = new Date();
 
 	// rate limit users by messages per day
-	if (locals.user) {
+	if (locals.user && MESSAGES_RATE_LIMIT) {
 		const messagesCount = await collections.messageEvents.countDocuments({
 			userId: locals.user._id,
 		});
-		if (messagesCount > parseInt(MESSAGES_RATE_LIMIT ?? 0)) {
-			throw error(429, ERROR_MESSAGES.overRateLimit);
+
+		if (messagesCount + 1 > parseInt(MESSAGES_RATE_LIMIT)) {
+			return new Response(JSON.stringify({ error: ERROR_MESSAGES.overRateLimit }), {
+				status: 429,
+				headers: { "Content-Type": "application/json" },
+			});
 		}
 	}
 
