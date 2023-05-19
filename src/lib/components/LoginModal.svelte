@@ -28,7 +28,7 @@
 		<p class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12">
 			This application is for demonstration purposes only.
 		</p>
-		<p class="text-gray-800">
+		<p class="text-base text-gray-800">
 			AI is an area of active research with known problems such as biased generation and
 			misinformation. Do not use this application for high-stakes decisions or advice.
 		</p>
