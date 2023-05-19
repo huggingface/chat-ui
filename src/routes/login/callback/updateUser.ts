@@ -44,6 +44,8 @@ export async function updateUser(params: {
 			_id: new ObjectId(),
 			createdAt: new Date(),
 			updatedAt: new Date(),
+			lastSeenAt: new Date(),
+			requestCount: 0,
 			username,
 			name,
 			avatarUrl,

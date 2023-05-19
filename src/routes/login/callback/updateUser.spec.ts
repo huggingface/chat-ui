@@ -28,6 +28,8 @@ const insertRandomUser = async () => {
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		lastSeenAt: new Date(),
+		requestCount: 0,
 		username: "base-username",
 		name: userData.name,
 		avatarUrl: userData.picture,
