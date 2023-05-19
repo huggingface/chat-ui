@@ -5,6 +5,7 @@
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonPause from "~icons/carbon/pause-filled";
+	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	import ChatMessages from "./ChatMessages.svelte";
 	import ChatInput from "./ChatInput.svelte";
@@ -20,12 +21,7 @@
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
 
-	const MOBILE_VIEWPORT_WIDTH = 768;
-
-	let innerWidth = 0;
-
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
-	$: isMobileScreen = innerWidth <= MOBILE_VIEWPORT_WIDTH;
 
 	let message: string;
 
@@ -42,8 +38,6 @@
 		message = "";
 	};
 </script>
-
-<svelte:window bind:innerWidth />
 
 <div class="relative min-h-0 min-w-0">
 	<ChatMessages
@@ -64,11 +58,9 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !isMobileScreen}
-			<div class="my-[0.5rem] flex justify-center">
-				<StopGeneratingBtn visible={loading} on:click={() => dispatch("stop")} />
-			</div>
-		{/if}
+		<div class="my-[0.5rem] hidden justify-center sm:flex">
+			<StopGeneratingBtn visible={loading} on:click={() => dispatch("stop")} />
+		</div>
 		<form
 			on:submit|preventDefault={handleSubmit}
 			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500 
@@ -83,17 +75,22 @@
 					disabled={isReadOnly}
 				/>
 
-				{#if isMobileScreen && loading}
+				{#if loading}
 					<button
-						class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
+						class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:hidden"
 						on:click={() => dispatch("stop")}
 					>
 						<CarbonPause />
 					</button>
+					<div
+						class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:flex"
+					>
+						<EosIconsLoading />
+					</div>
 				{:else}
 					<button
 						class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
-						disabled={!message || loading || isReadOnly}
+						disabled={!message || isReadOnly}
 						type="submit"
 					>
 						<CarbonSendAltFilled />
