@@ -9,6 +9,7 @@ import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
+import { addDays } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
@@ -78,6 +79,35 @@ export const handle: Handle = async ({ event, resolve }) => {
 			if (!hasAcceptedEthicsModal) {
 				return errorResponse(405, "You need to accept the welcome modal first");
 			}
+		}
+	}
+
+	// simple API usage limit
+	if (
+		user &&
+		event.request.method === "POST" &&
+		event.url.pathname.startsWith(`${base}/conversation`)
+	) {
+		// check that user.lastSeenAt is not from today
+		// if it is, check that user.requestCount is not over 1000
+		if (
+			user.lastSeenAt &&
+			addDays(user.lastSeenAt, 1) > new Date() &&
+			user.requestCount > 1000 // TODO: review this number when we have stats in DB
+		) {
+			return errorResponse(429, ERROR_MESSAGES.overRateLimit);
+		} else {
+			await collections.users.updateOne(
+				{ _id: user._id },
+				{
+					$inc: {
+						requestCount: 1,
+					},
+					$set: {
+						lastSeenAt: new Date(),
+					},
+				}
+			);
 		}
 	}
 
