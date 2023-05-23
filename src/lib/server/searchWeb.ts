@@ -22,19 +22,23 @@ export async function searchWeb(query: string) {
 	return response;
 }
 
-export async function getQueryFromPrompt(messages: Pick<Message, "from" | "content">[], model: BackendModel) {
+export async function getQueryFromPrompt(
+	messages: Pick<Message, "from" | "content">[],
+	model: BackendModel
+) {
 	let prompt =
-		model.userMessageToken + "The following messages were written by a user, trying to answer a question." + model.messageEndToken;
+		model.userMessageToken +
+		"The following messages were written by a user, trying to answer a question." +
+		model.messageEndToken;
 
 	prompt += messages
 		.filter((message) => message.from === "user")
-		.map((message) => (
-			model.userMessageToken + 
-			message.content +
-			model.messageEndToken
-		));
+		.map((message) => model.userMessageToken + message.content + model.messageEndToken);
 
-	prompt += model.userMessageToken+ "What query would you input into Google to answer the last question? Answer with a short (10 words max) plain-text query." + model.messageEndToken;
+	prompt +=
+		model.userMessageToken +
+		"What query would you input into Google to answer the last question? Answer with a short (10 words max) plain-text query." +
+		model.messageEndToken;
 	prompt += model.assistantMessageToken;
 
 	return await generateFromDefaultEndpoint(prompt);

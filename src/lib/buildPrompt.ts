@@ -1,7 +1,7 @@
 import type { BackendModel } from "./server/models";
 import { getQueryFromPrompt, searchWeb } from "./server/searchWeb";
 import type { Message } from "./types/Message";
-import { JSDOM } from 'jsdom';
+import { JSDOM } from "jsdom";
 /**
  * Convert [{user: "assistant", content: "hi"}, {user: "user", content: "hello"}] to:
  *
@@ -32,28 +32,29 @@ export async function buildPrompt(
 
 	if (webSearch) {
 		const query = await getQueryFromPrompt(messages, model);
-		console.log("query: ", query)
+		console.log("query: ", query);
 		const results = await searchWeb(query);
 
 		// fetch the top result, summarize it and pass it in the context
 		if (results.organic_results) {
 			const topUrl = results.organic_results[0].link;
-			console.log("top result :", topUrl)
+			console.log("top result :", topUrl);
 			const htmlString = await fetch(topUrl)
-									.then((response)=>response.text())
-									.catch((err)=>console.log(err));
+				.then((response) => response.text())
+				.catch((err) => console.log(err));
 
-			const dom = new JSDOM(htmlString??'');
-			const body = dom.window.document.querySelector('body');
+			const dom = new JSDOM(htmlString ?? "");
+			const body = dom.window.document.querySelector("body");
 
-			console.log(body?.textContent?.replace((/  |\r\n|\n|\r/gm),""))
+			console.log(body?.textContent?.replace(/  |\r\n|\n|\r/gm, ""));
 		}
-		
-		webPrompt = "<|context|>" + (
-		  results.organic_results ?
-		  results.organic_results.map(element => `- ${element.snippet}`).join("\n") 
-		  : "No results found."
-		) + model.messageEndToken;
+
+		webPrompt =
+			"<|context|>" +
+			(results.organic_results
+				? results.organic_results.map((element) => `- ${element.snippet}`).join("\n")
+				: "No results found.") +
+			model.messageEndToken;
 	}
 
 	const finalPrompt =
