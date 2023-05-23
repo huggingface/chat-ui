@@ -4,6 +4,7 @@ import type { Message } from "$lib/types/Message";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 import { generateFromDefaultEndpoint } from "./generateFromDefaultEndpoint";
+import type { BackendModel } from "./models";
 
 // Show result as JSON
 export async function searchWeb(query: string) {
@@ -21,19 +22,20 @@ export async function searchWeb(query: string) {
 	return response;
 }
 
-export async function getQueryFromPrompt(messages: Pick<Message, "from" | "content">[]) {
+export async function getQueryFromPrompt(messages: Pick<Message, "from" | "content">[], model: BackendModel) {
 	let prompt =
-		"<|prompter|>The following messages were written by a user, trying to answer a question.\n";
+		model.userMessageToken + "The following messages were written by a user, trying to answer a question." + model.messageEndToken;
 
-	messages
+	prompt += messages
 		.filter((message) => message.from === "user")
-		.forEach((message) => {
-			prompt += `<|${message.from}|> ${message.content}</s>`;
-		});
+		.map((message) => (
+			model.userMessageToken + 
+			message.content +
+			model.messageEndToken
+		));
 
-	prompt +=
-		"<|prompter|>What plain-text short (less than 10 words) sentence would you input into Google to answer the last question? Answer with just the query.\n</s>";
-	prompt += "<|assistant|>";
+	prompt += model.userMessageToken+ "What query would you input into Google to answer the last question? Answer with a short (10 words max) plain-text query." + model.messageEndToken;
+	prompt += model.assistantMessageToken;
 
 	return await generateFromDefaultEndpoint(prompt);
 }
