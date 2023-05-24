@@ -4,3 +4,5 @@ Dockerfile
 .gitignore
 LICENSE
 README.md
+node_modules/
+.svelte-kit/
