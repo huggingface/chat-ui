@@ -12,12 +12,14 @@ export async function updateUser(params: {
 	cookies: Cookies;
 }) {
 	const { userData, locals, cookies } = params;
+	// when using Google as OpenID provider, remember that it does not provide preferred_username
+	// example fix: userData.preferred_username = userData.email.split("@")[0];
 	const {
 		preferred_username: username,
 		name,
 		email,
 		picture: avatarUrl,
-		sub: providerUserId,
+		sub: hfUserId,
 	} = z
 		.object({
 			preferred_username: z.string(),
@@ -28,7 +30,7 @@ export async function updateUser(params: {
 		})
 		.parse(userData);
 
-	const existingUser = await collections.users.findOne({ providerUserId });
+	const existingUser = await collections.users.findOne({ hfUserId });
 	let userId = existingUser?._id;
 
 	if (existingUser) {
@@ -49,7 +51,7 @@ export async function updateUser(params: {
 			name,
 			email,
 			avatarUrl,
-			providerUserId,
+			hfUserId,
 			sessionId: locals.sessionId,
 		});
 

@@ -31,7 +31,7 @@ const insertRandomUser = async () => {
 		username: "base-username",
 		name: userData.name,
 		avatarUrl: userData.picture,
-		providerUserId: userData.sub,
+		hfUserId: userData.sub,
 		sessionId: locals.sessionId,
 	});
 
@@ -60,7 +60,7 @@ describe("login", () => {
 
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
-		const existingUser = await collections.users.findOne({ providerUserId: userData.sub });
+		const existingUser = await collections.users.findOne({ hfUserId: userData.sub });
 
 		assert.equal(existingUser?.name, userData.name);
 
@@ -123,7 +123,7 @@ describe("login", () => {
 
 		assert.exists(settings);
 
-		const user = await collections.users.findOne({ providerUserId: userData.sub });
+		const user = await collections.users.findOne({ hfUserId: userData.sub });
 
 		expect(settings).toMatchObject({
 			userId: user?._id,
@@ -139,6 +139,6 @@ describe("login", () => {
 });
 
 afterEach(async () => {
-	await collections.users.deleteMany({ providerUserId: userData.sub });
+	await collections.users.deleteMany({ hfUserId: userData.sub });
 	vi.clearAllMocks();
 });

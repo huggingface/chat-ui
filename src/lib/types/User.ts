@@ -8,7 +8,7 @@ export interface User extends Timestamps {
 	name: string;
 	email?: string;
 	avatarUrl: string;
-	providerUserId: string;
+	hfUserId: string;
 
 	// Session identifier, stored in the cookie
 	sessionId: string;
