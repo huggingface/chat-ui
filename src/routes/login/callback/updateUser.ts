@@ -12,8 +12,6 @@ export async function updateUser(params: {
 	cookies: Cookies;
 }) {
 	const { userData, locals, cookies } = params;
-	// when using Google as OpenID provider, remember that it does not provide preferred_username
-	// example fix: userData.preferred_username = userData.email.split("@")[0];
 	const {
 		preferred_username: username,
 		name,
