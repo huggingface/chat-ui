@@ -5,6 +5,7 @@ import {
 	OPENID_CLIENT_ID,
 	OPENID_CLIENT_SECRET,
 	OPENID_PROVIDER_URL,
+	OPENID_SCOPES,
 } from "$env/static/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -32,8 +33,6 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 		expires: addYears(new Date(), 1),
 	});
 }
-
-export const OIDC_SCOPES = "openid profile";
 
 export const authCondition = (locals: App.Locals) => {
 	return locals.user
@@ -75,7 +74,7 @@ export async function getOIDCAuthorizationUrl(
 	const client = await getOIDCClient(settings);
 	const csrfToken = await generateCsrfToken(params.sessionId, settings.redirectURI);
 	const url = client.authorizationUrl({
-		scope: OIDC_SCOPES,
+		scope: OPENID_SCOPES,
 		state: csrfToken,
 	});
 
