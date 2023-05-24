@@ -1,4 +1,4 @@
-import { MONGODB_URL, MONGODB_DB_NAME } from "$env/static/private";
+import { MONGODB_URL, MONGODB_DB_NAME, MONGODB_DIRECT_CONNECTION } from "$env/static/private";
 import { MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
@@ -13,7 +13,7 @@ if (!MONGODB_URL) {
 }
 
 const client = new MongoClient(MONGODB_URL, {
-	// directConnection: true
+	directConnection: MONGODB_DIRECT_CONNECTION === "true",
 });
 
 export const connectPromise = client.connect().catch(console.error);

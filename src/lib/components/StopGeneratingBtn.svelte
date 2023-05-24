@@ -8,7 +8,7 @@
 <button
 	type="button"
 	on:click
-	class="btn absolute flex rounded-lg border bg-white px-3 py-1 shadow-sm transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 
+	class="btn flex rounded-lg border bg-white px-3 py-1 shadow-sm transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 
     {className}
     {visible ? 'visible opacity-100' : 'invisible opacity-0'}
     "
