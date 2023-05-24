@@ -34,7 +34,14 @@ export async function POST({ request }) {
 		title: { type: "UTF8" },
 		created_at: { type: "TIMESTAMP_MILLIS" },
 		updated_at: { type: "TIMESTAMP_MILLIS" },
-		messages: { repeated: true, fields: { from: { type: "UTF8" }, content: { type: "UTF8" } } },
+		messages: {
+			repeated: true,
+			fields: {
+				from: { type: "UTF8" },
+				content: { type: "UTF8" },
+				score: { type: "INT_8", optional: true },
+			},
+		},
 	});
 
 	const fileName = `/tmp/conversations-${new Date().toJSON().slice(0, 10)}-${Date.now()}.parquet`;
@@ -77,6 +84,7 @@ export async function POST({ request }) {
 			messages: conversation.messages.map((message: Message) => ({
 				from: message.from,
 				content: message.content,
+				...(message.score ? { score: message.score } : undefined),
 			})),
 		});
 		++count;
