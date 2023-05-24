@@ -12,10 +12,10 @@ export async function updateUser(params: {
 	cookies: Cookies;
 }) {
 	const { userData, locals, cookies } = params;
-
 	const {
 		preferred_username: username,
 		name,
+		email,
 		picture: avatarUrl,
 		sub: hfUserId,
 	} = z
@@ -24,6 +24,7 @@ export async function updateUser(params: {
 			name: z.string(),
 			picture: z.string(),
 			sub: z.string(),
+			email: z.string().email().optional(),
 		})
 		.parse(userData);
 
@@ -46,6 +47,7 @@ export async function updateUser(params: {
 			updatedAt: new Date(),
 			username,
 			name,
+			email,
 			avatarUrl,
 			hfUserId,
 			sessionId: locals.sessionId,
