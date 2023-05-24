@@ -37,9 +37,9 @@ export async function getQueryFromPrompt(
 
 	prompt +=
 		model.userMessageToken +
-		"What query would you input into Google to answer the last question? Answer with a short (10 words max) plain-text query." +
+		"What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence." +
 		model.messageEndToken;
-	prompt += model.assistantMessageToken;
+	prompt += model.assistantMessageToken + "Query: ";
 
 	return await generateFromDefaultEndpoint(prompt);
 }

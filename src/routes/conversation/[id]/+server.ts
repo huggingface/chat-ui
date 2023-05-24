@@ -38,14 +38,14 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 	const {
 		inputs: newPrompt,
-		options: { id: messageId, is_retry, useSearch },
+		options: { id: messageId, is_retry, use_search },
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
 			options: z.object({
 				id: z.optional(z.string().uuid()),
 				is_retry: z.optional(z.boolean()),
-				useSearch: z.optional(z.boolean()),
+				use_search: z.optional(z.boolean()),
 			}),
 		})
 		.parse(json);
@@ -67,8 +67,8 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	console.log("use web search: ", useSearch);
-	const prompt = await buildPrompt(messages, model, useSearch ? true : undefined);
+	console.log("use web search: ", use_search);
+	const prompt = await buildPrompt(messages, model, use_search ? true : undefined);
 
 	const randomEndpoint = modelEndpoint(model);
 
@@ -128,7 +128,6 @@ export async function POST({ request, fetch, locals, params }) {
 	}
 
 	saveMessage().catch(console.error);
-
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream1, {
 		headers: Object.fromEntries(resp.headers.entries()),

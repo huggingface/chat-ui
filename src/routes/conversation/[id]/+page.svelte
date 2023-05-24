@@ -44,7 +44,7 @@
 			{
 				id: messageId,
 				is_retry: isRetry,
-				useSearch: $webSearchParameters.useSearch,
+				use_search: $webSearchParameters.useSearch,
 				use_cache: false,
 			} as Options
 		);
