@@ -29,7 +29,12 @@
 	let loading = false;
 	let pending = false;
 
-	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
+	async function getTextGenerationStream(
+		inputs: string,
+		messageId: string,
+		isRetry = false,
+		webSearchId?: string
+	) {
 		let conversationId = $page.params.id;
 
 		const response = textGenerationStream(
@@ -44,8 +49,8 @@
 			{
 				id: messageId,
 				is_retry: isRetry,
-				use_search: $webSearchParameters.useSearch,
 				use_cache: false,
+				web_search_id: webSearchId,
 			} as Options
 		);
 
@@ -125,7 +130,25 @@
 				{ from: "user", content: message, id: messageId },
 			];
 
-			await getTextGenerationStream(message, messageId, isRetry);
+			let searchResponseId = "";
+
+			if ($webSearchParameters.useSearch) {
+				const searchResponse = await fetch(
+					`${base}/conversation/${$page.params.id}/web-search?` +
+						new URLSearchParams({ prompt: message }),
+					{
+						method: "GET",
+					}
+				).then((res) => res.json());
+				searchResponseId = searchResponse.id;
+			}
+
+			await getTextGenerationStream(
+				message,
+				messageId,
+				isRetry,
+				searchResponseId !== "" ? searchResponseId : undefined
+			);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
