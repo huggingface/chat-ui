@@ -57,12 +57,63 @@ export async function POST({ request }) {
 		updated_at: Date;
 		messages: Message[];
 	}>([
-		{ $match: { shareConversationsWithModelAuthors: true } },
+		{
+			$match: {
+				shareConversationsWithModelAuthors: true,
+				sessionId: { $exists: true },
+				userId: { $exists: false },
+			},
+		},
 		{
 			$lookup: {
 				from: "conversations",
 				localField: "sessionId",
 				foreignField: "sessionId",
+				as: "conversations",
+				pipeline: [{ $match: { model, userId: { $exists: false } } }],
+			},
+		},
+		{ $unwind: "$conversations" },
+		{
+			$project: {
+				title: "$conversations.title",
+				created_at: "$conversations.createdAt",
+				updated_at: "$conversations.updatedAt",
+				messages: "$conversations.messages",
+			},
+		},
+	])) {
+		await writer.appendRow({
+			title: conversation.title,
+			created_at: conversation.created_at,
+			updated_at: conversation.updated_at,
+			messages: conversation.messages.map((message: Message) => ({
+				from: message.from,
+				content: message.content,
+				...(message.score ? { score: message.score } : undefined),
+			})),
+		});
+		++count;
+
+		if (count % 1_000 === 0) {
+			console.log("Exported", count, "conversations");
+		}
+	}
+
+	console.log("exporting convos with userId");
+
+	for await (const conversation of collections.settings.aggregate<{
+		title: string;
+		created_at: Date;
+		updated_at: Date;
+		messages: Message[];
+	}>([
+		{ $match: { shareConversationsWithModelAuthors: true, userId: { $exists: true } } },
+		{
+			$lookup: {
+				from: "conversations",
+				localField: "userId",
+				foreignField: "userId",
 				as: "conversations",
 				pipeline: [{ $match: { model } }],
 			},
