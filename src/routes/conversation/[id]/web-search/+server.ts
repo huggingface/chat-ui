@@ -118,8 +118,8 @@ export async function GET({ params, locals, url }) {
 
 				webSearchMessages.push({
 					type: "update",
-					message: "Exploring url: " + topUrl,
-					args: [topUrl],
+					message: "Exploring url: " + JSON.stringify(topUrl),
+					args: [JSON.stringify(topUrl)],
 					status: "pending",
 				});
 				controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
@@ -149,7 +149,6 @@ export async function GET({ params, locals, url }) {
 			webSearchMessages.push({
 				type: "update",
 				message: "Summarizing results",
-				args: [text],
 				status: "pending",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
@@ -169,7 +168,7 @@ export async function GET({ params, locals, url }) {
 			webSearchMessages.push({
 				type: "update",
 				message: "Created summary",
-				args: [summary],
+				args: [JSON.stringify(summary)],
 				status: "pending",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));

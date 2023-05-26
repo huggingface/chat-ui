@@ -21,6 +21,8 @@
 	let lastLoadedMessages = data.messages;
 	let isAborted = false;
 
+	let webSearchMessages: WebSearchMessage[] = [];
+
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
 		messages = data.messages;
@@ -131,9 +133,10 @@
 				{ from: "user", content: message, id: messageId },
 			];
 
-			let searchResponseId = "";
-
+			let searchResponseId: string | null = "";
 			if ($webSearchParameters.useSearch) {
+				webSearchMessages = [];
+
 				const res = await fetch(
 					`${base}/conversation/${$page.params.id}/web-search?` +
 						new URLSearchParams({ prompt: message }),
@@ -145,11 +148,10 @@
 				// required bc linting doesn't see TextDecoderStream for some reason?
 				// eslint-disable-next-line no-undef
 				const encoder = new TextDecoderStream();
-
 				const reader = res?.body?.pipeThrough(encoder).getReader();
 
 				while (searchResponseId === "") {
-					await new Promise((r) => setTimeout(r, 250));
+					await new Promise((r) => setTimeout(r, 25));
 					reader
 						?.read()
 						.then(async ({ done, value }) => {
@@ -157,18 +159,27 @@
 								reader.cancel();
 								return;
 							}
-							console.log(value);
-							const searchResponse = (JSON.parse(value) as { messages: WebSearchMessage[] })
-								.messages;
-							console.log(searchResponse);
 
-							const lastMessage = searchResponse[searchResponse.length - 1];
+							try {
+								webSearchMessages = (JSON.parse(value) as { messages: WebSearchMessage[] })
+									.messages;
+							} catch (parseError) {
+								// in case of parsing error we wait for the next message
+								return;
+							}
+
+							console.log("messages: ", webSearchMessages);
+							const lastMessage = webSearchMessages[webSearchMessages.length - 1];
 							if (lastMessage.type === "result") {
 								searchResponseId = lastMessage.id;
 								reader.cancel();
+								return;
 							}
 						})
-						.catch((er) => console.error(er));
+						.catch((er) => {
+							reader.cancel();
+							console.error(er);
+						});
 				}
 			}
 
@@ -176,8 +187,10 @@
 				message,
 				messageId,
 				isRetry,
-				searchResponseId !== "" ? searchResponseId : undefined
+				searchResponseId ? searchResponseId : undefined
 			);
+
+			webSearchMessages = [];
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
