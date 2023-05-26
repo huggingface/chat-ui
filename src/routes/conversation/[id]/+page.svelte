@@ -13,6 +13,7 @@
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
+	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
 
 	export let data;
 
@@ -133,14 +134,42 @@
 			let searchResponseId = "";
 
 			if ($webSearchParameters.useSearch) {
-				const searchResponse = await fetch(
+				const res = await fetch(
 					`${base}/conversation/${$page.params.id}/web-search?` +
 						new URLSearchParams({ prompt: message }),
 					{
 						method: "GET",
 					}
-				).then((res) => res.json());
-				searchResponseId = searchResponse.id;
+				);
+
+				// required bc linting doesn't see TextDecoderStream for some reason?
+				// eslint-disable-next-line no-undef
+				const encoder = new TextDecoderStream();
+
+				const reader = res?.body?.pipeThrough(encoder).getReader();
+
+				while (searchResponseId === "") {
+					await new Promise((r) => setTimeout(r, 250));
+					reader
+						?.read()
+						.then(async ({ done, value }) => {
+							if (done) {
+								reader.cancel();
+								return;
+							}
+							console.log(value);
+							const searchResponse = (JSON.parse(value) as { messages: WebSearchMessage[] })
+								.messages;
+							console.log(searchResponse);
+
+							const lastMessage = searchResponse[searchResponse.length - 1];
+							if (lastMessage.type === "result") {
+								searchResponseId = lastMessage.id;
+								reader.cancel();
+							}
+						})
+						.catch((er) => console.error(er));
+				}
 			}
 
 			await getTextGenerationStream(
