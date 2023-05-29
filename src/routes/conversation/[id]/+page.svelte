@@ -14,7 +14,6 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
-
 	export let data;
 
 	let messages = data.messages;
@@ -22,6 +21,7 @@
 	let isAborted = false;
 
 	let webSearchMessages: WebSearchMessage[] = [];
+	let webSearchModalOpen = false;
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -169,9 +169,9 @@
 							}
 
 							console.log("messages: ", webSearchMessages);
-							const lastMessage = webSearchMessages[webSearchMessages.length - 1];
-							if (lastMessage.type === "result") {
-								searchResponseId = lastMessage.id;
+							const lastSearchMessage = webSearchMessages[webSearchMessages.length - 1];
+							if (lastSearchMessage.type === "result") {
+								searchResponseId = lastSearchMessage.id;
 								reader.cancel();
 								return;
 							}
@@ -236,6 +236,8 @@
 	{loading}
 	{pending}
 	{messages}
+	{webSearchMessages}
+	bind:webSearchModalOpen
 	on:message={(message) => writeMessage(message.detail)}
 	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}

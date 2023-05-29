@@ -11,6 +11,11 @@
 	import CarbonDownload from "~icons/carbon/download";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
+	import WebSearchModal from "./WebSearchModal.svelte";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
+
+	import { base } from "$app/paths";
+	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -39,6 +44,9 @@
 	export let message: Message;
 	export let loading = false;
 	export let readOnly = false;
+
+	let webSearchModalOpen = false;
+	let webSearchMessages: WebSearchMessage[] = [];
 
 	const dispatch = createEventDispatcher<{ retry: void }>();
 
@@ -82,7 +90,18 @@
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
+
+	$: message.webSearchId && (webSearchMessages = []);
 </script>
+
+{#if webSearchModalOpen}
+	<WebSearchModal
+		messages={webSearchMessages}
+		on:close={() => {
+			webSearchModalOpen = false;
+		}}
+	/>
+{/if}
 
 {#if message.from === "assistant"}
 	<div class="flex items-start justify-start gap-4 leading-relaxed">
@@ -96,6 +115,28 @@
 		>
 			{#if !message.content}
 				<IconLoading classNames="absolute inset-0 m-auto" />
+			{/if}
+
+			{#if message.webSearchId}
+				<div class="pb-2">
+					<OpenWebSearchResults
+						on:click={() => {
+							webSearchModalOpen = !webSearchModalOpen;
+
+							if (webSearchMessages.length === 0) {
+								fetch(`${base}/search/${message.webSearchId}`)
+									.then((res) => res.json())
+									.then((res) => {
+										webSearchMessages = [
+											...res.messages,
+											{ type: "result", id: message.webSearchId },
+										];
+									})
+									.catch((err) => console.log(err));
+							}
+						}}
+					/>
+				</div>
 			{/if}
 			<div
 				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"

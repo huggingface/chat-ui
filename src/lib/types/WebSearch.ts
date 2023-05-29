@@ -13,15 +13,14 @@ export interface WebSearch extends Timestamps {
 	results: string[];
 	knowledgeGraph: string;
 	summary: string;
-}
 
-type MessageStatus = "pending" | "success" | "failure";
+	messages: WebSearchMessage[];
+}
 
 export type WebSearchMessageUpdate = {
 	type: "update";
 	message: string;
 	args?: string[];
-	status: MessageStatus;
 };
 
 export type WebSearchMessageResult = {

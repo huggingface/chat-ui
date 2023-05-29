@@ -18,6 +18,7 @@ function naiveInnerText(node: Node): string {
 				case Node.TEXT_NODE:
 					return node.textContent;
 				case Node.ELEMENT_NODE:
+					if (childNode.nodeName === "SCRIPT" || childNode.nodeName === "STYLE") return "";
 					return naiveInnerText(childNode);
 				default:
 					return "";
@@ -64,7 +65,6 @@ export async function GET({ params, locals, url }) {
 			webSearchMessages.push({
 				type: "update",
 				message: "Generating search query...",
-				status: "pending",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -92,9 +92,8 @@ export async function GET({ params, locals, url }) {
 
 			webSearchMessages.push({
 				type: "update",
-				message: "Searching google with query " + searchQuery + "...",
+				message: "Searching Google with query:",
 				args: [searchQuery],
-				status: "pending",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -102,25 +101,22 @@ export async function GET({ params, locals, url }) {
 			let text = "";
 
 			if (results.knowledge_graph) {
+				text = JSON.stringify(removeLinks(results.knowledge_graph));
 				webSearchMessages.push({
 					type: "update",
 					message: "Found a Google knowledge graph",
-					args: [JSON.stringify(removeLinks(results.knowledge_graph))],
-					status: "pending",
 				});
 				controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
 				// if google returns a knowledge graph, we use it
-				text = JSON.stringify(removeLinks(results.knowledge_graph));
 			} else if (results.organic_results) {
 				// otherwise we use the top result from search
 				const topUrl = results.organic_results[0].link;
 
 				webSearchMessages.push({
 					type: "update",
-					message: "Exploring url: " + JSON.stringify(topUrl),
+					message: "Exploring url: ",
 					args: [JSON.stringify(topUrl)],
-					status: "pending",
 				});
 				controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -149,7 +145,6 @@ export async function GET({ params, locals, url }) {
 			webSearchMessages.push({
 				type: "update",
 				message: "Summarizing results",
-				status: "pending",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -167,9 +162,8 @@ export async function GET({ params, locals, url }) {
 
 			webSearchMessages.push({
 				type: "update",
-				message: "Created summary",
+				message: "Created summary: ",
 				args: [JSON.stringify(summary)],
-				status: "pending",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -180,8 +174,11 @@ export async function GET({ params, locals, url }) {
 				searchQuery: searchQuery,
 				knowledgeGraph:
 					results.knowledge_graph && JSON.stringify(removeLinks(results.knowledge_graph)),
-				results: results.organic_results && results.organic_results.map((result) => result.link),
+				results:
+					results.organic_results &&
+					results.organic_results.map((result: { link: string }) => result.link),
 				summary: summary,
+				messages: webSearchMessages,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			});

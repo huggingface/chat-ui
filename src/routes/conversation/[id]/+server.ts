@@ -110,7 +110,12 @@ export async function POST({ request, fetch, locals, params }) {
 			}
 		}
 
-		messages.push({ from: "assistant", content: generated_text, id: crypto.randomUUID() });
+		messages.push({
+			from: "assistant",
+			content: generated_text,
+			id: crypto.randomUUID(),
+			webSearchId: web_search_id,
+		});
 
 		await collections.conversations.updateOne(
 			{

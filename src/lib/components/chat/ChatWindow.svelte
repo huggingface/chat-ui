@@ -11,6 +11,9 @@
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
+	import WebSearchModal from "./WebSearchModal.svelte";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -18,6 +21,8 @@
 	export let currentModel: Model;
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
+	export let webSearchMessages: WebSearchMessage[] = [];
+	export let webSearchModalOpen = false;
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
@@ -38,6 +43,14 @@
 </script>
 
 <div class="relative min-h-0 min-w-0">
+	{#if webSearchModalOpen}
+		<WebSearchModal
+			on:close={() => {
+				webSearchModalOpen = false;
+			}}
+			messages={webSearchMessages}
+		/>
+	{/if}
 	<ChatMessages
 		{loading}
 		{pending}
@@ -54,11 +67,16 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if settings?.searchEnabled}
-			<div class="mr-auto">
+		<div class="mr-auto pb-3">
+			{#if webSearchMessages.length > 0}
+				<OpenWebSearchResults
+					on:click={() => (webSearchModalOpen = !webSearchModalOpen)}
+					on:keypress={() => (webSearchModalOpen = !webSearchModalOpen)}
+				/>
+			{:else if settings?.searchEnabled}
 				<WebSearchToggle />
-			</div>
-		{/if}
+			{/if}
+		</div>
 		<StopGeneratingBtn
 			visible={loading}
 			className="right-5 mr-[1px] md:mr-0 md:right-7 top-6 md:top-10 z-10"
