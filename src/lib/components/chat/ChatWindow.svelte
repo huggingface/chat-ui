@@ -29,6 +29,8 @@
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
+	$: webSearchMessages.length === 0 && (webSearchModalOpen = false);
+
 	let message: string;
 
 	const dispatch = createEventDispatcher<{
