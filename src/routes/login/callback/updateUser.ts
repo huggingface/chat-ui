@@ -12,18 +12,22 @@ export async function updateUser(params: {
 	cookies: Cookies;
 }) {
 	const { userData, locals, cookies } = params;
-
 	const {
 		preferred_username: username,
 		name,
+		email,
 		picture: avatarUrl,
 		sub: hfUserId,
 	} = z
 		.object({
-			preferred_username: z.string(),
+			preferred_username: z.string().optional(),
 			name: z.string(),
 			picture: z.string(),
 			sub: z.string(),
+			email: z.string().email().optional(),
+		})
+		.refine((data) => data.preferred_username || data.email, {
+			message: "Either preferred_username or email must be provided by the provider.",
 		})
 		.parse(userData);
 
@@ -46,6 +50,7 @@ export async function updateUser(params: {
 			updatedAt: new Date(),
 			username,
 			name,
+			email,
 			avatarUrl,
 			hfUserId,
 			sessionId: locals.sessionId,

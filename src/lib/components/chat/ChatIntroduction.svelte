@@ -31,7 +31,7 @@
 	<div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
-				<Logo classNames="mr-1 text-yellow-400 text-4xl" />
+				<Logo classNames="mr-1 text-yellow-400 text-4xl flex-none" />
 				HuggingChat
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
@@ -51,7 +51,7 @@
 					target="_blank"
 					href={banner.linkHref}
 					class="mr-2 flex items-center underline hover:no-underline"
-					><CarbonArrowUpRight class="mr-1" /> {banner.linkTitle}</a
+					><CarbonArrowUpRight class="mr-1.5 text-xs" /> {banner.linkTitle}</a
 				>
 			</AnnouncementBanner>
 		{/each}

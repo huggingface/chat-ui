@@ -38,12 +38,13 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 	const {
 		inputs: newPrompt,
-		options: { id: messageId, is_retry, web_search_id },
+		options: { id: messageId, is_retry, web_search_id, response_id: responseId },
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
 			options: z.object({
 				id: z.optional(z.string().uuid()),
+				response_id: z.optional(z.string().uuid()),
 				is_retry: z.optional(z.boolean()),
 				web_search_id: z.ostring(),
 			}),
@@ -113,8 +114,8 @@ export async function POST({ request, fetch, locals, params }) {
 		messages.push({
 			from: "assistant",
 			content: generated_text,
-			id: crypto.randomUUID(),
 			webSearchId: web_search_id,
+			id: (responseId as Message["id"]) || crypto.randomUUID(),
 		});
 
 		await collections.conversations.updateOne(

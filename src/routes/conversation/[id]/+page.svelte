@@ -14,6 +14,8 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
+	import type { Message } from "$lib/types/Message";
+
 	export let data;
 
 	let messages = data.messages;
@@ -39,6 +41,7 @@
 		webSearchId?: string
 	) {
 		let conversationId = $page.params.id;
+		const responseId = randomUUID();
 
 		const response = textGenerationStream(
 			{
@@ -51,6 +54,7 @@
 			},
 			{
 				id: messageId,
+				response_id: responseId,
 				is_retry: isRetry,
 				use_cache: false,
 				web_search_id: webSearchId,
@@ -98,7 +102,7 @@
 					messages = [
 						...messages,
 						// id doesn't match the backend id but it's not important for assistant messages
-						{ from: "assistant", content: output.token.text.trimStart(), id: randomUUID() },
+						{ from: "assistant", content: output.token.text.trimStart(), id: responseId },
 					];
 				} else {
 					lastMessage.content += output.token.text;
@@ -214,6 +218,32 @@
 		}
 	}
 
+	async function voteMessage(score: Message["score"], messageId: string) {
+		let conversationId = $page.params.id;
+		let oldScore: Message["score"] | undefined;
+
+		// optimistic update to avoid waiting for the server
+		messages = messages.map((message) => {
+			if (message.id === messageId) {
+				oldScore = message.score;
+				return { ...message, score: score };
+			}
+			return message;
+		});
+
+		try {
+			await fetch(`${base}/conversation/${conversationId}/message/${messageId}/vote`, {
+				method: "POST",
+				body: JSON.stringify({ score }),
+			});
+		} catch {
+			// revert score on any error
+			messages = messages.map((message) => {
+				return message.id !== messageId ? message : { ...message, score: oldScore };
+			});
+		}
+	}
+
 	onMount(async () => {
 		if ($pendingMessage) {
 			const val = $pendingMessage;
@@ -238,8 +268,9 @@
 	{messages}
 	{webSearchMessages}
 	bind:webSearchModalOpen
-	on:message={(message) => writeMessage(message.detail)}
-	on:retry={(message) => writeMessage(message.detail.content, message.detail.id)}
+	on:message={(event) => writeMessage(event.detail)}
+	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
+	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
 	models={data.models}

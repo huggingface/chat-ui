@@ -3,4 +3,5 @@ export interface Message {
 	id: ReturnType<typeof crypto.randomUUID>;
 	content: string;
 	webSearchId?: string;
+	score?: -1 | 0 | 1;
 }
