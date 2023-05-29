@@ -89,6 +89,7 @@
 
 				if (lastMessage) {
 					lastMessage.content = output.generated_text;
+					lastMessage.webSearchId = webSearchId;
 					messages = [...messages];
 				}
 				break;
