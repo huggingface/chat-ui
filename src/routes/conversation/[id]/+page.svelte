@@ -173,7 +173,6 @@
 								return;
 							}
 
-							console.log("messages: ", webSearchMessages);
 							const lastSearchMessage = webSearchMessages[webSearchMessages.length - 1];
 							if (lastSearchMessage.type === "result") {
 								searchResponseId = lastSearchMessage.id;

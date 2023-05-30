@@ -85,8 +85,6 @@ export async function GET({ params, locals, url }) {
 				const arr = query.split(/\r?\n/);
 				return arr[0].length > 0 ? arr[0] : arr[1];
 			});
-
-			console.log("search query: ", searchQuery);
 			// the model has a tendency to continue answering even when we tell it not to, so the split makes
 			// sure we only get the first line of the response
 
@@ -188,8 +186,6 @@ export async function GET({ params, locals, url }) {
 				id: res.insertedId.toString(),
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
-
-			console.log("searchId:", res.insertedId.toString());
 		},
 	});
 
