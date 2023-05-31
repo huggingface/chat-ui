@@ -12,6 +12,7 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
+	import LoginModal from "../LoginModal.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -21,8 +22,10 @@
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
 
+	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
+	let loginModalOpen = false;
 	let message: string;
 
 	const dispatch = createEventDispatcher<{
@@ -40,6 +43,9 @@
 </script>
 
 <div class="relative min-h-0 min-w-0">
+	{#if loginModalOpen}
+		<LoginModal {settings} on:close={() => (loginModalOpen = false)} />
+	{/if}
 	<ChatMessages
 		{loading}
 		{pending}
@@ -71,6 +77,9 @@
 					placeholder="Ask anything"
 					bind:value={message}
 					on:submit={handleSubmit}
+					on:keypress={() => {
+						if (loginRequired) loginModalOpen = true;
+					}}
 					maxRows={4}
 					disabled={isReadOnly}
 				/>

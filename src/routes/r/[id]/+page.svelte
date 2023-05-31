@@ -77,4 +77,6 @@
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.model)}
 	settings={data.settings}
+	loginRequired={!$page.error &&
+		(data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt)}
 />
