@@ -16,13 +16,13 @@ app_port: 3000
 
 A chat interface using open source models, eg OpenAssistant. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
-1. [Set-up](#set-up)
+1. [Setup](#setup)
 2. [Launch](#launch)
 3. [Extra parameters](#extra-parameters)
 4. [Deploying to a HF Space](#deploying-to-a-hf-space)
 5. [Building](#building)
 
-## Set-up
+## Setup
 
 The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. This is done in `.env.local`.
 
@@ -33,19 +33,19 @@ MONGODB_URL=<the URL to your mongoDB instance>
 HF_ACCESS_TOKEN=<your access token>
 ```
 
-### MongoDB
+### Database
 
 The chat history is stored in a MongoDB instance, and having a DB instance available is needed for Chat UI to work.
 
-You can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within the free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
-
-Another alternative is to use a local MongoDB instance. The easiest way is to spin one up is using docker:
+You can use a local MongoDB instance. The easiest way is to spin one up is using docker:
 
 ```bash
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
 In which case the url of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
+
+Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within the free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
 
 ### Hugging Face Access Token
 
