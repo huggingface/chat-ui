@@ -65,6 +65,7 @@
 		{messages}
 		readOnly={isReadOnly}
 		isAuthor={!shared}
+		{webSearchMessages}
 		on:message
 		on:vote
 		on:retry={(ev) => {

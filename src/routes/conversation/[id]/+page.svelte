@@ -180,19 +180,13 @@
 								return;
 							}
 						})
-						.catch((er) => {
-							reader.cancel();
-							console.error(er);
+						.catch(() => {
+							searchResponseId = null;
 						});
 				}
 			}
 
-			await getTextGenerationStream(
-				message,
-				messageId,
-				isRetry,
-				searchResponseId ? searchResponseId : undefined
-			);
+			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
 
 			webSearchMessages = [];
 
@@ -266,7 +260,7 @@
 	{loading}
 	{pending}
 	{messages}
-	{webSearchMessages}
+	bind:webSearchMessages
 	bind:webSearchModalOpen
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}

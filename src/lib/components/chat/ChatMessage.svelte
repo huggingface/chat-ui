@@ -50,7 +50,7 @@
 	export let isTapped = false;
 
 	let webSearchModalOpen = false;
-	let webSearchMessages: WebSearchMessage[] = [];
+	export let webSearchMessages: WebSearchMessage[] = [];
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
@@ -124,11 +124,7 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[100px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if !message.content}
-				<IconLoading classNames="absolute inset-0 m-auto" />
-			{/if}
-
-			{#if message.webSearchId}
+			{#if message.webSearchId || webSearchMessages.length > 0}
 				<div class="pb-2">
 					<OpenWebSearchResults
 						on:click={() => {
@@ -149,6 +145,10 @@
 					/>
 				</div>
 			{/if}
+			{#if !message.content}
+				<IconLoading />
+			{/if}
+
 			<div
 				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}

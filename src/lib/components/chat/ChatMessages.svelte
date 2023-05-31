@@ -8,6 +8,7 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -19,6 +20,8 @@
 	export let readOnly: boolean;
 
 	let chatContainer: HTMLElement;
+
+	export let webSearchMessages: WebSearchMessage[] = [];
 
 	async function scrollToBottom() {
 		await tick();
@@ -44,6 +47,7 @@
 				{isAuthor}
 				{readOnly}
 				model={currentModel}
+				webSearchMessages={loading ? webSearchMessages : []}
 				on:retry
 				on:vote
 			/>
@@ -54,6 +58,7 @@
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
+				{webSearchMessages}
 			/>
 		{/if}
 		<div class="h-36 flex-none" />
