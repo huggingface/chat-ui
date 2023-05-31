@@ -33,8 +33,8 @@
 			misinformation. Do not use this application for high-stakes decisions or advice.
 		</p>
 		<p class="px-2 text-sm text-gray-500">
-			⚠️ <b>Data sharing:</b> Your conversations will be shared with the authors of the model
-			you use unless you disable data sharing in the HuggingChat settings.
+			⚠️ <b>Data sharing:</b> Your conversations will be shared with the authors of the model you use
+			unless you disable data sharing in the HuggingChat settings.
 		</p>
 		<form
 			action="{base}/{$page.data.requiresLogin ? 'login' : 'settings'}"
