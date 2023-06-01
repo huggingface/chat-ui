@@ -4,6 +4,8 @@
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
 	import IconLoading from "./icons/IconLoading.svelte";
+	import EosIconsLoading from "~icons/eos-icons/loading";
+
 	import { base } from "$app/paths";
 	import { onMount } from "svelte";
 
@@ -43,7 +45,7 @@
 		{#if webSearchId}
 			<CarbonCheckmark class="my-auto" />
 		{:else}
-			<IconLoading classNames="my-auto" />
+			<EosIconsLoading class="my-auto" />
 		{/if}
 		<span class="px-2 font-medium">Web search results</span>
 		<div class="my-auto transition-all" class:-rotate-90={detailsOpen}>
