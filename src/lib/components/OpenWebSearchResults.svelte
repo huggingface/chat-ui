@@ -57,7 +57,7 @@
 	<div class="content p-5 pb-1">
 		{#if webSearchMessages.length === 0}
 			<div class="mx-auto w-fit">
-				<IconLoading />
+				<EosIconsLoading class="mb-3 h-10 w-10" />
 			</div>
 		{:else}
 			<ol class="border-gray-20 relative border-l">
