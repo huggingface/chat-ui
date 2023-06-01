@@ -9,6 +9,7 @@
 	import { base } from "$app/paths";
 	import { onMount } from "svelte";
 
+	export let loading = false;
 	export let webSearchId: string | undefined;
 	export let webSearchMessages: WebSearchMessage[] = [];
 
@@ -42,10 +43,10 @@
 	bind:open={detailsOpen}
 >
 	<summary class="align-center mr-2 flex list-none p-2 align-text-top transition-all">
-		{#if webSearchId}
-			<CarbonCheckmark class="my-auto" />
-		{:else}
+		{#if loading}
 			<EosIconsLoading class="my-auto" />
+		{:else}
+			<CarbonCheckmark class="my-auto" />
 		{/if}
 		<span class="px-2 font-medium">Web search results</span>
 		<div class="my-auto transition-all" class:-rotate-90={detailsOpen}>

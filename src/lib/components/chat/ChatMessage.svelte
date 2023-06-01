@@ -95,7 +95,12 @@
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
-	$: message.webSearchId && (webSearchMessages = []);
+	let webSearchIsDone = true;
+
+	$: webSearchIsDone =
+		!!message.webSearchId ||
+		(webSearchMessages.length > 0 &&
+			webSearchMessages[webSearchMessages.length - 1].type === "result");
 </script>
 
 {#if message.from === "assistant"}
@@ -115,11 +120,15 @@
 			{#if message.webSearchId || webSearchMessages.length > 0}
 				<div class="pb-2">
 					{#key message.webSearchId}
-						<OpenWebSearchResults webSearchId={message.webSearchId} {webSearchMessages} />
+						<OpenWebSearchResults
+							webSearchId={message.webSearchId}
+							{webSearchMessages}
+							loading={!webSearchIsDone}
+						/>
 					{/key}
 				</div>
 			{/if}
-			{#if !message.content}
+			{#if !message.content && webSearchIsDone}
 				<IconLoading />
 			{/if}
 

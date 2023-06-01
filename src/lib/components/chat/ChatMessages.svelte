@@ -47,7 +47,7 @@
 				{isAuthor}
 				{readOnly}
 				model={currentModel}
-				webSearchMessages={loading ? webSearchMessages : []}
+				webSearchMessages={loading && messages.length - 1 === i ? webSearchMessages : []}
 				on:retry
 				on:vote
 			/>
