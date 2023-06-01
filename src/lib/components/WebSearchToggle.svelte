@@ -16,7 +16,7 @@
 	<div class="group relative m-auto ml-2 w-max">
 		<CarbonInformation />
 		<span
-			class="pointer-events-none absolute -top-16 w-max opacity-0 transition-opacity group-hover:opacity-100"
+			class="pointer-events-none absolute -top-20 left-1/2 w-max -translate-x-1/2 rounded-md bg-gray-100 p-2 opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-600"
 		>
 			<p class="max-w-sm text-sm text-gray-800 dark:text-gray-200">
 				When enabled, the model will try to complement its answer with information queried from the
