@@ -119,7 +119,7 @@
 		>
 			{#if message.webSearchId || webSearchMessages.length > 0}
 				<div class="pb-2">
-					{#key (message.webSearchId, message.score)}
+					{#key (message.webSearchId, message.score, loading)}
 						<OpenWebSearchResults
 							webSearchId={message.webSearchId}
 							{webSearchMessages}
