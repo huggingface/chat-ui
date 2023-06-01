@@ -24,6 +24,7 @@
 				},
 				body: JSON.stringify({
 					fromShare: $page.params.id,
+					model: data.model,
 				}),
 			});
 
