@@ -64,7 +64,7 @@ export async function GET({ params, locals, url }) {
 
 			webSearchMessages.push({
 				type: "update",
-				message: "Generating search query...",
+				message: "Generating search query",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -90,7 +90,7 @@ export async function GET({ params, locals, url }) {
 
 			webSearchMessages.push({
 				type: "update",
-				message: "Searching Google with query:",
+				message: "Searching Google",
 				args: [searchQuery],
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
@@ -102,7 +102,7 @@ export async function GET({ params, locals, url }) {
 				text = JSON.stringify(removeLinks(results.knowledge_graph));
 				webSearchMessages.push({
 					type: "update",
-					message: "Found a Google knowledge graph",
+					message: "Found a Google knowledge page",
 				});
 				controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -113,7 +113,7 @@ export async function GET({ params, locals, url }) {
 
 				webSearchMessages.push({
 					type: "update",
-					message: "Exploring url: ",
+					message: "Browsing first result",
 					args: [JSON.stringify(topUrl)],
 				});
 				controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
@@ -142,7 +142,7 @@ export async function GET({ params, locals, url }) {
 
 			webSearchMessages.push({
 				type: "update",
-				message: "Summarizing results",
+				message: "Creating summary",
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
 
@@ -156,11 +156,13 @@ export async function GET({ params, locals, url }) {
 				model.assistantMessageToken +
 				"Summary: ";
 
-			const summary = await generateFromDefaultEndpoint(summaryPrompt);
+			const summary = await generateFromDefaultEndpoint(summaryPrompt).then((txt: string) =>
+				txt.trim()
+			);
 
 			webSearchMessages.push({
 				type: "update",
-				message: "Created summary: ",
+				message: "Injecting summary",
 				args: [JSON.stringify(summary)],
 			});
 			controller.enqueue(JSON.stringify({ messages: webSearchMessages }));
