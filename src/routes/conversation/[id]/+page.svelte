@@ -156,6 +156,12 @@
 
 				while (searchResponseId === "") {
 					await new Promise((r) => setTimeout(r, 25));
+
+					if (isAborted) {
+						reader?.cancel();
+						return;
+					}
+
 					reader
 						?.read()
 						.then(async ({ done, value }) => {
@@ -247,7 +253,7 @@
 			writeMessage(val, messageId);
 		}
 	});
-
+	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 </script>
 

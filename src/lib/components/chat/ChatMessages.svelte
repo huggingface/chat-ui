@@ -41,16 +41,18 @@
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
-			<ChatMessage
-				loading={loading && i === messages.length - 1}
-				{message}
-				{isAuthor}
-				{readOnly}
-				model={currentModel}
-				webSearchMessages={loading && messages.length - 1 === i ? webSearchMessages : []}
-				on:retry
-				on:vote
-			/>
+			{#key message.id}
+				<ChatMessage
+					loading={loading && i === messages.length - 1}
+					{message}
+					{isAuthor}
+					{readOnly}
+					model={currentModel}
+					webSearchMessages={loading && messages.length - 1 === i ? webSearchMessages : []}
+					on:retry
+					on:vote
+				/>
+			{/key}
 		{:else}
 			<ChatIntroduction {settings} {models} {currentModel} on:message />
 		{/each}
