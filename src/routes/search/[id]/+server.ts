@@ -1,4 +1,5 @@
 import { collections } from "$lib/server/database";
+import { sha256 } from "$lib/utils/sha256.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -21,7 +22,16 @@ export async function GET({ params, locals }) {
 		throw error(404, "Conversation not found");
 	}
 
-	if (!conv.userId || locals.user?._id.toString() !== conv.userId.toString()) {
+	// there's no better way to see if a conversation has been shared, so we hash the messages and see if there's a shared conversation with the same hash
+	const hash = await sha256(JSON.stringify(conv.messages));
+	const sharedConv = await collections.sharedConversations.findOne({
+		hash: hash,
+	});
+
+	const userShouldSeeConv =
+		(conv.userId && locals.user?._id.toString() === conv.userId.toString()) || sharedConv !== null;
+
+	if (!userShouldSeeConv) {
 		throw error(403, "You don't have access to the conversation here.");
 	}
 
