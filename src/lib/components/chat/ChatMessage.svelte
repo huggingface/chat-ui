@@ -128,7 +128,7 @@
 					{/key}
 				</div>
 			{/if}
-			{#if !message.content && webSearchIsDone}
+			{#if !message.content && (webSearchIsDone || webSearchMessages.length === 0)}
 				<IconLoading />
 			{/if}
 
