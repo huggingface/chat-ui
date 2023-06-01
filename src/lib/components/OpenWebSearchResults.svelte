@@ -64,14 +64,14 @@
 				{#each webSearchMessages as message}
 					{#if message.type === "update"}
 						<li class="mb-4 ml-4">
-							<div
-								class="absolute -left-1.5 h-3 w-3 rounded-full border border-white bg-gray-200"
-							/>
-							<h3 class="text-md -translate-y-1 text-gray-800 dark:text-gray-100">
+							<div class="h-3 w-3 -translate-x-[1.4rem] rounded-full bg-gray-200" />
+							<h3 class="text-md -translate-y-[1.1rem] text-gray-800 dark:text-gray-100">
 								{message.message}
 							</h3>
 							{#if message.args}
-								<p class="mb-4 text-base font-normal text-gray-500 dark:text-gray-400 ">
+								<p
+									class="mb-4 -translate-y-[1.1rem] text-base font-normal text-gray-500 dark:text-gray-400 "
+								>
 									{message.args}
 								</p>
 							{/if}
