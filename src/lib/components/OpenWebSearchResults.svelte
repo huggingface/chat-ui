@@ -3,7 +3,6 @@
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
-	import IconLoading from "./icons/IconLoading.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	import { base } from "$app/paths";
