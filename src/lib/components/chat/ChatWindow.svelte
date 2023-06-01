@@ -62,13 +62,18 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		<div class="my-[0.5rem] hidden justify-center sm:flex">
-			<StopGeneratingBtn visible={loading} on:click={() => dispatch("stop")} />
-		</div>
-		<div class="mr-auto pb-3">
-			{#if settings?.searchEnabled}
-				<WebSearchToggle />
-			{/if}
+		<div class="flex w-full pb-3">
+			<div class="mr-auto w-fit flex-1">
+				<div class="mr-auto w-fit">
+					{#if settings?.searchEnabled}
+						<WebSearchToggle />
+					{/if}
+				</div>
+			</div>
+			<div>
+				<StopGeneratingBtn visible={loading} on:click={() => dispatch("stop")} />
+			</div>
+			<div class="flex-1" />
 		</div>
 		<form
 			on:submit|preventDefault={handleSubmit}
