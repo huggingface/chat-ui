@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 	import { PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
+
+	import CarbonGear from "~icons/carbon/settings";
+	import CarbonUser from "~icons/carbon/user-avatar-filled-alt";
+	import CarbonSun from "~icons/carbon/sun";
+	import CarbonMoon from "~icons/carbon/moon";
+	import CarbonChat from "~icons/carbon/chat";
 
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
@@ -19,6 +25,10 @@
 		title: string;
 	}> = [];
 	export let user: LayoutData["user"];
+
+	let theme: string | null;
+
+	onMount(() => (theme = localStorage.getItem("theme")));
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -41,7 +51,7 @@
 	{/each}
 </div>
 <div
-	class="mt-0.5 flex flex-col gap-1 rounded-r-xl bg-gradient-to-l from-gray-50 p-3 text-sm dark:from-gray-800/30"
+	class="mt-1 flex flex-col gap-1 rounded-r-xl bg-gradient-to-l from-gray-50 p-3 text-sm dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<form
@@ -50,9 +60,19 @@
 			class="group flex items-center gap-1.5 rounded-lg pl-3 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
 			<span
-				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
-				>{user?.username || user?.email}</span
+				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-smd font-semibold text-gray-500 dark:text-gray-400"
 			>
+				{#if user?.avatarUrl}
+					<img
+						src={"https://huggingface.co" + user?.avatarUrl}
+						alt="User Avatar"
+						class="h-5 w-5 rounded-full border-2 border-gray-400"
+					/>
+				{:else}
+					<CarbonUser class="h-5 w-5" />
+				{/if}
+				{user?.username || user?.email}
+			</span>
 			<button
 				type="submit"
 				class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md border bg-white px-2 text-gray-700 shadow-sm group-hover:flex hover:shadow-none dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
@@ -62,10 +82,18 @@
 		</form>
 	{/if}
 	<button
-		on:click={switchTheme}
+		on:click={() => {
+			switchTheme();
+			theme = localStorage.getItem("theme");
+		}}
 		type="button"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
+		{#if theme === "dark"}
+			<CarbonMoon class="h-5 w-5" />
+		{:else}
+			<CarbonSun class="h-5 w-5" />
+		{/if}
 		Theme
 	</button>
 	<button
@@ -73,6 +101,7 @@
 		type="button"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
+		<CarbonGear class="h-5 w-5" />
 		Settings
 	</button>
 	<a
@@ -81,6 +110,7 @@
 		rel="noreferrer"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
+		<CarbonChat class="h-5 w-5" />
 		Feedback
 	</a>
 	<a
