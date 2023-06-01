@@ -13,10 +13,8 @@
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
-	import WebSearchModal from "./WebSearchModal.svelte";
 	import type { WebSearchMessage } from "$lib/types/WebSearch";
 
-	import { base } from "$app/paths";
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 
 	function sanitizeMd(md: string) {
@@ -49,7 +47,6 @@
 	export let readOnly = false;
 	export let isTapped = false;
 
-	let webSearchModalOpen = false;
 	export let webSearchMessages: WebSearchMessage[] = [];
 
 	const dispatch = createEventDispatcher<{
@@ -101,15 +98,6 @@
 	$: message.webSearchId && (webSearchMessages = []);
 </script>
 
-{#if webSearchModalOpen}
-	<WebSearchModal
-		messages={webSearchMessages}
-		on:close={() => {
-			webSearchModalOpen = false;
-		}}
-	/>
-{/if}
-
 {#if message.from === "assistant"}
 	<div
 		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed"
@@ -126,23 +114,9 @@
 		>
 			{#if message.webSearchId || webSearchMessages.length > 0}
 				<div class="pb-2">
-					<OpenWebSearchResults
-						on:click={() => {
-							webSearchModalOpen = !webSearchModalOpen;
-
-							if (webSearchMessages.length === 0) {
-								fetch(`${base}/search/${message.webSearchId}`)
-									.then((res) => res.json())
-									.then((res) => {
-										webSearchMessages = [
-											...res.messages,
-											{ type: "result", id: message.webSearchId },
-										];
-									})
-									.catch((err) => console.log(err));
-							}
-						}}
-					/>
+					{#key message.webSearchId}
+						<OpenWebSearchResults webSearchId={message.webSearchId} {webSearchMessages} />
+					{/key}
 				</div>
 			{/if}
 			{#if !message.content}

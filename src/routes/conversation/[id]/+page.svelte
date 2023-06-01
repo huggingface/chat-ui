@@ -23,7 +23,6 @@
 	let isAborted = false;
 
 	let webSearchMessages: WebSearchMessage[] = [];
-	let webSearchModalOpen = false;
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -261,7 +260,6 @@
 	{pending}
 	{messages}
 	bind:webSearchMessages
-	bind:webSearchModalOpen
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}

@@ -13,9 +13,7 @@
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
-	import WebSearchModal from "./WebSearchModal.svelte";
 	import type { WebSearchMessage } from "$lib/types/WebSearch";
-	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -25,11 +23,8 @@
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
 	export let webSearchMessages: WebSearchMessage[] = [];
-	export let webSearchModalOpen = false;
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
-
-	$: webSearchMessages.length === 0 && (webSearchModalOpen = false);
 
 	let message: string;
 
@@ -48,14 +43,6 @@
 </script>
 
 <div class="relative min-h-0 min-w-0">
-	{#if webSearchModalOpen}
-		<WebSearchModal
-			on:close={() => {
-				webSearchModalOpen = false;
-			}}
-			messages={webSearchMessages}
-		/>
-	{/if}
 	<ChatMessages
 		{loading}
 		{pending}
@@ -79,12 +66,7 @@
 			<StopGeneratingBtn visible={loading} on:click={() => dispatch("stop")} />
 		</div>
 		<div class="mr-auto pb-3">
-			{#if webSearchMessages.length > 0}
-				<OpenWebSearchResults
-					on:click={() => (webSearchModalOpen = !webSearchModalOpen)}
-					on:keypress={() => (webSearchModalOpen = !webSearchModalOpen)}
-				/>
-			{:else if settings?.searchEnabled}
+			{#if settings?.searchEnabled}
 				<WebSearchToggle />
 			{/if}
 		</div>
