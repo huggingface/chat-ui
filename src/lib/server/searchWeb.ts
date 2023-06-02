@@ -1,10 +1,7 @@
 import { SERPAPI_KEY } from "$env/static/private";
-import type { Message } from "$lib/types/Message";
 
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
-import { generateFromDefaultEndpoint } from "./generateFromDefaultEndpoint";
-import type { BackendModel } from "./models";
 
 // Show result as JSON
 export async function searchWeb(query: string) {
@@ -20,26 +17,4 @@ export async function searchWeb(query: string) {
 	const response = await getJson("google", params);
 
 	return response;
-}
-
-export async function getQueryFromPrompt(
-	messages: Pick<Message, "from" | "content">[],
-	model: BackendModel
-) {
-	let prompt =
-		model.userMessageToken +
-		"The following messages were written by a user, trying to answer a question." +
-		model.messageEndToken;
-
-	prompt += messages
-		.filter((message) => message.from === "user")
-		.map((message) => model.userMessageToken + message.content + model.messageEndToken);
-
-	prompt +=
-		model.userMessageToken +
-		"What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence." +
-		model.messageEndToken;
-	prompt += model.assistantMessageToken + "Query: ";
-
-	return await generateFromDefaultEndpoint(prompt);
 }
