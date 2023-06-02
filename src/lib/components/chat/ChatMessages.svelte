@@ -50,6 +50,7 @@
 					{readOnly}
 					model={currentModel}
 					{webSearchMessages}
+					isLast={i === messages.length - 1}
 					on:retry
 					on:vote
 				/>
@@ -61,6 +62,7 @@
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
+				isLast={true}
 				{webSearchMessages}
 			/>
 		{/if}
