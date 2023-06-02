@@ -50,6 +50,7 @@
 		bind:this={textareaElement}
 		{disabled}
 		on:keydown={handleKeydown}
+		on:keypress
 		{placeholder}
 	/>
 </div>
