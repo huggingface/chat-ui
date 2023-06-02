@@ -40,7 +40,7 @@ export async function buildPrompt(
 		if (webSearch.summary) {
 			webPrompt =
 				model.assistantMessageToken +
-				`The following context was found while searching the internet.: ${webSearch.summary}` +
+				`The following context was found while searching the internet: ${webSearch.summary}` +
 				model.messageEndToken;
 		}
 	}

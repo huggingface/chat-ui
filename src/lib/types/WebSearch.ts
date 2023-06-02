@@ -23,9 +23,18 @@ export type WebSearchMessageUpdate = {
 	args?: string[];
 };
 
+export type WebSearchMessageError = {
+	type: "error";
+	message: string;
+	args?: string[];
+};
+
 export type WebSearchMessageResult = {
 	type: "result";
 	id: string;
 };
 
-export type WebSearchMessage = WebSearchMessageUpdate | WebSearchMessageResult;
+export type WebSearchMessage =
+	| WebSearchMessageUpdate
+	| WebSearchMessageResult
+	| WebSearchMessageError;

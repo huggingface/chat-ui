@@ -5,9 +5,19 @@ import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 
-export async function generateFromDefaultEndpoint(prompt: string) {
-	const parameters = {
+interface Parameters {
+	temperature: number;
+	truncate: number;
+	max_new_tokens: number;
+	stop: string[];
+}
+export async function generateFromDefaultEndpoint(
+	prompt: string,
+	parameters?: Partial<Parameters>
+) {
+	const newParameters = {
 		...defaultModel.parameters,
+		...parameters,
 		return_full_text: false,
 	};
 
@@ -16,7 +26,7 @@ export async function generateFromDefaultEndpoint(prompt: string) {
 		{
 			model: endpoint.url,
 			inputs: prompt,
-			parameters,
+			parameters: newParameters,
 		},
 		{
 			fetch: (url, options) =>
