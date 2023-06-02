@@ -91,6 +91,11 @@
 	});
 
 	$: if ($error) onError();
+
+	const requiresLogin =
+		!$page.error &&
+		(data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt) &&
+		!$page.route.id?.startsWith("/r/");
 </script>
 
 <svelte:head>
@@ -136,7 +141,7 @@
 	{#if isSettingsOpen}
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
 	{/if}
-	{#if !$page.error && (data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt)}
+	{#if requiresLogin}
 		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />
