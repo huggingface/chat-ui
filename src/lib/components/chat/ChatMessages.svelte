@@ -8,6 +8,8 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import { page } from "$app/stores";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -19,6 +21,8 @@
 	export let readOnly: boolean;
 
 	let chatContainer: HTMLElement;
+
+	export let webSearchMessages: WebSearchMessage[] = [];
 
 	async function scrollToBottom() {
 		await tick();
@@ -33,20 +37,24 @@
 
 <div
 	class="scrollbar-custom mr-1 h-full overflow-y-auto"
-	use:snapScrollToBottom={messages.length ? messages : false}
+	use:snapScrollToBottom={messages.length ? [...messages, ...webSearchMessages] : false}
 	bind:this={chatContainer}
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
-			<ChatMessage
-				loading={loading && i === messages.length - 1}
-				{message}
-				{isAuthor}
-				{readOnly}
-				model={currentModel}
-				on:retry
-				on:vote
-			/>
+			{#key (message.id, $page.params.id)}
+				<ChatMessage
+					loading={loading && i === messages.length - 1}
+					{message}
+					{isAuthor}
+					{readOnly}
+					model={currentModel}
+					{webSearchMessages}
+					isLast={i === messages.length - 1}
+					on:retry
+					on:vote
+				/>
+			{/key}
 		{:else}
 			<ChatIntroduction {settings} {models} {currentModel} on:message />
 		{/each}
@@ -54,9 +62,11 @@
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
+				isLast={true}
+				{webSearchMessages}
 			/>
 		{/if}
-		<div class="h-36 flex-none" />
+		<div class="h-44 flex-none" />
 	</div>
 	<ScrollToBottomBtn
 		class="bottom-36 right-4 max-md:hidden lg:right-10"

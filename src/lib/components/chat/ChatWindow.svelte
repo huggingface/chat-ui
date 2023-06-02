@@ -4,7 +4,7 @@
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
-	import CarbonPause from "~icons/carbon/pause-filled";
+	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	import ChatMessages from "./ChatMessages.svelte";
@@ -12,6 +12,8 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
+	import WebSearchToggle from "../WebSearchToggle.svelte";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
 	import LoginModal from "../LoginModal.svelte";
 
 	export let messages: Message[] = [];
@@ -21,6 +23,7 @@
 	export let currentModel: Model;
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
+	export let webSearchMessages: WebSearchMessage[] = [];
 
 	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
@@ -55,6 +58,7 @@
 		{messages}
 		readOnly={isReadOnly}
 		isAuthor={!shared}
+		{webSearchMessages}
 		on:message
 		on:vote
 		on:retry={(ev) => {
@@ -64,8 +68,16 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		<div class="my-[0.5rem] hidden justify-center sm:flex">
-			<StopGeneratingBtn visible={loading} on:click={() => dispatch("stop")} />
+		<div class="flex w-full pb-3 max-md:justify-between">
+			{#if settings?.searchEnabled}
+				<WebSearchToggle />
+			{/if}
+			{#if loading}
+				<StopGeneratingBtn
+					classNames={settings?.searchEnabled ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
+					on:click={() => dispatch("stop")}
+				/>
+			{/if}
 		</div>
 		<form
 			on:submit|preventDefault={handleSubmit}
@@ -89,7 +101,7 @@
 						class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:hidden"
 						on:click={() => dispatch("stop")}
 					>
-						<CarbonPause />
+						<CarbonStopFilledAlt />
 					</button>
 					<div
 						class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:flex"

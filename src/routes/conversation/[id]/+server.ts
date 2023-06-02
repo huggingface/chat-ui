@@ -38,7 +38,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const json = await request.json();
 	const {
 		inputs: newPrompt,
-		options: { id: messageId, is_retry, response_id: responseId },
+		options: { id: messageId, is_retry, web_search_id, response_id: responseId },
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
@@ -46,6 +46,7 @@ export async function POST({ request, fetch, locals, params }) {
 				id: z.optional(z.string().uuid()),
 				response_id: z.optional(z.string().uuid()),
 				is_retry: z.optional(z.boolean()),
+				web_search_id: z.ostring(),
 			}),
 		})
 		.parse(json);
@@ -67,8 +68,7 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	const prompt = buildPrompt(messages, model);
-
+	const prompt = await buildPrompt(messages, model, web_search_id);
 	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
@@ -114,6 +114,7 @@ export async function POST({ request, fetch, locals, params }) {
 		messages.push({
 			from: "assistant",
 			content: generated_text,
+			webSearchId: web_search_id,
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
 		});
 
@@ -131,7 +132,6 @@ export async function POST({ request, fetch, locals, params }) {
 	}
 
 	saveMessage().catch(console.error);
-
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream1, {
 		headers: Object.fromEntries(resp.headers.entries()),

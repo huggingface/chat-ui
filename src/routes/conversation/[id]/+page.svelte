@@ -12,6 +12,8 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
+	import { webSearchParameters } from "$lib/stores/webSearchParameters";
+	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
 	import type { Message } from "$lib/types/Message";
 
 	export let data;
@@ -19,6 +21,8 @@
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
 	let isAborted = false;
+
+	let webSearchMessages: WebSearchMessage[] = [];
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -29,8 +33,13 @@
 	let loading = false;
 	let pending = false;
 
-	async function getTextGenerationStream(inputs: string, messageId: string, isRetry = false) {
-		const conversationId = $page.params.id;
+	async function getTextGenerationStream(
+		inputs: string,
+		messageId: string,
+		isRetry = false,
+		webSearchId?: string
+	) {
+		let conversationId = $page.params.id;
 		const responseId = randomUUID();
 
 		const response = textGenerationStream(
@@ -47,6 +56,7 @@
 				response_id: responseId,
 				is_retry: isRetry,
 				use_cache: false,
+				web_search_id: webSearchId,
 			} as Options
 		);
 
@@ -78,6 +88,7 @@
 
 				if (lastMessage) {
 					lastMessage.content = output.generated_text;
+					lastMessage.webSearchId = webSearchId;
 					messages = [...messages];
 				}
 				break;
@@ -126,7 +137,63 @@
 				{ from: "user", content: message, id: messageId },
 			];
 
-			await getTextGenerationStream(message, messageId, isRetry);
+			let searchResponseId: string | null = "";
+			if ($webSearchParameters.useSearch) {
+				webSearchMessages = [];
+
+				const res = await fetch(
+					`${base}/conversation/${$page.params.id}/web-search?` +
+						new URLSearchParams({ prompt: message }),
+					{
+						method: "GET",
+					}
+				);
+
+				// required bc linting doesn't see TextDecoderStream for some reason?
+				// eslint-disable-next-line no-undef
+				const encoder = new TextDecoderStream();
+				const reader = res?.body?.pipeThrough(encoder).getReader();
+
+				while (searchResponseId === "") {
+					await new Promise((r) => setTimeout(r, 25));
+
+					if (isAborted) {
+						reader?.cancel();
+						return;
+					}
+
+					reader
+						?.read()
+						.then(async ({ done, value }) => {
+							if (done) {
+								reader.cancel();
+								return;
+							}
+
+							try {
+								webSearchMessages = (JSON.parse(value) as { messages: WebSearchMessage[] })
+									.messages;
+							} catch (parseError) {
+								// in case of parsing error we wait for the next message
+								return;
+							}
+
+							const lastSearchMessage = webSearchMessages[webSearchMessages.length - 1];
+							if (lastSearchMessage.type === "result") {
+								searchResponseId = lastSearchMessage.id;
+								reader.cancel();
+								return;
+							}
+						})
+						.catch(() => {
+							searchResponseId = null;
+						});
+				}
+			}
+
+			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
+
+			webSearchMessages = [];
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
@@ -186,7 +253,7 @@
 			writeMessage(val, messageId);
 		}
 	});
-
+	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 </script>
 
@@ -198,6 +265,7 @@
 	{loading}
 	{pending}
 	{messages}
+	bind:webSearchMessages
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
