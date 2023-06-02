@@ -11,6 +11,7 @@
 	import { onMount } from "svelte";
 
 	export let loading = false;
+	export let classNames = "";
 	export let webSearchId: string | undefined;
 	export let webSearchMessages: WebSearchMessage[] = [];
 
@@ -30,8 +31,7 @@
 </script>
 
 <details
-	class="details flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900
-	"
+	class="details flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames}"
 	on:toggle={() => {
 		if (webSearchMessages.length === 0 && webSearchId) {
 			fetch(`${base}/search/${webSearchId}`)
