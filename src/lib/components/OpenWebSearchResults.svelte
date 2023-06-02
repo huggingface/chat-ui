@@ -49,7 +49,7 @@
 	>
 		{#if error}
 			<CarbonError class="my-auto text-red-700 dark:text-red-500" />
-		{:else if loading || webSearchMessages.length === 0}
+		{:else if loading}
 			<EosIconsLoading class="my-auto text-gray-500" />
 		{:else}
 			<CarbonCheckmark class="my-auto text-gray-500" />
