@@ -1,4 +1,8 @@
-<div class="inline-flex h-8 flex-none items-center gap-1">
+<script lang="ts">
+	export let classNames = "";
+</script>
+
+<div class={"inline-flex h-8 flex-none items-center gap-1 " + classNames}>
 	<div
 		class="h-1 w-1 animate-bounce rounded-full bg-gray-500 dark:bg-gray-400"
 		style="animation-delay: 0.25s;"
