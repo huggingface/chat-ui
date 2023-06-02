@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { WebSearchMessage } from "$lib/types/WebSearch";
-	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonCaretRight from "~icons/carbon/caret-right";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
 	import CarbonError from "~icons/carbon/error-filled";
@@ -30,7 +30,7 @@
 </script>
 
 <details
-	class="details flex w-fit rounded-xl border border-gray-200 bg-white px-2 shadow-sm dark:border-gray-600 dark:bg-gray-700
+	class="details flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900
 	"
 	on:toggle={() => {
 		if (webSearchMessages.length === 0 && webSearchId) {
@@ -44,19 +44,21 @@
 	}}
 	bind:open={detailsOpen}
 >
-	<summary class="align-center mr-2 flex list-none p-2 align-text-top transition-all">
+	<summary
+		class="align-center flex cursor-pointer select-none list-none py-1 pl-2.5 pr-2 align-text-top transition-all"
+	>
 		{#if error}
 			<CarbonError class="my-auto text-red-700 dark:text-red-500" />
 		{:else if loading || webSearchMessages.length === 0}
-			<EosIconsLoading class="my-auto" />
+			<EosIconsLoading class="my-auto text-gray-500" />
 		{:else}
-			<CarbonCheckmark class="my-auto" />
+			<CarbonCheckmark class="my-auto text-gray-500" />
 		{/if}
 		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}
-			>Web search results</span
-		>
-		<div class="my-auto transition-all" class:-rotate-90={detailsOpen}>
-			<CarbonCaretDown />
+			>Web search
+		</span>
+		<div class="my-auto transition-all" class:rotate-90={detailsOpen}>
+			<CarbonCaretRight />
 		</div>
 	</summary>
 
@@ -66,11 +68,13 @@
 				<EosIconsLoading class="mb-3 h-10 w-10" />
 			</div>
 		{:else}
-			<ol class="relative border-l dark:border-l-gray-500">
+			<ol class="relative border-l border-gray-200 dark:border-gray-600">
 				{#each webSearchMessages as message}
 					{#if message.type === "update"}
 						<li class="mb-4 ml-4">
-							<div class="h-3 w-3 -translate-x-[1.4rem] rounded-full bg-gray-200" />
+							<div
+								class="h-3 w-3 -translate-x-[1.4rem] rounded-full bg-gray-200 dark:bg-gray-600"
+							/>
 							<h3 class="text-md -translate-y-[1.1rem] text-gray-800 dark:text-gray-100">
 								{message.message}
 							</h3>
