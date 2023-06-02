@@ -187,7 +187,10 @@ export async function GET({ params, locals, url }) {
 
 				const summaryPrompt =
 					model.userMessageToken +
-					text +
+					text
+						.split(" ")
+						.slice(0, model.parameters?.truncate ?? 0)
+						.join(" ") +
 					model.messageEndToken +
 					model.userMessageToken +
 					`The text above should be summarized to best answer the query: ${webSearch.searchQuery}.` +
