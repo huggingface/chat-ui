@@ -91,7 +91,9 @@
 					{:else if message.type === "error"}
 						<li class="group border-l pb-5 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
-								<CarbonError class="-ml-1.5 h-3 w-3  flex-none text-red-700 dark:text-red-500" />
+								<CarbonError
+									class="-ml-1.5 h-3 w-3 flex-none scale-110 text-red-700 dark:text-red-500"
+								/>
 								<h3 class="text-md -mt-1.5 pl-2.5 text-red-700 dark:text-red-500">
 									{message.message}
 								</h3>
