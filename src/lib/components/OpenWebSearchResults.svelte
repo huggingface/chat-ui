@@ -71,7 +71,7 @@
 			<ol>
 				{#each webSearchMessages as message}
 					{#if message.type === "update"}
-						<li class="group border-l pb-5 last:!border-transparent last:pb-0 dark:border-gray-800">
+						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<div
 									class="-ml-1.5 h-3 w-3 flex-none rounded-full bg-gray-200 dark:bg-gray-600 {loading
@@ -89,7 +89,7 @@
 							{/if}
 						</li>
 					{:else if message.type === "error"}
-						<li class="group border-l pb-5 last:!border-transparent last:pb-0 dark:border-gray-800">
+						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<CarbonError
 									class="-ml-1.5 h-3 w-3 flex-none scale-110 text-red-700 dark:text-red-500"
