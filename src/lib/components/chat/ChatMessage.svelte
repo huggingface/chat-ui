@@ -121,7 +121,7 @@
 			{#if message.webSearchId || (webSearchMessages.length > 0 && isLast)}
 				{#key (message.webSearchId, message.score, loading)}
 					<OpenWebSearchResults
-						classNames={tokens.length ? "mb-3" : ""}
+						classNames={tokens.length ? "mb-3.5" : ""}
 						webSearchId={message.webSearchId}
 						{webSearchMessages}
 						loading={!webSearchIsDone}
