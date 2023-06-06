@@ -13,7 +13,7 @@
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
-	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
 	import type { Message } from "$lib/types/Message";
 	import { browser } from "$app/environment";
 

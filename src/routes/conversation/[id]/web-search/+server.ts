@@ -1,16 +1,15 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import { defaultModel } from "$lib/server/models";
 import { searchWeb } from "$lib/server/websearch/searchWeb";
-import type { Message } from "$lib/types/Message.js";
+import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
-import { summarizeWeb } from "$lib/server/websearch/summarizeWeb.js";
+import { summarizeWeb } from "$lib/server/websearch/summarizeWeb";
 
 interface GenericObject {
 	[key: string]: GenericObject | unknown;
