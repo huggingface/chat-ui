@@ -31,7 +31,7 @@
 </script>
 
 <details
-	class="details flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
+	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
 	on:toggle={() => {
 		if (webSearchMessages.length === 0 && webSearchId) {
 			fetch(`${base}/search/${webSearchId}`)
@@ -126,9 +126,13 @@
 		}
 	}
 
-	.details[open] .content {
+	details[open] .content {
 		animation-name: grow;
 		animation-duration: 300ms;
 		animation-delay: 0ms;
+	}
+
+	details summary::-webkit-details-marker {
+		display: none;
 	}
 </style>
