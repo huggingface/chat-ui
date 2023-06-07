@@ -1,7 +1,7 @@
 import { buildPrompt } from "$lib/buildPrompt";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint.js";
+import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import { defaultModel } from "$lib/server/models";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";

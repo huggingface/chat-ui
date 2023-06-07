@@ -7,41 +7,17 @@
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
-	import { base } from "$app/paths";
-	import { onMount } from "svelte";
-
 	export let loading = false;
 	export let classNames = "";
-	export let webSearchId: string | undefined;
 	export let webSearchMessages: WebSearchMessage[] = [];
 
 	let detailsOpen: boolean;
 	let error: boolean;
-	onMount(() => {
-		if (webSearchMessages.length === 0 && webSearchId) {
-			fetch(`${base}/search/${webSearchId}`)
-				.then((res) => res.json())
-				.then((res) => {
-					webSearchMessages = [...res.messages, { type: "result", id: webSearchId }];
-				})
-				.catch((err) => console.log(err));
-		}
-	});
 	$: error = webSearchMessages.some((message) => message.type === "error");
 </script>
 
 <details
 	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
-	on:toggle={() => {
-		if (webSearchMessages.length === 0 && webSearchId) {
-			fetch(`${base}/search/${webSearchId}`)
-				.then((res) => res.json())
-				.then((res) => {
-					webSearchMessages = [...res.messages, { type: "result", id: webSearchId }];
-				})
-				.catch((err) => console.log(err));
-		}
-	}}
 	bind:open={detailsOpen}
 >
 	<summary

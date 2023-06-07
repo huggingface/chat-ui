@@ -1,5 +1,5 @@
 import { collections } from "$lib/server/database";
-import { sha256 } from "$lib/utils/sha256.js";
+import { sha256 } from "$lib/utils/sha256";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 

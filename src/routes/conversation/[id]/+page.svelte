@@ -13,8 +13,9 @@
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
-	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
+	import type { WebSearchMessage } from "$lib/types/WebSearch";
 	import type { Message } from "$lib/types/Message";
+	import { browser } from "$app/environment";
 
 	export let data;
 
@@ -194,6 +195,7 @@
 			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
 
 			webSearchMessages = [];
+			if (browser) invalidate(UrlDependency.Conversation);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
@@ -266,6 +268,7 @@
 	{pending}
 	{messages}
 	bind:webSearchMessages
+	searches={{ ...data.searches }}
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
