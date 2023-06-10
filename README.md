@@ -85,6 +85,7 @@ MODELS=`[
     "datasetName": "OpenAssistant/oasst1",
     "description": "A good alternative to ChatGPT",
     "websiteUrl": "https://open-assistant.io",
+    "endpoints": [{"url": "http://127.0.0.1:8080/generate_stream"}],
     "userMessageToken": "<|prompter|>",
     "assistantMessageToken": "<|assistant|>",
     "messageEndToken": "</s>",
