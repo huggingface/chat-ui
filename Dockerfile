@@ -1,31 +1,36 @@
 # read the doc: https://huggingface.co/docs/hub/spaces-sdks-docker
 # you will also find guides on how best to write your Dockerfile
-FROM node:19 as builder-production
+# FROM node:19 as builder-production
 
-WORKDIR /app
+# COPY . /app
 
-COPY --link --chown=1000 package-lock.json package.json ./
-RUN --mount=type=cache,target=/app/.npm \
-        npm set cache /app/.npm && \
-        npm ci --omit=dev
+# WORKDIR /app
 
-FROM builder-production as builder
+# RUN npm set cache /app/.npm && \
+#         npm ci --omit=dev
 
-RUN --mount=type=cache,target=/app/.npm \
-        npm set cache /app/.npm && \
-        npm ci
+# FROM builder-production as builder
 
-COPY --link --chown=1000 . .
+FROM shai-builder as builder
 
-RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local \
-    npm run build
+# RUN npm set cache /app/.npm && \
+#         npm ci
 
-FROM node:19-slim
+COPY .env.local .env.local
+COPY src src
+# COPY package.json package.json
 
-RUN npm install -g pm2
+# RUN npm run build
+# RUN npm install
 
-COPY --from=builder-production /app/node_modules /app/node_modules
-COPY --link --chown=1000 package.json /app/package.json
-COPY --from=builder /app/build /app/build
+CMD npm run dev
 
-CMD pm2 start /app/build/index.js -i $CPU_CORES --no-daemon
+# FROM node:19-slim
+
+# RUN npm install
+
+# COPY --from=builder /app/node_modules /app/node_modules
+# COPY --link --chown=1000 package.json /app/package.json
+# COPY --from=builder /app/build /app/build
+
+# CMD npm run dev
