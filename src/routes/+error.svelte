@@ -10,6 +10,6 @@
 	>
 		<h1 class="mb-2 text-5xl font-semibold">{$page.status}</h1>
 		<div class="-mx-8 my-2 h-px bg-gray-200 dark:bg-gray-700" />
-		<h2 class="text-lg">{$page.error?.message}</h2>
+		<h2 class="max-w-sm text-lg">{$page.error?.message}</h2>
 	</div>
 </div>

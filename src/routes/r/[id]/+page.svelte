@@ -24,6 +24,7 @@
 				},
 				body: JSON.stringify({
 					fromShare: $page.params.id,
+					model: data.model,
 				}),
 			});
 
@@ -58,6 +59,7 @@
 	{loading}
 	shared={true}
 	messages={data.messages}
+	searches={data.searches}
 	on:message={(ev) =>
 		createConversation()
 			.then((convId) => {
@@ -77,4 +79,6 @@
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.model)}
 	settings={data.settings}
+	loginRequired={!$page.error &&
+		(data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt)}
 />
