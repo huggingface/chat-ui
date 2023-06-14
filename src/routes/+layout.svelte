@@ -15,6 +15,7 @@
 	import Toast from "$lib/components/Toast.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
 	import LoginModal from "$lib/components/LoginModal.svelte";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	export let data;
 
@@ -96,16 +97,51 @@
 		!$page.error &&
 		(data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt) &&
 		!$page.route.id?.startsWith("/r/");
+
+	const iconFolder = isHuggingChat ? "huggingchat" : "chatui";
 </script>
 
 <svelte:head>
+	<title>{isHuggingChat ? "HuggingChat" : "ChatUI"}</title>
 	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
 	<meta property="og:title" content="HuggingChat" />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
-	<meta property="og:image" content="{PUBLIC_ORIGIN || $page.url.origin}{base}/thumbnail.png" />
+	<meta
+		property="og:image"
+		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/thumbnail.png"
+	/>
+	<link
+		rel="icon"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/favicon.svg"
+		type="image/svg+xml"
+	/>
+	<link
+		rel="icon"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/favicon.png"
+		type="image/png"
+	/>
+	<!-- Icon Support for iOS Bookmark Home Screen -->
+	<link
+		rel="apple-touch-icon"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/touch-icon-ipad-retina.png"
+		sizes="167x167"
+		type="image/png"
+	/>
+	<link
+		rel="apple-touch-icon"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/touch-icon-ipad.png"
+		sizes="152x152"
+		type="image/png"
+	/>
+	<link
+		rel="apple-touch-icon"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/touch-icon-iphone-retina.png"
+		sizes="180x180"
+		type="image/png"
+	/>
 </svelte:head>
 
 <div

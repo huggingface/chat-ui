@@ -11,6 +11,8 @@
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
+	import LogoChatUi from "../icons/LogoChatUI.svelte";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
@@ -31,8 +33,13 @@
 	<div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
-				<Logo classNames="mr-1 text-yellow-400 text-4xl flex-none" />
-				HuggingChat
+				{#if isHuggingChat}
+					<Logo classNames="mr-1 text-primary-400 text-4xl flex-none" />
+					HuggingChat
+				{:else}
+					<LogoChatUi classNames="mr-1 text-4xl flex-none" />
+					ChatUI
+				{/if}
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
