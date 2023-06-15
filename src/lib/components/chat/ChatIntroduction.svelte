@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_APP_NAME, PUBLIC_VERSION } from "$env/static/public";
 	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
@@ -11,8 +11,6 @@
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
-	import LogoChatUi from "../icons/LogoChatUI.svelte";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
@@ -33,13 +31,8 @@
 	<div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
-				{#if isHuggingChat}
-					<Logo classNames="mr-1 text-primary-400 text-4xl flex-none" />
-					HuggingChat
-				{:else}
-					<LogoChatUi classNames="mr-1 text-4xl flex-none" />
-					ChatUI
-				{/if}
+				<Logo classNames="mr-1 w-[30px] h-[30px]" />
+				{PUBLIC_APP_NAME}
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>

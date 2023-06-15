@@ -11,7 +11,7 @@ export default {
 	theme: {
 		extend: {
 			colors: {
-				primary: process.env.PUBLIC_THEME === "huggingchat" ? colors.yellow : colors.blue,
+				primary: colors[process.env.PUBLIC_APP_COLOR],
 			},
 			// fontFamily: {
 			// 	sans: ['"Inter"', ...defaultTheme.fontFamily.sans]

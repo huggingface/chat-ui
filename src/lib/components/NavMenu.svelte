@@ -4,11 +4,9 @@
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
-	import { PUBLIC_ORIGIN } from "$env/static/public";
+	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
-	import LogoChatUi from "./icons/LogoChatUI.svelte";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
@@ -25,13 +23,8 @@
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
 	<a class="flex items-center rounded-xl text-lg font-semibold" href="{PUBLIC_ORIGIN}{base}/">
-		{#if isHuggingChat}
-			<Logo classNames="mr-1 text-3xl" />
-			HuggingChat
-		{:else}
-			<LogoChatUi classNames="mr-1 text-3xl" />
-			ChatUI
-		{/if}
+		<Logo classNames="mr-1 w-[30px] h-[30px]" />
+		{PUBLIC_APP_NAME}
 	</a>
 	<a
 		href={`${base}/`}
@@ -82,7 +75,7 @@
 	>
 		Settings
 	</button>
-	{#if isHuggingChat}
+	{#if PUBLIC_APP_ASSETS === "huggingchat"}
 		<a
 			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
 			target="_blank"

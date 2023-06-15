@@ -15,7 +15,7 @@
 	import Toast from "$lib/components/Toast.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
 	import LoginModal from "$lib/components/LoginModal.svelte";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
 
 	export let data;
 
@@ -97,48 +97,47 @@
 		!$page.error &&
 		(data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt) &&
 		!$page.route.id?.startsWith("/r/");
-
-	const iconFolder = isHuggingChat ? "huggingchat" : "chatui";
 </script>
 
 <svelte:head>
-	<title>{isHuggingChat ? "HuggingChat" : "ChatUI"}</title>
+	<title>{PUBLIC_APP_NAME}</title>
 	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
-	<meta property="og:title" content="HuggingChat" />
+	<meta property="og:title" content={PUBLIC_APP_NAME} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/thumbnail.png"
+		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/thumbnail.png"
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/favicon.svg"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.svg"
 		type="image/svg+xml"
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/favicon.png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.png"
 		type="image/png"
 	/>
 	<!-- Icon Support for iOS Bookmark Home Screen -->
 	<link
 		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/touch-icon-ipad-retina.png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-ipad-retina.png"
 		sizes="167x167"
 		type="image/png"
 	/>
 	<link
 		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/touch-icon-ipad.png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-ipad.png"
 		sizes="152x152"
 		type="image/png"
 	/>
 	<link
 		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{iconFolder}/touch-icon-iphone-retina.png"
+		href="{PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-iphone-retina.png"
 		sizes="180x180"
 		type="image/png"
 	/>

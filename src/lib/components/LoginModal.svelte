@@ -2,13 +2,15 @@
 	import { browser } from "$app/environment";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { PUBLIC_VERSION } from "$env/static/public";
-	import Logo from "$lib/components/icons/Logo.svelte";
+	import {
+		PUBLIC_APP_ASSETS,
+		PUBLIC_APP_DATA_SHARING,
+		PUBLIC_APP_NAME,
+		PUBLIC_VERSION,
+	} from "$env/static/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import type { LayoutData } from "../../routes/$types";
-	import LogoChatUi from "./icons/LogoChatUI.svelte";
 	export let settings: LayoutData["settings"];
 
 	const isIframe = browser && window.self !== window.parent;
@@ -19,11 +21,7 @@
 		class="flex w-full flex-col items-center gap-6 bg-gradient-to-t from-primary-500/40 via-primary-500/10 to-primary-500/0 px-4 pb-10 pt-9 text-center "
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
-			{#if isHuggingChat}
-				<Logo classNames="text-3xl mr-1.5" />HuggingChat
-			{:else}
-				<LogoChatUi classNames="text-3xl mr-1.5" />ChatUI
-			{/if}
+			{PUBLIC_APP_NAME}
 			<div
 				class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
 			>
@@ -37,7 +35,7 @@
 			AI is an area of active research with known problems such as biased generation and
 			misinformation. Do not use this application for high-stakes decisions or advice.
 		</p>
-		{#if isHuggingChat}
+		{#if PUBLIC_APP_DATA_SHARING}
 			<p class="px-2 text-sm text-gray-500">
 				Your conversations will be shared with model authors unless you disable it from your
 				settings.
@@ -55,7 +53,7 @@
 					class="mt-2 flex items-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-primary-500"
 				>
 					Sign in
-					{#if isHuggingChat}
+					{#if PUBLIC_APP_ASSETS == "huggingchat"}
 						with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 					{/if}
 				</button>

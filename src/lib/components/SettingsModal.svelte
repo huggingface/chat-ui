@@ -7,8 +7,7 @@
 	import type { Settings } from "$lib/types/Settings";
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
-
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
 
@@ -34,7 +33,7 @@
 			method="post"
 			action="{base}/settings"
 		>
-			{#if isHuggingChat}
+			{#if PUBLIC_APP_DATA_SHARING}
 				<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500">
 					{#each Object.entries(settings).filter(([k]) => k !== "shareConversationsWithModelAuthors") as [key, val]}
 						<input type="hidden" name={key} value={val} />
