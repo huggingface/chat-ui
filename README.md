@@ -78,7 +78,7 @@ These variables will enable the openID sign-in modal for users.
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
-```json
+```
 MODELS=`[
   {
     "name": "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
