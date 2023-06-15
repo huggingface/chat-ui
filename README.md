@@ -129,11 +129,9 @@ If you want to, you can even run your own models, by having a look at our endpoi
 
 Custom endpoints may require authorization. In those situations, we will need to generate a base64 encoding of the username and password.
 
-```
-echo -n "USER:PASS" | base64
-```
+`echo -n "USER:PASS" | base64`
 
-VVNFUjpQQVNT
+> VVNFUjpQQVNT
 
 You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
