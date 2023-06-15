@@ -135,7 +135,7 @@ echo -n "USER:PASS" | base64
 
 VVNFUjpQQVNT
 
-You can then add the generated information to the `authorization` parameter in your `.env.local`.
+You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
 ```
 "endpoints": [ 
@@ -148,7 +148,7 @@ You can then add the generated information to the `authorization` parameter in y
 
 ### Models hosted on multiple custom endpoints
 
-If the model being hosted will be available on multiple servers/instances adjust the `weight` parameter in your `.env.local`.
+If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`.
 
 ```
 "endpoints": [ 
