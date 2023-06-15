@@ -37,7 +37,7 @@ HF_ACCESS_TOKEN=<your access token>
 
 The chat history is stored in a MongoDB instance, and having a DB instance available is needed for Chat UI to work.
 
-You can use a local MongoDB instance. The easiest way is to spin one up is using docker:
+You can use a local MongoDB instance. The easiest way is to spin one up using docker:
 
 ```bash
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
