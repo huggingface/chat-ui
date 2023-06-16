@@ -4,7 +4,7 @@
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import { base } from "$app/paths";
-	import { PUBLIC_ORIGIN } from "$env/static/public";
+	import { PUBLIC_ORIGIN, PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -95,8 +95,10 @@
 
 	const requiresLogin =
 		!$page.error &&
-		(data.requiresLogin ? !data.user : !data.settings.ethicsModalAcceptedAt) &&
-		!$page.route.id?.startsWith("/r/");
+		!$page.route.id?.startsWith("/r/") &&
+		(data.requiresLogin
+			? !data.user
+			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER);
 </script>
 
 <svelte:head>
