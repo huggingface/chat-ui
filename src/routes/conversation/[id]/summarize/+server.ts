@@ -25,8 +25,8 @@ export async function POST({ params, locals }) {
 		firstMessage?.content;
 
 	const prompt = await buildPrompt([{ from: "user", content: userPrompt }], defaultModel);
-	const generated_text = await generateFromDefaultEndpoint(prompt);
-
+	// const generated_text = await generateFromDefaultEndpoint(prompt);
+	const generated_text = "Engineering Question";
 	if (generated_text) {
 		await collections.conversations.updateOne(
 			{

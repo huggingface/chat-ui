@@ -34,8 +34,13 @@ export async function POST({ request, fetch, locals, params }) {
 	if (!model) {
 		throw error(410, "Model not available anymore");
 	}
-
+	console.log("#### HERE IS THE REQuest ####");
+	// throw new Error("test");
+	console.log(request)
 	const json = await request.json();
+	console.log("#### HERE IS THE FIRST JSON ####");
+	console.log(json);
+
 	const {
 		inputs: newPrompt,
 		options: { id: messageId, is_retry, web_search_id, response_id: responseId },
@@ -69,10 +74,19 @@ export async function POST({ request, fetch, locals, params }) {
 	})() satisfies Message[];
 
 	const prompt = await buildPrompt(messages, model, web_search_id);
+	console.log("#### HERE IS THE PROMPT ####");
+	console.log(prompt);
 	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
+	console.log("#### URL ####");
+	console.log(randomEndpoint.url);
+	console.log("#### JSON ####", json);
 
+	console.log("#### MORE JSON ####", JSON.stringify({
+			...json,
+			inputs: prompt,
+		}));
 	const resp = await fetch(randomEndpoint.url, {
 		headers: {
 			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
@@ -129,10 +143,14 @@ export async function POST({ request, fetch, locals, params }) {
 				},
 			}
 		);
+		console.log("#### After update! ####");
 	}
 
 	saveMessage().catch(console.error);
+
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
+	console.log("#### HERE IS THE END OF METHOD ####");
+	console.log(resp.status, resp.statusText);
 	return new Response(stream1, {
 		headers: Object.fromEntries(resp.headers.entries()),
 		status: resp.status,
@@ -163,13 +181,14 @@ async function parseGeneratedText(
 	promptedAt: Date,
 	abortController: AbortController
 ): Promise<string> {
+	console.log("#### AT: parseGeneratedText####")
 	const inputs: Uint8Array[] = [];
 	for await (const input of streamToAsyncIterable(stream)) {
 		inputs.push(input);
 
 		const date = abortedGenerations.get(conversationId.toString());
-
 		if (date && date > promptedAt) {
+			console.log("#### AT: INSIDE CANCELLATION!####")
 			abortController.abort("Cancelled by user");
 			const completeInput = concatUint8Arrays(inputs);
 
@@ -190,11 +209,15 @@ async function parseGeneratedText(
 		}
 	}
 
+	console.log("#### AT: After abortedGenerations####")
+
 	// Merge inputs into a single Uint8Array
 	const completeInput = concatUint8Arrays(inputs);
 
 	// Get last line starting with "data:" and parse it as JSON to get the generated text
 	const message = new TextDecoder().decode(completeInput);
+	console.log("#### AT2: message####", message)
+	console.log("#### AT: END MESSAGE####")
 
 	let lastIndex = message.lastIndexOf("\ndata:");
 	if (lastIndex === -1) {
@@ -222,6 +245,7 @@ async function parseGeneratedText(
 		throw new Error("Could not parse generated text");
 	}
 
+	console.log("#### RETURNING RES: ####", res)
 	return res;
 }
 
@@ -251,6 +275,7 @@ export async function PATCH({ request, locals, params }) {
 			},
 		}
 	);
+	console.log("#### PATCHED ####")
 
 	return new Response();
 }

@@ -15,6 +15,7 @@ export async function generateFromDefaultEndpoint(
 	prompt: string,
 	parameters?: Partial<Parameters>
 ) {
+	console.log("#### START_OF_GENERATED_DEF ####");
 	const newParameters = {
 		...defaultModel.parameters,
 		...parameters,
@@ -38,6 +39,8 @@ export async function generateFromDefaultEndpoint(
 	);
 
 	generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
+	console.log("#### HERE IS THE GENERATED TEXT ####");
+	console.log(generated_text);
 
 	return generated_text;
 }

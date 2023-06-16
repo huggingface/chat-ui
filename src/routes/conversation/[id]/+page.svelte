@@ -27,8 +27,11 @@
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
+		console.log("resetting messages###");
 		messages = data.messages;
 		lastLoadedMessages = data.messages;
+	}else{
+		console.log("not resetting messages###");
 	}
 
 	let loading = false;
@@ -69,6 +72,7 @@
 			}
 
 			if (conversationId !== $page.params.id) {
+				console.log("##ABORT!!##");
 				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
 					method: "POST",
 				}).catch(console.error);
@@ -76,11 +80,14 @@
 			}
 
 			if (isAborted) {
+				console.log("##ABORTED!!##");
 				isAborted = false;
 				fetch(`${base}/conversation/${conversationId}/stop-generating`, {
 					method: "POST",
 				}).catch(console.error);
 				break;
+			}else {
+				console.log("##NOT ABORTED!!##");
 			}
 
 			// final message
@@ -139,58 +146,58 @@
 			];
 
 			let searchResponseId: string | null = "";
-			if ($webSearchParameters.useSearch) {
-				webSearchMessages = [];
-
-				const res = await fetch(
-					`${base}/conversation/${$page.params.id}/web-search?` +
-						new URLSearchParams({ prompt: message }),
-					{
-						method: "GET",
-					}
-				);
-
-				// required bc linting doesn't see TextDecoderStream for some reason?
-				// eslint-disable-next-line no-undef
-				const encoder = new TextDecoderStream();
-				const reader = res?.body?.pipeThrough(encoder).getReader();
-
-				while (searchResponseId === "") {
-					await new Promise((r) => setTimeout(r, 25));
-
-					if (isAborted) {
-						reader?.cancel();
-						return;
-					}
-
-					reader
-						?.read()
-						.then(async ({ done, value }) => {
-							if (done) {
-								reader.cancel();
-								return;
-							}
-
-							try {
-								webSearchMessages = (JSON.parse(value) as { messages: WebSearchMessage[] })
-									.messages;
-							} catch (parseError) {
-								// in case of parsing error we wait for the next message
-								return;
-							}
-
-							const lastSearchMessage = webSearchMessages[webSearchMessages.length - 1];
-							if (lastSearchMessage.type === "result") {
-								searchResponseId = lastSearchMessage.id;
-								reader.cancel();
-								return;
-							}
-						})
-						.catch(() => {
-							searchResponseId = null;
-						});
-				}
-			}
+			// if ($webSearchParameters.useSearch) {
+			// 	webSearchMessages = [];
+			//
+			// 	const res = await fetch(
+			// 		`${base}/conversation/${$page.params.id}/web-search?` +
+			// 			new URLSearchParams({ prompt: message }),
+			// 		{
+			// 			method: "GET",
+			// 		}
+			// 	);
+			//
+			// 	// required bc linting doesn't see TextDecoderStream for some reason?
+			// 	// eslint-disable-next-line no-undef
+			// 	const encoder = new TextDecoderStream();
+			// 	const reader = res?.body?.pipeThrough(encoder).getReader();
+			//
+			// 	while (searchResponseId === "") {
+			// 		await new Promise((r) => setTimeout(r, 25));
+			//
+			// 		if (isAborted) {
+			// 			reader?.cancel();
+			// 			return;
+			// 		}
+			//
+			// 		reader
+			// 			?.read()
+			// 			.then(async ({ done, value }) => {
+			// 				if (done) {
+			// 					reader.cancel();
+			// 					return;
+			// 				}
+			//
+			// 				try {
+			// 					webSearchMessages = (JSON.parse(value) as { messages: WebSearchMessage[] })
+			// 						.messages;
+			// 				} catch (parseError) {
+			// 					// in case of parsing error we wait for the next message
+			// 					return;
+			// 				}
+			//
+			// 				const lastSearchMessage = webSearchMessages[webSearchMessages.length - 1];
+			// 				if (lastSearchMessage.type === "result") {
+			// 					searchResponseId = lastSearchMessage.id;
+			// 					reader.cancel();
+			// 					return;
+			// 				}
+			// 			})
+			// 			.catch(() => {
+			// 				searchResponseId = null;
+			// 			});
+			// 	}
+			// }
 
 			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
 
@@ -213,9 +220,11 @@
 				$error = ERROR_MESSAGES.default;
 			}
 			console.error(err);
+			console.log("ERRROR");
 		} finally {
 			loading = false;
 			pending = false;
+			console.log("FINALLY");
 		}
 	}
 

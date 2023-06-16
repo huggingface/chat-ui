@@ -43,6 +43,13 @@ export const load = async ({ params, depends, locals }) => {
 		])
 	);
 
+	console.log("HERE##", {
+		messages: conversation.messages,
+		title: conversation.title,
+		model: conversation.model,
+		searches,
+	})
+
 	return {
 		messages: conversation.messages,
 		title: conversation.title,
