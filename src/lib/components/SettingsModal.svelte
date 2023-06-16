@@ -7,6 +7,7 @@
 	import type { Settings } from "$lib/types/Settings";
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
+	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
 
@@ -32,32 +33,35 @@
 			method="post"
 			action="{base}/settings"
 		>
-			<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500">
-				{#each Object.entries(settings).filter(([k]) => k !== "shareConversationsWithModelAuthors") as [key, val]}
-					<input type="hidden" name={key} value={val} />
-				{/each}
-				<Switch
-					name="shareConversationsWithModelAuthors"
-					bind:checked={shareConversationsWithModelAuthors}
-				/>
-				Share conversations with model authors
-			</label>
+			{#if PUBLIC_APP_DATA_SHARING}
+				<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500">
+					{#each Object.entries(settings).filter(([k]) => k !== "shareConversationsWithModelAuthors") as [key, val]}
+						<input type="hidden" name={key} value={val} />
+					{/each}
+					<Switch
+						name="shareConversationsWithModelAuthors"
+						bind:checked={shareConversationsWithModelAuthors}
+					/>
+					Share conversations with model authors
+				</label>
 
-			<p class="text-gray-800">
-				Sharing your data will help improve the training data and make open models better over time.
-			</p>
-			<p class="text-gray-800">
-				You can change this setting at any time, it applies to all your conversations.
-			</p>
-			<p class="text-gray-800">
-				Read more about this model's authors,
-				<a
-					href="https://open-assistant.io/"
-					target="_blank"
-					rel="noreferrer"
-					class="underline decoration-gray-300 hover:decoration-gray-700">Open Assistant</a
-				>.
-			</p>
+				<p class="text-gray-800">
+					Sharing your data will help improve the training data and make open models better over
+					time.
+				</p>
+				<p class="text-gray-800">
+					You can change this setting at any time, it applies to all your conversations.
+				</p>
+				<p class="text-gray-800">
+					Read more about this model's authors,
+					<a
+						href="https://open-assistant.io/"
+						target="_blank"
+						rel="noreferrer"
+						class="underline decoration-gray-300 hover:decoration-gray-700">Open Assistant</a
+					>.
+				</p>
+			{/if}
 			<form
 				method="post"
 				action="{base}/conversations?/delete"
