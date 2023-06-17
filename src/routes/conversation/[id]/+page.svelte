@@ -202,7 +202,7 @@
 			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
 
 			webSearchMessages = [];
-			if (browser) invalidate(UrlDependency.Conversation);
+			// if (browser) invalidate(UrlDependency.Conversation);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
