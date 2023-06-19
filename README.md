@@ -117,28 +117,35 @@ You can change things like the parameters, or customize the preprompt to better 
 
 ### Running your own models using a custom endpoint
 
-If you want to, you can even run your own models, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoint to the `MODELS` variable in `.env.local`. Using the default `.env` information provided above as an example, the endpoint information is added after `websiteUrl` and before `userMessageToken` parameters.
+If you want to, you can even run your own models locally, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
 ```
-"websiteUrl": "https://open-assistant.io",
-"endpoints": [{"url": "https://HOST:PORT/generate_stream"}],
-"userMessageToken": "<|prompter|>",
+{
+  // rest of the model config here
+  "endpoints": [{"url": "https://HOST:PORT/generate_stream"}]
+}
 ```
+
+If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
 
 ### Custom endpoint authorization
 
-Custom endpoints may require authorization. In those situations, we will need to generate a base64 encoding of the username and password.
+Custom endpoints may require authorization, depending on how you configure them. Authentication will usually be set either with `Basic` or `Bearer`.
+
+For `Basic` we will need to generate a base64 encoding of the username and password.
 
 `echo -n "USER:PASS" | base64`
 
 > VVNFUjpQQVNT
 
+For `Bearer` you can use a token, which can be grabbed from [here](https://huggingface.co/settings/tokens).
+
 You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
 ```
-"endpoints": [ 
+"endpoints": [
     {
-        "url": "https://HOST:PORT/generate_stream", 
+        "url": "https://HOST:PORT/generate_stream",
         "authorization": "Basic VVNFUjpQQVNT",
     }
 ]
@@ -146,16 +153,16 @@ You can then add the generated information and the `authorization` parameter to 
 
 ### Models hosted on multiple custom endpoints
 
-If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`.
+If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
 
 ```
-"endpoints": [ 
+"endpoints": [
     {
-        "url": "https://HOST:PORT/generate_stream", 
+        "url": "https://HOST:PORT/generate_stream",
         "weight": 1
     }
     {
-        "url": "https://HOST:PORT/generate_stream", 
+        "url": "https://HOST:PORT/generate_stream",
         "weight": 2
     }
     ...
