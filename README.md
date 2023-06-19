@@ -115,9 +115,52 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-### Running your own models
+### Running your own models using a custom endpoint
 
-If you want to, you can even run your own models, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoint to the `MODELS` variable in `.env.local` and it will be picked up as well.
+If you want to, you can even run your own models, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoint to the `MODELS` variable in `.env.local`. Using the default `.env` information provided above as an example, the endpoint information is added after `websiteUrl` and before `userMessageToken` parameters.
+
+```
+"websiteUrl": "https://open-assistant.io",
+"endpoints": [{"url": "https://HOST:PORT/generate_stream"}],
+"userMessageToken": "<|prompter|>",
+```
+
+### Custom endpoint authorization
+
+Custom endpoints may require authorization. In those situations, we will need to generate a base64 encoding of the username and password.
+
+`echo -n "USER:PASS" | base64`
+
+> VVNFUjpQQVNT
+
+You can then add the generated information and the `authorization` parameter to your `.env.local`.
+
+```
+"endpoints": [ 
+    {
+        "url": "https://HOST:PORT/generate_stream", 
+        "authorization": "Basic VVNFUjpQQVNT",
+    }
+]
+```
+
+### Models hosted on multiple custom endpoints
+
+If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`.
+
+```
+"endpoints": [ 
+    {
+        "url": "https://HOST:PORT/generate_stream", 
+        "weight": 1
+    }
+    {
+        "url": "https://HOST:PORT/generate_stream", 
+        "weight": 2
+    }
+    ...
+]
+```
 
 ## Deploying to a HF Space
 
