@@ -50,6 +50,7 @@ export async function GET({ params, locals, url }) {
 				prompt: prompt,
 				searchQuery: "",
 				knowledgeGraph: "",
+				answerBox: "",
 				results: [],
 				summary: "",
 				messages: [],
@@ -79,7 +80,12 @@ export async function GET({ params, locals, url }) {
 						results.organic_results.map((el: { link: string }) => el.link)) ??
 					[];
 
-				if (results.knowledge_graph) {
+				if (results.answer_box) {
+					// if google returns an answer box, we use it
+					webSearch.answerBox = JSON.stringify(removeLinks(results.answer_box));
+					text = webSearch.answerBox;
+					appendUpdate("Found a Google answer box");
+				} else if (results.knowledge_graph) {
 					// if google returns a knowledge graph, we use it
 					webSearch.knowledgeGraph = JSON.stringify(removeLinks(results.knowledge_graph));
 					text = webSearch.knowledgeGraph;
