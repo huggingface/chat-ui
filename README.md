@@ -92,6 +92,10 @@ PUBLIC_APP_DISCLAIMER=
 - `PUBLIC_APP_DATA_SHARING` Can be set to 1 to add a toggle in the user settings that lets your users opt-in to data sharing with models creator.
 - `PUBLIC_APP_DISCLAIMER` If set to 1, we show a disclaimer about generated outputs on login.
 
+### Web Search
+
+You can enable the web search by adding either `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
+
 ### Custom models
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
@@ -135,7 +139,7 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-### Running your own models using a custom endpoint
+#### Running your own models using a custom endpoint
 
 If you want to, you can even run your own models locally, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
@@ -150,7 +154,7 @@ If you want to, you can even run your own models locally, by having a look at ou
 
 If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
 
-### Custom endpoint authorization
+#### Custom endpoint authorization
 
 Custom endpoints may require authorization, depending on how you configure them. Authentication will usually be set either with `Basic` or `Bearer`.
 
@@ -175,7 +179,7 @@ You can then add the generated information and the `authorization` parameter to 
 
 ```
 
-### Models hosted on multiple custom endpoints
+#### Models hosted on multiple custom endpoints
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
 
