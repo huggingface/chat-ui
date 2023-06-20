@@ -74,11 +74,30 @@ OPENID_CLIENT_SECRET=<your OIDC client secret>
 
 These variables will enable the openID sign-in modal for users.
 
+### Theming
+
+You can use a few environment variables to customize the look and feel of chat-ui. These are by default:
+
+```
+PUBLIC_APP_NAME=ChatUI
+PUBLIC_APP_ASSETS=chatui
+PUBLIC_APP_COLOR=blue
+PUBLIC_APP_DATA_SHARING=
+PUBLIC_APP_DISCLAIMER=
+```
+
+- `PUBLIC_APP_NAME` The name used as a title throughout the app.
+- `PUBLIC_APP_ASSETS` Is used to find logos & favicons in `static/$PUBLIC_APP_ASSETS`, current options are `chatui` and `huggingchat`.
+- `PUBLIC_APP_COLOR` Can be any of the [tailwind colors](https://tailwindcss.com/docs/customizing-colors#default-color-palette).
+- `PUBLIC_APP_DATA_SHARING` Can be set to 1 to add a toggle in the user settings that lets your users opt-in to data sharing with models creator.
+- `PUBLIC_APP_DISCLAIMER` If set to 1, we show a disclaimer about generated outputs on login.
+
 ### Custom models
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
 ```
+
 MODELS=`[
   {
     "name": "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
@@ -111,6 +130,7 @@ MODELS=`[
     }
   }
 ]`
+
 ```
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
@@ -120,10 +140,12 @@ You can change things like the parameters, or customize the preprompt to better 
 If you want to, you can even run your own models locally, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
 ```
+
 {
-  // rest of the model config here
-  "endpoints": [{"url": "https://HOST:PORT/generate_stream"}]
+// rest of the model config here
+"endpoints": [{"url": "https://HOST:PORT/generate_stream"}]
 }
+
 ```
 
 If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
@@ -143,12 +165,14 @@ For `Bearer` you can use a token, which can be grabbed from [here](https://huggi
 You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
 ```
+
 "endpoints": [
-    {
-        "url": "https://HOST:PORT/generate_stream",
-        "authorization": "Basic VVNFUjpQQVNT",
-    }
+{
+"url": "https://HOST:PORT/generate_stream",
+"authorization": "Basic VVNFUjpQQVNT",
+}
 ]
+
 ```
 
 ### Models hosted on multiple custom endpoints
@@ -156,17 +180,19 @@ You can then add the generated information and the `authorization` parameter to 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
 
 ```
+
 "endpoints": [
-    {
-        "url": "https://HOST:PORT/generate_stream",
-        "weight": 1
-    }
-    {
-        "url": "https://HOST:PORT/generate_stream",
-        "weight": 2
-    }
-    ...
+{
+"url": "https://HOST:PORT/generate_stream",
+"weight": 1
+}
+{
+"url": "https://HOST:PORT/generate_stream",
+"weight": 2
+}
+...
 ]
+
 ```
 
 ## Deploying to a HF Space
