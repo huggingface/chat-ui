@@ -41,7 +41,7 @@
 			{#each models as model}
 				<div
 					class="rounded-xl border border-gray-100 {model.id === selectedModelId
-						? 'bg-gradient-to-r from-yellow-200/40 via-yellow-500/10'
+						? 'bg-gradient-to-r from-primary-200/40 via-primary-500/10'
 						: ''}"
 				>
 					<label class="group flex cursor-pointer p-3" on:change aria-label={model.displayName}>
@@ -62,7 +62,7 @@
 						</span>
 						<CarbonCheckmark
 							class="-mr-1 -mt-1 ml-auto shrink-0 text-xl {model.id === selectedModelId
-								? 'text-yellow-400'
+								? 'text-primary-400'
 								: 'text-transparent group-hover:text-gray-200'}"
 						/>
 					</label>

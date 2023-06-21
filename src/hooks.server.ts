@@ -4,6 +4,7 @@ import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_DEPRECATED_GOOGLE_ANALYTICS_ID,
 	PUBLIC_ORIGIN,
+	PUBLIC_APP_DISCLAIMER,
 } from "$env/static/public";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
@@ -67,9 +68,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
 
-		// if login is not required and the call is not from /settings, we check if the user has accepted the ethics modal first.
+		// if login is not required and the call is not from /settings and we display the ethics modal with PUBLIC_APP_DISCLAIMER
+		//  we check if the user has accepted the ethics modal first.
 		// If login is required, `ethicsModalAcceptedAt` is already true at this point, so do not pass this condition. This saves a DB call.
-		if (!requiresUser && !event.url.pathname.startsWith(`${base}/settings`)) {
+		if (
+			!requiresUser &&
+			!event.url.pathname.startsWith(`${base}/settings`) &&
+			!!PUBLIC_APP_DISCLAIMER
+		) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },

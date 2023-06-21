@@ -1,4 +1,8 @@
 const defaultTheme = require("tailwindcss/defaultTheme");
+const colors = require("tailwindcss/colors");
+
+import dotenv from "dotenv";
+dotenv.config({ path: "./.env" });
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -6,6 +10,9 @@ export default {
 	content: ["./src/**/*.{html,js,svelte,ts}"],
 	theme: {
 		extend: {
+			colors: {
+				primary: colors[process.env.PUBLIC_APP_COLOR],
+			},
 			// fontFamily: {
 			// 	sans: ['"Inter"', ...defaultTheme.fontFamily.sans]
 			// },
