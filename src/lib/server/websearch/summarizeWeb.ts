@@ -1,7 +1,22 @@
+import { HF_ACCESS_TOKEN } from "$env/static/private";
+import { HfInference } from "@huggingface/inference";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import type { BackendModel } from "../models";
 
 export async function summarizeWeb(content: string, query: string, model: BackendModel) {
+	// if HF_ACCESS_TOKEN is set, we use a HF dedicated endpoint for summarization
+	if (HF_ACCESS_TOKEN) {
+		return (
+			await new HfInference(HF_ACCESS_TOKEN).summarization({
+				model: "facebook/bart-large-cnn",
+				inputs: content,
+				parameters: {
+					max_length: 512,
+				},
+			})
+		).summary_text;
+	}
+	// else we use the LLM to generate a summary
 	const summaryPrompt =
 		model.userMessageToken +
 		content
