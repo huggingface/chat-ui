@@ -97,9 +97,6 @@ export async function GET({ params, locals, url }) {
 						const searchUrl = webSearch.results[tries];
 						appendUpdate("Browsing result", [JSON.stringify(searchUrl)]);
 						try {
-							if (tries < 4) {
-								throw new Error("test error");
-							}
 							text = await parseWeb(searchUrl);
 							if (!text) throw new Error("text of the webpage is null");
 						} catch (e) {
