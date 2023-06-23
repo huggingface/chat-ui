@@ -6,6 +6,7 @@ import type { WebSearch } from "$lib/types/WebSearch";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
+import type { MessageEvent } from "$lib/types/MessageEvent";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -27,6 +28,7 @@ const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations"
 const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
 const webSearches = db.collection<WebSearch>("webSearches");
+const messageEvents = db.collection<MessageEvent>("messageEvents");
 
 export { client, db };
 export const collections = {
@@ -36,6 +38,7 @@ export const collections = {
 	settings,
 	users,
 	webSearches,
+	messageEvents,
 };
 
 client.on("open", () => {
@@ -59,4 +62,5 @@ client.on("open", () => {
 	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 });

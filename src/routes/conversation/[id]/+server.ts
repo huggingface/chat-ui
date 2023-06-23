@@ -1,3 +1,4 @@
+import { RATE_LIMIT } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
@@ -5,6 +6,7 @@ import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
+import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 import type { Message } from "$lib/types/Message";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -20,6 +22,12 @@ export async function POST({ request, fetch, locals, params }) {
 	const convId = new ObjectId(id);
 	const date = new Date();
 
+	const userId = locals.user?._id ?? locals.sessionId;
+
+	if (!userId) {
+		throw error(401, "Unauthorized");
+	}
+
 	const conv = await collections.conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
@@ -27,6 +35,12 @@ export async function POST({ request, fetch, locals, params }) {
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
+	}
+
+	const nEvents = await collections.messageEvents.countDocuments({ userId });
+
+	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
+		throw error(429, ERROR_MESSAGES.rateLimited);
 	}
 
 	const model = models.find((m) => m.id === conv.model);
@@ -116,6 +130,11 @@ export async function POST({ request, fetch, locals, params }) {
 			content: generated_text,
 			webSearchId: web_search_id,
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
+		});
+
+		await collections.messageEvents.insertOne({
+			userId: userId,
+			createdAt: new Date(),
 		});
 
 		await collections.conversations.updateOne(

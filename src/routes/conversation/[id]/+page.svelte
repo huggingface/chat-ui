@@ -207,6 +207,8 @@
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
+			} else if (err instanceof Error && err.message.includes("429")) {
+				$error = ERROR_MESSAGES.rateLimited;
 			} else if (err instanceof Error) {
 				$error = err.message;
 			} else {
