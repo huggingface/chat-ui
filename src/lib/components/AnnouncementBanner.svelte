@@ -5,7 +5,7 @@
 
 <div class="flex items-center rounded-xl bg-gray-100 p-1 text-sm dark:bg-gray-800 {classNames}">
 	<span
-		class="mr-2 inline-flex items-center rounded-lg bg-gradient-to-br from-primary-300 px-2 py-1 text-xxs font-medium uppercase leading-3 text-primary-700 dark:from-primary-900 dark:text-primary-400"
+		class="mr-2 inline-flex items-center rounded-lg bg-yellow-800 px-2 py-1 text-xxs font-medium uppercase leading-3 text-gray-800"
 		>New</span
 	>
 	{title}
