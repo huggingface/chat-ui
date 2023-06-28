@@ -16,6 +16,8 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import moment from "moment";
+import crypto from "crypto-js";
 
 export async function POST({ request, fetch, locals, params }) {
 	const id = z.string().parse(params.id);
@@ -87,18 +89,65 @@ export async function POST({ request, fetch, locals, params }) {
 
 	const abortController = new AbortController();
 
+	const request_parameters = JSON.stringify({
+		...json,
+		inputs: prompt,
+	})
+
+	var headers = {
+		"Content-Type": request.headers.get("Content-Type") ?? "application/json",
+		Authorization: randomEndpoint.authorization,
+	}
+
+	if (randomEndpoint.host === "aws"){
+		const access_key = randomEndpoint.access_key
+		const secret_key = randomEndpoint.secret_key
+		const url_content = randomEndpoint.url.split('https://')[1];
+		const host = url_content.split(".com")[0]+".com"
+		const canonical_uri = url_content.split(".com")[1]
+		const region = randomEndpoint.region
+
+		const method = 'POST';
+		const service = 'sagemaker';
+		const content_type = 'application/json';
+		const amz_date = moment().utc().format("yyyyMMDDTHHmmss\\Z")
+		const date_stamp =  moment().utc().format("yyyyMMDD")
+		const canonical_querystring = ''
+
+		function getSignatureKey(key, dateStamp, regionName, serviceName) {
+			var kDate = crypto.HmacSHA256(dateStamp, "AWS4" + key);
+			var kRegion = crypto.HmacSHA256(regionName, kDate);
+			var kService = crypto.HmacSHA256(serviceName, kRegion);
+			var kSigning = crypto.HmacSHA256("aws4_request", kService);
+			return kSigning;
+		}
+
+		const payload_hash = crypto.SHA256(request_parameters);
+		const canonical_headers = 'host:' + host + '\n' + 'x-amz-content-sha256:' + payload_hash + '\n' + 'x-amz-date:' + amz_date + '\n'
+		const signed_headers = 'host;x-amz-content-sha256;x-amz-date'
+		const canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + canonical_headers + '\n' + signed_headers + '\n' + payload_hash
+		const algorithm = 'AWS4-HMAC-SHA256'
+		const credential_scope = date_stamp + '/' + region + '/' + service + '/' + 'aws4_request'
+		const string_to_sign = algorithm + '\n' +  amz_date + '\n' +  credential_scope + '\n' +  crypto.SHA256(canonical_request);
+		const signing_key = getSignatureKey(secret_key, date_stamp, region, service)
+		const signature = crypto.HmacSHA256(string_to_sign, signing_key);
+		const authorization_header = algorithm + ' ' + 'Credential=' + access_key + '/' + credential_scope + ', ' +  'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + signature
+
+		headers = {
+			'X-Amz-Content-Sha256':payload_hash, 
+			'X-Amz-Date':amz_date,
+			'Authorization':authorization_header,
+			'Content-Type':content_type
+		}	
+	}
+
 	const resp = await fetch(randomEndpoint.url, {
-		headers: {
-			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
-			Authorization: randomEndpoint.authorization,
-		},
+		headers: headers,
 		method: "POST",
-		body: JSON.stringify({
-			...json,
-			inputs: prompt,
-		}),
+		body: request_parameters,
 		signal: abortController.signal,
 	});
+
 
 	if (!resp.body) {
 		throw new Error("Response body is empty");

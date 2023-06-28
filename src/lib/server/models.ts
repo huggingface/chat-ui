@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS , AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY, AWS_REGION} from "$env/static/private";
 import { z } from "zod";
 
 const modelsRaw = z
@@ -29,6 +29,10 @@ const modelsRaw = z
 				.array(
 					z.object({
 						url: z.string().url(),
+						host: z.string().default("huggingface"),
+						access_key: z.string().default(`${AWS_ACCESS_KEY}`),
+						secret_key: z.string().default(`${AWS_SECRET_ACCESS_KEY}`),
+						region: z.string().default(`${AWS_REGION}`),
 						authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
 						weight: z.number().int().positive().default(1),
 					})
