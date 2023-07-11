@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN } from "$env/static/private";
+import { HF_ACCESS_TOKEN, HF_API_ROOT } from "$env/static/private";
 import { sum } from "$lib/utils/sum";
 import type { BackendModel } from "./models";
 
@@ -12,7 +12,7 @@ export function modelEndpoint(model: BackendModel): {
 } {
 	if (!model.endpoints) {
 		return {
-			url: `https://api-inference.huggingface.co/models/${model.name}`,
+			url: `${HF_API_ROOT}/${model.name}`,
 			authorization: `Bearer ${HF_ACCESS_TOKEN}`,
 			weight: 1,
 		};
