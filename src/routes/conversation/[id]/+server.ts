@@ -17,7 +17,7 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
-export async function POST({ request, fetch, locals, params }) {
+export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const date = new Date();
@@ -37,10 +37,21 @@ export async function POST({ request, fetch, locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	const nEvents = await collections.messageEvents.countDocuments({ userId });
+	if (RATE_LIMIT !== "") {
+		let nEvents = 0;
+		if (locals.user?._id) {
+			// if logged in do rate limiting based on user id
+			nEvents = await collections.messageEvents.countDocuments({ userId });
+		} else {
+			// do rate limiting based on session id but also ip address
+			const nEventsIp = await collections.messageEvents.countDocuments({ ip: getClientAddress() });
+			const nEventsSession = await collections.messageEvents.countDocuments({ userId });
+			nEvents = Math.max(nEventsIp, nEventsSession);
+		}
 
-	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
-		throw error(429, ERROR_MESSAGES.rateLimited);
+		if (nEvents > parseInt(RATE_LIMIT)) {
+			throw error(429, ERROR_MESSAGES.rateLimited);
+		}
 	}
 
 	const model = models.find((m) => m.id === conv.model);
@@ -143,6 +154,7 @@ export async function POST({ request, fetch, locals, params }) {
 		await collections.messageEvents.insertOne({
 			userId: userId,
 			createdAt: new Date(),
+			ip: getClientAddress(),
 		});
 
 		await collections.conversations.updateOne(
