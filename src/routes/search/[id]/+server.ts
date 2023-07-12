@@ -1,5 +1,5 @@
 import { collections } from "$lib/server/database";
-import { sha256 } from "$lib/utils/sha256";
+import { hashConv } from "$lib/utils/hashConv.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -23,7 +23,7 @@ export async function GET({ params, locals }) {
 	}
 
 	// there's no better way to see if a conversation has been shared, so we hash the messages and see if there's a shared conversation with the same hash
-	const hash = await sha256(JSON.stringify(conv.messages));
+	const hash = await hashConv(conv);
 	const sharedConv = await collections.sharedConversations.findOne({
 		hash: hash,
 	});
