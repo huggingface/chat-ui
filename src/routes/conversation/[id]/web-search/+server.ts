@@ -58,9 +58,9 @@ export async function GET({ params, locals, url }) {
 				updatedAt: new Date(),
 			};
 
-			function appendUpdate(message: string, args?: string[]) {
+			function appendUpdate(message: string, args?: string[], type?: "error" | "update") {
 				webSearch.messages.push({
-					type: "update",
+					type: type ?? "update",
 					message,
 					args,
 				});
@@ -91,12 +91,20 @@ export async function GET({ params, locals, url }) {
 					text = webSearch.knowledgeGraph;
 					appendUpdate("Found a Google knowledge page");
 				} else if (webSearch.results.length > 0) {
-					// otherwise we use the top result from search
-					const topUrl = webSearch.results[0];
-					appendUpdate("Browsing first result", [JSON.stringify(topUrl)]);
+					let tries = 0;
 
-					text = await parseWeb(topUrl);
-					if (!text) throw new Error("text of the webpage is null");
+					while (!text && tries < 3) {
+						const searchUrl = webSearch.results[tries];
+						appendUpdate("Browsing result", [JSON.stringify(searchUrl)]);
+						try {
+							text = await parseWeb(searchUrl);
+							if (!text) throw new Error("text of the webpage is null");
+						} catch (e) {
+							appendUpdate("Error parsing webpage", [], "error");
+							tries++;
+						}
+					}
+					if (!text) throw new Error("No text found on the first 3 results");
 				} else {
 					throw new Error("No results found for this search query");
 				}
