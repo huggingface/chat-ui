@@ -73,12 +73,18 @@ export async function POST({ request, fetch, locals, params }) {
 			}
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
-				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
+				{ content: newPrompt, from: "user", id: messageId as Message["id"], updatedAt: new Date() },
 			];
 		}
 		return [
 			...conv.messages,
-			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
+			{
+				content: newPrompt,
+				from: "user",
+				id: (messageId as Message["id"]) || crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
 		];
 	})() satisfies Message[];
 
@@ -130,6 +136,8 @@ export async function POST({ request, fetch, locals, params }) {
 			content: generated_text,
 			webSearchId: web_search_id,
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
 		});
 
 		await collections.messageEvents.insertOne({
