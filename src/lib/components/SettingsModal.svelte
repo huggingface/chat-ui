@@ -52,15 +52,6 @@
 				<p class="text-gray-800">
 					You can change this setting at any time, it applies to all your conversations.
 				</p>
-				<p class="text-gray-800">
-					Read more about this model's authors,
-					<a
-						href="https://open-assistant.io/"
-						target="_blank"
-						rel="noreferrer"
-						class="underline decoration-gray-300 hover:decoration-gray-700">Open Assistant</a
-					>.
-				</p>
 			{/if}
 			<form
 				method="post"
