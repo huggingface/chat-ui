@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { MODELS } from "$env/static/private";
+
 	import { createEventDispatcher } from "svelte";
 
 	import Modal from "$lib/components/Modal.svelte";
@@ -51,6 +53,15 @@
 				</p>
 				<p class="text-gray-800">
 					You can change this setting at any time, it applies to all your conversations.
+				</p>
+				<p class="text-gray-800">
+					Read more about this model's authors,
+					<a
+						href="{JSON.parse(MODELS)[0]['websiteUrl']}"
+						target="_blank"
+						rel="noreferrer"
+						class="underline decoration-gray-300 hover:decoration-gray-700">{JSON.parse(MODELS)[0]['name']}</a
+					>.
 				</p>
 			{/if}
 			<form
