@@ -21,7 +21,7 @@ A chat interface using open source models, eg OpenAssistant. It is a SvelteKit a
 3. [Extra parameters](#extra-parameters)
 4. [Deploying to a HF Space](#deploying-to-a-hf-space)
 5. [Building](#building)
-6. [Deploying on HF Spaces](#launching-a-docker-space)
+6. [Deploying on HF Spaces](#deploying-on-hf-spaces)
 
 ## Setup
 
