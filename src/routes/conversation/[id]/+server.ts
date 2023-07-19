@@ -125,7 +125,7 @@ export async function POST({ request, fetch, locals, params }) {
 			},
 		});
 	} else {
-		resp = await fetch(randomEndpoint.url, {
+		resp = await fetch(randomEndpoint.url + '/generate_stream', {
 			headers: {
 				"Content-Type": request.headers.get("Content-Type") ?? "application/json",
 				Authorization: randomEndpoint.authorization,

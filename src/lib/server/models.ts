@@ -1,4 +1,5 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
+import { trimSuffix } from "$lib/utils/trimSuffix";
 import { z } from "zod";
 
 const sagemakerEndpoint = z.object({
@@ -80,6 +81,10 @@ export const models = await Promise.all(
 		...m,
 		userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
 		assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
+		endpoints: (m.endpoints || []).map((e) => ({
+			...e,
+			url: trimSuffix(e.url, '/generate_stream'),
+		})),
 		id: m.id || m.name,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
