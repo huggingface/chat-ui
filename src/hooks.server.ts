@@ -64,7 +64,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
-		if (!user && requiresUser && !(parseInt(MESSAGES_BEFORE_LOGIN ?? 0) > 0)) {
+		if (!user && requiresUser && !((parseInt(MESSAGES_BEFORE_LOGIN) || 0) > 0)) {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
 
