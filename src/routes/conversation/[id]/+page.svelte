@@ -16,6 +16,7 @@
 	import type { WebSearchMessage } from "$lib/types/WebSearch";
 	import type { Message } from "$lib/types/Message";
 	import { browser } from "$app/environment";
+	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -279,4 +280,8 @@
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	settings={data.settings}
+	loginRequired={(data.requiresLogin
+		? !data.user
+		: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
+		data.messages.length > data.messagesBeforeLogin}
 />
