@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "$env/static/private";
+import { COOKIE_NAME, MESSAGES_BEFORE_LOGIN } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
@@ -64,7 +64,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
-		if (!user && requiresUser) {
+		if (
+			!user &&
+			requiresUser &&
+			!((MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0)
+		) {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
 

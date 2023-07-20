@@ -25,11 +25,16 @@
 				v{PUBLIC_VERSION}
 			</div>
 		</h2>
-		<p class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12">
-			This application is for demonstration purposes only.
-		</p>
+		{#if $page.data.requiresLogin}
+			<p
+				class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12"
+				style="text-wrap: balance;"
+			>
+				Please Sign in with Hugging Face to continue
+			</p>
+		{/if}
 		<p class="text-base text-gray-800">
-			AI is an area of active research with known problems such as biased generation and
+			Disclaimer: AI is an area of active research with known problems such as biased generation and
 			misinformation. Do not use this application for high-stakes decisions or advice.
 		</p>
 		{#if PUBLIC_APP_DATA_SHARING}
@@ -54,7 +59,6 @@
 						with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 					{/if}
 				</button>
-				<p class="mt-2 px-2 text-sm text-gray-500">to start chatting right away</p>
 			{:else}
 				<input type="hidden" name="ethicsModalAccepted" value={true} />
 				{#each Object.entries(settings) as [key, val]}
