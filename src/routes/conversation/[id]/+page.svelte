@@ -33,6 +33,7 @@
 
 	let loading = false;
 	let pending = false;
+	let loginRequired = false;
 
 	async function getTextGenerationStream(
 		inputs: string,
@@ -258,6 +259,12 @@
 	});
 	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+
+	$: loginRequired =
+		(data.requiresLogin
+			? !data.user
+			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
+		messages.length >= data.messagesBeforeLogin;
 </script>
 
 <svelte:head>
@@ -278,8 +285,5 @@
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	settings={data.settings}
-	loginRequired={(data.requiresLogin
-		? !data.user
-		: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
-		data.messages.length >= data.messagesBeforeLogin}
+	{loginRequired}
 />
