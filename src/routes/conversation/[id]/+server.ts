@@ -1,4 +1,4 @@
-import { RATE_LIMIT } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
@@ -35,6 +35,13 @@ export async function POST({ request, fetch, locals, params }) {
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
+	}
+
+	if (
+		!locals.user?._id &&
+		conv.messages.length > (MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0)
+	) {
+		throw error(429, "Exceeded number of messages before login");
 	}
 
 	const nEvents = await collections.messageEvents.countDocuments({ userId });

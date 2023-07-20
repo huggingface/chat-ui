@@ -82,6 +82,6 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			email: locals.user.email,
 		},
 		requiresLogin: requiresUser,
-		messagesBeforeLogin: parseInt(MESSAGES_BEFORE_LOGIN ?? 0),
+		messagesBeforeLogin: MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0,
 	};
 };
