@@ -281,5 +281,5 @@
 	loginRequired={(data.requiresLogin
 		? !data.user
 		: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
-		data.messages.length > data.messagesBeforeLogin}
+		data.messages.length >= data.messagesBeforeLogin}
 />
