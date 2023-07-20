@@ -25,12 +25,14 @@
 				v{PUBLIC_VERSION}
 			</div>
 		</h2>
-		<p
-			class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12"
-			style="text-wrap: balance;"
-		>
-			Please Sign in with Hugging Face to continue
-		</p>
+		{#if $page.data.requiresLogin}
+			<p
+				class="px-4 text-lg font-semibold leading-snug text-gray-800 sm:px-12"
+				style="text-wrap: balance;"
+			>
+				Please Sign in with Hugging Face to continue
+			</p>
+		{/if}
 		<p class="text-base text-gray-800">
 			Disclaimer: AI is an area of active research with known problems such as biased generation and
 			misinformation. Do not use this application for high-stakes decisions or advice.
