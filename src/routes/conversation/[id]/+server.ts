@@ -1,8 +1,8 @@
-import { RATE_LIMIT } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
-import { authCondition } from "$lib/server/auth";
+import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
@@ -37,6 +37,14 @@ export async function POST({ request, fetch, locals, params }) {
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
+	}
+
+	if (
+		!locals.user?._id &&
+		requiresUser &&
+		conv.messages.length > (MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0)
+	) {
+		throw error(429, "Exceeded number of messages before login");
 	}
 
 	const nEvents = await collections.messageEvents.countDocuments({ userId });
@@ -75,12 +83,18 @@ export async function POST({ request, fetch, locals, params }) {
 			}
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
-				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
+				{ content: newPrompt, from: "user", id: messageId as Message["id"], updatedAt: new Date() },
 			];
 		}
 		return [
 			...conv.messages,
-			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
+			{
+				content: newPrompt,
+				from: "user",
+				id: (messageId as Message["id"]) || crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
 		];
 	})() satisfies Message[];
 
@@ -179,6 +193,8 @@ export async function POST({ request, fetch, locals, params }) {
 			content: generated_text,
 			webSearchId: web_search_id,
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
 		});
 
 		await collections.messageEvents.insertOne({

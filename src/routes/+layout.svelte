@@ -178,7 +178,7 @@
 	{#if isSettingsOpen}
 		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
 	{/if}
-	{#if requiresLogin}
+	{#if requiresLogin && data.messagesBeforeLogin === 0}
 		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />

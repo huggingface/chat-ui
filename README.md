@@ -16,11 +16,20 @@ app_port: 3000
 
 A chat interface using open source models, eg OpenAssistant. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
+0. [No Setup Deploy](#no-setup-deploy)
 1. [Setup](#setup)
 2. [Launch](#launch)
 3. [Extra parameters](#extra-parameters)
 4. [Deploying to a HF Space](#deploying-to-a-hf-space)
 5. [Building](#building)
+
+##  No Setup Deploy
+
+If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
+
+You can deploy your own customized Chat UI instance with any supported LLM of your choice with only a few clicks to Hugging Face Spaces thanks to the Chat UI Spaces Docker template. Get started [here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
+
+Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
 ## Setup
 
