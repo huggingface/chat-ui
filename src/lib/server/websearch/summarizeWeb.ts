@@ -29,10 +29,10 @@ export async function summarizeWeb(content: string, query: string, model: Backen
 			.split(" ")
 			.slice(0, model.parameters?.truncate ?? 0)
 			.join(" ") +
-		model.messageEndToken +
+		model.userMessageEndToken +
 		model.userMessageToken +
 		`The text above should be summarized to best answer the query: ${query}.` +
-		model.messageEndToken +
+		model.userMessageEndToken +
 		model.assistantMessageToken +
 		"Summary: ";
 

@@ -15,17 +15,17 @@ export async function buildPrompt(
 ): Promise<string> {
 	const prompt =
 		messages
-			.map(
-				(m) =>
-					(m.from === "user"
-						? model.userMessageToken + m.content
-						: model.assistantMessageToken + m.content) +
-					(model.messageEndToken
-						? m.content.endsWith(model.messageEndToken)
-							? ""
-							: model.messageEndToken
-						: "")
-			)
+			.map((m) => (
+				m.from === "user" ? (
+					model.userMessageToken +
+					m.content +
+					(m.content.endsWith(model.userMessageEndToken) ? "" : model.userMessageEndToken)
+				) : (
+					model.assistantMessageToken +
+					m.content +
+					(m.content.endsWith(model.assistantMessageEndToken) ? "" : model.assistantMessageEndToken)
+				)
+			))
 			.join("") + model.assistantMessageToken;
 
 	let webPrompt = "";
@@ -41,7 +41,7 @@ export async function buildPrompt(
 			webPrompt =
 				model.assistantMessageToken +
 				`The following context was found while searching the internet: ${webSearch.summary}` +
-				model.messageEndToken;
+				model.assistantMessageEndToken;
 		}
 	}
 	const finalPrompt =
