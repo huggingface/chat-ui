@@ -55,11 +55,11 @@ docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 
 In which case the url of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
 
-Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within the free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
+Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within their free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
 
 ### Hugging Face Access Token
 
-You will need a Hugging Face access token to run Chat UI locally, using the remote inference endpoints. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
+You will need a Hugging Face access token to run Chat UI locally, if you use a remote inference endpoint. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
 
 ## Launch
 
@@ -152,7 +152,11 @@ You can change things like the parameters, or customize the preprompt to better 
 
 #### Running your own models using a custom endpoint
 
-If you want to, you can even run your own models locally, by having a look at our endpoint project, [text-generation-inference](https://github.com/huggingface/text-generation-inference). You can then add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
+If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
+
+A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference) endpoint. This is what is done in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
+
+To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
 ```
 
