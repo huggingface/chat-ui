@@ -118,9 +118,9 @@ MODELS=`[
     "datasetName": "OpenAssistant/oasst1",
     "description": "A good alternative to ChatGPT",
     "websiteUrl": "https://open-assistant.io",
-    "userMessageToken": "<|prompter|>",
-    "assistantMessageToken": "<|assistant|>",
-    "messageEndToken": "</s>",
+    "userMessageToken": "<|prompter|>", # This does not need to be a token, can be any string
+    "assistantMessageToken": "<|assistant|>", # This does not need to be a token, can be any string
+    "messageEndToken": "<|endoftext|>", # This does not need to be a token, can be any string
     "preprompt": "Below are a series of dialogues between various people and an AI assistant. The AI tries to be helpful, polite, honest, sophisticated, emotionally aware, and humble-but-knowledgeable. The assistant is happy to help with almost anything, and will do its best to understand exactly what is needed. It also tries to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer. That said, the assistant is practical and really does its best, and doesn't let caution get too much in the way of being useful.\n-----\n",
     "promptExamples": [
       {
@@ -140,7 +140,8 @@ MODELS=`[
       "repetition_penalty": 1.2,
       "top_k": 50,
       "truncate": 1000,
-      "max_new_tokens": 1024
+      "max_new_tokens": 1024,
+      "stop": ["<|endoftext|>"]  # This does not need to be tokens, can be any list of strings
     }
   }
 ]`
