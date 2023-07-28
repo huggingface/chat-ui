@@ -14,13 +14,23 @@ app_port: 3000
 
 ![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/raw/f038917dd40d711a72d654ab1abfc03ae9f177e6/chat-ui-repo-thumbnail.svg)
 
-A chat interface using open source models, eg OpenAssistant. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
+A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
+0. [No Setup Deploy](#no-setup-deploy)
 1. [Setup](#setup)
 2. [Launch](#launch)
 3. [Extra parameters](#extra-parameters)
 4. [Deploying to a HF Space](#deploying-to-a-hf-space)
 5. [Building](#building)
+
+##  No Setup Deploy
+
+If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
+
+You can deploy your own customized Chat UI instance with any supported LLM of your choice with only a few clicks to Hugging Face Spaces thanks to the Chat UI Spaces Docker template. Get started [here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
+If you'd like to deploy a model with gated access or a model in a private repository, you can simply provide `HUGGING_FACE_HUB_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables). You need to set its value to an access token you can get from [here](https://huggingface.co/settings/tokens).
+
+Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
 ## Setup
 
@@ -108,9 +118,9 @@ MODELS=`[
     "datasetName": "OpenAssistant/oasst1",
     "description": "A good alternative to ChatGPT",
     "websiteUrl": "https://open-assistant.io",
-    "userMessageToken": "<|prompter|>",
-    "assistantMessageToken": "<|assistant|>",
-    "messageEndToken": "</s>",
+    "userMessageToken": "<|prompter|>", # This does not need to be a token, can be any string
+    "assistantMessageToken": "<|assistant|>", # This does not need to be a token, can be any string
+    "messageEndToken": "<|endoftext|>", # This does not need to be a token, can be any string
     "preprompt": "Below are a series of dialogues between various people and an AI assistant. The AI tries to be helpful, polite, honest, sophisticated, emotionally aware, and humble-but-knowledgeable. The assistant is happy to help with almost anything, and will do its best to understand exactly what is needed. It also tries to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer. That said, the assistant is practical and really does its best, and doesn't let caution get too much in the way of being useful.\n-----\n",
     "promptExamples": [
       {
@@ -130,7 +140,8 @@ MODELS=`[
       "repetition_penalty": 1.2,
       "top_k": 50,
       "truncate": 1000,
-      "max_new_tokens": 1024
+      "max_new_tokens": 1024,
+      "stop": ["<|endoftext|>"]  # This does not need to be tokens, can be any list of strings
     }
   }
 ]`

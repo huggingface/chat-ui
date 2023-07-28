@@ -15,7 +15,7 @@
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { WebSearchMessage } from "$lib/types/WebSearch";
 	import type { Message } from "$lib/types/Message";
-	import { browser } from "$app/environment";
+	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -33,6 +33,7 @@
 
 	let loading = false;
 	let pending = false;
+	let loginRequired = false;
 
 	async function getTextGenerationStream(
 		inputs: string,
@@ -195,7 +196,6 @@
 			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
 
 			webSearchMessages = [];
-			if (browser) invalidate(UrlDependency.Conversation);
 
 			if (messages.filter((m) => m.from === "user").length === 1) {
 				summarizeTitle($page.params.id)
@@ -259,6 +259,12 @@
 	});
 	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+
+	$: loginRequired =
+		(data.requiresLogin
+			? !data.user
+			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
+		messages.length >= data.messagesBeforeLogin;
 </script>
 
 <svelte:head>
@@ -279,4 +285,5 @@
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	settings={data.settings}
+	{loginRequired}
 />
