@@ -176,7 +176,11 @@
 		<Toast message={currentError} />
 	{/if}
 	{#if isSettingsOpen}
-		<SettingsModal on:close={() => (isSettingsOpen = false)} settings={data.settings} />
+		<SettingsModal
+			on:close={() => (isSettingsOpen = false)}
+			settings={data.settings}
+			models={data.models}
+		/>
 	{/if}
 	{#if requiresLogin && data.messagesBeforeLogin === 0}
 		<LoginModal settings={data.settings} />

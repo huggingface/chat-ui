@@ -8,8 +8,10 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
+	import type { Model } from "$lib/types/Model";
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
+	export let models: Array<Model>;
 
 	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
 	let isConfirmingDeletion = false;
@@ -52,22 +54,21 @@
 				<p class="text-gray-800">
 					You can change this setting at any time, it applies to all your conversations.
 				</p>
-				<p class="text-gray-800">
-					Read more about model authors,
-					<a
-						href="https://open-assistant.io/"
-						target="_blank"
-						rel="noreferrer"
-						class="underline decoration-gray-300 hover:decoration-gray-700">Open Assistant</a
-					>
-					or
-					<a
-						href="https://ai.meta.com/llama/"
-						target="_blank"
-						rel="noreferrer"
-						class="underline decoration-gray-300 hover:decoration-gray-700">Meta AI</a
-					>.
-				</p>
+				<div>
+					<p class="text-gray-800 ">Read more about model authors:</p>
+					<ul class="list-inside list-disc">
+						{#each models as model}
+							<li class="list-item">
+								<a
+									href={model["websiteUrl"]}
+									target="_blank"
+									rel="noreferrer"
+									class="underline decoration-gray-300 hover:decoration-gray-700">{model["name"]}</a
+								>
+							</li>
+						{/each}
+					</ul>
+				</div>
 			{/if}
 			<form
 				method="post"
