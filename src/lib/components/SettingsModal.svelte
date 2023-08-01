@@ -8,10 +8,10 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
-	import type { BackendModel } from "$lib/server/models";
+	import type { Model } from "$lib/types/Model";
 
 	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
-	export let models: Array<BackendModel>;
+	export let models: Array<Model>;
 
 	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
 	let isConfirmingDeletion = false;
