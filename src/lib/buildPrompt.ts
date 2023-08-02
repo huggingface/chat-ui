@@ -13,19 +13,20 @@ export async function buildPrompt(
 	model: BackendModel,
 	webSearchId?: string
 ): Promise<string> {
+	const userEndToken = model.userMessageEndToken ?? model.messageEndToken;
+	const assistantEndToken = model.assistantMessageEndToken ?? model.messageEndToken;
+
 	const prompt =
 		messages
-			.map((m) => (
-				m.from === "user" ? (
-					model.userMessageToken +
-					m.content +
-					(m.content.endsWith(model.userMessageEndToken) ? "" : model.userMessageEndToken)
-				) : (
-					model.assistantMessageToken +
-					m.content +
-					(m.content.endsWith(model.assistantMessageEndToken) ? "" : model.assistantMessageEndToken)
-				)
-			))
+			.map((m) =>
+				m.from === "user"
+					? model.userMessageToken +
+					  m.content +
+					  (m.content.endsWith(userEndToken) ? "" : userEndToken)
+					: model.assistantMessageToken +
+					  m.content +
+					  (m.content.endsWith(assistantEndToken) ? "" : assistantEndToken)
+			)
 			.join("") + model.assistantMessageToken;
 
 	let webPrompt = "";
