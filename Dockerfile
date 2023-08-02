@@ -2,6 +2,8 @@
 # you will also find guides on how best to write your Dockerfile
 # This Dockerfile builds a production image for a Node.js application.
 
+LABEL application=chat-ui #The name of the application.
+
 FROM node:19 as builder-production
 
 # Set the working directory.
