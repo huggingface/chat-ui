@@ -37,7 +37,16 @@ export async function generateFromDefaultEndpoint(
 		}
 	);
 
-	generated_text = trimSuffix(trimPrefix(generated_text, "<|startoftext|>"), PUBLIC_SEP_TOKEN);
+	generated_text = trimSuffix(
+		trimPrefix(generated_text, "<|startoftext|>"),
+		PUBLIC_SEP_TOKEN
+	).trimEnd();
+
+	for (const stop of [...(newParameters?.stop ?? []), "<|endoftext|>"]) {
+		if (generated_text.endsWith(stop)) {
+			generated_text = generated_text.slice(0, -stop.length).trimEnd();
+		}
+	}
 
 	return generated_text;
 }
