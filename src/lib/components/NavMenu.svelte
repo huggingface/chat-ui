@@ -18,7 +18,11 @@
 		id: string;
 		title: string;
 	}> = [];
+
+	export let canLogin: boolean;
 	export let user: LayoutData["user"];
+
+	export let loginModalVisible;
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -60,6 +64,15 @@
 				Sign Out
 			</button>
 		</form>
+	{/if}
+	{#if canLogin}
+		<button
+			on:click={() => (loginModalVisible = true)}
+			type="button"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		>
+			Login
+		</button>
 	{/if}
 	<button
 		on:click={switchTheme}
