@@ -99,6 +99,8 @@
 		(data.requiresLogin
 			? !data.user
 			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER);
+
+	let loginModalVisible = false;
 </script>
 
 <svelte:head>
@@ -156,6 +158,8 @@
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
+			canLogin={data.user === undefined && data.requiresLogin}
+			bind:loginModalVisible
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -166,6 +170,8 @@
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
+			canLogin={data.user === undefined && data.requiresLogin}
+			bind:loginModalVisible
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -182,7 +188,7 @@
 			models={data.models}
 		/>
 	{/if}
-	{#if requiresLogin && data.messagesBeforeLogin === 0}
+	{#if (requiresLogin && data.messagesBeforeLogin === 0) || loginModalVisible}
 		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />
