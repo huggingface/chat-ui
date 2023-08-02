@@ -6,13 +6,13 @@ export async function generateQuery(messages: Message[], model: BackendModel) {
 	const promptSearchQuery =
 		model.userMessageToken +
 		"The following messages were written by a user, trying to answer a question." +
-		model.messageEndToken +
+		model.userMessageEndToken +
 		messages
 			.filter((message) => message.from === "user")
-			.map((message) => model.userMessageToken + message.content + model.messageEndToken) +
+			.map((message) => model.userMessageToken + message.content + model.userMessageEndToken) +
 		model.userMessageToken +
 		"What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence." +
-		model.messageEndToken +
+		model.userMessageEndToken +
 		model.assistantMessageToken +
 		"Query: ";
 
