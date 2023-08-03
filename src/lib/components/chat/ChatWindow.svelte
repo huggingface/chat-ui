@@ -124,7 +124,7 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
-					href="https://huggingface.co/{currentModel.name}"
+					href={currentModel.modelUrl || "https://huggingface.co/" + currentModel.name}
 					target="_blank"
 					rel="noreferrer"
 					class="hover:underline">{currentModel.displayName}</a
