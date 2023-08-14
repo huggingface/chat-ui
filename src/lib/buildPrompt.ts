@@ -11,7 +11,8 @@ import { ObjectId } from "mongodb";
 export async function buildPrompt(
 	messages: Pick<Message, "from" | "content">[],
 	model: BackendModel,
-	webSearchId?: string
+	webSearchId?: string,
+	preprompt?: string
 ): Promise<string> {
 	const userEndToken = model.userMessageEndToken ?? model.messageEndToken;
 	const assistantEndToken = model.assistantMessageEndToken ?? model.messageEndToken;
@@ -46,7 +47,7 @@ export async function buildPrompt(
 		}
 	}
 	const finalPrompt =
-		model.preprompt +
+		(preprompt ?? model.preprompt) +
 		webPrompt +
 		prompt
 			.split(" ")

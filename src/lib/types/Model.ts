@@ -12,4 +12,5 @@ export type Model = Pick<
 	| "description"
 	| "modelUrl"
 	| "datasetUrl"
+	| "preprompt"
 >;
