@@ -1,6 +1,8 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import { z } from "zod";
 
+type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+
 const modelsRaw = z
 	.array(
 		z.object({
@@ -19,7 +21,7 @@ const modelsRaw = z
 			assistantMessageToken: z.string(),
 			assistantMessageEndToken: z.string().default(""),
 			messageEndToken: z.string().default(""),
-			preprompt: z.string().default(""),
+			preprompt: z.string().min(1).optional(),
 			prepromptUrl: z.string().url().optional(),
 			promptExamples: z
 				.array(
@@ -76,7 +78,7 @@ export const oldModels = OLD_MODELS
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
-export type BackendModel = (typeof models)[0];
+export type BackendModel = Optional<(typeof models)[0], "preprompt">;
 
 export const defaultModel = models[0];
 

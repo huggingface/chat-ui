@@ -35,7 +35,8 @@
 	function onModelChange() {
 		value =
 			settings.customPrompts[selectedModelId] ??
-			models.filter((el) => el.id === selectedModelId)[0].preprompt;
+			models.filter((el) => el.id === selectedModelId)[0].preprompt ??
+			"";
 	}
 
 	$: selectedModelId, onModelChange();
@@ -71,7 +72,7 @@
 				{@const active = model.id === selectedModelId}
 				<div
 					class="rounded-xl border border-gray-100 {active
-						? 'from-primary-200/40 via-primary-500/10 bg-gradient-to-r'
+						? 'bg-gradient-to-r from-primary-200/40 via-primary-500/10'
 						: ''}"
 				>
 					<label class="group flex cursor-pointer p-3" on:change aria-label={model.displayName}>
@@ -110,7 +111,7 @@
 									<button
 										class="text-gray-500 hover:text-gray-900"
 										on:click|preventDefault={() => {
-											value = model.preprompt;
+											value = model.preprompt ?? "";
 										}}
 									>
 										<CarbonRestart class="text-sm " />
