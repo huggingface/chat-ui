@@ -1,6 +1,27 @@
-import { HF_ACCESS_TOKEN, HF_API_ROOT } from "$env/static/private";
+import {
+	HF_ACCESS_TOKEN,
+	HF_API_ROOT,
+	USE_CLIENT_CERTIFICATE,
+	CERT_PATH,
+	KEY_PATH,
+	CA_PATH,
+	CLIENT_KEY_PASSWORD,
+	REJECT_UNAUTHORIZED,
+} from "$env/static/private";
 import { sum } from "$lib/utils/sum";
 import type { BackendModel } from "./models";
+
+import { loadClientCertificates } from "$lib/utils/loadClientCerts";
+
+if (USE_CLIENT_CERTIFICATE === "true") {
+	loadClientCertificates(
+		CERT_PATH,
+		KEY_PATH,
+		CA_PATH,
+		CLIENT_KEY_PASSWORD,
+		REJECT_UNAUTHORIZED === "true"
+	);
+}
 
 /**
  * Find a random load-balanced endpoint

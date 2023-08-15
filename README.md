@@ -152,7 +152,7 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-#### Running your own models using a custom endpoint
+### Running your own models using a custom endpoint
 
 If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
 
@@ -171,7 +171,9 @@ To do this, you can add your own endpoints to the `MODELS` variable in `.env.loc
 
 If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
 
-#### Custom endpoint authorization
+### Custom endpoint authorization
+
+#### Basic and Bearer
 
 Custom endpoints may require authorization, depending on how you configure them. Authentication will usually be set either with `Basic` or `Bearer`.
 
@@ -195,6 +197,14 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 
 ```
+
+#### Client Certificate Authentication (mTLS)
+
+Custom endpoints may require client certificate authentication, depending on how you configure them. To enable mTLS between Chat UI and your custom endpoint, you will need to set the `USE_CLIENT_CERTIFICATE` to `true`, and add the `CERT_PATH` and `KEY_PATH` parameters to your `.env.local`. These parameters should point to the location of the certificate and key files on your local machine. The certificate and key files should be in PEM format. The key file can be encrypted with a passphrase, in which case you will also need to add the `CLIENT_KEY_PASSWORD` parameter to your `.env.local`.
+
+If you're using a certificate signed by a private CA, you will also need to add the `CA_PATH` parameter to your `.env.local`. This parameter should point to the location of the CA certificate file on your local machine.
+
+If you're using a self-signed certificate, e.g. for testing or development purposes, you can set the `REJECT_UNAUTHORIZED` parameter to `false` in your `.env.local`. This will disable certificate validation, and allow Chat UI to connect to your custom endpoint.
 
 #### Models hosted on multiple custom endpoints
 
