@@ -198,6 +198,24 @@ You can then add the generated information and the `authorization` parameter to 
 
 ```
 
+### Amazon SageMaker
+
+You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
+
+```
+"endpoints": [
+    {
+      "host" : "sagemaker",
+      "url": "", // your aws sagemaker url here
+      "accessKey": "",
+      "secretKey" : "",
+      "sessionToken": "", // optional
+      "weight": 1
+    }
+```
+
+You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
+
 #### Client Certificate Authentication (mTLS)
 
 Custom endpoints may require client certificate authentication, depending on how you configure them. To enable mTLS between Chat UI and your custom endpoint, you will need to set the `USE_CLIENT_CERTIFICATE` to `true`, and add the `CERT_PATH` and `KEY_PATH` parameters to your `.env.local`. These parameters should point to the location of the certificate and key files on your local machine. The certificate and key files should be in PEM format. The key file can be encrypted with a passphrase, in which case you will also need to add the `CLIENT_KEY_PASSWORD` parameter to your `.env.local`.
