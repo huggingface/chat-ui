@@ -1,6 +1,29 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import { z } from "zod";
 
+const sagemakerEndpoint = z.object({
+	type: z.literal("sagemaker"),
+	url: z.string().url(),
+	region: z.string(),
+	accessKey: z.string(),
+	secretKey: z.string(),
+});
+
+const tgiEndpoint = z.object({
+	type: z.literal("tgi").optional(),
+	url: z.string().url(),
+	authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
+});
+
+const commonEndpoint = z.object({
+	weight: z.number().int().positive().default(1),
+});
+
+const endpoint = z.union([
+	sagemakerEndpoint.merge(commonEndpoint),
+	tgiEndpoint.merge(commonEndpoint),
+]);
+
 const modelsRaw = z
 	.array(
 		z.object({
@@ -29,15 +52,7 @@ const modelsRaw = z
 					})
 				)
 				.optional(),
-			endpoints: z
-				.array(
-					z.object({
-						url: z.string().url(),
-						authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
-						weight: z.number().int().positive().default(1),
-					})
-				)
-				.optional(),
+			endpoints: z.array(endpoint).optional(),
 			parameters: z
 				.object({
 					temperature: z.number().min(0).max(1),
@@ -77,6 +92,7 @@ export const oldModels = OLD_MODELS
 	: [];
 
 export type BackendModel = (typeof models)[0];
+export type Endpoint = z.infer<typeof endpoint>;
 
 export const defaultModel = models[0];
 
