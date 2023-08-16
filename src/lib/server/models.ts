@@ -10,7 +10,7 @@ const sagemakerEndpoint = z.object({
 });
 
 const tgiEndpoint = z.object({
-	host: z.literal("tgi"),
+	host: z.union([z.literal("tgi"), z.undefined()]),
 	url: z.string().url(),
 	authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
 });
@@ -19,10 +19,19 @@ const commonEndpoint = z.object({
 	weight: z.number().int().positive().default(1),
 });
 
-const endpoint = z.discriminatedUnion("host", [
-	sagemakerEndpoint.merge(commonEndpoint),
-	tgiEndpoint.merge(commonEndpoint),
-]);
+const endpoint = z.lazy(() =>
+	z.union([sagemakerEndpoint.merge(commonEndpoint), tgiEndpoint.merge(commonEndpoint)])
+);
+
+const combinedEndpoint = endpoint.transform((data) => {
+	if (data.host === "tgi" || data.host === undefined) {
+		return tgiEndpoint.merge(commonEndpoint).parse(data);
+	} else if (data.host === "sagemaker") {
+		return sagemakerEndpoint.merge(commonEndpoint).parse(data);
+	} else {
+		throw new Error(`Invalid host: ${data.host}`);
+	}
+});
 
 const modelsRaw = z
 	.array(
@@ -52,7 +61,7 @@ const modelsRaw = z
 					})
 				)
 				.optional(),
-			endpoints: z.array(endpoint).optional(),
+			endpoints: z.array(combinedEndpoint).optional(),
 			parameters: z
 				.object({
 					temperature: z.number().min(0).max(1),
