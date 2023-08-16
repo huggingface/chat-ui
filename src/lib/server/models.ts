@@ -2,15 +2,15 @@ import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import { z } from "zod";
 
 const sagemakerEndpoint = z.object({
-	type: z.literal("sagemaker"),
+	host: z.literal("sagemaker"),
 	url: z.string().url(),
-	region: z.string(),
-	accessKey: z.string(),
-	secretKey: z.string(),
+	accessKey: z.string().min(1),
+	secretKey: z.string().min(1),
+	sessionToken: z.string().optional(),
 });
 
 const tgiEndpoint = z.object({
-	type: z.literal("tgi").optional(),
+	host: z.literal("tgi"),
 	url: z.string().url(),
 	authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
 });
@@ -19,7 +19,7 @@ const commonEndpoint = z.object({
 	weight: z.number().int().positive().default(1),
 });
 
-const endpoint = z.union([
+const endpoint = z.discriminatedUnion("host", [
 	sagemakerEndpoint.merge(commonEndpoint),
 	tgiEndpoint.merge(commonEndpoint),
 ]);

@@ -16,10 +16,7 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import moment from "moment";
-import { SHA256, HmacSHA256 } from "crypto-js";
-import { getSignatureKey } from "$lib/server/aws.js";
-import { random } from "nanoid";
+import { AwsClient } from "aws4fetch";
 
 export async function POST({ request, fetch, locals, params }) {
 	const id = z.string().parse(params.id);
@@ -106,53 +103,26 @@ export async function POST({ request, fetch, locals, params }) {
 	const abortController = new AbortController();
 
 	let resp: Response;
-	if (randomEndpoint.type === "sagemaker") {
+	if (randomEndpoint.host === "sagemaker") {
 		const requestParams = JSON.stringify({
 			...json,
 			inputs: prompt,
 		});
 
-		const amz_date = moment().utc().format("yyyyMMDDTHHmmss\\Z");
-		const date_stamp = moment().utc().format("yyyyMMDD");
+		const aws = new AwsClient({
+			accessKeyId: randomEndpoint.accessKey,
+			secretAccessKey: randomEndpoint.secretKey,
+			sessionToken: randomEndpoint.sessionToken,
+			service: "sagemaker",
+		});
 
-		const payload_hash = SHA256(requestParams);
-
-		const credentialScope = `${date_stamp}/${randomEndpoint.region}/sagemaker/aws4_request`;
-		const canonical_request = `POST
-${randomEndpoint.url.split(".com")[1]}
-${randomEndpoint.url.split(".com")[0] + ".com"}
-host:${randomEndpoint.url.split(".com")[0] + ".com"}
-x-amz-content-sha256:${payload_hash}
-x-amz-date:${amz_date}
-host;x-amz-content-sha256;x-amz-date
-${payload_hash}`;
-
-		const string_to_sign = `AWS4-HMAC-SHA256
-${amz_date}
-${credentialScope}
-${SHA256(canonical_request)}
-`;
-		const signing_key = getSignatureKey(
-			randomEndpoint.secretKey,
-			date_stamp,
-			randomEndpoint.region,
-			"sagemaker"
-		);
-		const signature = HmacSHA256(string_to_sign, signing_key);
-		const authorization_header = `AWS4-HMAC-SHA256 Credential=${randomEndpoint.accessKey}/${credentialScope}, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`;
-
-		const headers = {
-			"X-Amz-Content-Sha256": payload_hash.toString(),
-			"X-Amz-Date": amz_date,
-			Authorization: authorization_header,
-			"Content-Type": "application/json",
-		};
-
-		resp = await fetch(randomEndpoint.url, {
-			headers: headers,
+		resp = await aws.fetch(randomEndpoint.url, {
 			method: "POST",
 			body: requestParams,
 			signal: abortController.signal,
+			headers: {
+				"Content-Type": "application/json",
+			},
 		});
 	} else {
 		resp = await fetch(randomEndpoint.url, {
