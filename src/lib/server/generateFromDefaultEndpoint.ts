@@ -1,6 +1,5 @@
 import { defaultModel } from "$lib/server/models";
 import { modelEndpoint } from "./modelEndpoint";
-import { textGeneration } from "@huggingface/inference";
 import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";

@@ -29,6 +29,7 @@ if (USE_CLIENT_CERTIFICATE === "true") {
 export function modelEndpoint(model: BackendModel): Endpoint {
 	if (!model.endpoints) {
 		return {
+			host: "tgi",
 			url: `${HF_API_ROOT}/${model.name}`,
 			authorization: `Bearer ${HF_ACCESS_TOKEN}`,
 			weight: 1,
