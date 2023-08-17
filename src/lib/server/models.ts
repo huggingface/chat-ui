@@ -7,6 +7,38 @@ import type {
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
+const sagemakerEndpoint = z.object({
+	host: z.literal("sagemaker"),
+	url: z.string().url(),
+	accessKey: z.string().min(1),
+	secretKey: z.string().min(1),
+	sessionToken: z.string().optional(),
+});
+
+const tgiEndpoint = z.object({
+	host: z.union([z.literal("tgi"), z.undefined()]),
+	url: z.string().url(),
+	authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
+});
+
+const commonEndpoint = z.object({
+	weight: z.number().int().positive().default(1),
+});
+
+const endpoint = z.lazy(() =>
+	z.union([sagemakerEndpoint.merge(commonEndpoint), tgiEndpoint.merge(commonEndpoint)])
+);
+
+const combinedEndpoint = endpoint.transform((data) => {
+	if (data.host === "tgi" || data.host === undefined) {
+		return tgiEndpoint.merge(commonEndpoint).parse(data);
+	} else if (data.host === "sagemaker") {
+		return sagemakerEndpoint.merge(commonEndpoint).parse(data);
+	} else {
+		throw new Error(`Invalid host: ${data.host}`);
+	}
+});
+
 const modelsRaw = z
 	.array(
 		z.object({
@@ -68,15 +100,7 @@ const modelsRaw = z
 					})
 				)
 				.optional(),
-			endpoints: z
-				.array(
-					z.object({
-						url: z.string().url(),
-						authorization: z.string().min(1).default(`Bearer ${HF_ACCESS_TOKEN}`),
-						weight: z.number().int().positive().default(1),
-					})
-				)
-				.optional(),
+			endpoints: z.array(combinedEndpoint).optional(),
 			parameters: z
 				.object({
 					temperature: z.number().min(0).max(1),
@@ -125,6 +149,7 @@ export const oldModels = OLD_MODELS
 	: [];
 
 export type BackendModel = (typeof models)[0];
+export type Endpoint = z.infer<typeof endpoint>;
 
 export const defaultModel = models[0];
 
