@@ -1,9 +1,9 @@
 import { defaultModel } from "$lib/server/models";
 import { modelEndpoint } from "./modelEndpoint";
-import { textGeneration } from "@huggingface/inference";
 import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+import { AwsClient } from "aws4fetch";
 
 interface Parameters {
 	temperature: number;
@@ -21,24 +21,76 @@ export async function generateFromDefaultEndpoint(
 		return_full_text: false,
 	};
 
-	const endpoint = modelEndpoint(defaultModel);
-	let { generated_text } = await textGeneration(
-		{
-			model: endpoint.url,
-			inputs: prompt,
-			parameters: newParameters,
-		},
-		{
-			fetch: (url, options) =>
-				fetch(url, {
-					...options,
-					headers: { ...options?.headers, Authorization: endpoint.authorization },
-				}),
-		}
-	);
+	const randomEndpoint = modelEndpoint(defaultModel);
 
-	generated_text = trimSuffix(
-		trimPrefix(generated_text, "<|startoftext|>"),
+	const abortController = new AbortController();
+
+	let resp: Response;
+
+	if (randomEndpoint.host === "sagemaker") {
+		const requestParams = JSON.stringify({
+			...newParameters,
+			inputs: prompt,
+		});
+
+		const aws = new AwsClient({
+			accessKeyId: randomEndpoint.accessKey,
+			secretAccessKey: randomEndpoint.secretKey,
+			sessionToken: randomEndpoint.sessionToken,
+			service: "sagemaker",
+		});
+
+		resp = await aws.fetch(randomEndpoint.url, {
+			method: "POST",
+			body: requestParams,
+			signal: abortController.signal,
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	} else {
+		resp = await fetch(randomEndpoint.url, {
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: randomEndpoint.authorization,
+			},
+			method: "POST",
+			body: JSON.stringify({
+				...newParameters,
+				inputs: prompt,
+			}),
+			signal: abortController.signal,
+		});
+	}
+
+	if (!resp.ok) {
+		throw new Error(await resp.text());
+	}
+
+	if (!resp.body) {
+		throw new Error("Response body is empty");
+	}
+
+	const decoder = new TextDecoder();
+	const reader = resp.body.getReader();
+
+	let isDone = false;
+	let result = "";
+
+	while (!isDone) {
+		const { done, value } = await reader.read();
+
+		isDone = done;
+		result += decoder.decode(value, { stream: true }); // Convert current chunk to text
+	}
+
+	// Close the reader when done
+	reader.releaseLock();
+
+	const results = await JSON.parse(result);
+
+	let generated_text = trimSuffix(
+		trimPrefix(trimPrefix(results[0].generated_text, "<|startoftext|>"), prompt),
 		PUBLIC_SEP_TOKEN
 	).trimEnd();
 
