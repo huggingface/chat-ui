@@ -9,7 +9,7 @@ import {
 	REJECT_UNAUTHORIZED,
 } from "$env/static/private";
 import { sum } from "$lib/utils/sum";
-import type { BackendModel } from "./models";
+import type { BackendModel, Endpoint } from "./models";
 
 import { loadClientCertificates } from "$lib/utils/loadClientCerts";
 
@@ -26,13 +26,10 @@ if (USE_CLIENT_CERTIFICATE === "true") {
 /**
  * Find a random load-balanced endpoint
  */
-export function modelEndpoint(model: BackendModel): {
-	url: string;
-	authorization: string;
-	weight: number;
-} {
+export function modelEndpoint(model: BackendModel): Endpoint {
 	if (!model.endpoints) {
 		return {
+			host: "tgi",
 			url: `${HF_API_ROOT}/${model.name}`,
 			authorization: `Bearer ${HF_ACCESS_TOKEN}`,
 			weight: 1,
