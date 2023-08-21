@@ -7,6 +7,8 @@ import type {
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
+type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+
 const sagemakerEndpoint = z.object({
 	host: z.literal("sagemaker"),
 	url: z.string().url(),
@@ -57,7 +59,7 @@ const modelsRaw = z
 			assistantMessageToken: z.string().default(""),
 			assistantMessageEndToken: z.string().default(""),
 			messageEndToken: z.string().default(""),
-			preprompt: z.string().default(""),
+			preprompt: z.string().min(1).optional(),
 			prepromptUrl: z.string().url().optional(),
 			chatPromptTemplate: z
 				.string()
@@ -148,7 +150,7 @@ export const oldModels = OLD_MODELS
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
-export type BackendModel = (typeof models)[0];
+export type BackendModel = Optional<(typeof models)[0], "preprompt">;
 export type Endpoint = z.infer<typeof endpoint>;
 
 export const defaultModel = models[0];

@@ -53,6 +53,7 @@ export async function POST({ request, fetch, locals, params }) {
 	}
 
 	const model = models.find((m) => m.id === conv.model);
+	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (!model) {
 		throw error(410, "Model not available anymore");
@@ -97,7 +98,13 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	const prompt = await buildPrompt(messages, model, web_search_id);
+	const prompt = await buildPrompt(
+		messages,
+		model,
+		web_search_id,
+		settings?.customPrompts?.[model.id]
+	);
+
 	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
