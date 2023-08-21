@@ -24,7 +24,7 @@ export async function summarizeWeb(content: string, query: string, model: Backen
 	}
 
 	// else we use the LLM to generate a summary
-	const summaryPrompt = defaultModel.webSearchSummeryPromptRender({
+	const summaryPrompt = defaultModel.webSearchSummaryPromptRender({
 		answer: content
 			.split(" ")
 			.slice(0, model.parameters?.truncate ?? 0)

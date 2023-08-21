@@ -69,7 +69,7 @@ const modelsRaw = z
 						"{{/each}}" +
 						"{{assistantMessageToken}}"
 				),
-			webSearchSummeryPromptTemplate: z
+			webSearchSummaryPromptTemplate: z
 				.string()
 				.default(
 					"{{userMessageToken}}{{answer}}{{userMessageEndToken}}" +
@@ -120,8 +120,8 @@ export const models = await Promise.all(
 		userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
 		assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
 		chatPromptRender: compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m),
-		webSearchSummeryPromptRender: compileTemplate<WebSearchSummaryTemplateInput>(
-			m.webSearchSummeryPromptTemplate,
+		webSearchSummaryPromptRender: compileTemplate<WebSearchSummaryTemplateInput>(
+			m.webSearchSummaryPromptTemplate,
 			m
 		),
 		webSearchQueryPromptRender: compileTemplate<WebSearchQueryTemplateInput>(

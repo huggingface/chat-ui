@@ -155,7 +155,7 @@ You can change things like the parameters, or customize the preprompt to better 
 
 By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
-However, these templates can be modified by setting the `chatPromptTemplate`, `webSearchSummeryPromptTemplate`, and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+However, these templates can be modified by setting the `chatPromptTemplate`, `webSearchSummaryPromptTemplate`, and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
 For example:
 
@@ -202,11 +202,11 @@ The following is the default `webSearchQueryPromptTemplate`. Note that not all m
 {{assistantMessageToken}}Query:
 ```
 
-**webSearchSummeryPromptTemplate**
+**webSearchSummaryPromptTemplate**
 
 The search-engine response (`answer`) is summarized using the following prompt template. However, when `HF_ACCESS_TOKEN` is provided, a dedicated summary model is used instead. Additionally, the model's `query` response to `webSearchQueryPromptTemplate` is also available to this template.
 
-The following is the default `webSearchSummeryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
+The following is the default `webSearchSummaryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
 
 ```
 {{userMessageToken}}{{answer}}{{userMessageEndToken}}
