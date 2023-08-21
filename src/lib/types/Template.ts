@@ -1,7 +1,7 @@
 import type { Message } from "./Message";
 
 export type LegacyParamatersTemplateInput = {
-	preprompt: string;
+	preprompt?: string;
 	userMessageToken: string;
 	userMessageEndToken: string;
 	assistantMessageToken: string;
@@ -10,6 +10,7 @@ export type LegacyParamatersTemplateInput = {
 
 export type ChatTemplateInput = {
 	messages: Pick<Message, "from" | "content">[];
+	preprompt?: string;
 };
 
 export type WebSearchSummaryTemplateInput = {

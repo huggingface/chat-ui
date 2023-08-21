@@ -17,11 +17,13 @@ export const actions = {
 					.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
 				activeModel: validateModel(models),
+				customPrompts: z.record(z.string()).default({}),
 			})
 			.parse({
 				shareConversationsWithModelAuthors: formData.get("shareConversationsWithModelAuthors"),
 				ethicsModalAccepted: formData.get("ethicsModalAccepted"),
 				activeModel: formData.get("activeModel") ?? DEFAULT_SETTINGS.activeModel,
+				customPrompts: JSON.parse(formData.get("customPrompts")?.toString() ?? "{}"),
 			});
 
 		await collections.settings.updateOne(
@@ -40,7 +42,6 @@ export const actions = {
 				upsert: true,
 			}
 		);
-
 		throw redirect(303, request.headers.get("referer") || `${base}/`);
 	},
 };
