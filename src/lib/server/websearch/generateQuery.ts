@@ -1,8 +1,8 @@
 import type { Message } from "$lib/types/Message";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
-import { defaultModel, type BackendModel } from "../models";
+import { defaultModel } from "../models";
 
-export async function generateQuery(messages: Message[], model: BackendModel) {
+export async function generateQuery(messages: Message[]) {
 	const promptSearchQuery = defaultModel.webSearchQueryPromptRender({ messages });
 	const searchQuery = await generateFromDefaultEndpoint(promptSearchQuery).then((query) => {
 		const arr = query.split(/\r?\n/);

@@ -69,7 +69,7 @@ export async function GET({ params, locals, url }) {
 
 			try {
 				appendUpdate("Generating search query");
-				webSearch.searchQuery = await generateQuery(messages, model);
+				webSearch.searchQuery = await generateQuery(messages);
 
 				appendUpdate("Searching Google", [webSearch.searchQuery]);
 				const results = await searchWeb(webSearch.searchQuery);

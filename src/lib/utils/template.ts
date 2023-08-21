@@ -13,11 +13,7 @@ Handlebars.registerHelper(
 	}
 );
 
-export function compileTemplate<T>(
-	input: string,
-	model: LegacyParamatersTemplateInput,
-	options?: CompileOptions
-) {
+export function compileTemplate<T>(input: string, model: LegacyParamatersTemplateInput) {
 	const template = Handlebars.compile<T & LegacyParamatersTemplateInput>(input, {
 		knownHelpers: { ifUser: true, ifAssistant: true },
 		knownHelpersOnly: true,
