@@ -1,7 +1,8 @@
 import { HF_ACCESS_TOKEN } from "$env/static/private";
 import { HfInference } from "@huggingface/inference";
-import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
+import { defaultModel } from "$lib/server/models";
 import type { BackendModel } from "../models";
+import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 
 export async function summarizeWeb(content: string, query: string, model: BackendModel) {
 	// if HF_ACCESS_TOKEN is set, we use a HF dedicated endpoint for summarization
@@ -23,19 +24,13 @@ export async function summarizeWeb(content: string, query: string, model: Backen
 	}
 
 	// else we use the LLM to generate a summary
-	const summaryPrompt =
-		model.userMessageToken +
-		content
+	const summaryPrompt = defaultModel.webSearchSummaryPromptRender({
+		answer: content
 			.split(" ")
 			.slice(0, model.parameters?.truncate ?? 0)
-			.join(" ") +
-		model.userMessageEndToken +
-		model.userMessageToken +
-		`The text above should be summarized to best answer the query: ${query}.` +
-		model.userMessageEndToken +
-		model.assistantMessageToken +
-		"Summary: ";
-
+			.join(" "),
+		query: query,
+	});
 	const summary = await generateFromDefaultEndpoint(summaryPrompt).then((txt: string) =>
 		txt.trim()
 	);

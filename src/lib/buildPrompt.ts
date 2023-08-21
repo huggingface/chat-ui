@@ -13,24 +13,6 @@ export async function buildPrompt(
 	model: BackendModel,
 	webSearchId?: string
 ): Promise<string> {
-	const userEndToken = model.userMessageEndToken ?? model.messageEndToken;
-	const assistantEndToken = model.assistantMessageEndToken ?? model.messageEndToken;
-
-	const prompt =
-		messages
-			.map((m) =>
-				m.from === "user"
-					? model.userMessageToken +
-					  m.content +
-					  (m.content.endsWith(userEndToken) ? "" : userEndToken)
-					: model.assistantMessageToken +
-					  m.content +
-					  (m.content.endsWith(assistantEndToken) ? "" : assistantEndToken)
-			)
-			.join("") + model.assistantMessageToken;
-
-	let webPrompt = "";
-
 	if (webSearchId) {
 		const webSearch = await collections.webSearches.findOne({
 			_id: new ObjectId(webSearchId),
@@ -39,20 +21,22 @@ export async function buildPrompt(
 		if (!webSearch) throw new Error("Web search not found");
 
 		if (webSearch.summary) {
-			webPrompt =
-				model.assistantMessageToken +
-				`The following context was found while searching the internet: ${webSearch.summary}` +
-				model.assistantMessageEndToken;
+			messages = [
+				{
+					from: "assistant",
+					content: `The following context was found while searching the internet: ${webSearch.summary}`,
+				},
+				...messages,
+			];
 		}
 	}
-	const finalPrompt =
-		model.preprompt +
-		webPrompt +
-		prompt
+
+	return (
+		model
+			.chatPromptRender({ messages })
+			// Not super precise, but it's truncated in the model's backend anyway
 			.split(" ")
 			.slice(-(model.parameters?.truncate ?? 0))
-			.join(" ");
-
-	// Not super precise, but it's truncated in the model's backend anyway
-	return finalPrompt;
+			.join(" ")
+	);
 }

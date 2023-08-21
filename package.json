@@ -46,6 +46,7 @@
 		"aws4fetch": "^1.0.17",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
+		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
 		"jsdom": "^22.0.0",
 		"marked": "^4.3.0",
