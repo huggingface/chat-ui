@@ -164,7 +164,7 @@ To do this, you can add your own endpoints to the `MODELS` variable in `.env.loc
 
 {
 // rest of the model config here
-"endpoints": [{"url": "https://HOST:PORT/generate_stream"}]
+"endpoints": [{"url": "https://HOST:PORT"}]
 }
 
 ```
@@ -191,12 +191,30 @@ You can then add the generated information and the `authorization` parameter to 
 
 "endpoints": [
 {
-"url": "https://HOST:PORT/generate_stream",
+"url": "https://HOST:PORT",
 "authorization": "Basic VVNFUjpQQVNT",
 }
 ]
 
 ```
+
+### Amazon SageMaker
+
+You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
+
+```
+"endpoints": [
+    {
+      "host" : "sagemaker",
+      "url": "", // your aws sagemaker url here
+      "accessKey": "",
+      "secretKey" : "",
+      "sessionToken": "", // optional
+      "weight": 1
+    }
+```
+
+You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
 
 #### Client Certificate Authentication (mTLS)
 
@@ -214,11 +232,11 @@ If the model being hosted will be available on multiple servers/instances add th
 
 "endpoints": [
 {
-"url": "https://HOST:PORT/generate_stream",
+"url": "https://HOST:PORT",
 "weight": 1
 }
 {
-"url": "https://HOST:PORT/generate_stream",
+"url": "https://HOST:PORT",
 "weight": 2
 }
 ...
