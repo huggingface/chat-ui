@@ -11,7 +11,8 @@ import { ObjectId } from "mongodb";
 export async function buildPrompt(
 	messages: Pick<Message, "from" | "content">[],
 	model: BackendModel,
-	webSearchId?: string
+	webSearchId?: string,
+	preprompt?: string
 ): Promise<string> {
 	if (webSearchId) {
 		const webSearch = await collections.webSearches.findOne({
@@ -33,7 +34,7 @@ export async function buildPrompt(
 
 	return (
 		model
-			.chatPromptRender({ messages })
+			.chatPromptRender({ messages, preprompt })
 			// Not super precise, but it's truncated in the model's backend anyway
 			.split(" ")
 			.slice(-(model.parameters?.truncate ?? 0))
