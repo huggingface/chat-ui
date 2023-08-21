@@ -98,12 +98,13 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	const prompt = await buildPrompt(
+	const prompt = await buildPrompt({
 		messages,
 		model,
-		web_search_id,
-		settings?.customPrompts?.[model.id]
-	);
+		webSearchId: web_search_id,
+		preprompt: settings?.customPrompts?.[model.id],
+		locals: locals,
+	});
 
 	const randomEndpoint = modelEndpoint(model);
 

@@ -24,7 +24,10 @@ export async function POST({ params, locals }) {
 		`Please summarize the following message as a single sentence of less than 5 words:\n` +
 		firstMessage?.content;
 
-	const prompt = await buildPrompt([{ from: "user", content: userPrompt }], defaultModel);
+	const prompt = await buildPrompt({
+		messages: [{ from: "user", content: userPrompt }],
+		model: defaultModel,
+	});
 	const generated_text = await generateFromDefaultEndpoint(prompt);
 
 	if (generated_text) {
