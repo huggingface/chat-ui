@@ -120,9 +120,8 @@ MODELS=`[
     "websiteUrl": "https://open-assistant.io",
     "userMessageToken": "<|prompter|>", # This does not need to be a token, can be any string
     "assistantMessageToken": "<|assistant|>", # This does not need to be a token, can be any string
-    "messageEndToken": "<|endoftext|>", # This does not need to be a token, can be any string
-    # "userMessageEndToken": "", # Applies only to user messages, messageEndToken has no effect if specified. Can be any string.
-    # "assistantMessageEndToken": "", # Applies only to assistant messages, messageEndToken has no effect if specified. Can be any string.
+    "userMessageEndToken": "<|endoftext|>", # Applies only to user messages. Can be any string.
+    "assistantMessageEndToken": "<|endoftext|>", # Applies only to assistant messages. Can be any string.
     "preprompt": "Below are a series of dialogues between various people and an AI assistant. The AI tries to be helpful, polite, honest, sophisticated, emotionally aware, and humble-but-knowledgeable. The assistant is happy to help with almost anything, and will do its best to understand exactly what is needed. It also tries to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer. That said, the assistant is practical and really does its best, and doesn't let caution get too much in the way of being useful.\n-----\n",
     "promptExamples": [
       {
@@ -152,7 +151,72 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-### Running your own models using a custom endpoint
+#### Custom prompt templates:
+
+By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
+
+However, these templates can be modified by setting the `chatPromptTemplate`, `webSearchSummaryPromptTemplate`, and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+
+For example:
+
+```
+<System>You are an AI, called ChatAI.</System>
+{{#each messages}}
+  {{#ifUser}}<User>{{content}}</User>{{/ifUser}}
+  {{#ifAssistant}}<Assistant>{{content}}</Assistant>{{/ifAssistant}}
+{{/each}}
+<Assistant>
+```
+
+**chatPromptTemplate**
+
+When quering the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To idenify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
+
+The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability.
+
+```
+{{preprompt}}
+{{#each messages}}
+  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
+  {{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}
+{{/each}}
+{{assistantMessageToken}}
+```
+
+**webSearchQueryPromptTemplate**
+
+When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that that the prompt instructs the chat model to only return a few keywords.
+
+The following is the default `webSearchQueryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
+
+```
+{{userMessageToken}}
+  The following messages were written by a user, trying to answer a question.
+{{userMessageEndToken}}
+{{#each messages}}
+  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
+{{/each}}
+{{userMessageToken}}
+  What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence.
+{{userMessageEndToken}}
+{{assistantMessageToken}}Query:
+```
+
+**webSearchSummaryPromptTemplate**
+
+The search-engine response (`answer`) is summarized using the following prompt template. However, when `HF_ACCESS_TOKEN` is provided, a dedicated summary model is used instead. Additionally, the model's `query` response to `webSearchQueryPromptTemplate` is also available to this template.
+
+The following is the default `webSearchSummaryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
+
+```
+{{userMessageToken}}{{answer}}{{userMessageEndToken}}
+{{userMessageToken}}
+  The text above should be summarized to best answer the query: {{query}}.
+{{userMessageEndToken}}
+{{assistantMessageToken}}Summary:
+```
+
+#### Running your own models using a custom endpoint
 
 If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
 

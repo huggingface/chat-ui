@@ -1,4 +1,10 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
+import type {
+	ChatTemplateInput,
+	WebSearchQueryTemplateInput,
+	WebSearchSummaryTemplateInput,
+} from "$lib/types/Template";
+import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
 const sagemakerEndpoint = z.object({
@@ -46,13 +52,46 @@ const modelsRaw = z
 			modelUrl: z.string().url().optional(),
 			datasetName: z.string().min(1).optional(),
 			datasetUrl: z.string().url().optional(),
-			userMessageToken: z.string(),
+			userMessageToken: z.string().default(""),
 			userMessageEndToken: z.string().default(""),
-			assistantMessageToken: z.string(),
+			assistantMessageToken: z.string().default(""),
 			assistantMessageEndToken: z.string().default(""),
 			messageEndToken: z.string().default(""),
 			preprompt: z.string().default(""),
 			prepromptUrl: z.string().url().optional(),
+			chatPromptTemplate: z
+				.string()
+				.default(
+					"{{preprompt}}" +
+						"{{#each messages}}" +
+						"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
+						"{{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}" +
+						"{{/each}}" +
+						"{{assistantMessageToken}}"
+				),
+			webSearchSummaryPromptTemplate: z
+				.string()
+				.default(
+					"{{userMessageToken}}{{answer}}{{userMessageEndToken}}" +
+						"{{userMessageToken}}" +
+						"The text above should be summarized to best answer the query: {{query}}." +
+						"{{userMessageEndToken}}" +
+						"{{assistantMessageToken}}Summary: "
+				),
+			webSearchQueryPromptTemplate: z
+				.string()
+				.default(
+					"{{userMessageToken}}" +
+						"The following messages were written by a user, trying to answer a question." +
+						"{{userMessageEndToken}}" +
+						"{{#each messages}}" +
+						"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
+						"{{/each}}" +
+						"{{userMessageToken}}" +
+						"What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence." +
+						"{{userMessageEndToken}}" +
+						"{{assistantMessageToken}}Query: "
+				),
 			promptExamples: z
 				.array(
 					z.object({
@@ -80,6 +119,15 @@ export const models = await Promise.all(
 		...m,
 		userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
 		assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
+		chatPromptRender: compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m),
+		webSearchSummaryPromptRender: compileTemplate<WebSearchSummaryTemplateInput>(
+			m.webSearchSummaryPromptTemplate,
+			m
+		),
+		webSearchQueryPromptRender: compileTemplate<WebSearchQueryTemplateInput>(
+			m.webSearchQueryPromptTemplate,
+			m
+		),
 		id: m.id || m.name,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
