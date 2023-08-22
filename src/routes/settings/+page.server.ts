@@ -13,8 +13,10 @@ export const actions = {
 		const { ethicsModalAccepted, ...settings } = z
 			.object({
 				shareConversationsWithModelAuthors: z
-					.boolean({ coerce: true })
-					.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
+					.union([z.literal("true"), z.literal("on"), z.literal("false"), z.null()])
+					.transform((value) => {
+						return value === "true" || value === "on";
+					}),
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
 				activeModel: validateModel(models),
 				customPrompts: z.record(z.string()).default({}),
