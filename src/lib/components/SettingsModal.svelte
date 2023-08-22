@@ -4,13 +4,13 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import Switch from "$lib/components/Switch.svelte";
-	import type { Settings } from "$lib/types/Settings";
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
 	import type { Model } from "$lib/types/Model";
+	import type { LayoutData } from "../../routes/$types";
 
-	export let settings: Settings;
+	export let settings: LayoutData["settings"];
 	export let models: Array<Model>;
 
 	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
