@@ -10,7 +10,7 @@
 	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
 	import type { Model } from "$lib/types/Model";
 
-	export let settings: Pick<Settings, "shareConversationsWithModelAuthors">;
+	export let settings: Settings;
 	export let models: Array<Model>;
 
 	let shareConversationsWithModelAuthors = settings.shareConversationsWithModelAuthors;
@@ -37,9 +37,14 @@
 		>
 			{#if PUBLIC_APP_DATA_SHARING}
 				<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500">
-					{#each Object.entries(settings).filter(([k]) => k !== "shareConversationsWithModelAuthors") as [key, val]}
+					{#each Object.entries(settings).filter(([k]) => !(k === "shareConversationsWithModelAuthors" || k === "customPrompts")) as [key, val]}
 						<input type="hidden" name={key} value={val} />
 					{/each}
+					<input
+						type="hidden"
+						name="customPrompts"
+						value={JSON.stringify(settings.customPrompts)}
+					/>
 					<Switch
 						name="shareConversationsWithModelAuthors"
 						bind:checked={shareConversationsWithModelAuthors}
