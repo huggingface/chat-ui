@@ -26,7 +26,7 @@ export async function GET({ params }) {
 		throw error(404, "Conversation model not found");
 	}
 
-	const prompt = await buildPrompt(conv.messages.slice(0, messageIndex + 1), model);
+	const prompt = await buildPrompt({ messages: conv.messages.slice(0, messageIndex + 1), model });
 
 	return new Response(
 		JSON.stringify(
