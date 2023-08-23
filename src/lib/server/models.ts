@@ -9,6 +9,11 @@ import { z } from "zod";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
+const openAICompatibleEndpoint = z.object({
+	host: z.literal("openai-compatible"),
+	url: z.string().url(),
+});
+
 const sagemakerEndpoint = z.object({
 	host: z.literal("sagemaker"),
 	url: z.string().url(),
@@ -28,7 +33,11 @@ const commonEndpoint = z.object({
 });
 
 const endpoint = z.lazy(() =>
-	z.union([sagemakerEndpoint.merge(commonEndpoint), tgiEndpoint.merge(commonEndpoint)])
+	z.union([
+		openAICompatibleEndpoint.merge(commonEndpoint),
+		sagemakerEndpoint.merge(commonEndpoint),
+		tgiEndpoint.merge(commonEndpoint),
+	])
 );
 
 const combinedEndpoint = endpoint.transform((data) => {
@@ -36,6 +45,8 @@ const combinedEndpoint = endpoint.transform((data) => {
 		return tgiEndpoint.merge(commonEndpoint).parse(data);
 	} else if (data.host === "sagemaker") {
 		return sagemakerEndpoint.merge(commonEndpoint).parse(data);
+	} else if (data.host === "openai-compatible") {
+		return openAICompatibleEndpoint.merge(commonEndpoint).parse(data);
 	} else {
 		throw new Error(`Invalid host: ${data.host}`);
 	}

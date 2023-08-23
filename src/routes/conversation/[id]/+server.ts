@@ -131,6 +131,17 @@ export async function POST({ request, fetch, locals, params }) {
 				"Content-Type": "application/json",
 			},
 		});
+	} else if (randomEndpoint.host === "openai-compatible") {
+		resp = await fetch(randomEndpoint.url, {
+			headers: {
+				"Content-Type": request.headers.get("Content-Type") ?? "application/json",
+			},
+			method: "POST",
+			body: JSON.stringify({
+				prompt,
+			}),
+			signal: abortController.signal,
+		});
 	} else {
 		resp = await fetch(randomEndpoint.url, {
 			headers: {
