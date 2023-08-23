@@ -59,7 +59,7 @@ const modelsRaw = z
 			assistantMessageToken: z.string().default(""),
 			assistantMessageEndToken: z.string().default(""),
 			messageEndToken: z.string().default(""),
-			preprompt: z.string().min(1).optional(),
+			preprompt: z.string().default(""),
 			prepromptUrl: z.string().url().optional(),
 			chatPromptTemplate: z
 				.string()
