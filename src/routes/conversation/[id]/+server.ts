@@ -102,7 +102,7 @@ export async function POST({ request, fetch, locals, params }) {
 		messages,
 		model,
 		webSearchId: web_search_id,
-		preprompt: settings?.customPrompts?.[model.id],
+		preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
 		locals: locals,
 	});
 
