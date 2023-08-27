@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { marked } from "marked";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher } from "svelte";
+	import { afterUpdate, createEventDispatcher, onMount } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
-
+	import "../../../styles/latex.css";
 	import CodeBlock from "../CodeBlock.svelte";
+	import LatexBlock from "../LatexBlock.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
 	import CarbonDownload from "~icons/carbon/download";
@@ -91,6 +92,17 @@
 			}, 600);
 		}
 	});
+	onMount(() => {
+		let script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js";
+        document.head.append(script);
+        script.onload = () => {
+            MathJax = {
+					tex: {inlineMath: [['$', '$'], ['\\(', '\\)']]},
+					svg: {fontCache: 'global'},
+			}
+		};					  
+	});
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
@@ -132,7 +144,9 @@
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
-					{#if token.type === "code"}
+					{#if token.lang === "latex"}
+						<LatexBlock code={unsanitizeMd(token.text)} />
+					{:else if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
