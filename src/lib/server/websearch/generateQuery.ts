@@ -1,9 +1,11 @@
 import type { Message } from "$lib/types/Message";
+import { format } from "date-fns";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { defaultModel } from "../models";
 
 export async function generateQuery(messages: Message[]) {
-	const promptSearchQuery = defaultModel.webSearchQueryPromptRender({ messages });
+	const currentDate = format(new Date(), "MMMM d, yyyy");
+	const promptSearchQuery = defaultModel.webSearchQueryPromptRender({ messages, currentDate });
 	const searchQuery = await generateFromDefaultEndpoint(promptSearchQuery).then((query) => {
 		const regexLastPhrase = /("|'|`)((?:(?!\1).)+)\1$/;
 		const match = query.match(regexLastPhrase);
