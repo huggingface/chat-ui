@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
+import { chunk } from "$lib/utils/chunk.js";
 import { summarizeWeb } from "$lib/server/websearch/summarizeWeb";
 
 interface GenericObject {
@@ -73,9 +74,6 @@ export async function GET({ params, locals, url }) {
 
 				appendUpdate("Searching Google", [webSearch.searchQuery]);
 				const results = await searchWeb(webSearch.searchQuery);
-				console.log(results);
-
-				let text = "";
 				webSearch.results = [
 					...((results.top_stories && results.top_stories.map((el: { link: string }) => el.link)) ??
 						[]),
@@ -83,28 +81,33 @@ export async function GET({ params, locals, url }) {
 						results.organic_results.map((el: { link: string }) => el.link)) ??
 						[]),
 				];
+				webSearch.results = webSearch.results
+					.filter((link) => !link.includes("youtube.com")) // filter out youtube links
+					.slice(0, 5); // limit to first 5 links only
 
 				if (webSearch.results.length > 0) {
-					let tries = 0;
-
-					while (!text && tries < 3) {
-						const searchUrl = webSearch.results[tries];
-						appendUpdate("Browsing result", [JSON.stringify(searchUrl)]);
+					appendUpdate("Browsing results", [JSON.stringify(webSearch.results)]);
+					const promises = webSearch.results.map(async (link) => {
+						let text = "";
 						try {
-							text = await parseWeb(searchUrl);
-							if (!text) throw new Error("text of the webpage is null");
+							text = await parseWeb(link);
 						} catch (e) {
-							appendUpdate("Error parsing webpage", [], "error");
-							tries++;
+							console.error(`Error parsing webpage "${link}"`, e);
+							appendUpdate("Error parsing webpage", [link], "error");
 						}
-					}
-					if (!text) throw new Error("No text found on the first 3 results");
+						const CHUNK_CAR_LEN = 512;
+						const chunks = chunk(text, CHUNK_CAR_LEN);
+						return chunks;
+					});
+					const paragraphChunks = await Promise.all(promises);
+					// todo:
+					// if (!text) throw new Error("No text found on the first 5 results");
 				} else {
 					throw new Error("No results found for this search query");
 				}
 
 				appendUpdate("Creating summary");
-				webSearch.summary = await summarizeWeb(text, webSearch.searchQuery, model);
+				webSearch.summary = "Some placeholder text here";
 				appendUpdate("Injecting summary", [JSON.stringify(webSearch.summary)]);
 			} catch (searchError) {
 				if (searchError instanceof Error) {
