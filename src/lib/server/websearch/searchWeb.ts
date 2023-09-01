@@ -42,8 +42,7 @@ export async function searchWebSerper(query: string) {
 
 	return {
 		organic_results: data["organic"] ?? [],
-		knowledge_graph: data["knowledgeGraph"] ?? null,
-		answer_box: data["answerBox"] ?? null,
+		top_results: data["topResults"] ?? [],
 	};
 }
 

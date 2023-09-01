@@ -73,24 +73,18 @@ export async function GET({ params, locals, url }) {
 
 				appendUpdate("Searching Google", [webSearch.searchQuery]);
 				const results = await searchWeb(webSearch.searchQuery);
+				console.log(results);
 
 				let text = "";
-				webSearch.results =
-					(results.organic_results &&
+				webSearch.results = [
+					...((results.top_stories && results.top_stories.map((el: { link: string }) => el.link)) ??
+						[]),
+					...((results.organic_results &&
 						results.organic_results.map((el: { link: string }) => el.link)) ??
-					[];
+						[]),
+				];
 
-				if (results.answer_box) {
-					// if google returns an answer box, we use it
-					webSearch.answerBox = JSON.stringify(removeLinks(results.answer_box));
-					text = webSearch.answerBox;
-					appendUpdate("Found a Google answer box");
-				} else if (results.knowledge_graph) {
-					// if google returns a knowledge graph, we use it
-					webSearch.knowledgeGraph = JSON.stringify(removeLinks(results.knowledge_graph));
-					text = webSearch.knowledgeGraph;
-					appendUpdate("Found a Google knowledge page");
-				} else if (webSearch.results.length > 0) {
+				if (webSearch.results.length > 0) {
 					let tries = 0;
 
 					while (!text && tries < 3) {
