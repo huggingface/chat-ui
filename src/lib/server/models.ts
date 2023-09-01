@@ -84,15 +84,15 @@ const modelsRaw = z
 				.string()
 				.default(
 					"{{userMessageToken}}" +
-						"The following messages were written by a user, trying to answer a question." +
-						"{{userMessageEndToken}}" +
+						"My question is: " +
+						' "' +
 						"{{#each messages}}" +
-						"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
+						"{{#if @last}}{{#ifUser}}{{content}}{{/ifUser}}{{/if}}" +
 						"{{/each}}" +
-						"{{userMessageToken}}" +
-						"What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence." +
+						'". ' +
+						"Based on the conversation history, give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query." +
 						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}Query: "
+						"{{assistantMessageToken}}"
 				),
 			promptExamples: z
 				.array(
