@@ -85,6 +85,7 @@ export async function GET({ params, locals, url }) {
 					.filter((link) => !link.includes("youtube.com")) // filter out youtube links
 					.slice(0, 5); // limit to first 5 links only
 
+				let paragraphChunks: string[] = [];
 				if (webSearch.results.length > 0) {
 					appendUpdate("Browsing results", [JSON.stringify(webSearch.results)]);
 					const promises = webSearch.results.map(async (link) => {
@@ -99,14 +100,17 @@ export async function GET({ params, locals, url }) {
 						const chunks = chunk(text, CHUNK_CAR_LEN);
 						return chunks;
 					});
-					const paragraphChunks = await Promise.all(promises);
-					// todo:
-					// if (!text) throw new Error("No text found on the first 5 results");
+					const nestedParagraphChunks = await Promise.all(promises);
+					paragraphChunks = nestedParagraphChunks.flat();
+					if (!paragraphChunks.length) {
+						throw new Error("No text found on the first 5 results");
+					}
 				} else {
 					throw new Error("No results found for this search query");
 				}
 
 				appendUpdate("Creating summary");
+				// paragraphChunks: string[]
 				webSearch.summary = "Some placeholder text here";
 				appendUpdate("Injecting summary", [JSON.stringify(webSearch.summary)]);
 			} catch (searchError) {
