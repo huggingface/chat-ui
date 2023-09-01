@@ -109,10 +109,10 @@ export async function GET({ params, locals, url }) {
 					throw new Error("No results found for this search query");
 				}
 
-				appendUpdate("Creating summary");
+				appendUpdate("Extracing relevant information");
 				// paragraphChunks: string[]
 				webSearch.summary = "Some placeholder text here";
-				appendUpdate("Injecting summary", [JSON.stringify(webSearch.summary)]);
+				appendUpdate("Injecting relevant information", [JSON.stringify(webSearch.summary)]);
 			} catch (searchError) {
 				if (searchError instanceof Error) {
 					webSearch.messages.push({
