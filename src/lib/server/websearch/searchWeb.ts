@@ -42,7 +42,7 @@ export async function searchWebSerper(query: string) {
 
 	return {
 		organic_results: data["organic"] ?? [],
-		top_results: data["topResults"] ?? [],
+		top_stories: data["topStories"] ?? [],
 	};
 }
 

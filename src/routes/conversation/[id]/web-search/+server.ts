@@ -1,6 +1,5 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { defaultModel } from "$lib/server/models";
 import { searchWeb } from "$lib/server/websearch/searchWeb";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
