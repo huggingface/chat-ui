@@ -12,6 +12,14 @@ import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk.js";
 import { client as gradioClient } from "@gradio/client";
 
+interface GradioResult {
+	type: string;
+	endpoint: string;
+	fn_index: string;
+	data: string[];
+	time: Date;
+}
+
 export async function GET({ params, locals, url }) {
 	const convId = new ObjectId(params.id);
 	const searchId = new ObjectId();
@@ -100,13 +108,13 @@ export async function GET({ params, locals, url }) {
 
 				appendUpdate("Extracing relevant information");
 				const topKClosestParagraphs = 8;
-				const gradioApp = await gradioClient("http://127.0.0.1:7860", {});
-				const result = await gradioApp.predict("/predict", [
+				const gradioApp = await gradioClient("http://127.0.0.1:7861", {});
+				const result = (await gradioApp.predict("/predict", [
 					webSearch.searchQuery,
 					paragraphChunks.join("-HFSEP-"),
 					topKClosestParagraphs,
-				]);
-				const idx: number[] = result.data[0].match(/\d+/g).map(Number);
+				])) as GradioResult;
+				const idx: number[] = JSON.parse(result.data[0]);
 				for (const id of idx) {
 					console.log(paragraphChunks[id]);
 				}
