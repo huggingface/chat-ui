@@ -106,7 +106,7 @@ export async function GET({ params, locals, url }) {
 
 				appendUpdate("Extracing relevant information");
 				const topKClosestParagraphs = 8;
-				const gradioApp = await gradioClient("http://127.0.0.1:7861", {});
+				const gradioApp = await gradioClient("https://mishig-embeddings-similarity.hf.space/", {});
 				const result = (await gradioApp.predict("/predict", [
 					webSearch.searchQuery,
 					paragraphChunks.join("-HFSEP-"), // see: https://huggingface.co/spaces/mishig/embeddings-similarity/blob/main/app.py#L10
