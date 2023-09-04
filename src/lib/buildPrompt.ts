@@ -46,7 +46,7 @@ export async function buildPrompt({
 				...messagesWithoutLastUsrMsg,
 				{
 					from: "assistant",
-					content: `Based on the provided texts below, please answer to '${lastUserMsg.content}' in your own words. Try to explain in detailed introduction, body, and conclusion structure as much as possible.\n=====================\n${webSearch.context}`,
+					content: `Below are paragraph exceerpts from various websites: \n=====================\n${webSearch.context}\n=====================\n Using the paragprahs above, answer to the user the following question '${lastUserMsg.content}'`,
 				},
 			];
 		}
