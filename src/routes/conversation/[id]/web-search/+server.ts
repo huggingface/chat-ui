@@ -85,7 +85,8 @@ export async function GET({ params, locals, url }) {
 							appendUpdate("Error parsing webpage", [link], "error");
 						}
 						const CHUNK_CAR_LEN = 512;
-						const chunks = chunk(text, CHUNK_CAR_LEN);
+						const MAX_N_CHUNKS = 100;
+						const chunks = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
 						return chunks;
 					});
 					const nestedParagraphChunks = await Promise.all(promises);
