@@ -18,7 +18,7 @@ export async function parseWeb(url: string) {
 	});
 
 	const { document } = dom.window;
-	const textElTags = "p, li, span";
+	const textElTags = "p";
 	const paragraphs = document.querySelectorAll(textElTags);
 	if (!paragraphs.length) {
 		throw new Error(`webpage doesn't have any "${textElTags}" element`);
@@ -26,7 +26,7 @@ export async function parseWeb(url: string) {
 	const paragraphTexts = Array.from(paragraphs).map((p) => p.textContent);
 
 	// combine text contents from paragraphs and then remove newlines and multiple spaces
-	const text = paragraphTexts.join("\n").replace(/ {2}|\r\n|\n|\r/gm, "");
+	const text = paragraphTexts.join(" ").replace(/ {2}|\r\n|\n|\r/gm, "");
 
 	return text;
 }
