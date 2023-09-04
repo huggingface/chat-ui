@@ -46,8 +46,9 @@ export async function buildPrompt({
 				...messagesWithoutLastUsrMsg,
 				{
 					from: "assistant",
-					content: `Below are paragraph exceerpts from various websites: \n=====================\n${webSearch.context}\n=====================\n Using the paragprahs above, answer to the user the following question '${lastUserMsg.content}'`,
+					content: `Here is a context (texts from various websites) to answer user's question ("${lastUserMsg.content}") below: \n=====================\n${webSearch.context}`,
 				},
+				lastUserMsg,
 			];
 		}
 	}
