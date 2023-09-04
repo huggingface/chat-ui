@@ -193,6 +193,8 @@
 				}
 			}
 
+			console.log("Sending message", { message });
+
 			await getTextGenerationStream(message, messageId, isRetry, searchResponseId ?? undefined);
 
 			webSearchMessages = [];
