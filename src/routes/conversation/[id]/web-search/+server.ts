@@ -46,10 +46,8 @@ export async function GET({ params, locals, url }) {
 				convId: convId,
 				prompt: prompt,
 				searchQuery: "",
-				knowledgeGraph: "",
-				answerBox: "",
 				results: [],
-				summary: "",
+				context: "",
 				messages: [],
 				createdAt: new Date(),
 				updatedAt: new Date(),
@@ -111,15 +109,12 @@ export async function GET({ params, locals, url }) {
 				const gradioApp = await gradioClient("http://127.0.0.1:7861", {});
 				const result = (await gradioApp.predict("/predict", [
 					webSearch.searchQuery,
-					paragraphChunks.join("-HFSEP-"),
+					paragraphChunks.join("-HFSEP-"), // see: https://huggingface.co/spaces/mishig/embeddings-similarity/blob/main/app.py#L10
 					topKClosestParagraphs,
 				])) as GradioResult;
-				const idx: number[] = JSON.parse(result.data[0]);
-				for (const id of idx) {
-					console.log(paragraphChunks[id]);
-				}
-				webSearch.summary = "Some placeholder text here";
-				appendUpdate("Injecting relevant information", [JSON.stringify(webSearch.summary)]);
+				const indices: number[] = JSON.parse(result.data[0]);
+				webSearch.context = indices.map((idx) => paragraphChunks[idx]).join("");
+				appendUpdate("Injecting relevant information");
 			} catch (searchError) {
 				if (searchError instanceof Error) {
 					webSearch.messages.push({

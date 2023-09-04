@@ -39,13 +39,15 @@ export async function buildPrompt({
 
 		if (!conversation) throw new Error("Conversation not found");
 
-		if (webSearch.summary) {
+		if (webSearch.context) {
+			const messagesWithoutLastUsrMsg = messages.slice(0, -1);
+			const lastUserMsg = messages.slice(-1)[0];
 			messages = [
+				...messagesWithoutLastUsrMsg,
 				{
-					from: "assistant",
-					content: `The following context was found while searching the internet: ${webSearch.summary}`,
+					from: "user",
+					content: `Based on the provided texts below, please answer to '${lastUserMsg.content}' in your own words. Try to explain in detailed introduction, body, and conclusion structure as much as possible.\n=====================\n${webSearch.context}`,
 				},
-				...messages,
 			];
 		}
 	}
