@@ -10,21 +10,9 @@ import type { WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk.js";
-import { summarizeWeb } from "$lib/server/websearch/summarizeWeb";
+import { client as gradioClient } from "@gradio/client";
 
-interface GenericObject {
-	[key: string]: GenericObject | unknown;
-}
-
-function removeLinks(obj: GenericObject) {
-	for (const prop in obj) {
-		if (prop.endsWith("link")) delete obj[prop];
-		else if (typeof obj[prop] === "object") removeLinks(obj[prop] as GenericObject);
-	}
-	return obj;
-}
 export async function GET({ params, locals, url }) {
-	const model = defaultModel;
 	const convId = new ObjectId(params.id);
 	const searchId = new ObjectId();
 
@@ -110,7 +98,17 @@ export async function GET({ params, locals, url }) {
 				}
 
 				appendUpdate("Extracing relevant information");
-				// paragraphChunks: string[]
+				const topKClosestParagraphs = 8;
+				const gradioApp = await gradioClient("http://127.0.0.1:7860", {});
+				const result = await gradioApp.predict("/predict", [
+					webSearch.searchQuery,
+					paragraphChunks.join("-HFSEP-"),
+					topKClosestParagraphs,
+				]);
+				const idx: number[] = result.data[0].match(/\d+/g).map(Number);
+				for (const id of idx) {
+					console.log(paragraphChunks[id]);
+				}
 				webSearch.summary = "Some placeholder text here";
 				appendUpdate("Injecting relevant information", [JSON.stringify(webSearch.summary)]);
 			} catch (searchError) {
