@@ -9,12 +9,14 @@ import { z } from "zod";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
-const sagemakerEndpoint = z.object({
-	host: z.literal("sagemaker"),
+const awsEndpoint = z.object({
+	host: z.literal("aws"),
+	service: z.union([z.literal("lambda"), z.literal("sagemaker")]),
 	url: z.string().url(),
 	accessKey: z.string().min(1),
 	secretKey: z.string().min(1),
 	sessionToken: z.string().optional(),
+	region: z.string().optional()
 });
 
 const tgiEndpoint = z.object({
@@ -28,14 +30,14 @@ const commonEndpoint = z.object({
 });
 
 const endpoint = z.lazy(() =>
-	z.union([sagemakerEndpoint.merge(commonEndpoint), tgiEndpoint.merge(commonEndpoint)])
+	z.union([awsEndpoint.merge(commonEndpoint), tgiEndpoint.merge(commonEndpoint)])
 );
 
 const combinedEndpoint = endpoint.transform((data) => {
 	if (data.host === "tgi" || data.host === undefined) {
 		return tgiEndpoint.merge(commonEndpoint).parse(data);
-	} else if (data.host === "sagemaker") {
-		return sagemakerEndpoint.merge(commonEndpoint).parse(data);
+	} else if (data.host === "aws") {
+		return awsEndpoint.merge(commonEndpoint).parse(data);
 	} else {
 		throw new Error(`Invalid host: ${data.host}`);
 	}

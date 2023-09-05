@@ -27,7 +27,7 @@ export async function generateFromDefaultEndpoint(
 
 	let resp: Response;
 
-	if (randomEndpoint.host === "sagemaker") {
+	if (randomEndpoint.host === "aws") {
 		const requestParams = JSON.stringify({
 			...newParameters,
 			inputs: prompt,
@@ -37,7 +37,8 @@ export async function generateFromDefaultEndpoint(
 			accessKeyId: randomEndpoint.accessKey,
 			secretAccessKey: randomEndpoint.secretKey,
 			sessionToken: randomEndpoint.sessionToken,
-			service: "sagemaker",
+			region: randomEndpoint.region,
+			service: randomEndpoint.service,
 		});
 
 		resp = await aws.fetch(randomEndpoint.url, {

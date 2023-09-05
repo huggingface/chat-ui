@@ -111,7 +111,7 @@ export async function POST({ request, fetch, locals, params }) {
 	const abortController = new AbortController();
 
 	let resp: Response;
-	if (randomEndpoint.host === "sagemaker") {
+	if (randomEndpoint.host === "aws") {
 		const requestParams = JSON.stringify({
 			...json,
 			inputs: prompt,
@@ -121,7 +121,8 @@ export async function POST({ request, fetch, locals, params }) {
 			accessKeyId: randomEndpoint.accessKey,
 			secretAccessKey: randomEndpoint.secretKey,
 			sessionToken: randomEndpoint.sessionToken,
-			service: "sagemaker",
+			region: randomEndpoint.region,
+			service: randomEndpoint.service,
 		});
 
 		resp = await aws.fetch(randomEndpoint.url, {

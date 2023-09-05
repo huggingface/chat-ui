@@ -262,23 +262,29 @@ You can then add the generated information and the `authorization` parameter to 
 
 ```
 
-### Amazon SageMaker
+### AWS Endpoints
 
-You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
+You can also specify your AWS endpoints for chat-ui, e.g. a sagemaker endpoint or a lambda function URL. 
+The config goes like this:
 
-```
-"endpoints": [
+```json
+	"endpoints": [
     {
-      "host" : "sagemaker",
-      "url": "", // your aws sagemaker url here
-      "accessKey": "",
-      "secretKey" : "",
-      "sessionToken": "", // optional
-      "weight": 1
-    }
+        "host": "aws",
+        "service": "", // the service type, either "sagemaker" or "lambda"
+        "url": "",
+        "accessKey": "",
+        "secretKey": "",
+        "sessionToken": "", // optional
+        "region": "", // required if service = "lambda"
+        "weight": 1
+	}
+]
 ```
 
-You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
+You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access. 
+The following endpoint services are currently enabled: "sagemaker" and "lambda." 
+If you intend to utilize "lambda," please ensure that you specify the corresponding "region" as well.
 
 #### Client Certificate Authentication (mTLS)
 
