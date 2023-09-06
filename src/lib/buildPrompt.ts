@@ -41,14 +41,16 @@ export async function buildPrompt({
 
 		if (webSearch.context) {
 			const messagesWithoutLastUsrMsg = messages.slice(0, -1);
-			const lastUserMsg = messages.slice(-1)[0];
 			messages = [
 				...messagesWithoutLastUsrMsg,
 				{
 					from: "assistant",
-					content: `Here is a context (texts from various websites) to answer user's question ("${lastUserMsg.content}") below: \n=====================\n${webSearch.context}`,
+					content: `Here is a context (texts from various websites) to answer user's question (tell me about "${webSearch.searchQuery}" clearly) below: \n=====================\n${webSearch.context}`,
 				},
-				lastUserMsg,
+				{
+					from: "user",
+					content: `tell me about "${webSearch.searchQuery}" clearly using context above`,
+				},
 			];
 		}
 	}
