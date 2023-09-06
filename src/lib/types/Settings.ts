@@ -14,6 +14,9 @@ export interface Settings extends Timestamps {
 	shareConversationsWithModelAuthors: boolean;
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
+
+	// model name and system prompts
+	customPrompts?: Record<string, string>;
 }
 
 // TODO: move this to a constant file along with other constants

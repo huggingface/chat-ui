@@ -16,6 +16,7 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { AwsClient } from "aws4fetch";
 
 export async function POST({ request, fetch, locals, params }) {
 	const id = z.string().parse(params.id);
@@ -52,6 +53,7 @@ export async function POST({ request, fetch, locals, params }) {
 	}
 
 	const model = models.find((m) => m.id === conv.model);
+	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (!model) {
 		throw error(410, "Model not available anymore");
@@ -96,23 +98,54 @@ export async function POST({ request, fetch, locals, params }) {
 		];
 	})() satisfies Message[];
 
-	const prompt = await buildPrompt(messages, model, web_search_id);
+	const prompt = await buildPrompt({
+		messages,
+		model,
+		webSearchId: web_search_id,
+		preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
+		locals: locals,
+	});
+
 	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
 
-	const resp = await fetch(randomEndpoint.url, {
-		headers: {
-			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
-			Authorization: randomEndpoint.authorization,
-		},
-		method: "POST",
-		body: JSON.stringify({
+	let resp: Response;
+	if (randomEndpoint.host === "sagemaker") {
+		const requestParams = JSON.stringify({
 			...json,
 			inputs: prompt,
-		}),
-		signal: abortController.signal,
-	});
+		});
+
+		const aws = new AwsClient({
+			accessKeyId: randomEndpoint.accessKey,
+			secretAccessKey: randomEndpoint.secretKey,
+			sessionToken: randomEndpoint.sessionToken,
+			service: "sagemaker",
+		});
+
+		resp = await aws.fetch(randomEndpoint.url, {
+			method: "POST",
+			body: requestParams,
+			signal: abortController.signal,
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	} else {
+		resp = await fetch(randomEndpoint.url, {
+			headers: {
+				"Content-Type": request.headers.get("Content-Type") ?? "application/json",
+				Authorization: randomEndpoint.authorization,
+			},
+			method: "POST",
+			body: JSON.stringify({
+				...json,
+				inputs: prompt,
+			}),
+			signal: abortController.signal,
+		});
+	}
 
 	if (!resp.body) {
 		throw new Error("Response body is empty");

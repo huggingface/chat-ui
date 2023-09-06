@@ -62,6 +62,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY),
+			customPrompts: settings?.customPrompts ?? {},
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -74,6 +75,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			description: model.description,
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
+			preprompt: model.preprompt,
 		})),
 		oldModels,
 		user: locals.user && {

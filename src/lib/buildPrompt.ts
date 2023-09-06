@@ -2,57 +2,60 @@ import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
+import { authCondition } from "./server/auth";
 /**
  * Convert [{user: "assistant", content: "hi"}, {user: "user", content: "hello"}] to:
  *
  * <|assistant|>hi<|endoftext|><|prompter|>hello<|endoftext|><|assistant|>
  */
 
-export async function buildPrompt(
-	messages: Pick<Message, "from" | "content">[],
-	model: BackendModel,
-	webSearchId?: string
-): Promise<string> {
-	const userEndToken = model.userMessageEndToken ?? model.messageEndToken;
-	const assistantEndToken = model.assistantMessageEndToken ?? model.messageEndToken;
+interface buildPromptOptions {
+	messages: Pick<Message, "from" | "content">[];
+	model: BackendModel;
+	locals?: App.Locals;
+	webSearchId?: string;
+	preprompt?: string;
+}
 
-	const prompt =
-		messages
-			.map((m) =>
-				m.from === "user"
-					? model.userMessageToken +
-					  m.content +
-					  (m.content.endsWith(userEndToken) ? "" : userEndToken)
-					: model.assistantMessageToken +
-					  m.content +
-					  (m.content.endsWith(assistantEndToken) ? "" : assistantEndToken)
-			)
-			.join("") + model.assistantMessageToken;
-
-	let webPrompt = "";
-
+export async function buildPrompt({
+	messages,
+	model,
+	locals,
+	webSearchId,
+	preprompt,
+}: buildPromptOptions): Promise<string> {
 	if (webSearchId) {
 		const webSearch = await collections.webSearches.findOne({
 			_id: new ObjectId(webSearchId),
 		});
 
 		if (!webSearch) throw new Error("Web search not found");
+		if (!locals) throw new Error("User not authenticated");
+
+		const conversation = await collections.conversations.findOne({
+			_id: webSearch.convId,
+			...authCondition(locals),
+		});
+
+		if (!conversation) throw new Error("Conversation not found");
 
 		if (webSearch.summary) {
-			webPrompt =
-				model.assistantMessageToken +
-				`The following context was found while searching the internet: ${webSearch.summary}` +
-				model.assistantMessageEndToken;
+			messages = [
+				{
+					from: "assistant",
+					content: `The following context was found while searching the internet: ${webSearch.summary}`,
+				},
+				...messages,
+			];
 		}
 	}
-	const finalPrompt =
-		model.preprompt +
-		webPrompt +
-		prompt
+
+	return (
+		model
+			.chatPromptRender({ messages, preprompt })
+			// Not super precise, but it's truncated in the model's backend anyway
 			.split(" ")
 			.slice(-(model.parameters?.truncate ?? 0))
-			.join(" ");
-
-	// Not super precise, but it's truncated in the model's backend anyway
-	return finalPrompt;
+			.join(" ")
+	);
 }
