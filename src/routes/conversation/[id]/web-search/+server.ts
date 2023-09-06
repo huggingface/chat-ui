@@ -19,6 +19,9 @@ interface GradioResult {
 	time: Date;
 }
 
+const MAX_N_PAGES_SCRAPE = 10 as const;
+const MAX_N_PAGES_EMBED = 5 as const;
+
 export async function GET({ params, locals, url }) {
 	const convId = new ObjectId(params.id);
 	const searchId = new ObjectId();
@@ -76,11 +79,11 @@ export async function GET({ params, locals, url }) {
 				];
 				webSearch.results = webSearch.results
 					.filter((link) => !link.includes("youtube.com")) // filter out youtube links
-					.slice(0, 5); // limit to first 5 links only
+					.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
 				let paragraphChunks: string[] = [];
 				if (webSearch.results.length > 0) {
-					appendUpdate("Browsing results", [JSON.stringify(webSearch.results)]);
+					appendUpdate("Browsing results");
 					const promises = webSearch.results.map(async (link) => {
 						let text = "";
 						try {
@@ -94,7 +97,7 @@ export async function GET({ params, locals, url }) {
 						const chunks = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
 						return chunks;
 					});
-					const nestedParagraphChunks = await Promise.all(promises);
+					const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
 					paragraphChunks = nestedParagraphChunks.flat();
 					if (!paragraphChunks.length) {
 						throw new Error("No text found on the first 5 results");
