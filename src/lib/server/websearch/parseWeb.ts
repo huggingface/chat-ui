@@ -1,32 +1,29 @@
-import { JSDOM, VirtualConsole } from "jsdom";
+import Parser from "@postlight/parser";
+
+interface ParserResult {
+	title: string | null;
+	content: string | null;
+	author: string | null;
+	date_published: string | null;
+	lead_image_url: string | null;
+	url: string;
+	error?: boolean;
+	message?: string;
+}
 
 export async function parseWeb(url: string) {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
-	const htmlString = await fetch(url, { signal: abortController.signal })
-		.then((response) => response.text())
-		.catch((err) => console.log(err));
-
-	const virtualConsole = new VirtualConsole();
-	virtualConsole.on("error", () => {
-		// No-op to skip console errors.
-	});
-
-	// put the html string into a DOM
-	const dom = new JSDOM(htmlString ?? "", {
-		virtualConsole,
-	});
-
-	const { document } = dom.window;
-	const textElTags = "p";
-	const paragraphs = document.querySelectorAll(textElTags);
-	if (!paragraphs.length) {
-		throw new Error(`webpage doesn't have any "${textElTags}" element`);
+	const result = (await Parser.parse(url, { contentType: "text" })) as ParserResult;
+	if (result.error) {
+		throw new Error(result.message);
 	}
-	const paragraphTexts = Array.from(paragraphs).map((p) => p.textContent);
 
-	// combine text contents from paragraphs and then remove newlines and multiple spaces
-	const text = paragraphTexts.join(" ").replace(/ {2}|\r\n|\n|\r/gm, "");
-
-	return text;
+	let { content } = result;
+	// remove newlines and multiple spaces
+	content = content?.replace(/ {2}|\r\n|\n|\r/gm, "") ?? null;
+	if (!content) {
+		throw new Error(`parser couldn't find any text content`);
+	}
+	return content;
 }

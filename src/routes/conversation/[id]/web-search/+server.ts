@@ -87,7 +87,7 @@ export async function GET({ params, locals, url }) {
 							text = await parseWeb(link);
 						} catch (e) {
 							console.error(`Error parsing webpage "${link}"`, e);
-							appendUpdate("Error parsing webpage", [link], "error");
+							appendUpdate("Error parsing webpage", [`url: ${link} error: ${e}`], "error");
 						}
 						const CHUNK_CAR_LEN = 512;
 						const MAX_N_CHUNKS = 100;
