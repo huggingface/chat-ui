@@ -1,12 +1,10 @@
-import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
-import { authCondition, requiresUser } from "$lib/server/auth";
+import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
-import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 import type { Message } from "$lib/types/Message";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
 import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
@@ -16,44 +14,21 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { AwsClient } from "aws4fetch";
 
 export async function POST({ request, fetch, locals, params }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const date = new Date();
 
-	const userId = locals.user?._id ?? locals.sessionId;
-
-	if (!userId) {
-		throw error(401, "Unauthorized");
-	}
-
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		...authCondition(locals),
 	});
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
 	}
 
-	if (
-		!locals.user?._id &&
-		requiresUser &&
-		conv.messages.length > (MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0)
-	) {
-		throw error(429, "Exceeded number of messages before login");
-	}
-
-	const nEvents = await collections.messageEvents.countDocuments({ userId });
-
-	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
-		throw error(429, ERROR_MESSAGES.rateLimited);
-	}
-
 	const model = models.find((m) => m.id === conv.model);
-	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (!model) {
 		throw error(410, "Model not available anymore");
@@ -83,69 +58,32 @@ export async function POST({ request, fetch, locals, params }) {
 			}
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
-				{ content: newPrompt, from: "user", id: messageId as Message["id"], updatedAt: new Date() },
+				{ content: newPrompt, from: "user", id: messageId as Message["id"] },
 			];
 		}
 		return [
 			...conv.messages,
-			{
-				content: newPrompt,
-				from: "user",
-				id: (messageId as Message["id"]) || crypto.randomUUID(),
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			},
+			{ content: newPrompt, from: "user", id: (messageId as Message["id"]) || crypto.randomUUID() },
 		];
 	})() satisfies Message[];
 
-	const prompt = await buildPrompt({
-		messages,
-		model,
-		webSearchId: web_search_id,
-		preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
-		locals: locals,
-	});
-
+	const prompt = await buildPrompt(messages, model, web_search_id);
 	const randomEndpoint = modelEndpoint(model);
 
 	const abortController = new AbortController();
 
-	let resp: Response;
-	if (randomEndpoint.host === "sagemaker") {
-		const requestParams = JSON.stringify({
+	const resp = await fetch(randomEndpoint.url, {
+		headers: {
+			"Content-Type": request.headers.get("Content-Type") ?? "application/json",
+			Authorization: randomEndpoint.authorization,
+		},
+		method: "POST",
+		body: JSON.stringify({
 			...json,
 			inputs: prompt,
-		});
-
-		const aws = new AwsClient({
-			accessKeyId: randomEndpoint.accessKey,
-			secretAccessKey: randomEndpoint.secretKey,
-			sessionToken: randomEndpoint.sessionToken,
-			service: "sagemaker",
-		});
-
-		resp = await aws.fetch(randomEndpoint.url, {
-			method: "POST",
-			body: requestParams,
-			signal: abortController.signal,
-			headers: {
-				"Content-Type": "application/json",
-			},
-		});
-	} else {
-		resp = await fetch(randomEndpoint.url, {
-			headers: {
-				"Content-Type": request.headers.get("Content-Type") ?? "application/json",
-				Authorization: randomEndpoint.authorization,
-			},
-			method: "POST",
-			body: JSON.stringify({
-				...json,
-				inputs: prompt,
-			}),
-			signal: abortController.signal,
-		});
-	}
+		}),
+		signal: abortController.signal,
+	});
 
 	if (!resp.body) {
 		throw new Error("Response body is empty");
@@ -177,13 +115,6 @@ export async function POST({ request, fetch, locals, params }) {
 			content: generated_text,
 			webSearchId: web_search_id,
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		});
-
-		await collections.messageEvents.insertOne({
-			userId: userId,
-			createdAt: new Date(),
 		});
 
 		await collections.conversations.updateOne(
@@ -213,7 +144,6 @@ export async function DELETE({ locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		...authCondition(locals),
 	});
 
 	if (!conv) {
@@ -302,7 +232,6 @@ export async function PATCH({ request, locals, params }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		...authCondition(locals),
 	});
 
 	if (!conv) {

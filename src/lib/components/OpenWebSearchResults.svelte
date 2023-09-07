@@ -7,17 +7,41 @@
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
+	import { base } from "$app/paths";
+	import { onMount } from "svelte";
+
 	export let loading = false;
 	export let classNames = "";
+	export let webSearchId: string | undefined;
 	export let webSearchMessages: WebSearchMessage[] = [];
 
 	let detailsOpen: boolean;
 	let error: boolean;
-	$: error = webSearchMessages[webSearchMessages.length - 2]?.type === "error";
+	onMount(() => {
+		if (webSearchMessages.length === 0 && webSearchId) {
+			fetch(`${base}/search/${webSearchId}`)
+				.then((res) => res.json())
+				.then((res) => {
+					webSearchMessages = [...res.messages, { type: "result", id: webSearchId }];
+				})
+				.catch((err) => console.log(err));
+		}
+	});
+	$: error = webSearchMessages.some((message) => message.type === "error");
 </script>
 
 <details
-	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
+	class="details flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames}"
+	on:toggle={() => {
+		if (webSearchMessages.length === 0 && webSearchId) {
+			fetch(`${base}/search/${webSearchId}`)
+				.then((res) => res.json())
+				.then((res) => {
+					webSearchMessages = [...res.messages, { type: "result", id: webSearchId }];
+				})
+				.catch((err) => console.log(err));
+		}
+	}}
 	bind:open={detailsOpen}
 >
 	<summary
@@ -38,49 +62,48 @@
 		</div>
 	</summary>
 
-	<div class="content px-5 pb-5 pt-4">
+	<div class="content p-5 pb-1">
 		{#if webSearchMessages.length === 0}
 			<div class="mx-auto w-fit">
-				<EosIconsLoading class="mb-3 h-4 w-4" />
+				<EosIconsLoading class="mb-3 h-10 w-10" />
 			</div>
 		{:else}
-			<ol>
+			<ol class="relative border-l border-gray-200 dark:border-gray-600">
 				{#each webSearchMessages as message}
 					{#if message.type === "update"}
-						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
-							<div class="flex items-start">
-								<div
-									class="-ml-1.5 h-3 w-3 flex-none rounded-full bg-gray-200 dark:bg-gray-600 {loading
-										? 'group-last:animate-pulse group-last:bg-gray-300 group-last:dark:bg-gray-500'
-										: ''}"
-								/>
-								<h3 class="text-md -mt-1.5 pl-2.5 text-gray-800 dark:text-gray-100">
-									{message.message}
-								</h3>
-							</div>
+						<li class="mb-4 ml-4">
+							<div
+								class="h-3 w-3 -translate-x-[1.4rem] rounded-full bg-gray-200 dark:bg-gray-600"
+							/>
+							<h3 class="text-md -translate-y-[1.1rem] text-gray-800 dark:text-gray-100">
+								{message.message}
+							</h3>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p
+									class="mb-4 -translate-y-[1.1rem]  font-normal text-gray-500 dark:text-gray-400 "
+								>
 									{message.args}
 								</p>
 							{/if}
 						</li>
 					{:else if message.type === "error"}
-						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
-							<div class="flex items-start">
-								<CarbonError
-									class="-ml-1.5 h-3 w-3 flex-none scale-110 text-red-700 dark:text-red-500"
-								/>
-								<h3 class="text-md -mt-1.5 pl-2.5 text-red-700 dark:text-red-500">
-									{message.message}
-								</h3>
+						<li class="mb-4 ml-4">
+							<div
+								class="h-3 w-3 -translate-x-[1.4rem] rounded-full text-red-700 dark:text-red-500"
+							>
+								<CarbonError class="h-3 w-3" />
 							</div>
+							<h3 class="text-md -translate-y-[1.1rem] text-red-700 dark:text-red-500">
+								{message.message}
+							</h3>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mb-4 -translate-y-[1.1rem] font-normal text-gray-500 dark:text-gray-400 ">
 									{message.args}
 								</p>
 							{/if}
 						</li>
 					{/if}
+					<p />
 				{/each}
 			</ol>
 		{/if}
@@ -102,13 +125,9 @@
 		}
 	}
 
-	details[open] .content {
+	.details[open] .content {
 		animation-name: grow;
 		animation-duration: 300ms;
 		animation-delay: 0ms;
-	}
-
-	details summary::-webkit-details-marker {
-		display: none;
 	}
 </style>

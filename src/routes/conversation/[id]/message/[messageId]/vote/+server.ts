@@ -16,7 +16,6 @@ export async function POST({ params, request, locals }) {
 	const document = await collections.conversations.updateOne(
 		{
 			_id: conversationId,
-			...authCondition(locals),
 			"messages.id": messageId,
 		},
 		{

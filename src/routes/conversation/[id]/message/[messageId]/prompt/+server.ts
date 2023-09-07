@@ -10,7 +10,6 @@ export async function GET({ params, locals }) {
 
 	const conv = await collections.conversations.findOne({
 		_id: convId,
-		...authCondition(locals),
 	});
 
 	if (!conv) {
@@ -31,10 +30,7 @@ export async function GET({ params, locals }) {
 		throw error(404, "Conversation model not found");
 	}
 
-	const prompt = await buildPrompt({
-		messages: conv.messages.slice(0, messageIndex + 1),
-		model: model,
-	});
+	const prompt = await buildPrompt(conv.messages.slice(0, messageIndex + 1), model);
 
 	return new Response(
 		JSON.stringify(

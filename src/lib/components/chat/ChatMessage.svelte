@@ -46,6 +46,7 @@
 	export let isAuthor = true;
 	export let readOnly = false;
 	export let isTapped = false;
+	export let isLast = false;
 
 	export let webSearchMessages: WebSearchMessage[] = [];
 
@@ -98,8 +99,9 @@
 	let webSearchIsDone = true;
 
 	$: webSearchIsDone =
-		webSearchMessages.length > 0 &&
-		webSearchMessages[webSearchMessages.length - 1].type === "result";
+		!!message.webSearchId ||
+		(webSearchMessages.length > 0 &&
+			webSearchMessages[webSearchMessages.length - 1].type === "result");
 </script>
 
 {#if message.from === "assistant"}
@@ -116,14 +118,17 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if webSearchMessages && webSearchMessages.length > 0}
-				<OpenWebSearchResults
-					classNames={tokens.length ? "mb-3.5" : ""}
-					{webSearchMessages}
-					loading={!webSearchIsDone}
-				/>
+			{#if message.webSearchId || (webSearchMessages.length > 0 && isLast)}
+				{#key (message.webSearchId, message.score, loading)}
+					<OpenWebSearchResults
+						classNames={tokens.length ? "mb-3" : ""}
+						webSearchId={message.webSearchId}
+						{webSearchMessages}
+						loading={!webSearchIsDone}
+					/>
+				{/key}
 			{/if}
-			{#if !message.content && (webSearchIsDone || (webSearchMessages && webSearchMessages.length === 0))}
+			{#if !message.content && (webSearchIsDone || webSearchMessages.length === 0)}
 				<IconLoading />
 			{/if}
 

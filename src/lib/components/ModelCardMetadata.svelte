@@ -3,7 +3,7 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import type { Model } from "$lib/types/Model";
 
-	export let model: Pick<Model, "name" | "datasetName" | "websiteUrl" | "modelUrl" | "datasetUrl">;
+	export let model: Pick<Model, "name" | "datasetName" | "websiteUrl">;
 
 	export let variant: "light" | "dark" = "light";
 </script>
@@ -14,8 +14,9 @@
 		? 'text-gray-600 dark:bg-gray-800 dark:text-gray-300'
 		: 'text-gray-800 dark:bg-gray-100 dark:text-gray-600'}"
 >
+<!--This is a comment. Comments are not displayed in the browser
 	<a
-		href={model.modelUrl || "https://huggingface.co/" + model.name}
+		href="https://huggingface.co/{model.name}"
 		target="_blank"
 		rel="noreferrer"
 		class="flex items-center hover:underline"
@@ -23,9 +24,9 @@
 		Model
 		<div class="max-sm:hidden">&nbsp;page</div></a
 	>
-	{#if model.datasetName || model.datasetUrl}
+	{#if model.datasetName}
 		<a
-			href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
+			href="https://huggingface.co/datasets/{model.datasetName}"
 			target="_blank"
 			rel="noreferrer"
 			class="flex items-center hover:underline"
@@ -45,4 +46,5 @@
 			Website
 		</a>
 	{/if}
+//-->
 </div>

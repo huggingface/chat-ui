@@ -24,7 +24,6 @@
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
 	export let webSearchMessages: WebSearchMessage[] = [];
-	export let searches: Record<string, WebSearchMessage[]> = {};
 
 	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
@@ -60,7 +59,6 @@
 		readOnly={isReadOnly}
 		isAuthor={!shared}
 		{webSearchMessages}
-		{searches}
 		on:message
 		on:vote
 		on:retry={(ev) => {
@@ -124,7 +122,7 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				Model: <a
-					href={currentModel.modelUrl || "https://huggingface.co/" + currentModel.name}
+					href="https://huggingface.co/{currentModel.name}"
 					target="_blank"
 					rel="noreferrer"
 					class="hover:underline">{currentModel.displayName}</a
@@ -137,7 +135,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-yellow-500" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}

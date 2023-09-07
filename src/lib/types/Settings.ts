@@ -7,16 +7,13 @@ export interface Settings extends Timestamps {
 	sessionId?: string;
 
 	/**
-	 * Note: Only conversations with this settings explicitly set to true should be shared.
+	 * Note: Only conversations with this settings explictly set to true should be shared.
 	 *
 	 * This setting is explicitly set to true when users accept the ethics modal.
 	 * */
 	shareConversationsWithModelAuthors: boolean;
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
-
-	// model name and system prompts
-	customPrompts?: Record<string, string>;
 }
 
 // TODO: move this to a constant file along with other constants

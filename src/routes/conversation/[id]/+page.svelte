@@ -13,9 +13,8 @@
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import type { WebSearchMessage } from "$lib/types/WebSearch.js";
 	import type { Message } from "$lib/types/Message";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -33,7 +32,6 @@
 
 	let loading = false;
 	let pending = false;
-	let loginRequired = false;
 
 	async function getTextGenerationStream(
 		inputs: string,
@@ -207,8 +205,6 @@
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
-			} else if (err instanceof Error && err.message.includes("429")) {
-				$error = ERROR_MESSAGES.rateLimited;
 			} else if (err instanceof Error) {
 				$error = err.message;
 			} else {
@@ -259,12 +255,6 @@
 	});
 	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
-
-	$: loginRequired =
-		(data.requiresLogin
-			? !data.user
-			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
-		messages.length >= data.messagesBeforeLogin;
 </script>
 
 <svelte:head>
@@ -276,7 +266,6 @@
 	{pending}
 	{messages}
 	bind:webSearchMessages
-	searches={{ ...data.searches }}
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
@@ -285,5 +274,4 @@
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	settings={data.settings}
-	{loginRequired}
 />

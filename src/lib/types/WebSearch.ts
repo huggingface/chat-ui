@@ -12,7 +12,6 @@ export interface WebSearch extends Timestamps {
 	searchQuery: string;
 	results: string[];
 	knowledgeGraph: string;
-	answerBox: string;
 	summary: string;
 
 	messages: WebSearchMessage[];

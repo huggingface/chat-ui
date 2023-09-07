@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PUBLIC_APP_NAME, PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_VERSION } from "$env/static/public";
 	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
@@ -31,8 +31,8 @@
 	<div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
-				<Logo classNames="mr-1 flex-none" />
-				{PUBLIC_APP_NAME}
+				<Logo classNames="mr-1 text-yellow-400 text-4xl flex-none" />
+				PortfolioChat
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
@@ -40,7 +40,7 @@
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
-				Making the community's best AI chat models available to everyone.
+				Your Portfolio Chatbot assistant ready to help you.
 			</p>
 		</div>
 	</div>
@@ -78,7 +78,7 @@
 		</div>
 	</div>
 	{#if currentModelMetadata.promptExamples}
-		<div class="lg:col-span-3 lg:mt-6">
+		<div class="lg:col-span-3 lg:mt-12">
 			<p class="mb-3 text-gray-600 dark:text-gray-300">Examples</p>
 			<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
 				{#each currentModelMetadata.promptExamples as example}

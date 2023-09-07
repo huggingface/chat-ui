@@ -8,7 +8,6 @@ export const actions = {
 		// double check we have a user to delete conversations for
 		if (locals.user?._id || locals.sessionId) {
 			await collections.conversations.deleteMany({
-				...authCondition(locals),
 			});
 		}
 
