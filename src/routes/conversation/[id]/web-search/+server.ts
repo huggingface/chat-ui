@@ -70,13 +70,10 @@ export async function GET({ params, locals, url }) {
 
 				appendUpdate("Searching Google", [webSearch.searchQuery]);
 				const results = await searchWeb(webSearch.searchQuery);
-				webSearch.results = [
-					...((results.top_stories && results.top_stories.map((el: { link: string }) => el.link)) ??
-						[]),
-					...((results.organic_results &&
+				webSearch.results =
+					(results.organic_results &&
 						results.organic_results.map((el: { link: string }) => el.link)) ??
-						[]),
-				];
+					[];
 				webSearch.results = webSearch.results
 					.filter((link) => !link.includes("youtube.com")) // filter out youtube links
 					.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
