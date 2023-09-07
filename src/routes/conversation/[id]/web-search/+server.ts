@@ -9,15 +9,6 @@ import type { WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk.js";
-import { client as gradioClient } from "@gradio/client";
-
-interface GradioResult {
-	type: string;
-	endpoint: string;
-	fn_index: string;
-	data: string[];
-	time: Date;
-}
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -105,13 +96,23 @@ export async function GET({ params, locals, url }) {
 
 				appendUpdate("Extracing relevant information");
 				const topKClosestParagraphs = 8;
-				const gradioApp = await gradioClient("https://mishig-embeddings-similarity.hf.space/", {});
-				const result = (await gradioApp.predict("/predict", [
-					webSearch.searchQuery,
-					paragraphChunks.join("-HFSEP-"), // see: https://huggingface.co/spaces/mishig/embeddings-similarity/blob/main/app.py#L10
-					topKClosestParagraphs,
-				])) as GradioResult;
-				const indices: number[] = JSON.parse(result.data[0]);
+				const requestBody = {
+					paragraphs: paragraphChunks,
+					query: prompt,
+					top_k: topKClosestParagraphs,
+				};
+				const res = await fetch("https://mishig-embeddings-similarity.hf.space/", {
+					method: "POST",
+					headers: {
+						Accept: "application/json",
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(requestBody),
+				});
+				if (!res.ok) {
+					throw new Error("API request to emb similarity service failed");
+				}
+				const indices: number[] = await res.json();
 				webSearch.context = indices.map((idx) => paragraphChunks[idx]).join("");
 				appendUpdate("Injecting relevant information");
 			} catch (searchError) {

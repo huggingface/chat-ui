@@ -40,7 +40,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@gradio/client": "^0.2.1",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.2.0",
 		"@postlight/parser": "^2.2.3",
