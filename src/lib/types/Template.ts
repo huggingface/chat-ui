@@ -19,6 +19,6 @@ export type WebSearchSummaryTemplateInput = {
 };
 
 export type WebSearchQueryTemplateInput = {
-	messages: Pick<Message, "from" | "content">[];
+	message: Pick<Message, "from" | "content">;
 	currentDate: string;
 };
