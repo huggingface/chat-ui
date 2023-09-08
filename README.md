@@ -264,7 +264,7 @@ You can then add the generated information and the `authorization` parameter to 
 
 ### AWS Endpoints
 
-You can also specify your AWS endpoints for chat-ui, e.g. a sagemaker endpoint or a lambda function URL. 
+You can also specify your AWS endpoints for chat-ui, e.g. a sagemaker endpoint or a lambda function URL.
 The config goes like this:
 
 ```json
@@ -282,8 +282,8 @@ The config goes like this:
 ]
 ```
 
-You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access. 
-The following endpoint services are currently enabled: "sagemaker" and "lambda." 
+You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
+The following endpoint services are currently enabled: "sagemaker" and "lambda."
 If you intend to utilize "lambda," please ensure that you specify the corresponding "region" as well.
 
 #### Client Certificate Authentication (mTLS)

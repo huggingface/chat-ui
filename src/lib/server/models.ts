@@ -16,7 +16,7 @@ const awsEndpoint = z.object({
 	accessKey: z.string().min(1),
 	secretKey: z.string().min(1),
 	sessionToken: z.string().optional(),
-	region: z.string().optional()
+	region: z.string().optional(),
 });
 
 const tgiEndpoint = z.object({
