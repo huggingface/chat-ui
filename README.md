@@ -187,19 +187,14 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that that the prompt instructs the chat model to only return a few keywords.
 
-The following is the default `webSearchQueryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
+The following is the default `webSearchQueryPromptTemplate`.
 
 ```
 {{userMessageToken}}
-  The following messages were written by a user, trying to answer a question.
+  My question is: {{message.content}}.
+  Based on the conversation history, give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
 {{userMessageEndToken}}
-{{#each messages}}
-  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
-{{/each}}
-{{userMessageToken}}
-  What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence.
-{{userMessageEndToken}}
-{{assistantMessageToken}}Query:
+{{assistantMessageToken}}
 ```
 
 #### Running your own models using a custom endpoint
