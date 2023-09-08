@@ -86,9 +86,7 @@ const modelsRaw = z
 					"{{userMessageToken}}" +
 						"My question is: " +
 						' "' +
-						"{{#each messages}}" +
-						"{{#if @last}}{{#ifUser}}{{content}}{{/ifUser}}{{/if}}" +
-						"{{/each}}" +
+						"{{message.content}}" +
 						'". ' +
 						"Based on the conversation history, give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
 						"{{userMessageEndToken}}" +
