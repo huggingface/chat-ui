@@ -1,9 +1,5 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
-import type {
-	ChatTemplateInput,
-	WebSearchQueryTemplateInput,
-	WebSearchSummaryTemplateInput,
-} from "$lib/types/Template";
+import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
@@ -71,15 +67,6 @@ const modelsRaw = z
 						"{{/each}}" +
 						"{{assistantMessageToken}}"
 				),
-			webSearchSummaryPromptTemplate: z
-				.string()
-				.default(
-					"{{userMessageToken}}{{answer}}{{userMessageEndToken}}" +
-						"{{userMessageToken}}" +
-						"The text above should be summarized to best answer the query: {{query}}." +
-						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}Summary: "
-				),
 			webSearchQueryPromptTemplate: z
 				.string()
 				.default(
@@ -120,10 +107,6 @@ export const models = await Promise.all(
 		userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
 		assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
 		chatPromptRender: compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m),
-		webSearchSummaryPromptRender: compileTemplate<WebSearchSummaryTemplateInput>(
-			m.webSearchSummaryPromptTemplate,
-			m
-		),
 		webSearchQueryPromptRender: compileTemplate<WebSearchQueryTemplateInput>(
 			m.webSearchQueryPromptTemplate,
 			m
