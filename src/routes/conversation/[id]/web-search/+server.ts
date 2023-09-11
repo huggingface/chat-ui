@@ -8,7 +8,7 @@ import { z } from "zod";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
-import { chunk } from "$lib/utils/chunk.js";
+import { chunk } from "$lib/utils/chunk";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -94,7 +94,7 @@ export async function GET({ params, locals, url }) {
 					throw new Error("No results found for this search query");
 				}
 
-				appendUpdate("Extracing relevant information");
+				appendUpdate("Extracting relevant information");
 				const topKClosestParagraphs = 8;
 				const requestBody = {
 					paragraphs: paragraphChunks,
