@@ -42,6 +42,7 @@
 	"dependencies": {
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.2.0",
+		"@xenova/transformers": "^2.6.0",
 		"autoprefixer": "^10.4.14",
 		"aws4fetch": "^1.0.17",
 		"date-fns": "^2.29.3",
