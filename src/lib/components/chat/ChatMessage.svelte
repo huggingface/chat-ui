@@ -13,7 +13,7 @@
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import type { WebSearchMessage, WebSearchMessageSources } from "$lib/types/WebSearch";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 
@@ -100,6 +100,10 @@
 	$: webSearchIsDone =
 		webSearchMessages.length > 0 &&
 		webSearchMessages[webSearchMessages.length - 1].type === "result";
+
+	$: webSearchSources = (
+		webSearchMessages.filter(({ type }) => type === "sources")?.[0] as WebSearchMessageSources
+	)?.sources;
 </script>
 
 {#if message.from === "assistant"}
@@ -140,6 +144,26 @@
 					{/if}
 				{/each}
 			</div>
+			<!-- Web Search sources -->
+			{#if webSearchSources?.length}
+				<div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
+					Sources:
+					{#each webSearchSources as { link, title, hostname }}
+						<a
+							class="flex items-center gap-x-2 rounded-lg border border-gray-500/40 px-2 py-1.5"
+							href={link}
+							target="_blank"
+						>
+							<img
+								class="w-5 truncate rounded-full"
+								src="https://www.google.com/s2/favicons?sz=64&domain_url={hostname}"
+								alt="{title} fav icon"
+							/>
+							<span class="max-w-[6rem] truncate">{title}</span>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 		{#if isAuthor && !loading && message.content}
 			<div
