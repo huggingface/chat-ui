@@ -18,7 +18,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { AwsClient } from "aws4fetch";
 
-export async function POST({ request, fetch, locals, params }) {
+export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const date = new Date();
@@ -184,6 +184,7 @@ export async function POST({ request, fetch, locals, params }) {
 		await collections.messageEvents.insertOne({
 			userId: userId,
 			createdAt: new Date(),
+			ip: getClientAddress(),
 		});
 
 		await collections.conversations.updateOne(
