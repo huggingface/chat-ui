@@ -46,7 +46,10 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		throw error(429, "Exceeded number of messages before login");
 	}
 
-	const nEvents = await collections.messageEvents.countDocuments({ userId });
+	const nEvents = Math.max(
+		await collections.messageEvents.countDocuments({ userId }),
+		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+	);
 
 	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
 		throw error(429, ERROR_MESSAGES.rateLimited);
