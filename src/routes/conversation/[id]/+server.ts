@@ -38,6 +38,12 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		throw error(404, "Conversation not found");
 	}
 
+	await collections.messageEvents.insertOne({
+		userId: userId,
+		createdAt: new Date(),
+		ip: getClientAddress(),
+	});
+
 	if (
 		!locals.user?._id &&
 		requiresUser &&
@@ -182,12 +188,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
 			createdAt: new Date(),
 			updatedAt: new Date(),
-		});
-
-		await collections.messageEvents.insertOne({
-			userId: userId,
-			createdAt: new Date(),
-			ip: getClientAddress(),
 		});
 
 		await collections.conversations.updateOne(
