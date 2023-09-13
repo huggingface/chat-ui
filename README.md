@@ -12,16 +12,17 @@ app_port: 3000
 
 # Chat UI
 
-![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/raw/f038917dd40d711a72d654ab1abfc03ae9f177e6/chat-ui-repo-thumbnail.svg)
+![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chatui-websearch.png)
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
 0. [No Setup Deploy](#no-setup-deploy)
 1. [Setup](#setup)
 2. [Launch](#launch)
-3. [Extra parameters](#extra-parameters)
-4. [Deploying to a HF Space](#deploying-to-a-hf-space)
-5. [Building](#building)
+3. [Web Search](#web-search)
+4. [Extra parameters](#extra-parameters)
+5. [Deploying to a HF Space](#deploying-to-a-hf-space)
+6. [Building](#building)
 
 ##  No Setup Deploy
 
@@ -69,6 +70,16 @@ After you're done with the `.env.local` file you can run Chat UI locally with:
 npm install
 npm run dev
 ```
+
+## Web Search
+
+Chat UI features a powerful Web Search feature. It works by:
+
+1. Generating an appropriate Google query from the user prompt.
+2. Performing Google search and extracting content from webpages.
+3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/e5-small-v2](https://huggingface.co/Xenova/e5-small-v2) model.
+4. From these embeddings, find the ones that are closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
+5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
 
 ## Extra parameters
 
