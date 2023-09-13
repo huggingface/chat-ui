@@ -159,7 +159,7 @@
 								src="https://www.google.com/s2/favicons?sz=64&domain_url={hostname}"
 								alt="{title} favicon"
 							/>
-							<span class="truncate">{new URL(link).hostname}</span>
+							<span class="truncate">{new URL(link).hostname.replace(/^www\./, "")}</span>
 						</a>
 					{/each}
 				</div>
