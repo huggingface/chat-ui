@@ -146,20 +146,20 @@
 			</div>
 			<!-- Web Search sources -->
 			{#if webSearchSources?.length}
-				<div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
-					Sources:
+				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+					<div class="text-gray-400">Sources:</div>
 					{#each webSearchSources as { link, title, hostname }}
 						<a
-							class="flex items-center gap-x-2 rounded-lg border border-gray-500/40 px-2 py-1.5"
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300  dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
 							href={link}
 							target="_blank"
 						>
 							<img
-								class="w-5 truncate rounded-full"
+								class="h-3.5 w-3.5 rounded"
 								src="https://www.google.com/s2/favicons?sz=64&domain_url={hostname}"
-								alt="{title} fav icon"
+								alt="{title} favicon"
 							/>
-							<span class="max-w-[6rem] truncate">{title}</span>
+							<span class="truncate">{new URL(link).hostname}</span>
 						</a>
 					{/each}
 				</div>
