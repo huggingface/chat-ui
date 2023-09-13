@@ -184,6 +184,7 @@
 							if (lastSearchMessage.type === "result") {
 								searchResponseId = lastSearchMessage.id;
 								reader.cancel();
+								data.searches[searchResponseId] = [...webSearchMessages];
 								return;
 							}
 						})

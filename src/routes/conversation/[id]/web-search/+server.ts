@@ -5,10 +5,11 @@ import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import type { WebSearch } from "$lib/types/WebSearch";
+import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
-import { chunk } from "$lib/utils/chunk.js";
+import { chunk } from "$lib/utils/chunk";
+import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -41,6 +42,7 @@ export async function GET({ params, locals, url }) {
 				searchQuery: "",
 				results: [],
 				context: "",
+				contextSources: [],
 				messages: [],
 				createdAt: new Date(),
 				updatedAt: new Date(),
@@ -63,16 +65,21 @@ export async function GET({ params, locals, url }) {
 				const results = await searchWeb(webSearch.searchQuery);
 				webSearch.results =
 					(results.organic_results &&
-						results.organic_results.map((el: { link: string }) => el.link)) ??
+						results.organic_results.map((el: { title: string; link: string }) => {
+							const { title, link } = el;
+							const { hostname } = new URL(link);
+							return { title, link, hostname };
+						})) ??
 					[];
 				webSearch.results = webSearch.results
-					.filter((link) => !link.includes("youtube.com")) // filter out youtube links
+					.filter(({ link }) => !link.includes("youtube.com")) // filter out youtube links
 					.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
-				let paragraphChunks: string[] = [];
+				let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
 				if (webSearch.results.length > 0) {
 					appendUpdate("Browsing results");
-					const promises = webSearch.results.map(async (link) => {
+					const promises = webSearch.results.map(async (result) => {
+						const { link } = result;
 						let text = "";
 						try {
 							text = await parseWeb(link);
@@ -82,8 +89,8 @@ export async function GET({ params, locals, url }) {
 						}
 						const CHUNK_CAR_LEN = 512;
 						const MAX_N_CHUNKS = 100;
-						const chunks = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
-						return chunks;
+						const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
+						return texts.map((t) => ({ source: result, text: t }));
 					});
 					const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
 					paragraphChunks = nestedParagraphChunks.flat();
@@ -94,26 +101,23 @@ export async function GET({ params, locals, url }) {
 					throw new Error("No results found for this search query");
 				}
 
-				appendUpdate("Extracing relevant information");
+				appendUpdate("Extracting relevant information");
 				const topKClosestParagraphs = 8;
-				const requestBody = {
-					paragraphs: paragraphChunks,
-					query: prompt,
-					top_k: topKClosestParagraphs,
-				};
-				const res = await fetch("https://mishig-embeddings-similarity.hf.space/", {
-					method: "POST",
-					headers: {
-						Accept: "application/json",
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(requestBody),
+				const texts = paragraphChunks.map(({ text }) => text);
+				const indices = await findSimilarSentences(prompt, texts, {
+					topK: topKClosestParagraphs,
 				});
-				if (!res.ok) {
-					throw new Error("API request to emb similarity service failed");
+				webSearch.context = indices.map((idx) => texts[idx]).join("");
+
+				const usedSources = new Set<string>();
+				for (const idx of indices) {
+					const { source } = paragraphChunks[idx];
+					if (!usedSources.has(source.link)) {
+						usedSources.add(source.link);
+						webSearch.contextSources.push(source);
+					}
 				}
-				const indices: number[] = await res.json();
-				webSearch.context = indices.map((idx) => paragraphChunks[idx]).join("");
+
 				appendUpdate("Injecting relevant information");
 			} catch (searchError) {
 				if (searchError instanceof Error) {
@@ -126,6 +130,10 @@ export async function GET({ params, locals, url }) {
 			}
 
 			const res = await collections.webSearches.insertOne(webSearch);
+			webSearch.messages.push({
+				type: "sources",
+				sources: webSearch.contextSources,
+			});
 			webSearch.messages.push({
 				type: "result",
 				id: res.insertedId.toString(),
