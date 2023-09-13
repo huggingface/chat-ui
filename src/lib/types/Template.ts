@@ -15,5 +15,6 @@ export type ChatTemplateInput = {
 
 export type WebSearchQueryTemplateInput = {
 	message: Pick<Message, "from" | "content">;
+	previousMessages: string;
 	currentDate: string;
 };

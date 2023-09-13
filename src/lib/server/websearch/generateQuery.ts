@@ -5,9 +5,12 @@ import { defaultModel } from "../models";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
-	const lastMessage = messages[messages.length - 1];
+	const userMessages = messages.filter(({ from }) => from === "user");
+	const previousUserMessages = userMessages.slice(0, -1);
+	const lastMessage = userMessages.slice(-1)[0];
 	const promptSearchQuery = defaultModel.webSearchQueryPromptRender({
 		message: lastMessage,
+		previousMessages: previousUserMessages.map(({ content }) => content).join(" "),
 		currentDate,
 	});
 	const searchQuery = await generateFromDefaultEndpoint(promptSearchQuery).then((query) => {
