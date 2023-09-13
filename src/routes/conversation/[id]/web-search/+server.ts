@@ -1,31 +1,22 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { defaultModel } from "$lib/server/models";
 import { searchWeb } from "$lib/server/websearch/searchWeb";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import type { WebSearch } from "$lib/types/WebSearch";
+import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
-import { summarizeWeb } from "$lib/server/websearch/summarizeWeb";
+import { chunk } from "$lib/utils/chunk";
+import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import { RATE_LIMIT } from "$env/static/private";
 import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 
-interface GenericObject {
-	[key: string]: GenericObject | unknown;
-}
+const MAX_N_PAGES_SCRAPE = 10 as const;
+const MAX_N_PAGES_EMBED = 5 as const;
 
-function removeLinks(obj: GenericObject) {
-	for (const prop in obj) {
-		if (prop.endsWith("link")) delete obj[prop];
-		else if (typeof obj[prop] === "object") removeLinks(obj[prop] as GenericObject);
-	}
-	return obj;
-}
 export async function GET({ params, locals, url, getClientAddress }) {
-	const model = defaultModel;
 	const convId = new ObjectId(params.id);
 	const searchId = new ObjectId();
 
@@ -68,10 +59,9 @@ export async function GET({ params, locals, url, getClientAddress }) {
 				convId: convId,
 				prompt: prompt,
 				searchQuery: "",
-				knowledgeGraph: "",
-				answerBox: "",
 				results: [],
-				summary: "",
+				context: "",
+				contextSources: [],
 				messages: [],
 				createdAt: new Date(),
 				updatedAt: new Date(),
@@ -92,45 +82,62 @@ export async function GET({ params, locals, url, getClientAddress }) {
 
 				appendUpdate("Searching Google", [webSearch.searchQuery]);
 				const results = await searchWeb(webSearch.searchQuery);
-
-				let text = "";
 				webSearch.results =
 					(results.organic_results &&
-						results.organic_results.map((el: { link: string }) => el.link)) ??
+						results.organic_results.map((el: { title: string; link: string }) => {
+							const { title, link } = el;
+							const { hostname } = new URL(link);
+							return { title, link, hostname };
+						})) ??
 					[];
+				webSearch.results = webSearch.results
+					.filter(({ link }) => !link.includes("youtube.com")) // filter out youtube links
+					.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
-				if (results.answer_box) {
-					// if google returns an answer box, we use it
-					webSearch.answerBox = JSON.stringify(removeLinks(results.answer_box));
-					text = webSearch.answerBox;
-					appendUpdate("Found a Google answer box");
-				} else if (results.knowledge_graph) {
-					// if google returns a knowledge graph, we use it
-					webSearch.knowledgeGraph = JSON.stringify(removeLinks(results.knowledge_graph));
-					text = webSearch.knowledgeGraph;
-					appendUpdate("Found a Google knowledge page");
-				} else if (webSearch.results.length > 0) {
-					let tries = 0;
-
-					while (!text && tries < 3) {
-						const searchUrl = webSearch.results[tries];
-						appendUpdate("Browsing result", [JSON.stringify(searchUrl)]);
+				let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
+				if (webSearch.results.length > 0) {
+					appendUpdate("Browsing results");
+					const promises = webSearch.results.map(async (result) => {
+						const { link } = result;
+						let text = "";
 						try {
-							text = await parseWeb(searchUrl);
-							if (!text) throw new Error("text of the webpage is null");
+							text = await parseWeb(link);
+							appendUpdate("Browsing webpage", [link]);
 						} catch (e) {
-							appendUpdate("Error parsing webpage", [], "error");
-							tries++;
+							console.error(`Error parsing webpage "${link}"`, e);
 						}
+						const CHUNK_CAR_LEN = 512;
+						const MAX_N_CHUNKS = 100;
+						const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
+						return texts.map((t) => ({ source: result, text: t }));
+					});
+					const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
+					paragraphChunks = nestedParagraphChunks.flat();
+					if (!paragraphChunks.length) {
+						throw new Error("No text found on the first 5 results");
 					}
-					if (!text) throw new Error("No text found on the first 3 results");
 				} else {
 					throw new Error("No results found for this search query");
 				}
 
-				appendUpdate("Creating summary");
-				webSearch.summary = await summarizeWeb(text, webSearch.searchQuery, model);
-				appendUpdate("Injecting summary", [JSON.stringify(webSearch.summary)]);
+				appendUpdate("Extracting relevant information");
+				const topKClosestParagraphs = 8;
+				const texts = paragraphChunks.map(({ text }) => text);
+				const indices = await findSimilarSentences(prompt, texts, {
+					topK: topKClosestParagraphs,
+				});
+				webSearch.context = indices.map((idx) => texts[idx]).join("");
+
+				const usedSources = new Set<string>();
+				for (const idx of indices) {
+					const { source } = paragraphChunks[idx];
+					if (!usedSources.has(source.link)) {
+						usedSources.add(source.link);
+						webSearch.contextSources.push(source);
+					}
+				}
+
+				appendUpdate("Injecting relevant information");
 			} catch (searchError) {
 				if (searchError instanceof Error) {
 					webSearch.messages.push({
@@ -142,6 +149,10 @@ export async function GET({ params, locals, url, getClientAddress }) {
 			}
 
 			const res = await collections.webSearches.insertOne(webSearch);
+			webSearch.messages.push({
+				type: "sources",
+				sources: webSearch.contextSources,
+			});
 			webSearch.messages.push({
 				type: "result",
 				id: res.insertedId.toString(),

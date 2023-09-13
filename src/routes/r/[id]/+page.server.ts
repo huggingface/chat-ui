@@ -2,7 +2,7 @@ import type { PageServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
-import type { WebSearchMessageResult } from "$lib/types/WebSearch";
+import type { WebSearchMessageResult, WebSearchMessageSources } from "$lib/types/WebSearch";
 
 export const load: PageServerLoad = async ({ params }) => {
 	const conversation = await collections.sharedConversations.findOne({
@@ -22,7 +22,11 @@ export const load: PageServerLoad = async ({ params }) => {
 	const searches = Object.fromEntries(
 		results.map((x) => [
 			x._id.toString(),
-			[...x.messages, { type: "result", id: x._id.toString() } satisfies WebSearchMessageResult],
+			[
+				...x.messages,
+				{ type: "sources", sources: x.contextSources ?? [] } satisfies WebSearchMessageSources,
+				{ type: "result", id: x._id.toString() } satisfies WebSearchMessageResult,
+			],
 		])
 	);
 
