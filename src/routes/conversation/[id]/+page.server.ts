@@ -2,7 +2,7 @@ import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
 import { authCondition } from "$lib/server/auth";
-import type { WebSearchMessageResult } from "$lib/types/WebSearch";
+import type { WebSearchMessageResult, WebSearchMessageSources } from "$lib/types/WebSearch";
 import { UrlDependency } from "$lib/types/UrlDependency";
 
 export const load = async ({ params, depends, locals }) => {
@@ -39,7 +39,11 @@ export const load = async ({ params, depends, locals }) => {
 	const searches = Object.fromEntries(
 		results.map((x) => [
 			x._id.toString(),
-			[...x.messages, { type: "result", id: x._id.toString() } satisfies WebSearchMessageResult],
+			[
+				...x.messages,
+				{ type: "sources", sources: x.contextSources ?? [] } satisfies WebSearchMessageSources,
+				{ type: "result", id: x._id.toString() } satisfies WebSearchMessageResult,
+			],
 		])
 	);
 

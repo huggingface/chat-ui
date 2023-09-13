@@ -1,9 +1,5 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
-import type {
-	ChatTemplateInput,
-	WebSearchQueryTemplateInput,
-	WebSearchSummaryTemplateInput,
-} from "$lib/types/Template";
+import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
@@ -71,28 +67,14 @@ const modelsRaw = z
 						"{{/each}}" +
 						"{{assistantMessageToken}}"
 				),
-			webSearchSummaryPromptTemplate: z
-				.string()
-				.default(
-					"{{userMessageToken}}{{answer}}{{userMessageEndToken}}" +
-						"{{userMessageToken}}" +
-						"The text above should be summarized to best answer the query: {{query}}." +
-						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}Summary: "
-				),
 			webSearchQueryPromptTemplate: z
 				.string()
 				.default(
 					"{{userMessageToken}}" +
-						"The following messages were written by a user, trying to answer a question." +
+						'My question is: "{{message.content}}". ' +
+						"Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
 						"{{userMessageEndToken}}" +
-						"{{#each messages}}" +
-						"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
-						"{{/each}}" +
-						"{{userMessageToken}}" +
-						"What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence." +
-						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}Query: "
+						"{{assistantMessageToken}}"
 				),
 			promptExamples: z
 				.array(
@@ -122,10 +104,6 @@ export const models = await Promise.all(
 		userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
 		assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
 		chatPromptRender: compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m),
-		webSearchSummaryPromptRender: compileTemplate<WebSearchSummaryTemplateInput>(
-			m.webSearchSummaryPromptTemplate,
-			m
-		),
 		webSearchQueryPromptRender: compileTemplate<WebSearchQueryTemplateInput>(
 			m.webSearchQueryPromptTemplate,
 			m
