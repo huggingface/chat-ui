@@ -10,11 +10,13 @@ import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
+import { RATE_LIMIT } from "$env/static/private";
+import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
 
-export async function GET({ params, locals, url }) {
+export async function GET({ params, locals, url, getClientAddress }) {
 	const convId = new ObjectId(params.id);
 	const searchId = new ObjectId();
 
@@ -25,6 +27,23 @@ export async function GET({ params, locals, url }) {
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
+	}
+
+	const userId = locals.user?._id ?? locals.sessionId;
+
+	await collections.messageEvents.insertOne({
+		userId: userId,
+		createdAt: new Date(),
+		ip: getClientAddress(),
+	});
+
+	const nEvents = Math.max(
+		await collections.messageEvents.countDocuments({ userId }),
+		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+	);
+
+	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
+		throw error(429, ERROR_MESSAGES.rateLimited);
 	}
 
 	const prompt = z.string().trim().min(1).parse(url.searchParams.get("prompt"));
