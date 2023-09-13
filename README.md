@@ -75,10 +75,10 @@ npm run dev
 
 Chat UI features a powerful Web Search feature. It works by:
 
-1. Generate appropriate google query from user prompt.
-2. Perform google search and extract texts from google results.
-3. Create embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, we are using [Xenova/e5-small-v2](https://huggingface.co/Xenova/e5-small-v2) model.
-4. From those emebddings, find the closest ones to user prompt using vector similarity search. Specifically, we are using `inner product` distance.
+1. Generating an appropriate Google query from the user prompt.
+2. Performing Google search and extracting content from webpages.
+3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/e5-small-v2](https://huggingface.co/Xenova/e5-small-v2) model.
+4. From these embeddings, find the ones closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
 
 ## Extra parameters
