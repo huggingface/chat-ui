@@ -19,9 +19,10 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 0. [No Setup Deploy](#no-setup-deploy)
 1. [Setup](#setup)
 2. [Launch](#launch)
-3. [Extra parameters](#extra-parameters)
-4. [Deploying to a HF Space](#deploying-to-a-hf-space)
-5. [Building](#building)
+3. [Web Search](#web-search)
+4. [Extra parameters](#extra-parameters)
+5. [Deploying to a HF Space](#deploying-to-a-hf-space)
+6. [Building](#building)
 
 ##  No Setup Deploy
 
@@ -69,6 +70,16 @@ After you're done with the `.env.local` file you can run Chat UI locally with:
 npm install
 npm run dev
 ```
+
+## Web Search
+
+Chat UI features a powerful Web Search feature. It works by:
+
+1. Generate appropriate google query from user prompt.
+2. Perform google search and extract texts from google results.
+3. Create embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, we are using [Xenova/e5-small-v2](https://huggingface.co/Xenova/e5-small-v2) model.
+4. From those emebddings, find the closest ones to user prompt using vector similarity search. Specifically, we are using `inner product` distance.
+5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
 
 ## Extra parameters
 
