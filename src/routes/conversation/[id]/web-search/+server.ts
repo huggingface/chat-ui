@@ -83,6 +83,7 @@ export async function GET({ params, locals, url }) {
 						let text = "";
 						try {
 							text = await parseWeb(link);
+							appendUpdate("Browsing webpage", [link]);
 						} catch (e) {
 							console.error(`Error parsing webpage "${link}"`, e);
 						}
