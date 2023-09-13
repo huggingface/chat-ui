@@ -13,7 +13,7 @@
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import type { WebSearchMessage, WebSearchMessageSources } from "$lib/types/WebSearch";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 
@@ -100,6 +100,10 @@
 	$: webSearchIsDone =
 		webSearchMessages.length > 0 &&
 		webSearchMessages[webSearchMessages.length - 1].type === "result";
+
+	$: webSearchSources = (
+		webSearchMessages.filter(({ type }) => type === "sources")?.[0] as WebSearchMessageSources
+	)?.sources;
 </script>
 
 {#if message.from === "assistant"}
@@ -140,6 +144,26 @@
 					{/if}
 				{/each}
 			</div>
+			<!-- Web Search sources -->
+			{#if webSearchSources?.length}
+				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+					<div class="text-gray-400">Sources:</div>
+					{#each webSearchSources as { link, title, hostname }}
+						<a
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300  dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+							href={link}
+							target="_blank"
+						>
+							<img
+								class="h-3.5 w-3.5 rounded"
+								src="https://www.google.com/s2/favicons?sz=64&domain_url={hostname}"
+								alt="{title} favicon"
+							/>
+							<div>{hostname.replace(/^www\./, "")}</div>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 		{#if isAuthor && !loading && message.content}
 			<div

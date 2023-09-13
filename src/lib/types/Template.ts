@@ -13,11 +13,8 @@ export type ChatTemplateInput = {
 	preprompt?: string;
 };
 
-export type WebSearchSummaryTemplateInput = {
-	answer: string;
-	query: string;
-};
-
 export type WebSearchQueryTemplateInput = {
-	messages: Pick<Message, "from" | "content">[];
+	message: Pick<Message, "from" | "content">;
+	previousMessages: string;
+	currentDate: string;
 };
