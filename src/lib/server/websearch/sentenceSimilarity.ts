@@ -13,6 +13,8 @@ export async function findSimilarSentences(
 	sentences: string[],
 	{ topK = 5 }: { topK: number }
 ) {
+	// this preprocessing step is suggested for e5-small-v2 model
+	// see more: https://huggingface.co/intfloat/e5-small-v2/blob/main/README.md?code=true#L2631
 	const input = [`query: ${query}`, ...sentences.map((s) => `passage: ${s}`)];
 	const output: Tensor = await extractor(input, { pooling: "mean", normalize: true });
 
