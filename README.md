@@ -12,16 +12,17 @@ app_port: 3000
 
 # Chat UI
 
-![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/raw/f038917dd40d711a72d654ab1abfc03ae9f177e6/chat-ui-repo-thumbnail.svg)
+![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chatui-websearch.png)
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
 0. [No Setup Deploy](#no-setup-deploy)
 1. [Setup](#setup)
 2. [Launch](#launch)
-3. [Extra parameters](#extra-parameters)
-4. [Deploying to a HF Space](#deploying-to-a-hf-space)
-5. [Building](#building)
+3. [Web Search](#web-search)
+4. [Extra parameters](#extra-parameters)
+5. [Deploying to a HF Space](#deploying-to-a-hf-space)
+6. [Building](#building)
 
 ##  No Setup Deploy
 
@@ -69,6 +70,16 @@ After you're done with the `.env.local` file you can run Chat UI locally with:
 npm install
 npm run dev
 ```
+
+## Web Search
+
+Chat UI features a powerful Web Search feature. It works by:
+
+1. Generating an appropriate Google query from the user prompt.
+2. Performing Google search and extracting content from webpages.
+3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/e5-small-v2](https://huggingface.co/Xenova/e5-small-v2) model.
+4. From these embeddings, find the ones that are closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
+5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
 
 ## Extra parameters
 
@@ -155,7 +166,7 @@ You can change things like the parameters, or customize the preprompt to better 
 
 By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
-However, these templates can be modified by setting the `chatPromptTemplate`, `webSearchSummaryPromptTemplate`, and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
 For example:
 
@@ -187,33 +198,14 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that that the prompt instructs the chat model to only return a few keywords.
 
-The following is the default `webSearchQueryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
+The following is the default `webSearchQueryPromptTemplate`.
 
 ```
 {{userMessageToken}}
-  The following messages were written by a user, trying to answer a question.
+  My question is: {{message.content}}.
+  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
 {{userMessageEndToken}}
-{{#each messages}}
-  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
-{{/each}}
-{{userMessageToken}}
-  What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence.
-{{userMessageEndToken}}
-{{assistantMessageToken}}Query:
-```
-
-**webSearchSummaryPromptTemplate**
-
-The search-engine response (`answer`) is summarized using the following prompt template. However, when `HF_ACCESS_TOKEN` is provided, a dedicated summary model is used instead. Additionally, the model's `query` response to `webSearchQueryPromptTemplate` is also available to this template.
-
-The following is the default `webSearchSummaryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
-
-```
-{{userMessageToken}}{{answer}}{{userMessageEndToken}}
-{{userMessageToken}}
-  The text above should be summarized to best answer the query: {{query}}.
-{{userMessageEndToken}}
-{{assistantMessageToken}}Summary:
+{{assistantMessageToken}}
 ```
 
 #### Running your own models using a custom endpoint

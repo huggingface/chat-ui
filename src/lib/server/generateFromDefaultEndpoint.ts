@@ -29,7 +29,7 @@ export async function generateFromDefaultEndpoint(
 
 	if (randomEndpoint.host === "sagemaker") {
 		const requestParams = JSON.stringify({
-			...newParameters,
+			parameters: newParameters,
 			inputs: prompt,
 		});
 
@@ -56,7 +56,7 @@ export async function generateFromDefaultEndpoint(
 			},
 			method: "POST",
 			body: JSON.stringify({
-				...newParameters,
+				parameters: newParameters,
 				inputs: prompt,
 			}),
 			signal: abortController.signal,

@@ -18,7 +18,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { AwsClient } from "aws4fetch";
 
-export async function POST({ request, fetch, locals, params }) {
+export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const date = new Date();
@@ -38,6 +38,12 @@ export async function POST({ request, fetch, locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
+	await collections.messageEvents.insertOne({
+		userId: userId,
+		createdAt: new Date(),
+		ip: getClientAddress(),
+	});
+
 	if (
 		!locals.user?._id &&
 		requiresUser &&
@@ -46,7 +52,10 @@ export async function POST({ request, fetch, locals, params }) {
 		throw error(429, "Exceeded number of messages before login");
 	}
 
-	const nEvents = await collections.messageEvents.countDocuments({ userId });
+	const nEvents = Math.max(
+		await collections.messageEvents.countDocuments({ userId }),
+		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+	);
 
 	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
 		throw error(429, ERROR_MESSAGES.rateLimited);
@@ -179,11 +188,6 @@ export async function POST({ request, fetch, locals, params }) {
 			id: (responseId as Message["id"]) || crypto.randomUUID(),
 			createdAt: new Date(),
 			updatedAt: new Date(),
-		});
-
-		await collections.messageEvents.insertOne({
-			userId: userId,
-			createdAt: new Date(),
 		});
 
 		await collections.conversations.updateOne(

@@ -3,6 +3,7 @@ import type { Message } from "./types/Message";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { authCondition } from "./server/auth";
+import { format } from "date-fns";
 /**
  * Convert [{user: "assistant", content: "hi"}, {user: "user", content: "hello"}] to:
  *
@@ -39,13 +40,16 @@ export async function buildPrompt({
 
 		if (!conversation) throw new Error("Conversation not found");
 
-		if (webSearch.summary) {
+		if (webSearch.context) {
+			const messagesWithoutLastUsrMsg = messages.slice(0, -1);
+			const lastUserMsg = messages.slice(-1)[0];
+			const currentDate = format(new Date(), "MMMM d, yyyy");
 			messages = [
+				...messagesWithoutLastUsrMsg,
 				{
-					from: "assistant",
-					content: `The following context was found while searching the internet: ${webSearch.summary}`,
+					from: "user",
+					content: `Please answer my question "${lastUserMsg.content}" using the supplied context below (paragrpahs from various websites). For the context, today is ${currentDate}: \n=====================\n${webSearch.context}\n=====================\nSo my question is "${lastUserMsg.content}"`,
 				},
-				...messages,
 			];
 		}
 	}
