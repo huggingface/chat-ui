@@ -8,7 +8,7 @@ import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
-export async function POST({ params, locals, getClientAddress }) {
+export async function POST({ params, locals, getClientAddress, fetch }) {
 	const convId = new ObjectId(params.id);
 
 	const conversation = await collections.conversations.findOne({
@@ -47,7 +47,7 @@ export async function POST({ params, locals, getClientAddress }) {
 		messages: [{ from: "user", content: userPrompt }],
 		model: defaultModel,
 	});
-	const generated_text = await generateFromDefaultEndpoint(prompt);
+	const generated_text = await generateFromDefaultEndpoint(prompt, fetch);
 
 	if (generated_text) {
 		await collections.conversations.updateOne(
@@ -65,8 +65,8 @@ export async function POST({ params, locals, getClientAddress }) {
 		JSON.stringify(
 			generated_text
 				? {
-						title: generated_text,
-				  }
+					title: generated_text,
+				}
 				: {}
 		),
 		{ headers: { "Content-Type": "application/json" } }

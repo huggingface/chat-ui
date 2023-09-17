@@ -17,6 +17,7 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { AwsClient } from "aws4fetch";
+import { base } from "$app/paths";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -141,6 +142,24 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				"Content-Type": "application/json",
 			},
 		});
+	} else if (randomEndpoint.host === "openai") {
+		resp = await fetch(`${base}/openai`, {
+			headers: {
+				"Content-Type": request.headers.get("Content-Type") ?? "application/json",
+			},
+			method: "POST",
+			body: JSON.stringify({
+				stream: true,
+				prompt: prompt,
+				url: randomEndpoint.url,
+				apiKey: randomEndpoint.apiKey,
+				model: randomEndpoint.model,
+				temperature: randomEndpoint.temperature,
+				max_tokens: randomEndpoint.max_tokens,
+			}),
+			signal: abortController.signal,
+		});
+
 	} else {
 		resp = await fetch(randomEndpoint.url, {
 			headers: {
