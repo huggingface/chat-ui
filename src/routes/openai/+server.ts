@@ -63,8 +63,6 @@ export async function POST({ request }) {
             signal: request.signal
         });
 
-    console.log(stream.body);
-
 
     if (body.stream && stream.body) {
         return new Response(streamData(stream.body), {
@@ -73,9 +71,12 @@ export async function POST({ request }) {
             }
         });
     } else {
+        const generated_text = await stream.json().then(
+            (data) => data.choices[0].message.content
+        );
         return new Response(
             JSON.stringify([{
-                generated_text: stream.choices[0]?.message.content
+                generated_text: generated_text
             }]),
             { headers: { "Content-Type": "application/json" } }
         );
@@ -86,7 +87,6 @@ async function* streamData(openaiStream: ReadableStream<Uint8Array>) {
     const decoder = new TextDecoder();
     const textEncoder = new TextEncoder();
     let generated_text = '';
-    console.log(openaiStream);
     for await (const chunk of openaiStream) {
         const decodedChunk = decoder.decode(chunk);
 
