@@ -4,6 +4,7 @@ import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { AwsClient } from "aws4fetch";
+import { base } from "$app/paths";
 
 interface Parameters {
 	temperature: number;
@@ -13,7 +14,8 @@ interface Parameters {
 }
 export async function generateFromDefaultEndpoint(
 	prompt: string,
-	parameters?: Partial<Parameters>
+	fetch: typeof window.fetch = window.fetch,
+	parameters?: Partial<Parameters>,
 ) {
 	const newParameters = {
 		...defaultModel.parameters,
@@ -48,6 +50,24 @@ export async function generateFromDefaultEndpoint(
 				"Content-Type": "application/json",
 			},
 		});
+	} else if (randomEndpoint.host === "openai") {
+		resp = await fetch(`${base}/openai`, {
+			headers: {
+				"Content-Type": "application/json",
+			},
+			method: "POST",
+			body: JSON.stringify({
+				stream: false,
+				prompt: prompt,
+				url: randomEndpoint.url,
+				apiKey: randomEndpoint.apiKey,
+				model: randomEndpoint.model,
+				temperature: randomEndpoint.temperature,
+				max_tokens: randomEndpoint.max_tokens,
+			}),
+			signal: abortController.signal,
+		});
+
 	} else {
 		resp = await fetch(randomEndpoint.url, {
 			headers: {
