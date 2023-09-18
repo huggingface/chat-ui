@@ -137,7 +137,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 			if (webSearch) {
 				webSearchResults = await runWebSearch(conv, newPrompt, update);
-				console.log(webSearchResults);
 			}
 
 			// we can now build the prompt using the messages
@@ -183,7 +182,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 			for await (const output of tokenStream) {
 				if (!output) {
-					console.log("breaking out");
 					break;
 				}
 
