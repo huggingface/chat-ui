@@ -5,11 +5,11 @@ import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
-import { ERROR_MESSAGES } from "$lib/stores/errors.js";
+import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { trimSuffix } from "$lib/utils/trimSuffix";
-import { textGenerationStream, type TextGenerationStreamOutput } from "@huggingface/inference";
+import { textGenerationStream } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -17,81 +17,6 @@ import { AwsClient } from "aws4fetch";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
-import { streamToAsyncIterable } from "$lib/utils/streamToAsyncIterable";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
-import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
-import { makeRequestOptions } from "$lib/server/getInit";
-
-async function parseGeneratedText(
-	stream: ReadableStream,
-	conversationId: ObjectId,
-	promptedAt: Date,
-	abortController: AbortController
-): Promise<string> {
-	const inputs: Uint8Array[] = [];
-	for await (const input of streamToAsyncIterable(stream)) {
-		inputs.push(input);
-
-		console.log(new TextDecoder().decode(concatUint8Arrays(inputs)));
-
-		const date = abortedGenerations.get(conversationId.toString());
-
-		if (date && date > promptedAt) {
-			abortController.abort("Cancelled by user");
-			const completeInput = concatUint8Arrays(inputs);
-
-			const lines = new TextDecoder()
-				.decode(completeInput)
-				.split("\n")
-				.filter((line) => line.startsWith("data:"));
-
-			const tokens = lines.map((line) => {
-				try {
-					const json: TextGenerationStreamOutput = JSON.parse(line.slice("data:".length));
-					return json.token.text;
-				} catch {
-					return "";
-				}
-			});
-			return tokens.join("");
-		}
-	}
-
-	// Merge inputs into a single Uint8Array
-	const completeInput = concatUint8Arrays(inputs);
-
-	// Get last line starting with "data:" and parse it as JSON to get the generated text
-	const message = new TextDecoder().decode(completeInput);
-
-	let lastIndex = message.lastIndexOf("\ndata:");
-	if (lastIndex === -1) {
-		lastIndex = message.indexOf("data");
-	}
-
-	if (lastIndex === -1) {
-		console.error("Could not parse last message", message);
-	}
-
-	let lastMessage = message.slice(lastIndex).trim().slice("data:".length);
-	if (lastMessage.includes("\n")) {
-		lastMessage = lastMessage.slice(0, lastMessage.indexOf("\n"));
-	}
-
-	const lastMessageJSON = JSON.parse(lastMessage);
-
-	if (lastMessageJSON.error) {
-		throw new Error(lastMessageJSON.error);
-	}
-
-	const res = lastMessageJSON.generated_text;
-
-	if (typeof res !== "string") {
-		throw new Error("Could not parse generated text");
-	}
-
-	return res;
-}
-
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);

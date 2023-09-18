@@ -4,7 +4,7 @@ import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import { defaultModel } from "$lib/server/models";
-import { ERROR_MESSAGES } from "$lib/stores/errors.js";
+import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 

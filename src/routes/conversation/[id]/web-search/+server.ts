@@ -11,7 +11,7 @@ import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import { RATE_LIMIT } from "$env/static/private";
-import { ERROR_MESSAGES } from "$lib/stores/errors.js";
+import { ERROR_MESSAGES } from "$lib/stores/errors";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
