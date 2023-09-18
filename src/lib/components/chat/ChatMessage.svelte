@@ -59,10 +59,18 @@
 	let loadingEl: IconLoading;
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 
+	const renderer = new marked.Renderer();
+	// For code blocks with simple backticks
+	renderer.codespan = (code) => {
+		// Unsanitize double-sanitized code
+		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
+	};
+
 	const options: marked.MarkedOptions = {
 		// ...marked.getDefaults(), // Breaks katex
 		gfm: true,
 		breaks: true,
+		renderer,
 	};
 
 	marked.use(
