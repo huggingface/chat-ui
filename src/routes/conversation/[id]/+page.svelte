@@ -117,6 +117,7 @@
 							let update = JSON.parse(el) as MessageUpdate;
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
+								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
 								pending = false;
 
@@ -141,8 +142,6 @@
 					});
 				});
 			}
-
-			invalidate(UrlDependency.Conversation);
 
 			// reset the websearchmessages
 			webSearchMessages = [];
