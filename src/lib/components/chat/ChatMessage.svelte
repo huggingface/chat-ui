@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { marked } from "marked";
+	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
@@ -58,20 +59,18 @@
 	let loadingEl: IconLoading;
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 
-	const renderer = new marked.Renderer();
-
-	// For code blocks with simple backticks
-	renderer.codespan = (code) => {
-		// Unsanitize double-sanitized code
-		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
-	};
-
 	const options: marked.MarkedOptions = {
-		...marked.getDefaults(),
+		// ...marked.getDefaults(), // Breaks katex
 		gfm: true,
 		breaks: true,
-		renderer,
 	};
+
+	marked.use(
+		markedKatex({
+			throwOnError: false,
+			// output: "html",
+		})
+	);
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
 
@@ -140,7 +139,7 @@
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked(token.raw, options)}
+						{@html marked.parse(token.raw, options)}
 					{/if}
 				{/each}
 			</div>
@@ -150,7 +149,7 @@
 					<div class="text-gray-400">Sources:</div>
 					{#each webSearchSources as { link, title, hostname }}
 						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300  dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
 							href={link}
 							target="_blank"
 						>
@@ -173,7 +172,7 @@
 				"
 			>
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score > 0
 						? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
 						: ''}"
@@ -184,7 +183,7 @@
 					<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
 				</button>
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score < 0
 						? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
 						: ''}"
