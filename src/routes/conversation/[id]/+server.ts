@@ -17,6 +17,7 @@ import { AwsClient } from "aws4fetch";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
+
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
@@ -124,7 +125,9 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			const updates: MessageUpdate[] = [];
 
 			function update(newUpdate: MessageUpdate) {
-				updates.push(newUpdate);
+				if (newUpdate.type !== "stream") {
+					updates.push(newUpdate);
+				}
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
 			}
 

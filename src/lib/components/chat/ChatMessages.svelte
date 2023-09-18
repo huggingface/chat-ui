@@ -8,7 +8,7 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -18,12 +18,10 @@
 	export let settings: LayoutData["settings"];
 	export let models: Model[];
 	export let readOnly: boolean;
-	export let searches: Record<string, WebSearchMessage[]>;
 
-	let webSearchArray: Array<WebSearchMessage[] | undefined> = [];
 	let chatContainer: HTMLElement;
 
-	export let webSearchMessages: WebSearchMessage[] = [];
+	export let webSearchMessages: WebSearchUpdate[] = [];
 
 	async function scrollToBottom() {
 		await tick();
@@ -34,17 +32,6 @@
 	$: if (messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
-
-	$: messages,
-		(webSearchArray = messages.map((message, idx) => {
-			if (message.webSearchId) {
-				return searches[message.webSearchId] ?? [];
-			} else if (idx === messages.length - 1) {
-				return webSearchMessages;
-			} else {
-				return [];
-			}
-		}));
 </script>
 
 <div
@@ -60,7 +47,7 @@
 				{isAuthor}
 				{readOnly}
 				model={currentModel}
-				webSearchMessages={webSearchArray[i]}
+				webSearchMessages={i === messages.length - 1 ? webSearchMessages : []}
 				on:retry
 				on:vote
 			/>

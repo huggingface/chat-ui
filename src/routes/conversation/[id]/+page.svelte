@@ -226,7 +226,6 @@
 	{pending}
 	{messages}
 	bind:webSearchMessages
-	searches={{ ...data.searches }}
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}

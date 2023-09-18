@@ -7,7 +7,6 @@ import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { ObjectId } from "mongodb";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -22,8 +21,6 @@ export async function runWebSearch(
 	})() satisfies Message[];
 
 	const webSearch: WebSearch = {
-		_id: new ObjectId(),
-		convId: conv._id,
 		prompt: prompt,
 		searchQuery: "",
 		results: [],
@@ -93,10 +90,14 @@ export async function runWebSearch(
 			if (!usedSources.has(source.link)) {
 				usedSources.add(source.link);
 				webSearch.contextSources.push(source);
+				updatePad({
+					type: "webSearch",
+					messageType: "sources",
+					message: "sources",
+					sources: webSearch.contextSources,
+				});
 			}
 		}
-
-		appendUpdate("Injecting relevant information");
 	} catch (searchError) {
 		if (searchError instanceof Error) {
 			appendUpdate(

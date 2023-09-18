@@ -1,3 +1,5 @@
+import type { WebSearchSource } from "./WebSearch";
+
 export type FinalAnswer = {
 	type: "finalAnswer";
 	text: string;
@@ -17,9 +19,10 @@ export type AgentUpdate = {
 
 export type WebSearchUpdate = {
 	type: "webSearch";
-	messageType: "update" | "error";
+	messageType: "update" | "error" | "sources";
 	message: string;
 	args?: string[];
+	sources?: WebSearchSource[];
 };
 
 export type StatusUpdate = {

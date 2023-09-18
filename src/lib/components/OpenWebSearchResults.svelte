@@ -13,7 +13,7 @@
 
 	let detailsOpen: boolean;
 	let error: boolean;
-	$: error = webSearchMessages[webSearchMessages.length - 2]?.messageType === "error";
+	$: error = webSearchMessages[webSearchMessages.length - 1]?.messageType === "error";
 </script>
 
 <details

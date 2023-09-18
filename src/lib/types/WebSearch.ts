@@ -3,9 +3,8 @@ import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
 
 export interface WebSearch extends Timestamps {
-	_id: ObjectId;
-
-	convId: Conversation["_id"];
+	_id?: ObjectId;
+	convId?: Conversation["_id"];
 
 	prompt: string;
 
