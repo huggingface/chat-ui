@@ -224,23 +224,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			// fetch the endpoint
 			const randomEndpoint = modelEndpoint(model);
 
-			// const abortController = new AbortController();
-			// send the request either to aws or to the inference endpoint
-
-			// const init = makeRequestOptions(
-			// 	{
-			// 		parameters: {
-			// 			...models.find((m) => m.id === conv.model)?.parameters,
-			// 			return_full_text: false,
-			// 		},
-			// 		model: conv.model,
-			// 		inputs: newPrompt,
-			// 	},
-			// 	{
-			// 		use_cache: false,
-			// 	}
-			// );
-
 			let usedFetch = fetch;
 
 			if (randomEndpoint.host === "sagemaker") {
@@ -261,7 +244,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						return_full_text: false,
 					},
 					model: randomEndpoint.url,
-					inputs: newPrompt,
+					inputs: prompt,
 					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
 				},
 				{
@@ -269,9 +252,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					fetch: usedFetch,
 				}
 			);
-
-			// ugly ts trick
-			// https://github.com/microsoft/TypeScript/issues/29867#issuecomment-1519126346
 
 			for await (const output of tokenStream) {
 				if (!output) {
@@ -284,6 +264,10 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					// else we get the next token
 					if (!output.token.special) {
 						const lastMessage = messages[messages.length - 1];
+						update({
+							type: "stream",
+							token: output.token.text,
+						});
 
 						// if the last message is not from assistant, it means this is the first token
 						if (lastMessage?.from !== "assistant") {
@@ -305,11 +289,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						} else {
 							// otherwise we just concatenate tokens
 							lastMessage.content += output.token.text;
-
-							update({
-								type: "stream",
-								token: output.token.text,
-							});
 						}
 					}
 				} else {
