@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { authCondition, requiresUser } from "$lib/server/auth";
@@ -9,7 +9,7 @@ import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 import type { Message } from "$lib/types/Message";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { trimSuffix } from "$lib/utils/trimSuffix";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import { textGenerationStream, type TextGenerationStreamOutput } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -168,7 +168,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 	// get the list of messages
 	// while checking for retries
-	const messages = (() => {
+	let messages = (() => {
 		if (is_retry && messageId) {
 			// if the message is a retry, replace the message and remove the messages after it
 			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
@@ -200,7 +200,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 			function update(newUpdate: MessageUpdate) {
 				updates.push(newUpdate);
-				controller.enqueue(JSON.stringify(newUpdate));
+				controller.enqueue(JSON.stringify(newUpdate) + "\n");
 			}
 
 			update({ type: "status", status: "started" });
@@ -224,25 +224,24 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			// fetch the endpoint
 			const randomEndpoint = modelEndpoint(model);
 
-			const abortController = new AbortController();
-
-			let resp: Response;
-
+			// const abortController = new AbortController();
 			// send the request either to aws or to the inference endpoint
 
-			const init = makeRequestOptions(
-				{
-					parameters: {
-						...models.find((m) => m.id === conv.model)?.parameters,
-						return_full_text: false,
-					},
-					model: conv.model,
-					inputs: newPrompt,
-				},
-				{
-					use_cache: false,
-				}
-			);
+			// const init = makeRequestOptions(
+			// 	{
+			// 		parameters: {
+			// 			...models.find((m) => m.id === conv.model)?.parameters,
+			// 			return_full_text: false,
+			// 		},
+			// 		model: conv.model,
+			// 		inputs: newPrompt,
+			// 	},
+			// 	{
+			// 		use_cache: false,
+			// 	}
+			// );
+
+			let usedFetch = fetch;
 
 			if (randomEndpoint.host === "sagemaker") {
 				const aws = new AwsClient({
@@ -252,123 +251,114 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					service: "sagemaker",
 				});
 
-				resp = await aws.fetch(randomEndpoint.url, {
-					...init.info,
-					headers: {
-						...init.info.headers,
-						"Content-Type": "application/json",
-					},
-					signal: abortController.signal,
-				});
-			} else {
-				resp = await fetch(randomEndpoint.url, {
-					...init.info,
-					headers: {
-						...init.info.headers,
-						"Content-Type": "application/json",
-						Authorization: randomEndpoint.authorization,
-					},
-					signal: abortController.signal,
-				});
+				usedFetch = aws.fetch.bind(aws) as typeof fetch;
 			}
 
-			if (!resp.body) {
-				throw new Error("Response body is empty");
-			}
+			const tokenStream = textGenerationStream(
+				{
+					parameters: {
+						...models.find((m) => m.id === conv.model)?.parameters,
+						return_full_text: false,
+					},
+					model: randomEndpoint.url,
+					inputs: newPrompt,
+					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
+				},
+				{
+					use_cache: false,
+					fetch: usedFetch,
+				}
+			);
 
-			const reader = resp.body.getReader();
 			// ugly ts trick
 			// https://github.com/microsoft/TypeScript/issues/29867#issuecomment-1519126346
 
-			for await (const output of reader as unknown as AsyncGenerator<Uint8Array>) {
-				console.log("output:", output);
+			for await (const output of tokenStream) {
 				if (!output) {
 					console.log("breaking out");
 					break;
 				}
 
-				// // if generated_text is here it means the generation is done
-				// if (output.generated_text) {
-				// 	const lastMessage = messages[messages.length - 1];
+				// if not generated_text is here it means the generation is not done
+				if (!output.generated_text) {
+					// else we get the next token
+					if (!output.token.special) {
+						const lastMessage = messages[messages.length - 1];
 
-				// 	if (lastMessage) {
-				// 		let generated_text = output.generated_text;
+						// if the last message is not from assistant, it means this is the first token
+						if (lastMessage?.from !== "assistant") {
+							// so we create a new message
+							messages = [
+								...messages,
+								// id doesn't match the backend id but it's not important for assistant messages
+								// First token has a space at the beginning, trim it
+								{
+									from: "assistant",
+									content: output.token.text.trimStart(),
+									webSearch: webSearchResults,
+									updates: updates,
+									id: (responseId as Message["id"]) || crypto.randomUUID(),
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+							];
+						} else {
+							// otherwise we just concatenate tokens
+							lastMessage.content += output.token.text;
 
-				// 		// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
-				// 		if (generated_text.startsWith(prompt)) {
-				// 			generated_text = generated_text.slice(prompt.length);
-				// 		}
+							update({
+								type: "stream",
+								token: output.token.text,
+							});
+						}
+					}
+				} else {
+					const lastMessage = messages[messages.length - 1];
 
-				// 		generated_text = trimSuffix(
-				// 			trimPrefix(generated_text, "<|startoftext|>"),
-				// 			PUBLIC_SEP_TOKEN
-				// 		).trimEnd();
+					if (lastMessage) {
+						let generated_text = output.generated_text;
 
-				// 		// remove the stop tokens
-				// 		for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
-				// 			if (generated_text.endsWith(stop)) {
-				// 				generated_text = generated_text.slice(0, -stop.length).trimEnd();
-				// 			}
-				// 		}
-				// 		lastMessage.content = generated_text;
+						// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
+						if (generated_text.startsWith(prompt)) {
+							generated_text = generated_text.slice(prompt.length);
+						}
 
-				// 		await collections.conversations.updateOne(
-				// 			{
-				// 				_id: convId,
-				// 			},
-				// 			{
-				// 				$set: {
-				// 					messages,
-				// 					updatedAt: new Date(),
-				// 				},
-				// 			}
-				// 		);
+						generated_text = trimSuffix(
+							trimPrefix(generated_text, "<|startoftext|>"),
+							PUBLIC_SEP_TOKEN
+						).trimEnd();
 
-				// 		update({
-				// 			type: "finalAnswer",
-				// 			text: generated_text,
-				// 		});
-				// 	}
-				// 	break;
-				// }
+						// remove the stop tokens
+						for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
+							if (generated_text.endsWith(stop)) {
+								generated_text = generated_text.slice(0, -stop.length).trimEnd();
+							}
+						}
+						lastMessage.content = generated_text;
 
-				// // else we get the next token
-				// if (!output.token.special) {
-				// 	console.log(output.token.text);
-				// 	const lastMessage = messages[messages.length - 1];
+						await collections.conversations.updateOne(
+							{
+								_id: convId,
+							},
+							{
+								$set: {
+									messages,
+									updatedAt: new Date(),
+								},
+							}
+						);
 
-				// 	// if the last message is not from assistant, it means this is the first token
-				// 	if (lastMessage?.from !== "assistant") {
-				// 		// so we create a new message
-				// 		messages = [
-				// 			...messages,
-				// 			// id doesn't match the backend id but it's not important for assistant messages
-				// 			// First token has a space at the beginning, trim it
-				// 			{
-				// 				from: "assistant",
-				// 				content: output.token.text.trimStart(),
-				// 				webSearch: webSearchResults,
-				// 				updates: updates,
-				// 				id: (responseId as Message["id"]) || crypto.randomUUID(),
-				// 				createdAt: new Date(),
-				// 				updatedAt: new Date(),
-				// 			},
-				// 		];
-				// 	} else {
-				// 		// otherwise we just concatenate tokens
-				// 		lastMessage.content += output.token.text;
-
-				// 		update({
-				// 			type: "stream",
-				// 			token: output.token.text,
-				// 		});
-				// 	}
-				// }
+						update({
+							type: "finalAnswer",
+							text: generated_text,
+						});
+					}
+					break;
+				}
 			}
 		},
 	});
 
-	console.log("aaaaa");
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream);
 }

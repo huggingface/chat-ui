@@ -65,7 +65,6 @@
 			];
 
 			const responseId = randomUUID();
-			console.log("posting lol");
 
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
@@ -86,13 +85,12 @@
 			// eslint-disable-next-line no-undef
 			const encoder = new TextDecoderStream();
 			const reader = response?.body?.pipeThrough(encoder).getReader();
-
 			let finalAnswer = "";
 
 			// this is a bit ugly
 			// we read the stream until we get the final answer
 			while (finalAnswer === "") {
-				await new Promise((r) => setTimeout(r, 25));
+				// await new Promise((r) => setTimeout(r, 25));
 
 				// check for abort
 				if (isAborted) {
@@ -101,7 +99,7 @@
 				}
 
 				// if there is something to read
-				reader?.read().then(async ({ done, value }) => {
+				await reader?.read().then(async ({ done, value }) => {
 					// we read, if it's done we cancel
 					if (done) {
 						reader.cancel();
@@ -113,31 +111,32 @@
 					}
 
 					// if it's not done we parse the value, which contains all messages
-					try {
-						let update = JSON.parse(value) as MessageUpdate;
-						if (update.type === "finalAnswer") {
-							finalAnswer = update.text;
-						} else if (update.type === "stream") {
-							let lastMessage = messages[messages.length - 1];
+					const inputs = value.split("\n");
+					inputs.forEach((el: string) => {
+						try {
+							let update = JSON.parse(el) as MessageUpdate;
+							if (update.type === "finalAnswer") {
+								finalAnswer = update.text;
+							} else if (update.type === "stream") {
+								let lastMessage = messages[messages.length - 1];
 
-							if (lastMessage.from !== "assistant") {
-								messages = [
-									...messages,
-									{ from: "assistant", id: randomUUID(), content: update.token },
-								];
-							} else {
-								lastMessage.content += update.token;
-								messages = [...messages];
+								if (lastMessage.from !== "assistant") {
+									messages = [
+										...messages,
+										{ from: "assistant", id: randomUUID(), content: update.token },
+									];
+								} else {
+									lastMessage.content += update.token;
+									messages = [...messages];
+								}
+							} else if (update.type === "webSearch") {
+								webSearchMessages = [...webSearchMessages, update];
 							}
-						} else if (update.type === "webSearch") {
-							console.log(update);
-							webSearchMessages = [...webSearchMessages, update];
+						} catch (parseError) {
+							// in case of parsing error we wait for the next message
+							return;
 						}
-					} catch (parseError) {
-						console.log(parseError, value);
-						// in case of parsing error we wait for the next message
-						return;
-					}
+					});
 				});
 			}
 
