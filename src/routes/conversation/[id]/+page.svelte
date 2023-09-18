@@ -118,6 +118,8 @@
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
 							} else if (update.type === "stream") {
+								pending = false;
+
 								let lastMessage = messages[messages.length - 1];
 
 								if (lastMessage.from !== "assistant") {
