@@ -17,6 +17,9 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { AwsClient } from "aws4fetch";
+import OpenAI from "openai";
+import { openAICompletionToTextGenerationStream } from "$lib/utils/openAICompletionToTextGenerationStream";
+import { openAIChatToTextGenerationStream } from "$lib/utils/openAIChatToTextGenerationStream";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -142,33 +145,60 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			},
 		});
 	} else if (randomEndpoint.host === "openai-compatible") {
-		const openaiResp = await fetch(randomEndpoint.url, {
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `${randomEndpoint.authorization}` ?? `Bearer sk-null`,
+		const openai = new OpenAI({
+			apiKey: randomEndpoint.apiKey,
+			baseURL: randomEndpoint.baseURL,
+		});
+		const textGenerationStream =
+			randomEndpoint.type === "completions"
+				? openAICompletionToTextGenerationStream(
+						await openai.completions.create(
+							{
+								model: model.id ?? model.name,
+								prompt,
+								stream: true,
+								max_tokens: model.parameters?.max_new_tokens,
+								stop: model.parameters?.stop,
+								temperature: model.parameters?.temperature,
+								top_p: model.parameters?.top_p,
+								frequency_penalty: model.parameters?.repetition_penalty,
+							},
+							{ signal: abortController.signal }
+						),
+						abortController.signal
+				  )
+				: openAIChatToTextGenerationStream(
+						await openai.chat.completions.create(
+							{
+								model: model.id ?? model.name,
+								messages: [{ role: "user", content: prompt }],
+								stream: true,
+								max_tokens: model.parameters?.max_new_tokens,
+								stop: model.parameters?.stop,
+								temperature: model.parameters?.temperature,
+								top_p: model.parameters?.top_p,
+								frequency_penalty: model.parameters?.repetition_penalty,
+							},
+							{ signal: abortController.signal }
+						),
+						abortController.signal
+				  );
+		const readableStream = new ReadableStream({
+			async start(controller) {
+				for await (const chuck of textGenerationStream) {
+					if (abortController.signal.aborted) {
+						break;
+					}
+					controller.enqueue(chuck);
+				}
+				controller.close();
 			},
-			method: "POST",
-			body: JSON.stringify({
-				stream: true,
-				model: model.id ?? model.name,
-				prompt,
-				max_tokens: model.parameters?.max_new_tokens,
-				stop: model.parameters?.stop,
-				temperature: model.parameters?.temperature,
-				top_p: model.parameters?.top_p,
-				frequency_penalty: model.parameters?.repetition_penalty,
-			}),
-			signal: abortController.signal,
+			cancel() {
+				abortController.abort();
+			},
 		});
 
-		if (!openaiResp.body) {
-			throw new Error("Response body is empty");
-		}
-
-		// Needs this to work around that ts thinks that ReadableStream is not an AsyncGenerator
-		// https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/62651
-		const body = stream(openaiResp.body as unknown as AsyncGenerator<Uint8Array>);
-		resp = new Response(body as unknown as ReadableStream<Uint8Array>, {
+		resp = new Response(readableStream, {
 			headers: {
 				"Content-Type": "text/event-stream",
 			},
@@ -359,60 +389,4 @@ export async function PATCH({ request, locals, params }) {
 	);
 
 	return new Response();
-}
-
-async function* stream(asyncGenerator: AsyncGenerator<Uint8Array>) {
-	const textdecoder = new TextDecoder();
-	const textEncoder = new TextEncoder();
-	let generatedText = "";
-	let tokenId = 0;
-	// Needs this to work around that ts thinks that ReadableStream is not an AsyncGenerator
-	// https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/62651
-	for await (const chunk of asyncGenerator) {
-		const decoded = textdecoder.decode(chunk);
-		console.log({ decoded });
-		const lines = decoded.split(/\r\n/g);
-		console.log({ lines });
-		const parsedLines = lines
-			.map((line) => line.replace(/^data: /, "").trim()) // Remove the "data: " prefix
-			.filter((line) => line !== "" && line !== "[DONE]") // Remove empty lines and "[DONE]"
-			.map((line) => {
-				console.log({ line });
-				return JSON.parse(line);
-			});
-		console.log(JSON.stringify(parsedLines, null, 2));
-		if (parsedLines[0].error) {
-			throw new Error(parsedLines[0].error.message);
-		}
-
-		for (const parsedLine of parsedLines) {
-			const { choices } = parsedLine as {
-				id: string;
-				object: "text_completion.chunk";
-				created: string;
-				model: string;
-				choices: [
-					{
-						indext: number;
-						text: string;
-						finish_reason: string;
-					}
-				];
-			};
-			const { text } = choices[0];
-			const last = choices[0]?.finish_reason === "stop";
-			generatedText = generatedText + text;
-			const output: TextGenerationStreamOutput = {
-				token: {
-					id: tokenId++,
-					text,
-					logprob: 0,
-					special: last ? true : false,
-				},
-				generated_text: last ? generatedText : null,
-				details: null,
-			};
-			yield textEncoder.encode("data:" + JSON.stringify(output) + "\n\n");
-		}
-	}
 }

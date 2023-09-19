@@ -4,6 +4,9 @@ import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { AwsClient } from "aws4fetch";
+import { openAIChatToTextGenerationStream } from "$lib/utils/openAIChatToTextGenerationStream";
+import { openAICompletionToTextGenerationStream } from "$lib/utils/openAICompletionToTextGenerationStream";
+import OpenAI from "openai";
 
 interface Parameters {
 	temperature: number;
@@ -49,24 +52,66 @@ export async function generateFromDefaultEndpoint(
 			},
 		});
 	} else if (randomEndpoint.host === "openai-compatible") {
-		resp = await fetch(randomEndpoint.url, {
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `${randomEndpoint.authorization}` ?? `Bearer sk-null`,
+		// TODO: should not use stream:true
+		const openai = new OpenAI({
+			apiKey: randomEndpoint.apiKey,
+			baseURL: randomEndpoint.baseURL,
+		});
+		const textGenerationStream =
+			randomEndpoint.type === "completions"
+				? openAICompletionToTextGenerationStream(
+						await openai.completions.create(
+							{
+								model: defaultModel.id ?? defaultModel.name,
+								prompt,
+								stream: true,
+								max_tokens: defaultModel.parameters?.max_new_tokens,
+								stop: defaultModel.parameters?.stop,
+								temperature: defaultModel.parameters?.temperature,
+								top_p: defaultModel.parameters?.top_p,
+								frequency_penalty: defaultModel.parameters?.repetition_penalty,
+							},
+							{ signal: abortController.signal }
+						),
+						abortController.signal
+				  )
+				: openAIChatToTextGenerationStream(
+						await openai.chat.completions.create(
+							{
+								model: defaultModel.id ?? defaultModel.name,
+								messages: [{ role: "user", content: prompt }],
+								stream: true,
+								max_tokens: defaultModel.parameters?.max_new_tokens,
+								stop: defaultModel.parameters?.stop,
+								temperature: defaultModel.parameters?.temperature,
+								top_p: defaultModel.parameters?.top_p,
+								frequency_penalty: defaultModel.parameters?.repetition_penalty,
+							},
+							{ signal: abortController.signal }
+						),
+						abortController.signal
+				  );
+		const readableStream = new ReadableStream({
+			async start(controller) {
+				for await (const chuck of textGenerationStream) {
+					if (abortController.signal.aborted) {
+						break;
+					}
+					controller.enqueue(chuck);
+				}
+				controller.close();
 			},
-			method: "POST",
-			body: JSON.stringify({
-				stream: false,
-				model: defaultModel.id ?? defaultModel.name,
-				prompt,
-				max_tokens: defaultModel.parameters?.max_new_tokens,
-				stop: defaultModel.parameters?.stop,
-				temperature: defaultModel.parameters?.temperature,
-				top_p: defaultModel.parameters?.top_p,
-				// top_k: defaultModel.parameters?.top_k,
-				frequency_penalty: defaultModel.parameters?.repetition_penalty,
-			}),
-			signal: abortController.signal,
+			cancel() {
+				abortController.abort();
+			},
+		});
+
+		resp = new Response(readableStream, {
+			headers: {
+				"Content-Type": "text/event-stream",
+			},
+			status: 200,
+			statusText: "OK",
 		});
 	} else {
 		resp = await fetch(randomEndpoint.url, {
