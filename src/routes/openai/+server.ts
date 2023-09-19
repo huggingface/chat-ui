@@ -1,5 +1,3 @@
-import { OPENAI_API_KEY } from '$env/static/private';
-
 const FORMAT_REGEX = RegExp(/<\|(system|user|assistant)\|>([^<]+)<\/s>/g);
 
 interface ChatCompletionMessageParam {
@@ -7,14 +5,34 @@ interface ChatCompletionMessageParam {
     role: 'system' | 'user' | 'assistant';
 }
 
-export interface ChatCompletion {
+interface ChatCompletion {
     id: string;
     choices: {
-        finish_reason: 'stop' | 'length' | 'function_call';
+        message: {
+            content?: string
+            role: 'system' | 'user' | 'assistant';
+        }
+        finish_reason?: 'stop' | 'length' | 'function_call';
+        index: number
+    }[]
+    created: number
+    model: string
+    object: string
+    usage?: {
+        prompt_tokens: number
+        completion_tokens: number
+        total_tokens: number
+    }
+}
+
+interface StreamingChatCompletion {
+    id: string;
+    choices: {
         delta: {
-            content: string | null;
+            content?: string;
             role: 'system' | 'user' | 'assistant';
         };
+        finish_reason?: 'stop' | 'length' | 'function_call';
         index: number;
     }[];
     created: number;
@@ -39,40 +57,38 @@ function formatMessages(prompt: string) {
     }
     return messages;
 }
+
 export async function POST({ request }) {
     const body = await request.json();
     const prompt = body.prompt;
 
     const messages = formatMessages(prompt)
 
-    const stream = await fetch(
-        body.url || "https://api.openai.com/v1/chat/completions",
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': "Bearer " + body.apiKey,
-            },
-            body: JSON.stringify({
-                messages: messages,
-                stream: body.stream,
-                model: body?.model,
-                temperature: body?.temperature,
-                max_tokens: body?.max_tokens,
-            }),
-            signal: request.signal
-        });
+    const response = await fetch(body.url || "https://api.openai.com/v1/chat/completions", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': "Bearer " + body.apiKey,
+        },
+        body: JSON.stringify({
+            messages: messages,
+            stream: body.stream,
+            model: body?.model,
+            temperature: body?.temperature,
+            max_tokens: body?.max_tokens,
+        }),
+        signal: request.signal
+    });
 
-
-    if (body.stream && stream.body) {
-        return new Response(streamData(stream.body), {
+    if (body.stream) {
+        return new Response(streamData(response.body), {
             headers: {
                 'content-type': 'text/event-stream',
             }
         });
     } else {
-        const generated_text = await stream.json().then(
-            (data) => data.choices[0].message.content
+        const generated_text = await response.json().then(
+            (data: ChatCompletion) => data.choices[0].message.content
         );
         return new Response(
             JSON.stringify([{
@@ -95,16 +111,23 @@ async function* streamData(openaiStream: ReadableStream<Uint8Array>) {
             .split("\n")
             .map((line) => line.replace("data: ", ""))
             .filter((line) => line.length > 0)
-            .filter((line) => line !== "[DONE]")
-            .map((line) => JSON.parse(line));
 
-        for (const line of lines as ChatCompletion[]) {
-            const is_last_chunk = line.choices[0]?.finish_reason === 'stop';
-            const text = line.choices[0]?.delta.content || '';
+        for (const line of lines) {
+            let is_last_chunk;
+            let text;
+            if (line === "[DONE]") {
+                is_last_chunk = true;
+                text = "";
+            } else {
+                const completion = JSON.parse(line) as StreamingChatCompletion;
+                is_last_chunk = completion.choices[0]?.finish_reason === 'stop';
+                text = completion.choices[0]?.delta.content || '';
+            }
+
             generated_text += text;
             const hf_chunk = {
                 token: {
-                    id: is_last_chunk ? 0 : Math.floor(Math.random() * 1000),
+                    id: is_last_chunk ? 0 : Math.floor(Math.random() * 10_000),
                     text: is_last_chunk ? "" : text,
                     logprob: 0,
                     special: is_last_chunk ? true : false,
