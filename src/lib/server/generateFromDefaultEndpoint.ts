@@ -52,7 +52,7 @@ export async function generateFromDefaultEndpoint(
 		resp = await fetch(randomEndpoint.url, {
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${randomEndpoint.authorization}` ?? `Bearer sk-null`,
+				Authorization: `${randomEndpoint.authorization}` ?? `Bearer sk-null`,
 			},
 			method: "POST",
 			body: JSON.stringify({
@@ -63,7 +63,7 @@ export async function generateFromDefaultEndpoint(
 				stop: defaultModel.parameters?.stop,
 				temperature: defaultModel.parameters?.temperature,
 				top_p: defaultModel.parameters?.top_p,
-				top_k: defaultModel.parameters?.top_k,
+				// top_k: defaultModel.parameters?.top_k,
 				frequency_penalty: defaultModel.parameters?.repetition_penalty,
 			}),
 			signal: abortController.signal,
