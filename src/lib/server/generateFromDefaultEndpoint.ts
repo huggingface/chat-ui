@@ -48,6 +48,26 @@ export async function generateFromDefaultEndpoint(
 				"Content-Type": "application/json",
 			},
 		});
+	} else if (randomEndpoint.host === "openai-compatible") {
+		resp = await fetch(randomEndpoint.url, {
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${randomEndpoint.authorization}` ?? `Bearer sk-null`,
+			},
+			method: "POST",
+			body: JSON.stringify({
+				stream: false,
+				model: defaultModel.id ?? defaultModel.name,
+				prompt,
+				max_tokens: defaultModel.parameters?.max_new_tokens,
+				stop: defaultModel.parameters?.stop,
+				temperature: defaultModel.parameters?.temperature,
+				top_p: defaultModel.parameters?.top_p,
+				top_k: defaultModel.parameters?.top_k,
+				frequency_penalty: defaultModel.parameters?.repetition_penalty,
+			}),
+			signal: abortController.signal,
+		});
 	} else {
 		resp = await fetch(randomEndpoint.url, {
 			headers: {

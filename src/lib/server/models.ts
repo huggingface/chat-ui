@@ -1,9 +1,15 @@
-import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
+import { HF_ACCESS_TOKEN, OPENAI_API_KEY, MODELS, OLD_MODELS } from "$env/static/private";
 import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+
+const openAICompatibleEndpoint = z.object({
+	host: z.literal("openai-compatible"),
+	url: z.string().url().default("https://api.openai.com/v1/chat/completions"),
+	authorization: z.string().min(1).default(`Bearer ${OPENAI_API_KEY}`),
+});
 
 const sagemakerEndpoint = z.object({
 	host: z.literal("sagemaker"),
@@ -24,7 +30,11 @@ const commonEndpoint = z.object({
 });
 
 const endpoint = z.lazy(() =>
-	z.union([sagemakerEndpoint.merge(commonEndpoint), tgiEndpoint.merge(commonEndpoint)])
+	z.union([
+		openAICompatibleEndpoint.merge(commonEndpoint),
+		sagemakerEndpoint.merge(commonEndpoint),
+		tgiEndpoint.merge(commonEndpoint),
+	])
 );
 
 const combinedEndpoint = endpoint.transform((data) => {
@@ -32,6 +42,8 @@ const combinedEndpoint = endpoint.transform((data) => {
 		return tgiEndpoint.merge(commonEndpoint).parse(data);
 	} else if (data.host === "sagemaker") {
 		return sagemakerEndpoint.merge(commonEndpoint).parse(data);
+	} else if (data.host === "openai-compatible") {
+		return openAICompatibleEndpoint.merge(commonEndpoint).parse(data);
 	} else {
 		throw new Error(`Invalid host: ${data.host}`);
 	}
@@ -91,6 +103,9 @@ const modelsRaw = z
 					truncate: z.number().int().positive(),
 					max_new_tokens: z.number().int().positive(),
 					stop: z.array(z.string()).optional(),
+					top_p: z.number().positive(),
+					top_k: z.number().positive(),
+					repetition_penalty: z.number().positive(),
 				})
 				.passthrough()
 				.optional(),

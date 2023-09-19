@@ -141,6 +141,95 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				"Content-Type": "application/json",
 			},
 		});
+	} else if (randomEndpoint.host === "openai-compatible") {
+		const openaiResp = await fetch(randomEndpoint.url, {
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${randomEndpoint.authorization}` ?? `Bearer sk-null`,
+			},
+			method: "POST",
+			body: JSON.stringify({
+				stream: true,
+				model: model.id ?? model.name,
+				prompt,
+				max_tokens: model.parameters?.max_new_tokens,
+				stop: model.parameters?.stop,
+				temperature: model.parameters?.temperature,
+				top_p: model.parameters?.top_p,
+				top_k: model.parameters?.top_k,
+				frequency_penalty: model.parameters?.repetition_penalty,
+			}),
+			signal: abortController.signal,
+		});
+
+		const readableStream = new ReadableStream({
+			async start(controller) {
+				if (!openaiResp.body) {
+					throw new Error("Response body is empty");
+				}
+				const reader = openaiResp.body.getReader();
+				const decoder = new TextDecoder("utf-8");
+				const textEncoder = new TextEncoder();
+				let generatedText = "";
+				let isDone = false;
+
+				while (!isDone) {
+					const { done, value } = await reader.read();
+
+					isDone = done;
+					const chunk = decoder.decode(value);
+					const lines = chunk.split(/\r\n/g);
+					const parsedLines = lines
+						.map((line) => line.replace(/^data: /, "").trim()) // Remove the "data: " prefix
+						.filter((line) => line !== "" && line !== "[DONE]") // Remove empty lines and "[DONE]"
+						.map((line) => JSON.parse(line));
+
+					let tokenId = 0;
+					if (parsedLines.length > 0) {
+						for (const parsedLine of parsedLines) {
+							const { choices } = parsedLine as {
+								id: string;
+								object: "text_completion.chunk";
+								created: string;
+								model: string;
+								choices: [
+									{
+										indext: number;
+										text: string;
+										finish_reason: string;
+									}
+								];
+							};
+							const { text } = choices[0];
+							const last = choices[0]?.finish_reason === "stop";
+							generatedText = generatedText + text;
+							const output: TextGenerationStreamOutput = {
+								token: {
+									id: tokenId++,
+									text,
+									logprob: 0,
+									special: last ? true : false,
+								},
+								generated_text: last ? generatedText : null,
+								details: null,
+							};
+							controller.enqueue(textEncoder.encode("data:" + JSON.stringify(output) + "\n\n"));
+						}
+					}
+				}
+				controller.close();
+			},
+			cancel() {
+				abortController.abort();
+			},
+		});
+		resp = new Response(readableStream, {
+			headers: {
+				"Content-Type": "text/event-stream",
+			},
+			status: 200,
+			statusText: "OK",
+		});
 	} else {
 		resp = await fetch(randomEndpoint.url, {
 			headers: {
