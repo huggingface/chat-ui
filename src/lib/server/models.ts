@@ -2,6 +2,7 @@ import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
+import { error } from '@sveltejs/kit';
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -37,6 +38,14 @@ const combinedEndpoint = endpoint.transform((data) => {
 	}
 });
 
+let parsedModels;
+try {
+	parsedModels = JSON.parse(MODELS);
+} catch (e) {
+	throw error(500, {
+		message: "There's a formatting error in your MODELS .env file. Please check it (missing/extra commas, etc.).",
+	});
+}
 const modelsRaw = z
 	.array(
 		z.object({
@@ -61,20 +70,20 @@ const modelsRaw = z
 				.string()
 				.default(
 					"{{preprompt}}" +
-						"{{#each messages}}" +
-						"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
-						"{{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}" +
-						"{{/each}}" +
-						"{{assistantMessageToken}}"
+					"{{#each messages}}" +
+					"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
+					"{{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}" +
+					"{{/each}}" +
+					"{{assistantMessageToken}}"
 				),
 			webSearchQueryPromptTemplate: z
 				.string()
 				.default(
 					"{{userMessageToken}}" +
-						'My question is: "{{message.content}}". ' +
-						"Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
-						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}"
+					'My question is: "{{message.content}}". ' +
+					"Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
+					"{{userMessageEndToken}}" +
+					"{{assistantMessageToken}}"
 				),
 			promptExamples: z
 				.array(
@@ -96,7 +105,7 @@ const modelsRaw = z
 				.optional(),
 		})
 	)
-	.parse(JSON.parse(MODELS));
+	.parse(parsedModels);
 
 export const models = await Promise.all(
 	modelsRaw.map(async (m) => ({
@@ -117,15 +126,15 @@ export const models = await Promise.all(
 // Models that have been deprecated
 export const oldModels = OLD_MODELS
 	? z
-			.array(
-				z.object({
-					id: z.string().optional(),
-					name: z.string().min(1),
-					displayName: z.string().min(1).optional(),
-				})
-			)
-			.parse(JSON.parse(OLD_MODELS))
-			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
+		.array(
+			z.object({
+				id: z.string().optional(),
+				name: z.string().min(1),
+				displayName: z.string().min(1).optional(),
+			})
+		)
+		.parse(JSON.parse(OLD_MODELS))
+		.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
 export type BackendModel = Optional<(typeof models)[0], "preprompt">;
