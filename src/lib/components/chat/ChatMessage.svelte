@@ -66,8 +66,13 @@
 		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
 	};
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { extensions, ...defaults } = marked.getDefaults() as marked.MarkedOptions & {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		extensions: any;
+	};
 	const options: marked.MarkedOptions = {
-		// ...marked.getDefaults(), // Breaks katex
+		...defaults,
 		gfm: true,
 		breaks: true,
 		renderer,
