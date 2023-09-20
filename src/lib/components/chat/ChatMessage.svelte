@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { marked } from "marked";
+	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
@@ -59,19 +60,30 @@
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 
 	const renderer = new marked.Renderer();
-
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
 		// Unsanitize double-sanitized code
 		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
 	};
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { extensions, ...defaults } = marked.getDefaults() as marked.MarkedOptions & {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		extensions: any;
+	};
 	const options: marked.MarkedOptions = {
-		...marked.getDefaults(),
+		...defaults,
 		gfm: true,
 		breaks: true,
 		renderer,
 	};
+
+	marked.use(
+		markedKatex({
+			throwOnError: false,
+			// output: "html",
+		})
+	);
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
 
@@ -140,7 +152,7 @@
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked(token.raw, options)}
+						{@html marked.parse(token.raw, options)}
 					{/if}
 				{/each}
 			</div>
@@ -150,7 +162,7 @@
 					<div class="text-gray-400">Sources:</div>
 					{#each webSearchSources as { link, title, hostname }}
 						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300  dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
 							href={link}
 							target="_blank"
 						>
