@@ -6,7 +6,10 @@ function innerProduct(tensor1: Tensor, tensor2: Tensor) {
 	return 1.0 - dot(tensor1.data, tensor2.data);
 }
 
-const extractor = await pipeline("feature-extraction", "Xenova/gte-small");
+const modelId = "Xenova/gte-small";
+const extractor = await pipeline("feature-extraction", modelId);
+// see https://huggingface.co/thenlper/gte-small/blob/d8e2604cadbeeda029847d19759d219e0ce2e6d8/README.md?code=true#L2625
+export const MAX_SEQ_LEN = 512 as const;
 
 export async function findSimilarSentences(
 	query: string,
