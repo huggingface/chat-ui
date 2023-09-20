@@ -30,7 +30,7 @@ export async function buildPrompt({
 			...messagesWithoutLastUsrMsg,
 			{
 				from: "user",
-				content: `Please answer my question "${lastUserMsg.content}" using the supplied context below (paragrpahs from various websites). For the context, today is ${currentDate}: 
+				content: `Please answer my question "${lastUserMsg.content}" using the supplied context below (paragraphs from various websites). For the context, today is ${currentDate}: 
 				=====================
 				${webSearch.context}
 				=====================
