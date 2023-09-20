@@ -3,6 +3,7 @@ import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 import { error } from '@sveltejs/kit';
+import { parse } from "jsonlint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -40,10 +41,10 @@ const combinedEndpoint = endpoint.transform((data) => {
 
 let parsedModels;
 try {
-	parsedModels = JSON.parse(MODELS);
+	parsedModels = parse(MODELS);
 } catch (e) {
 	throw error(500, {
-		message: "There's a formatting error in your MODELS .env file. Please check it (missing/extra commas, etc.).",
+		message: e as string,
 	});
 }
 const modelsRaw = z
