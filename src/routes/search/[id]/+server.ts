@@ -1,5 +1,5 @@
 import { collections } from "$lib/server/database";
-import { hashConv } from "$lib/utils/hashConv.js";
+import { hashConv } from "$lib/utils/hashConv";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
