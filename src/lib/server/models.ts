@@ -43,8 +43,11 @@ let parsedModels;
 try {
 	parsedModels = parse(MODELS);
 } catch (e) {
+	const { stack, message } = e as Error;
+	console.log(stack);
+	const error_message = message.replace("---", "<br>---").replace("-^", "-^<br>");
 	throw error(500, {
-		message: e as string,
+		message: error_message,
 	});
 }
 const modelsRaw = z
@@ -71,20 +74,20 @@ const modelsRaw = z
 				.string()
 				.default(
 					"{{preprompt}}" +
-						"{{#each messages}}" +
-						"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
-						"{{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}" +
-						"{{/each}}" +
-						"{{assistantMessageToken}}"
+					"{{#each messages}}" +
+					"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
+					"{{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}" +
+					"{{/each}}" +
+					"{{assistantMessageToken}}"
 				),
 			webSearchQueryPromptTemplate: z
 				.string()
 				.default(
 					"{{userMessageToken}}" +
-						'My question is: "{{message.content}}". ' +
-						"Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
-						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}"
+					'My question is: "{{message.content}}". ' +
+					"Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
+					"{{userMessageEndToken}}" +
+					"{{assistantMessageToken}}"
 				),
 			promptExamples: z
 				.array(
@@ -127,15 +130,15 @@ export const models = await Promise.all(
 // Models that have been deprecated
 export const oldModels = OLD_MODELS
 	? z
-			.array(
-				z.object({
-					id: z.string().optional(),
-					name: z.string().min(1),
-					displayName: z.string().min(1).optional(),
-				})
-			)
-			.parse(JSON.parse(OLD_MODELS))
-			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
+		.array(
+			z.object({
+				id: z.string().optional(),
+				name: z.string().min(1),
+				displayName: z.string().min(1).optional(),
+			})
+		)
+		.parse(JSON.parse(OLD_MODELS))
+		.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
 export type BackendModel = Optional<(typeof models)[0], "preprompt">;
