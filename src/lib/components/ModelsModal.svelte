@@ -72,7 +72,7 @@
 				{@const active = model.id === selectedModelId}
 				<div
 					class="relative rounded-xl border border-gray-100 {active
-						? 'from-primary-200/40 via-primary-500/10 bg-gradient-to-r'
+						? 'bg-gradient-to-r from-primary-200/40 via-primary-500/10'
 						: ''}"
 				>
 					<label
