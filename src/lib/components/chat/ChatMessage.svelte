@@ -6,6 +6,7 @@
 	import { page } from "$app/stores";
 
 	import CodeBlock from "../CodeBlock.svelte";
+	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
 	import CarbonDownload from "~icons/carbon/download";
@@ -195,6 +196,10 @@
 				>
 					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 				</button>
+				<CopyToClipBoardBtn
+					classNames="border-none rounded-sm p-1 focus:ring-0"
+					value={message.content}
+				/>
 			</div>
 		{/if}
 	</div>
