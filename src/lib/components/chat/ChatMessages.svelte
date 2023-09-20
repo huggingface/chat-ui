@@ -9,6 +9,7 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import { browser } from "$app/environment";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -29,7 +30,7 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	$: if (messages[messages.length - 1]?.from === "user") {
+	$: if (browser && messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
 </script>
