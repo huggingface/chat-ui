@@ -4,7 +4,10 @@ import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
-import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
+import {
+	MAX_SEQ_LEN as CHUNK_CAR_LEN,
+	findSimilarSentences,
+} from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 
@@ -62,7 +65,6 @@ export async function runWebSearch(
 				} catch (e) {
 					console.error(`Error parsing webpage "${link}"`, e);
 				}
-				const CHUNK_CAR_LEN = 512;
 				const MAX_N_CHUNKS = 100;
 				const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
 				return texts.map((t) => ({ source: result, text: t }));
