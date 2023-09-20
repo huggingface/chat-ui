@@ -197,7 +197,7 @@
 					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 				</button>
 				<CopyToClipBoardBtn
-					classNames="border-none rounded-sm p-1 focus:ring-0"
+					classNames="border-none rounded-sm p-1 focus:ring-0 px-0 py-0"
 					value={message.content}
 				/>
 			</div>
