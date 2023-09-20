@@ -72,7 +72,7 @@
 				{@const active = model.id === selectedModelId}
 				<div
 					class="rounded-xl border border-gray-100 {active
-						? 'bg-gradient-to-r from-primary-200/40 via-primary-500/10'
+						? 'from-primary-200/40 via-primary-500/10 bg-gradient-to-r'
 						: ''}"
 				>
 					<label class="group flex cursor-pointer p-3" on:change aria-label={model.displayName}>
