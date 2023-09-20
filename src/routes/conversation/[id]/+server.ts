@@ -17,10 +17,12 @@ import { AwsClient } from "aws4fetch";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
+import { abortedGenerations } from "$lib/server/abortedGenerations.js";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
+	const promptedAt = new Date();
 
 	const userId = locals.user?._id ?? locals.sessionId;
 
@@ -164,6 +166,47 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				usedFetch = aws.fetch.bind(aws) as typeof fetch;
 			}
 
+			async function saveLast(generated_text: string) {
+				const lastMessage = messages[messages.length - 1];
+
+				if (lastMessage) {
+					// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
+					if (generated_text.startsWith(prompt)) {
+						generated_text = generated_text.slice(prompt.length);
+					}
+
+					generated_text = trimSuffix(
+						trimPrefix(generated_text, "<|startoftext|>"),
+						PUBLIC_SEP_TOKEN
+					).trimEnd();
+
+					// remove the stop tokens
+					for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
+						if (generated_text.endsWith(stop)) {
+							generated_text = generated_text.slice(0, -stop.length).trimEnd();
+						}
+					}
+					lastMessage.content = generated_text;
+
+					await collections.conversations.updateOne(
+						{
+							_id: convId,
+						},
+						{
+							$set: {
+								messages,
+								updatedAt: new Date(),
+							},
+						}
+					);
+
+					update({
+						type: "finalAnswer",
+						text: generated_text,
+					});
+				}
+			}
+
 			const tokenStream = textGenerationStream(
 				{
 					parameters: {
@@ -181,10 +224,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			);
 
 			for await (const output of tokenStream) {
-				if (!output) {
-					break;
-				}
-
 				// if not generated_text is here it means the generation is not done
 				if (!output.generated_text) {
 					// else we get the next token
@@ -213,54 +252,35 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 								},
 							];
 						} else {
+							const date = abortedGenerations.get(convId.toString());
+							if (date && date > promptedAt) {
+								saveLast(lastMessage.content);
+							}
+							if (!output) {
+								break;
+							}
+
 							// otherwise we just concatenate tokens
 							lastMessage.content += output.token.text;
 						}
 					}
 				} else {
-					const lastMessage = messages[messages.length - 1];
-
-					if (lastMessage) {
-						let generated_text = output.generated_text;
-
-						// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
-						if (generated_text.startsWith(prompt)) {
-							generated_text = generated_text.slice(prompt.length);
-						}
-
-						generated_text = trimSuffix(
-							trimPrefix(generated_text, "<|startoftext|>"),
-							PUBLIC_SEP_TOKEN
-						).trimEnd();
-
-						// remove the stop tokens
-						for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
-							if (generated_text.endsWith(stop)) {
-								generated_text = generated_text.slice(0, -stop.length).trimEnd();
-							}
-						}
-						lastMessage.content = generated_text;
-
-						await collections.conversations.updateOne(
-							{
-								_id: convId,
-							},
-							{
-								$set: {
-									messages,
-									updatedAt: new Date(),
-								},
-							}
-						);
-
-						update({
-							type: "finalAnswer",
-							text: generated_text,
-						});
-					}
-					break;
+					saveLast(output.generated_text);
 				}
 			}
+		},
+		async cancel() {
+			await collections.conversations.updateOne(
+				{
+					_id: convId,
+				},
+				{
+					$set: {
+						messages,
+						updatedAt: new Date(),
+					},
+				}
+			);
 		},
 	});
 
