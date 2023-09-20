@@ -162,11 +162,106 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-#### Custom prompt templates:
+##### OpenAI API compatible models
+
+Chat UI can be used with any API server that supports OpenAI API compatibility, for example [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol).
+
+This makes Chat UI works with [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai).
+
+```
+MODELS=`[
+  {
+    "name": "oobabooga",
+    "id": "oobabooga",
+    "userMessageToken": "### User:\n",
+    "userMessageEndToken": "\n", # Optional
+    "assistantMessageToken": "### Assistant:\n",
+    "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
+    "promptExamples": [],
+    "parameters": { # These will be sent to the OpenAI API compatible server
+      "temperature": 0.9,
+      "top_p": 0.95,
+      "repetition_penalty": 1.2,
+      "top_k": 50,
+      "truncate": 1000,
+      "max_new_tokens": 1024,
+      "stop": ["###"]
+    },
+    "endpoints": [{
+      "host" : "openai-compatible",
+      "baseUrl": "http://localhost:8000/v1", # the url of the OpenAI API compatible server, this overrides the baseUrl to be used by OpenAI instance
+      "type": "chat_completions" # Optional, or "completions" to use the `v1/completions`, default is "chat_completions" which uses `v1/chat/completions`
+    }]
+  }
+]`
+
+```
+
+The `openai-compatible` type includes official OpenAI models. You can add, for example, GPT4/GPT3.5 as a "openai-compatible" model:
+
+```
+OPENAI_API_KEY=#your openai api key here
+MODELS=`[
+  {
+    "name": "GPT4",
+    "id": "gpt-4",
+    "userMessageToken": "### User:\n",
+    "userMessageEndToken": "\n", # Optional
+    "assistantMessageToken": "### Assistant:\n",
+    "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
+    "promptExamples": [],
+    "parameters": { # These will be sent to openAI API
+      "temperature": 0.9,
+      "top_p": 0.95,
+      "repetition_penalty": 1.2,
+      "top_k": 50,
+      "truncate": 1000,
+      "max_new_tokens": 1024,
+      "stop": ["###"]
+    },
+    "endpoints": [{
+      "host" : "openai-compatible"
+    }]
+  }
+]`
+
+```
+
+This adds GPT-3.5 Turbo as a "openai-compatible" model:
+
+```
+OPENAI_API_KEY=#your openai api key here
+MODELS=`[
+  {
+    "name": "GPT-3.5 Turbo",
+    "id": "gpt-3.5-turbo",
+    "userMessageToken": "### User:\n",
+    "userMessageEndToken": "\n", # Optional
+    "assistantMessageToken": "### Assistant:\n",
+    "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
+    "promptExamples": [],
+    "parameters": { # These will be sent to openAI API
+      "temperature": 0.9,
+      "top_p": 0.95,
+      "repetition_penalty": 1.2,
+      "top_k": 50,
+      "truncate": 1000,
+      "max_new_tokens": 1024,
+      "stop": ["###"]
+    },
+    "endpoints": [{
+      "host" : "openai-compatible"
+    }]
+  }
+]`
+
+```
+
+#### Custom prompt templates
 
 By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
-However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is <https://handlebarsjs.com>. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
 For example:
 
