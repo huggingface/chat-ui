@@ -185,7 +185,7 @@
 				"
 			>
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score > 0
 						? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
 						: ''}"
@@ -196,7 +196,7 @@
 					<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
 				</button>
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score < 0
 						? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
 						: ''}"
