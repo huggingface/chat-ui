@@ -45,9 +45,9 @@ try {
 } catch (e) {
 	const { stack, message } = e as Error;
 	console.error(stack);
-	const safe_error_message = message.split("\n")[0].slice(0, -2);
+	const safe_error_message = message.split("\n")[0].slice(0, -1);
 	throw error(500, {
-		message: "Failed to parse `MODELS` config: " + safe_error_message,
+		message: "Failed to parse `MODELS` config:<br>" + safe_error_message,
 	});
 }
 const modelsRaw = z
