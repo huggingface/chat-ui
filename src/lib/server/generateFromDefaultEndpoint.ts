@@ -4,8 +4,6 @@ import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { AwsClient } from "aws4fetch";
-import { openAIChatToTextGenerationStream } from "$lib/utils/openAIChatToTextGenerationStream";
-import { openAICompletionToTextGenerationStream } from "$lib/utils/openAICompletionToTextGenerationStream";
 import OpenAI from "openai";
 
 interface Parameters {
@@ -52,52 +50,63 @@ export async function generateFromDefaultEndpoint(
 			},
 		});
 	} else if (randomEndpoint.host === "openai-compatible") {
-		// TODO: should not use stream:true
 		const openai = new OpenAI({
 			apiKey: randomEndpoint.apiKey,
 			baseURL: randomEndpoint.baseURL,
 		});
-		const textGenerationStream =
+		const apiPromise =
 			randomEndpoint.type === "completions"
-				? openAICompletionToTextGenerationStream(
-						await openai.completions.create(
-							{
-								model: defaultModel.id ?? defaultModel.name,
-								prompt,
-								stream: true,
-								max_tokens: defaultModel.parameters?.max_new_tokens,
-								stop: defaultModel.parameters?.stop,
-								temperature: defaultModel.parameters?.temperature,
-								top_p: defaultModel.parameters?.top_p,
-								frequency_penalty: defaultModel.parameters?.repetition_penalty,
-							},
-							{ signal: abortController.signal }
-						),
-						abortController.signal
+				? openai.completions.create(
+						{
+							model: defaultModel.id ?? defaultModel.name,
+							prompt,
+							max_tokens: defaultModel.parameters?.max_new_tokens,
+							stop: defaultModel.parameters?.stop,
+							temperature: defaultModel.parameters?.temperature,
+							top_p: defaultModel.parameters?.top_p,
+							frequency_penalty: defaultModel.parameters?.repetition_penalty,
+						},
+						{ signal: abortController.signal }
 				  )
-				: openAIChatToTextGenerationStream(
-						await openai.chat.completions.create(
-							{
-								model: defaultModel.id ?? defaultModel.name,
-								messages: [{ role: "user", content: prompt }],
-								stream: true,
-								max_tokens: defaultModel.parameters?.max_new_tokens,
-								stop: defaultModel.parameters?.stop,
-								temperature: defaultModel.parameters?.temperature,
-								top_p: defaultModel.parameters?.top_p,
-								frequency_penalty: defaultModel.parameters?.repetition_penalty,
-							},
-							{ signal: abortController.signal }
-						),
-						abortController.signal
+				: openai.chat.completions.create(
+						{
+							model: defaultModel.id ?? defaultModel.name,
+							messages: [{ role: "user", content: prompt }],
+							max_tokens: defaultModel.parameters?.max_new_tokens,
+							stop: defaultModel.parameters?.stop,
+							temperature: defaultModel.parameters?.temperature,
+							top_p: defaultModel.parameters?.top_p,
+							frequency_penalty: defaultModel.parameters?.repetition_penalty,
+						},
+						{ signal: abortController.signal }
 				  );
 		const readableStream = new ReadableStream({
 			async start(controller) {
-				for await (const chuck of textGenerationStream) {
-					if (abortController.signal.aborted) {
-						break;
-					}
-					controller.enqueue(chuck);
+				const textEncoder = new TextEncoder();
+				if (randomEndpoint.type === "completions") {
+					const result = (await apiPromise) as OpenAI.Completions.Completion;
+					controller.enqueue(
+						textEncoder.encode(
+							JSON.stringify([
+								{
+									generated_text: result.choices[0].text,
+								},
+							])
+						)
+					);
+				} else if (randomEndpoint.type === "chat_completions") {
+					const result = (await apiPromise) as OpenAI.Chat.Completions.ChatCompletion;
+					controller.enqueue(
+						textEncoder.encode(
+							JSON.stringify([
+								{
+									generated_text: result.choices[0].message.content,
+								},
+							])
+						)
+					);
+				} else {
+					throw new Error("unknown endpoint type");
 				}
 				controller.close();
 			},
@@ -108,7 +117,7 @@ export async function generateFromDefaultEndpoint(
 
 		resp = new Response(readableStream, {
 			headers: {
-				"Content-Type": "text/event-stream",
+				"Content-Type": "application/json",
 			},
 			status: 200,
 			statusText: "OK",
