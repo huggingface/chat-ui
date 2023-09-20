@@ -12,7 +12,6 @@ export async function summarize(prompt: string) {
 		model: defaultModel,
 	});
 
-	console.log(summaryPrompt);
 	const generated_text = await generateFromDefaultEndpoint(summaryPrompt);
 
 	if (generated_text) {
