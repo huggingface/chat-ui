@@ -13,8 +13,8 @@
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
 	import LoginModal from "../LoginModal.svelte";
+	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -23,8 +23,7 @@
 	export let currentModel: Model;
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
-	export let webSearchMessages: WebSearchMessage[] = [];
-	export let searches: Record<string, WebSearchMessage[]> = {};
+	export let webSearchMessages: WebSearchUpdate[] = [];
 
 	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
@@ -60,7 +59,6 @@
 		readOnly={isReadOnly}
 		isAuthor={!shared}
 		{webSearchMessages}
-		{searches}
 		on:message
 		on:vote
 		on:retry={(ev) => {
