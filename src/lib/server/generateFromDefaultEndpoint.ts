@@ -64,11 +64,13 @@ export async function generateFromDefaultEndpoint(
 	}
 
 	if (!resp.ok) {
-		throw new Error(await resp.text());
+		console.error(await resp.text());
+		return;
 	}
 
 	if (!resp.body) {
-		throw new Error("Response body is empty");
+		console.error("Body is empty");
+		return;
 	}
 
 	const decoder = new TextDecoder();
