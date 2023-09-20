@@ -34,12 +34,6 @@
 	let pending = false;
 	let loginRequired = false;
 
-	async function summarizeTitle(id: string) {
-		await fetch(`${base}/conversation/${id}/summarize`, {
-			method: "POST",
-		});
-	}
-
 	// this function is used to send new message to the backends
 	async function writeMessage(message: string, messageId = randomUUID()) {
 		if (!message.trim()) return;
@@ -146,15 +140,7 @@
 			// reset the websearchmessages
 			webSearchMessages = [];
 
-			// do title summarization
-			// TODO: we should change this to wait until there is an assistant response.
-			if (messages.filter((m) => m.from === "user").length === 1) {
-				summarizeTitle($page.params.id)
-					.then(() => invalidate(UrlDependency.ConversationList))
-					.catch(console.error);
-			} else {
-				await invalidate(UrlDependency.ConversationList);
-			}
+			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";

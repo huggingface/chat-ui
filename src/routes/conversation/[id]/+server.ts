@@ -17,7 +17,8 @@ import { AwsClient } from "aws4fetch";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
-import { abortedGenerations } from "$lib/server/abortedGenerations.js";
+import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { summarize } from "$lib/server/summarize";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -167,6 +168,10 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			}
 
 			async function saveLast(generated_text: string) {
+				if (!conv) {
+					throw new Error("Conversation not found");
+				}
+
 				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage) {
@@ -195,6 +200,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						{
 							$set: {
 								messages,
+								title: (await summarize(newPrompt)) ?? conv.title,
 								updatedAt: new Date(),
 							},
 						}
@@ -277,6 +283,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				{
 					$set: {
 						messages,
+						title: (await summarize(newPrompt)) ?? conv.title,
 						updatedAt: new Date(),
 					},
 				}
