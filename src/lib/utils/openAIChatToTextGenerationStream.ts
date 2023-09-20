@@ -24,13 +24,15 @@ export async function* openAIChatToTextGenerationStream(
 			delta: { content },
 		} = choices[0];
 		const last = choices[0]?.finish_reason === "stop";
-		generatedText = generatedText + content;
+		if (content) {
+			generatedText = generatedText + content;
+		}
 		const output: TextGenerationStreamOutput = {
 			token: {
 				id: tokenId++,
 				text: content ?? "",
 				logprob: 0,
-				special: last ? true : false,
+				special: false,
 			},
 			generated_text: last ? generatedText : null,
 			details: null,
