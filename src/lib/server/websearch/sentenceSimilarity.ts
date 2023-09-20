@@ -6,16 +6,14 @@ function innerProduct(tensor1: Tensor, tensor2: Tensor) {
 	return 1.0 - dot(tensor1.data, tensor2.data);
 }
 
-const extractor = await pipeline("feature-extraction", "Xenova/e5-small-v2");
+const extractor = await pipeline("feature-extraction", "Xenova/gte-small");
 
 export async function findSimilarSentences(
 	query: string,
 	sentences: string[],
 	{ topK = 5 }: { topK: number }
 ) {
-	// this preprocessing step is suggested for e5-small-v2 model
-	// see more: https://huggingface.co/intfloat/e5-small-v2/blob/main/README.md?code=true#L2631
-	const input = [`query: ${query}`, ...sentences.map((s) => `passage: ${s}`)];
+	const input = [query, ...sentences];
 	const output: Tensor = await extractor(input, { pooling: "mean", normalize: true });
 
 	const queryTensor: Tensor = output[0];
