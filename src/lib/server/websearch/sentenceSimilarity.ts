@@ -6,18 +6,15 @@ function innerProduct(tensor1: Tensor, tensor2: Tensor) {
 	return 1.0 - dot(tensor1.data, tensor2.data);
 }
 
-const extractor = await pipeline("feature-extraction", "Xenova/bge-small-en-v1.5");
-const queryInstruction = "Represent this sentence for searching relevant passages: ";
+const extractor = await pipeline("feature-extraction", "Xenova/gte-base");
 
 export async function findSimilarSentences(
 	query: string,
 	sentences: string[],
 	{ topK = 5 }: { topK: number }
 ) {
-	query = queryInstruction + query;
 	const input = [query, ...sentences];
-	let output: Tensor = await extractor(input, { pooling: "none", normalize: true });
-	output = output.slice(null, 0); // CLS pooling
+	const output: Tensor = await extractor(input, { pooling: "mean", normalize: true });
 
 	const queryTensor: Tensor = output[0];
 	const sentencesTensor: Tensor = output.slice([1, input.length - 1]);
