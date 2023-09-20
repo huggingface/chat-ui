@@ -5,7 +5,7 @@ import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
-import { models } from "$lib/server/models";
+import { models, type BackendModel } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors.js";
 import type { Message } from "$lib/types/Message";
 import { concatUint8Arrays } from "$lib/utils/concatUint8Arrays";
@@ -171,7 +171,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						await openai.chat.completions.create(
 							{
 								model: model.id ?? model.name,
-								messages: [{ role: "user", content: prompt }],
+								messages: promptToMessages(prompt, model),
 								stream: true,
 								max_tokens: model.parameters?.max_new_tokens,
 								stop: model.parameters?.stop,
@@ -389,4 +389,20 @@ export async function PATCH({ request, locals, params }) {
 	);
 
 	return new Response();
+}
+
+function promptToMessages(
+	prompt: string,
+	model: BackendModel
+): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+	if (model.preprompt && model.preprompt.length > 0 && prompt.startsWith(model.preprompt)) {
+		// remove system prompt from the prompt
+		const withOutSystemPrompt = prompt.replace(model.preprompt, "");
+		return [
+			// add system prompt in request body
+			{ role: "system", content: model.preprompt },
+			{ role: "user", content: withOutSystemPrompt },
+		];
+	}
+	return [{ role: "user", content: prompt }];
 }
