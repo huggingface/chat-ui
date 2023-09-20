@@ -140,8 +140,6 @@
 			// reset the websearchmessages
 			webSearchMessages = [];
 
-			// do title summarization
-			// TODO: we should change this to wait until there is an assistant response.
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
