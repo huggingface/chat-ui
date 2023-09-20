@@ -2,8 +2,6 @@ import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
 import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
-import { error } from "@sveltejs/kit";
-import { parse } from "jsonlint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -39,17 +37,6 @@ const combinedEndpoint = endpoint.transform((data) => {
 	}
 });
 
-let parsedModels;
-try {
-	parsedModels = parse(MODELS);
-} catch (e) {
-	const { stack, message } = e as Error;
-	console.error(stack);
-	const safe_error_message = message.split("\n")[0].slice(0, -1);
-	throw error(500, {
-		message: "Failed to parse `MODELS` config:<br>" + safe_error_message,
-	});
-}
 const modelsRaw = z
 	.array(
 		z.object({
@@ -109,7 +96,7 @@ const modelsRaw = z
 				.optional(),
 		})
 	)
-	.parse(parsedModels);
+	.parse(JSON.parse(MODELS));
 
 export const models = await Promise.all(
 	modelsRaw.map(async (m) => ({
