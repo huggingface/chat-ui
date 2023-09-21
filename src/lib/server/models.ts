@@ -8,7 +8,7 @@ type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 const openAICompatibleEndpoint = z.object({
 	host: z.literal("openai-compatible"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	apiKey: z.string().min(1).default(OPENAI_API_KEY).optional(),
+	apiKey: z.string().optional().default(OPENAI_API_KEY),
 	type: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
