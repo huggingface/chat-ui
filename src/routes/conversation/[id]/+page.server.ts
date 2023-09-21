@@ -2,7 +2,6 @@ import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
 import { authCondition } from "$lib/server/auth";
-import type { WebSearchMessageResult, WebSearchMessageSources } from "$lib/types/WebSearch";
 import { UrlDependency } from "$lib/types/UrlDependency";
 
 export const load = async ({ params, depends, locals }) => {
@@ -30,27 +29,9 @@ export const load = async ({ params, depends, locals }) => {
 		throw error(404, "Conversation not found.");
 	}
 
-	const webSearchesId = conversation.messages
-		.filter((message) => message.webSearchId)
-		.map((message) => new ObjectId(message.webSearchId));
-
-	const results = await collections.webSearches.find({ _id: { $in: webSearchesId } }).toArray();
-
-	const searches = Object.fromEntries(
-		results.map((x) => [
-			x._id.toString(),
-			[
-				...x.messages,
-				{ type: "sources", sources: x.contextSources ?? [] } satisfies WebSearchMessageSources,
-				{ type: "result", id: x._id.toString() } satisfies WebSearchMessageResult,
-			],
-		])
-	);
-
 	return {
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
-		searches,
 	};
 };

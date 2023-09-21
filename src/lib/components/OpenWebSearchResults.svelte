@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import CarbonCaretRight from "~icons/carbon/caret-right";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
@@ -9,11 +9,11 @@
 
 	export let loading = false;
 	export let classNames = "";
-	export let webSearchMessages: WebSearchMessage[] = [];
+	export let webSearchMessages: WebSearchUpdate[] = [];
 
 	let detailsOpen: boolean;
 	let error: boolean;
-	$: error = webSearchMessages[webSearchMessages.length - 2]?.type === "error";
+	$: error = webSearchMessages[webSearchMessages.length - 1]?.messageType === "error";
 </script>
 
 <details
@@ -46,7 +46,7 @@
 		{:else}
 			<ol>
 				{#each webSearchMessages as message}
-					{#if message.type === "update"}
+					{#if message.messageType === "update"}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<div
@@ -64,7 +64,7 @@
 								</p>
 							{/if}
 						</li>
-					{:else if message.type === "error"}
+					{:else if message.messageType === "error"}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<CarbonError

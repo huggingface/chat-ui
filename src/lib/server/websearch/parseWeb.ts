@@ -5,7 +5,7 @@ export async function parseWeb(url: string) {
 	setTimeout(() => abortController.abort(), 10000);
 	const htmlString = await fetch(url, { signal: abortController.signal })
 		.then((response) => response.text())
-		.catch((err) => console.log(err));
+		.catch();
 
 	const virtualConsole = new VirtualConsole();
 	virtualConsole.on("error", () => {
