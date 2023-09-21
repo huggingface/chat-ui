@@ -166,31 +166,31 @@ You can change things like the parameters, or customize the preprompt to better 
 
 Chat UI can be used with any API server that supports OpenAI API compatibility, for example [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol).
 
-This makes Chat UI works with [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai).
+This makes Chat UI works with [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), the `endpoint.baseUrl` is the url of the OpenAI API compatible server, this overrides the baseUrl to be used by OpenAI instance. The `endpoint.type` determine which endpoint to be used, default is `chat_completions` which uses `v1/chat/completions`, change to `endpoint.type` to `completions` to use the `v1/completions` endpoint.
 
 ```
 MODELS=`[
   {
     "name": "oobabooga",
     "id": "oobabooga",
-    "userMessageToken": "### User:\n",
-    "userMessageEndToken": "\n", # Optional
-    "assistantMessageToken": "### Assistant:\n",
-    "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
+    "userMessageToken": "User:\n",
+    "userMessageEndToken": "\n",
+    "assistantMessageToken": "Assistant:\n",
+    "preprompt": "You are ai assistant pretend to be a hugging face model",
     "promptExamples": [],
-    "parameters": { # These will be sent to the OpenAI API compatible server
+    "parameters": {
       "temperature": 0.9,
       "top_p": 0.95,
       "repetition_penalty": 1.2,
       "top_k": 50,
       "truncate": 1000,
       "max_new_tokens": 1024,
-      "stop": ["###"]
+      "stop": []
     },
     "endpoints": [{
       "host" : "openai-compatible",
-      "baseUrl": "http://localhost:8000/v1", # the url of the OpenAI API compatible server, this overrides the baseUrl to be used by OpenAI instance
-      "type": "chat_completions" # Optional, or "completions" to use the `v1/completions`, default is "chat_completions" which uses `v1/chat/completions`
+      "baseUrl": "http://localhost:8000/v1",
+      "type": "chat_completions"
     }]
   }
 ]`
@@ -205,19 +205,19 @@ MODELS=`[
   {
     "name": "GPT4",
     "id": "gpt-4",
-    "userMessageToken": "### User:\n",
-    "userMessageEndToken": "\n", # Optional
-    "assistantMessageToken": "### Assistant:\n",
+    "userMessageToken": "User:\n",
+    "userMessageEndToken": "\n",
+    "assistantMessageToken": "Assistant:\n",
     "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
     "promptExamples": [],
-    "parameters": { # These will be sent to openAI API
+    "parameters": {
       "temperature": 0.9,
       "top_p": 0.95,
       "repetition_penalty": 1.2,
       "top_k": 50,
       "truncate": 1000,
       "max_new_tokens": 1024,
-      "stop": ["###"]
+      "stop": []
     },
     "endpoints": [{
       "host" : "openai-compatible"
@@ -235,19 +235,19 @@ MODELS=`[
   {
     "name": "GPT-3.5 Turbo",
     "id": "gpt-3.5-turbo",
-    "userMessageToken": "### User:\n",
-    "userMessageEndToken": "\n", # Optional
-    "assistantMessageToken": "### Assistant:\n",
-    "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
+    "userMessageToken": "User:\n",
+    "userMessageEndToken": "\n",
+    "assistantMessageToken": "Assistant:\n",
+    "preprompt": "You are ai assistant pretend to be a hugging face model",
     "promptExamples": [],
-    "parameters": { # These will be sent to openAI API
+    "parameters": {
       "temperature": 0.9,
       "top_p": 0.95,
       "repetition_penalty": 1.2,
       "top_k": 50,
       "truncate": 1000,
       "max_new_tokens": 1024,
-      "stop": ["###"]
+      "stop": []
     },
     "endpoints": [{
       "host" : "openai-compatible"
