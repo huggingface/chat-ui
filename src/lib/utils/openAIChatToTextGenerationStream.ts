@@ -4,21 +4,13 @@ import type { Stream } from "openai/streaming";
 
 /**
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
- *
- * @param SSEncode - encode into SSE Uint8Array format, default is true
  */
 export async function* openAIChatToTextGenerationStream(
-	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
-	abortSignal: AbortSignal,
-	SSEncode = true
+	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>
 ) {
 	let generatedText = "";
 	let tokenId = 0;
-	const textEncoder = new TextEncoder();
 	for await (const completion of completionStream) {
-		if (abortSignal.aborted) {
-			break;
-		}
 		const { choices } = completion;
 		const {
 			delta: { content },
@@ -37,10 +29,6 @@ export async function* openAIChatToTextGenerationStream(
 			generated_text: last ? generatedText : null,
 			details: null,
 		};
-		if (SSEncode) {
-			yield textEncoder.encode("data:" + JSON.stringify(output) + "\n\n");
-		} else {
-			yield output;
-		}
+		yield output;
 	}
 }

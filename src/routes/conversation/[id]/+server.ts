@@ -215,60 +215,63 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					});
 				}
 			}
-      
-      async function openAITextGenerationStream() {
-        const openai = new OpenAI({
-          apiKey: randomEndpoint.apiKey ?? "sk-",
-          baseURL: randomEndpoint.baseURL,
-        });
-        const textGenerationStream =
-          randomEndpoint.type === "completions"
-            ? openAICompletionToTextGenerationStream(
-                await openai.completions.create(
-                  {
-                    model: model.id ?? model.name,
-                    prompt,
-                    stream: true,
-                    max_tokens: model.parameters?.max_new_tokens,
-                    stop: model.parameters?.stop,
-                    temperature: model.parameters?.temperature,
-                    top_p: model.parameters?.top_p,
-                    frequency_penalty: model.parameters?.repetition_penalty,
-                  }
-                )
-              )
-            : openAIChatToTextGenerationStream(
-                await openai.chat.completions.create(
-                  {
-                    model: model.id ?? model.name,
-                    messages: promptToMessages(prompt, model),
-                    stream: true,
-                    max_tokens: model.parameters?.max_new_tokens,
-                    stop: model.parameters?.stop,
-                    temperature: model.parameters?.temperature,
-                    top_p: model.parameters?.top_p,
-                    frequency_penalty: model.parameters?.repetition_penalty,
-                  }
-                )
-              );
-        return textGenerationStream;
-      }
 
-			const tokenStream = randomEndpoint.host === "openai-compatible" ? openAITextGenerationStream() : textGenerationStream(
-				{
-					parameters: {
-						...models.find((m) => m.id === conv.model)?.parameters,
-						return_full_text: false,
-					},
-					model: randomEndpoint.url,
-					inputs: prompt,
-					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
-				},
-				{
-					use_cache: false,
-					fetch: usedFetch,
+			async function openAITextGenerationStream() {
+				if (randomEndpoint.host !== "openai-compatible") {
+					throw new Error("only openai-compatible endpoints");
 				}
-			);
+				if (!model) {
+					throw new Error("model is undefined");
+				}
+				const openai = new OpenAI({
+					apiKey: randomEndpoint.apiKey ?? "sk-",
+					baseURL: randomEndpoint.baseURL,
+				});
+				return randomEndpoint.type === "completions"
+					? openAICompletionToTextGenerationStream(
+							await openai.completions.create({
+								model: model.id ?? model.name,
+								prompt,
+								stream: true,
+								max_tokens: model.parameters?.max_new_tokens,
+								stop: model.parameters?.stop,
+								temperature: model.parameters?.temperature,
+								top_p: model.parameters?.top_p,
+								frequency_penalty: model.parameters?.repetition_penalty,
+							})
+					  )
+					: openAIChatToTextGenerationStream(
+							await openai.chat.completions.create({
+								model: model.id ?? model.name,
+								messages: promptToMessages(prompt, model),
+								stream: true,
+								max_tokens: model.parameters?.max_new_tokens,
+								stop: model.parameters?.stop,
+								temperature: model.parameters?.temperature,
+								top_p: model.parameters?.top_p,
+								frequency_penalty: model.parameters?.repetition_penalty,
+							})
+					  );
+			}
+
+			const tokenStream =
+				randomEndpoint.host === "openai-compatible"
+					? await openAITextGenerationStream()
+					: textGenerationStream(
+							{
+								parameters: {
+									...models.find((m) => m.id === conv.model)?.parameters,
+									return_full_text: false,
+								},
+								model: randomEndpoint.url,
+								inputs: prompt,
+								accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
+							},
+							{
+								use_cache: false,
+								fetch: usedFetch,
+							}
+					  );
 
 			for await (const output of tokenStream) {
 				// if not generated_text is here it means the generation is not done
