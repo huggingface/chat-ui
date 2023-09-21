@@ -146,7 +146,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		});
 	} else if (randomEndpoint.host === "openai-compatible") {
 		const openai = new OpenAI({
-			apiKey: randomEndpoint.apiKey,
+			apiKey: randomEndpoint.apiKey ?? "sk-",
 			baseURL: randomEndpoint.baseURL,
 		});
 		const textGenerationStream =

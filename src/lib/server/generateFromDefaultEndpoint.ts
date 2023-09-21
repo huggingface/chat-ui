@@ -51,7 +51,7 @@ export async function generateFromDefaultEndpoint(
 		});
 	} else if (randomEndpoint.host === "openai-compatible") {
 		const openai = new OpenAI({
-			apiKey: randomEndpoint.apiKey,
+			apiKey: randomEndpoint.apiKey ?? "sk-",
 			baseURL: randomEndpoint.baseURL,
 		});
 		const apiPromise =
