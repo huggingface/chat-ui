@@ -14,7 +14,7 @@ interface Parameters {
 export async function generateFromDefaultEndpoint(
 	prompt: string,
 	parameters?: Partial<Parameters>
-) {
+): Promise<string> {
 	const newParameters = {
 		...defaultModel.parameters,
 		...parameters,
@@ -64,13 +64,11 @@ export async function generateFromDefaultEndpoint(
 	}
 
 	if (!resp.ok) {
-		console.error(await resp.text());
-		return;
+		throw new Error(await resp.text());
 	}
 
 	if (!resp.body) {
-		console.error("Body is empty");
-		return;
+		throw new Error("Body is empty");
 	}
 
 	const decoder = new TextDecoder();
