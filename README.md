@@ -77,7 +77,7 @@ Chat UI features a powerful Web Search feature. It works by:
 
 1. Generating an appropriate Google query from the user prompt.
 2. Performing Google search and extracting content from webpages.
-3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/e5-small-v2](https://huggingface.co/Xenova/e5-small-v2) model.
+3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
 4. From these embeddings, find the ones that are closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
 
