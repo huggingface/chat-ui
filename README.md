@@ -176,7 +176,7 @@ MODELS=`[
     "userMessageToken": "User:\n",
     "userMessageEndToken": "\n",
     "assistantMessageToken": "Assistant:\n",
-    "preprompt": "You are ai assistant pretend to be a hugging face model",
+    "preprompt": "You are a helpful assistant",
     "promptExamples": [],
     "parameters": {
       "temperature": 0.9,
@@ -208,7 +208,7 @@ MODELS=`[
     "userMessageToken": "User:\n",
     "userMessageEndToken": "\n",
     "assistantMessageToken": "Assistant:\n",
-    "preprompt": "You are ai assistant pretend to be a hugging face model", # Will be used as the system prompt
+    "preprompt": "You are a helpful assistant", # Will be used as the system prompt
     "promptExamples": [],
     "parameters": {
       "temperature": 0.9,
@@ -238,7 +238,7 @@ MODELS=`[
     "userMessageToken": "User:\n",
     "userMessageEndToken": "\n",
     "assistantMessageToken": "Assistant:\n",
-    "preprompt": "You are ai assistant pretend to be a hugging face model",
+    "preprompt": "You are a helpful assistant",
     "promptExamples": [],
     "parameters": {
       "temperature": 0.9,
