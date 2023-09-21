@@ -89,7 +89,7 @@ export async function generateFromDefaultEndpoint(
 
 	let results;
 	if (result.startsWith("data:")) {
-		results = [JSON.parse(result.split("data:").pop())];
+		results = [JSON.parse(result.split("data:")?.pop() ?? "")];
 	} else {
 		results = JSON.parse(result);
 	}
