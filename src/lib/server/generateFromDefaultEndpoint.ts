@@ -82,33 +82,38 @@ export async function generateFromDefaultEndpoint(
 				  );
 		const readableStream = new ReadableStream({
 			async start(controller) {
-				const textEncoder = new TextEncoder();
-				if (randomEndpoint.type === "completions") {
-					const result = (await apiPromise) as OpenAI.Completions.Completion;
-					controller.enqueue(
-						textEncoder.encode(
-							JSON.stringify([
-								{
-									generated_text: result.choices[0].text,
-								},
-							])
-						)
-					);
-				} else if (randomEndpoint.type === "chat_completions") {
-					const result = (await apiPromise) as OpenAI.Chat.Completions.ChatCompletion;
-					controller.enqueue(
-						textEncoder.encode(
-							JSON.stringify([
-								{
-									generated_text: result.choices[0].message.content,
-								},
-							])
-						)
-					);
-				} else {
-					throw new Error("unknown endpoint type");
+				try {
+					const textEncoder = new TextEncoder();
+					if (randomEndpoint.type === "completions") {
+						const result = (await apiPromise) as OpenAI.Completions.Completion;
+						controller.enqueue(
+							textEncoder.encode(
+								JSON.stringify([
+									{
+										generated_text: result.choices[0].text,
+									},
+								])
+							)
+						);
+					} else if (randomEndpoint.type === "chat_completions") {
+						const result = (await apiPromise) as OpenAI.Chat.Completions.ChatCompletion;
+						controller.enqueue(
+							textEncoder.encode(
+								JSON.stringify([
+									{
+										generated_text: result.choices[0].message.content,
+									},
+								])
+							)
+						);
+					} else {
+						throw new Error("unknown endpoint type");
+					}
+				} catch (error) {
+					controller.error(error);
+				} finally {
+					controller.close();
 				}
-				controller.close();
 			},
 			cancel() {
 				abortController.abort();
