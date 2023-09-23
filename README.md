@@ -166,7 +166,7 @@ You can change things like the parameters, or customize the preprompt to better 
 
 Chat UI can be used with any API server that supports OpenAI API compatibility, for example [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol).
 
-This makes Chat UI works with [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), the `endpoint.baseUrl` is the url of the OpenAI API compatible server, this overrides the baseUrl to be used by OpenAI instance. The `endpoint.type` determine which endpoint to be used, default is `chat_completions` which uses `v1/chat/completions`, change to `endpoint.type` to `completions` to use the `v1/completions` endpoint.
+This makes Chat UI works with [oobabooga](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), the `endpoint.baseURL` is the url of the OpenAI API compatible server, this overrides the baseURL to be used by OpenAI instance. The `endpoint.type` determine which endpoint to be used, default is `chat_completions` which uses `v1/chat/completions`, change to `endpoint.type` to `completions` to use the `v1/completions` endpoint.
 
 ```
 MODELS=`[
@@ -189,7 +189,7 @@ MODELS=`[
     },
     "endpoints": [{
       "host" : "openai-compatible",
-      "baseUrl": "http://localhost:8000/v1",
+      "baseURL": "http://localhost:8000/v1",
       "type": "chat_completions"
     }]
   }
