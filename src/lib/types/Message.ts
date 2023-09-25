@@ -2,6 +2,12 @@ import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { WebSearch } from "./WebSearch";
 
+export interface File {
+	sha256: string;
+	model?: string;
+	mime?: string;
+}
+
 export type Message = Partial<Timestamps> & {
 	from: "user" | "assistant";
 	id: ReturnType<typeof crypto.randomUUID>;
@@ -10,4 +16,5 @@ export type Message = Partial<Timestamps> & {
 	webSearchId?: WebSearch["_id"]; // legacy version
 	webSearch?: WebSearch;
 	score?: -1 | 0 | 1;
+	files?: File[]; // filenames
 };

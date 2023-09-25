@@ -1,5 +1,5 @@
 import { buildPrompt } from "$lib/buildPrompt";
-import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
+import { generateFromEndpoint } from "$lib/server/generateFromEndpoint";
 import { defaultModel } from "$lib/server/models";
 
 export async function summarize(prompt: string) {
@@ -12,7 +12,7 @@ export async function summarize(prompt: string) {
 		model: defaultModel,
 	});
 
-	const generated_text = await generateFromDefaultEndpoint(summaryPrompt).catch((e) => {
+	const generated_text = await generateFromEndpoint(summaryPrompt).catch((e) => {
 		console.error(e);
 		return null;
 	});

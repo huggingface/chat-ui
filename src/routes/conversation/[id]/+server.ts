@@ -6,7 +6,7 @@ import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
-import type { Message } from "$lib/types/Message";
+import type { File, Message } from "$lib/types/Message";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { trimSuffix } from "$lib/utils/trimSuffix";
 import { textGenerationStream } from "@huggingface/inference";
@@ -14,11 +14,15 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { AwsClient } from "aws4fetch";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import type { AgentUpdate, MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import { defaultTools, HfChatAgent } from "@huggingface/agents";
+import { uploadFile } from "$lib/server/tools/uploadFile.js";
+import type { Tool } from "@huggingface/agents/src/types.js";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -84,14 +88,14 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		response_id: responseId,
 		id: messageId,
 		is_retry,
-		web_search: webSearch,
+		tools,
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
 			id: z.optional(z.string().uuid()),
 			response_id: z.optional(z.string().uuid()),
 			is_retry: z.optional(z.boolean()),
-			web_search: z.optional(z.boolean()),
+			tools: z.array(z.string()),
 		})
 		.parse(json);
 
@@ -122,6 +126,36 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		];
 	})() satisfies Message[];
 
+	// save user prompt
+	await collections.conversations.updateOne(
+		{
+			_id: convId,
+		},
+		{
+			$set: {
+				messages,
+				title: (await summarize(newPrompt)) ?? conv.title,
+				updatedAt: new Date(),
+			},
+		}
+	);
+
+	// fetch the endpoint
+	const randomEndpoint = modelEndpoint(model);
+
+	let usedFetch = fetch;
+
+	if (randomEndpoint.host === "sagemaker") {
+		const aws = new AwsClient({
+			accessKeyId: randomEndpoint.accessKey,
+			secretAccessKey: randomEndpoint.secretKey,
+			sessionToken: randomEndpoint.sessionToken,
+			service: "sagemaker",
+		});
+
+		usedFetch = aws.fetch.bind(aws) as typeof fetch;
+	}
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -131,40 +165,33 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				if (newUpdate.type !== "stream") {
 					updates.push(newUpdate);
 				}
-				controller.enqueue(JSON.stringify(newUpdate) + "\n");
+				try {
+					controller.enqueue(JSON.stringify(newUpdate) + "\n");
+				} catch (e) {
+					console.error(e);
+				}
 			}
 
-			update({ type: "status", status: "started" });
+			function getStream(inputs: string) {
+				if (!conv) {
+					throw new Error("Conversation not found");
+				}
 
-			let webSearchResults: WebSearch | undefined;
-
-			if (webSearch) {
-				webSearchResults = await runWebSearch(conv, newPrompt, update);
-			}
-
-			// we can now build the prompt using the messages
-			const prompt = await buildPrompt({
-				messages,
-				model,
-				webSearch: webSearchResults,
-				preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
-				locals: locals,
-			});
-
-			// fetch the endpoint
-			const randomEndpoint = modelEndpoint(model);
-
-			let usedFetch = fetch;
-
-			if (randomEndpoint.host === "sagemaker") {
-				const aws = new AwsClient({
-					accessKeyId: randomEndpoint.accessKey,
-					secretAccessKey: randomEndpoint.secretKey,
-					sessionToken: randomEndpoint.sessionToken,
-					service: "sagemaker",
-				});
-
-				usedFetch = aws.fetch.bind(aws) as typeof fetch;
+				return textGenerationStream(
+					{
+						inputs,
+						parameters: {
+							...models.find((m) => m.id === conv.model)?.parameters,
+							return_full_text: false,
+						},
+						model: randomEndpoint.url,
+						accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
+					},
+					{
+						use_cache: false,
+						fetch: usedFetch,
+					}
+				);
 			}
 
 			async function saveLast(generated_text: string) {
@@ -175,16 +202,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage) {
-					// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
-					if (generated_text.startsWith(prompt)) {
-						generated_text = generated_text.slice(prompt.length);
-					}
-
-					generated_text = trimSuffix(
-						trimPrefix(generated_text, "<|startoftext|>"),
-						PUBLIC_SEP_TOKEN
-					).trimEnd();
-
 					// remove the stop tokens
 					for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
 						if (generated_text.endsWith(stop)) {
@@ -213,33 +230,11 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			}
 
-			const tokenStream = textGenerationStream(
-				{
-					parameters: {
-						...models.find((m) => m.id === conv.model)?.parameters,
-						return_full_text: false,
-					},
-					model: randomEndpoint.url,
-					inputs: prompt,
-					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
-				},
-				{
-					use_cache: false,
-					fetch: usedFetch,
-				}
-			);
-
-			for await (const output of tokenStream) {
-				// if not generated_text is here it means the generation is not done
+			const streamCallback = async (output: TextGenerationStreamOutput) => {
 				if (!output.generated_text) {
 					// else we get the next token
 					if (!output.token.special) {
 						const lastMessage = messages[messages.length - 1];
-						update({
-							type: "stream",
-							token: output.token.text,
-						});
-
 						// if the last message is not from assistant, it means this is the first token
 						if (lastMessage?.from !== "assistant") {
 							// so we create a new message
@@ -250,7 +245,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 								{
 									from: "assistant",
 									content: output.token.text.trimStart(),
-									webSearch: webSearchResults,
+									webSearch: undefined,
 									updates: updates,
 									id: (responseId as Message["id"]) || crypto.randomUUID(),
 									createdAt: new Date(),
@@ -259,21 +254,165 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							];
 						} else {
 							const date = abortedGenerations.get(convId.toString());
+
 							if (date && date > promptedAt) {
 								saveLast(lastMessage.content);
 							}
+
 							if (!output) {
-								break;
+								return;
 							}
 
 							// otherwise we just concatenate tokens
 							lastMessage.content += output.token.text;
 						}
+
+						update({
+							type: "stream",
+							token: output.token.text,
+						});
 					}
-				} else {
-					saveLast(output.generated_text);
 				}
+			};
+
+			const files: File[] = [];
+
+			const webSearchTool: Tool = {
+				name: "webSearch",
+				description:
+					"This tool can be used to search the web for extra information. It will return the most relevant paragraphs from the web",
+				examples: [
+					{
+						prompt: "What are the best restaurants in Paris?",
+						code: '{"tool" : "imageToText", "input" : "What are the best restaurants in Paris?"}',
+						tools: ["webSearch"],
+					},
+					{
+						prompt: "Who is the president of the United States?",
+						code: '{"tool" : "imageToText", "input" : "Who is the president of the United States?"}',
+						tools: ["webSearch"],
+					},
+				],
+				call: async (input, _) => {
+					const data = await input;
+					if (typeof data !== "string") throw "Input must be a string.";
+
+					const results = await runWebSearch(conv, data, update);
+					return results.context;
+				},
+			};
+
+			const SDXLTool: Tool = {
+				name: "textToImage",
+				description:
+					"This tool can be used to generate an image from text. It will return the image.",
+				mime: "image/jpeg",
+				model: "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0",
+				examples: [
+					{
+						prompt: "Generate an image of a cat wearing a top hat",
+						code: '{"tool" : "textToImage", "input" : "a cat wearing a top hat"}',
+						tools: ["textToImage"],
+					},
+					{
+						prompt: "Draw a brown dog on a beach",
+						code: '{"tool" : "textToImage", "input" : "drawing of a brown dog on a beach"}',
+						tools: ["textToImage"],
+					},
+				],
+				call: async (input, inference) => {
+					const data = await input;
+					if (typeof data !== "string") throw "Input must be a string.";
+
+					const imageBase = await inference.textToImage(
+						{
+							inputs: data,
+							model: "stabilityai/stable-diffusion-xl-base-1.0",
+						},
+						{ wait_for_model: true }
+					);
+
+					const imageRefined = await inference.imageToImage(
+						{
+							inputs: imageBase,
+							model: "stabilityai/stable-diffusion-xl-refiner-1.0",
+							parameters: {
+								prompt: data,
+							},
+						},
+						{
+							wait_for_model: true,
+						}
+					);
+					return imageRefined;
+				},
+			};
+
+			// const listTools = [
+			// 	...defaultTools.filter((t) => t.name !== "textToImage"),
+			// 	webSearchTool,
+			// 	SDXLTool,
+			// ];
+
+			const listTools = [...defaultTools, webSearchTool];
+
+			const agent = new HfChatAgent({
+				accessToken: HF_ACCESS_TOKEN,
+				llm: getStream,
+				chatFormat: (inputs: { messages: Message[] }) =>
+					model.chatPromptRender({
+						messages: inputs.messages,
+						preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
+					}),
+				callbacks: {
+					onFile: async (file, tool) => {
+						const filename = await uploadFile(file, conv, tool);
+						files.push({
+							sha256: filename.split("-")[1],
+							model: tool?.model,
+							mime: tool?.mime,
+						});
+					},
+					onUpdate: async (agentUpdate) => {
+						update({ ...agentUpdate, type: "agent" } satisfies AgentUpdate);
+					},
+					onStream: streamCallback,
+					onFinalAnswer: async (answer) => {
+						saveLast(answer);
+					},
+				},
+				chatHistory: messages,
+				tools: listTools,
+			});
+
+			update({ type: "status", status: "started" });
+
+			try {
+				await agent.chat(newPrompt);
+
+				const lastMessage = messages[messages.length - 1];
+				if (lastMessage && lastMessage.from === "assistant") {
+					lastMessage.files = files;
+				}
+			} catch (e) {
+				console.error(e);
+				return new Error((e as Error).message);
 			}
+
+			// let webSearchResults: WebSearch | undefined;
+
+			// if (tools.includes("websearch")) {
+			// 	webSearchResults = await runWebSearch(conv, newPrompt, update);
+			// }
+
+			// // we can now build the prompt using the messages
+			// const prompt = await buildPrompt({
+			// 	messages,
+			// 	model,
+			// 	webSearch: webSearchResults,
+			// 	preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
+			// 	locals: locals,
+			// });
 		},
 		async cancel() {
 			await collections.conversations.updateOne(

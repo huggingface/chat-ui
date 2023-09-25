@@ -68,7 +68,7 @@
 					id: messageId,
 					response_id: responseId,
 					is_retry: isRetry,
-					web_search: $webSearchParameters.useSearch,
+					tools: $webSearchParameters.useSearch ? ["textToImage", "webSearch", "textToSpeech"] : [],
 				}),
 			});
 
@@ -128,6 +128,8 @@
 								}
 							} else if (update.type === "webSearch") {
 								webSearchMessages = [...webSearchMessages, update];
+							} else if (update.type === "agent") {
+								console.log(update);
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message

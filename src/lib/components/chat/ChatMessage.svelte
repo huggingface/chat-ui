@@ -152,6 +152,33 @@
 				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}
 			>
+				{#if message.files && message.files.length > 0}
+					<div class="mx-auto grid w-fit grid-cols-2 gap-5">
+						{#each message.files as file}
+							<div class="flex flex-col flex-nowrap gap-0">
+								{#if file.mime === "image/jpeg"}
+									<img
+										src={$page.url.pathname + "/output/" + file.sha256}
+										alt="tool output"
+										class="my-2 aspect-auto"
+									/>
+								{:else if file.mime === "audio/wav"}
+									<audio controls class="my-2">
+										<source src={$page.url.pathname + "/output/" + file.sha256} type="audio/wav" />
+									</audio>
+								{/if}
+								{#if file.model}
+									<span class="text-sm"
+										>Content generated using <a href={`https://huggingface.co/${file.model}`}
+											>{file.model}</a
+										></span
+									>
+								{/if}
+							</div>
+						{/each}
+					</div>
+					<div class="my-5 w-full border-b-2 border-gray-300 dark:border-gray-700" />
+				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />

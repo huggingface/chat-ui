@@ -11,8 +11,9 @@ interface Parameters {
 	max_new_tokens: number;
 	stop: string[];
 }
-export async function generateFromDefaultEndpoint(
+export async function generateFromEndpoint(
 	prompt: string,
+	model?: typeof defaultModel,
 	parameters?: Partial<Parameters>
 ): Promise<string> {
 	const newParameters = {
@@ -21,7 +22,7 @@ export async function generateFromDefaultEndpoint(
 		return_full_text: false,
 	};
 
-	const randomEndpoint = modelEndpoint(defaultModel);
+	const randomEndpoint = modelEndpoint(model ?? defaultModel);
 
 	const abortController = new AbortController();
 

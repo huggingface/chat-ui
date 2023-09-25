@@ -1,6 +1,6 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
-import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
+import { generateFromEndpoint } from "../generateFromEndpoint";
 import { defaultModel } from "../models";
 
 export async function generateQuery(messages: Message[]) {
@@ -13,7 +13,7 @@ export async function generateQuery(messages: Message[]) {
 		previousMessages: previousUserMessages.map(({ content }) => content).join(" "),
 		currentDate,
 	});
-	const searchQuery = await generateFromDefaultEndpoint(promptSearchQuery).then((query) => {
+	const searchQuery = await generateFromEndpoint(promptSearchQuery).then((query) => {
 		// example of generating google query:
 		// case 1
 		// user: tell me what happened yesterday

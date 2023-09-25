@@ -1,4 +1,5 @@
 import type { WebSearchSource } from "./WebSearch";
+import type { Update } from "@huggingface/agents/src/types";
 
 export type FinalAnswer = {
 	type: "finalAnswer";
@@ -10,12 +11,9 @@ export type TextStreamUpdate = {
 	token: string;
 };
 
-export type AgentUpdate = {
+export interface AgentUpdate extends Update {
 	type: "agent";
-	agent: string;
-	content: string;
-	binary?: Blob;
-};
+}
 
 export type WebSearchUpdate = {
 	type: "webSearch";
