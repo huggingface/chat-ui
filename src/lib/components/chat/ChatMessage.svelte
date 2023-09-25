@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { marked } from "marked";
+	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
@@ -14,9 +15,9 @@
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
-	import type { WebSearchMessage, WebSearchMessageSources } from "$lib/types/WebSearch";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
+	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -48,7 +49,7 @@
 	export let readOnly = false;
 	export let isTapped = false;
 
-	export let webSearchMessages: WebSearchMessage[] = [];
+	export let webSearchMessages: WebSearchUpdate[];
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
@@ -61,19 +62,30 @@
 	let isCopied = false;
 
 	const renderer = new marked.Renderer();
-
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
 		// Unsanitize double-sanitized code
 		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
 	};
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { extensions, ...defaults } = marked.getDefaults() as marked.MarkedOptions & {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		extensions: any;
+	};
 	const options: marked.MarkedOptions = {
-		...marked.getDefaults(),
+		...defaults,
 		gfm: true,
 		breaks: true,
 		renderer,
 	};
+
+	marked.use(
+		markedKatex({
+			throwOnError: false,
+			// output: "html",
+		})
+	);
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
 
@@ -94,18 +106,23 @@
 		}
 	});
 
+	let searchUpdates: WebSearchUpdate[] = [];
+
+	$: searchUpdates = ((webSearchMessages.length > 0
+		? webSearchMessages
+		: message.updates?.filter(({ type }) => type === "webSearch")) ?? []) as WebSearchUpdate[];
+
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
 	let webSearchIsDone = true;
 
 	$: webSearchIsDone =
-		webSearchMessages.length > 0 &&
-		webSearchMessages[webSearchMessages.length - 1].type === "result";
+		searchUpdates.length > 0 && searchUpdates[searchUpdates.length - 1].messageType === "sources";
 
-	$: webSearchSources = (
-		webSearchMessages.filter(({ type }) => type === "sources")?.[0] as WebSearchMessageSources
-	)?.sources;
+	$: webSearchSources =
+		searchUpdates &&
+		searchUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
 
 	$: if (isCopied) {
 		setTimeout(() => {
@@ -128,11 +145,11 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if webSearchMessages && webSearchMessages.length > 0}
+			{#if searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
-					{webSearchMessages}
-					loading={!webSearchIsDone}
+					webSearchMessages={searchUpdates}
+					loading={!(searchUpdates[searchUpdates.length - 1]?.messageType === "sources")}
 				/>
 			{/if}
 			{#if !message.content && (webSearchIsDone || (webSearchMessages && webSearchMessages.length === 0))}
@@ -148,7 +165,7 @@
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked(token.raw, options)}
+						{@html marked.parse(token.raw, options)}
 					{/if}
 				{/each}
 			</div>
@@ -158,7 +175,7 @@
 					<div class="text-gray-400">Sources:</div>
 					{#each webSearchSources as { link, title, hostname }}
 						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300  dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
 							href={link}
 							target="_blank"
 						>

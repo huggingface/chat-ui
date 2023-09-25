@@ -14,7 +14,7 @@ interface Parameters {
 export async function generateFromDefaultEndpoint(
 	prompt: string,
 	parameters?: Partial<Parameters>
-) {
+): Promise<string> {
 	const newParameters = {
 		...defaultModel.parameters,
 		...parameters,
@@ -68,7 +68,7 @@ export async function generateFromDefaultEndpoint(
 	}
 
 	if (!resp.body) {
-		throw new Error("Response body is empty");
+		throw new Error("Body is empty");
 	}
 
 	const decoder = new TextDecoder();
@@ -87,7 +87,12 @@ export async function generateFromDefaultEndpoint(
 	// Close the reader when done
 	reader.releaseLock();
 
-	const results = await JSON.parse(result);
+	let results;
+	if (result.startsWith("data:")) {
+		results = [JSON.parse(result.split("data:")?.pop() ?? "")];
+	} else {
+		results = JSON.parse(result);
+	}
 
 	let generated_text = trimSuffix(
 		trimPrefix(trimPrefix(results[0].generated_text, "<|startoftext|>"), prompt),

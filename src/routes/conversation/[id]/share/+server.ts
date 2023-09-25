@@ -3,7 +3,7 @@ import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import type { SharedConversation } from "$lib/types/SharedConversation";
-import { hashConv } from "$lib/utils/hashConv.js";
+import { hashConv } from "$lib/utils/hashConv";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { nanoid } from "nanoid";

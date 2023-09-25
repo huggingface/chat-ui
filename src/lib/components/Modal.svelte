@@ -54,7 +54,7 @@
 			tabindex="-1"
 			bind:this={modalEl}
 			on:keydown={handleKeydown}
-			class="-mt-10 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none md:-mt-20 {width}"
+			class="max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10 sm:max-h-screen {width}"
 		>
 			<slot />
 		</div>
