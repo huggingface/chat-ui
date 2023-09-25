@@ -58,6 +58,7 @@
 	let contentEl: HTMLElement;
 	let loadingEl: IconLoading;
 	let pendingTimeout: ReturnType<typeof setTimeout>;
+	let isCopied = false;
 
 	const renderer = new marked.Renderer();
 
@@ -105,6 +106,12 @@
 	$: webSearchSources = (
 		webSearchMessages.filter(({ type }) => type === "sources")?.[0] as WebSearchMessageSources
 	)?.sources;
+
+	$: if (isCopied) {
+		setTimeout(() => {
+			isCopied = false;
+		}, 1000);
+	}
 </script>
 
 {#if message.from === "assistant"}
@@ -170,7 +177,7 @@
 			<div
 				class="absolute bottom-1 right-0 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
 					{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
-					{isTapped ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
+					{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 				"
 			>
 				<button
@@ -197,6 +204,9 @@
 					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 				</button>
 				<CopyToClipBoardBtn
+					on:click={() => {
+						isCopied = true;
+					}}
 					classNames="ml-1.5 !rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 dark:!text-gray-400 dark:hover:!text-gray-300 !border-none !shadow-none"
 					value={message.content}
 				/>
