@@ -173,10 +173,6 @@
 					{isTapped ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 				"
 			>
-				<CopyToClipBoardBtn
-					classNames="!rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 dark:!text-gray-400 dark:hover:!text-gray-300 !border-none !shadow-none"
-					value={message.content}
-				/>
 				<button
 					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score > 0
@@ -200,6 +196,10 @@
 				>
 					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 				</button>
+				<CopyToClipBoardBtn
+					classNames="ml-1.5 !rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 dark:!text-gray-400 dark:hover:!text-gray-300 !border-none !shadow-none"
+					value={message.content}
+				/>
 			</div>
 		{/if}
 	</div>
