@@ -1,14 +1,10 @@
 import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
-import { buildPrompt } from "$lib/buildPrompt";
-import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { File, Message } from "$lib/types/Message";
-import { trimPrefix } from "$lib/utils/trimPrefix";
-import { trimSuffix } from "$lib/utils/trimSuffix";
 import { textGenerationStream } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -16,7 +12,6 @@ import { z } from "zod";
 import { AwsClient } from "aws4fetch";
 import type { AgentUpdate, MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
@@ -302,6 +297,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				},
 			};
 
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			const SDXLTool: Tool = {
 				name: "textToImage",
 				description:
@@ -382,7 +378,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					},
 				},
 				chatHistory: messages,
-				tools: listTools,
+				tools: listTools.filter((t) => tools.includes(t.name)),
 			});
 
 			update({ type: "status", status: "started" });
