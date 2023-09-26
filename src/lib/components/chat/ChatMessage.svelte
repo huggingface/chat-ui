@@ -50,7 +50,6 @@
 
 	export let updateMessages: MessageUpdate[];
 
-	console.log(updateMessages);
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
 		vote: { score: Message["score"]; id: Message["id"] };
@@ -118,8 +117,6 @@
 		(updateMessages?.filter(({ type }) => type === "webSearch") as WebSearchUpdate[]).filter(
 			({ messageType }) => messageType === "sources"
 		)?.[0]?.sources;
-
-	console.log(updateMessages);
 </script>
 
 {#if message.from === "assistant"}
