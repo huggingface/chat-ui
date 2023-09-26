@@ -18,7 +18,6 @@
 
 	export let messages: Message[] = [];
 	export let loading = false;
-	export let pending = false;
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
@@ -51,7 +50,6 @@
 	{/if}
 	<ChatMessages
 		{loading}
-		{pending}
 		{settings}
 		{currentModel}
 		{models}

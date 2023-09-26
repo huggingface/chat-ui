@@ -31,7 +31,6 @@
 	}
 
 	let loading = false;
-	let pending = false;
 	let loginRequired = false;
 
 	// this function is used to send new message to the backends
@@ -41,7 +40,6 @@
 		try {
 			isAborted = false;
 			loading = true;
-			pending = true;
 
 			// first we check if the messageId already exists, indicating a retry
 
@@ -58,7 +56,19 @@
 				{ from: "user", content: message, id: messageId },
 			];
 
+			messages = [...messages, { from: "assistant", id: randomUUID(), content: "", files: [] }];
+
 			const responseId = randomUUID();
+
+			const toolsToBeUsed = [];
+
+			if ($webSearchParameters.useSearch) {
+				toolsToBeUsed.push("webSearch");
+			}
+
+			if ($webSearchParameters.useSDXL) {
+				toolsToBeUsed.push("textToImage");
+			}
 
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
@@ -68,7 +78,7 @@
 					id: messageId,
 					response_id: responseId,
 					is_retry: isRetry,
-					tools: $webSearchParameters.useSearch ? ["textToImage", "webSearch", "textToSpeech"] : [],
+					tools: toolsToBeUsed,
 				}),
 			});
 
@@ -83,7 +93,7 @@
 
 			// this is a bit ugly
 			// we read the stream until we get the final answer
-			while (finalAnswer === "") {
+			while (finalAnswer === "" && !isAborted) {
 				// await new Promise((r) => setTimeout(r, 25));
 
 				// check for abort
@@ -112,25 +122,17 @@
 							if (update.type === "finalAnswer") {
 								updateMessages = [...updateMessages, update];
 								finalAnswer = update.text;
-								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
-								pending = false;
-
 								let lastMessage = messages[messages.length - 1];
-
-								if (lastMessage.from !== "assistant") {
-									messages = [
-										...messages,
-										{ from: "assistant", id: randomUUID(), content: update.token },
-									];
-								} else {
-									lastMessage.content += update.token;
-									messages = [...messages];
-								}
+								lastMessage.content += update.token;
+								messages = [...messages];
 							} else if (update.type === "webSearch") {
 								updateMessages = [...updateMessages, update];
 							} else if (update.type === "agent") {
 								updateMessages = [...updateMessages, update];
+							} else if (update.type === "file") {
+								messages[messages.length - 1].files?.push(update.file);
+								messages = [...messages];
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
@@ -142,7 +144,6 @@
 
 			// reset the websearchmessages
 			updateMessages = [];
-
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
@@ -157,7 +158,9 @@
 			console.error(err);
 		} finally {
 			loading = false;
-			pending = false;
+			// wait 500ms
+			await new Promise((r) => setTimeout(r, 500));
+			invalidate(UrlDependency.Conversation);
 		}
 	}
 
@@ -219,7 +222,6 @@
 
 <ChatWindow
 	{loading}
-	{pending}
 	{messages}
 	bind:updateMessages
 	on:message={(event) => writeMessage(event.detail)}

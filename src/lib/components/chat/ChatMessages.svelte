@@ -3,7 +3,6 @@
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import ScrollToBottomBtn from "$lib/components/ScrollToBottomBtn.svelte";
 	import { tick } from "svelte";
-	import { randomUUID } from "$lib/utils/randomUuid";
 	import type { Model } from "$lib/types/Model";
 	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
@@ -13,7 +12,6 @@
 
 	export let messages: Message[];
 	export let loading: boolean;
-	export let pending: boolean;
 	export let isAuthor: boolean;
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
@@ -57,13 +55,6 @@
 		{:else}
 			<ChatIntroduction {settings} {models} {currentModel} on:message />
 		{/each}
-		{#if pending}
-			<ChatMessage
-				message={{ from: "assistant", content: "", id: randomUUID() }}
-				model={currentModel}
-				{updateMessages}
-			/>
-		{/if}
 		<div class="h-44 flex-none" />
 	</div>
 	<ScrollToBottomBtn

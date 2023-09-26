@@ -56,8 +56,6 @@
 	}>();
 
 	let contentEl: HTMLElement;
-	let loadingEl: IconLoading;
-	let pendingTimeout: ReturnType<typeof setTimeout>;
 
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
@@ -86,23 +84,6 @@
 	);
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
-
-	afterUpdate(() => {
-		loadingEl?.$destroy();
-		clearTimeout(pendingTimeout);
-
-		// Add loading animation to the last message if update takes more than 600ms
-		if (loading) {
-			pendingTimeout = setTimeout(() => {
-				if (contentEl) {
-					loadingEl = new IconLoading({
-						target: deepestChild(contentEl),
-						props: { classNames: "loading inline ml-2" },
-					});
-				}
-			}, 600);
-		}
-	});
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
@@ -133,7 +114,7 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if updateMessages && updateMessages.length > 0}
+			{#if updateMessages && updateMessages.filter(({ type }) => type === "agent").length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
 					messages={updateMessages}
@@ -152,13 +133,13 @@
 					<div class="mx-auto grid w-fit grid-cols-2 gap-5">
 						{#each message.files as file}
 							<div class="flex flex-col flex-nowrap gap-0">
-								{#if file.mime === "image/jpeg"}
+								{#if file.mime?.startsWith("image")}
 									<img
 										src={$page.url.pathname + "/output/" + file.sha256}
 										alt="tool output"
 										class="my-2 aspect-auto"
 									/>
-								{:else if file.mime === "audio/wav"}
+								{:else if file.mime?.startsWith("audio")}
 									<audio controls class="my-2">
 										<source src={$page.url.pathname + "/output/" + file.sha256} type="audio/wav" />
 									</audio>

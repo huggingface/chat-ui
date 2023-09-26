@@ -4,7 +4,7 @@ import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
-import type { File, Message } from "$lib/types/Message";
+import type { Message } from "$lib/types/Message";
 import { textGenerationStream } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -161,10 +161,13 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				content: "",
 				webSearch: undefined,
 				updates: updates,
+				files: [],
 				id: (responseId as Message["id"]) || crypto.randomUUID(),
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			});
+
+			const lastMessage = messages[messages.length - 1];
 
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
@@ -173,7 +176,12 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				try {
 					controller.enqueue(JSON.stringify(newUpdate) + "\n");
 				} catch (e) {
-					console.error(e);
+					try {
+						stream.cancel();
+					} catch (f) {
+						console.error(f);
+						// ignore
+					}
 				}
 			}
 
@@ -188,6 +196,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						parameters: {
 							...models.find((m) => m.id === conv.model)?.parameters,
 							return_full_text: false,
+							max_new_tokens: 4000,
 						},
 						model: randomEndpoint.url,
 						accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
@@ -203,8 +212,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				if (!conv) {
 					throw new Error("Conversation not found");
 				}
-
-				const lastMessage = messages[messages.length - 1];
 
 				if (lastMessage) {
 					// remove the stop tokens
@@ -228,10 +235,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						}
 					);
 
-					update({
-						type: "finalAnswer",
-						text: generated_text,
-					});
+					update({ type: "finalAnswer", text: generated_text });
 				}
 			}
 
@@ -239,7 +243,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				if (!output.generated_text) {
 					// else we get the next token
 					if (!output.token.special) {
-						const lastMessage = messages[messages.length - 1];
 						// if the last message is not from assistant, it means this is the first token
 						const date = abortedGenerations.get(convId.toString());
 
@@ -261,8 +264,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					}
 				}
 			};
-
-			const files: File[] = [];
 
 			const webSearchTool: Tool = {
 				name: "webSearch",
@@ -355,11 +356,14 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				callbacks: {
 					onFile: async (file, tool) => {
 						const filename = await uploadFile(file, conv, tool);
-						files.push({
+
+						const fileObject = {
 							sha256: filename.split("-")[1],
 							model: tool?.model,
 							mime: tool?.mime,
-						});
+						};
+						lastMessage.files?.push(fileObject);
+						update({ type: "file", file: fileObject });
 					},
 					onUpdate: async (agentUpdate) => {
 						update({ ...agentUpdate, type: "agent" } satisfies AgentUpdate);
@@ -370,38 +374,16 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						saveLast(answer);
 					},
 				},
-				chatHistory: messages,
+				chatHistory: [...messages],
 				tools: listTools.filter((t) => tools.includes(t.name)),
 			});
 
-			update({ type: "status", status: "started" });
-
 			try {
 				await agent.chat(newPrompt);
-
-				const lastMessage = messages[messages.length - 1];
-				if (lastMessage && lastMessage.from === "assistant") {
-					lastMessage.files = files;
-				}
 			} catch (e) {
 				console.error(e);
 				return new Error((e as Error).message);
 			}
-
-			// let webSearchResults: WebSearch | undefined;
-
-			// if (tools.includes("websearch")) {
-			// 	webSearchResults = await runWebSearch(conv, newPrompt, update);
-			// }
-
-			// // we can now build the prompt using the messages
-			// const prompt = await buildPrompt({
-			// 	messages,
-			// 	model,
-			// 	webSearch: webSearchResults,
-			// 	preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
-			// 	locals: locals,
-			// });
 		},
 		async cancel() {
 			await collections.conversations.updateOne(
