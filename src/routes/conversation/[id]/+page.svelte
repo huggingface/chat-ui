@@ -14,7 +14,7 @@
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
 	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
-	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 
 	export let data;
 
@@ -22,7 +22,7 @@
 	let lastLoadedMessages = data.messages;
 	let isAborted = false;
 
-	let webSearchMessages: WebSearchUpdate[] = [];
+	let updateMessages: MessageUpdate[] = [];
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -110,6 +110,7 @@
 						try {
 							let update = JSON.parse(el) as MessageUpdate;
 							if (update.type === "finalAnswer") {
+								updateMessages = [...updateMessages, update];
 								finalAnswer = update.text;
 								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
@@ -127,9 +128,9 @@
 									messages = [...messages];
 								}
 							} else if (update.type === "webSearch") {
-								webSearchMessages = [...webSearchMessages, update];
+								updateMessages = [...updateMessages, update];
 							} else if (update.type === "agent") {
-								console.log(update);
+								updateMessages = [...updateMessages, update];
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
@@ -140,7 +141,7 @@
 			}
 
 			// reset the websearchmessages
-			webSearchMessages = [];
+			updateMessages = [];
 
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
@@ -220,7 +221,7 @@
 	{loading}
 	{pending}
 	{messages}
-	bind:webSearchMessages
+	bind:updateMessages
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}

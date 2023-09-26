@@ -374,6 +374,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					},
 					onStream: streamCallback,
 					onFinalAnswer: async (answer) => {
+						update({ type: "finalAnswer", text: answer });
 						saveLast(answer);
 					},
 				},

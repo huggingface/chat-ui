@@ -14,7 +14,7 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -23,7 +23,7 @@
 	export let currentModel: Model;
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let updateMessages: MessageUpdate[] = [];
 
 	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
@@ -58,7 +58,7 @@
 		{messages}
 		readOnly={isReadOnly}
 		isAuthor={!shared}
-		{webSearchMessages}
+		{updateMessages}
 		on:message
 		on:vote
 		on:retry={(ev) => {
@@ -135,7 +135,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+					<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}

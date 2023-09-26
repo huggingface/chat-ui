@@ -16,7 +16,7 @@
 	import type { Model } from "$lib/types/Model";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -48,8 +48,9 @@
 	export let readOnly = false;
 	export let isTapped = false;
 
-	export let webSearchMessages: WebSearchUpdate[];
+	export let updateMessages: MessageUpdate[];
 
+	console.log(updateMessages);
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
 		vote: { score: Message["score"]; id: Message["id"] };
@@ -104,23 +105,21 @@
 		}
 	});
 
-	let searchUpdates: WebSearchUpdate[] = [];
-
-	$: searchUpdates = ((webSearchMessages.length > 0
-		? webSearchMessages
-		: message.updates?.filter(({ type }) => type === "webSearch")) ?? []) as WebSearchUpdate[];
-
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
 	let webSearchIsDone = true;
 
 	$: webSearchIsDone =
-		searchUpdates.length > 0 && searchUpdates[searchUpdates.length - 1].messageType === "sources";
+		updateMessages.length > 0 && updateMessages[updateMessages.length - 1].type === "finalAnswer";
 
 	$: webSearchSources =
-		searchUpdates &&
-		searchUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
+		updateMessages &&
+		(updateMessages?.filter(({ type }) => type === "webSearch") as WebSearchUpdate[]).filter(
+			({ messageType }) => messageType === "sources"
+		)?.[0]?.sources;
+
+	console.log(updateMessages);
 </script>
 
 {#if message.from === "assistant"}
@@ -137,14 +136,14 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if searchUpdates && searchUpdates.length > 0}
+			{#if updateMessages && updateMessages.length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
-					webSearchMessages={searchUpdates}
-					loading={!(searchUpdates[searchUpdates.length - 1]?.messageType === "sources")}
+					messages={updateMessages}
+					loading={!(updateMessages[updateMessages.length - 1]?.type === "finalAnswer")}
 				/>
 			{/if}
-			{#if !message.content && (webSearchIsDone || (webSearchMessages && webSearchMessages.length === 0))}
+			{#if !message.content && (webSearchIsDone || (updateMessages && updateMessages.length === 0))}
 				<IconLoading />
 			{/if}
 

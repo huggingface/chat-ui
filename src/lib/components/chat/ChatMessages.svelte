@@ -8,7 +8,7 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 	import { browser } from "$app/environment";
 
 	export let messages: Message[];
@@ -22,7 +22,7 @@
 
 	let chatContainer: HTMLElement;
 
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let updateMessages: MessageUpdate[] = [];
 
 	async function scrollToBottom() {
 		await tick();
@@ -37,7 +37,7 @@
 
 <div
 	class="scrollbar-custom mr-1 h-full overflow-y-auto"
-	use:snapScrollToBottom={messages.length ? [...messages, ...webSearchMessages] : false}
+	use:snapScrollToBottom={messages.length ? [...messages, ...updateMessages] : false}
 	bind:this={chatContainer}
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
@@ -48,7 +48,9 @@
 				{isAuthor}
 				{readOnly}
 				model={currentModel}
-				webSearchMessages={i === messages.length - 1 ? webSearchMessages : []}
+				updateMessages={!message.updates && i === messages.length - 1
+					? updateMessages
+					: message.updates ?? []}
 				on:retry
 				on:vote
 			/>
@@ -59,7 +61,7 @@
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
-				{webSearchMessages}
+				{updateMessages}
 			/>
 		{/if}
 		<div class="h-44 flex-none" />
