@@ -96,7 +96,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 	// get the list of messages
 	// while checking for retries
-	let messages = (() => {
+	const messages = (() => {
 		if (is_retry && messageId) {
 			// if the message is a retry, replace the message and remove the messages after it
 			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
@@ -155,6 +155,16 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 	const stream = new ReadableStream({
 		async start(controller) {
 			const updates: MessageUpdate[] = [];
+
+			messages.push({
+				from: "assistant",
+				content: "",
+				webSearch: undefined,
+				updates: updates,
+				id: (responseId as Message["id"]) || crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
 
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
@@ -231,36 +241,18 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					if (!output.token.special) {
 						const lastMessage = messages[messages.length - 1];
 						// if the last message is not from assistant, it means this is the first token
-						if (lastMessage?.from !== "assistant") {
-							// so we create a new message
-							messages = [
-								...messages,
-								// id doesn't match the backend id but it's not important for assistant messages
-								// First token has a space at the beginning, trim it
-								{
-									from: "assistant",
-									content: output.token.text.trimStart(),
-									webSearch: undefined,
-									updates: updates,
-									id: (responseId as Message["id"]) || crypto.randomUUID(),
-									createdAt: new Date(),
-									updatedAt: new Date(),
-								},
-							];
-						} else {
-							const date = abortedGenerations.get(convId.toString());
+						const date = abortedGenerations.get(convId.toString());
 
-							if (date && date > promptedAt) {
-								saveLast(lastMessage.content);
-							}
-
-							if (!output) {
-								return;
-							}
-
-							// otherwise we just concatenate tokens
-							lastMessage.content += output.token.text;
+						if (date && date > promptedAt) {
+							saveLast(lastMessage.content);
 						}
+
+						if (!output) {
+							return;
+						}
+
+						// otherwise we just concatenate tokens
+						lastMessage.content += output.token.text;
 
 						update({
 							type: "stream",
