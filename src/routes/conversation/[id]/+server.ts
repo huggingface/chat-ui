@@ -365,6 +365,9 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						update({ type: "finalAnswer", text: answer });
 						saveLast(answer);
 					},
+					onError: async (errorUpdate) => {
+						update({ type: "error", message: errorUpdate.message });
+					},
 				},
 				chatHistory: messages,
 				tools: listTools.filter((t) => tools.includes(t.name)),

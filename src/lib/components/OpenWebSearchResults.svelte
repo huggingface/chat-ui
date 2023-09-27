@@ -1,5 +1,10 @@
 <script lang="ts">
-	import type { AgentUpdate, MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type {
+		AgentUpdate,
+		ErrorUpdate,
+		MessageUpdate,
+		WebSearchUpdate,
+	} from "$lib/types/MessageUpdate";
 	import CarbonCaretRight from "~icons/carbon/caret-right";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
@@ -15,8 +20,13 @@
 	let error: boolean;
 
 	$: messagesToDisplay = messages.filter(
-		(el) => el.type === "agent" || (el.type === "webSearch" && el.messageType !== "sources")
-	) as Array<WebSearchUpdate | AgentUpdate>;
+		(el) =>
+			el.type === "agent" ||
+			(el.type === "webSearch" && el.messageType !== "sources") ||
+			el.type === "error"
+	) as Array<WebSearchUpdate | AgentUpdate | ErrorUpdate>;
+
+	$: error = messages.some((el) => el.type === "error");
 </script>
 
 <details
@@ -51,12 +61,20 @@
 				{#each messagesToDisplay as message}
 					<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 						<div class="flex items-start">
-							<div
-								class="-ml-1.5 h-3 w-3 flex-none rounded-full bg-gray-200 dark:bg-gray-600 {loading
-									? 'group-last:animate-pulse group-last:bg-gray-300 group-last:dark:bg-gray-500'
-									: ''}"
-							/>
-							<h3 class="text-md -mt-1.5 pl-2.5 text-gray-800 dark:text-gray-100">
+							{#if message.type === "error"}
+								<CarbonError class=" -ml-2 -mt-0.5 h-4 w-4 text-red-700 dark:text-red-500" />
+							{:else}
+								<div
+									class="-ml-1.5 h-3 w-3 flex-none rounded-full bg-gray-200 dark:bg-gray-600 {loading
+										? 'group-last:animate-pulse group-last:bg-gray-300 group-last:dark:bg-gray-500'
+										: ''}"
+								/>
+							{/if}
+							<h3
+								class="text-md -mt-1.5 pl-2.5 text-gray-800 dark:text-gray-100"
+								class:text-red-700={message.type === "error"}
+								class:dark:text-red-500={message.type === "error"}
+							>
 								{message.message}
 							</h3>
 						</div>

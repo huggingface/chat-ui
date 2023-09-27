@@ -35,10 +35,16 @@ export type FileUpdate = {
 	file: File;
 };
 
+export type ErrorUpdate = {
+	type: "error";
+	message: string;
+};
+
 export type MessageUpdate =
 	| FinalAnswer
 	| TextStreamUpdate
 	| AgentUpdate
 	| WebSearchUpdate
 	| StatusUpdate
-	| FileUpdate;
+	| FileUpdate
+	| ErrorUpdate;
