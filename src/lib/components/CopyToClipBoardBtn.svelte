@@ -41,6 +41,7 @@
 	"
 	title={"Copy to clipboard"}
 	type="button"
+	on:click
 	on:click={handleClick}
 >
 	<span class="relative">
