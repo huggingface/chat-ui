@@ -162,11 +162,11 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-#### Custom prompt templates:
+#### Custom prompt templates
 
 By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
-However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is <https://handlebarsjs.com>. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
 For example:
 
@@ -299,6 +299,37 @@ If the model being hosted will be available on multiple servers/instances add th
 ]
 
 ```
+
+### Tools
+
+chat-ui supports two tools currently:
+
+- `webSearch`
+- `textToImage`
+
+You can enable them by adding the following JSON to your `.env.local`:
+
+```
+TOOLS = `[
+  {
+    "name" : "textToImage",
+    "model" : "[model name form the hub here]"
+  },
+  {
+    "name" : "webSearch",
+    "key" : {
+      "type" : "serper",
+      "apiKey" : "[your key here]"
+    }
+  }
+]`
+```
+
+Or a subset of these if you only want to enable some of the tools.
+
+The web search key `type` can be either `serper` or `serpapi`.
+
+The `textToImage` model can be [any model from the hub](https://huggingface.co/tasks/text-to-image) that matches the right task as long as the inference endpoint for it is enabled.
 
 ## Deploying to a HF Space
 
