@@ -35,22 +35,24 @@ export const tools = toolsDefinition.parse(JSON.parse(TOOLS));
 
 // check if SERPAPI_KEY or SERPER_API_KEY are defined, and if so append them to the tools
 
-if (SERPAPI_KEY) {
-	tools.push({
-		name: "webSearch",
-		key: {
-			type: "serpapi",
-			apiKey: SERPAPI_KEY,
-		},
-	});
-} else if (SERPER_API_KEY) {
-	tools.push({
-		name: "webSearch",
-		key: {
-			type: "serper",
-			apiKey: SERPER_API_KEY,
-		},
-	});
+if (!tools.some((tool) => tool.name === "webSearch")) {
+	if (SERPAPI_KEY) {
+		tools.push({
+			name: "webSearch",
+			key: {
+				type: "serpapi",
+				apiKey: SERPAPI_KEY,
+			},
+		});
+	} else if (SERPER_API_KEY) {
+		tools.push({
+			name: "webSearch",
+			key: {
+				type: "serper",
+				apiKey: SERPER_API_KEY,
+			},
+		});
+	}
 }
 
 export type Tool = z.infer<typeof toolsDefinition>[number];
