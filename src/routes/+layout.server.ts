@@ -6,7 +6,8 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
-import { SERPAPI_KEY, SERPER_API_KEY, MESSAGES_BEFORE_LOGIN } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN } from "$env/static/private";
+import { tools } from "$lib/server/tools";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
@@ -61,7 +62,10 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
-			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY),
+			tools: {
+				webSearch: tools.some((tool) => tool.name === "webSearch"),
+				textToImage: tools.some((tool) => tool.name === "textToImage"),
+			},
 			customPrompts: settings?.customPrompts ?? {},
 		},
 		models: models.map((model) => ({

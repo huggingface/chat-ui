@@ -15,9 +15,10 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { defaultTools, HfChatAgent } from "@huggingface/agents";
+import { HfChatAgent } from "@huggingface/agents";
 import { uploadFile } from "$lib/server/tools/uploadFile.js";
 import type { Tool } from "@huggingface/agents/src/types.js";
+import { tools as toolSettings, type TextToImageTool } from "$lib/server/tools.js";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -155,20 +156,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 	const stream = new ReadableStream({
 		async start(controller) {
 			const updates: MessageUpdate[] = [];
-
-			messages.push({
-				from: "assistant",
-				content: "",
-				webSearch: undefined,
-				updates: updates,
-				files: [],
-				id: (responseId as Message["id"]) || crypto.randomUUID(),
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			});
-
-			const lastMessage = messages[messages.length - 1];
-
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
 					updates.push(newUpdate);
@@ -207,6 +194,18 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					}
 				);
 			}
+
+			messages.push({
+				from: "assistant",
+				content: "",
+				updates: updates,
+				files: [],
+				id: (responseId as Message["id"]) || crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+
+			const lastMessage = messages[messages.length - 1];
 
 			async function saveLast(generated_text: string) {
 				if (!conv) {
@@ -265,85 +264,78 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			};
 
-			const webSearchTool: Tool = {
-				name: "webSearch",
-				description:
-					"This tool can be used to search the web for extra information. It will return the most relevant paragraphs from the web",
-				examples: [
-					{
-						prompt: "What are the best restaurants in Paris?",
-						code: '{"tool" : "imageToText", "input" : "What are the best restaurants in Paris?"}',
-						tools: ["webSearch"],
-					},
-					{
-						prompt: "Who is the president of the United States?",
-						code: '{"tool" : "imageToText", "input" : "Who is the president of the United States?"}',
-						tools: ["webSearch"],
-					},
-				],
-				call: async (input, _) => {
-					const data = await input;
-					if (typeof data !== "string") throw "Input must be a string.";
+			const listTools: Tool[] = [];
 
-					const results = await runWebSearch(conv, data, update);
-					return results.context;
-				},
-			};
-
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const SDXLTool: Tool = {
-				name: "textToImage",
-				description:
-					"This tool can be used to generate an image from text. It will return the image.",
-				mime: "image/jpeg",
-				model: "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0",
-				examples: [
-					{
-						prompt: "Generate an image of a cat wearing a top hat",
-						code: '{"tool" : "textToImage", "input" : "a cat wearing a top hat"}',
-						tools: ["textToImage"],
-					},
-					{
-						prompt: "Draw a brown dog on a beach",
-						code: '{"tool" : "textToImage", "input" : "drawing of a brown dog on a beach"}',
-						tools: ["textToImage"],
-					},
-				],
-				call: async (input, inference) => {
-					const data = await input;
-					if (typeof data !== "string") throw "Input must be a string.";
-
-					const imageBase = await inference.textToImage(
+			if (toolSettings.some((t) => t.name === "webSearch")) {
+				const webSearchTool: Tool = {
+					name: "webSearch",
+					description:
+						"This tool can be used to search the web for extra information. It will return the most relevant paragraphs from the web",
+					examples: [
 						{
-							inputs: data,
-							model: "stabilityai/stable-diffusion-xl-base-1.0",
+							prompt: "What are the best restaurants in Paris?",
+							code: '{"tool" : "imageToText", "input" : "What are the best restaurants in Paris?"}',
+							tools: ["webSearch"],
 						},
-						{ wait_for_model: true }
-					);
-
-					const imageRefined = await inference.imageToImage(
 						{
-							inputs: imageBase,
-							model: "stabilityai/stable-diffusion-xl-refiner-1.0",
-							parameters: {
-								prompt: data,
+							prompt: "Who is the president of the United States?",
+							code: '{"tool" : "imageToText", "input" : "Who is the president of the United States?"}',
+							tools: ["webSearch"],
+						},
+					],
+					call: async (input, _) => {
+						const data = await input;
+						if (typeof data !== "string") throw "Input must be a string.";
+
+						const results = await runWebSearch(conv, data, update);
+						return results.context;
+					},
+				};
+
+				listTools.push(webSearchTool);
+			}
+
+			if (toolSettings.some((t) => t.name === "textToImage")) {
+				const toolParameters = toolSettings.find(
+					(t) => t.name === "textToImage"
+				) as TextToImageTool;
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const SDXLTool: Tool = {
+					name: "textToImage",
+					description:
+						"This tool can be used to generate an image from text. It will return the image.",
+					mime: "image/jpeg",
+					model: "https://huggingface.co/" + toolParameters.model,
+					examples: [
+						{
+							prompt: "Generate an image of a cat wearing a top hat",
+							code: '{"tool" : "textToImage", "input" : "a cat wearing a top hat"}',
+							tools: ["textToImage"],
+						},
+						{
+							prompt: "Draw a brown dog on a beach",
+							code: '{"tool" : "textToImage", "input" : "drawing of a brown dog on a beach"}',
+							tools: ["textToImage"],
+						},
+					],
+					call: async (input, inference) => {
+						const data = await input;
+						if (typeof data !== "string") throw "Input must be a string.";
+
+						const imageBase = await inference.textToImage(
+							{
+								inputs: data,
+								model: toolParameters.model,
+								parameters: toolParameters.parameters,
 							},
-						},
-						{
-							wait_for_model: true,
-						}
-					);
-					return imageRefined;
-				},
-			};
+							{ wait_for_model: true }
+						);
+						return imageBase;
+					},
+				};
 
-			// const listTools = [
-			// 	...defaultTools.filter((t) => t.name !== "textToImage"),
-			// 	webSearchTool,
-			// 	SDXLTool,
-			// ];
-
-			const listTools = [...defaultTools, webSearchTool];
+				listTools.push(SDXLTool);
+			}
 
 			const agent = new HfChatAgent({
 				accessToken: HF_ACCESS_TOKEN,
@@ -374,7 +366,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						saveLast(answer);
 					},
 				},
-				chatHistory: [...messages],
+				chatHistory: messages,
 				tools: listTools.filter((t) => tools.includes(t.name)),
 			});
 

@@ -2,8 +2,7 @@
 	import { marked } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher } from "svelte";
-	import { deepestChild } from "$lib/utils/deepestChild";
+	import { createEventDispatcher } from "svelte";
 	import { page } from "$app/stores";
 
 	import CodeBlock from "../CodeBlock.svelte";

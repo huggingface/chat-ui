@@ -42,6 +42,7 @@
 		dispatch("message", message);
 		message = "";
 	};
+	const showTools = settings?.tools.webSearch || settings?.tools.textToImage;
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -67,12 +68,12 @@
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		<div class="flex w-full pb-3 max-md:justify-between">
-			{#if settings?.searchEnabled}
-				<WebSearchToggle />
+			{#if showTools}
+				<WebSearchToggle tools={settings.tools} />
 			{/if}
 			{#if loading}
 				<StopGeneratingBtn
-					classNames={settings?.searchEnabled ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
+					classNames={showTools ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
 					on:click={() => dispatch("stop")}
 				/>
 			{/if}
