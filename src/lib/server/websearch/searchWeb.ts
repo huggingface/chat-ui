@@ -1,14 +1,14 @@
-import { SERPAPI_KEY, SERPER_API_KEY } from "$env/static/private";
-
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
+import { tools, type WebSearchTool } from "../tools";
 
+const webSearchTool = tools.find((tool) => tool.name === "webSearch") as WebSearchTool;
 // Show result as JSON
 export async function searchWeb(query: string) {
-	if (SERPER_API_KEY) {
+	if (webSearchTool.key.type === "serper") {
 		return await searchWebSerper(query);
 	}
-	if (SERPAPI_KEY) {
+	if (webSearchTool.key.type === "serpapi") {
 		return await searchWebSerpApi(query);
 	}
 	throw new Error("No Serper.dev or SerpAPI key found");
@@ -25,7 +25,7 @@ export async function searchWebSerper(query: string) {
 		method: "POST",
 		body: JSON.stringify(params),
 		headers: {
-			"x-api-key": SERPER_API_KEY,
+			"x-api-key": webSearchTool.key.apiKey,
 			"Content-type": "application/json; charset=UTF-8",
 		},
 	});
@@ -51,7 +51,7 @@ export async function searchWebSerpApi(query: string) {
 		hl: "en",
 		gl: "us",
 		google_domain: "google.com",
-		api_key: SERPAPI_KEY,
+		api_key: webSearchTool.key.apiKey,
 	} satisfies GoogleParameters;
 
 	// Show result as JSON
