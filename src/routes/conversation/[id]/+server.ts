@@ -5,20 +5,18 @@ import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
-import { textGenerationStream } from "@huggingface/inference";
+import { HfInference, textGenerationStream } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { AwsClient } from "aws4fetch";
-import type { AgentUpdate, MessageUpdate } from "$lib/types/MessageUpdate";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { HfChatAgent } from "@huggingface/agents";
-import { uploadFile } from "$lib/server/tools/uploadFile.js";
-import type { Tool } from "@huggingface/agents/src/types.js";
+import { buildPrompt } from "$lib/buildPrompt.js";
 import { tools as toolSettings, type TextToImageTool } from "$lib/server/tools.js";
+import { uploadFile } from "$lib/server/tools/uploadFile.js";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -163,42 +161,17 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				try {
 					controller.enqueue(JSON.stringify(newUpdate) + "\n");
 				} catch (e) {
-					try {
-						stream.cancel();
-					} catch (f) {
-						console.error(f);
-						// ignore
-					}
+					// ignore
 				}
-			}
-
-			function getStream(inputs: string) {
-				if (!conv) {
-					throw new Error("Conversation not found");
-				}
-
-				return textGenerationStream(
-					{
-						inputs,
-						parameters: {
-							...models.find((m) => m.id === conv.model)?.parameters,
-							return_full_text: false,
-							max_new_tokens: 4000,
-						},
-						model: randomEndpoint.url,
-						accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
-					},
-					{
-						use_cache: false,
-						fetch: usedFetch,
-					}
-				);
 			}
 
 			messages.push({
 				from: "assistant",
 				content: "",
 				updates: updates,
+				webSearch: tools?.includes("webSearch")
+					? await runWebSearch(conv, newPrompt, update)
+					: undefined,
 				files: [],
 				id: (responseId as Message["id"]) || crypto.randomUUID(),
 				createdAt: new Date(),
@@ -238,146 +211,104 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			}
 
-			const streamCallback = async (output: TextGenerationStreamOutput) => {
-				if (!output.generated_text) {
-					// else we get the next token
-					if (!output.token.special) {
-						// if the last message is not from assistant, it means this is the first token
-						const date = abortedGenerations.get(convId.toString());
+			const toolParameters = toolSettings.find((t) => t.name === "textToImage") as
+				| TextToImageTool
+				| undefined;
 
-						if (date && date > promptedAt) {
-							saveLast(lastMessage.content);
-						}
-
-						if (!output) {
-							return;
-						}
-
-						// otherwise we just concatenate tokens
-						lastMessage.content += output.token.text;
-
-						update({
-							type: "stream",
-							token: output.token.text,
-						});
-					}
-				}
-			};
-
-			const listTools: Tool[] = [];
-
-			if (toolSettings.some((t) => t.name === "webSearch")) {
-				const webSearchTool: Tool = {
-					name: "webSearch",
-					description:
-						"This tool can be used to search the web for extra information. It will return the most relevant paragraphs from the web",
-					examples: [
-						{
-							prompt: "What are the best restaurants in Paris?",
-							code: '{"tool" : "imageToText", "input" : "What are the best restaurants in Paris?"}',
-							tools: ["webSearch"],
-						},
-						{
-							prompt: "Who is the president of the United States?",
-							code: '{"tool" : "imageToText", "input" : "Who is the president of the United States?"}',
-							tools: ["webSearch"],
-						},
-					],
-					call: async (input, _) => {
-						const data = await input;
-						if (typeof data !== "string") throw "Input must be a string.";
-
-						const results = await runWebSearch(conv, data, update);
-						return results.context;
-					},
-				};
-
-				listTools.push(webSearchTool);
-			}
-
-			if (toolSettings.some((t) => t.name === "textToImage")) {
-				const toolParameters = toolSettings.find(
-					(t) => t.name === "textToImage"
-				) as TextToImageTool;
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				const SDXLTool: Tool = {
-					name: "textToImage",
-					description:
-						"This tool can be used to generate an image from text. It will return the image.",
+			if (toolParameters && tools.includes("textToImage") && newPrompt.startsWith("/generate ")) {
+				const tool = {
+					model: toolParameters.model,
 					mime: "image/jpeg",
-					model: "https://huggingface.co/" + toolParameters.model,
-					examples: [
-						{
-							prompt: "Generate an image of a cat wearing a top hat",
-							code: '{"tool" : "textToImage", "input" : "a cat wearing a top hat"}',
-							tools: ["textToImage"],
-						},
-						{
-							prompt: "Draw a brown dog on a beach",
-							code: '{"tool" : "textToImage", "input" : "drawing of a brown dog on a beach"}',
-							tools: ["textToImage"],
-						},
-					],
-					call: async (input, inference) => {
-						const data = await input;
-						if (typeof data !== "string") throw "Input must be a string.";
-
-						const imageBase = await inference.textToImage(
-							{
-								inputs: data,
-								model: toolParameters.model,
-								parameters: toolParameters.parameters,
-							},
-							{ wait_for_model: true }
-						);
-						return imageBase;
-					},
 				};
 
-				listTools.push(SDXLTool);
-			}
+				const imagePrompt = newPrompt.slice("/generate ".length).split("\n")?.[0];
 
-			const agent = new HfChatAgent({
-				accessToken: HF_ACCESS_TOKEN,
-				llm: getStream,
-				chatFormat: (inputs: { messages: Message[] }) =>
-					model.chatPromptRender({
-						messages: inputs.messages,
-						preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
-					}),
-				callbacks: {
-					onFile: async (file, tool) => {
-						const filename = await uploadFile(file, conv, tool);
+				update({
+					type: "finalAnswer",
+					text: `Generating image from text: ${imagePrompt}`,
+				});
+
+				const inference = new HfInference(HF_ACCESS_TOKEN);
+
+				try {
+					const image = await inference.textToImage(
+						{
+							inputs: imagePrompt,
+							model: toolParameters.model,
+							parameters: toolParameters.parameters,
+						},
+						{ wait_for_model: true }
+					);
+
+					if (image) {
+						const filename = await uploadFile(image, conv, tool);
 
 						const fileObject = {
 							sha256: filename.split("-")[1],
 							model: tool?.model,
 							mime: tool?.mime,
 						};
+
 						lastMessage.files?.push(fileObject);
+
 						update({ type: "file", file: fileObject });
-					},
-					onUpdate: async (agentUpdate) => {
-						update({ ...agentUpdate, type: "agent" } satisfies AgentUpdate);
-					},
-					onStream: streamCallback,
-					onFinalAnswer: async (answer) => {
-						update({ type: "finalAnswer", text: answer });
-						saveLast(answer);
-					},
-					onError: async (errorUpdate) => {
-						update({ type: "error", message: errorUpdate.message });
-					},
-				},
-				chatHistory: messages,
-				tools: listTools.filter((t) => tools.includes(t.name)),
+					}
+				} catch (e) {
+					update({ type: "finalAnswer", text: `Error: ${e}` });
+				}
+				saveLast(`Generating image from text: ${imagePrompt}`);
+			}
+
+			const prompt = await buildPrompt({
+				messages,
+				model,
+				webSearch: lastMessage.webSearch,
+				preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
+				locals: locals,
 			});
 
-			try {
-				await agent.chat(newPrompt);
-			} catch (e) {
-				console.error(e);
-				return new Error((e as Error).message);
+			const tokenStream = textGenerationStream(
+				{
+					inputs: prompt,
+					parameters: {
+						...models.find((m) => m.id === conv.model)?.parameters,
+						return_full_text: false,
+					},
+					model: randomEndpoint.url,
+					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
+				},
+				{
+					use_cache: false,
+					fetch: usedFetch,
+				}
+			);
+
+			for await (const output of tokenStream) {
+				// if not generated_text is here it means the generation is not done
+				if (!output.generated_text) {
+					// else we get the next token
+					if (!output.token.special) {
+						update({
+							type: "stream",
+							token: output.token.text,
+						});
+
+						// if the last message is not from assistant, it means this is the first token
+					} else {
+						const date = abortedGenerations.get(convId.toString());
+						if (date && date > promptedAt) {
+							saveLast(lastMessage.content);
+						}
+						if (!output) {
+							break;
+						}
+
+						// otherwise we just concatenate tokens
+						lastMessage.content += output.token.text;
+					}
+				} else {
+					saveLast(output.generated_text);
+				}
 			}
 		},
 		async cancel() {

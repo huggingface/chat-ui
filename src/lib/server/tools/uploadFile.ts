@@ -1,8 +1,11 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { sha256 } from "$lib/utils/sha256";
-import type { Tool } from "@huggingface/agents/src/types";
 import { collections } from "../database";
 
+interface Tool {
+	model: string;
+	mime: string;
+}
 export async function uploadFile(file: Blob, conv: Conversation, tool?: Tool): Promise<string> {
 	const sha = await sha256(await file.text());
 	const filename = `${conv._id}-${sha}`;

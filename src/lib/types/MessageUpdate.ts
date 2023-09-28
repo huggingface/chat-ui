@@ -1,6 +1,5 @@
 import type { File } from "./Message";
 import type { WebSearchSource } from "./WebSearch";
-import type { Update } from "@huggingface/agents/src/types";
 
 export type FinalAnswer = {
 	type: "finalAnswer";
@@ -11,10 +10,6 @@ export type TextStreamUpdate = {
 	type: "stream";
 	token: string;
 };
-
-export interface AgentUpdate extends Update {
-	type: "agent";
-}
 
 export type WebSearchUpdate = {
 	type: "webSearch";
@@ -43,7 +38,6 @@ export type ErrorUpdate = {
 export type MessageUpdate =
 	| FinalAnswer
 	| TextStreamUpdate
-	| AgentUpdate
 	| WebSearchUpdate
 	| StatusUpdate
 	| FileUpdate

@@ -8,8 +8,21 @@
 		textToImage: boolean;
 	};
 
-	const toggleWebSearch = () => ($webSearchParameters.useSearch = !$webSearchParameters.useSearch);
-	const toggleSDXL = () => ($webSearchParameters.useSDXL = !$webSearchParameters.useSDXL);
+	const toggleWebSearch = () => {
+		$webSearchParameters.useSearch = !$webSearchParameters.useSearch;
+
+		if ($webSearchParameters.useSearch) {
+			$webSearchParameters.useSDXL = false;
+		}
+	};
+
+	const toggleSDXL = () => {
+		$webSearchParameters.useSDXL = !$webSearchParameters.useSDXL;
+
+		if ($webSearchParameters.useSDXL) {
+			$webSearchParameters.useSearch = false;
+		}
+	};
 </script>
 
 <div

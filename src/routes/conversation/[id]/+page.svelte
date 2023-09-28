@@ -128,8 +128,6 @@
 								messages = [...messages];
 							} else if (update.type === "webSearch") {
 								updateMessages = [...updateMessages, update];
-							} else if (update.type === "agent") {
-								updateMessages = [...updateMessages, update];
 							} else if (update.type === "file") {
 								messages[messages.length - 1].files?.push(update.file);
 								messages = [...messages];

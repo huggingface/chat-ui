@@ -1,10 +1,5 @@
 <script lang="ts">
-	import type {
-		AgentUpdate,
-		ErrorUpdate,
-		MessageUpdate,
-		WebSearchUpdate,
-	} from "$lib/types/MessageUpdate";
+	import type { ErrorUpdate, MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import CarbonCaretRight from "~icons/carbon/caret-right";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
@@ -20,11 +15,8 @@
 	let error: boolean;
 
 	$: messagesToDisplay = messages.filter(
-		(el) =>
-			el.type === "agent" ||
-			(el.type === "webSearch" && el.messageType !== "sources") ||
-			el.type === "error"
-	) as Array<WebSearchUpdate | AgentUpdate | ErrorUpdate>;
+		(el) => (el.type === "webSearch" && el.messageType !== "sources") || el.type === "error"
+	) as Array<WebSearchUpdate | ErrorUpdate>;
 
 	$: error = messages.some((el) => el.type === "error");
 </script>

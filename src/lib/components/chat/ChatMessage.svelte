@@ -105,6 +105,9 @@
 			isCopied = false;
 		}, 1000);
 	}
+
+	$: lastMessage = updateMessages[updateMessages.length - 1];
+	$: isLoading = !(lastMessage?.type === "finalAnswer" || !!webSearchSources);
 </script>
 
 {#if message.from === "assistant"}
@@ -121,11 +124,11 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if updateMessages && updateMessages.filter(({ type }) => type === "agent").length > 0}
+			{#if updateMessages && updateMessages.filter(({ type }) => type === "webSearch").length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
 					messages={updateMessages}
-					loading={!(updateMessages[updateMessages.length - 1]?.type === "finalAnswer")}
+					loading={isLoading}
 				/>
 			{/if}
 			{#if !message.content && (webSearchIsDone || (updateMessages && updateMessages.length === 0))}
