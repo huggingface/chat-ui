@@ -173,9 +173,10 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			}
 
-			const webSearch = tools?.includes("webSearch")
-				? await runWebSearch(conv, newPrompt, update)
-				: undefined;
+			const webSearch =
+				!newPrompt.startsWith("/generate") && tools?.includes("webSearch")
+					? await runWebSearch(conv, newPrompt, update)
+					: undefined;
 
 			messages.push({
 				from: "assistant",
