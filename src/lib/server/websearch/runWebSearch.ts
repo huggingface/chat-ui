@@ -63,7 +63,7 @@ export async function runWebSearch(
 					text = await parseWeb(link);
 					appendUpdate("Browsing webpage", [link]);
 				} catch (e) {
-					console.error(`Error parsing webpage "${link}"`, e);
+					// ignore errors
 				}
 				const MAX_N_CHUNKS = 100;
 				const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
