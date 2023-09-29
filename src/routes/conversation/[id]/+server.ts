@@ -120,6 +120,14 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		];
 	})() satisfies Message[];
 
+	if (conv.title.startsWith("Untitled")) {
+		try {
+			conv.title = (await summarize(newPrompt)) ?? conv.title;
+		} catch (e) {
+			console.error(e);
+		}
+	}
+
 	// save user prompt
 	await collections.conversations.updateOne(
 		{
@@ -128,7 +136,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		{
 			$set: {
 				messages,
-				title: (await summarize(newPrompt)) ?? conv.title,
+				title: conv.title,
 				updatedAt: new Date(),
 			},
 		}
@@ -184,7 +192,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 			async function saveLast(generated_text: string) {
 				if (!conv) {
-					throw new Error("Conversation not found");
+					throw error(404, "Conversation not found");
 				}
 
 				if (lastMessage) {
@@ -203,7 +211,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						{
 							$set: {
 								messages,
-								title: (await summarize(newPrompt)) ?? conv.title,
+								title: conv.title,
 								updatedAt: new Date(),
 							},
 						}
@@ -274,21 +282,27 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				locals: locals,
 			});
 
-			const tokenStream = textGenerationStream(
-				{
-					inputs: prompt,
-					parameters: {
-						...models.find((m) => m.id === conv.model)?.parameters,
-						return_full_text: false,
+			let tokenStream;
+			try {
+				tokenStream = textGenerationStream(
+					{
+						inputs: prompt,
+						parameters: {
+							...models.find((m) => m.id === conv.model)?.parameters,
+							return_full_text: false,
+						},
+						model: randomEndpoint.url,
+						accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
 					},
-					model: randomEndpoint.url,
-					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
-				},
-				{
-					use_cache: false,
-					fetch: usedFetch,
-				}
-			);
+					{
+						use_cache: false,
+						fetch: usedFetch,
+					}
+				);
+			} catch (e) {
+				console.log(e);
+				throw error(500, (e as Error).message);
+			}
 
 			for await (const output of tokenStream) {
 				// if not generated_text is here it means the generation is not done
@@ -326,7 +340,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				{
 					$set: {
 						messages,
-						title: (await summarize(newPrompt)) ?? conv.title,
+						title: conv.title,
 						updatedAt: new Date(),
 					},
 				}
