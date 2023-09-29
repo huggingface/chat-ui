@@ -259,6 +259,9 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 				update({ type: "finalAnswer", text: "Generated an image from prompt: " + imagePrompt });
 				saveLast(`Generated an image from prompt: ${imagePrompt}`);
+
+				controller.close();
+				return;
 			}
 
 			const prompt = await buildPrompt({
