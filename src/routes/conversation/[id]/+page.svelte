@@ -82,6 +82,10 @@
 				throw new Error("Body not defined");
 			}
 
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+
 			// eslint-disable-next-line no-undef
 			const encoder = new TextDecoderStream();
 			const reader = response?.body?.pipeThrough(encoder).getReader();

@@ -18,7 +18,9 @@
 		(el) => (el.type === "webSearch" && el.messageType !== "sources") || el.type === "error"
 	) as Array<WebSearchUpdate | ErrorUpdate>;
 
-	$: error = messages.some((el) => el.type === "error");
+	$: error = messages.some(
+		(el) => el.type === "error" || (el.type === "webSearch" && el.messageType === "error")
+	);
 </script>
 
 <details
@@ -51,9 +53,10 @@
 		{:else}
 			<ol>
 				{#each messagesToDisplay as message}
+					{@const isError = message.type === "error" || message.messageType === "error"}
 					<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 						<div class="flex items-start">
-							{#if message.type === "error"}
+							{#if isError}
 								<CarbonError class=" -ml-2 -mt-0.5 h-4 w-4 text-red-700 dark:text-red-500" />
 							{:else}
 								<div
@@ -64,8 +67,8 @@
 							{/if}
 							<h3
 								class="text-md -mt-1.5 pl-2.5 text-gray-800 dark:text-gray-100"
-								class:text-red-700={message.type === "error"}
-								class:dark:text-red-500={message.type === "error"}
+								class:text-red-700={isError}
+								class:dark:text-red-500={isError}
 							>
 								{message.message}
 							</h3>
