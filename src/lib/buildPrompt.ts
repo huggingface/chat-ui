@@ -24,7 +24,8 @@ export async function buildPrompt({
 }: buildPromptOptions): Promise<string> {
 	if (webSearch && webSearch.context) {
 		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
-		const lastUserMsg = messages.slice(-1)[0];
+		const lastUserMsg = messages.filter(({ from }) => from === "user").slice(-1)[0];
+
 		const currentDate = format(new Date(), "MMMM d, yyyy");
 		messages = [
 			...messagesWithoutLastUsrMsg,

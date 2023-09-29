@@ -165,13 +165,15 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			}
 
+			const webSearch = tools?.includes("webSearch")
+				? await runWebSearch(conv, newPrompt, update)
+				: undefined;
+
 			messages.push({
 				from: "assistant",
 				content: "",
 				updates: updates,
-				webSearch: tools?.includes("webSearch")
-					? await runWebSearch(conv, newPrompt, update)
-					: undefined,
+				webSearch: webSearch,
 				files: [],
 				id: (responseId as Message["id"]) || crypto.randomUUID(),
 				createdAt: new Date(),
