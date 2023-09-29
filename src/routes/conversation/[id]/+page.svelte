@@ -66,10 +66,6 @@
 				toolsToBeUsed.push("webSearch");
 			}
 
-			if ($webSearchParameters.useSDXL) {
-				toolsToBeUsed.push("textToImage");
-			}
-
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },

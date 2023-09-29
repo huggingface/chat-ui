@@ -215,17 +215,17 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				| TextToImageTool
 				| undefined;
 
-			if (toolParameters && tools.includes("textToImage") && newPrompt.startsWith("/generate ")) {
+			if (toolParameters && newPrompt.startsWith("/generate ")) {
 				const tool = {
 					model: toolParameters.model,
 					mime: "image/jpeg",
 				};
 
 				const imagePrompt = newPrompt.slice("/generate ".length).split("\n")?.[0];
-
 				update({
-					type: "finalAnswer",
-					text: `Generating image from text: ${imagePrompt}`,
+					type: "webSearch",
+					messageType: "update",
+					message: "Calling image model with prompt: " + imagePrompt,
 				});
 
 				const inference = new HfInference(HF_ACCESS_TOKEN);
@@ -256,7 +256,9 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				} catch (e) {
 					update({ type: "finalAnswer", text: `Error: ${e}` });
 				}
-				saveLast(`Generating image from text: ${imagePrompt}`);
+
+				update({ type: "finalAnswer", text: "Generated an image from prompt: " + imagePrompt });
+				saveLast(`Generated an image from prompt: ${imagePrompt}`);
 			}
 
 			const prompt = await buildPrompt({
