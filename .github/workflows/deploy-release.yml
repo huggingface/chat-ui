@@ -18,3 +18,7 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
+      - name: Push to hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: git push https://nsarrazin:$HF_TOKEN@huggingface.co/spaces/huggingchat/chat-ui main
