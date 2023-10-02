@@ -264,14 +264,15 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 						update({ type: "file", file: fileObject });
 					}
+					update({ type: "finalAnswer", text: "Generated an image from prompt: " + imagePrompt });
+					saveLast(`Generated an image from prompt: ${imagePrompt}`);
 				} catch (e) {
+					update({ type: "webSearch", messageType: "error", message: `Error: ${e}` });
 					update({ type: "finalAnswer", text: `Error: ${e}` });
+					saveLast(`Error while generating an image: \`${e}\``);
+				} finally {
+					controller.close();
 				}
-
-				update({ type: "finalAnswer", text: "Generated an image from prompt: " + imagePrompt });
-				saveLast(`Generated an image from prompt: ${imagePrompt}`);
-
-				controller.close();
 				return;
 			}
 
