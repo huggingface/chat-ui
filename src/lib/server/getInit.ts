@@ -39,7 +39,7 @@ export function makeRequestOptions(
 	}
 
 	const url =
-		/^http(s?):/.test(model) || model.startsWith("/")
+		/^http(s?):/.test(model ?? "") || model?.startsWith("/")
 			? model
 			: `${HF_INFERENCE_API_BASE_URL}${model}`;
 	const info: RequestInit = {
@@ -54,5 +54,5 @@ export function makeRequestOptions(
 		credentials: options?.includeCredentials ? "include" : "same-origin",
 	};
 
-	return { url, info };
+	return { url: url ?? "", info };
 }
