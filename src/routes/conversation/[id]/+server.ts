@@ -265,7 +265,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						update({ type: "file", file: fileObject });
 					}
 					update({ type: "finalAnswer", text: "Generated an image from prompt: " + imagePrompt });
-					saveLast(`Generated an image from prompt: ${imagePrompt}`);
+					saveLast(`Generated an image from prompt: \`${imagePrompt}\``);
 				} catch (e) {
 					update({ type: "webSearch", messageType: "error", message: `Error: ${e}` });
 					update({ type: "finalAnswer", text: `Error: ${e}` });
