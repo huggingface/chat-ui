@@ -70,7 +70,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 	// fetch the model
 	const model = models.find((m) => m.id === conv.model);
-	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (!model) {
 		throw error(410, "Model not available anymore");
@@ -155,7 +154,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				messages,
 				model,
 				webSearch: webSearchResults,
-				preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
+				preprompt: conv.preprompt ?? model.preprompt,
 				locals: locals,
 			});
 

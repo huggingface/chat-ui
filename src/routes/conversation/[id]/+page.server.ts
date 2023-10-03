@@ -33,5 +33,6 @@ export const load = async ({ params, depends, locals }) => {
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
+		preprompt: conversation.preprompt,
 	};
 };
