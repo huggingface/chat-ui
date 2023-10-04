@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Modal from "./Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonBlockchain from "~icons/carbon/blockchain";
 
 	export let preprompt: string;
 
@@ -9,18 +10,18 @@
 
 <button
 	type="button"
-	class="mx-auto rounded-xl border bg-gray-50 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+	class="mx-auto flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
 	on:click={() => (isOpen = !isOpen)}
 	on:keypress={(e) => e.key === "Enter" && (isOpen = !isOpen)}
 >
-	Custom System Prompt
+	<CarbonBlockchain class="text-xxs" /> Using Custom System Prompt
 </button>
 
 {#if isOpen}
-	<Modal on:close={() => (isOpen = false)} width="w-full max-w-xl">
-		<div class="flex w-full flex-col gap-5 p-4 ">
-			<div class="flex items-center justify-between text-lg font-semibold text-gray-800">
-				<h2 class="">System Prompt</h2>
+	<Modal on:close={() => (isOpen = false)} width="w-full max-w-2xl">
+		<div class="flex w-full flex-col gap-5 p-6">
+			<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
+				<h2>System Prompt</h2>
 				<button type="button" class="group" on:click={() => (isOpen = false)}>
 					<CarbonClose class="mt-auto text-gray-900 group-hover:text-gray-500" />
 				</button>
@@ -28,7 +29,7 @@
 			<textarea
 				disabled
 				value={preprompt}
-				class="min-h-[120px] w-full resize-none rounded-lg border bg-gray-50 p-1 pt-2 text-gray-600"
+				class="min-h-[420px] w-full resize-none rounded-lg border bg-gray-50 p-2.5 text-gray-600 max-sm:text-sm"
 			/>
 		</div>
 	</Modal>
