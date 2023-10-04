@@ -16,7 +16,7 @@ The goal of this app is to showcase that it is now possible to build an open sou
 
 For now (October 2023), it's running:
 
-- [Llama 2 75B](https://huggingface.co/meta-llama/Llama-2-70b-chat-hf)
+- [Llama 2 70B](https://huggingface.co/meta-llama/Llama-2-70b-chat-hf)
 - [CodeLlama 35B](https://about.fb.com/news/2023/08/code-llama-ai-for-coding/)
 - [Falcon 180B](https://www.tii.ae/news/technology-innovation-institute-introduces-worlds-most-powerful-open-llm-falcon-180b)
 - [Mistral 7B](https://mistral.ai/news/announcing-mistral-7b/)
