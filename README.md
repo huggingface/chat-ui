@@ -28,8 +28,9 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 
 If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
 
-You can deploy your own customized Chat UI instance with any supported LLM of your choice with only a few clicks to Hugging Face Spaces thanks to the Chat UI Spaces Docker template. Get started [here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
-If you'd like to deploy a model with gated access or a model in a private repository, you can simply provide `HUGGING_FACE_HUB_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables). You need to set its value to an access token you can get from [here](https://huggingface.co/settings/tokens).
+You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
+
+Set `HUGGING_FACE_HUB_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personnal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
