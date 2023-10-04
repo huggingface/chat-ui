@@ -1,6 +1,6 @@
 ## Privacy
 
-> Last updated: July 23, 2023
+> Last updated: October 4, 2023
 
 Users of HuggingChat are authenticated through their HF user account.
 
