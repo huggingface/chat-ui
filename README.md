@@ -39,7 +39,7 @@ The default config for Chat UI is stored in the `.env` file. You will need to ov
 
 Start by creating a `.env.local` file in the root of the repository. The bare minimum config you need to get Chat UI to run locally is the following:
 
-```bash
+```env
 MONGODB_URL=<the URL to your mongoDB instance>
 HF_ACCESS_TOKEN=<your access token>
 ```
@@ -87,7 +87,7 @@ Chat UI features a powerful Web Search feature. It works by:
 
 The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
 
-```bash
+```env
 OPENID_PROVIDER_URL=<your OIDC issuer>
 OPENID_CLIENT_ID=<your OIDC client ID>
 OPENID_CLIENT_SECRET=<your OIDC client secret>
@@ -99,7 +99,7 @@ These variables will enable the openID sign-in modal for users.
 
 You can use a few environment variables to customize the look and feel of chat-ui. These are by default:
 
-```
+```env
 PUBLIC_APP_NAME=ChatUI
 PUBLIC_APP_ASSETS=chatui
 PUBLIC_APP_COLOR=blue
@@ -113,7 +113,7 @@ PUBLIC_APP_DISCLAIMER=
 - `PUBLIC_APP_DATA_SHARING` Can be set to 1 to add a toggle in the user settings that lets your users opt-in to data sharing with models creator.
 - `PUBLIC_APP_DISCLAIMER` If set to 1, we show a disclaimer about generated outputs on login.
 
-### Web Search
+### Web Search config
 
 You can enable the web search by adding either `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
 
@@ -121,8 +121,7 @@ You can enable the web search by adding either `SERPER_API_KEY` ([serper.dev](ht
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
-```
-
+```env
 MODELS=`[
   {
     "name": "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
@@ -162,15 +161,15 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-#### Custom prompt templates:
+#### Custom prompt templates
 
 By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
-However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is <https://handlebarsjs.com>. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
 For example:
 
-```
+```prompt
 <System>You are an AI, called ChatAI.</System>
 {{#each messages}}
   {{#ifUser}}<User>{{content}}</User>{{/ifUser}}
@@ -179,13 +178,13 @@ For example:
 <Assistant>
 ```
 
-**chatPromptTemplate**
+##### chatPromptTemplate
 
 When quering the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To idenify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
 The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability.
 
-```
+```prompt
 {{preprompt}}
 {{#each messages}}
   {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
@@ -194,13 +193,13 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 {{assistantMessageToken}}
 ```
 
-**webSearchQueryPromptTemplate**
+##### webSearchQueryPromptTemplate
 
 When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that that the prompt instructs the chat model to only return a few keywords.
 
 The following is the default `webSearchQueryPromptTemplate`.
 
-```
+```prompt
 {{userMessageToken}}
   My question is: {{message.content}}.
   Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
@@ -216,13 +215,11 @@ A good option is to hit a [text-generation-inference](https://github.com/hugging
 
 To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
-```
-
+```env
 {
 // rest of the model config here
 "endpoints": [{"url": "https://HOST:PORT"}]
 }
-
 ```
 
 If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
@@ -243,22 +240,20 @@ For `Bearer` you can use a token, which can be grabbed from [here](https://huggi
 
 You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
-```
-
+```env
 "endpoints": [
 {
 "url": "https://HOST:PORT",
 "authorization": "Basic VVNFUjpQQVNT",
 }
 ]
-
 ```
 
 ### Amazon SageMaker
 
 You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
 
-```
+```env
 "endpoints": [
     {
       "host" : "sagemaker",
@@ -268,6 +263,7 @@ You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. 
       "sessionToken": "", // optional
       "weight": 1
     }
+]
 ```
 
 You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
@@ -284,8 +280,7 @@ If you're using a self-signed certificate, e.g. for testing or development purpo
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
 
-```
-
+```env
 "endpoints": [
 {
 "url": "https://HOST:PORT",
