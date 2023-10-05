@@ -39,6 +39,7 @@ export async function POST({ params, url, locals }) {
 		updatedAt: new Date(),
 		title: conversation.title,
 		model: conversation.model,
+		preprompt: conversation.preprompt,
 	};
 
 	await collections.sharedConversations.insertOne(shared);
