@@ -87,8 +87,8 @@ const modelsRaw = z
 			endpoints: z.array(combinedEndpoint).optional(),
 			parameters: z
 				.object({
-					temperature: z.number().min(0).max(1),
-					truncate: z.number().int().positive(),
+					temperature: z.number().min(0).max(1).optional(),
+					truncate: z.number().int().positive().optional(),
 					max_new_tokens: z.number().int().positive(),
 					stop: z.array(z.string()).optional(),
 				})
