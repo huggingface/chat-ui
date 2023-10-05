@@ -60,6 +60,7 @@
 	{loading}
 	shared={true}
 	messages={data.messages}
+	preprompt={data.preprompt}
 	on:message={(ev) =>
 		createConversation()
 			.then((convId) => {

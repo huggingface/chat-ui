@@ -218,6 +218,7 @@
 	{loading}
 	{pending}
 	{messages}
+	preprompt={data.preprompt}
 	bind:webSearchMessages
 	on:message={(event) => writeMessage(event.detail)}
 	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}

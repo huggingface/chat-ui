@@ -18,8 +18,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
+			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
+
+	let preprompt = values.preprompt;
 
 	if (values.fromShare) {
 		const conversation = await collections.sharedConversations.findOne({
@@ -33,7 +36,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		title = conversation.title;
 		messages = conversation.messages;
 		values.model = conversation.model;
+		preprompt = conversation.preprompt;
 	}
+
+	const model = models.find((m) => m.name === values.model);
 
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
@@ -42,6 +48,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			"Untitled " + ((await collections.conversations.countDocuments(authCondition(locals))) + 1),
 		messages,
 		model: values.model,
+		preprompt: preprompt === model?.preprompt ? undefined : preprompt,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),

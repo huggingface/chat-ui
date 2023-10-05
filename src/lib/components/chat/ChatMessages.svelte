@@ -10,6 +10,7 @@
 	import ChatMessage from "./ChatMessage.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { browser } from "$app/environment";
+	import SystemPromptModal from "../SystemPromptModal.svelte";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -18,6 +19,7 @@
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
 	export let models: Model[];
+	export let preprompt: string | undefined;
 	export let readOnly: boolean;
 
 	let chatContainer: HTMLElement;
@@ -42,6 +44,9 @@
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
+			{#if i === 0 && preprompt}
+				<SystemPromptModal {preprompt} />
+			{/if}
 			<ChatMessage
 				loading={loading && i === messages.length - 1}
 				{message}

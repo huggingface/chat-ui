@@ -9,4 +9,5 @@ export interface SharedConversation extends Timestamps {
 	model: string;
 	title: string;
 	messages: Message[];
+	preprompt?: string;
 }

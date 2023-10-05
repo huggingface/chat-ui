@@ -12,6 +12,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	return {
+		preprompt: conversation.preprompt,
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
