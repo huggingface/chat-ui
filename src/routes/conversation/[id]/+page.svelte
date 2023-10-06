@@ -1,10 +1,9 @@
 <script lang="ts">
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
-	import { pendingMessageIdToRetry } from "$lib/stores/pendingMessageIdToRetry";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { invalidate } from "$app/navigation";
+	import { goto, invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -34,6 +33,35 @@
 	let pending = false;
 	let loginRequired = false;
 
+	async function convFromShared() {
+		try {
+			loading = true;
+			const res = await fetch(`${base}/conversation`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					fromShare: $page.params.id,
+					model: data.model,
+				}),
+			});
+
+			if (!res.ok) {
+				error.set("Error while creating conversation, try again.");
+				console.error("Error while creating conversation: " + (await res.text()));
+				return;
+			}
+
+			const { conversationId } = await res.json();
+
+			return conversationId;
+		} catch (err) {
+			error.set(ERROR_MESSAGES.default);
+			console.error(String(err));
+			throw err;
+		}
+	}
 	// this function is used to send new message to the backends
 	async function writeMessage(message: string, messageId = randomUUID()) {
 		if (!message.trim()) return;
@@ -76,6 +104,10 @@
 				throw new Error("Body not defined");
 			}
 
+			if (!response.ok) {
+				error.set((await response.json())?.message);
+				return;
+			}
 			// eslint-disable-next-line no-undef
 			const encoder = new TextDecoderStream();
 			const reader = response?.body?.pipeThrough(encoder).getReader();
@@ -84,7 +116,7 @@
 			// this is a bit ugly
 			// we read the stream until we get the final answer
 			while (finalAnswer === "") {
-				// await new Promise((r) => setTimeout(r, 25));
+				await new Promise((r) => setTimeout(r, 25));
 
 				// check for abort
 				if (isAborted) {
@@ -111,6 +143,7 @@
 							let update = JSON.parse(el) as MessageUpdate;
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
+								reader.cancel();
 								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
 								pending = false;
@@ -128,6 +161,8 @@
 								}
 							} else if (update.type === "webSearch") {
 								webSearchMessages = [...webSearchMessages, update];
+							} else {
+								console.log();
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
@@ -185,15 +220,38 @@
 	}
 
 	onMount(async () => {
+		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
-			const val = $pendingMessage;
-			const messageId = $pendingMessageIdToRetry || undefined;
-			$pendingMessage = "";
-			$pendingMessageIdToRetry = null;
-
-			writeMessage(val, messageId);
+			writeMessage($pendingMessage);
 		}
 	});
+
+	async function onMessage(event: CustomEvent<string>) {
+		if (!data.shared) {
+			writeMessage(event.detail);
+		} else {
+			convFromShared()
+				.then(async (convId) => {
+					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+				})
+				.then(() => writeMessage(event.detail))
+				.finally(() => (loading = false));
+		}
+	}
+
+	async function onRetry(event: CustomEvent<{ id: Message["id"]; content: string }>) {
+		if (!data.shared) {
+			writeMessage(event.detail.content, event.detail.id);
+		} else {
+			convFromShared()
+				.then(async (convId) => {
+					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+				})
+				.then(() => writeMessage(event.detail.content, event.detail.id))
+				.finally(() => (loading = false));
+		}
+	}
+
 	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
@@ -218,10 +276,11 @@
 	{loading}
 	{pending}
 	{messages}
+	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:webSearchMessages
-	on:message={(event) => writeMessage(event.detail)}
-	on:retry={(event) => writeMessage(event.detail.content, event.detail.id)}
+	on:message={onMessage}
+	on:retry={onRetry}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
