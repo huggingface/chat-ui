@@ -1,15 +1,12 @@
 import { searchWeb } from "$lib/server/websearch/searchWeb";
 import type { Message } from "$lib/types/Message";
-import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import type { WebSearch, WebResultNode } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
-import { chunk } from "$lib/utils/chunk";
-import {
-	MAX_SEQ_LEN as CHUNK_CAR_LEN,
-	findSimilarSentences,
-} from "$lib/server/websearch/sentenceSimilarity";
+import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import { createChildren, getLeafNodes } from "./chunker";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -53,25 +50,22 @@ export async function runWebSearch(
 			.filter(({ link }) => !link.includes("youtube.com")) // filter out youtube links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
-		let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
+		let allNodes: WebResultNode[] = [];
 		if (webSearch.results.length > 0) {
 			appendUpdate("Browsing results");
-			const promises = webSearch.results.map(async (result) => {
-				const { link } = result;
-				let text = "";
+			const promises = webSearch.results.map(async (source) => {
 				try {
-					text = await parseWeb(link);
-					appendUpdate("Browsing webpage", [link]);
+					const nodes = await parseWeb(source);
+					appendUpdate("Browsing webpage", [source.link]);
+					return nodes;
 				} catch (e) {
 					// ignore errors
+					return [];
 				}
-				const MAX_N_CHUNKS = 100;
-				const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
-				return texts.map((t) => ({ source: result, text: t }));
 			});
-			const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
-			paragraphChunks = nestedParagraphChunks.flat();
-			if (!paragraphChunks.length) {
+			const nestedNodes = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
+			allNodes = nestedNodes.flat();
+			if (!allNodes.length) {
 				throw new Error("No text found on the first 5 results");
 			}
 		} else {
@@ -79,8 +73,13 @@ export async function runWebSearch(
 		}
 
 		appendUpdate("Extracting relevant information");
+		// get leaf nodes thing here
+		// start the real work here
+		const CHUNK_LENGTHS = [512, 256, 128, 64];
+		allNodes = allNodes.map((node) => createChildren(node, CHUNK_LENGTHS));
+		const leafNodes = getLeafNodes(allNodes);
 		const topKClosestParagraphs = 8;
-		const texts = paragraphChunks.map(({ text }) => text);
+		const texts = leafNodes.map(({ content }) => content);
 		const indices = await findSimilarSentences(prompt, texts, {
 			topK: topKClosestParagraphs,
 		});
@@ -88,7 +87,7 @@ export async function runWebSearch(
 
 		const usedSources = new Set<string>();
 		for (const idx of indices) {
-			const { source } = paragraphChunks[idx];
+			const { source } = allNodes[idx];
 			if (!usedSources.has(source.link)) {
 				usedSources.add(source.link);
 				webSearch.contextSources.push(source);

@@ -24,3 +24,10 @@ export type WebSearchMessageSources = {
 	type: "sources";
 	sources: WebSearchSource[];
 };
+
+export interface WebResultNode {
+	content: string;
+	source: WebSearchSource;
+	children?: WebResultNode[];
+	id?: number;
+}
