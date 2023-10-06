@@ -1,8 +1,7 @@
-import { base } from "$app/paths";
-import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import type { SharedConversation } from "$lib/types/SharedConversation";
+import { getShareUrl } from "$lib/utils/getShareUrl.js";
 import { hashConv } from "$lib/utils/hashConv";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -50,8 +49,4 @@ export async function POST({ params, url, locals }) {
 		}),
 		{ headers: { "Content-Type": "application/json" } }
 	);
-}
-
-function getShareUrl(url: URL, shareId: string): string {
-	return `${PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`}/r/${shareId}`;
 }
