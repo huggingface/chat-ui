@@ -31,11 +31,11 @@ export async function parseWeb(source: WebSearchSource) {
 	});
 	const markdownRaw = turndownService.turndown($("body").html());
 	const potentialMarkdown: string = await prettier.format(markdownRaw, { parser: "markdown" });
-	const [nonMarkdown, markdown] = splitMarkdown(potentialMarkdown);
-	const nonMdNode: WebResultNode = { content: nonMarkdown, source };
-	const nodes = divideMarkdwonSections(markdown, source);
-	nodes.unshift(nonMdNode);
-	return nodes;
+	// const [nonMarkdown, markdown] = splitMarkdown(potentialMarkdown);
+	const nonMdNode: WebResultNode = { content: potentialMarkdown, source };
+	// const nodes = divideMarkdwonSections(markdown, source);
+	// nodes.unshift(nonMdNode);
+	return [nonMdNode];
 }
 
 function splitMarkdown(markdown: string): [string, string] {
