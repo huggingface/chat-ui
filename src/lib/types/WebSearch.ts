@@ -30,4 +30,6 @@ export interface WebResultNode {
 	source: WebSearchSource;
 	children?: WebResultNode[];
 	id?: number;
+	leftSibling?: WebResultNode;
+	rightSibling?: WebResultNode;
 }

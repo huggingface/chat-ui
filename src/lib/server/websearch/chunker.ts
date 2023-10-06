@@ -17,6 +17,10 @@ export function createChildren(node: WebResultNode, lengths: number[]): WebResul
 		const child: WebResultNode = { content: part, source };
 		return createChildren(child, restLengths);
 	});
+	for (let i = 0; i < node.children.length; i++) {
+		node.children[i].leftSibling = node.children[i - 1];
+		node.children[i].rightSibling = node.children[i + 1];
+	}
 
 	return node;
 }
