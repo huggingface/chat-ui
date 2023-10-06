@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS, TASK_MODEL } from "$env/static/private";
 import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
@@ -132,6 +132,8 @@ export type BackendModel = Optional<(typeof models)[0], "preprompt">;
 export type Endpoint = z.infer<typeof endpoint>;
 
 export const defaultModel = models[0];
+
+export const smallModel = models.find((m) => m.name === TASK_MODEL) || defaultModel;
 
 export const validateModel = (_models: BackendModel[]) => {
 	// Zod enum function requires 2 parameters

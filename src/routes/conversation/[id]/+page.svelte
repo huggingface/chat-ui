@@ -161,8 +161,6 @@
 								}
 							} else if (update.type === "webSearch") {
 								webSearchMessages = [...webSearchMessages, update];
-							} else {
-								console.log();
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
