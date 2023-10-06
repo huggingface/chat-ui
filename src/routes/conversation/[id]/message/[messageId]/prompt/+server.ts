@@ -6,14 +6,17 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export async function GET({ params, locals }) {
-	const convId = new ObjectId(params.id);
+	const conv =
+		params.id.length === 7
+			? await collections.sharedConversations.findOne({
+					_id: params.id,
+			  })
+			: await collections.conversations.findOne({
+					_id: new ObjectId(params.id),
+					...authCondition(locals),
+			  });
 
-	const conv = await collections.conversations.findOne({
-		_id: convId,
-		...authCondition(locals),
-	});
-
-	if (!conv) {
+	if (conv === null) {
 		throw error(404, "Conversation not found");
 	}
 
@@ -31,8 +34,12 @@ export async function GET({ params, locals }) {
 		throw error(404, "Conversation model not found");
 	}
 
+	const messagesUpTo = conv.messages.slice(0, messageIndex + 1);
+
 	const prompt = await buildPrompt({
-		messages: conv.messages.slice(0, messageIndex + 1),
+		preprompt: conv.preprompt,
+		webSearch: messagesUpTo[messagesUpTo.length - 1].webSearch,
+		messages: messagesUpTo,
 		model: model,
 	});
 

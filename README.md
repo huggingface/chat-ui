@@ -12,23 +12,25 @@ app_port: 3000
 
 # Chat UI
 
-![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/raw/f038917dd40d711a72d654ab1abfc03ae9f177e6/chat-ui-repo-thumbnail.svg)
+![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chatui-websearch.png)
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
 0. [No Setup Deploy](#no-setup-deploy)
 1. [Setup](#setup)
 2. [Launch](#launch)
-3. [Extra parameters](#extra-parameters)
-4. [Deploying to a HF Space](#deploying-to-a-hf-space)
-5. [Building](#building)
+3. [Web Search](#web-search)
+4. [Extra parameters](#extra-parameters)
+5. [Deploying to a HF Space](#deploying-to-a-hf-space)
+6. [Building](#building)
 
 ##  No Setup Deploy
 
 If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
 
-You can deploy your own customized Chat UI instance with any supported LLM of your choice with only a few clicks to Hugging Face Spaces thanks to the Chat UI Spaces Docker template. Get started [here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
-If you'd like to deploy a model with gated access or a model in a private repository, you can simply provide `HUGGING_FACE_HUB_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables). You need to set its value to an access token you can get from [here](https://huggingface.co/settings/tokens).
+You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
+
+Set `HUGGING_FACE_HUB_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
@@ -38,7 +40,7 @@ The default config for Chat UI is stored in the `.env` file. You will need to ov
 
 Start by creating a `.env.local` file in the root of the repository. The bare minimum config you need to get Chat UI to run locally is the following:
 
-```bash
+```env
 MONGODB_URL=<the URL to your mongoDB instance>
 HF_ACCESS_TOKEN=<your access token>
 ```
@@ -70,13 +72,23 @@ npm install
 npm run dev
 ```
 
+## Web Search
+
+Chat UI features a powerful Web Search feature. It works by:
+
+1. Generating an appropriate Google query from the user prompt.
+2. Performing Google search and extracting content from webpages.
+3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+4. From these embeddings, find the ones that are closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
+5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
+
 ## Extra parameters
 
 ### OpenID connect
 
 The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
 
-```bash
+```env
 OPENID_PROVIDER_URL=<your OIDC issuer>
 OPENID_CLIENT_ID=<your OIDC client ID>
 OPENID_CLIENT_SECRET=<your OIDC client secret>
@@ -88,7 +100,7 @@ These variables will enable the openID sign-in modal for users.
 
 You can use a few environment variables to customize the look and feel of chat-ui. These are by default:
 
-```
+```env
 PUBLIC_APP_NAME=ChatUI
 PUBLIC_APP_ASSETS=chatui
 PUBLIC_APP_COLOR=blue
@@ -102,7 +114,7 @@ PUBLIC_APP_DISCLAIMER=
 - `PUBLIC_APP_DATA_SHARING` Can be set to 1 to add a toggle in the user settings that lets your users opt-in to data sharing with models creator.
 - `PUBLIC_APP_DISCLAIMER` If set to 1, we show a disclaimer about generated outputs on login.
 
-### Web Search
+### Web Search config
 
 You can enable the web search by adding either `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
 
@@ -110,8 +122,7 @@ You can enable the web search by adding either `SERPER_API_KEY` ([serper.dev](ht
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
-```
-
+```env
 MODELS=`[
   {
     "name": "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
@@ -151,15 +162,15 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-#### Custom prompt templates:
+#### Custom prompt templates
 
 By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
-However, these templates can be modified by setting the `chatPromptTemplate`, `webSearchSummaryPromptTemplate`, and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is https://handlebarsjs.com. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
+However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is <https://handlebarsjs.com>. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
 For example:
 
-```
+```prompt
 <System>You are an AI, called ChatAI.</System>
 {{#each messages}}
   {{#ifUser}}<User>{{content}}</User>{{/ifUser}}
@@ -168,13 +179,13 @@ For example:
 <Assistant>
 ```
 
-**chatPromptTemplate**
+##### chatPromptTemplate
 
 When quering the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To idenify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
 The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability.
 
-```
+```prompt
 {{preprompt}}
 {{#each messages}}
   {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
@@ -183,37 +194,18 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 {{assistantMessageToken}}
 ```
 
-**webSearchQueryPromptTemplate**
+##### webSearchQueryPromptTemplate
 
 When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that that the prompt instructs the chat model to only return a few keywords.
 
-The following is the default `webSearchQueryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
+The following is the default `webSearchQueryPromptTemplate`.
 
-```
+```prompt
 {{userMessageToken}}
-  The following messages were written by a user, trying to answer a question.
+  My question is: {{message.content}}.
+  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
 {{userMessageEndToken}}
-{{#each messages}}
-  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
-{{/each}}
-{{userMessageToken}}
-  What plain-text english sentence would you input into Google to answer the last question? Answer with a short (10 words max) simple sentence.
-{{userMessageEndToken}}
-{{assistantMessageToken}}Query:
-```
-
-**webSearchSummaryPromptTemplate**
-
-The search-engine response (`answer`) is summarized using the following prompt template. However, when `HF_ACCESS_TOKEN` is provided, a dedicated summary model is used instead. Additionally, the model's `query` response to `webSearchQueryPromptTemplate` is also available to this template.
-
-The following is the default `webSearchSummaryPromptTemplate`. Note that not all models supports consecutive user-messages which this template uses.
-
-```
-{{userMessageToken}}{{answer}}{{userMessageEndToken}}
-{{userMessageToken}}
-  The text above should be summarized to best answer the query: {{query}}.
-{{userMessageEndToken}}
-{{assistantMessageToken}}Summary:
+{{assistantMessageToken}}
 ```
 
 #### Running your own models using a custom endpoint
@@ -224,13 +216,11 @@ A good option is to hit a [text-generation-inference](https://github.com/hugging
 
 To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
-```
-
+```env
 {
 // rest of the model config here
 "endpoints": [{"url": "https://HOST:PORT"}]
 }
-
 ```
 
 If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
@@ -251,22 +241,20 @@ For `Bearer` you can use a token, which can be grabbed from [here](https://huggi
 
 You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
-```
-
+```env
 "endpoints": [
 {
 "url": "https://HOST:PORT",
 "authorization": "Basic VVNFUjpQQVNT",
 }
 ]
-
 ```
 
 ### Amazon SageMaker
 
 You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
 
-```
+```env
 "endpoints": [
     {
       "host" : "sagemaker",
@@ -276,6 +264,7 @@ You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. 
       "sessionToken": "", // optional
       "weight": 1
     }
+]
 ```
 
 You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
@@ -292,8 +281,7 @@ If you're using a self-signed certificate, e.g. for testing or development purpo
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
 
-```
-
+```env
 "endpoints": [
 {
 "url": "https://HOST:PORT",

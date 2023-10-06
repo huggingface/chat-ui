@@ -1,6 +1,6 @@
 {
 	"name": "chat-ui",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"private": true,
 	"packageManager": "npm@9.5.0",
 	"scripts": {
@@ -27,6 +27,7 @@
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.27.3",
+		"marked-katex-extension": "^3.0.6",
 		"prettier": "^2.8.0",
 		"prettier-plugin-svelte": "^2.8.1",
 		"prettier-plugin-tailwindcss": "^0.2.7",
@@ -42,6 +43,7 @@
 	"dependencies": {
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.2.0",
+		"@xenova/transformers": "^2.6.0",
 		"autoprefixer": "^10.4.14",
 		"aws4fetch": "^1.0.17",
 		"date-fns": "^2.29.3",
@@ -50,7 +52,7 @@
 		"highlight.js": "^11.7.0",
 		"jsdom": "^22.0.0",
 		"marked": "^4.3.0",
-		"mongodb": "^5.3.0",
+		"mongodb": "^5.8.0",
 		"nanoid": "^4.0.2",
 		"openid-client": "^5.4.2",
 		"parquetjs": "^0.11.2",

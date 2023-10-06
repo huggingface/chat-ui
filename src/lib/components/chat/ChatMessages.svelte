@@ -8,7 +8,9 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
-	import type { WebSearchMessage } from "$lib/types/WebSearch";
+	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import { browser } from "$app/environment";
+	import SystemPromptModal from "../SystemPromptModal.svelte";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -17,13 +19,12 @@
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
 	export let models: Model[];
+	export let preprompt: string | undefined;
 	export let readOnly: boolean;
-	export let searches: Record<string, WebSearchMessage[]>;
 
-	let webSearchArray: Array<WebSearchMessage[] | undefined> = [];
 	let chatContainer: HTMLElement;
 
-	export let webSearchMessages: WebSearchMessage[] = [];
+	export let webSearchMessages: WebSearchUpdate[] = [];
 
 	async function scrollToBottom() {
 		await tick();
@@ -31,20 +32,9 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	$: if (messages[messages.length - 1]?.from === "user") {
+	$: if (browser && messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
-
-	$: messages,
-		(webSearchArray = messages.map((message, idx) => {
-			if (message.webSearchId) {
-				return searches[message.webSearchId] ?? [];
-			} else if (idx === messages.length - 1) {
-				return webSearchMessages;
-			} else {
-				return [];
-			}
-		}));
 </script>
 
 <div
@@ -54,13 +44,16 @@
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
+			{#if i === 0 && preprompt}
+				<SystemPromptModal {preprompt} />
+			{/if}
 			<ChatMessage
 				loading={loading && i === messages.length - 1}
 				{message}
 				{isAuthor}
 				{readOnly}
 				model={currentModel}
-				webSearchMessages={webSearchArray[i]}
+				webSearchMessages={i === messages.length - 1 ? webSearchMessages : []}
 				on:retry
 				on:vote
 			/>

@@ -17,4 +17,6 @@ export interface Conversation extends Timestamps {
 	meta?: {
 		fromShareId?: string;
 	};
+
+	preprompt?: string;
 }

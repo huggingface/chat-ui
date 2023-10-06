@@ -1,4 +1,4 @@
-import { defaultModel } from "$lib/server/models";
+import { smallModel } from "$lib/server/models";
 import { modelEndpoint } from "./modelEndpoint";
 import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
@@ -14,14 +14,14 @@ interface Parameters {
 export async function generateFromDefaultEndpoint(
 	prompt: string,
 	parameters?: Partial<Parameters>
-) {
+): Promise<string> {
 	const newParameters = {
-		...defaultModel.parameters,
+		...smallModel.parameters,
 		...parameters,
 		return_full_text: false,
 	};
 
-	const randomEndpoint = modelEndpoint(defaultModel);
+	const randomEndpoint = modelEndpoint(smallModel);
 
 	const abortController = new AbortController();
 
@@ -29,7 +29,7 @@ export async function generateFromDefaultEndpoint(
 
 	if (randomEndpoint.host === "sagemaker") {
 		const requestParams = JSON.stringify({
-			...newParameters,
+			parameters: newParameters,
 			inputs: prompt,
 		});
 
@@ -56,7 +56,7 @@ export async function generateFromDefaultEndpoint(
 			},
 			method: "POST",
 			body: JSON.stringify({
-				...newParameters,
+				parameters: newParameters,
 				inputs: prompt,
 			}),
 			signal: abortController.signal,
@@ -68,7 +68,7 @@ export async function generateFromDefaultEndpoint(
 	}
 
 	if (!resp.body) {
-		throw new Error("Response body is empty");
+		throw new Error("Body is empty");
 	}
 
 	const decoder = new TextDecoder();
@@ -87,7 +87,12 @@ export async function generateFromDefaultEndpoint(
 	// Close the reader when done
 	reader.releaseLock();
 
-	const results = await JSON.parse(result);
+	let results;
+	if (result.startsWith("data:")) {
+		results = [JSON.parse(result.split("data:")?.pop() ?? "")];
+	} else {
+		results = JSON.parse(result);
+	}
 
 	let generated_text = trimSuffix(
 		trimPrefix(trimPrefix(results[0].generated_text, "<|startoftext|>"), prompt),

@@ -71,11 +71,15 @@
 			{#each models as model}
 				{@const active = model.id === selectedModelId}
 				<div
-					class="rounded-xl border border-gray-100 {active
+					class="relative rounded-xl border border-gray-100 {active
 						? 'bg-gradient-to-r from-primary-200/40 via-primary-500/10'
 						: ''}"
 				>
-					<label class="group flex cursor-pointer p-3" on:change aria-label={model.displayName}>
+					<label
+						class="group flex cursor-pointer flex-col p-3"
+						on:change
+						aria-label={model.displayName}
+					>
 						<input
 							type="radio"
 							class="sr-only"
@@ -83,16 +87,16 @@
 							value={model.id}
 							bind:group={selectedModelId}
 						/>
-						<span>
-							<span class="text-md block font-semibold leading-tight text-gray-800"
-								>{model.displayName}</span
-							>
-							{#if model.description}
-								<span class="text-xs text-[#9FA8B5]">{model.description}</span>
-							{/if}
-						</span>
+						<div
+							class="mb-1.5 block pr-8 text-sm font-semibold leading-tight text-gray-800 sm:text-base"
+						>
+							{model.displayName}
+						</div>
+						{#if model.description}
+							<div class="text-xs text-gray-500 sm:text-sm">{model.description}</div>
+						{/if}
 						<CarbonCheckmark
-							class="-mr-1 -mt-1 ml-auto shrink-0 text-xl {active
+							class="absolute right-2 top-2 text-xl {active
 								? 'text-primary-400'
 								: 'text-transparent group-hover:text-gray-200'}"
 						/>
@@ -106,7 +110,7 @@
 										class="text-gray-500 hover:text-gray-900"
 										on:click|preventDefault={onToggle}
 									>
-										<CarbonSave class="text-sm " />
+										<CarbonSave class="text-sm" />
 									</button>
 									<button
 										class="text-gray-500 hover:text-gray-900"
@@ -114,14 +118,14 @@
 											value = model.preprompt ?? "";
 										}}
 									>
-										<CarbonRestart class="text-sm " />
+										<CarbonRestart class="text-sm" />
 									</button>
 								{:else}
 									<button
 										class=" text-gray-500 hover:text-gray-900"
 										on:click|preventDefault={onToggle}
 									>
-										<CarbonEdit class="text-sm " />
+										<CarbonEdit class="text-sm" />
 									</button>
 								{/if}
 							</div>
@@ -141,7 +145,7 @@
 		</div>
 		<button
 			type="submit"
-			class="mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-colors hover:ring"
+			class="sticky bottom-6 mt-2 rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-colors hover:ring"
 		>
 			Apply
 		</button>

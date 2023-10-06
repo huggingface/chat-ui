@@ -1,38 +1,11 @@
 import { JSDOM, VirtualConsole } from "jsdom";
 
-function removeTags(node: Node) {
-	if (node.hasChildNodes()) {
-		node.childNodes.forEach((childNode) => {
-			if (node.nodeName === "SCRIPT" || node.nodeName === "STYLE") {
-				node.removeChild(childNode);
-			} else {
-				removeTags(childNode);
-			}
-		});
-	}
-}
-function naiveInnerText(node: Node): string {
-	const Node = node; // We need Node(DOM's Node) for the constants, but Node doesn't exist in the nodejs global space, and any Node instance references the constants through the prototype chain
-	return [...node.childNodes]
-		.map((childNode) => {
-			switch (childNode.nodeType) {
-				case Node.TEXT_NODE:
-					return node.textContent;
-				case Node.ELEMENT_NODE:
-					return naiveInnerText(childNode);
-				default:
-					return "";
-			}
-		})
-		.join("\n");
-}
-
 export async function parseWeb(url: string) {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
 	const htmlString = await fetch(url, { signal: abortController.signal })
 		.then((response) => response.text())
-		.catch((err) => console.log(err));
+		.catch();
 
 	const virtualConsole = new VirtualConsole();
 	virtualConsole.on("error", () => {
@@ -44,13 +17,16 @@ export async function parseWeb(url: string) {
 		virtualConsole,
 	});
 
-	const body = dom.window.document.querySelector("body");
-	if (!body) throw new Error("body of the webpage is null");
+	const { document } = dom.window;
+	const textElTags = "p";
+	const paragraphs = document.querySelectorAll(textElTags);
+	if (!paragraphs.length) {
+		throw new Error(`webpage doesn't have any "${textElTags}" element`);
+	}
+	const paragraphTexts = Array.from(paragraphs).map((p) => p.textContent);
 
-	removeTags(body);
-
-	// recursively extract text content from the body and then remove newlines and multiple spaces
-	const text = (naiveInnerText(body) ?? "").replace(/ {2}|\r\n|\n|\r/gm, "");
+	// combine text contents from paragraphs and then remove newlines and multiple spaces
+	const text = paragraphTexts.join(" ").replace(/ {2}|\r\n|\n|\r/gm, "");
 
 	return text;
 }
