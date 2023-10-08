@@ -32,31 +32,8 @@ export async function parseWeb(source: WebSearchSource) {
 	const markdownRaw = turndownService.turndown($("body").html());
 	const potentialMarkdown: string = await prettier.format(markdownRaw, { parser: "markdown" });
 	// const [nonMarkdown, markdown] = splitMarkdown(potentialMarkdown);
-	const nonMdNode: WebResultNode = { content: potentialMarkdown, source };
+	const node: WebResultNode = { content: potentialMarkdown, source };
 	// const nodes = divideMarkdwonSections(markdown, source);
 	// nodes.unshift(nonMdNode);
-	return [nonMdNode];
-}
-
-function splitMarkdown(markdown: string): [string, string] {
-	// divide into markdown and non-markdown sections
-	const index = markdown.indexOf("# ");
-	const beforeHeading = markdown.substring(0, index).trim();
-	const afterHeading = index !== -1 ? markdown.substring(index).trim() : "";
-	return [beforeHeading, afterHeading];
-}
-
-// return node of type {depth, content, children}[]
-function divideMarkdwonSections(markdown: string, source: WebSearchSource): WebResultNode[] {
-	const sections = markdown.split(/((#{1,6}) .+)\n/g);
-	const nodes: WebResultNode[] = [];
-
-	for (let i = 1; i < sections.length; i += 3) {
-		const heading = sections[i + 0];
-		const content = `${heading}\n\n${sections[i + 2]}`;
-		const node: WebResultNode = { content, source };
-		nodes.push(node);
-	}
-
-	return nodes;
+	return node;
 }

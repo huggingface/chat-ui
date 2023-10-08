@@ -32,4 +32,5 @@ export interface WebResultNode {
 	id?: number;
 	leftSibling?: WebResultNode;
 	rightSibling?: WebResultNode;
+	isSelected?: boolean;
 }

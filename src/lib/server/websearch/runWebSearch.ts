@@ -6,7 +6,7 @@ import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { createChildren, getLeafNodes } from "./chunker";
+import { createChildren, getContextFromNodes, getLeafNodes } from "./chunker";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -55,16 +55,17 @@ export async function runWebSearch(
 			appendUpdate("Browsing results");
 			const promises = webSearch.results.map(async (source) => {
 				try {
-					const nodes = await parseWeb(source);
+					const node = await parseWeb(source);
 					appendUpdate("Browsing webpage", [source.link]);
-					return nodes;
+					return node;
 				} catch (e) {
 					// ignore errors
-					return [];
+					return null;
 				}
 			});
-			const nestedNodes = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
-			allNodes = nestedNodes.flat();
+			allNodes = (await Promise.all(promises))
+				.slice(0, MAX_N_PAGES_EMBED)
+				.filter((node) => node !== null) as WebResultNode[];
 			if (!allNodes.length) {
 				throw new Error("No text found on the first 5 results");
 			}
@@ -75,30 +76,37 @@ export async function runWebSearch(
 		appendUpdate("Extracting relevant information");
 		// get leaf nodes thing here
 		// start the real work here
-		const CHUNK_LENGTHS = [512, 256, 128, 64];
+		const CHUNK_LENGTHS = [512, 256, 128]; // units in words
 		allNodes = allNodes.map((node) => createChildren(node, CHUNK_LENGTHS));
 		const leafNodes = getLeafNodes(allNodes);
 		const topKClosestParagraphs = 8;
-		const texts = leafNodes.map(({ content }) => content);
+		// does object.values preserve insertentin time
+		const texts = Object.values(leafNodes).map(({ content }) => content);
 		const indices = await findSimilarSentences(prompt, texts, {
 			topK: topKClosestParagraphs,
 		});
-		webSearch.context = indices.map((idx) => texts[idx]).join("");
+		// label the contexes and do that tree shit
+		//
+		const possibleContext = getContextFromNodes(allNodes, leafNodes, indices);
+		console.log("POSSIBLE CONTEXT", possibleContext);
+		webSearch.context = indices.map((idx) => texts[idx]).join("\n");
+		// console.log(JSON.stringify(texts, null, 2));
+		// console.log("Closest context are:", webSearch.context);
 
-		const usedSources = new Set<string>();
-		for (const idx of indices) {
-			const { source } = allNodes[idx];
-			if (!usedSources.has(source.link)) {
-				usedSources.add(source.link);
-				webSearch.contextSources.push(source);
-				updatePad({
-					type: "webSearch",
-					messageType: "sources",
-					message: "sources",
-					sources: webSearch.contextSources,
-				});
-			}
-		}
+		// const usedSources = new Set<string>();
+		// for (const idx of indices) {
+		// 	const { source } = allNodes[idx];
+		// 	if (!usedSources.has(source.link)) {
+		// 		usedSources.add(source.link);
+		// 		webSearch.contextSources.push(source);
+		// 		updatePad({
+		// 			type: "webSearch",
+		// 			messageType: "sources",
+		// 			message: "sources",
+		// 			sources: webSearch.contextSources,
+		// 		});
+		// 	}
+		// }
 	} catch (searchError) {
 		if (searchError instanceof Error) {
 			appendUpdate(
