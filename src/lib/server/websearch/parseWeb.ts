@@ -31,9 +31,6 @@ export async function parseWeb(source: WebSearchSource) {
 	});
 	const markdownRaw = turndownService.turndown($("body").html());
 	const potentialMarkdown: string = await prettier.format(markdownRaw, { parser: "markdown" });
-	// const [nonMarkdown, markdown] = splitMarkdown(potentialMarkdown);
 	const node: WebResultNode = { content: potentialMarkdown, source };
-	// const nodes = divideMarkdwonSections(markdown, source);
-	// nodes.unshift(nonMdNode);
 	return node;
 }
