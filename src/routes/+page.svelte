@@ -17,7 +17,10 @@
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ model: data.settings.activeModel }),
+				body: JSON.stringify({
+					model: data.settings.activeModel,
+					preprompt: data.settings.customPrompts[data.settings.activeModel],
+				}),
 			});
 
 			if (!res.ok) {

@@ -73,7 +73,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 	// fetch the model
 	const model = models.find((m) => m.id === conv.model);
-	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (!model) {
 		throw error(410, "Model not available anymore");
@@ -125,6 +124,14 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		];
 	})() satisfies Message[];
 
+	if (conv.title.startsWith("Untitled")) {
+		try {
+			conv.title = (await summarize(newPrompt)) ?? conv.title;
+		} catch (e) {
+			console.error(e);
+		}
+	}
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -150,7 +157,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				messages,
 				model,
 				webSearch: webSearchResults,
-				preprompt: settings?.customPrompts?.[model.id] ?? model.preprompt,
+				preprompt: conv.preprompt ?? model.preprompt,
 				locals: locals,
 			});
 
@@ -172,7 +179,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 			async function saveLast(generated_text: string) {
 				if (!conv) {
-					throw new Error("Conversation not found");
+					throw error(404, "Conversation not found");
 				}
 
 				const lastMessage = messages[messages.length - 1];
@@ -203,7 +210,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						{
 							$set: {
 								messages,
-								title: (await summarize(newPrompt)) ?? conv.title,
+								title: conv.title,
 								updatedAt: new Date(),
 							},
 						}
@@ -327,7 +334,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				{
 					$set: {
 						messages,
-						title: (await summarize(newPrompt)) ?? conv.title,
+						title: conv.title,
 						updatedAt: new Date(),
 					},
 				}

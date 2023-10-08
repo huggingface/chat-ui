@@ -24,6 +24,7 @@
 	export let models: Model[];
 	export let settings: LayoutData["settings"];
 	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let preprompt: string | undefined = undefined;
 
 	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
@@ -59,6 +60,7 @@
 		readOnly={isReadOnly}
 		isAuthor={!shared}
 		{webSearchMessages}
+		{preprompt}
 		on:message
 		on:vote
 		on:retry={(ev) => {
