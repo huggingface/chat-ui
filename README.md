@@ -203,7 +203,7 @@ The following is the default `webSearchQueryPromptTemplate`.
 ```
 {{userMessageToken}}
   My question is: {{message.content}}.
-  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
+  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}. Be exact with dates by using actual date rather than words such as "current", "past".
 {{userMessageEndToken}}
 {{assistantMessageToken}}
 ```
