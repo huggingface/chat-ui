@@ -1,16 +1,23 @@
+/**
+ * Based on https://gpt-index.readthedocs.io/en/v0.8.41/examples/retrievers/auto_merging_retriever.html
+ * Read this twitter thread for comprehensive description: https://twitter.com/clusteredbytes/status/1707864519433736305
+ * See `getRagContext` function comments
+ */
 import { chunk } from "$lib/utils/chunk";
 import type { WebResultNode } from "$lib/types/WebSearch";
 
-export function createChildren(node: WebResultNode, lengths: number[]): WebResultNode {
-	if (lengths.length === 0 || node.content.length === 0) {
+/**
+ * Given a node & chunkSizes, create children rescursively.
+ * Example: give nodeA (whose content length is 512 words) & chunkSizes [512, 256, 128],
+ * then, nodeA will have two children (each with content length of 256 words),
+ * and each children of nodeA will have two children (each with content length of 128 words).
+ */
+export function createChildren(node: WebResultNode, chunkSizes: number[]): WebResultNode {
+	if (chunkSizes.length === 0 || node.content.length === 0) {
 		return node;
 	}
 
-	const [firstLength, ...restLengths] = lengths;
-	if (firstLength <= 0) {
-		throw new Error("Lengths should be positive integers.");
-	}
-
+	const [firstLength, ...restLengths] = chunkSizes;
 	const { source } = node;
 	const parts = chunk(node.content, firstLength, "words");
 	node.children = parts.map((part) => {
@@ -47,48 +54,47 @@ export function getLeafNodes(nodes: WebResultNode[]): Record<number, WebResultNo
 	return leafNodes;
 }
 
-export function getContextFromNodes(
+export function getRagContext(
 	rootNodes: WebResultNode[],
 	leadNodes: Record<number, WebResultNode>,
 	indices: number[]
 ): string {
-	const ragContent: string[] = [];
-	// 1. label the nodes
+	const ragContext: string[] = [];
+	// 1. select leaf nodes based on `indices` (`indices` come from `findSimilarSentences` embeddings search function)
 	for (const idx of indices) {
 		leadNodes[idx].isSelected = true;
 	}
-	// 2. if both siblings are selected, then mark the node as selected as well
+	// 2. for a leaf node, if both left and right siblings are selected, then the node should be selected as well
 	for (const node of Object.values(leadNodes)) {
 		if (node.leftSibling?.isSelected && node.rightSibling?.isSelected) {
 			node.isSelected = true;
 		}
 	}
-	// 3. label them if children are n greener n shit
+	// 3. select nodes that have enough selected children
+	// this is the dynamic k-part of AutoMergeRetriever algorithm
 	for (const node of rootNodes) {
 		postOrderSelect(node);
 	}
-	// 4. get the top down node green and return the string context
+	// 4. get RAG context by combining contents of all selected nodes
 	const stack = [...rootNodes];
-
 	while (stack.length > 0) {
 		const node = stack.pop();
 		if (!node) {
 			continue;
 		}
 		if (node.isSelected) {
-			console.log("NODE SIZE", node.content.length, !!node.children);
-			if (node.children) {
-				console.log(JSON.stringify(node, null, 2));
-			}
-			ragContent.push(node.content);
+			ragContext.push(node.content);
 		} else if (node.children && node.children.length > 0) {
 			stack.push(...node.children);
 		}
 	}
-
-	return ragContent.join(" ");
+	return ragContext.join(" ");
 }
 
+const THRESHOLD_TO_SELECT = 0.5 as const;
+/**
+ * Select a nodeA if nodeA has enough selected children based on `THRESHOLD_TO_SELECT`
+ */
 function postOrderSelect(node: WebResultNode | null): boolean {
 	if (node == null) {
 		return false;
@@ -108,6 +114,6 @@ function postOrderSelect(node: WebResultNode | null): boolean {
 		}
 	}
 
-	node.isSelected = selectedChildrenCount / totalChildren > 0.5;
+	node.isSelected = selectedChildrenCount / totalChildren > THRESHOLD_TO_SELECT;
 	return node.isSelected;
 }

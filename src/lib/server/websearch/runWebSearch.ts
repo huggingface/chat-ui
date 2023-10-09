@@ -6,7 +6,7 @@ import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { createChildren, getContextFromNodes, getLeafNodes } from "./chunker";
+import { createChildren, getRagContext, getLeafNodes } from "./autoMergeRetriever";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -50,7 +50,7 @@ export async function runWebSearch(
 			.filter(({ link }) => !link.includes("youtube.com")) // filter out youtube links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
-		let allNodes: WebResultNode[] = [];
+		let rootNodes: WebResultNode[] = [];
 		if (webSearch.results.length > 0) {
 			appendUpdate("Browsing results");
 			const promises = webSearch.results.map(async (source) => {
@@ -63,10 +63,10 @@ export async function runWebSearch(
 					return null;
 				}
 			});
-			allNodes = (await Promise.all(promises))
+			rootNodes = (await Promise.all(promises))
 				.slice(0, MAX_N_PAGES_EMBED)
 				.filter((node) => node !== null) as WebResultNode[];
-			if (!allNodes.length) {
+			if (!rootNodes.length) {
 				throw new Error("No text found on the first 5 results");
 			}
 		} else {
@@ -77,8 +77,8 @@ export async function runWebSearch(
 		// get leaf nodes thing here
 		// start the real work here
 		const CHUNK_LENGTHS = [512, 256, 128]; // units in words
-		allNodes = allNodes.map((node) => createChildren(node, CHUNK_LENGTHS));
-		const leafNodes = getLeafNodes(allNodes);
+		rootNodes = rootNodes.map((node) => createChildren(node, CHUNK_LENGTHS));
+		const leafNodes = getLeafNodes(rootNodes);
 		const topKClosestParagraphs = 8;
 		// does object.values preserve insertentin time
 		const texts = Object.values(leafNodes).map(({ content }) => content);
@@ -87,7 +87,7 @@ export async function runWebSearch(
 		});
 		// label the contexes and do that tree shit
 		//
-		const possibleContext = getContextFromNodes(allNodes, leafNodes, indices);
+		const possibleContext = getRagContext(rootNodes, leafNodes, indices);
 		console.log("POSSIBLE CONTEXT", possibleContext);
 		webSearch.context = indices.map((idx) => texts[idx]).join("\n");
 		// console.log(JSON.stringify(texts, null, 2));
