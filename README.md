@@ -183,7 +183,7 @@ For example:
 
 When quering the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To idenify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
-The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability.
+The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
 
 ```prompt
 {{preprompt}}
