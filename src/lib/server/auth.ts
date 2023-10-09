@@ -7,6 +7,7 @@ import {
 	OPENID_PROVIDER_URL,
 	OPENID_SCOPES,
 	OPENID_TOLERANCE,
+	OPENID_RESOURCE
 } from "$env/static/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -78,10 +79,14 @@ export async function getOIDCAuthorizationUrl(
 ): Promise<string> {
 	const client = await getOIDCClient(settings);
 	const csrfToken = await generateCsrfToken(params.sessionId, settings.redirectURI);
-	const url = client.authorizationUrl({
+	let autorizationParams = {
 		scope: OPENID_SCOPES,
 		state: csrfToken,
-	});
+	};
+	if (OPENID_RESOURCE) {
+		autorizationParams["resource"] = OPENID_RESOURCE;
+	}
+	const url = client.authorizationUrl(autorizationParams);
 
 	return url;
 }
