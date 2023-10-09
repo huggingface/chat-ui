@@ -7,7 +7,7 @@
 </script>
 
 <div
-	transition:fade={{ duration: 300 }}
+	transition:fade|global={{ duration: 300 }}
 	class="pointer-events-none fixed right-0 top-12 z-20 bg-gradient-to-bl from-red-500/20 via-red-500/0 to-red-500/0 pb-36 pl-36 pr-2 pt-2 md:top-0 md:pr-8 md:pt-5"
 >
 	<div

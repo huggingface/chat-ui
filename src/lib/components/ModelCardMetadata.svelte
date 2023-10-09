@@ -9,7 +9,7 @@
 </script>
 
 <div
-	class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-xs sm:text-sm 
+	class="flex items-center gap-5 rounded-xl bg-gray-100 px-3 py-2 text-xs sm:text-sm
 	{variant === 'dark'
 		? 'text-gray-600 dark:bg-gray-800 dark:text-gray-300'
 		: 'text-gray-800 dark:bg-gray-100 dark:text-gray-600'}"
