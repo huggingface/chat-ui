@@ -74,22 +74,18 @@ export async function runWebSearch(
 		}
 
 		appendUpdate("Extracting relevant information");
-		// get leaf nodes thing here
-		// start the real work here
 		const CHUNK_LENGTHS = [512, 256, 128]; // units in words
 		rootNodes = rootNodes.map((node) => createChildren(node, CHUNK_LENGTHS));
 		const leafNodes = getLeafNodes(rootNodes);
 		const topKClosestParagraphs = 8;
-		// does object.values preserve insertentin time
 		const texts = Object.values(leafNodes).map(({ content }) => content);
+		console.log(JSON.stringify({ prompt, texts }, null, 2));
 		const indices = await findSimilarSentences(prompt, texts, {
 			topK: topKClosestParagraphs,
 		});
-		// label the contexes and do that tree shit
-		//
 		const possibleContext = getRagContext(rootNodes, leafNodes, indices);
-		console.log("POSSIBLE CONTEXT", possibleContext);
-		webSearch.context = indices.map((idx) => texts[idx]).join("\n");
+		// console.log("POSSIBLE CONTEXT", possibleContext);
+		webSearch.context = possibleContext;
 		// console.log(JSON.stringify(texts, null, 2));
 		// console.log("Closest context are:", webSearch.context);
 
