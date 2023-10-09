@@ -29,7 +29,11 @@ export async function parseWeb(source: WebSearchSource) {
 	$("img").replaceWith((_idx, el) => {
 		return $(el).attr("alt") || "Image";
 	});
-	const markdownRaw = turndownService.turndown($("body").html());
+	const htmlBody = $("body").html();
+	if (!htmlBody) {
+		throw new Error(`Couldn't parse html body for ${link}`);
+	}
+	const markdownRaw = turndownService.turndown(htmlBody);
 	const potentialMarkdown: string = await prettier.format(markdownRaw, { parser: "markdown" });
 	const node: WebResultNode = { content: potentialMarkdown, source };
 	return node;
