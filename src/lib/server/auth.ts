@@ -1,4 +1,4 @@
-import { Issuer, BaseClient, type UserinfoResponse, TokenSet } from "openid-client";
+import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
 import { addHours, addYears } from "date-fns";
 import {
 	COOKIE_NAME,
@@ -6,6 +6,7 @@ import {
 	OPENID_CLIENT_SECRET,
 	OPENID_PROVIDER_URL,
 	OPENID_SCOPES,
+	OPENID_TOLERANCE,
 } from "$env/static/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -59,12 +60,16 @@ export async function generateCsrfToken(sessionId: string, redirectUrl: string):
 
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 	const issuer = await Issuer.discover(OPENID_PROVIDER_URL);
-	return new issuer.Client({
+	let client = new issuer.Client({
 		client_id: OPENID_CLIENT_ID,
 		client_secret: OPENID_CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
 	});
+	if (OPENID_TOLERANCE) {
+		client[custom.clock_tolerance] = OPENID_TOLERANCE;
+	}
+	return client;
 }
 
 export async function getOIDCAuthorizationUrl(
