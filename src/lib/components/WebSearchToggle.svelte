@@ -10,6 +10,10 @@
 	class="flex h-9 cursor-pointer select-none items-center gap-2 rounded-xl border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
 	on:click={toggle}
 	on:keypress={toggle}
+	aria-checked={$webSearchParameters.useSearch}
+	aria-label="web search toggle"
+	role="switch"
+	tabindex="0"
 >
 	<Switch name="useSearch" bind:checked={$webSearchParameters.useSearch} on:click on:keypress />
 	<div class="whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">Search web</div>
