@@ -60,7 +60,7 @@
 					You can change this setting at any time, it applies to all your conversations.
 				</p>
 				<div>
-					<p class="text-gray-800 ">Read more about model authors:</p>
+					<p class="text-gray-800">Read more about model authors:</p>
 					<ul class="list-inside list-disc">
 						{#each models as model}
 							<li class="list-item">
