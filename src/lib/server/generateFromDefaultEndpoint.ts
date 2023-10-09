@@ -1,4 +1,4 @@
-import { defaultModel } from "$lib/server/models";
+import { smallModel } from "$lib/server/models";
 import { modelEndpoint } from "./modelEndpoint";
 import { trimSuffix } from "$lib/utils/trimSuffix";
 import { trimPrefix } from "$lib/utils/trimPrefix";
@@ -16,12 +16,12 @@ export async function generateFromDefaultEndpoint(
 	parameters?: Partial<Parameters>
 ): Promise<string> {
 	const newParameters = {
-		...defaultModel.parameters,
+		...smallModel.parameters,
 		...parameters,
 		return_full_text: false,
 	};
 
-	const randomEndpoint = modelEndpoint(defaultModel);
+	const randomEndpoint = modelEndpoint(smallModel);
 
 	const abortController = new AbortController();
 

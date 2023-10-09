@@ -1,0 +1,30 @@
+{
+	"background_color": "#ffffff",
+	"theme_color": "#eab308",
+	"name": "HuggingChat",
+	"short_name": "HuggingChat",
+	"display": "minimal-ui",
+	"start_url": "/chat",
+	"icons": [
+		{
+			"src": "/huggingchat/touch-icon-ipad-retina.png",
+			"sizes": "167x167",
+			"type": "image/png"
+		},
+		{
+			"src": "/huggingchat/touch-icon-ipad.png",
+			"sizes": "152x152",
+			"type": "image/png"
+		},
+		{
+			"src": "/huggingchat/touch-icon-iphone-retina.png",
+			"sizes": "180x180",
+			"type": "image/png"
+		},
+		{
+			"src": "/huggingchat/favicon.png",
+			"sizes": "192x192",
+			"type": "image/png"
+		}
+	]
+}
