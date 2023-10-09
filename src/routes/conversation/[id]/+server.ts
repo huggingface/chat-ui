@@ -129,6 +129,19 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		}
 	}
 
+	await collections.conversations.updateOne(
+		{
+			_id: convId,
+		},
+		{
+			$set: {
+				messages,
+				title: conv.title,
+				updatedAt: new Date(),
+			},
+		}
+	);
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
