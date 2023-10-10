@@ -129,7 +129,7 @@ export const oldModels = OLD_MODELS
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
-export type BackendModel = Optional<(typeof models)[0], "preprompt">;
+export type BackendModel = Optional<(typeof models)[0], "preprompt" | "parameters">;
 export type Endpoint = z.infer<typeof endpoint>;
 
 export const defaultModel = models[0];
