@@ -7,7 +7,7 @@ import {
 
 export async function summarize(prompt: string) {
 	if (!LLM_SUMMERIZATION) {
-		return prompt;
+		return prompt.split(/\s+/g).slice(0,5).join(' ');
 	}
 	const userPrompt = `Please summarize the following message: \n` + prompt;
 
