@@ -111,6 +111,7 @@ export const models = await Promise.all(
 		id: m.id || m.name,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
+		parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
 	}))
 );
 
