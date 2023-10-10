@@ -10,7 +10,7 @@ with open('.env.template', 'r') as f:
     PUBLIC_CONFIG = f.read()
 
 # Prepend the content of the env variable SECRET_CONFIG
-full_config = f'{SECRET_CONFIG}\n{PUBLIC_CONFIG}'
+full_config = f'{PUBLIC_CONFIG}\n{SECRET_CONFIG}'
 
 api = HfApi()
 
