@@ -7,6 +7,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  update-env:
+    name: "Update production environment config"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout repo content
+        uses: actions/checkout@v3 # checkout the repository content to github runner.
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11 #install the python needed
+      - name: "Install dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install huggingface_hub
+      - name: Update .env.local # run file
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SECRET_CONFIG: ${{ secrets.SECRET_CONFIG }}
+        run: |
+          python update_env.py
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
