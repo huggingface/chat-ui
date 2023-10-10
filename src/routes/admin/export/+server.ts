@@ -150,7 +150,7 @@ export async function POST({ request }) {
 	console.log("Uploading", fileName, "to Hugging Face Hub");
 
 	await uploadFile({
-		file: pathToFileURL(fileName),
+		file: pathToFileURL(fileName) as URL,
 		credentials: { accessToken: PARQUET_EXPORT_HF_TOKEN },
 		repo: {
 			type: "dataset",
