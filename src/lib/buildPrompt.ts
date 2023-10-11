@@ -49,7 +49,6 @@ export async function buildPrompt({
 		];
 	}
 
-	console.log(messages);
 	return (
 		model
 			.chatPromptRender({ messages, preprompt })
