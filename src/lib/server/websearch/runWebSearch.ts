@@ -2,7 +2,7 @@ import { searchWeb } from "$lib/server/websearch/searchWeb";
 import type { Message } from "$lib/types/Message";
 import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
-import { parseWeb } from "$lib/server/websearch/parseWeb";
+import { parseWebintoMarkdown } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import {
 	MAX_SEQ_LEN as CHUNK_CAR_LEN,
@@ -60,7 +60,7 @@ export async function runWebSearch(
 				const { link } = result;
 				let text = "";
 				try {
-					text = await parseWeb(link);
+					text = await parseWebintoMarkdown(link);
 					appendUpdate("Browsing webpage", [link]);
 				} catch (e) {
 					// ignore errors

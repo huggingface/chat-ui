@@ -1,6 +1,6 @@
 import { JSDOM, VirtualConsole } from "jsdom";
 
-export async function parseWeb(url: string) {
+export async function parseWebintoMarkdown(url: string) {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
 	const htmlString = await fetch(url, { signal: abortController.signal })
