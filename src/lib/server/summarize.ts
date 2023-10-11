@@ -1,8 +1,13 @@
+import { LLM_SUMMERIZATION } from "$env/static/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import { smallModel } from "$lib/server/models";
 import type { Message } from "$lib/types/Message";
 
 export async function summarize(prompt: string) {
+	if (!LLM_SUMMERIZATION) {
+		return prompt.split(/\s+/g).slice(0, 5).join(" ");
+	}
+
 	const messages: Array<Omit<Message, "id">> = [
 		{ from: "user", content: "Who is the president of France ?" },
 		{ from: "assistant", content: "🇫🇷 President of France request" },
