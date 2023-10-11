@@ -49,11 +49,11 @@
 		"@xenova/transformers": "^2.6.0",
 		"autoprefixer": "^10.4.14",
 		"aws4fetch": "^1.0.17",
+		"cheerio": "^1.0.0-rc.12",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
-		"jsdom": "^22.0.0",
 		"marked": "^4.3.0",
 		"mongodb": "^5.8.0",
 		"nanoid": "^4.0.2",
@@ -63,6 +63,8 @@
 		"serpapi": "^1.1.1",
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.3.1",
+		"turndown": "^7.1.2",
+		"turndown-plugin-gfm": "^1.0.2",
 		"zod": "^3.22.3"
 	}
 }
