@@ -21,7 +21,7 @@ Current Question: What about Mexico?
 		},
 		{
 			from: "assistant",
-			content: 'query: "President of Mexico"',
+			content: "President of Mexico",
 		},
 		{
 			from: "user",
@@ -32,7 +32,7 @@ Current Question: Where is it being hosted ?`,
 		},
 		{
 			from: "assistant",
-			content: 'query: "location of next formula 1 grand prix"',
+			content: "location of next formula 1 grand prix",
 		},
 		{
 			from: "user",
@@ -40,7 +40,7 @@ Current Question: Where is it being hosted ?`,
 		},
 		{
 			from: "assistant",
-			content: 'query: "Epson F2270 DTG printer printhead"',
+			content: "Epson F2270 DTG printer printhead",
 		},
 		{
 			from: "user",
@@ -56,38 +56,9 @@ Current Question: Where is it being hosted ?`,
 	];
 
 	const promptQuery = smallModel.chatPromptRender({
-		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Your answer should follow the format \`query:"[query here]\`. Today is ${currentDate}`,
+		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
 		messages: convQuery,
 	});
 
-	const searchQuery = await generateFromDefaultEndpoint(promptQuery).then((query) => {
-		// example of generating google query:
-		// case 1
-		// user: tell me what happened yesterday
-		// LLM: google query is "news september 12, 2023"
-		// the regex below will try to capture the last "phrase" (i.e. words between quotes or double quotes or ticks)
-		// in this case, it is "news september 12, 2023"
-		// if there is no "phrase", we will just use the user query, which was "tell me what happened yesterday"
-		const regexLastPhrase = /("|'|`)((?:(?!\1).)+)\1$/;
-		let match = query.match(regexLastPhrase);
-		if (match) {
-			return match[2];
-		}
-
-		// case 2
-		// user: tell me what happened yesterday
-		// LLM: Here is a query: news september 12, 2023
-		// the regex below will try to capture the last sentences starting from :
-		// in this case, it is "news september 12, 2023"
-		// if there is no math, we will just use the user query, which was "tell me what happened yesterday"
-		const regexColon = /:\s(.*)$/;
-		match = query.match(regexColon);
-		if (match) {
-			return match[1];
-		}
-
-		return lastMessage.content;
-	});
-
-	return searchQuery;
+	return await generateFromDefaultEndpoint(promptQuery);
 }
