@@ -1,5 +1,5 @@
 import { HF_ACCESS_TOKEN, MODELS, OLD_MODELS, TASK_MODEL } from "$env/static/private";
-import type { ChatTemplateInput, WebSearchQueryTemplateInput } from "$lib/types/Template";
+import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 
@@ -67,15 +67,6 @@ const modelsRaw = z
 						"{{/each}}" +
 						"{{assistantMessageToken}}"
 				),
-			webSearchQueryPromptTemplate: z
-				.string()
-				.default(
-					"{{userMessageToken}}" +
-						'My question is: "{{message.content}}". ' +
-						"Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}" +
-						"{{userMessageEndToken}}" +
-						"{{assistantMessageToken}}"
-				),
 			promptExamples: z
 				.array(
 					z.object({
@@ -104,10 +95,6 @@ export const models = await Promise.all(
 		userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
 		assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
 		chatPromptRender: compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m),
-		webSearchQueryPromptRender: compileTemplate<WebSearchQueryTemplateInput>(
-			m.webSearchQueryPromptTemplate,
-			m
-		),
 		id: m.id || m.name,
 		displayName: m.displayName || m.name,
 		preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
