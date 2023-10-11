@@ -1,4 +1,10 @@
-import { JSDOM, VirtualConsole } from "jsdom";
+import { load as cheerioLoad } from "cheerio";
+import TurndownService from "turndown";
+import { tables } from "turndown-plugin-gfm";
+import prettier from "prettier";
+
+const turndownService = new TurndownService();
+turndownService.use(tables);
 
 export async function parseWebintoMarkdown(url: string) {
 	const abortController = new AbortController();
@@ -7,26 +13,36 @@ export async function parseWebintoMarkdown(url: string) {
 		.then((response) => response.text())
 		.catch();
 
-	const virtualConsole = new VirtualConsole();
-	virtualConsole.on("error", () => {
-		// No-op to skip console errors.
+	const $ = cheerioLoad(htmlString);
+	// Remove all CSS, including inline ones
+	$("style").remove();
+	$("*").removeAttr("style");
+	// Remove all <script> elements within <body>
+	$("body script").remove();
+	// Replace links with just their text
+	$("a").replaceWith((_idx, el) => {
+		return $(el).text();
 	});
-
-	// put the html string into a DOM
-	const dom = new JSDOM(htmlString ?? "", {
-		virtualConsole,
+	// Replace images with just their alt text
+	$("img").replaceWith((_idx, el) => {
+		return $(el).attr("alt") || "Image";
 	});
-
-	const { document } = dom.window;
-	const textElTags = "p";
-	const paragraphs = document.querySelectorAll(textElTags);
-	if (!paragraphs.length) {
-		throw new Error(`webpage doesn't have any "${textElTags}" element`);
+	const htmlBody = $("body").html();
+	if (!htmlBody) {
+		throw new Error(`Couldn't parse html body for ${url}`);
 	}
-	const paragraphTexts = Array.from(paragraphs).map((p) => p.textContent);
+	const markdownRaw = turndownService.turndown(htmlBody);
+	const potentialMarkdown = prettier.format(markdownRaw, { parser: "markdown" });
+	const markdown = getMarkdownSection(potentialMarkdown);
+	if (!markdown) {
+		throw new Error(`Couldn't parse markdown for ${url}`);
+	}
+	return markdown;
+}
 
-	// combine text contents from paragraphs and then remove newlines and multiple spaces
-	const text = paragraphTexts.join(" ").replace(/ {2}|\r\n|\n|\r/gm, "");
-
-	return text;
+function getMarkdownSection(markdown: string) {
+	const REGEX_MD_HEADING = /^#+\s/m;
+	const idx = markdown.search(REGEX_MD_HEADING);
+	const afterHeading = idx !== -1 ? markdown.substring(idx).trim() : "";
+	return afterHeading;
 }

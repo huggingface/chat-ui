@@ -24,3 +24,18 @@ export type WebSearchMessageSources = {
 	type: "sources";
 	sources: WebSearchSource[];
 };
+
+export interface MarkdownNode {
+	heading: string;
+	depth: number;
+	content: string;
+	source: WebSearchSource;
+	sections: MarkdownNode[];
+}
+
+export type MarkdownFlatNode = Pick<MarkdownNode, "heading" | "content" | "source">;
+
+export interface TextWithSource {
+	text: string;
+	source: WebSearchSource;
+}
