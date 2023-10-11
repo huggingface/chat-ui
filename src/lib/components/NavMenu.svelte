@@ -7,7 +7,6 @@
 	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
-	import { browser } from "$app/environment";
 
 	const dispatch = createEventDispatcher<{
 		shareConversation: { id: string; title: string };
@@ -22,8 +21,6 @@
 
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
-
-	const isIframe = browser && window.self !== window.parent;
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -67,7 +64,7 @@
 		</form>
 	{/if}
 	{#if canLogin}
-		<form action="{base}/login" method="POST" target={isIframe ? "_blank" : ""}>
+		<form action="{base}/login" method="POST" target="_parent">
 			<button
 				type="submit"
 				class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"

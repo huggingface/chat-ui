@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { PUBLIC_APP_DATA_SHARING, PUBLIC_APP_NAME, PUBLIC_VERSION } from "$env/static/public";
@@ -8,8 +7,6 @@
 	import type { LayoutData } from "../../routes/$types";
 	import Logo from "./icons/Logo.svelte";
 	export let settings: LayoutData["settings"];
-
-	const isIframe = browser && window.self !== window.parent;
 </script>
 
 <Modal>
@@ -45,7 +42,7 @@
 		{/if}
 		<form
 			action="{base}/{$page.data.requiresLogin ? 'login' : 'settings'}"
-			target={isIframe ? "_blank" : ""}
+			target="_parent"
 			method="POST"
 			class="flex w-full flex-col items-center gap-2"
 		>
