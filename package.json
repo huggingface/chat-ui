@@ -24,6 +24,8 @@
 		"@types/jsdom": "^21.1.1",
 		"@types/marked": "^4.0.8",
 		"@types/parquetjs": "^0.10.3",
+		"@types/prettier": "^2.7.3",
+		"@types/turndown": "^5.0.2",
 		"@typescript-eslint/eslint-plugin": "^6.x",
 		"@typescript-eslint/parser": "^6.x",
 		"eslint": "^8.28.0",
