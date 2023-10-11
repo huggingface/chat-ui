@@ -1,12 +1,9 @@
 import { searchWeb } from "$lib/server/websearch/searchWeb";
 import type { Message } from "$lib/types/Message";
-import type { TextWithSource, WebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import type { TextWithSource, WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWebintoMarkdown } from "$lib/server/websearch/parseWeb";
-import {
-	MAX_SEQ_LEN as CHUNK_CAR_LEN,
-	findSimilarSentences,
-} from "$lib/server/websearch/sentenceSimilarity";
+import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { parseMarkdown, flattenNodes, chunkSlidingWindow } from "./slidingWindowChunker";
