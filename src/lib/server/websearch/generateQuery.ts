@@ -1,14 +1,14 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
-import { defaultModel } from "../models";
+import { smallModel } from "../models";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
 	const userMessages = messages.filter(({ from }) => from === "user");
 	const previousUserMessages = userMessages.slice(0, -1);
 	const lastMessage = userMessages.slice(-1)[0];
-	const promptSearchQuery = defaultModel.webSearchQueryPromptRender({
+	const promptSearchQuery = smallModel.webSearchQueryPromptRender({
 		message: lastMessage,
 		previousMessages: previousUserMessages.map(({ content }) => content).join(" "),
 		currentDate,
