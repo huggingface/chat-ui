@@ -89,7 +89,7 @@ export async function runWebSearch(
 		const indices = await findSimilarSentences(prompt, texts, {
 			topK: topKClosestParagraphs,
 		});
-		webSearch.context = indices.map((idx) => texts[idx]).join("");
+		webSearch.context = indices.map((idx) => texts[idx]).join(" ");
 
 		const usedSources = new Set<string>();
 		for (const idx of indices) {
