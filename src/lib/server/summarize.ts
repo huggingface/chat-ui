@@ -1,13 +1,11 @@
 import { buildPrompt } from "$lib/buildPrompt";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import { defaultModel } from "$lib/server/models";
-import {
-	LLM_SUMMERIZATION
-} from "$env/static/private";
+import { LLM_SUMMERIZATION } from "$env/static/private";
 
 export async function summarize(prompt: string) {
 	if (!LLM_SUMMERIZATION) {
-		return prompt.split(/\s+/g).slice(0,5).join(' ');
+		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 	const userPrompt = `Please summarize the following message: \n` + prompt;
 
