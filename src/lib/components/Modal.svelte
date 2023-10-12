@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher, onDestroy, onMount } from "svelte";
+	import { afterUpdate, createEventDispatcher, onDestroy, onMount } from "svelte";
 	import { cubicOut } from "svelte/easing";
 	import { fade } from "svelte/transition";
 	import Portal from "./Portal.svelte";
@@ -33,8 +33,8 @@
 
 	onDestroy(() => {
 		if (!browser) return;
-		// remove inert attribute if this is the last modal
-		if (document.querySelectorAll('[role="dialog"]:not(#app *)').length === 1) {
+		// remove inert attribute if this is the second last modal
+		if (document.querySelectorAll('[role="dialog"]:not(#app *)').length === 2) {
 			document.getElementById("app")?.removeAttribute("inert");
 		}
 	});
