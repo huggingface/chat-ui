@@ -23,18 +23,28 @@ export async function buildPrompt({
 	preprompt,
 }: buildPromptOptions): Promise<string> {
 	if (webSearch && webSearch.context) {
+		const lastMsg = messages.slice(-1)[0];
 		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
-		const lastUserMsg = messages.slice(-1)[0];
+		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
+
+		const previousQuestions =
+			previousUserMessages.length > 0
+				? `Previous questions: \n${previousUserMessages
+						.map(({ content }) => `- ${content}`)
+						.join("\n")}`
+				: "";
 		const currentDate = format(new Date(), "MMMM d, yyyy");
 		messages = [
 			...messagesWithoutLastUsrMsg,
 			{
 				from: "user",
-				content: `Please answer my question "${lastUserMsg.content}" using the supplied context below (paragraphs from various websites). For the context, today is ${currentDate}: 
+				content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
 				=====================
 				${webSearch.context}
 				=====================
-				So my question is "${lastUserMsg.content}"`,
+				${previousQuestions}
+				Answer the question: ${lastMsg.content} 
+				`,
 			},
 		];
 	}
