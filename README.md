@@ -10,6 +10,64 @@ base_path: /chat
 app_port: 3000
 ---
 
+# Cenia's Chile-Atiende demo interface
+
+## Setup
+
+Install the requirements
+
+```bash
+npm install
+```
+
+Create a file called `.env.local`, with the following
+
+```yaml
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DB_NAME=chat-ui
+MONGODB_DIRECT_CONNECTION=false
+
+MODELS=`[
+    {
+        "name": "Chile Atiende",
+        "endpoints": [{"url": "your_endpoint"}],
+        "userMessageToken": "User: ",
+        "assistantMessageToken": "Assistant: ",
+        "messageEndToken": "\n",
+        "parameters": {
+            "temperature": 0.1,
+            "max_new_tokens": 250,
+            "truncate": 1000
+        }
+    }
+]`
+
+PUBLIC_APP_NAME="Chile Atiende"
+```
+
+## Run
+
+Setup a mongo db to handle the chat history.
+
+```bash
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+```
+
+In case you get conflicts with Mongo's container, run:
+
+```bash
+docker stop container-id
+docker rm container-id
+```
+
+Finally, run the app
+
+```bash
+npm run dev
+```
+
+---
+
 # Chat UI
 
 ![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chatui-websearch.png)
