@@ -104,6 +104,7 @@ You can use a few environment variables to customize the look and feel of chat-u
 PUBLIC_APP_NAME=ChatUI
 PUBLIC_APP_ASSETS=chatui
 PUBLIC_APP_COLOR=blue
+PUBLIC_APP_DESCRIPTION="Making the community's best AI chat models available to everyone."
 PUBLIC_APP_DATA_SHARING=
 PUBLIC_APP_DISCLAIMER=
 ```
