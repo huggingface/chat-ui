@@ -43,7 +43,10 @@ Current Question: Where is it being hosted ?`,
 			content: "Epson F2270 DTG printer printhead",
 		},
 		{ from: "user", content: "What were the news yesterday ?" },
-		{ from: "assistant", content: `news ${new Date(Date.now() - 864e5).toDateString()}` },
+		{
+			from: "assistant",
+			content: `news ${format(new Date(Date.now() - 864e5), "MMMM d, yyyy")}`,
+		},
 		{ from: "user", content: "What is the current weather in Paris ?" },
 		{ from: "assistant", content: `weather in Paris ${currentDate}` },
 		{
