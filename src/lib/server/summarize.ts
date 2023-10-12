@@ -20,7 +20,7 @@ export async function summarize(prompt: string) {
 
 	const summaryPrompt = smallModel.chatPromptRender({
 		messages,
-		preprompt: `You are a summarization AI. Your task is to summarize user requests, in a single sentence of less than 5 words. Do not try to answer questions, just summarize the user's request. Start your answer with an emoji relevant to the summary.`,
+		preprompt: `You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence of four words or less. Always start your answer with an emoji relevant to the summary.`,
 	});
 
 	const generated_text = await generateFromDefaultEndpoint(summaryPrompt).catch((e) => {
