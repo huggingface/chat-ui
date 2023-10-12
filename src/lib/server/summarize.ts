@@ -9,12 +9,22 @@ export async function summarize(prompt: string) {
 	}
 
 	const messages: Array<Omit<Message, "id">> = [
-		{ from: "user", content: "Who is the president of France ?" },
-		{ from: "assistant", content: "🇫🇷 President of France request" },
-		{ from: "user", content: "What are the latest news ?" },
+		{ from: "user", content: "Who is the president of Gabon?" },
+		{ from: "assistant", content: "🇬🇦 President of Gabon" },
+		{ from: "user", content: "Who is Julien Chaumond?" },
+		{ from: "assistant", content: "🧑 Julien Chaumond" },
+		{ from: "user", content: "what is 1 + 1?" },
+		{ from: "assistant", content: "🔢 Simple math operation" },
+		{ from: "user", content: "What are the latest news?" },
 		{ from: "assistant", content: "📰 Latest news" },
-		{ from: "user", content: "Can you debug this python code?" },
-		{ from: "assistant", content: "🐍 Python code debugging request" },
+		{ from: "user", content: "How to make a great cheesecake?" },
+		{ from: "assistant", content: "🍰 Cheesecake recipe" },
+		{ from: "user", content: "what is your favorite movie? do a short answer." },
+		{ from: "assistant", content: "🎥 Favorite movie" },
+		{ from: "user", content: "Explain the concept of artificial intelligence in one sentence" },
+		{ from: "assistant", content: "🤖 AI definition" },
+		{ from: "user", content: "Answer all my questions like chewbacca from now ok?" },
+		{ from: "assistant", content: "🐒 Answer as Chewbacca" },
 		{ from: "user", content: prompt },
 	];
 
