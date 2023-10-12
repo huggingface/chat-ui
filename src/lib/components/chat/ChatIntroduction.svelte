@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { PUBLIC_APP_NAME, PUBLIC_VERSION } from "$env/static/public";
 	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
+	import { PUBLIC_APP_DESCRIPTION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconChevron from "$lib/components/icons/IconChevron.svelte";
@@ -40,7 +41,8 @@
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
-				Making the community's best AI chat models available to everyone.
+				{PUBLIC_APP_DESCRIPTION ||
+					"Making the community's best AI chat models available to everyone."}
 			</p>
 		</div>
 	</div>
