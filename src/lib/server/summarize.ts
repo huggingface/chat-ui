@@ -33,14 +33,16 @@ export async function summarize(prompt: string) {
 		preprompt: `You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence of four words or less. Always start your answer with an emoji relevant to the summary.`,
 	});
 
-	const generated_text = await generateFromDefaultEndpoint(summaryPrompt).catch((e) => {
-		console.error(e);
-		return null;
-	});
-
-	if (generated_text) {
-		return generated_text;
-	}
-
-	return null;
+	return await generateFromDefaultEndpoint(summaryPrompt)
+		.then((summary) => {
+			// add an emoji if none is found in the first three characters
+			if (!/\p{Emoji}/u.test(summary.slice(0, 3))) {
+				return "💬 " + summary;
+			}
+			return summary;
+		})
+		.catch((e) => {
+			console.error(e);
+			return null;
+		});
 }
