@@ -7,7 +7,8 @@ import {
 	OPENID_PROVIDER_URL,
 	OPENID_SCOPES,
 	OPENID_TOLERANCE,
-	OPENID_RESOURCE
+	OPENID_RESOURCE,
+	OPENID_CONFIG,
 } from "$env/static/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -23,7 +24,24 @@ export interface OIDCUserInfo {
 	userData: UserinfoResponse;
 }
 
-export const requiresUser = !!OPENID_CLIENT_ID && !!OPENID_CLIENT_SECRET;
+const stringWithDefault = (value: string) =>
+	z
+		.string()
+		.default(value)
+		.transform((el) => (el ? el : value));
+
+const OIDConfig = z
+	.object({
+		CLIENT_ID: stringWithDefault(OPENID_CLIENT_ID),
+		CLIENT_SECRET: stringWithDefault(OPENID_CLIENT_SECRET),
+		PROVIDER_URL: stringWithDefault(OPENID_PROVIDER_URL),
+		SCOPES: stringWithDefault(OPENID_SCOPES),
+		TOLERANCE: stringWithDefault(OPENID_TOLERANCE),
+		RESOURCE: stringWithDefault(OPENID_RESOURCE),
+	})
+	.parse(JSON.parse(OPENID_CONFIG));
+
+export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(COOKIE_NAME, sessionId, {
@@ -60,17 +78,15 @@ export async function generateCsrfToken(sessionId: string, redirectUrl: string):
 }
 
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
-	const issuer = await Issuer.discover(OPENID_PROVIDER_URL);
-	let client = new issuer.Client({
-		client_id: OPENID_CLIENT_ID,
-		client_secret: OPENID_CLIENT_SECRET,
+	const issuer = await Issuer.discover(OIDConfig.PROVIDER_URL);
+
+	return new issuer.Client({
+		client_id: OIDConfig.CLIENT_ID,
+		client_secret: OIDConfig.CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
+		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
 	});
-	if (OPENID_TOLERANCE) {
-		client[custom.clock_tolerance] = OPENID_TOLERANCE;
-	}
-	return client;
 }
 
 export async function getOIDCAuthorizationUrl(
@@ -79,16 +95,12 @@ export async function getOIDCAuthorizationUrl(
 ): Promise<string> {
 	const client = await getOIDCClient(settings);
 	const csrfToken = await generateCsrfToken(params.sessionId, settings.redirectURI);
-	let autorizationParams = {
-		scope: OPENID_SCOPES,
-		state: csrfToken,
-	};
-	if (OPENID_RESOURCE) {
-		autorizationParams["resource"] = OPENID_RESOURCE;
-	}
-	const url = client.authorizationUrl(autorizationParams);
 
-	return url;
+	return client.authorizationUrl({
+		scope: OIDConfig.SCOPES,
+		state: csrfToken,
+		resource: OIDConfig.RESOURCE || undefined,
+	});
 }
 
 export async function getOIDCUserData(settings: OIDCSettings, code: string): Promise<OIDCUserInfo> {
