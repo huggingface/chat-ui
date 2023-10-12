@@ -45,7 +45,7 @@ Current Question: Where is it being hosted ?`,
 		{ from: "user", content: "What were the news yesterday ?" },
 		{
 			from: "assistant",
-			content: `news${format(new Date(Date.now() - 864e5), "MMMM d, yyyy")}`,
+			content: `news ${format(new Date(Date.now() - 864e5), "MMMM d, yyyy")}`,
 		},
 		{ from: "user", content: "What is the current weather in Paris ?" },
 		{ from: "assistant", content: `weather in Paris ${currentDate}` },
