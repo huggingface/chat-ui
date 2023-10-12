@@ -19,6 +19,7 @@ export async function generateFromDefaultEndpoint(
 		...smallModel.parameters,
 		...parameters,
 		return_full_text: false,
+		wait_for_model: true,
 	};
 
 	const randomEndpoint = modelEndpoint(smallModel);

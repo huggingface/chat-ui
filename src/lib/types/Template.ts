@@ -12,9 +12,3 @@ export type ChatTemplateInput = {
 	messages: Pick<Message, "from" | "content">[];
 	preprompt?: string;
 };
-
-export type WebSearchQueryTemplateInput = {
-	message: Pick<Message, "from" | "content">;
-	previousMessages: string;
-	currentDate: string;
-};
