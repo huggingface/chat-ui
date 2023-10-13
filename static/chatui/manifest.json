@@ -1,9 +1,8 @@
 {
 	"background_color": "#ffffff",
-	"theme_color": "#3b82f6",
 	"name": "Chat UI",
 	"short_name": "Chat UI",
-	"display": "minimal-ui",
+	"display": "standalone",
 	"start_url": "/",
 	"icons": [
 		{

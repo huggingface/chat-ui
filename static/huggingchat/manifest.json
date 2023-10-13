@@ -1,9 +1,8 @@
 {
 	"background_color": "#ffffff",
-	"theme_color": "#eab308",
 	"name": "HuggingChat",
 	"short_name": "HuggingChat",
-	"display": "minimal-ui",
+	"display": "standalone",
 	"start_url": "/chat",
 	"icons": [
 		{
