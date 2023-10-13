@@ -4,7 +4,7 @@ const SECRET_CONFIG = fs.existsSync(".env.SECRET_CONFIG")
 	? fs.readFileSync(".env.SECRET_CONFIG", "utf8")
 	: process.env.SECRET_CONFIG;
 
-if (SECRET_CONFIG === "") {
+if (!SECRET_CONFIG) {
 	throw new Error(
 		"SECRET_CONFIG is not defined. Please provide it either in a file or as an environment variable."
 	);
