@@ -8,26 +8,21 @@ on:
 
 jobs:
   update-env:
-    name: "Update production environment config"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - name: checkout repo content
-        uses: actions/checkout@v3 # checkout the repository content to github runner.
-      - name: setup python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          python-version: 3.11 #install the python needed
-      - name: "Install dependencies"
-        run: |
-          python -m pip install --upgrade pip
-          pip install huggingface_hub
-      - name: Update .env.local # run file
+          node-version: "18"
+          cache: "npm"
+      - run: npm install ci
+      - name: "Update DOTENV_LOCAL in prod"
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SECRET_CONFIG: ${{ secrets.SECRET_CONFIG }}
-        run: |
-          python update_env.py
+        run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
