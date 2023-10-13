@@ -17,11 +17,12 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-      - run: |
-          npm install ci
+      - run: npm install ci
       - name: "Update DOTENV_LOCAL in prod"
-        run: |
-          npm run updateProdEnv
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SECRET_CONFIG: ${{ secrets.SECRET_CONFIG }}
+        run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
