@@ -27,7 +27,7 @@ export type WebSearchUpdate = {
 
 export type StatusUpdate = {
 	type: "status";
-	status: "started" | "pending" | "finished" | "error";
+	status: "started" | "pending" | "finished" | "error" | "title";
 	message?: string;
 };
 

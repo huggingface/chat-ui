@@ -161,6 +161,14 @@
 								}
 							} else if (update.type === "webSearch") {
 								webSearchMessages = [...webSearchMessages, update];
+							} else if (update.type === "status") {
+								if (update.status === "title") {
+									const conv = data.conversations.find(({ id }) => id === $page.params.id);
+									if (conv) {
+										console.log({ update });
+										conv.title = update.message ?? data.title;
+									}
+								}
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
