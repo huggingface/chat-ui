@@ -89,9 +89,14 @@ Chat UI features a powerful Web Search feature. It works by:
 The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
 
 ```env
-OPENID_PROVIDER_URL=<your OIDC issuer>
-OPENID_CLIENT_ID=<your OIDC client ID>
-OPENID_CLIENT_SECRET=<your OIDC client secret>
+OPENID_CONFIG=`{
+  PROVIDER_URL: "<your OIDC issuer>",
+  CLIENT_ID: "<your OIDC client ID>",
+  CLIENT_SECRET: "<your OIDC client secret>",
+  SCOPES: "openid profile",
+  TOLERANCE: // optional
+  RESOURCE: // optional
+}`
 ```
 
 These variables will enable the openID sign-in modal for users.
