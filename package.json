@@ -11,7 +11,9 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write .",
-		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest"
+		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest",
+		"updateLocalEnv": "npx ts-node --esm scripts/updateLocalEnv.ts",
+		"updateProdEnv": "npx ts-node --esm scripts/updateProdEnv.ts"
 	},
 	"devDependencies": {
 		"@iconify-json/carbon": "^1.1.16",
@@ -33,6 +35,7 @@
 		"prettier-plugin-tailwindcss": "^0.2.7",
 		"svelte": "^4.0.0",
 		"svelte-check": "^3.4.3",
+		"ts-node": "^10.9.1",
 		"tslib": "^2.4.1",
 		"typescript": "^5.0.0",
 		"unplugin-icons": "^0.16.1",
