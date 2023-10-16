@@ -14,7 +14,7 @@
 	import type { Message } from "$lib/types/Message";
 	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
-	import titleUpdate from "$lib/stores/titleUpdate.js";
+	import titleUpdate from "$lib/stores/titleUpdate";
 
 	export let data;
 
