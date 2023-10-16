@@ -14,6 +14,7 @@
 	import type { Message } from "$lib/types/Message";
 	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import titleQueue from "$lib/stores/titleQueue";
 
 	export let data;
 
@@ -138,9 +139,9 @@
 
 					// if it's not done we parse the value, which contains all messages
 					const inputs = value.split("\n");
-					inputs.forEach((el: string) => {
+					inputs.forEach(async (el: string) => {
 						try {
-							let update = JSON.parse(el) as MessageUpdate;
+							const update = JSON.parse(el) as MessageUpdate;
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
 								reader.cancel();
@@ -162,11 +163,15 @@
 							} else if (update.type === "webSearch") {
 								webSearchMessages = [...webSearchMessages, update];
 							} else if (update.type === "status") {
-								if (update.status === "title") {
+								if (update.status === "title" && update.message) {
 									const conv = data.conversations.find(({ id }) => id === $page.params.id);
 									if (conv) {
-										console.log({ update });
-										conv.title = update.message ?? data.title;
+										conv.title = update.message;
+
+										titleQueue.push({
+											title: update.message,
+											convId: $page.params.id,
+										});
 									}
 								}
 							}
@@ -228,6 +233,7 @@
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
+			// $pendingMessage = "";
 			writeMessage($pendingMessage);
 		}
 	});

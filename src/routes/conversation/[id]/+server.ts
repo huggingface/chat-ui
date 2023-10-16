@@ -157,6 +157,19 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			}
 
+			await collections.conversations.updateOne(
+				{
+					_id: convId,
+				},
+				{
+					$set: {
+						messages,
+						title: conv.title,
+						updatedAt: new Date(),
+					},
+				}
+			);
+
 			let webSearchResults: WebSearch | undefined;
 
 			if (webSearch) {
