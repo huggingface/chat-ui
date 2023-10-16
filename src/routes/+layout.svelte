@@ -103,7 +103,6 @@
 
 	$: if ($titleQueue.length > 0) {
 		const update = $titleQueue.pop();
-		console.log({ update, $titleQueue });
 
 		const convIdx = data.conversations.findIndex(({ id }) => id === update?.convId);
 
