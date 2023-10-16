@@ -14,7 +14,7 @@
 	import type { Message } from "$lib/types/Message";
 	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
-	import titleQueue from "$lib/stores/titleQueue";
+	import titleUpdate from "$lib/stores/titleUpdate.js";
 
 	export let data;
 
@@ -168,10 +168,10 @@
 									if (conv) {
 										conv.title = update.message;
 
-										titleQueue.push({
+										$titleUpdate = {
 											title: update.message,
 											convId: $page.params.id,
-										});
+										};
 									}
 								}
 							}
