@@ -36,3 +36,8 @@ interface YouSearchHit {
 	description: string;
 	snippets: string[];
 }
+
+export enum WebSearchProvider {
+	GOOGLE = "Google",
+	YOU = "You.com",
+}

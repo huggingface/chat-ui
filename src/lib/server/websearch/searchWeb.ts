@@ -1,15 +1,12 @@
 import type { YouWebSearch } from "../../types/WebSearch";
+import { WebSearchProvider } from "../../types/WebSearch";
 import { SERPAPI_KEY, SERPER_API_KEY, YDC_API_KEY } from "$env/static/private";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
-	if (YDC_API_KEY) {
-		return "You.com";
-	} else {
-		return "Google";
-	}
+	return YDC_API_KEY ? WebSearchProvider.YOU : WebSearchProvider.GOOGLE;
 }
 
 // Show result as JSON
