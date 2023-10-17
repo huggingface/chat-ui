@@ -128,33 +128,17 @@
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.svg"
-		type="image/svg+xml"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.ico"
+		sizes="32x32"
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.png"
-		type="image/png"
-	/>
-	<!-- Icon Support for iOS Bookmark Home Screen -->
-	<link
-		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-ipad-retina.png"
-		sizes="167x167"
-		type="image/png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/icon.svg"
+		type="image/svg+xml"
 	/>
 	<link
 		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-ipad.png"
-		sizes="152x152"
-		type="image/png"
-	/>
-	<link
-		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-iphone-retina.png"
-		sizes="180x180"
-		type="image/png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/apple-touch-icon.png"
 	/>
 	<link
 		rel="manifest"

@@ -1,29 +1,23 @@
 {
 	"background_color": "#ffffff",
-	"theme_color": "#3b82f6",
 	"name": "Chat UI",
 	"short_name": "Chat UI",
-	"display": "minimal-ui",
+	"display": "standalone",
 	"start_url": "/",
 	"icons": [
 		{
-			"src": "/chatui/touch-icon-ipad-retina.png",
-			"sizes": "167x167",
+			"src": "/chatui/icon-128x128.png",
+			"sizes": "128x128",
 			"type": "image/png"
 		},
 		{
-			"src": "/chatui/touch-icon-ipad.png",
-			"sizes": "152x152",
+			"src": "/chatui/icon-256x256.png",
+			"sizes": "256x256",
 			"type": "image/png"
 		},
 		{
-			"src": "/chatui/touch-icon-iphone-retina.png",
-			"sizes": "180x180",
-			"type": "image/png"
-		},
-		{
-			"src": "/chatui/favicon.png",
-			"sizes": "192x192",
+			"src": "/chatui/icon-512x512.png",
+			"sizes": "512x512",
 			"type": "image/png"
 		}
 	]
