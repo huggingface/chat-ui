@@ -24,3 +24,15 @@ export type WebSearchMessageSources = {
 	type: "sources";
 	sources: WebSearchSource[];
 };
+
+export interface YouWebSearch {
+  hits: YouSearchHit[];
+  latency: number;
+}
+
+interface YouSearchHit {
+  url: string;
+  title: string;
+  description: string;
+  snippets: string[];
+}

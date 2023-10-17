@@ -10,6 +10,7 @@ import {
 } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import { getWebSearchProvider } from "./searchWeb";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -39,7 +40,8 @@ export async function runWebSearch(
 
 	try {
 		webSearch.searchQuery = await generateQuery(messages);
-		appendUpdate("Searching Google", [webSearch.searchQuery]);
+		const searchProvider = getWebSearchProvider();
+		appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 		const results = await searchWeb(webSearch.searchQuery);
 		webSearch.results =
 			(results.organic_results &&
