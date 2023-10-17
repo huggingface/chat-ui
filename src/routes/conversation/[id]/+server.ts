@@ -121,14 +121,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		];
 	})() satisfies Message[];
 
-	if (conv.title.startsWith("Untitled")) {
-		try {
-			conv.title = (await summarize(newPrompt)) ?? conv.title;
-		} catch (e) {
-			console.error(e);
-		}
-	}
-
 	await collections.conversations.updateOne(
 		{
 			_id: convId,
@@ -155,6 +147,28 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			}
 
 			update({ type: "status", status: "started" });
+
+			if (conv.title === "New Chat" && messages.length === 1) {
+				try {
+					conv.title = (await summarize(newPrompt)) ?? conv.title;
+					update({ type: "status", status: "title", message: conv.title });
+				} catch (e) {
+					console.error(e);
+				}
+			}
+
+			await collections.conversations.updateOne(
+				{
+					_id: convId,
+				},
+				{
+					$set: {
+						messages,
+						title: conv.title,
+						updatedAt: new Date(),
+					},
+				}
+			);
 
 			let webSearchResults: WebSearch | undefined;
 

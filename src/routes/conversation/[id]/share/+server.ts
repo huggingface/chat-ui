@@ -1,7 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import type { SharedConversation } from "$lib/types/SharedConversation";
-import { getShareUrl } from "$lib/utils/getShareUrl.js";
+import { getShareUrl } from "$lib/utils/getShareUrl";
 import { hashConv } from "$lib/utils/hashConv";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
