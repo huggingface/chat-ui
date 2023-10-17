@@ -3,12 +3,16 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<meta name="theme-color" content="rgb(249, 250, 251)" />
 		<script>
 			if (
 				localStorage.theme === "dark" ||
 				(!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
 			) {
 				document.documentElement.classList.add("dark");
+				document
+					.querySelector('meta[name="theme-color"]')
+					.setAttribute("content", "rgb(26, 36, 50)");
 			}
 
 			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
