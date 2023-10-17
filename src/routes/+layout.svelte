@@ -16,6 +16,7 @@
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
 	import LoginModal from "$lib/components/LoginModal.svelte";
 	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
+	import titleUpdate from "$lib/stores/titleUpdate";
 
 	export let data;
 
@@ -99,6 +100,18 @@
 		(data.requiresLogin
 			? !data.user
 			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER);
+
+	$: if ($titleUpdate) {
+		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+
+		if (convIdx != -1) {
+			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
+		}
+		// update data.conversations
+		data.conversations = [...data.conversations];
+
+		$titleUpdate = null;
+	}
 </script>
 
 <svelte:head>
