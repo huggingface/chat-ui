@@ -26,13 +26,19 @@ export type WebSearchMessageSources = {
 };
 
 export interface YouWebSearch {
-  hits: YouSearchHit[];
-  latency: number;
+	hits: YouSearchHit[];
+	latency: number;
 }
 
 interface YouSearchHit {
-  url: string;
-  title: string;
-  description: string;
-  snippets: string[];
+	url: string;
+	title: string;
+	description: string;
+	snippets: string[];
+}
+
+// eslint-disable-next-line no-shadow
+export enum WebSearchProvider {
+	GOOGLE = "Google",
+	YOU = "You.com",
 }
