@@ -89,8 +89,14 @@ export async function searchWebYouApi(query: string) {
 	}
 
 	const data: YouWebSearch = await response.json();
+	const formattedResultsWithSnippets = data.hits.map(({ title, url, snippets }) => ({
+		title,
+		link: url,
+		text: snippets?.join("\n") || "",
+		hostname: new URL(url).hostname,
+	}))
 
 	return {
-		organic_results: data.hits.map((hit) => hit.snippets.join("\n")) ?? [],
+		organic_results: formattedResultsWithSnippets,
 	};
 }
