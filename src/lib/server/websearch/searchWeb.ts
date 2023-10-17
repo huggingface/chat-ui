@@ -7,9 +7,9 @@ import { YouWebSearch } from "../../types/WebSearch";
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
 	if (YDC_API_KEY) {
-		return "You.com"
+		return "You.com";
 	} else {
-		return "Google"
+		return "Google";
 	}
 }
 
@@ -83,9 +83,7 @@ export async function searchWebYouApi(query: string) {
 	});
 
 	if (!response.ok) {
-		throw new Error(
-				`You.com API returned error code ${response.status} - ${response.statusText}`
-		);
+		throw new Error(`You.com API returned error code ${response.status} - ${response.statusText}`);
 	}
 
 	const data: YouWebSearch = await response.json();
@@ -94,7 +92,7 @@ export async function searchWebYouApi(query: string) {
 		link: url,
 		text: snippets?.join("\n") || "",
 		hostname: new URL(url).hostname,
-	}))
+	}));
 
 	return {
 		organic_results: formattedResultsWithSnippets,
