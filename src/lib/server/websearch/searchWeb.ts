@@ -1,8 +1,7 @@
+import type { YouWebSearch } from "../../types/WebSearch";
 import { SERPAPI_KEY, SERPER_API_KEY, YDC_API_KEY } from "$env/static/private";
-
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
-import { YouWebSearch } from "../../types/WebSearch";
 
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
@@ -86,7 +85,7 @@ export async function searchWebYouApi(query: string) {
 		throw new Error(`You.com API returned error code ${response.status} - ${response.statusText}`);
 	}
 
-	const data: YouWebSearch = await response.json();
+	const data = (await response.json()) as YouWebSearch;
 	const formattedResultsWithSnippets = data.hits.map(({ title, url, snippets }) => ({
 		title,
 		link: url,
