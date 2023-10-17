@@ -37,6 +37,7 @@ interface YouSearchHit {
 	snippets: string[];
 }
 
+// eslint-disable-next-line no-shadow
 export enum WebSearchProvider {
 	GOOGLE = "Google",
 	YOU = "You.com",
