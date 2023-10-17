@@ -122,9 +122,10 @@ export const validateModel = (_models: BackendModel[]) => {
 };
 
 // if `TASK_MODEL` is the name of a model we use it, else we try to parse `TASK_MODEL` as a model config itself
-export const smallModel =
-	models.find((m) => m.name === TASK_MODEL) ||
-	(await processModel(modelConfig.parse(JSON.parse(TASK_MODEL))));
+export const smallModel = TASK_MODEL
+	? models.find((m) => m.name === TASK_MODEL) ||
+	  (await processModel(modelConfig.parse(JSON.parse(TASK_MODEL))))
+	: defaultModel;
 
 export type BackendModel = Optional<(typeof models)[0], "preprompt" | "parameters">;
 export type Endpoint = z.infer<typeof endpoint>;
