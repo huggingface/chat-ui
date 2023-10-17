@@ -121,7 +121,7 @@ export const validateModel = (_models: BackendModel[]) => {
 	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
 };
 
-// if `TASK_MODEL` is the name of a model we use it, else we try to parse `TASK_MODEL` as a model config itslef
+// if `TASK_MODEL` is the name of a model we use it, else we try to parse `TASK_MODEL` as a model config itself
 export const smallModel =
 	models.find((m) => m.name === TASK_MODEL) ||
 	(await processModel(modelConfig.parse(JSON.parse(TASK_MODEL))));
