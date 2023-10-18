@@ -18,6 +18,7 @@ export interface WebSearchSource {
 	title: string;
 	link: string;
 	hostname: string;
+	text?: string; // You.com provides text of webpage right away
 }
 
 export type WebSearchMessageSources = {
