@@ -18,7 +18,7 @@ SERPER_API_KEY=${SERPER_API_KEY}
 HF_ACCESS_TOKEN=${HF_ACCESS_TOKEN}
 `;
 
-// Make an HTTP POST request to add the space secre
+// Make an HTTP POST request to add the space secrets
 fetch(`https://huggingface.co/api/spaces/huggingchat/chat-ui/secrets`, {
 	method: "POST",
 	body: JSON.stringify({

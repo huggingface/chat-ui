@@ -17,7 +17,6 @@
 
 			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
 			window.gaId = "%gaId%";
-			window.gaIdDeprecated = "%gaIdDeprecated%";
 		</script>
 		%sveltekit.head%
 	</head>
@@ -42,33 +41,6 @@
 				gtag("consent", "default", { ad_storage: "denied", analytics_storage: "denied" });
 				/// ^ See https://developers.google.com/tag-platform/gtagjs/reference#consent
 				/// TODO: ask the user for their consent and update this with gtag('consent', 'update')
-			}
-		</script>
-
-		<!-- Google Analytics v3 (deprecated on 1 July 2023) -->
-		<script>
-			if (window.gaIdDeprecated) {
-				(function (i, s, o, g, r, a, m) {
-					i["GoogleAnalyticsObject"] = r;
-					(i[r] =
-						i[r] ||
-						function () {
-							(i[r].q = i[r].q || []).push(arguments);
-						}),
-						(i[r].l = 1 * new Date());
-					(a = s.createElement(o)), (m = s.getElementsByTagName(o)[0]);
-					a.async = 1;
-					a.src = g;
-					m.parentNode.insertBefore(a, m);
-				})(
-					window,
-					document,
-					"script",
-					"https://www.google-analytics.com/analytics.js",
-					"ganalytics"
-				);
-				ganalytics("create", window.gaIdDeprecated, "auto");
-				ganalytics("send", "pageview");
 			}
 		</script>
 	</body>
