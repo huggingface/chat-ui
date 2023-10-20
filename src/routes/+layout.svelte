@@ -4,7 +4,7 @@
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import { base } from "$app/paths";
-	import { PUBLIC_ORIGIN, PUBLIC_APP_DISCLAIMER } from "$env/static/public";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -14,7 +14,6 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
-	import LoginModal from "$lib/components/LoginModal.svelte";
 	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
 	import titleUpdate from "$lib/stores/titleUpdate";
 
@@ -94,13 +93,6 @@
 
 	$: if ($error) onError();
 
-	const requiresLogin =
-		!$page.error &&
-		!$page.route.id?.startsWith("/r/") &&
-		(data.requiresLogin
-			? !data.user
-			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER);
-
 	$: if ($titleUpdate) {
 		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
@@ -157,7 +149,7 @@
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.requiresLogin}
+			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -168,7 +160,7 @@
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.requiresLogin}
+			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -184,9 +176,6 @@
 			settings={data.settings}
 			models={data.models}
 		/>
-	{/if}
-	{#if requiresLogin && data.messagesBeforeLogin === 0}
-		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />
 </div>

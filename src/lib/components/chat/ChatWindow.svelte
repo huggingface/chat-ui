@@ -15,6 +15,8 @@
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import { page } from "$app/stores";
+	import DisclaimerModal from "../DisclaimerModal.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -26,7 +28,6 @@
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 
-	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
 	let loginModalOpen = false;
@@ -47,8 +48,15 @@
 </script>
 
 <div class="relative min-h-0 min-w-0">
-	{#if loginModalOpen}
-		<LoginModal {settings} on:close={() => (loginModalOpen = false)} />
+	{#if !settings.ethicsModalAcceptedAt}
+		<DisclaimerModal {settings} />
+	{:else if loginModalOpen}
+		<LoginModal
+			{settings}
+			on:close={() => {
+				loginModalOpen = false;
+			}}
+		/>
 	{/if}
 	<ChatMessages
 		{loading}
@@ -61,7 +69,13 @@
 		isAuthor={!shared}
 		{webSearchMessages}
 		{preprompt}
-		on:message
+		on:message={(ev) => {
+			if ($page.data.loginRequired) {
+				loginModalOpen = true;
+			} else {
+				dispatch("message", ev.detail);
+			}
+		}}
 		on:vote
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);
@@ -91,8 +105,11 @@
 					placeholder="Ask anything"
 					bind:value={message}
 					on:submit={handleSubmit}
-					on:keypress={() => {
-						if (loginRequired) loginModalOpen = true;
+					on:keypress={(ev) => {
+						if ($page.data.loginRequired) {
+							ev.preventDefault();
+							loginModalOpen = true;
+						}
 					}}
 					maxRows={4}
 					disabled={isReadOnly}
