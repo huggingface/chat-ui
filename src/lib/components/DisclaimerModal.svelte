@@ -16,46 +16,23 @@
 
 <Modal>
 	<div
-		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-primary-500/40 via-primary-500/10 to-primary-500/0 px-4 pb-10 pt-9 text-center"
+		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center sm:px-6"
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="mr-1" />
 			{PUBLIC_APP_NAME}
 		</h2>
 
-		<p
-			class="px-2 text-lg font-semibold leading-snug text-gray-800 sm:px-8"
-			style="text-wrap: balance;"
-		>
+		<p class="text-lg font-semibold leading-snug text-gray-800" style="text-wrap: balance;">
 			{PUBLIC_APP_DESCRIPTION}
 		</p>
 
-		<p class="px-2 text-sm text-gray-800">
+		<p class="text-sm text-gray-500">
 			Disclaimer: AI is an area of active research with known problems such as biased generation and
 			misinformation. Do not use this application for high-stakes decisions or advice.
 		</p>
 
-		{#if PUBLIC_APP_DATA_SHARING}
-			<p class="px-2 text-sm text-gray-500">
-				Your conversations will be shared with model authors unless you disable it from your
-				settings.
-			</p>
-		{/if}
-
-		<div class="flex w-full flex-col items-center gap-2 px-5">
-			{#if $page.data.loginEnabled}
-				<form action="{base}/login" target="_parent" method="POST" class="w-full">
-					<button
-						type="submit"
-						class="mt-2 flex w-full items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-primary-500"
-					>
-						Sign in
-						{#if PUBLIC_APP_NAME === "HuggingChat"}
-							with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
-						{/if}
-					</button>
-				</form>
-			{/if}
+		<div class="flex w-full flex-col items-center gap-2">
 			{#if $page.data.guestMode || !$page.data.loginEnabled}
 				<form action="{base}/settings" target="_parent" method="POST" class="w-full">
 					<input type="hidden" name="ethicsModalAccepted" value={true} />
@@ -69,7 +46,7 @@
 					/>
 					<button
 						type="submit"
-						class="mt-2 w-full justify-center rounded-full bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-primary-500"
+						class="w-full justify-center rounded-full border-2 border-gray-300 bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-100"
 						class:bg-white={$page.data.loginEnabled}
 						class:text-gray-800={$page.data.loginEnabled}
 					>
@@ -77,6 +54,19 @@
 							Try as guest
 						{:else}
 							Start chatting
+						{/if}
+					</button>
+				</form>
+			{/if}
+			{#if $page.data.loginEnabled}
+				<form action="{base}/login" target="_parent" method="POST" class="w-full">
+					<button
+						type="submit"
+						class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+					>
+						Sign in
+						{#if PUBLIC_APP_NAME === "HuggingChat"}
+							with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging Face
 						{/if}
 					</button>
 				</form>
