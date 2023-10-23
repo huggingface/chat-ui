@@ -83,14 +83,12 @@ export async function searchWebYouApi(query: string) {
 	}
 
 	const data = (await response.json()) as YouWebSearch;
-	const formattedResultsWithSnippets = data.hits
-		.map(({ title, url, snippets }) => ({
-			title,
-			link: url,
-			text: snippets?.join("\n") || "",
-			hostname: new URL(url).hostname,
-		}))
-		.sort((a, b) => b.text.length - a.text.length); // desc order by text length
+	const formattedResultsWithSnippets = data.hits.map(({ title, url, snippets }) => ({
+		title,
+		link: url,
+		text: snippets?.join("\n") || "",
+		hostname: new URL(url).hostname,
+	}));
 
 	return {
 		organic_results: formattedResultsWithSnippets,
