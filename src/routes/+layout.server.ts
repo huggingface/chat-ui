@@ -103,7 +103,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
 		},
-		loginRequired: loginRequired,
+		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
 	};
