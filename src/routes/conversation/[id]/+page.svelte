@@ -12,8 +12,8 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import titleUpdate from "$lib/stores/titleUpdate";
 
 	export let data;
 
@@ -31,7 +31,6 @@
 
 	let loading = false;
 	let pending = false;
-	let loginRequired = false;
 
 	async function convFromShared() {
 		try {
@@ -138,9 +137,9 @@
 
 					// if it's not done we parse the value, which contains all messages
 					const inputs = value.split("\n");
-					inputs.forEach((el: string) => {
+					inputs.forEach(async (el: string) => {
 						try {
-							let update = JSON.parse(el) as MessageUpdate;
+							const update = JSON.parse(el) as MessageUpdate;
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
 								reader.cancel();
@@ -161,6 +160,18 @@
 								}
 							} else if (update.type === "webSearch") {
 								webSearchMessages = [...webSearchMessages, update];
+							} else if (update.type === "status") {
+								if (update.status === "title" && update.message) {
+									const conv = data.conversations.find(({ id }) => id === $page.params.id);
+									if (conv) {
+										conv.title = update.message;
+
+										$titleUpdate = {
+											title: update.message,
+											convId: $page.params.id,
+										};
+									}
+								}
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
@@ -220,7 +231,8 @@
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
-			writeMessage($pendingMessage);
+			await writeMessage($pendingMessage);
+			$pendingMessage = "";
 		}
 	});
 
@@ -252,12 +264,6 @@
 
 	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
-
-	$: loginRequired =
-		(data.requiresLogin
-			? !data.user
-			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER) &&
-		messages.length >= data.messagesBeforeLogin;
 </script>
 
 <svelte:head>
@@ -285,5 +291,4 @@
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	settings={data.settings}
-	{loginRequired}
 />

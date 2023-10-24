@@ -92,14 +92,14 @@ export async function runWebSearch(
 			if (!usedSources.has(source.link)) {
 				usedSources.add(source.link);
 				webSearch.contextSources.push(source);
-				updatePad({
-					type: "webSearch",
-					messageType: "sources",
-					message: "sources",
-					sources: webSearch.contextSources,
-				});
 			}
 		}
+		updatePad({
+			type: "webSearch",
+			messageType: "sources",
+			message: "sources",
+			sources: webSearch.contextSources,
+		});
 	} catch (searchError) {
 		if (searchError instanceof Error) {
 			appendUpdate(

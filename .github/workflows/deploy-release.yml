@@ -7,6 +7,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  update-env:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+      - run: npm install ci
+      - name: "Update DOTENV_LOCAL in prod"
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          OPENID_CONFIG: ${{ secrets.OPENID_CONFIG }}
+          MONGODB_URL: ${{ secrets.MONGODB_URL }}
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:

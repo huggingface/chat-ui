@@ -52,13 +52,28 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		ip: getClientAddress(),
 	});
 
-	// make sure an anonymous user can't post more than one message
+	// guest mode check
 	if (
 		!locals.user?._id &&
 		requiresUser &&
-		conv.messages.length > (MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0)
+		(MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0
 	) {
-		throw error(429, "Exceeded number of messages before login");
+		const totalMessages =
+			(
+				await collections.conversations
+					.aggregate([
+						{ $match: authCondition(locals) },
+						{ $project: { messages: 1 } },
+						{ $unwind: "$messages" },
+						{ $match: { "messages.from": "assistant" } },
+						{ $count: "messages" },
+					])
+					.toArray()
+			)[0]?.messages ?? 0;
+
+		if (totalMessages > parseInt(MESSAGES_BEFORE_LOGIN)) {
+			throw error(429, "Exceeded number of messages before login");
+		}
 	}
 
 	// check if the user is rate limited
@@ -124,13 +139,18 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		];
 	})() satisfies Message[];
 
-	if (conv.title.startsWith("Untitled")) {
-		try {
-			conv.title = (await summarize(newPrompt)) ?? conv.title;
-		} catch (e) {
-			console.error(e);
+	await collections.conversations.updateOne(
+		{
+			_id: convId,
+		},
+		{
+			$set: {
+				messages,
+				title: conv.title,
+				updatedAt: new Date(),
+			},
 		}
-	}
+	);
 
 	// we now build the stream
 	const stream = new ReadableStream({
@@ -145,6 +165,28 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			}
 
 			update({ type: "status", status: "started" });
+
+			if (conv.title === "New Chat" && messages.length === 1) {
+				try {
+					conv.title = (await summarize(newPrompt)) ?? conv.title;
+					update({ type: "status", status: "title", message: conv.title });
+				} catch (e) {
+					console.error(e);
+				}
+			}
+
+			await collections.conversations.updateOne(
+				{
+					_id: convId,
+				},
+				{
+					$set: {
+						messages,
+						title: conv.title,
+						updatedAt: new Date(),
+					},
+				}
+			);
 
 			let webSearchResults: WebSearch | undefined;
 

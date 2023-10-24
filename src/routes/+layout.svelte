@@ -4,7 +4,7 @@
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import { base } from "$app/paths";
-	import { PUBLIC_ORIGIN, PUBLIC_APP_DISCLAIMER } from "$env/static/public";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -14,8 +14,8 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
-	import LoginModal from "$lib/components/LoginModal.svelte";
 	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
+	import titleUpdate from "$lib/stores/titleUpdate";
 
 	export let data;
 
@@ -93,14 +93,17 @@
 
 	$: if ($error) onError();
 
-	const requiresLogin =
-		!$page.error &&
-		!$page.route.id?.startsWith("/r/") &&
-		(data.requiresLogin
-			? !data.user
-			: !data.settings.ethicsModalAcceptedAt && !!PUBLIC_APP_DISCLAIMER);
+	$: if ($titleUpdate) {
+		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-	let loginModalVisible = false;
+		if (convIdx != -1) {
+			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
+		}
+		// update data.conversations
+		data.conversations = [...data.conversations];
+
+		$titleUpdate = null;
+	}
 </script>
 
 <svelte:head>
@@ -117,33 +120,17 @@
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.svg"
-		type="image/svg+xml"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.ico"
+		sizes="32x32"
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.png"
-		type="image/png"
-	/>
-	<!-- Icon Support for iOS Bookmark Home Screen -->
-	<link
-		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-ipad-retina.png"
-		sizes="167x167"
-		type="image/png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/icon.svg"
+		type="image/svg+xml"
 	/>
 	<link
 		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-ipad.png"
-		sizes="152x152"
-		type="image/png"
-	/>
-	<link
-		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/touch-icon-iphone-retina.png"
-		sizes="180x180"
-		type="image/png"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/apple-touch-icon.png"
 	/>
 	<link
 		rel="manifest"
@@ -162,8 +149,7 @@
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.requiresLogin}
-			bind:loginModalVisible
+			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -174,8 +160,7 @@
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.requiresLogin}
-			bind:loginModalVisible
+			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:clickSettings={() => (isSettingsOpen = true)}
@@ -191,9 +176,6 @@
 			settings={data.settings}
 			models={data.models}
 		/>
-	{/if}
-	{#if (requiresLogin && data.messagesBeforeLogin === 0) || loginModalVisible}
-		<LoginModal settings={data.settings} />
 	{/if}
 	<slot />
 </div>

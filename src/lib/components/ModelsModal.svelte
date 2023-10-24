@@ -133,7 +133,7 @@
 								enterkeyhint="send"
 								tabindex="0"
 								rows="1"
-								class="h-20 w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll rounded-md border border-gray-300 bg-transparent p-1  text-xs outline-none focus:ring-0 focus-visible:ring-0"
+								class="h-20 w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll rounded-md border border-gray-300 bg-transparent p-1 text-xs outline-none focus:ring-0 focus-visible:ring-0"
 								bind:value
 								hidden={!expanded}
 							/>

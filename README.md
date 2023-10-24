@@ -89,9 +89,14 @@ Chat UI features a powerful Web Search feature. It works by:
 The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
 
 ```env
-OPENID_PROVIDER_URL=<your OIDC issuer>
-OPENID_CLIENT_ID=<your OIDC client ID>
-OPENID_CLIENT_SECRET=<your OIDC client secret>
+OPENID_CONFIG=`{
+  PROVIDER_URL: "<your OIDC issuer>",
+  CLIENT_ID: "<your OIDC client ID>",
+  CLIENT_SECRET: "<your OIDC client secret>",
+  SCOPES: "openid profile",
+  TOLERANCE: // optional
+  RESOURCE: // optional
+}`
 ```
 
 These variables will enable the openID sign-in modal for users.
@@ -104,6 +109,7 @@ You can use a few environment variables to customize the look and feel of chat-u
 PUBLIC_APP_NAME=ChatUI
 PUBLIC_APP_ASSETS=chatui
 PUBLIC_APP_COLOR=blue
+PUBLIC_APP_DESCRIPTION="Making the community's best AI chat models available to everyone."
 PUBLIC_APP_DATA_SHARING=
 PUBLIC_APP_DISCLAIMER=
 ```
@@ -278,7 +284,7 @@ For example:
 
 When quering the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To idenify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
-The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability.
+The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
 
 ```prompt
 {{preprompt}}

@@ -134,6 +134,7 @@
 {#if message.from === "assistant"}
 	<div
 		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed"
+		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keypress={() => (isTapped = !isTapped)}
 	>
