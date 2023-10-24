@@ -87,24 +87,21 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		<div class="flex w-full pb-3 max-md:justify-between">
+		<div class="flex w-full pb-3">
 			{#if settings?.searchEnabled}
 				<WebSearchToggle />
 			{/if}
 			{#if loading}
-				<StopGeneratingBtn
-					classNames={settings?.searchEnabled ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
-					on:click={() => dispatch("stop")}
-				/>
+				<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
 			{/if}
 			{#if lastIsError}
 				<RetryBtn
+					classNames="ml-auto"
 					on:click={() =>
 						dispatch("retry", {
 							id: messages[messages.length - 1].id,
 							content: messages[messages.length - 1].content,
 						})}
-					classNames={settings?.searchEnabled ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
 				/>
 			{/if}
 		</div>
@@ -175,7 +172,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+					<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}
