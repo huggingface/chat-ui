@@ -6,6 +6,7 @@
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
+	export let error = false;
 
 	// Approximate width from which we disable autofocus
 	const TABLET_VIEWPORT_WIDTH = 768;
@@ -46,6 +47,8 @@
 		tabindex="0"
 		rows="1"
 		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0"
+		class:text-gray-400={disabled}
+		class:text-red-500={error}
 		bind:value
 		bind:this={textareaElement}
 		{disabled}

@@ -17,6 +17,7 @@
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/stores";
 	import DisclaimerModal from "../DisclaimerModal.svelte";
+	import RetryBtn from "../RetryBtn.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -45,6 +46,8 @@
 		dispatch("message", message);
 		message = "";
 	};
+
+	$: lastIsError = messages[messages.length - 1]?.from === "user" && !loading;
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -94,6 +97,16 @@
 					on:click={() => dispatch("stop")}
 				/>
 			{/if}
+			{#if lastIsError}
+				<RetryBtn
+					on:click={() =>
+						dispatch("retry", {
+							id: messages[messages.length - 1].id,
+							content: messages[messages.length - 1].content,
+						})}
+					classNames={settings?.searchEnabled ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
+				/>
+			{/if}
 		</div>
 		<form
 			on:submit|preventDefault={handleSubmit}
@@ -101,19 +114,28 @@
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
 			<div class="flex w-full flex-1 border-none bg-transparent">
-				<ChatInput
-					placeholder="Ask anything"
-					bind:value={message}
-					on:submit={handleSubmit}
-					on:keypress={(ev) => {
-						if ($page.data.loginRequired) {
-							ev.preventDefault();
-							loginModalOpen = true;
-						}
-					}}
-					maxRows={4}
-					disabled={isReadOnly}
-				/>
+				{#if lastIsError}
+					<ChatInput
+						value="Sorry, something went wrong. Please try again."
+						maxRows={4}
+						disabled={isReadOnly || lastIsError}
+						error={true}
+					/>
+				{:else}
+					<ChatInput
+						placeholder="Ask anything"
+						bind:value={message}
+						on:submit={handleSubmit}
+						on:keypress={(ev) => {
+							if ($page.data.loginRequired) {
+								ev.preventDefault();
+								loginModalOpen = true;
+							}
+						}}
+						maxRows={4}
+						disabled={isReadOnly || lastIsError}
+					/>
+				{/if}
 
 				{#if loading}
 					<button
@@ -154,7 +176,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+					<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}
