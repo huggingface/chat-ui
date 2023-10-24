@@ -10,4 +10,5 @@ export type Message = Partial<Timestamps> & {
 	webSearchId?: WebSearch["_id"]; // legacy version
 	webSearch?: WebSearch;
 	score?: -1 | 0 | 1;
+	files?: string[]; // filenames
 };

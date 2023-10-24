@@ -19,8 +19,9 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
+import { uploadFile } from "$lib/server/uploadFile.js";
 
-export async function POST({ request, fetch, locals, params, getClientAddress }) {
+export async function POST({ request, fetch, url, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const promptedAt = new Date();
@@ -99,6 +100,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		id: messageId,
 		is_retry,
 		web_search: webSearch,
+		files: b64files,
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
@@ -106,8 +108,23 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			response_id: z.optional(z.string().uuid()),
 			is_retry: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
+			files: z.optional(z.array(z.string())),
 		})
 		.parse(json);
+
+	// files is an array of base64 strings encoding File objects
+	// we need to convert this array to an array of File objects
+
+	const files = b64files?.map((file) => {
+		const blob = Buffer.from(file, "base64"); // works from here maybe b64files is wrong
+		return new File([blob], "image.png");
+	});
+
+	let hashes: undefined | string[];
+
+	if (files) {
+		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
+	}
 
 	// get the list of messages
 	// while checking for retries
@@ -132,6 +149,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				id: (messageId as Message["id"]) || crypto.randomUUID(),
 				createdAt: new Date(),
 				updatedAt: new Date(),
+				files: hashes,
 			},
 		];
 	})() satisfies Message[];
@@ -197,7 +215,8 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				model,
 				webSearch: webSearchResults,
 				preprompt: conv.preprompt ?? model.preprompt,
-				locals: locals,
+				locals,
+				url,
 			});
 
 			// fetch the endpoint
@@ -262,66 +281,79 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			}
 
-			const tokenStream = textGenerationStream(
-				{
-					parameters: {
-						...models.find((m) => m.id === conv.model)?.parameters,
-						return_full_text: false,
+			if (model.multimodal) {
+				await collections.allowedConversations.insertOne({
+					convId: convId,
+					createdAt: new Date(),
+				});
+			}
+			try {
+				const tokenStream = textGenerationStream(
+					{
+						parameters: {
+							...models.find((m) => m.id === conv.model)?.parameters,
+							return_full_text: false,
+						},
+						model: randomEndpoint.url,
+						inputs: prompt,
+						accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
 					},
-					model: randomEndpoint.url,
-					inputs: prompt,
-					accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
-				},
-				{
-					use_cache: false,
-					fetch: usedFetch,
-				}
-			);
-
-			for await (const output of tokenStream) {
-				// if not generated_text is here it means the generation is not done
-				if (!output.generated_text) {
-					// else we get the next token
-					if (!output.token.special) {
-						const lastMessage = messages[messages.length - 1];
-						update({
-							type: "stream",
-							token: output.token.text,
-						});
-
-						// if the last message is not from assistant, it means this is the first token
-						if (lastMessage?.from !== "assistant") {
-							// so we create a new message
-							messages = [
-								...messages,
-								// id doesn't match the backend id but it's not important for assistant messages
-								// First token has a space at the beginning, trim it
-								{
-									from: "assistant",
-									content: output.token.text.trimStart(),
-									webSearch: webSearchResults,
-									updates: updates,
-									id: (responseId as Message["id"]) || crypto.randomUUID(),
-									createdAt: new Date(),
-									updatedAt: new Date(),
-								},
-							];
-						} else {
-							const date = abortedGenerations.get(convId.toString());
-							if (date && date > promptedAt) {
-								saveLast(lastMessage.content);
-							}
-							if (!output) {
-								break;
-							}
-
-							// otherwise we just concatenate tokens
-							lastMessage.content += output.token.text;
-						}
+					{
+						use_cache: false,
+						fetch: usedFetch,
 					}
-				} else {
-					saveLast(output.generated_text);
+				);
+
+				for await (const output of tokenStream) {
+					// if not generated_text is here it means the generation is not done
+					if (!output.generated_text) {
+						// else we get the next token
+						if (!output.token.special) {
+							const lastMessage = messages[messages.length - 1];
+							update({
+								type: "stream",
+								token: output.token.text,
+							});
+
+							// if the last message is not from assistant, it means this is the first token
+							if (lastMessage?.from !== "assistant") {
+								// so we create a new message
+								messages = [
+									...messages,
+									// id doesn't match the backend id but it's not important for assistant messages
+									// First token has a space at the beginning, trim it
+									{
+										from: "assistant",
+										content: output.token.text.trimStart(),
+										webSearch: webSearchResults,
+										updates: updates,
+										id: (responseId as Message["id"]) || crypto.randomUUID(),
+										createdAt: new Date(),
+										updatedAt: new Date(),
+									},
+								];
+							} else {
+								const date = abortedGenerations.get(convId.toString());
+								if (date && date > promptedAt) {
+									saveLast(lastMessage.content);
+								}
+								if (!output) {
+									break;
+								}
+
+								// otherwise we just concatenate tokens
+								lastMessage.content += output.token.text;
+							}
+						}
+					} else {
+						saveLast(output.generated_text);
+					}
 				}
+			} catch (e) {
+				update({
+					type: "error",
+					...(e as Error),
+				});
 			}
 		},
 		async cancel() {

@@ -234,36 +234,52 @@
 {/if}
 {#if message.from === "user"}
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
-		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
-		<div
-			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
-		>
-			{message.content.trim()}
-		</div>
-		{#if !loading}
-			<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
-				{#if downloadLink}
-					<a
-						class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
-						title="Download prompt and parameters"
-						type="button"
-						target="_blank"
-						href={downloadLink}
-					>
-						<CarbonDownload />
-					</a>
-				{/if}
-				{#if !readOnly}
-					<button
-						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-						title="Retry"
-						type="button"
-						on:click={() => dispatch("retry", { content: message.content, id: message.id })}
-					>
-						<CarbonRotate360 />
-					</button>
-				{/if}
+		<div class="flex flex-col">
+			<div
+				class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
+			>
+				{message.content.trim()}
 			</div>
-		{/if}
+			{#if !loading}
+				<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
+					{#if downloadLink}
+						<a
+							class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
+							title="Download prompt and parameters"
+							type="button"
+							target="_blank"
+							href={downloadLink}
+						>
+							<CarbonDownload />
+						</a>
+					{/if}
+					{#if !readOnly}
+						<button
+							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+							title="Retry"
+							type="button"
+							on:click={() => dispatch("retry", { content: message.content, id: message.id })}
+						>
+							<CarbonRotate360 />
+						</button>
+					{/if}
+				</div>
+			{/if}
+			{#if message.files && message.files.length > 0}
+				<div class="my-5 w-full border-b-2 border-gray-300 dark:border-gray-700" />
+
+				<div class="mx-auto grid w-fit grid-cols-2 gap-5">
+					{#each message.files as file}
+						<div class="flex flex-col flex-nowrap gap-0">
+							<img
+								src={$page.url.pathname + "/output/" + file}
+								alt="input from user"
+								class="my-2 aspect-auto max-h-48"
+							/>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
 	</div>
 {/if}

@@ -83,6 +83,7 @@ const modelConfig = z.object({
 		})
 		.passthrough()
 		.optional(),
+	multimodal: z.boolean().default(false),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));

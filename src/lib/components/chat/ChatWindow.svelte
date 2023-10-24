@@ -17,6 +17,7 @@
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/stores";
 	import DisclaimerModal from "../DisclaimerModal.svelte";
+	import FileDropzone from "./FileDropzone.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -27,6 +28,7 @@
 	export let settings: LayoutData["settings"];
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
+	export let files: File[] = [];
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
@@ -44,6 +46,23 @@
 		if (loading) return;
 		dispatch("message", message);
 		message = "";
+	};
+
+	let lastTarget: EventTarget | null = null;
+
+	let onDrag = false;
+
+	const onDragEnter = (e: DragEvent) => {
+		lastTarget = e.target;
+		onDrag = true;
+	};
+	const onDragLeave = (e: DragEvent) => {
+		if (e.target === lastTarget) {
+			onDrag = false;
+		}
+	};
+	const onDragOver = (e: DragEvent) => {
+		e.preventDefault();
 	};
 </script>
 
@@ -83,6 +102,12 @@
 	/>
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		on:dragover={onDragOver}
+		on:dragenter={onDragEnter}
+		on:dragleave={onDragLeave}
+		role="button"
+		tabindex="-1"
+		aria-label="file dropzone"
 	>
 		<div class="flex w-full pb-3 max-md:justify-between">
 			{#if settings?.searchEnabled}
@@ -100,43 +125,48 @@
 			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
-			<div class="flex w-full flex-1 border-none bg-transparent">
-				<ChatInput
-					placeholder="Ask anything"
-					bind:value={message}
-					on:submit={handleSubmit}
-					on:keypress={(ev) => {
-						if ($page.data.loginRequired) {
-							ev.preventDefault();
-							loginModalOpen = true;
-						}
-					}}
-					maxRows={4}
-					disabled={isReadOnly}
-				/>
+			{#if onDrag}
+				<FileDropzone bind:files bind:onDrag />
+			{:else}
+				<div class="flex w-full flex-1 border-none bg-transparent">
+					<ChatInput
+						placeholder="Ask anything"
+						bind:value={message}
+						on:submit={handleSubmit}
+						on:keypress={(ev) => {
+							if ($page.data.loginRequired) {
+								ev.preventDefault();
+								loginModalOpen = true;
+							}
+						}}
+						maxRows={4}
+						disabled={isReadOnly}
+						bind:files
+					/>
 
-				{#if loading}
-					<button
-						class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:hidden"
-						on:click={() => dispatch("stop")}
-					>
-						<CarbonStopFilledAlt />
-					</button>
-					<div
-						class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:flex"
-					>
-						<EosIconsLoading />
-					</div>
-				{:else}
-					<button
-						class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
-						disabled={!message || isReadOnly}
-						type="submit"
-					>
-						<CarbonSendAltFilled />
-					</button>
-				{/if}
-			</div>
+					{#if loading}
+						<button
+							class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:hidden"
+							on:click={() => dispatch("stop")}
+						>
+							<CarbonStopFilledAlt />
+						</button>
+						<div
+							class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:flex"
+						>
+							<EosIconsLoading />
+						</div>
+					{:else}
+						<button
+							class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
+							disabled={!message || isReadOnly}
+							type="submit"
+						>
+							<CarbonSendAltFilled />
+						</button>
+					{/if}
+				</div>
+			{/if}
 		</form>
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>

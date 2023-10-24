@@ -14,6 +14,7 @@
 	import type { Message } from "$lib/types/Message";
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
+	import file2base64 from "$lib/utils/file2base64.js";
 
 	export let data;
 
@@ -31,6 +32,8 @@
 
 	let loading = false;
 	let pending = false;
+
+	let files: File[] = [];
 
 	async function convFromShared() {
 		try {
@@ -96,9 +99,11 @@
 					response_id: responseId,
 					is_retry: isRetry,
 					web_search: $webSearchParameters.useSearch,
+					files: await Promise.all(files.map(async (file) => await file2base64(file))),
 				}),
 			});
 
+			files = [];
 			if (!response.body) {
 				throw new Error("Body not defined");
 			}
@@ -107,6 +112,7 @@
 				error.set((await response.json())?.message);
 				return;
 			}
+
 			// eslint-disable-next-line no-undef
 			const encoder = new TextDecoderStream();
 			const reader = response?.body?.pipeThrough(encoder).getReader();
@@ -172,6 +178,9 @@
 										};
 									}
 								}
+							} else if (update.type === "error") {
+								error.set(update.message);
+								reader.cancel();
 							}
 						} catch (parseError) {
 							// in case of parsing error we wait for the next message
@@ -231,8 +240,9 @@
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
-			await writeMessage($pendingMessage);
-			$pendingMessage = "";
+			files = $pendingMessage.files;
+			await writeMessage($pendingMessage.content);
+			$pendingMessage = undefined;
 		}
 	});
 
@@ -283,6 +293,7 @@
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:webSearchMessages
+	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}

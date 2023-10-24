@@ -2,18 +2,15 @@ import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 import { format } from "date-fns";
 import type { WebSearch } from "./types/WebSearch";
-/**
- * Convert [{user: "assistant", content: "hi"}, {user: "user", content: "hello"}] to:
- *
- * <|assistant|>hi<|endoftext|><|prompter|>hello<|endoftext|><|assistant|>
- */
 
 interface buildPromptOptions {
-	messages: Pick<Message, "from" | "content">[];
+	messages: Pick<Message, "from" | "content" | "files">[];
 	model: BackendModel;
 	locals?: App.Locals;
 	webSearch?: WebSearch;
 	preprompt?: string;
+	files?: File[];
+	url?: URL;
 }
 
 export async function buildPrompt({
@@ -21,6 +18,7 @@ export async function buildPrompt({
 	model,
 	webSearch,
 	preprompt,
+	url,
 }: buildPromptOptions): Promise<string> {
 	if (webSearch && webSearch.context) {
 		const lastMsg = messages.slice(-1)[0];
@@ -47,6 +45,30 @@ export async function buildPrompt({
 				`,
 			},
 		];
+	}
+
+	if (model.multimodal) {
+		messages = await Promise.all(
+			messages.map(async (el) => {
+				let content = el.content;
+
+				if (el.from === "user") {
+					// append each files ![](data:image/png;base64,<base64content here>) to the end of the message
+					// the content of the file is fetched from `conversation/[id]/output/[file] and then needs to be base64 encoded
+					if (el.files && url && el.files.length > 0) {
+						const markdowns = await Promise.all(
+							el.files.map((hash) => `\n ![](${url.href}/output/${hash})`)
+						);
+						content += markdowns.join(" ");
+					} else {
+						content +=
+							"\n![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEYAAAAUCAAAAAAVAxSkAAABrUlEQVQ4y+3TPUvDQBgH8OdDOGa+oUMgk2MpdHIIgpSUiqC0OKirgxYX8QVFRQRpBRF8KShqLbgIYkUEteCgFVuqUEVxEIkvJFhae3m8S2KbSkcFBw9yHP88+eXucgH8kQZ/jSm4VDaIy9RKCpKac9NKgU4uEJNwhHhK3qvPBVO8rxRWmFXPF+NSM1KVMbwriAMwhDgVcrxeMZm85GR0PhvGJAAmyozJsbsxgNEir4iEjIK0SYqGd8sOR3rJAGN2BCEkOxhxMhpd8Mk0CXtZacxi1hr20mI/rzgnxayoidevcGuHXTC/q6QuYSMt1jC+gBIiMg12v2vb5NlklChiWnhmFZpwvxDGzuUzV8kOg+N8UUvNBp64vy9q3UN7gDXhwWLY2nMC3zRDibfsY7wjEkY79CdMZhrxSqqzxf4ZRPXwzWJirMicDa5KwiPeARygHXKNMQHEy3rMopDR20XNZGbJzUtrwDC/KshlLDWyqdmhxZzCsdYmf2fWZPoxCEDyfIvdtNQH0PRkH6Q51g8rFO3Qzxh2LbItcDCOpmuOsV7ntNaERe3v/lP/zO8yn4N+yNPrekmPAAAAAElFTkSuQmCC)";
+					}
+				}
+
+				return { ...el, content };
+			})
+		);
 	}
 
 	return (

@@ -1,5 +1,5 @@
 import { MONGODB_URL, MONGODB_DB_NAME, MONGODB_DIRECT_CONNECTION } from "$env/static/private";
-import { MongoClient } from "mongodb";
+import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { WebSearch } from "$lib/types/WebSearch";
@@ -7,6 +7,7 @@ import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
+import type { AllowedConversation } from "$lib/types/AllowedConversation";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -29,6 +30,8 @@ const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
 const webSearches = db.collection<WebSearch>("webSearches");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
+const bucket = new GridFSBucket(db, { bucketName: "files" });
+const allowedConversations = db.collection<AllowedConversation>("allowedConversations");
 
 export { client, db };
 export const collections = {
@@ -39,6 +42,8 @@ export const collections = {
 	users,
 	webSearches,
 	messageEvents,
+	bucket,
+	allowedConversations,
 };
 
 client.on("open", () => {
@@ -63,4 +68,7 @@ client.on("open", () => {
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
+	allowedConversations
+		.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+		.catch(console.error);
 });
