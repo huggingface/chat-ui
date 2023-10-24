@@ -1,4 +1,10 @@
-import { HF_ACCESS_TOKEN, MODELS, OPENAI_API_KEY, OLD_MODELS, TASK_MODEL } from "$env/static/private";
+import {
+	HF_ACCESS_TOKEN,
+	MODELS,
+	OPENAI_API_KEY,
+	OLD_MODELS,
+	TASK_MODEL,
+} from "$env/static/private";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
