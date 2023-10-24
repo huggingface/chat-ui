@@ -117,8 +117,7 @@
 				{#if lastIsError}
 					<ChatInput
 						value="Sorry, something went wrong. Please try again."
-						maxRows={4}
-						disabled={isReadOnly || lastIsError}
+						disabled={true}
 						error={true}
 					/>
 				{:else}
