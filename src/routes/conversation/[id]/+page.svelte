@@ -15,7 +15,6 @@
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64.js";
-	import { readAndCompressImage } from "browser-image-resizer";
 	export let data;
 
 	let messages = data.messages;
@@ -90,6 +89,8 @@
 
 			const responseId = randomUUID();
 
+			const module = await import("browser-image-resizer");
+
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -101,7 +102,7 @@
 					web_search: $webSearchParameters.useSearch,
 					files: await Promise.all(
 						files.map(async (file) => {
-							const resizedImage = await readAndCompressImage(file, {
+							const resizedImage = await module.readAndCompressImage(file, {
 								maxHeight: 224,
 								maxWidth: 224,
 								quality: 1,
