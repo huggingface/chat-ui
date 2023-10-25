@@ -15,7 +15,7 @@
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64.js";
-
+	import { readAndCompressImage } from "browser-image-resizer";
 	export let data;
 
 	let messages = data.messages;
@@ -99,7 +99,17 @@
 					response_id: responseId,
 					is_retry: isRetry,
 					web_search: $webSearchParameters.useSearch,
-					files: await Promise.all(files.map(async (file) => await file2base64(file))),
+					files: await Promise.all(
+						files.map(async (file) => {
+							const resizedImage = await readAndCompressImage(file, {
+								maxHeight: 224,
+								maxWidth: 224,
+								quality: 1,
+							});
+
+							return await file2base64(resizedImage as File);
+						})
+					),
 				}),
 			});
 
