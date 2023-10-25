@@ -232,7 +232,7 @@
 						type="button"
 						on:click={() => dispatch("share")}
 					>
-						<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
+						<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 						<div class="max-sm:hidden">Share this conversation</div>
 					</button>
 				{/if}
