@@ -1,5 +1,4 @@
 <script lang="ts">
-	import file2base64 from "$lib/utils/file2base64";
 	import { createEventDispatcher, onMount } from "svelte";
 
 	export let value = "";
@@ -7,7 +6,6 @@
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
-	export let files: File[] = [];
 	// Approximate width from which we disable autofocus
 	const TABLET_VIEWPORT_WIDTH = 768;
 
@@ -32,22 +30,9 @@
 			textareaElement.focus();
 		}
 	});
-
-	$: sources = files.map((file) => file2base64(file));
 </script>
 
 <svelte:window bind:innerWidth />
-
-{#each sources as source}
-	{#await source then src}
-		<img
-			src={`data:image/png;base64,${src}
-		`}
-			alt="input"
-			class="my-2 aspect-auto max-h-24"
-		/>
-	{/await}
-{/each}
 
 <div class="relative min-w-0 flex-1">
 	<pre
