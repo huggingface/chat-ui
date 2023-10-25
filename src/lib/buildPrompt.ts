@@ -43,7 +43,7 @@ export async function buildPrompt({
 				${webSearch.context}
 				=====================
 				${previousQuestions}
-				Answer the question: ${lastMsg.content}. When asked about past or future events, remember that today is ${currentDate}.
+				Answer the question: ${lastMsg.content} in a concise manner. When asked about past or future events, remember that today is ${currentDate}.
 				`,
 			},
 		];
