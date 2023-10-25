@@ -283,12 +283,6 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 				}
 			}
 
-			if (model.multimodal) {
-				await collections.allowedConversations.insertOne({
-					convId: convId,
-					createdAt: new Date(),
-				});
-			}
 			try {
 				const tokenStream = textGenerationStream(
 					{

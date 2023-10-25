@@ -7,7 +7,6 @@ import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
-import type { AllowedConversation } from "$lib/types/AllowedConversation";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -31,7 +30,6 @@ const users = db.collection<User>("users");
 const webSearches = db.collection<WebSearch>("webSearches");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
 const bucket = new GridFSBucket(db, { bucketName: "files" });
-const allowedConversations = db.collection<AllowedConversation>("allowedConversations");
 
 export { client, db };
 export const collections = {
@@ -43,7 +41,6 @@ export const collections = {
 	webSearches,
 	messageEvents,
 	bucket,
-	allowedConversations,
 };
 
 client.on("open", () => {
@@ -68,7 +65,4 @@ client.on("open", () => {
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
-	allowedConversations
-		.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
-		.catch(console.error);
 });

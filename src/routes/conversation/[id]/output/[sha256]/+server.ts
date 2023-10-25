@@ -12,13 +12,8 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	const userId = locals.user?._id ?? locals.sessionId;
 
-	// check if the conv id is in the allowed conversations
-	const allowedConv = await collections.allowedConversations.findOne({
-		convId: convId,
-	});
-
 	// check user
-	if (!userId && !allowedConv) {
+	if (!userId) {
 		throw error(401, "Unauthorized");
 	}
 
@@ -28,7 +23,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		...authCondition(locals),
 	});
 
-	if (!conv && !allowedConv) {
+	if (!conv) {
 		throw error(404, "Conversation not found");
 	}
 
