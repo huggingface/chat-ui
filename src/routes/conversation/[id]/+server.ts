@@ -217,6 +217,7 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 				preprompt: conv.preprompt ?? model.preprompt,
 				locals,
 				url,
+				fetch,
 			});
 
 			// fetch the endpoint

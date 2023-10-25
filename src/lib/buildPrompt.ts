@@ -11,6 +11,7 @@ interface buildPromptOptions {
 	preprompt?: string;
 	files?: File[];
 	url?: URL;
+	fetch?: typeof fetch;
 }
 
 export async function buildPrompt({
@@ -19,6 +20,7 @@ export async function buildPrompt({
 	webSearch,
 	preprompt,
 	url,
+	fetch,
 }: buildPromptOptions): Promise<string> {
 	if (webSearch && webSearch.context) {
 		const lastMsg = messages.slice(-1)[0];
@@ -55,9 +57,21 @@ export async function buildPrompt({
 				if (el.from === "user") {
 					// append each files ![](data:image/png;base64,<base64content here>) to the end of the message
 					// the content of the file is fetched from `conversation/[id]/output/[file] and then needs to be base64 encoded
-					if (el.files && url && el.files.length > 0) {
+					if (el.files && url && fetch && el.files?.length > 0) {
 						const markdowns = await Promise.all(
-							el.files.map((hash) => `\n ![](${url.href}/output/${hash})`)
+							el.files.map(async (hash) => {
+								try {
+									const blob = await fetch(`${url.href}/output/${hash}`).then((res) => res.text());
+									const file = new File([blob], "image.png");
+									const b64 = await file
+										.text()
+										.then((text) => Buffer.from(text).toString("base64"));
+
+									return `\n ![](data:image/png;base64,${b64})})`;
+								} catch (e) {
+									console.error(e);
+								}
+							})
 						);
 						content += markdowns.join(" ");
 					} else {
