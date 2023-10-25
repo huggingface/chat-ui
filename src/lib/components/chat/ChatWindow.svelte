@@ -15,6 +15,9 @@
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import { page } from "$app/stores";
+	import DisclaimerModal from "../DisclaimerModal.svelte";
+	import RetryBtn from "../RetryBtn.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -26,7 +29,6 @@
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 
-	export let loginRequired = false;
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
 	let loginModalOpen = false;
@@ -44,11 +46,20 @@
 		dispatch("message", message);
 		message = "";
 	};
+
+	$: lastIsError = messages[messages.length - 1]?.from === "user" && !loading;
 </script>
 
 <div class="relative min-h-0 min-w-0">
-	{#if loginModalOpen}
-		<LoginModal {settings} on:close={() => (loginModalOpen = false)} />
+	{#if !settings.ethicsModalAcceptedAt}
+		<DisclaimerModal {settings} />
+	{:else if loginModalOpen}
+		<LoginModal
+			{settings}
+			on:close={() => {
+				loginModalOpen = false;
+			}}
+		/>
 	{/if}
 	<ChatMessages
 		{loading}
@@ -61,7 +72,13 @@
 		isAuthor={!shared}
 		{webSearchMessages}
 		{preprompt}
-		on:message
+		on:message={(ev) => {
+			if ($page.data.loginRequired) {
+				loginModalOpen = true;
+			} else {
+				dispatch("message", ev.detail);
+			}
+		}}
 		on:vote
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);
@@ -70,14 +87,21 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		<div class="flex w-full pb-3 max-md:justify-between">
+		<div class="flex w-full pb-3">
 			{#if settings?.searchEnabled}
 				<WebSearchToggle />
 			{/if}
 			{#if loading}
-				<StopGeneratingBtn
-					classNames={settings?.searchEnabled ? "md:-translate-x-1/2 md:mx-auto" : "mx-auto"}
-					on:click={() => dispatch("stop")}
+				<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
+			{/if}
+			{#if lastIsError}
+				<RetryBtn
+					classNames="ml-auto"
+					on:click={() =>
+						dispatch("retry", {
+							id: messages[messages.length - 1].id,
+							content: messages[messages.length - 1].content,
+						})}
 				/>
 			{/if}
 		</div>
@@ -87,16 +111,23 @@
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
 			<div class="flex w-full flex-1 border-none bg-transparent">
-				<ChatInput
-					placeholder="Ask anything"
-					bind:value={message}
-					on:submit={handleSubmit}
-					on:keypress={() => {
-						if (loginRequired) loginModalOpen = true;
-					}}
-					maxRows={4}
-					disabled={isReadOnly}
-				/>
+				{#if lastIsError}
+					<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+				{:else}
+					<ChatInput
+						placeholder="Ask anything"
+						bind:value={message}
+						on:submit={handleSubmit}
+						on:keypress={(ev) => {
+							if ($page.data.loginRequired) {
+								ev.preventDefault();
+								loginModalOpen = true;
+							}
+						}}
+						maxRows={4}
+						disabled={isReadOnly || lastIsError}
+					/>
+				{/if}
 
 				{#if loading}
 					<button

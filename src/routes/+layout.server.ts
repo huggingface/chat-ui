@@ -43,6 +43,26 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 		});
 	}
 
+	// get the number of messages where `from === "assistant"` across all conversations.
+	const totalMessages =
+		(
+			await conversations
+				.aggregate([
+					{ $match: authCondition(locals) },
+					{ $project: { messages: 1 } },
+					{ $unwind: "$messages" },
+					{ $match: { "messages.from": "assistant" } },
+					{ $count: "messages" },
+				])
+				.toArray()
+		)[0]?.messages ?? 0;
+
+	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+
+	const userHasExceededMessages = messagesBeforeLogin > 0 && totalMessages > messagesBeforeLogin;
+
+	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
+
 	return {
 		conversations: await conversations
 			.find(authCondition(locals))
@@ -56,7 +76,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			})
 			.map((conv) => ({
 				id: conv._id.toString(),
-				title: conv.title,
+				title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
 				model: conv.model ?? defaultModel,
 			}))
 			.toArray(),
@@ -66,6 +86,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
+			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
 			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY),
 			customPrompts: settings?.customPrompts ?? {},
 		},
@@ -88,7 +109,8 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
 		},
-		requiresLogin: requiresUser,
-		messagesBeforeLogin: MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0,
+		loginRequired,
+		loginEnabled: requiresUser,
+		guestMode: requiresUser && messagesBeforeLogin > 0,
 	};
 };

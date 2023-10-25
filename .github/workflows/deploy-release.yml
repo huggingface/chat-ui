@@ -21,7 +21,10 @@ jobs:
       - name: "Update DOTENV_LOCAL in prod"
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          SECRET_CONFIG: ${{ secrets.SECRET_CONFIG }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          OPENID_CONFIG: ${{ secrets.OPENID_CONFIG }}
+          MONGODB_URL: ${{ secrets.MONGODB_URL }}
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
         run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest

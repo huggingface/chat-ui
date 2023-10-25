@@ -6,22 +6,26 @@ import { models, validateModel } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
+const booleanFormObject = z
+	.union([z.literal("true"), z.literal("on"), z.literal("false"), z.null()])
+	.transform((value) => {
+		return value === "true" || value === "on";
+	});
+
 export const actions = {
 	default: async function ({ request, locals }) {
 		const formData = await request.formData();
 
 		const { ethicsModalAccepted, ...settings } = z
 			.object({
-				shareConversationsWithModelAuthors: z
-					.union([z.literal("true"), z.literal("on"), z.literal("false"), z.null()])
-					.transform((value) => {
-						return value === "true" || value === "on";
-					}),
+				shareConversationsWithModelAuthors: booleanFormObject,
+				hideEmojiOnSidebar: booleanFormObject,
 				ethicsModalAccepted: z.boolean({ coerce: true }).optional(),
 				activeModel: validateModel(models),
 				customPrompts: z.record(z.string()).default({}),
 			})
 			.parse({
+				hideEmojiOnSidebar: formData.get("hideEmojiOnSidebar"),
 				shareConversationsWithModelAuthors: formData.get("shareConversationsWithModelAuthors"),
 				ethicsModalAccepted: formData.get("ethicsModalAccepted"),
 				activeModel: formData.get("activeModel") ?? DEFAULT_SETTINGS.activeModel,

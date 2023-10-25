@@ -12,14 +12,14 @@
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write .",
 		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest",
-		"updateLocalEnv": "npx ts-node --esm scripts/updateLocalEnv.ts",
-		"updateProdEnv": "npx ts-node --esm scripts/updateProdEnv.ts"
+		"updateLocalEnv": "node --loader ts-node/esm scripts/updateLocalEnv.ts",
+		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts"
 	},
 	"devDependencies": {
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^1.2.4",
-		"@sveltejs/kit": "^1.20.4",
+		"@sveltejs/kit": "^1.26.0",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/jsdom": "^21.1.1",
 		"@types/marked": "^4.0.8",

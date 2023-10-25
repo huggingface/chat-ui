@@ -22,7 +22,7 @@
 {:else}
 	<object
 		class={classNames}
-		data="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.svg"
+		data="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/logo.svg"
 		title="{PUBLIC_APP_NAME} logo"
 	/>
 {/if}
