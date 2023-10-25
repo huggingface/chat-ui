@@ -13,6 +13,9 @@
 		event.preventDefault();
 		if (event.dataTransfer && event.dataTransfer.items) {
 			// Use DataTransferItemList interface to access the file(s)
+			if (files.length > 0) {
+				files = [];
+			}
 			for (let i = 0; i < event.dataTransfer.items.length; i++) {
 				// If dropped items aren't files, reject them
 				if (event.dataTransfer.items[i].kind === "file") {

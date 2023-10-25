@@ -128,5 +128,5 @@ export const smallModel = TASK_MODEL
 	  (await processModel(modelConfig.parse(JSON.parse(TASK_MODEL))))
 	: defaultModel;
 
-export type BackendModel = Optional<(typeof models)[0], "preprompt" | "parameters">;
+export type BackendModel = Optional<(typeof models)[0], "preprompt" | "parameters" | "multimodal">;
 export type Endpoint = z.infer<typeof endpoint>;

@@ -19,6 +19,7 @@
 	import DisclaimerModal from "../DisclaimerModal.svelte";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
+	import UploadBtn from "../UploadBtn.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -117,8 +118,7 @@
 			{/if}
 			{#if loading}
 				<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
-			{/if}
-			{#if lastIsError}
+			{:else if lastIsError}
 				<RetryBtn
 					classNames="ml-auto"
 					on:click={() =>
@@ -127,6 +127,8 @@
 							content: messages[messages.length - 1].content,
 						})}
 				/>
+			{:else if currentModel.multimodal}
+				<UploadBtn bind:files classNames="ml-auto" />
 			{/if}
 		</div>
 		<form
@@ -134,7 +136,7 @@
 			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
-			{#if onDrag}
+			{#if onDrag && currentModel.multimodal}
 				<FileDropzone bind:files bind:onDrag />
 			{:else}
 				<div class="flex w-full flex-1 border-none bg-transparent">
@@ -197,7 +199,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+					<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}
