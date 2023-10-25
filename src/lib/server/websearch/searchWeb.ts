@@ -11,11 +11,11 @@ export function getWebSearchProvider() {
 
 // Show result as JSON
 export async function searchWeb(query: string) {
-	if (YDC_API_KEY) {
-		return await searchWebYouApi(query);
-	}
 	if (SERPER_API_KEY) {
 		return await searchWebSerper(query);
+	}
+	if (YDC_API_KEY) {
+		return await searchWebYouApi(query);
 	}
 	if (SERPAPI_KEY) {
 		return await searchWebSerpApi(query);
