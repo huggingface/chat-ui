@@ -71,7 +71,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			})
 			.map((conv) => ({
 				id: conv._id.toString(),
-				title: conv.title,
+				title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
 				model: conv.model ?? defaultModel,
 			}))
 			.toArray(),
@@ -81,6 +81,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
+			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
 			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY),
 			customPrompts: settings?.customPrompts ?? {},
 		},
