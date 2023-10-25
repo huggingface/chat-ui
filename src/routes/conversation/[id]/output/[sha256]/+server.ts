@@ -4,6 +4,7 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { RequestHandler } from "./$types";
+import { downloadFile } from "$lib/server/files/downloadFile";
 
 export const GET: RequestHandler = async ({ locals, params }) => {
 	const convId = new ObjectId(z.string().parse(params.id));
@@ -31,32 +32,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		throw error(404, "Conversation not found");
 	}
 
-	const fileId = collections.bucket.find({ filename: `${convId.toString()}-${sha256}` });
-
-	let mime;
-
-	const content = await fileId.next().then(async (file) => {
-		if (!file) {
-			throw error(404, "File not found");
-		}
-
-		if (file.metadata?.conversation !== convId.toString()) {
-			throw error(403, "You don't have access to this file.");
-		}
-
-		mime = file.metadata?.mime;
-
-		const fileStream = collections.bucket.openDownloadStream(file._id);
-
-		const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
-			const chunks: Uint8Array[] = [];
-			fileStream.on("data", (chunk) => chunks.push(chunk));
-			fileStream.on("error", reject);
-			fileStream.on("end", () => resolve(Buffer.concat(chunks)));
-		});
-
-		return fileBuffer;
-	});
+	const { content, mime } = await downloadFile(sha256, convId);
 
 	return new Response(content, {
 		headers: {

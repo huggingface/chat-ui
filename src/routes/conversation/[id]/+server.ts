@@ -19,7 +19,7 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
-import { uploadFile } from "$lib/server/uploadFile.js";
+import { uploadFile } from "$lib/server/files/uploadFile.js";
 
 export async function POST({ request, fetch, url, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -218,6 +218,7 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 				locals,
 				url,
 				fetch,
+				id: conv._id,
 			});
 
 			// fetch the endpoint

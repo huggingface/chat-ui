@@ -2,9 +2,12 @@ import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 import { format } from "date-fns";
 import type { WebSearch } from "./types/WebSearch";
+import { downloadFile } from "./server/files/downloadFile";
+import type { Conversation } from "./types/Conversation";
 
 interface buildPromptOptions {
 	messages: Pick<Message, "from" | "content" | "files">[];
+	id?: Conversation["_id"];
 	model: BackendModel;
 	locals?: App.Locals;
 	webSearch?: WebSearch;
@@ -21,6 +24,7 @@ export async function buildPrompt({
 	preprompt,
 	url,
 	fetch,
+	id,
 }: buildPromptOptions): Promise<string> {
 	if (webSearch && webSearch.context) {
 		const lastMsg = messages.slice(-1)[0];
@@ -57,17 +61,13 @@ export async function buildPrompt({
 				if (el.from === "user") {
 					// append each files ![](data:image/png;base64,<base64content here>) to the end of the message
 					// the content of the file is fetched from `conversation/[id]/output/[file] and then needs to be base64 encoded
-					if (el.files && url && fetch && el.files?.length > 0) {
+					if (el.files && url && fetch && id && el.files?.length > 0) {
 						const markdowns = await Promise.all(
 							el.files.map(async (hash) => {
 								try {
-									const blob = await fetch(`${url.href}/output/${hash}`).then((res) => res.text());
-									const file = new File([blob], "image.png");
-									const b64 = await file
-										.text()
-										.then((text) => Buffer.from(text).toString("base64"));
-
-									return `\n ![](data:image/png;base64,${b64})})`;
+									const { content: image, mime } = await downloadFile(hash, id);
+									const b64 = image.toString("base64");
+									return `\n ![](data:${mime};base64,${b64})})`;
 								} catch (e) {
 									console.error(e);
 								}
