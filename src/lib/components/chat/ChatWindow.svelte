@@ -110,7 +110,7 @@
 	/>
 
 	<div
-		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center max-sm:p-4 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		<div class="flex flex-row flex-wrap justify-center gap-2.5">
 			{#each sources as source, index}
@@ -144,7 +144,7 @@
 			tabindex="-1"
 			aria-label="file dropzone"
 		>
-			<div class="flex w-full pb-3">
+			<div class="flex w-full py-3">
 				{#if settings?.searchEnabled}
 					<WebSearchToggle />
 				{/if}

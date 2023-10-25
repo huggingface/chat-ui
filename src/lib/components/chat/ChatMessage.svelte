@@ -235,6 +235,18 @@
 {#if message.from === "user"}
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="flex flex-col">
+			{#if message.files && message.files.length > 0}
+				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
+					{#each message.files as file}
+						<img
+							src={$page.url.pathname + "/output/" + file}
+							alt="input from user"
+							class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+						/>
+					{/each}
+				</div>
+			{/if}
+
 			<div
 				class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
 			>
@@ -263,21 +275,6 @@
 							<CarbonRotate360 />
 						</button>
 					{/if}
-				</div>
-			{/if}
-			{#if message.files && message.files.length > 0}
-				<div class="my-5 w-full border-b-2 border-gray-300 dark:border-gray-700" />
-
-				<div class="mx-auto grid w-fit grid-cols-2 gap-5">
-					{#each message.files as file}
-						<div class="flex flex-col flex-nowrap gap-0">
-							<img
-								src={$page.url.pathname + "/output/" + file}
-								alt="input from user"
-								class="my-2 aspect-auto max-h-48"
-							/>
-						</div>
-					{/each}
 				</div>
 			{/if}
 		</div>
