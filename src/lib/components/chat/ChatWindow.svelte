@@ -112,11 +112,7 @@
 		>
 			<div class="flex w-full flex-1 border-none bg-transparent">
 				{#if lastIsError}
-					<ChatInput
-						value="Sorry, something went wrong. Please try again."
-						disabled={true}
-						error={true}
-					/>
+					<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 				{:else}
 					<ChatInput
 						placeholder="Ask anything"
@@ -172,7 +168,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
+					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}
