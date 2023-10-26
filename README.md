@@ -76,8 +76,8 @@ npm run dev
 
 Chat UI features a powerful Web Search feature. It works by:
 
-1. Generating an appropriate Google query from the user prompt.
-2. Performing Google search and extracting content from webpages.
+1. Generating an appropriate search query from the user prompt.
+2. Performing web search and extracting content from webpages.
 3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
 4. From these embeddings, find the ones that are closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
@@ -122,7 +122,7 @@ PUBLIC_APP_DISCLAIMER=
 
 ### Web Search config
 
-You can enable the web search by adding either `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
+You can enable the web search by adding any of `YDC_API_KEY` ([docs.you.com](https://docs.you.com)) or `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
 
 ### Custom models
 
@@ -209,7 +209,7 @@ The following is the default `webSearchQueryPromptTemplate`.
 ```prompt
 {{userMessageToken}}
   My question is: {{message.content}}.
-  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for google search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
+  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for web search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
 {{userMessageEndToken}}
 {{assistantMessageToken}}
 ```
