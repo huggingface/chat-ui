@@ -238,11 +238,19 @@
 			{#if message.files && message.files.length > 0}
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
-						<img
-							src={$page.url.pathname + "/output/" + file}
-							alt="input from user"
-							class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-						/>
+						{#if file.length === 64}
+							<img
+								src={$page.url.pathname + "/output/" + file}
+								alt="input from user"
+								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+							/>
+						{:else}
+							<img
+								src={"data:image/png;base64," + file}
+								alt="input from user"
+								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+							/>
+						{/if}
 					{/each}
 				</div>
 			{/if}

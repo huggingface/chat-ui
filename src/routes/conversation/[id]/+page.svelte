@@ -81,16 +81,34 @@
 				retryMessageIndex = messages.length;
 			}
 
+			const module = await import("browser-image-resizer");
+
+			const resizedImages = await Promise.all(
+				files.map(async (file) => {
+					return await module
+						.readAndCompressImage(file, {
+							maxHeight: 224,
+							maxWidth: 224,
+							quality: 1,
+						})
+						.then(async (el) => await file2base64(el as File));
+				})
+			);
+
 			// slice up to the point of the retry
 			messages = [
 				...messages.slice(0, retryMessageIndex),
-				{ from: "user", content: message, id: messageId },
+				{
+					from: "user",
+					content: message,
+					id: messageId,
+					files: resizedImages,
+				},
 			];
 
+			files = [];
+
 			const responseId = randomUUID();
-
-			const module = await import("browser-image-resizer");
-
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -100,17 +118,7 @@
 					response_id: responseId,
 					is_retry: isRetry,
 					web_search: $webSearchParameters.useSearch,
-					files: await Promise.all(
-						files.map(async (file) => {
-							const resizedImage = await module.readAndCompressImage(file, {
-								maxHeight: 224,
-								maxWidth: 224,
-								quality: 1,
-							});
-
-							return await file2base64(resizedImage as File);
-						})
-					),
+					files: resizedImages,
 				}),
 			});
 
