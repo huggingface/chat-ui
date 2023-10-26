@@ -276,31 +276,42 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					apiKey: randomEndpoint.apiKey ?? "sk-",
 					baseURL: randomEndpoint.baseURL,
 				});
-				return randomEndpoint.type === "completions"
-					? openAICompletionToTextGenerationStream(
-							await openai.completions.create({
-								model: model.id ?? model.name,
-								prompt,
-								stream: true,
-								max_tokens: model.parameters?.max_new_tokens,
-								stop: model.parameters?.stop,
-								temperature: model.parameters?.temperature,
-								top_p: model.parameters?.top_p,
-								frequency_penalty: model.parameters?.repetition_penalty,
-							})
-					  )
-					: openAIChatToTextGenerationStream(
-							await openai.chat.completions.create({
-								model: model.id ?? model.name,
-								messages: promptToMessages(prompt, model),
-								stream: true,
-								max_tokens: model.parameters?.max_new_tokens,
-								stop: model.parameters?.stop,
-								temperature: model.parameters?.temperature,
-								top_p: model.parameters?.top_p,
-								frequency_penalty: model.parameters?.repetition_penalty,
-							})
-					  );
+				try {
+					return randomEndpoint.type === "completions"
+						? openAICompletionToTextGenerationStream(
+								await openai.completions.create({
+									model: model.id ?? model.name,
+									prompt,
+									stream: true,
+									max_tokens: model.parameters?.max_new_tokens,
+									stop: model.parameters?.stop,
+									temperature: model.parameters?.temperature,
+									top_p: model.parameters?.top_p,
+									frequency_penalty: model.parameters?.repetition_penalty,
+								})
+						  )
+						: openAIChatToTextGenerationStream(
+								await openai.chat.completions.create({
+									model: model.id ?? model.name,
+									messages: promptToMessages(prompt, model),
+									stream: true,
+									max_tokens: model.parameters?.max_new_tokens,
+									stop: model.parameters?.stop,
+									temperature: model.parameters?.temperature,
+									top_p: model.parameters?.top_p,
+									frequency_penalty: model.parameters?.repetition_penalty,
+								})
+						  );
+				} catch (exception: unknown) {
+					console.error(exception);
+					if (exception instanceof OpenAI.APIError) {
+						controller.error(exception.message);
+						controller.close();
+					} else {
+						controller.error(new Error("Unknown error", { cause: exception }));
+						controller.close();
+					}
+				}
 			}
 
 			const tokenStream =
@@ -321,6 +332,9 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 								fetch: usedFetch,
 							}
 					  );
+			if (!tokenStream) {
+				throw new Error("tokenStream is undefined");
+			}
 
 			for await (const output of tokenStream) {
 				// if not generated_text is here it means the generation is not done
