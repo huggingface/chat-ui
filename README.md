@@ -41,7 +41,7 @@ The default config for Chat UI is stored in the `.env` file. You will need to ov
 Start by creating a `.env.local` file in the root of the repository. The bare minimum config you need to get Chat UI to run locally is the following:
 
 ```env
-MONGODB_URL=<the URL to your mongoDB instance>
+MONGODB_URL=<the URL to your MongoDB instance>
 HF_ACCESS_TOKEN=<your access token>
 ```
 
@@ -61,7 +61,7 @@ Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricin
 
 ### Hugging Face Access Token
 
-You will need a Hugging Face access token to run Chat UI locally, if you use a remote inference endpoint. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
+If you use a remote inference endpoint, you will need a Hugging Face access token to run Chat UI locally. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
 
 ## Launch
 
@@ -79,8 +79,8 @@ Chat UI features a powerful Web Search feature. It works by:
 1. Generating an appropriate search query from the user prompt.
 2. Performing web search and extracting content from webpages.
 3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
-4. From these embeddings, find the ones that are closest to the user query using vector similarity search. Specifically, we use `inner product` distance.
-5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that a LLM can use this information).
+4. From these embeddings, find the ones that are closest to the user query using a vector similarity search. Specifically, we use `inner product` distance.
+5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that an LLM can use this information).
 
 ## Extra parameters
 
@@ -139,14 +139,14 @@ MODELS=`[
     "assistantMessageToken": "<|assistant|>", # This does not need to be a token, can be any string
     "userMessageEndToken": "<|endoftext|>", # Applies only to user messages. Can be any string.
     "assistantMessageEndToken": "<|endoftext|>", # Applies only to assistant messages. Can be any string.
-    "preprompt": "Below are a series of dialogues between various people and an AI assistant. The AI tries to be helpful, polite, honest, sophisticated, emotionally aware, and humble-but-knowledgeable. The assistant is happy to help with almost anything, and will do its best to understand exactly what is needed. It also tries to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer. That said, the assistant is practical and really does its best, and doesn't let caution get too much in the way of being useful.\n-----\n",
+    "preprompt": "Below are a series of dialogues between various people and an AI assistant. The AI tries to be helpful, polite, honest, sophisticated, emotionally aware, and humble but knowledgeable. The assistant is happy to help with almost anything and will do its best to understand exactly what is needed. It also tries to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer. That said, the assistant is practical and really does its best, and doesn't let caution get too much in the way of being useful.\n-----\n",
     "promptExamples": [
       {
         "title": "Write an email from bullet list",
         "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
       }, {
         "title": "Code a snake game",
-        "prompt": "Code a basic snake game in python, give explanations for each step."
+        "prompt": "Code a basic snake game in python and give explanations for each step."
       }, {
         "title": "Assist in a task",
         "prompt": "How do I make a delicious lemon cheesecake?"
@@ -170,7 +170,7 @@ You can change things like the parameters, or customize the preprompt to better 
 
 #### Custom prompt templates
 
-By default the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
+By default, the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
 
 However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is <https://handlebarsjs.com>. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
 
@@ -187,7 +187,7 @@ For example:
 
 ##### chatPromptTemplate
 
-When quering the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To idenify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
+When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
 The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
 
@@ -202,14 +202,16 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 ##### webSearchQueryPromptTemplate
 
-When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that that the prompt instructs the chat model to only return a few keywords.
+When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that the prompt instructs the chat model to only return a few keywords.
 
 The following is the default `webSearchQueryPromptTemplate`.
 
 ```prompt
 {{userMessageToken}}
   My question is: {{message.content}}.
-  Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for web search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
+
+Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for web search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
+
 {{userMessageEndToken}}
 {{assistantMessageToken}}
 ```
@@ -229,7 +231,7 @@ To do this, you can add your own endpoints to the `MODELS` variable in `.env.loc
 }
 ```
 
-If `endpoints` is left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
+If `endpoints` are left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
 
 ### Custom endpoint authorization
 
