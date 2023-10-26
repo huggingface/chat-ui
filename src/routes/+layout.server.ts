@@ -6,7 +6,12 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
-import { SERPAPI_KEY, SERPER_API_KEY, MESSAGES_BEFORE_LOGIN } from "$env/static/private";
+import {
+	SERPAPI_KEY,
+	SERPER_API_KEY,
+	MESSAGES_BEFORE_LOGIN,
+	YDC_API_KEY,
+} from "$env/static/private";
 
 export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 	const { conversations } = collections;
@@ -82,7 +87,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
-			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY),
+			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY),
 			customPrompts: settings?.customPrompts ?? {},
 		},
 		models: models.map((model) => ({
