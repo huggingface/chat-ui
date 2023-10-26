@@ -20,6 +20,7 @@ import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile.js";
+import sizeof from "image-size";
 
 export async function POST({ request, fetch, url, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -119,6 +120,25 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 		const blob = Buffer.from(file, "base64"); // works from here maybe b64files is wrong
 		return new File([blob], "image.png");
 	});
+
+	// check sizes
+	if (files) {
+		const filechecks = await Promise.all(
+			files.map(async (file) => {
+				// convert file (a File) to a Buffer
+				const dimensions = sizeof(Buffer.from(await file.arrayBuffer()));
+				return (
+					file.size > 2 * 1024 * 1024 ||
+					(dimensions.width ?? 0) > 224 ||
+					(dimensions.height ?? 0) > 224
+				);
+			})
+		);
+
+		if (filechecks.some((check) => check)) {
+			throw error(413, "File too large, should be <2MB and 224x224 max.");
+		}
+	}
 
 	let hashes: undefined | string[];
 
@@ -340,6 +360,10 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 								// otherwise we just concatenate tokens
 								lastMessage.content += output.token.text;
 							}
+						} else {
+							if (output.token.id === 0) {
+								throw new Error("Unknown token returned");
+							}
 						}
 					} else {
 						saveLast(output.generated_text);
@@ -350,6 +374,7 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 					type: "error",
 					...(e as Error),
 				});
+				console.error(e);
 			}
 		},
 		async cancel() {

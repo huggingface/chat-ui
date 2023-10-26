@@ -54,6 +54,7 @@
 		"dotenv": "^16.0.3",
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
+		"image-size": "^1.0.2",
 		"jsdom": "^22.0.0",
 		"marked": "^4.3.0",
 		"mongodb": "^5.8.0",
