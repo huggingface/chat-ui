@@ -157,7 +157,13 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 			}
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
-				{ content: newPrompt, from: "user", id: messageId as Message["id"], updatedAt: new Date() },
+				{
+					content: newPrompt,
+					from: "user",
+					id: messageId as Message["id"],
+					updatedAt: new Date(),
+					files: conv.messages[retryMessageIdx].files,
+				},
 			];
 		} // else append the message at the bottom
 

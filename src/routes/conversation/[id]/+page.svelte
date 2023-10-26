@@ -102,7 +102,7 @@
 					from: "user",
 					content: message,
 					id: messageId,
-					files: resizedImages,
+					files: isRetry ? messages[retryMessageIndex].files : resizedImages,
 				},
 			];
 
@@ -118,7 +118,7 @@
 					response_id: responseId,
 					is_retry: isRetry,
 					web_search: $webSearchParameters.useSearch,
-					files: resizedImages,
+					files: isRetry ? undefined : resizedImages,
 				}),
 			});
 
