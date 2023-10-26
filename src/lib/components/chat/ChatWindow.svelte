@@ -137,12 +137,6 @@
 
 		<div
 			class="dark:via-gray-80 w-full bg-gradient-to-t from-white via-white/80 to-white/0 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900"
-			on:dragover={onDragOver}
-			on:dragenter={onDragEnter}
-			on:dragleave={onDragLeave}
-			role="button"
-			tabindex="-1"
-			aria-label="file dropzone"
 		>
 			<div class="flex w-full py-3">
 				{#if settings?.searchEnabled}
@@ -164,6 +158,11 @@
 				{/if}
 			</div>
 			<form
+				on:dragover={onDragOver}
+				on:dragenter={onDragEnter}
+				on:dragleave={onDragLeave}
+				tabindex="-1"
+				aria-label="file dropzone"
 				on:submit|preventDefault={handleSubmit}
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
@@ -232,7 +231,7 @@
 						type="button"
 						on:click={() => dispatch("share")}
 					>
-						<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+						<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 						<div class="max-sm:hidden">Share this conversation</div>
 					</button>
 				{/if}
