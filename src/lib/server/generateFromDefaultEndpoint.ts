@@ -64,6 +64,8 @@ export async function generateFromDefaultEndpoint(
 							max_tokens: smallModel.parameters?.max_new_tokens,
 							stop: smallModel.parameters?.stop,
 							temperature: smallModel.parameters?.temperature,
+							top_p: smallModel.parameters?.top_p,
+							frequency_penalty: smallModel.parameters?.repetition_penalty,
 						},
 						{ signal: abortController.signal }
 				  )
@@ -74,6 +76,8 @@ export async function generateFromDefaultEndpoint(
 							max_tokens: smallModel.parameters?.max_new_tokens,
 							stop: smallModel.parameters?.stop,
 							temperature: smallModel.parameters?.temperature,
+							top_p: smallModel.parameters?.top_p,
+							frequency_penalty: smallModel.parameters?.repetition_penalty,
 						},
 						{ signal: abortController.signal }
 				  );
