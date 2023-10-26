@@ -81,7 +81,7 @@
 					name="hideEmojiOnSidebar"
 					bind:checked={settings.hideEmojiOnSidebar}
 				/>
-				Show emoticons in conversation topics
+				Hide emoticons in conversation topics
 			</label>
 			<form
 				method="post"
