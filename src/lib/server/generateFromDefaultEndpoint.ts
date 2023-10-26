@@ -59,25 +59,21 @@ export async function generateFromDefaultEndpoint(
 			randomEndpoint.type === "completions"
 				? openai.completions.create(
 						{
-							model: defaultModel.id ?? defaultModel.name,
+							model: smallModel.id ?? smallModel.name,
 							prompt,
-							max_tokens: defaultModel.parameters?.max_new_tokens,
-							stop: defaultModel.parameters?.stop,
-							temperature: defaultModel.parameters?.temperature,
-							top_p: defaultModel.parameters?.top_p,
-							frequency_penalty: defaultModel.parameters?.repetition_penalty,
+							max_tokens: smallModel.parameters?.max_new_tokens,
+							stop: smallModel.parameters?.stop,
+							temperature: smallModel.parameters?.temperature,
 						},
 						{ signal: abortController.signal }
 				  )
 				: openai.chat.completions.create(
 						{
-							model: defaultModel.id ?? defaultModel.name,
+							model: smallModel.id ?? smallModel.name,
 							messages: [{ role: "user", content: prompt }],
-							max_tokens: defaultModel.parameters?.max_new_tokens,
-							stop: defaultModel.parameters?.stop,
-							temperature: defaultModel.parameters?.temperature,
-							top_p: defaultModel.parameters?.top_p,
-							frequency_penalty: defaultModel.parameters?.repetition_penalty,
+							max_tokens: smallModel.parameters?.max_new_tokens,
+							stop: smallModel.parameters?.stop,
+							temperature: smallModel.parameters?.temperature,
 						},
 						{ signal: abortController.signal }
 				  );
