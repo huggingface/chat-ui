@@ -7,7 +7,7 @@
 </script>
 
 <div
-	class="flex h-9 cursor-pointer select-none items-center gap-2 rounded-xl border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
+	class="flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
 	on:click={toggle}
 	on:keypress={toggle}
 	aria-checked={$webSearchParameters.useSearch}
