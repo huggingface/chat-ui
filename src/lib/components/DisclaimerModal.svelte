@@ -12,7 +12,7 @@
 
 <Modal>
 	<div
-		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-primary-500/40 via-primary-500/10 to-primary-500/0 px-5 pb-8 pt-9 text-center sm:px-6"
+		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center sm:px-6"
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="mr-1" />
@@ -30,7 +30,7 @@
 
 		<div class="flex w-full flex-col items-center gap-2">
 			{#if $page.data.guestMode || !$page.data.loginEnabled}
-				<form action="{base}/settings" target="_parent" method="POST" class="w-full">
+				<form action="{base}/settings" method="POST" class="w-full">
 					<input type="hidden" name="ethicsModalAccepted" value={true} />
 					{#each Object.entries(settings).filter(([k]) => !(k === "customPrompts")) as [key, val]}
 						<input type="hidden" name={key} value={val} />
