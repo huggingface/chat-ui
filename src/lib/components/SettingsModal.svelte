@@ -75,6 +75,14 @@
 					</ul>
 				</div>
 			{/if}
+			<label class="flex cursor-pointer select-none items-center gap-2 text-sm text-gray-500">
+				<input
+					type="checkbox"
+					name="hideEmojiOnSidebar"
+					bind:checked={settings.hideEmojiOnSidebar}
+				/>
+				Hide emoticons in conversation topics
+			</label>
 			<form
 				method="post"
 				action="{base}/conversations?/delete"
