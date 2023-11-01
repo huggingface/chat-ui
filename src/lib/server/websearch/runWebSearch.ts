@@ -10,6 +10,7 @@ import {
 } from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import { getWebSearchProvider } from "./searchWeb";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -39,14 +40,15 @@ export async function runWebSearch(
 
 	try {
 		webSearch.searchQuery = await generateQuery(messages);
-		appendUpdate("Searching Google", [webSearch.searchQuery]);
+		const searchProvider = getWebSearchProvider();
+		appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 		const results = await searchWeb(webSearch.searchQuery);
 		webSearch.results =
 			(results.organic_results &&
-				results.organic_results.map((el: { title: string; link: string }) => {
-					const { title, link } = el;
+				results.organic_results.map((el: { title: string; link: string; text?: string }) => {
+					const { title, link, text } = el;
 					const { hostname } = new URL(link);
-					return { title, link, hostname };
+					return { title, link, hostname, text };
 				})) ??
 			[];
 		webSearch.results = webSearch.results
@@ -58,12 +60,14 @@ export async function runWebSearch(
 			appendUpdate("Browsing results");
 			const promises = webSearch.results.map(async (result) => {
 				const { link } = result;
-				let text = "";
-				try {
-					text = await parseWeb(link);
-					appendUpdate("Browsing webpage", [link]);
-				} catch (e) {
-					// ignore errors
+				let text = result.text ?? "";
+				if (!text) {
+					try {
+						text = await parseWeb(link);
+						appendUpdate("Browsing webpage", [link]);
+					} catch (e) {
+						// ignore errors
+					}
 				}
 				const MAX_N_CHUNKS = 100;
 				const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
