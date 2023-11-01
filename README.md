@@ -179,11 +179,6 @@ MODELS=`[
   {
     "name": "oobabooga",
     "id": "oobabooga",
-    "userMessageToken": "User:\n",
-    "userMessageEndToken": "\n",
-    "assistantMessageToken": "Assistant:\n",
-    "preprompt": "You are a helpful assistant",
-    "promptExamples": [],
     "parameters": {
       "temperature": 0.9,
       "top_p": 0.95,
@@ -196,7 +191,6 @@ MODELS=`[
     "endpoints": [{
       "type" : "openai",
       "baseURL": "http://localhost:8000/v1",
-      "type": "chat_completions"
     }]
   }
 ]`
@@ -207,60 +201,20 @@ The `openai` type includes official OpenAI models. You can add, for example, GPT
 
 ```
 OPENAI_API_KEY=#your openai api key here
-MODELS=`[
-  {
-    "name": "GPT4",
-    "id": "gpt-4",
-    "userMessageToken": "User:\n",
-    "userMessageEndToken": "\n",
-    "assistantMessageToken": "Assistant:\n",
-    "preprompt": "You are a helpful assistant", # Will be used as the system prompt
-    "promptExamples": [],
-    "parameters": {
-      "temperature": 0.9,
-      "top_p": 0.95,
-      "repetition_penalty": 1.2,
-      "top_k": 50,
-      "truncate": 1000,
-      "max_new_tokens": 1024,
-      "stop": []
-    },
-    "endpoints": [{
-      "type" : "openai"
-    }]
-  }
-]`
-
-```
-
-This adds GPT-3.5 Turbo as a "openai-compatible" model:
-
-```
-OPENAI_API_KEY=#your openai api key here
-MODELS=`[
-  {
-    "name": "GPT-3.5 Turbo",
-    "id": "gpt-3.5-turbo",
-    "userMessageToken": "User:\n",
-    "userMessageEndToken": "\n",
-    "assistantMessageToken": "Assistant:\n",
-    "preprompt": "You are a helpful assistant",
-    "promptExamples": [],
-    "parameters": {
-      "temperature": 0.9,
-      "top_p": 0.95,
-      "repetition_penalty": 1.2,
-      "top_k": 50,
-      "truncate": 1000,
-      "max_new_tokens": 1024,
-      "stop": []
-    },
-    "endpoints": [{
-      "type" : "openai"
-    }]
-  }
-]`
-
+MODELS=`[{
+      "name": "gpt-4",
+      "displayName": "GPT 4",
+      "endpoints" : [{
+        "type": "openai"
+      }],
+},
+      {
+      "name": "gpt-3.5-turbo",
+      "displayName": "GPT 3.5 Turbo",
+      "endpoints" : [{
+        "type": "openai"
+      }]
+}]`
 ```
 
 #### Custom prompt templates
