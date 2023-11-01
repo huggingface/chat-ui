@@ -1,29 +1,19 @@
-import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
-import { buildPrompt } from "$lib/buildPrompt";
-import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { modelEndpoint } from "$lib/server/modelEndpoint";
-import { models, type BackendModel } from "$lib/server/models";
+import { models } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
-import { trimPrefix } from "$lib/utils/trimPrefix";
-import { trimSuffix } from "$lib/utils/trimSuffix";
-import { textGenerationStream } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { AwsClient } from "aws4fetch";
-import OpenAI from "openai";
-import { openAICompletionToTextGenerationStream } from "$lib/utils/openAICompletionToTextGenerationStream";
-import { openAIChatToTextGenerationStream } from "$lib/utils/openAIChatToTextGenerationStream";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 
-export async function POST({ request, fetch, locals, params, getClientAddress }) {
+export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
 	const convId = new ObjectId(id);
 	const promptedAt = new Date();
@@ -194,160 +184,25 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				webSearchResults = await runWebSearch(conv, newPrompt, update);
 			}
 
-			// we can now build the prompt using the messages
-			const prompt = await buildPrompt({
-				messages,
-				model,
-				webSearch: webSearchResults,
-				preprompt: conv.preprompt ?? model.preprompt,
-				locals: locals,
-			});
+			messages[messages.length - 1].webSearch = webSearchResults;
 
-			// fetch the endpoint
-			const randomEndpoint = modelEndpoint(model);
+			conv.messages = messages;
 
-			let usedFetch = fetch;
+			const endpoint = await model.getEndpoint();
 
-			if (randomEndpoint.host === "sagemaker") {
-				const aws = new AwsClient({
-					accessKeyId: randomEndpoint.accessKey,
-					secretAccessKey: randomEndpoint.secretKey,
-					sessionToken: randomEndpoint.sessionToken,
-					service: "sagemaker",
-				});
-
-				usedFetch = aws.fetch.bind(aws) as typeof fetch;
-			}
-
-			async function saveLast(generated_text: string) {
-				if (!conv) {
-					throw error(404, "Conversation not found");
-				}
-
-				const lastMessage = messages[messages.length - 1];
-
-				if (lastMessage) {
-					// We could also check if PUBLIC_ASSISTANT_MESSAGE_TOKEN is present and use it to slice the text
-					if (generated_text.startsWith(prompt)) {
-						generated_text = generated_text.slice(prompt.length);
-					}
-
-					generated_text = trimSuffix(
-						trimPrefix(generated_text, "<|startoftext|>"),
-						PUBLIC_SEP_TOKEN
-					).trimEnd();
-
-					// remove the stop tokens
-					for (const stop of [...(model?.parameters?.stop ?? []), "<|endoftext|>"]) {
-						if (generated_text.endsWith(stop)) {
-							generated_text = generated_text.slice(0, -stop.length).trimEnd();
-						}
-					}
-					lastMessage.content = generated_text;
-
-					await collections.conversations.updateOne(
-						{
-							_id: convId,
-						},
-						{
-							$set: {
-								messages,
-								title: conv.title,
-								updatedAt: new Date(),
-							},
-						}
-					);
-
-					update({
-						type: "finalAnswer",
-						text: generated_text,
-					});
-				}
-			}
-
-			async function openAITextGenerationStream() {
-				if (randomEndpoint.host !== "openai-compatible") {
-					throw new Error("only openai-compatible endpoints");
-				}
-				if (!model) {
-					throw new Error("model is undefined");
-				}
-				const openai = new OpenAI({
-					apiKey: randomEndpoint.apiKey ?? "sk-",
-					baseURL: randomEndpoint.baseURL,
-				});
-				try {
-					return randomEndpoint.type === "completions"
-						? openAICompletionToTextGenerationStream(
-								await openai.completions.create({
-									model: model.id ?? model.name,
-									prompt,
-									stream: true,
-									max_tokens: model.parameters?.max_new_tokens,
-									stop: model.parameters?.stop,
-									temperature: model.parameters?.temperature,
-									top_p: model.parameters?.top_p,
-									frequency_penalty: model.parameters?.repetition_penalty,
-								})
-						  )
-						: openAIChatToTextGenerationStream(
-								await openai.chat.completions.create({
-									model: model.id ?? model.name,
-									messages: promptToMessages(prompt, model),
-									stream: true,
-									max_tokens: model.parameters?.max_new_tokens,
-									stop: model.parameters?.stop,
-									temperature: model.parameters?.temperature,
-									top_p: model.parameters?.top_p,
-									frequency_penalty: model.parameters?.repetition_penalty,
-								})
-						  );
-				} catch (exception: unknown) {
-					console.error(exception);
-					if (exception instanceof OpenAI.APIError) {
-						controller.error(exception.message);
-						controller.close();
-					} else {
-						controller.error(new Error("Unknown error", { cause: exception }));
-						controller.close();
-					}
-				}
-			}
-
-			const tokenStream =
-				randomEndpoint.host === "openai-compatible"
-					? await openAITextGenerationStream()
-					: textGenerationStream(
-							{
-								parameters: {
-									...models.find((m) => m.id === conv.model)?.parameters,
-									return_full_text: false,
-								},
-								model: randomEndpoint.url,
-								inputs: prompt,
-								accessToken: randomEndpoint.host === "sagemaker" ? undefined : HF_ACCESS_TOKEN,
-							},
-							{
-								use_cache: false,
-								fetch: usedFetch,
-							}
-					  );
-			if (!tokenStream) {
-				throw new Error("tokenStream is undefined");
-			}
-
-			for await (const output of tokenStream) {
+			for await (const output of await endpoint({ conversation: conv })) {
 				// if not generated_text is here it means the generation is not done
 				if (!output.generated_text) {
 					// else we get the next token
 					if (!output.token.special) {
-						const lastMessage = messages[messages.length - 1];
 						update({
 							type: "stream",
 							token: output.token.text,
 						});
 
 						// if the last message is not from assistant, it means this is the first token
+						const lastMessage = messages[messages.length - 1];
+
 						if (lastMessage?.from !== "assistant") {
 							// so we create a new message
 							messages = [
@@ -365,10 +220,12 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 								},
 							];
 						} else {
+							// abort check
 							const date = abortedGenerations.get(convId.toString());
 							if (date && date > promptedAt) {
-								saveLast(lastMessage.content);
+								break;
 							}
+
 							if (!output) {
 								break;
 							}
@@ -378,9 +235,36 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						}
 					}
 				} else {
-					saveLast(output.generated_text);
+					// add output.generated text to the last message
+					messages = [
+						...messages.slice(0, -1),
+						{
+							...messages[messages.length - 1],
+							content: output.generated_text,
+							updates: updates,
+							updatedAt: new Date(),
+						},
+					];
 				}
 			}
+
+			await collections.conversations.updateOne(
+				{
+					_id: convId,
+				},
+				{
+					$set: {
+						messages,
+						title: conv?.title,
+						updatedAt: new Date(),
+					},
+				}
+			);
+
+			update({
+				type: "finalAnswer",
+				text: messages[messages.length - 1].content,
+			});
 		},
 		async cancel() {
 			await collections.conversations.updateOne(
@@ -447,20 +331,4 @@ export async function PATCH({ request, locals, params }) {
 	);
 
 	return new Response();
-}
-
-function promptToMessages(
-	prompt: string,
-	model: BackendModel
-): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-	if (model.preprompt && model.preprompt.length > 0 && prompt.startsWith(model.preprompt)) {
-		// remove system prompt from the prompt
-		const withOutSystemPrompt = prompt.replace(model.preprompt, "");
-		return [
-			// add system prompt in request body
-			{ role: "system", content: model.preprompt },
-			{ role: "user", content: withOutSystemPrompt },
-		];
-	}
-	return [{ role: "user", content: prompt }];
 }

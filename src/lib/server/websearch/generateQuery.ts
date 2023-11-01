@@ -1,7 +1,6 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
-import { smallModel } from "../models";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
@@ -62,10 +61,8 @@ Current Question: Where is it being hosted ?`,
 		},
 	];
 
-	const promptQuery = smallModel.chatPromptRender({
-		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
+	return await generateFromDefaultEndpoint({
 		messages: convQuery,
+		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
 	});
-
-	return await generateFromDefaultEndpoint(promptQuery);
 }
