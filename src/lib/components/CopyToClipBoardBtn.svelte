@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
-import Modal from './Modal.svelte'
+    import Modal from './Modal.svelte'
 	import IconCopy from "./icons/IconCopy.svelte";
 	import Tooltip from "./Tooltip.svelte";
 	import Toast from './Toast.svelte';
@@ -49,7 +49,7 @@ const handleSave=async()=>{
   body:JSON.stringify({
 	text:text,
 	file_name:fileName,
-	// path_dir:filePath,
+	path_dir:filePath,
 	
   })
 }
@@ -58,19 +58,22 @@ try {
  successPage=true;
 let data=await res.json()
 console.log(data)
-	  if(res){
+	  if(data){
 messageValue="Successfully saved Into file"
 	  }
 	  else{
 		messageValue="Please Try Again"
 	  }
-	  
-
+	
 } catch (error) {
  messageValue="Please Try Again"
 }
-  
+
   modal=false;
+
+  setTimeout(()=>{
+  successPage=false
+  },3000)
 
 }
 
