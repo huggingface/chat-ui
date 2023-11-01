@@ -64,7 +64,7 @@ messageValue="Successfully saved Into file"
 	  else{
 		messageValue="Please Try Again"
 	  }
-	
+
 } catch (error) {
  messageValue="Please Try Again"
 }
@@ -88,8 +88,10 @@ messageValue="Successfully saved Into file"
 
 <button 
 on:click={()=>{handleClick(); modal=true}}
-class="btn right-12 mr-10 rounded-lg border border-gray-200 px-2 py-[6px] text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 {classNames} 	{!isSuccess && 'text-gray-200 dark:text-gray-200'}
-		{isSuccess && 'text-green-500'}"> Save into file</button>
+class="btn rounded-lg absolute right-12 top-2  border border-gray-200 px-2 py-[6px] text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 invisible opacity-0 group-hover:visible group-hover:opacity-100  	{!isSuccess && 'text-gray-200 dark:text-gray-200'}
+{isSuccess && 'text-green-500'}"> 
+Save into file
+</button>
 <button
 	class="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 {classNames}
 		{!isSuccess && 'text-gray-200 dark:text-gray-200'}
@@ -105,8 +107,7 @@ class="btn right-12 mr-10 rounded-lg border border-gray-200 px-2 py-[6px] text-s
 	</span>
 </button>
 
-	
-	{#if modal}
+{#if modal}
 <Modal>
 	<div class="w-[385px] p-5">
 		<div class="flex  justify-end px-2 pb-2">
