@@ -307,20 +307,42 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
-### Amazon SageMaker
+### Amazon
+
+#### SageMaker
 
 You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
 
 ```env
 "endpoints": [
     {
-      "type" : "sagemaker",
-      "url": "", // your aws sagemaker url here
+      "type" : "aws",
+      "service" : "sagemaker"
+      "url": "",
       "accessKey": "",
       "secretKey" : "",
-      "sessionToken": "", // optional
-      "weight": 1
+      "sessionToken": "",
+      "weight": 1,
     }
+]
+```
+
+#### Lambda
+
+You can also specify your Amazon Lambda instance as an endpoint for chat-ui. The config goes like this:
+
+```env
+"endpoints" : [
+  {
+        "host": "aws",
+        "service": "lambda",
+        "url": "",
+        "accessKey": "",
+        "secretKey": "",
+        "sessionToken": "",
+        "region": "",
+        "weight": 1
+ }
 ]
 ```
 
