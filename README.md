@@ -194,7 +194,7 @@ MODELS=`[
       "stop": []
     },
     "endpoints": [{
-      "host" : "openai-compatible",
+      "type" : "openai",
       "baseURL": "http://localhost:8000/v1",
       "type": "chat_completions"
     }]
@@ -203,7 +203,7 @@ MODELS=`[
 
 ```
 
-The `openai-compatible` type includes official OpenAI models. You can add, for example, GPT4/GPT3.5 as a "openai-compatible" model:
+The `openai` type includes official OpenAI models. You can add, for example, GPT4/GPT3.5 as a "openai" model:
 
 ```
 OPENAI_API_KEY=#your openai api key here
@@ -226,7 +226,7 @@ MODELS=`[
       "stop": []
     },
     "endpoints": [{
-      "host" : "openai-compatible"
+      "type" : "openai"
     }]
   }
 ]`
@@ -256,7 +256,7 @@ MODELS=`[
       "stop": []
     },
     "endpoints": [{
-      "host" : "openai-compatible"
+      "type" : "openai"
     }]
   }
 ]`
@@ -358,7 +358,7 @@ You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. 
 ```env
 "endpoints": [
     {
-      "host" : "sagemaker",
+      "type" : "sagemaker",
       "url": "", // your aws sagemaker url here
       "accessKey": "",
       "secretKey" : "",
