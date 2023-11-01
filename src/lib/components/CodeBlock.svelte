@@ -25,7 +25,7 @@
 
 
 const getInput=(event:any)=>{
-		filePath=event.target.value;
+		fileName=event.target.value;
 	}
 
 	 const getFilePath=(e:any)=>{
