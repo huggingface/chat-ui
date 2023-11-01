@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { afterUpdate } from "svelte";
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
+	import IconSave from "./icons/IconSave.svelte";
 	import Modal from './Modal.svelte'
 	import Toast from './Toast.svelte';
+	import Tooltip from "./Tooltip.svelte";
     export let modal=false;
 	export let code = "";
 	export let lang = "";
+	let isHovered=false;
 	let filePath='';
 	let fileName='';
 	let messageValue='';
@@ -52,27 +55,68 @@ const handleSave=async()=>{
 try {
  const res=await fetch('http://localhost:8000/v1/save/',header )
 let data=await res.json()
-console.log(data)
-	  if(data){
+
+	  if(data?.message){
 		setCookie('file_name', fileName,7);
 		setCookie('path_dir', filePath,7);
 		successPage=true;
-messageValue="Successfully saved Into file"
+        messageValue=data?.message
 	  }
-	  else{
-		messageValue="Please Try Again"
+	  else if(data?.detail?.message){
+		successPage=true;
+		messageValue=data?.detail?.message;
 	  }
 
 } catch (error) {
- messageValue="Please Try Again"
+ console.log(error)
 }
-
   modal=false;
+  fileName='';
+  filePath=''
   setTimeout(()=>{
   successPage=false
-  },3000)
+  },4000)
+}
+
+function getCookieValue(cookieName:string) {
+  const name = cookieName + "=";
+  const decodedCookie = decodeURIComponent(document.cookie);
+  const cookieArray = decodedCookie.split(';');
+  
+  for (let i = 0; i < cookieArray.length; i++) {
+    let cookie = cookieArray[i];
+    while (cookie.charAt(0) === ' ') {
+      cookie = cookie.substring(1);
+    }
+    if (cookie.indexOf(name) === 0) {
+      return cookie.substring(name.length, cookie.length);
+    }
+  }
+  return "";
+}
+
+ const handleModal=()=>{
+    const pathval= getCookieValue('path_dir');
+    const fileval=getCookieValue('file_name');
+
+	if(pathval){
+		filePath=pathval	
+	}
+
+	if(fileval){
+		fileName=fileval;
+	}
+modal=true;
+}
+
+const handleMouseEnter=()=>{
+	isHovered=true;
+}
+const handleMouseLeave=()=>{
+	isHovered=false;
 
 }
+
 </script>
 
 <div class="group relative my-4 rounded-lg">
@@ -83,15 +127,21 @@ messageValue="Successfully saved Into file"
 		></pre>
 
 		<button 
-on:click={()=>{modal=true}}
-class="btn rounded-lg absolute right-12 top-2  border border-gray-200 px-2 py-[6px] text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 invisible opacity-0 group-hover:visible group-hover:opacity-100  
+on:mouseenter={handleMouseEnter}
+on:mouseleave={handleMouseLeave}
+on:click={handleModal}
+class="btn rounded-lg absolute right-12 top-2  border border-gray-200 px-2 py-[7px] text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 invisible opacity-0 group-hover:visible group-hover:opacity-100  
 {!successPage && 'text-gray-200 dark:text-gray-200'}
 		{successPage && 'text-green-500'}"
 > 
-Save into file
-<span class="relative">
-		<!-- <Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} /> -->
-	</span>
+<IconSave/>
+{#if isHovered}
+<div class="absolute text-[12px] right-6 top-8 border-t border-white border-r  bg-gray-800 px-4 py-[2px]" >
+	Save into file
+</div>
+{/if}
+
+
 </button>
 	<CopyToClipBoardBtn
 		classNames="absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100"
@@ -110,7 +160,7 @@ Save into file
 		<div class="w-full pl-2 flex gap-3 items-center">
 
 	<span class="min-w-[100px]">File Name</span>
-			<input  bind:value={fileName} on:change={getInput}  class=" font-[300] border border-gray-500 w-[250px] px-2 rounded outline-none py-1 text-sm" type='text' placeholder="Enter your path here..."/>
+			<input  bind:value={fileName} on:change={getInput}  class=" font-[300] border border-gray-500 w-[250px] px-2 rounded outline-none py-1 text-sm" type='text' placeholder="Enter your file name here..."/>
 			
 		</div>
 
