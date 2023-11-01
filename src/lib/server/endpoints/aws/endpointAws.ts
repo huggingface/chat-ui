@@ -8,11 +8,13 @@ const AwsClient = (await import("aws4fetch")).AwsClient;
 export const endpointAwsParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
-	type: z.literal("sagemaker"),
+	type: z.literal("aws"),
 	url: z.string().url(),
 	accessKey: z.string().min(1),
 	secretKey: z.string().min(1),
 	sessionToken: z.string().optional(),
+	service: z.union([z.literal("sagemaker"), z.literal("lambda")]).default("sagemaker"),
+	region: z.string().optional(),
 });
 
 export function endpointAws({
@@ -21,12 +23,15 @@ export function endpointAws({
 	secretKey,
 	sessionToken,
 	model,
+	region,
+	service,
 }: z.infer<typeof endpointAwsParametersSchema>): Endpoint {
 	const aws = new AwsClient({
 		accessKeyId: accessKey,
 		secretAccessKey: secretKey,
-		sessionToken: sessionToken,
-		service: "sagemaker",
+		sessionToken,
+		service,
+		region,
 	});
 
 	return async ({ conversation }) => {
