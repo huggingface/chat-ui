@@ -3,8 +3,6 @@ import { textGenerationStream } from "@huggingface/inference";
 import { z } from "zod";
 import type { Endpoint } from "../endpoints";
 
-const AwsClient = (await import("aws4fetch")).AwsClient;
-
 export const endpointAwsParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
@@ -17,7 +15,7 @@ export const endpointAwsParametersSchema = z.object({
 	region: z.string().optional(),
 });
 
-export function endpointAws({
+export async function endpointAws({
 	url,
 	accessKey,
 	secretKey,
@@ -25,7 +23,14 @@ export function endpointAws({
 	model,
 	region,
 	service,
-}: z.infer<typeof endpointAwsParametersSchema>): Endpoint {
+}: z.infer<typeof endpointAwsParametersSchema>): Promise<Endpoint> {
+	let AwsClient;
+	try {
+		AwsClient = (await import("aws4fetch")).AwsClient;
+	} catch (e) {
+		throw new Error("Failed to import aws4fetch");
+	}
+
 	const aws = new AwsClient({
 		accessKeyId: accessKey,
 		secretAccessKey: secretKey,

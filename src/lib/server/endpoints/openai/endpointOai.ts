@@ -5,8 +5,6 @@ import { buildPrompt } from "$lib/buildPrompt";
 import { OPENAI_API_KEY } from "$env/static/private";
 import type { Endpoint } from "../endpoints";
 
-const OpenAI = (await import("openai")).OpenAI;
-
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
@@ -18,12 +16,19 @@ export const endpointOAIParametersSchema = z.object({
 		.default("chat_completions"),
 });
 
-export function endpointOai({
+export async function endpointOai({
 	baseURL,
 	apiKey,
 	completion,
 	model,
-}: z.infer<typeof endpointOAIParametersSchema>): Endpoint {
+}: z.infer<typeof endpointOAIParametersSchema>): Promise<Endpoint> {
+	let OpenAI;
+	try {
+		OpenAI = (await import("openai")).OpenAI;
+	} catch (e) {
+		throw new Error("Failed to import OpenAI");
+	}
+
 	const openai = new OpenAI({
 		apiKey: apiKey ?? "sk-",
 		baseURL: baseURL,
