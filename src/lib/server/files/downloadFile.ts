@@ -1,8 +1,12 @@
 import { error } from "@sveltejs/kit";
 import { collections } from "../database";
 import type { Conversation } from "$lib/types/Conversation";
+import type { SharedConversation } from "$lib/types/SharedConversation";
 
-export async function downloadFile(sha256: string, convId: Conversation["_id"]) {
+export async function downloadFile(
+	sha256: string,
+	convId: Conversation["_id"] | SharedConversation["_id"]
+) {
 	const fileId = collections.bucket.find({ filename: `${convId.toString()}-${sha256}` });
 	let mime = "";
 
@@ -10,7 +14,6 @@ export async function downloadFile(sha256: string, convId: Conversation["_id"]) 
 		if (!file) {
 			throw error(404, "File not found");
 		}
-
 		if (file.metadata?.conversation !== convId.toString()) {
 			throw error(403, "You don't have access to this file.");
 		}
