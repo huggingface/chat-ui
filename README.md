@@ -206,7 +206,7 @@ MODELS=`[{
       "displayName": "GPT 4",
       "endpoints" : [{
         "type": "openai"
-      }],
+      }]
 },
       {
       "name": "gpt-3.5-turbo",
@@ -334,7 +334,7 @@ You can also specify your Amazon Lambda instance as an endpoint for chat-ui. The
 ```env
 "endpoints" : [
   {
-        "host": "aws",
+        "type": "aws",
         "service": "lambda",
         "url": "",
         "accessKey": "",
