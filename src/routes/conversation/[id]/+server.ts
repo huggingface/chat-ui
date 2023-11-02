@@ -113,11 +113,11 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 		})
 		.parse(json);
 
-	// files is an array of base64 strings encoding File objects
+	// files is an array of base64 strings encoding Blob objects
 	// we need to convert this array to an array of File objects
 
 	const files = b64files?.map((file) => {
-		const blob = Buffer.from(file, "base64"); // works from here maybe b64files is wrong
+		const blob = Buffer.from(file, "base64");
 		return new File([blob], "image.png");
 	});
 
@@ -125,7 +125,6 @@ export async function POST({ request, fetch, url, locals, params, getClientAddre
 	if (files) {
 		const filechecks = await Promise.all(
 			files.map(async (file) => {
-				// convert file (a File) to a Buffer
 				const dimensions = sizeof(Buffer.from(await file.arrayBuffer()));
 				return (
 					file.size > 2 * 1024 * 1024 ||
