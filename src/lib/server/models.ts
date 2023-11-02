@@ -74,7 +74,7 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 
 const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	...m,
-	getEndpoint: (): Endpoint => {
+	getEndpoint: async (): Promise<Endpoint> => {
 		if (!m.endpoints) {
 			return endpointTgi({
 				type: "tgi",
@@ -94,9 +94,9 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				if (args.type === "tgi") {
 					return endpoints.tgi(args);
 				} else if (args.type === "aws") {
-					return endpoints.sagemaker(args);
+					return await endpoints.sagemaker(args);
 				} else if (args.type === "openai") {
-					return endpoints.openai(args);
+					return await endpoints.openai(args);
 				} else {
 					throw new Error(`Unknown endpoint type`);
 				}

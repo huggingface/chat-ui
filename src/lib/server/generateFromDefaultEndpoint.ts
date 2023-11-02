@@ -8,7 +8,7 @@ export async function generateFromDefaultEndpoint({
 	messages: Omit<Conversation["messages"][0], "id">[];
 	preprompt?: string;
 }): Promise<string> {
-	const endpoint = smallModel.getEndpoint();
+	const endpoint = await smallModel.getEndpoint();
 
 	const tokenStream = await endpoint({ conversation: { messages, preprompt } });
 
