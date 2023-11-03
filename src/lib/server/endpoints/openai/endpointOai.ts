@@ -26,7 +26,7 @@ export async function endpointOai({
 	try {
 		OpenAI = (await import("openai")).OpenAI;
 	} catch (e) {
-		throw new Error("Failed to import OpenAI");
+		throw new Error("Failed to import OpenAI", { cause: e });
 	}
 
 	const openai = new OpenAI({
