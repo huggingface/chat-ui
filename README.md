@@ -322,7 +322,7 @@ You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. 
       "accessKey": "",
       "secretKey" : "",
       "sessionToken": "",
-      "weight": 1,
+      "weight": 1
     }
 ]
 ```
