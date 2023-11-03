@@ -190,7 +190,7 @@ MODELS=`[
     },
     "endpoints": [{
       "type" : "openai",
-      "baseURL": "http://localhost:8000/v1",
+      "baseURL": "http://localhost:8000/v1"
     }]
   }
 ]`
