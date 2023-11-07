@@ -30,7 +30,7 @@
 
 		<div class="flex w-full flex-col items-center gap-2">
 			{#if $page.data.guestMode || !$page.data.loginEnabled}
-				<form action="{base}/settings" target="_parent" method="POST" class="w-full">
+				<form action="{base}/settings" method="POST" class="w-full">
 					<input type="hidden" name="ethicsModalAccepted" value={true} />
 					{#each Object.entries(settings).filter(([k]) => !(k === "customPrompts")) as [key, val]}
 						<input type="hidden" name={key} value={val} />

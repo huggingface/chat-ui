@@ -10,5 +10,6 @@ node_modules
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 SECRET_CONFIG
+.idea
 # directory for local transformers.js models
 local-models
