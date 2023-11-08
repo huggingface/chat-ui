@@ -49,9 +49,11 @@ function flattenNode(node: MarkdownNode, suffix: string[], flatNodes: MarkdownFl
 	}
 }
 
+type Character = number;
+
 export function chunkSlidingWindow(
 	flatNodes: MarkdownFlatNode[],
-	opts: { windowWidth: number; paddingWidth: number }
+	opts: { windowWidth: Character; paddingWidth: Character }
 ) {
 	const { windowWidth, paddingWidth } = opts;
 	const results: TextWithSource[] = [];
