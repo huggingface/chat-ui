@@ -87,10 +87,7 @@ export async function runWebSearch(
 				windowWidth: 1024,
 				paddingWidth: 100,
 			}).slice(0, MAX_N_CHUNKS_PER_SOURCE);
-			// TODO:
-			// if (!paragraphChunks.length) {
-			// 	throw new Error("No text found on the first 5 results");
-			// }
+
 			appendUpdate("Extracting relevant information");
 			const topKClosestParagraphs = 5;
 			const texts = paragraphChunks.map(({ text }) => text);
@@ -123,6 +120,10 @@ export async function runWebSearch(
 
 			// break from the loop of creating emebddings for web pages
 			break;
+		}
+
+		if (!webSearch.context) {
+			throw new Error("Web search couldn't find relevant information.");
 		}
 	} catch (searchError) {
 		if (searchError instanceof Error) {
