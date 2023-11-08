@@ -16,7 +16,7 @@ export function parseMarkdown(markdownWithSource: TextWithSource) {
 		nodes = addToTree(nodes, node);
 	}
 
-	return nodes;
+	return flattenNodes(nodes);
 }
 
 // Helper function to `parseMarkdown`
@@ -30,7 +30,7 @@ function addToTree(nodes: MarkdownNode[], node: MarkdownNode): MarkdownNode[] {
 	return nodes;
 }
 
-export function flattenNodes(nodes: MarkdownNode[]): MarkdownFlatNode[] {
+function flattenNodes(nodes: MarkdownNode[]): MarkdownFlatNode[] {
 	const flatNodes: MarkdownFlatNode[] = [];
 	for (const node of nodes) {
 		flattenNode(node, [], flatNodes);

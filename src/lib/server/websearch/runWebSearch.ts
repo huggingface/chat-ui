@@ -3,14 +3,18 @@ import type { Message } from "$lib/types/Message";
 import type { TextWithSource, WebSearch } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWebintoMarkdown } from "$lib/server/websearch/parseWeb";
-import { findSimilarSentences } from "$lib/server/websearch/sentenceSimilarity";
+import {
+	SIMILARITY_SCORE_THRESHOLD,
+	findSimilarSentences,
+} from "$lib/server/websearch/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { parseMarkdown, flattenNodes, chunkSlidingWindow } from "./slidingWindowChunker";
+import { parseMarkdown, chunkSlidingWindow } from "./slidingWindowChunker";
 import { getWebSearchProvider } from "./searchWeb";
 
-const MAX_N_PAGES_SCRAPE = 10 as const;
+const MAX_N_PAGES_SCRAPE = 20 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
+const MAX_N_CHUNKS_PER_SOURCE = 40 as const;
 
 export async function runWebSearch(
 	conv: Conversation,
@@ -50,12 +54,19 @@ export async function runWebSearch(
 			[];
 		webSearch.results = webSearch.results
 			.filter(({ link }) => !link.includes("youtube.com")) // filter out youtube links
-			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
+			.slice(0, MAX_N_PAGES_SCRAPE);
+
+		if (!webSearch.results.length) {
+			throw new Error("No results found for this search query");
+		}
 
 		let paragraphChunks: TextWithSource[] = [];
-		if (webSearch.results.length > 0) {
+
+		while (webSearch.results.length) {
+			const webSources = webSearch.results.slice(0, MAX_N_PAGES_EMBED);
+			webSearch.results = webSearch.results.slice(MAX_N_PAGES_EMBED);
 			appendUpdate("Browsing results");
-			const promises = webSearch.results.map(async (source) => {
+			const promises = webSources.map(async (source) => {
 				const { link } = source;
 				let markdown = source.text ?? "";
 				if (!markdown) {
@@ -69,46 +80,50 @@ export async function runWebSearch(
 				return { text: markdown, source } as TextWithSource;
 			});
 			// chunk and do all the things here
-			const markdownsWithSource = (await Promise.all(promises))
-				.sort((a, b) => b.text.length - a.text.length) // desc order by markdown length
-				.slice(0, MAX_N_PAGES_EMBED); // get the top 5
+			const markdownsWithSource = await Promise.all(promises);
 			// increasee the character limit there
-			const markdownNodes = markdownsWithSource.map((item) => parseMarkdown(item)).flat();
-			const markdownFlatNodes = flattenNodes(markdownNodes);
+			const markdownFlatNodes = markdownsWithSource.map((item) => parseMarkdown(item)).flat();
 			paragraphChunks = chunkSlidingWindow(markdownFlatNodes, {
 				windowWidth: 1024,
 				paddingWidth: 100,
-			});
+			}).slice(0, MAX_N_CHUNKS_PER_SOURCE);
 			// TODO:
 			// if (!paragraphChunks.length) {
 			// 	throw new Error("No text found on the first 5 results");
 			// }
-		} else {
-			throw new Error("No results found for this search query");
-		}
+			appendUpdate("Extracting relevant information");
+			const topKClosestParagraphs = 5;
+			const texts = paragraphChunks.map(({ text }) => text);
+			const similarityResults = await findSimilarSentences(prompt, texts, {
+				topK: topKClosestParagraphs,
+			});
 
-		appendUpdate("Extracting relevant information");
-		const topKClosestParagraphs = 5;
-		const texts = paragraphChunks.map(({ text }) => text);
-		const indices = await findSimilarSentences(prompt, texts, {
-			topK: topKClosestParagraphs,
-		});
-		webSearch.context = indices.map((idx) => texts[idx]).join(" ");
-
-		const usedSources = new Set<string>();
-		for (const idx of indices) {
-			const { source } = paragraphChunks[idx];
-			if (!usedSources.has(source.link)) {
-				usedSources.add(source.link);
-				webSearch.contextSources.push(source);
+			// if there was no similar text chunks to the query, embed the next set of web pages
+			if (similarityResults[0].score > SIMILARITY_SCORE_THRESHOLD) {
+				continue;
 			}
+
+			const indices = similarityResults.map((item) => item.index);
+			webSearch.context = indices.map((idx) => texts[idx]).join(" ");
+
+			const usedSources = new Set<string>();
+			for (const idx of indices) {
+				const { source } = paragraphChunks[idx];
+				if (!usedSources.has(source.link)) {
+					usedSources.add(source.link);
+					webSearch.contextSources.push(source);
+				}
+			}
+			updatePad({
+				type: "webSearch",
+				messageType: "sources",
+				message: "sources",
+				sources: webSearch.contextSources,
+			});
+
+			// break from the loop of creating emebddings for web pages
+			break;
 		}
-		updatePad({
-			type: "webSearch",
-			messageType: "sources",
-			message: "sources",
-			sources: webSearch.contextSources,
-		});
 	} catch (searchError) {
 		if (searchError instanceof Error) {
 			appendUpdate(

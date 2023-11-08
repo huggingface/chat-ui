@@ -14,6 +14,8 @@ const extractor = await pipeline("feature-extraction", modelId);
 // see https://huggingface.co/thenlper/gte-small/blob/d8e2604cadbeeda029847d19759d219e0ce2e6d8/README.md?code=true#L2625
 export const MAX_SEQ_LEN = 512 as const;
 
+export const SIMILARITY_SCORE_THRESHOLD = 0.1;
+
 export async function findSimilarSentences(
 	query: string,
 	sentences: string[],
@@ -25,19 +27,19 @@ export async function findSimilarSentences(
 	const queryTensor: Tensor = output[0];
 	const sentencesTensor: Tensor = output.slice([1, input.length - 1]);
 
-	const distancesFromQuery: { distance: number; index: number }[] = [...sentencesTensor].map(
+	const distancesFromQuery: { score: number; index: number }[] = [...sentencesTensor].map(
 		(sentenceTensor: Tensor, index: number) => {
 			return {
-				distance: innerProduct(queryTensor, sentenceTensor),
+				score: innerProduct(queryTensor, sentenceTensor),
 				index: index,
 			};
 		}
 	);
 
 	distancesFromQuery.sort((a, b) => {
-		return a.distance - b.distance;
+		return a.score - b.score;
 	});
 
 	// Return the indexes of the closest topK sentences
-	return distancesFromQuery.slice(0, topK).map((item) => item.index);
+	return distancesFromQuery.slice(0, topK);
 }
