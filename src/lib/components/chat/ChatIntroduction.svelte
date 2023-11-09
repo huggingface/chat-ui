@@ -13,7 +13,7 @@
 	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
 
-	export let currentModel: Model;
+	// export let currentModel: Model;	
 	export let settings: LayoutData["settings"];
 	export let models: Model[];
 
