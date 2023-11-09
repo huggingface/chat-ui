@@ -22,5 +22,4 @@ RUN npm install
 RUN npm run build
 
 
-#CMD ["HOST=0.0.0.0" ,"PORT=8080","node","-r", "dotenv/config", "build"]
 CMD ["npm", "start"]
