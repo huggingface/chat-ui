@@ -47,35 +47,10 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		{#each announcementBanners as banner}
-			<AnnouncementBanner classNames="mb-4" title={banner.title}>
-				<a
-					target="_blank"
-					href={banner.linkHref}
-					class="mr-2 flex items-center underline hover:no-underline"
-					><CarbonArrowUpRight class="mr-1.5 text-xs" /> {banner.linkTitle}</a
-				>
-			</AnnouncementBanner>
-		{/each}
+		
 
-		{#if isModelsModalOpen}
-			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
-		{/if}
-		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
-			<div class="flex p-3">
-				<div>
-					<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
-					<div class="font-semibold">{currentModel.displayName}</div>
-				</div>
-				<button
-					type="button"
-					on:click={() => (isModelsModalOpen = true)}
-					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-gray-100 p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
-					><IconChevron /></button
-				>
-			</div>
-			<ModelCardMetadata variant="dark" model={currentModel} />
-		</div>
+		
+		
 	</div>
 	{#if currentModelMetadata.promptExamples}
 		<div class="lg:col-span-3 lg:mt-6">
