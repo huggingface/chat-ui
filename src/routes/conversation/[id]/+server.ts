@@ -149,6 +149,10 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		}
 	);
 
+
+	let code = "";
+	let flag = -1;
+	let generated_code:string[] = [];
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -278,17 +282,65 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			);
 
-			for await (const output of tokenStream) {
+			(async () => {
+				for await (const output of tokenStream) {
 				// if not generated_text is here it means the generation is not done
 				if (!output.generated_text) {
 					// else we get the next token
 					if (!output.token.special) {
 						const lastMessage = messages[messages.length - 1];
-						update({
-							type: "stream",
-							token: output.token.text,
-						});
+						
+						// <execute> </execute>
+						
+						console.log("text:  "+output.token.text + " flag: "+flag + " code: "+code);
+						if((output.token.text ==="<" ) && flag === -1) {
+							flag = 0;
+							code = "<";
+						} else if(flag === 0 && output.token.text === "execute") {
+							flag = 1;
+							code += output.token.text;
+						} else if(flag === 1 && output.token.text === ">") {
+							
+							update({
+								type: "stream",
+								token:"```python\n",
+							});
+							
+							code += ">"
+						} else if(code === "<execute>") {
+							flag = 10;
+						} else if(flag !== 10){
+							update({
+								type: "stream",
+								token: code + output.token.text,
+							});
+							code = "";
+							flag = -1;
+						}
 
+						if(flag === 10 && code === "<execute>" && output.token.text === " </") {
+							flag = 0;
+							code = output.token.text
+						} else if(flag === 0 && code === "</" && output.token.text === "execute") {
+							update({
+								type: "stream",
+								token:"```",
+							});
+						} else if(code === "</") {
+							update({
+								type: "stream",
+								token: code + output.token.text,
+							});
+							code = "";
+							flag = 10;
+						}
+
+						if(flag == 10) {
+							update({
+								type: "stream",
+								token: output.token.text,
+							});
+						} 
 						// if the last message is not from assistant, it means this is the first token
 						if (lastMessage?.from !== "assistant") {
 							// so we create a new message
@@ -309,6 +361,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						} else {
 							const date = abortedGenerations.get(convId.toString());
 							if (date && date > promptedAt) {
+								
 								saveLast(lastMessage.content);
 							}
 							if (!output) {
@@ -316,13 +369,80 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							}
 
 							// otherwise we just concatenate tokens
-							lastMessage.content += output.token.text;
+							if(lastMessage.content + output.token.text === "<execute>" && flag === 1) {
+								lastMessage.content = "```python\n"
+							} else {
+								lastMessage.content += output.token.text;
+							}
+							if (lastMessage.content.endsWith("</execute")) {
+								// Replace "</execute" with "\n```"
+								lastMessage.content = lastMessage.content.replace(/<\/execute$/, '\n```');
+							}
+							
 						}
+						console.log("--lastMessage--")
+						console.log(lastMessage.content);
 					}
 				} else {
+					const inputString = output.generated_text;
+
+					const pattern = /<execute>([\s\S]*?)<\/execute>/;
+					const match = inputString.match(pattern);
+
+					if (match) {
+						const substringBetweenExecuteTags = match[1].trim();
+						console.log(substringBetweenExecuteTags)
+						console.log("--fetch last--");
+						try {
+							const resFromJupyter = await fetch('http://127.0.0.1:8080/execute', {
+								headers: {
+									'Content-Type': 'application/json', 
+								},
+								method: "POST",
+								body: JSON.stringify({
+								convid: convId.toString(),
+								code: substringBetweenExecuteTags
+								}),
+							});
+							console.log('Request to Jupyter executed.');
+					
+							if (resFromJupyter.ok) {
+								const data = await resFromJupyter.json();
+								console.log('Response from Jupyter:', data);
+								const result = "\n" + "```python\n" + data["result"] + "```"
+								// const tokens: string[] = result.match(/\b\w+\b/g) || [];
+								
+								// Print the tokens
+								for (const token_ of result) {
+									console.log("update code generated result");
+									update({
+										type: "stream",
+										token: token_,
+									});
+									const lastMessage = messages[messages.length - 1];
+									lastMessage.content+= token_;
+									
+
+								}
+								output.generated_text += result;
+							} else {
+								console.error('Request to Jupyter failed with status:', resFromJupyter.status);
+					
+							}
+						} catch (error) {
+							console.error('Error making the request:', error);
+						}
+					} else {
+						console.log('Pattern not found in the string');
+					}
+					// console.log(output.generated_text);
+					const replacedString = output.generated_text.replace(/<execute>|<execute\n>/g, '```python\n').replace(/<\/execute>/g, '\n```');
+					console.log(replacedString);
+					output.generated_text = replacedString;
 					saveLast(output.generated_text);
 				}
 			}
+		})();
 		},
 		async cancel() {
 			await collections.conversations.updateOne(
