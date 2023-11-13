@@ -150,9 +150,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 	);
 
 
-	let code = "";
-	let flag = -1;
-	let generated_code:string[] = [];
+	
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -258,7 +256,8 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							},
 						}
 					);
-
+					
+					
 					update({
 						type: "finalAnswer",
 						text: generated_text,
@@ -282,6 +281,8 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			);
 
+			let code = "";
+			let flag = -1;
 			(async () => {
 				for await (const output of tokenStream) {
 				// if not generated_text is here it means the generation is not done
@@ -289,58 +290,61 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					// else we get the next token
 					if (!output.token.special) {
 						const lastMessage = messages[messages.length - 1];
-						
+						update({
+							type: "stream",
+							token: output.token.text,
+						});
 						// <execute> </execute>
 						
-						console.log("text:  "+output.token.text + " flag: "+flag + " code: "+code);
-						if((output.token.text ==="<" ) && flag === -1) {
-							flag = 0;
-							code = "<";
-						} else if(flag === 0 && output.token.text === "execute") {
-							flag = 1;
-							code += output.token.text;
-						} else if(flag === 1 && output.token.text === ">") {
+						// console.log("text:  "+output.token.text + " flag: "+flag + " code: "+code);
+						// if((output.token.text ==="<" ) && flag === -1) {
+						// 	flag = 0;
+						// 	code = "<";
+						// } else if(flag === 0 && output.token.text === "execute") {
+						// 	flag = 1;
+						// 	code += output.token.text;
+						// } else if(flag === 1 && output.token.text === ">") {
 							
-							update({
-								type: "stream",
-								token:"```python\n",
-							});
+						// 	update({
+						// 		type: "stream",
+						// 		token:"```python\n",
+						// 	});
 							
-							code += ">"
-						} else if(code === "<execute>") {
-							flag = 10;
-						} else if(flag !== 10){
-							update({
-								type: "stream",
-								token: code + output.token.text,
-							});
-							code = "";
-							flag = -1;
-						}
+						// 	code += ">"
+						// } else if(code === "<execute>") {
+						// 	flag = 10;
+						// } else if(flag !== 10){
+						// 	update({
+						// 		type: "stream",
+						// 		token: code + output.token.text,
+						// 	});
+						// 	code = "";
+						// 	flag = -1;
+						// }
 
-						if(flag === 10 && code === "<execute>" && output.token.text === " </") {
-							flag = 0;
-							code = output.token.text
-						} else if(flag === 0 && code === "</" && output.token.text === "execute") {
-							update({
-								type: "stream",
-								token:"```",
-							});
-						} else if(code === "</") {
-							update({
-								type: "stream",
-								token: code + output.token.text,
-							});
-							code = "";
-							flag = 10;
-						}
+						// if(flag === 10 && code === "<execute>" && output.token.text === " </") {
+						// 	flag = 0;
+						// 	code = output.token.text
+						// } else if(flag === 0 && code === "</" && output.token.text === "execute") {
+						// 	update({
+						// 		type: "stream",
+						// 		token:"```",
+						// 	});
+						// } else if(code === "</") {
+						// 	update({
+						// 		type: "stream",
+						// 		token: code + output.token.text,
+						// 	});
+						// 	code = "";
+						// 	flag = 10;
+						// }
 
-						if(flag == 10) {
-							update({
-								type: "stream",
-								token: output.token.text,
-							});
-						} 
+						// if(flag == 10) {
+						// 	update({
+						// 		type: "stream",
+						// 		token: output.token.text,
+						// 	});
+						// } 
 						// if the last message is not from assistant, it means this is the first token
 						if (lastMessage?.from !== "assistant") {
 							// so we create a new message
@@ -369,15 +373,16 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							}
 
 							// otherwise we just concatenate tokens
-							if(lastMessage.content + output.token.text === "<execute>" && flag === 1) {
-								lastMessage.content = "```python\n"
-							} else {
-								lastMessage.content += output.token.text;
-							}
-							if (lastMessage.content.endsWith("</execute")) {
-								// Replace "</execute" with "\n```"
-								lastMessage.content = lastMessage.content.replace(/<\/execute$/, '\n```');
-							}
+							lastMessage.content += output.token.text;
+							// if(lastMessage.content + output.token.text === "<execute>" && flag === 1) {
+							// 	lastMessage.content = "```python\n"
+							// } else {
+							// 	lastMessage.content += output.token.text;
+							// }
+							// if (lastMessage.content.endsWith("</execute")) {
+							// 	// Replace "</execute" with "\n```"
+							// 	lastMessage.content = lastMessage.content.replace(/<\/execute$/, '\n```');
+							// }
 							
 						}
 						console.log("--lastMessage--")
@@ -419,8 +424,8 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 										type: "stream",
 										token: token_,
 									});
-									const lastMessage = messages[messages.length - 1];
-									lastMessage.content+= token_;
+									// const lastMessage = messages[messages.length - 1];
+									// lastMessage.content+= token_;
 									
 
 								}
@@ -435,10 +440,12 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					} else {
 						console.log('Pattern not found in the string');
 					}
-					// console.log(output.generated_text);
-					const replacedString = output.generated_text.replace(/<execute>|<execute\n>/g, '```python\n').replace(/<\/execute>/g, '\n```');
-					console.log(replacedString);
-					output.generated_text = replacedString;
+					console.log();
+					console.log("--save last--")
+					console.log(output.generated_text);
+					// const replacedString = output.generated_text.replace(/<execute>|<execute\n>/g, '```python\n').replace(/<\/execute>/g, '\n```');
+					// console.log(replacedString);
+					// output.generated_text = replacedString;
 					saveLast(output.generated_text);
 				}
 			}
