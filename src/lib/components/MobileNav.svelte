@@ -30,7 +30,7 @@
 </script>
 
 <nav
-	class="flex h-12 items-center justify-between border-b bg-gray-50 px-4 dark:border-gray-800 dark:bg-gray-800/70 md:hidden"
+	class="flex h-12 items-center justify-between border-b bg-gray-50 px-4 md:hidden"
 >
 	<button
 		type="button"
@@ -39,13 +39,13 @@
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
-	<span class="truncate px-4">{title}</span>
+	<span class="truncate px-4 text-gray-500">{title}</span>
 	<a href={`${base}/`} class="-mr-3 flex h-9 w-9 shrink-0 items-center justify-center"
 		><CarbonAdd /></a
 	>
 </nav>
 <nav
-	class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white bg-gradient-to-l from-gray-50 dark:bg-gray-900 dark:from-gray-800/30 max-sm:rounded-t-2xl {isOpen
+	class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white bg-gradient-to-l from-gray-50 max-sm:rounded-t-2xl {isOpen
 		? 'block'
 		: 'hidden'}"
 >

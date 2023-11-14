@@ -24,14 +24,14 @@
 		confirmDelete = false;
 	}}
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-11 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 {conv.id ===
+	class="group flex h-11 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 {conv.id ===
 	$page.params.id
-		? 'bg-gray-100 dark:bg-gray-700'
+		? 'bg-gray-100'
 		: ''}"
 >
 	<div class="flex-1 truncate">
 		{#if confirmDelete}
-			<span class="font-semibold"> Delete </span>
+			<span class="font-semibold text-red-400"> Delete </span>
 		{/if}
 		{conv.title}
 	</div>
@@ -43,7 +43,7 @@
 			title="Confirm delete action"
 			on:click|preventDefault={() => dispatch("deleteConversation", conv.id)}
 		>
-			<CarbonCheckmark class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+			<CarbonCheckmark class="text-xs text-gray-400 hover:text-red-500" />
 		</button>
 		<button
 			type="button"
@@ -53,7 +53,7 @@
 				confirmDelete = false;
 			}}
 		>
-			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+			<CarbonClose class="text-xs text-gray-400 hover:text-green-500" />
 		</button>
 	{:else}
 		<button
@@ -66,7 +66,7 @@
 				dispatch("editConversationTitle", { id: conv.id, title: newTitle });
 			}}
 		>
-			<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+			<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500" />
 		</button>
 
 		<button
@@ -81,7 +81,7 @@
 				}
 			}}
 		>
-			<CarbonTrashCan class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
+			<CarbonTrashCan class="text-xs text-gray-400  hover:text-gray-500" />
 		</button>
 	{/if}
 </a>

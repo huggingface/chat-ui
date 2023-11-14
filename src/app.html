@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full bg-gray-50">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<meta name="theme-color" content="rgb(249, 250, 251)" />
-		<script>
+		<!-- <script>
 			if (
 				localStorage.theme === "dark" ||
 				(!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
@@ -17,7 +17,7 @@
 
 			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
 			window.gaId = "%gaId%";
-		</script>
+		</script> -->
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">

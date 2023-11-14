@@ -45,13 +45,14 @@
 		enterkeyhint="send"
 		tabindex="0"
 		rows="1"
-		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0"
+		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0 text-gray-500 placeholder-gray-300"
 		class:text-gray-400={disabled}
 		bind:value
 		bind:this={textareaElement}
 		{disabled}
 		on:keydown={handleKeydown}
 		on:keypress
+
 		{placeholder}
 	/>
 </div>

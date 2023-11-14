@@ -133,7 +133,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed"
+		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed "
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keypress={() => (isTapped = !isTapped)}
@@ -144,7 +144,7 @@
 			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 		/>
 		<div
-			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
+			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 bg-gray-100"
 		>
 			{#if searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults
@@ -158,7 +158,7 @@
 			{/if}
 
 			<div
-				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+				class="prose max-w-none max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 text-gray-500"
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
@@ -176,7 +176,7 @@
 					<div class="text-gray-400">Sources:</div>
 					{#each webSearchSources as { link, title, hostname }}
 						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300"
 							href={link}
 							target="_blank"
 						>
@@ -199,9 +199,9 @@
 				"
 			>
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500
 					{message.score && message.score > 0
-						? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
+						? 'text-green-500 hover:text-green-500'
 						: ''}"
 					title={message.score === 1 ? "Remove +1" : "+1"}
 					type="button"
@@ -210,9 +210,9 @@
 					<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
 				</button>
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500
 					{message.score && message.score < 0
-						? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
+						? 'text-red-500 hover:text-red-500'
 						: ''}"
 					title={message.score === -1 ? "Remove -1" : "-1"}
 					type="button"
@@ -225,7 +225,7 @@
 					on:click={() => {
 						isCopied = true;
 					}}
-					classNames="ml-1.5 !rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 dark:!text-gray-400 dark:hover:!text-gray-300 !border-none !shadow-none"
+					classNames="ml-1.5 !rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 !border-none !shadow-none"
 					value={message.content}
 				/>
 			</div>
@@ -236,7 +236,7 @@
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
 		<div
-			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
+			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500"
 		>
 			{message.content.trim()}
 		</div>
@@ -244,7 +244,7 @@
 			<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
 				{#if downloadLink}
 					<a
-						class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
+						class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden"
 						title="Download prompt and parameters"
 						type="button"
 						target="_blank"
@@ -255,7 +255,7 @@
 				{/if}
 				{#if !readOnly}
 					<button
-						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2"
 						title="Retry"
 						type="button"
 						on:click={() => dispatch("retry", { content: message.content, id: message.id })}

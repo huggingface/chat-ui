@@ -18,7 +18,7 @@
 <div class="group relative my-4 rounded-lg">
 	<!-- eslint-disable svelte/no-at-html-tags -->
 	<pre
-		class="scrollbar-custom overflow-auto px-5 scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20"><code
+		class="scrollbar-custom overflow-auto px-5 scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400"><code
 			class="language-{lang}">{@html highlightedCode || code.replaceAll("<", "&lt;")}</code
 		></pre>
 	<CopyToClipBoardBtn

@@ -85,8 +85,9 @@
 		}}
 	/>
 	<div
-		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center px-3.5 py-4   max-md:border-t max-md:bg-white sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
+	<!-- class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4   max-md:border-t max-md:bg-white sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto" -->
 		<div class="flex w-full pb-3">
 			{#if settings?.searchEnabled}
 				<WebSearchToggle />
@@ -107,7 +108,7 @@
 		</div>
 		<form
 			on:submit|preventDefault={handleSubmit}
-			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
+			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300
 			{isReadOnly ? 'opacity-30' : ''}"
 		>
 			<div class="flex w-full flex-1 border-none bg-transparent">
@@ -115,7 +116,7 @@
 					<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 				{:else}
 					<ChatInput
-						placeholder="Ask anything"
+						placeholder="Write your intro..."
 						bind:value={message}
 						on:submit={handleSubmit}
 						on:keypress={(ev) => {
@@ -131,19 +132,19 @@
 
 				{#if loading}
 					<button
-						class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:hidden"
+						class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 md:hidden"
 						on:click={() => dispatch("stop")}
 					>
 						<CarbonStopFilledAlt />
 					</button>
 					<div
-						class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:flex"
+						class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 md:flex"
 					>
 						<EosIconsLoading />
 					</div>
 				{:else}
 					<button
-						class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
+						class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700"
 						disabled={!message || isReadOnly}
 						type="submit"
 					>
@@ -159,7 +160,7 @@
 			</p>
 			{#if messages.length}
 				<button
-					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
+					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5"
 					type="button"
 					on:click={() => dispatch("share")}
 				>
