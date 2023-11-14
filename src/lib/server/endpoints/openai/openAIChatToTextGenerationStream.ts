@@ -12,9 +12,7 @@ export async function* openAIChatToTextGenerationStream(
 	let tokenId = 0;
 	for await (const completion of completionStream) {
 		const { choices } = completion;
-		const {
-			delta: { content },
-		} = choices[0];
+		const content = choices[0]?.delta?.content ?? "";
 		const last = choices[0]?.finish_reason === "stop";
 		if (content) {
 			generatedText = generatedText + content;
