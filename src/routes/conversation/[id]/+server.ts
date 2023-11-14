@@ -344,21 +344,21 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 								}),
 							});
 					
+							var result;
 							if (resFromJupyter.ok) {
 								const data = await resFromJupyter.json();
-								const result = "\n" + "```result\n" + data["result"] + "```"
-								
-								for (const token_ of result) {
-									update({
-										type: "stream",
-										token: token_,
-									});
-								}
-								output.generated_text += result;
+								result = "\n" + "```result\n" + data["result"]
 							} else {
 								console.error('Request to Jupyter failed with status:', resFromJupyter.status);
-					
+								result = "\n" + "```result\n" + "Request to Code Execution failed with status: " + resFromJupyter.status + ". Please try again."
 							}
+							for (const token_ of result) {
+								update({
+									type: "stream",
+									token: token_,
+								});
+							}
+							output.generated_text += result;
 						} catch (error) {
 							console.error('Error making the request:', error);
 						}
