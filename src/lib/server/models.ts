@@ -108,9 +108,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-export const models = await Promise.all(modelsRaw.map((e) => processModel(e))).then((mods) =>
-	Promise.all(mods.map((m) => addEndpoint(m)))
-);
+export const models = await Promise.all(modelsRaw.map((e) => processModel(e).then(addEndpoint)));
 
 export const defaultModel = models[0];
 
