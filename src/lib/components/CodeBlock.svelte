@@ -22,7 +22,7 @@
         <div class="bg-gray-700 p-4 text-xs rounded-lg">
             <div class="mb-1 text-gray-400">STDOUT/STDERR</div>
             <div class="prose flex flex-col-reverse text-white ">
-				{code}
+				{@html code.replaceAll("\n", "<br />")}
             </div>
         </div>
     {:else}
