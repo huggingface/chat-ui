@@ -188,66 +188,69 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			conv.messages = messages;
 
-			const endpoint = await model.getEndpoint();
+			try {
+				const endpoint = await model.getEndpoint();
+				for await (const output of await endpoint({ conversation: conv })) {
+					// if not generated_text is here it means the generation is not done
+					if (!output.generated_text) {
+						// else we get the next token
+						if (!output.token.special) {
+							update({
+								type: "stream",
+								token: output.token.text,
+							});
 
-			for await (const output of await endpoint({ conversation: conv })) {
-				// if not generated_text is here it means the generation is not done
-				if (!output.generated_text) {
-					// else we get the next token
-					if (!output.token.special) {
-						update({
-							type: "stream",
-							token: output.token.text,
-						});
+							// if the last message is not from assistant, it means this is the first token
+							const lastMessage = messages[messages.length - 1];
 
-						// if the last message is not from assistant, it means this is the first token
-						const lastMessage = messages[messages.length - 1];
+							if (lastMessage?.from !== "assistant") {
+								// so we create a new message
+								messages = [
+									...messages,
+									// id doesn't match the backend id but it's not important for assistant messages
+									// First token has a space at the beginning, trim it
+									{
+										from: "assistant",
+										content: output.token.text.trimStart(),
+										webSearch: webSearchResults,
+										updates: updates,
+										id: (responseId as Message["id"]) || crypto.randomUUID(),
+										createdAt: new Date(),
+										updatedAt: new Date(),
+									},
+								];
+							} else {
+								// abort check
+								const date = abortedGenerations.get(convId.toString());
+								if (date && date > promptedAt) {
+									break;
+								}
 
-						if (lastMessage?.from !== "assistant") {
-							// so we create a new message
-							messages = [
-								...messages,
-								// id doesn't match the backend id but it's not important for assistant messages
-								// First token has a space at the beginning, trim it
-								{
-									from: "assistant",
-									content: output.token.text.trimStart(),
-									webSearch: webSearchResults,
-									updates: updates,
-									id: (responseId as Message["id"]) || crypto.randomUUID(),
-									createdAt: new Date(),
-									updatedAt: new Date(),
-								},
-							];
-						} else {
-							// abort check
-							const date = abortedGenerations.get(convId.toString());
-							if (date && date > promptedAt) {
-								break;
+								if (!output) {
+									break;
+								}
+
+								// otherwise we just concatenate tokens
+								lastMessage.content += output.token.text;
 							}
-
-							if (!output) {
-								break;
-							}
-
-							// otherwise we just concatenate tokens
-							lastMessage.content += output.token.text;
 						}
+					} else {
+						// add output.generated text to the last message
+						messages = [
+							...messages.slice(0, -1),
+							{
+								...messages[messages.length - 1],
+								content: output.generated_text,
+								updates: updates,
+								updatedAt: new Date(),
+							},
+						];
 					}
-				} else {
-					// add output.generated text to the last message
-					messages = [
-						...messages.slice(0, -1),
-						{
-							...messages[messages.length - 1],
-							content: output.generated_text,
-							updates: updates,
-							updatedAt: new Date(),
-						},
-					];
 				}
+			} catch (e) {
+				console.error(e);
+				update({ type: "status", status: "error", message: (e as Error).message });
 			}
-
 			await collections.conversations.updateOne(
 				{
 					_id: convId,
