@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT, JUPYTER_API_URL } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 import { authCondition, requiresUser } from "$lib/server/auth";
@@ -333,7 +333,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 					if (match) {
 						const substringBetweenExecuteTags = match[1].trim();
 						try {
-							const resFromJupyter = await fetch('http://127.0.0.1:8080/execute', {
+							const resFromJupyter = await fetch(JUPYTER_API_URL + "/execute", {
 								headers: {
 									'Content-Type': 'application/json', 
 								},
