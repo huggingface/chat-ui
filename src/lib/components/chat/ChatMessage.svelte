@@ -21,7 +21,7 @@
 
 	function sanitizeMd(md: string) {
 		let ret = md
-			.replace(/<execute>|<execute\n>/g, '```python\n').replace(/<\/execute>|<\/execute/g, '\n```')
+			.replace(/<execute> |<execute\n> /g, '```python\n').replace(/<\/execute>|<\/execute/g, '\n```')
 			.replace(/<\|[a-z]*$/, "")
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
@@ -36,11 +36,9 @@
 				ret = ret.slice(0, -stop.length).trim();
 			}
 		}
-		console.log(md + "-- sanitied to --" + ret);
 		return ret;
 	}
 	function unsanitizeMd(md: string) {
-		console.log(md + "-- unsanitied to --" + md.replaceAll("&lt;", "<"));
 		return md.replaceAll("&lt;", "<");
 	}
 
@@ -90,7 +88,6 @@
 	);
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
-	console.log(tokens)
 
 	afterUpdate(() => {
 		loadingEl?.$destroy();
