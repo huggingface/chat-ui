@@ -64,8 +64,8 @@ export async function endpointOai({
 			return openAIChatToTextGenerationStream(
 				await openai.chat.completions.create({
 					model: model.id ?? model.name,
-					messages: model.preprompt
-						? [{ role: "system", content: model.preprompt }, ...messages]
+					messages: conversation.preprompt
+						? [{ role: "system", content: conversation.preprompt }, ...messages]
 						: messages,
 					stream: true,
 					max_tokens: model.parameters?.max_new_tokens,
