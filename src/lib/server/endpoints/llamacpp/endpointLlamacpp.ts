@@ -66,8 +66,13 @@ export function endpointLlamacpp({
 				}
 
 				if (out.value.startsWith("data: ")) {
-					const data = JSON.parse(out.value.slice(6));
-					if (data.content) {
+					let data = null;
+					try {
+						data = JSON.parse(out.value.slice(6));
+					} catch (e) {
+						return;
+					}
+					if (data.content || data.stop) {
 						generatedText += data.content;
 						const output: TextGenerationStreamOutput = {
 							token: {
@@ -76,16 +81,15 @@ export function endpointLlamacpp({
 								logprob: 0,
 								special: false,
 							},
-							generated_text: data.done ? generatedText : null,
+							generated_text: data.stop ? generatedText : null,
 							details: null,
 						};
+						if (data.stop) {
+							stop = true;
+							reader?.cancel();
+						}
 						yield output;
 						// take the data.content value and yield it
-					}
-					if (data.stop) {
-						stop = true;
-						reader?.cancel();
-						return;
 					}
 				}
 			}
