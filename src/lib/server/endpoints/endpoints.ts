@@ -28,7 +28,7 @@ export type EndpointGenerator<T extends CommonEndpoint> = (parameters: T) => End
 // list of all endpoint generators
 export const endpoints = {
 	tgi: endpointTgi,
-	sagemaker: endpointAws,
+	aws: endpointAws,
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
 };
