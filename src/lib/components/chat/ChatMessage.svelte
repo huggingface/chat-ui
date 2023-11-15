@@ -21,7 +21,8 @@
 
 	function sanitizeMd(md: string) {
 		let ret = md
-			.replace(/<execute>\n|<execute>|<execute\n>/g, '```python\n').replace(/<\/execute>|<\/execute/g, '\n```')
+			.replace(/<execute(\s)*(>)?(\s)*/g, '```python\n')
+			.replace(/<\/execute(>)?/g, '\n```')
 			.replace(/<\|[a-z]*$/, "")
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
