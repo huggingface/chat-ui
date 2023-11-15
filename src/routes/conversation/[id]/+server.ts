@@ -364,8 +364,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							}
 							output.generated_text += result;
 
-						} else {
-							console.log('Pattern not found in the string');
 						}
 						saveLast(output.generated_text);
 					}

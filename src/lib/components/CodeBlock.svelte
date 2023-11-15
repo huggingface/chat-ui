@@ -15,24 +15,27 @@
 	});
 </script>
 
-
 <div class="group relative my-4 rounded-lg">
-    <!-- eslint-disable svelte/no-at-html-tags -->
-    {#if lang === "result"}
-        <div class="bg-gray-700 p-4 text-xs rounded-lg">
-            <div class="mb-1 text-gray-400">STDOUT/STDERR</div>
-            <div class="prose flex flex-col-reverse text-white ">
-				{@html code.replaceAll("\n", "<br />")}
-            </div>
-        </div>
-    {:else}
+	<!-- eslint-disable svelte/no-at-html-tags -->
+	{#if lang === "result"}
+		<div class="rounded-lg bg-gray-700 p-4 text-xs">
+			<div class="mb-1 text-gray-400">STDOUT/STDERR</div>
+			<div class="prose flex flex-col-reverse text-white">
+				{@html code
+				.replaceAll("<", "&lt;")
+				.replaceAll(">", "&gt;")
+				.replaceAll("\n", "<br />")
+				}
+			</div>
+		</div>
+	{:else}
 		<pre
-			class="scrollbar-custom overflow-auto px-5 scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20"><code
+			class="scrollbar-custom scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20 overflow-auto px-5"><code
 				class="language-{lang}">{@html highlightedCode || code.replaceAll("<", "&lt;")}</code
 			></pre>
 		<CopyToClipBoardBtn
 			classNames="absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100"
 			value={code}
 		/>
-    {/if}
+	{/if}
 </div>
