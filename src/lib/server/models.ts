@@ -94,7 +94,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				if (args.type === "tgi") {
 					return endpoints.tgi(args);
 				} else if (args.type === "aws") {
-					return await endpoints.sagemaker(args);
+					return await endpoints.aws(args);
 				} else if (args.type === "openai") {
 					return await endpoints.openai(args);
 				} else if (args.type === "llamacpp") {
