@@ -100,7 +100,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				} else if (args.type === "llamacpp") {
 					return await endpoints.llamacpp(args);
 				} else {
-					throw new Error(`Unknown endpoint type`);
+					// for legacy reason
+					return await endpoints.tgi(args);
 				}
 			}
 			random -= endpoint.weight;
