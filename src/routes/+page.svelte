@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
+	import { PUBLIC_APP_NAME } from "$env/static/public";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
@@ -44,6 +45,10 @@
 		}
 	}
 </script>
+
+<svelte:head>
+	<title>{PUBLIC_APP_NAME}</title>
+</svelte:head>
 
 <ChatWindow
 	on:message={(ev) => createConversation(ev.detail)}
