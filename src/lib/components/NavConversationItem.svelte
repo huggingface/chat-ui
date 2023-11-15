@@ -31,7 +31,7 @@
 >
 	<div class="flex-1 truncate">
 		{#if confirmDelete}
-			<span class="font-semibold"> Delete </span>
+			<span class="font-semibold"> Borrar </span>
 		{/if}
 		{conv.title}
 	</div>

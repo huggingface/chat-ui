@@ -117,7 +117,7 @@
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.svg"
+		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.ico"
 		type="image/svg+xml"
 	/>
 	<link

@@ -15,6 +15,7 @@
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import Cenia from "$lib/components/icons/LogoCenia.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -88,7 +89,7 @@
 		>
 			<div class="flex w-full flex-1 border-none bg-transparent">
 				<ChatInput
-					placeholder="Ask anything"
+					placeholder="Ingresa tu pregunta"
 					bind:value={message}
 					on:submit={handleSubmit}
 					on:keypress={() => {
@@ -121,26 +122,26 @@
 				{/if}
 			</div>
 		</form>
-		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
-			<!-- <p>
-				Model: <a
-					href={currentModel.modelUrl || "https://huggingface.co/" + currentModel.name}
-					target="_blank"
-					rel="noreferrer"
-					class="hover:underline">{currentModel.displayName}</a
-				> <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
-				or false.
-			</p> -->
-			{#if messages.length}
-				<button
-					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
-					type="button"
-					on:click={() => dispatch("share")}
-				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
-					<div class="max-sm:hidden">Share this conversation</div>
-				</button>
+		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2 items-center">
+			{#if messages.length == 0}
+			<div class="flex items-center">
+				<p class="ml-1 flex-none"></p>
+			</div>
 			{/if}
-		</div>
+			{#if messages.length > 0}
+			  <button
+				class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
+				type="button"
+				on:click={() => dispatch("share")}
+			  >
+				<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+				<div class="max-sm:hidden">Compartir la conversación</div>
+			  </button>
+			{/if}
+			<div class="flex items-center">
+				<p class="ml-1 flex-none">Desarrollado por Cenia</p>
+				<Cenia classNames="ml-1 flex-none" />
+			</div>
+		</div>							  
 	</div>
 </div>

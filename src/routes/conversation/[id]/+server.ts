@@ -26,7 +26,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 	const promptedAt = new Date();
 
 	const userId = locals.user?._id ?? locals.sessionId;
-
+	
 	// check user
 	if (!userId) {
 		throw error(401, "Unauthorized");

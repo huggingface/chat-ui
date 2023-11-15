@@ -9,10 +9,10 @@
 {#if PUBLIC_APP_ASSETS === "chatui"}
 	<object
 		class={classNames}
-		data="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/chile_atiende.svg"
+		data="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/cenia_favicon.svg"
 		title="{PUBLIC_APP_NAME} logo"
-		width="130"
-		height="65"
+		width="30"
+		height="30"
 	/>
 {:else}
 	<object
