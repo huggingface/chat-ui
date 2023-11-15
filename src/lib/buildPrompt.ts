@@ -60,7 +60,7 @@ export async function buildPrompt({
 				let content = el.content;
 
 				if (el.from === "user") {
-					if (el.files && url && fetch && id && el.files?.length > 0) {
+					if (el?.files?.length > 0 && url && fetch && id) {
 						const markdowns = await Promise.all(
 							el.files.map(async (hash) => {
 								try {
