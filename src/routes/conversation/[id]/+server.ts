@@ -150,7 +150,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 	);
 
 
-	
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -256,8 +256,8 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							},
 						}
 					);
-					
-					
+
+
 					update({
 						type: "finalAnswer",
 						text: generated_text,
@@ -283,75 +283,79 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 
 			(async () => {
 				for await (const output of tokenStream) {
-				// if not generated_text is here it means the generation is not done
-				if (!output.generated_text) {
-					// else we get the next token
-					if (!output.token.special) {
-						const lastMessage = messages[messages.length - 1];
-						update({
-							type: "stream",
-							token: output.token.text,
-						});
-						
-						// if the last message is not from assistant, it means this is the first token
-						if (lastMessage?.from !== "assistant") {
-							// so we create a new message
-							messages = [
-								...messages,
-								// id doesn't match the backend id but it's not important for assistant messages
-								// First token has a space at the beginning, trim it
-								{
-									from: "assistant",
-									content: output.token.text.trimStart(),
-									webSearch: webSearchResults,
-									updates: updates,
-									id: (responseId as Message["id"]) || crypto.randomUUID(),
-									createdAt: new Date(),
-									updatedAt: new Date(),
-								},
-							];
-						} else {
-							const date = abortedGenerations.get(convId.toString());
-							if (date && date > promptedAt) {
-								
-								saveLast(lastMessage.content);
-							}
-							if (!output) {
-								break;
-							}
-
-							// otherwise we just concatenate tokens
-							lastMessage.content += output.token.text;
-						}
-					}
-				} else {
-					const inputString = output.generated_text;
-
-					const pattern = /<execute>([\s\S]*?)<\/execute>/;
-					const match = inputString.match(pattern);
-
-					if (match) {
-						const substringBetweenExecuteTags = match[1].trim();
-						try {
-							const resFromJupyter = await fetch(JUPYTER_API_URL + "/execute", {
-								headers: {
-									'Content-Type': 'application/json', 
-								},
-								method: "POST",
-								body: JSON.stringify({
-								convid: convId.toString(),
-								code: substringBetweenExecuteTags
-								}),
+					// if not generated_text is here it means the generation is not done
+					if (!output.generated_text) {
+						// else we get the next token
+						if (!output.token.special) {
+							const lastMessage = messages[messages.length - 1];
+							update({
+								type: "stream",
+								token: output.token.text,
 							});
-					
-							var result;
-							if (resFromJupyter.ok) {
-								const data = await resFromJupyter.json();
-								result = "\n" + "```result\n" + data["result"]
+
+							// if the last message is not from assistant, it means this is the first token
+							if (lastMessage?.from !== "assistant") {
+								// so we create a new message
+								messages = [
+									...messages,
+									// id doesn't match the backend id but it's not important for assistant messages
+									// First token has a space at the beginning, trim it
+									{
+										from: "assistant",
+										content: output.token.text.trimStart(),
+										webSearch: webSearchResults,
+										updates: updates,
+										id: (responseId as Message["id"]) || crypto.randomUUID(),
+										createdAt: new Date(),
+										updatedAt: new Date(),
+									},
+								];
 							} else {
-								console.error('Request to Jupyter failed with status:', resFromJupyter.status);
-								result = "\n" + "```result\n" + "Request to Code Execution failed with status: " + resFromJupyter.status + ". Please try again."
+								const date = abortedGenerations.get(convId.toString());
+								if (date && date > promptedAt) {
+
+									saveLast(lastMessage.content);
+								}
+								if (!output) {
+									break;
+								}
+
+								// otherwise we just concatenate tokens
+								lastMessage.content += output.token.text;
 							}
+						}
+					} else {
+						const inputString = output.generated_text;
+
+						const pattern = /<execute>([\s\S]*?)<\/execute>/;
+						const match = inputString.match(pattern);
+
+						if (match) {
+							const substringBetweenExecuteTags = match[1].trim();
+							var result;
+							try {
+								const resFromJupyter = await fetch(JUPYTER_API_URL + "/execute", {
+									headers: {
+										'Content-Type': 'application/json',
+									},
+									method: "POST",
+									body: JSON.stringify({
+										convid: convId.toString(),
+										code: substringBetweenExecuteTags
+									}),
+								});
+								if (resFromJupyter.ok) {
+									const data = await resFromJupyter.json();
+									result = "\n" + "```result\n" + data["result"]
+								} else {
+									console.error('Request to Jupyter failed with status:', resFromJupyter.status);
+									result = "\n" + "```result\n" + "Request to Code Execution failed with status: " + resFromJupyter.status + ". Please try again."
+								}
+							} catch (error) {
+								console.error('Error making the request:', error);
+								result = "\n" + "```result\n" + "Error making the request: " + error + ". Please try again."
+							}
+
 							for (const token_ of result) {
 								update({
 									type: "stream",
@@ -359,16 +363,14 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 								});
 							}
 							output.generated_text += result;
-						} catch (error) {
-							console.error('Error making the request:', error);
+
+						} else {
+							console.log('Pattern not found in the string');
 						}
-					} else {
-						console.log('Pattern not found in the string');
+						saveLast(output.generated_text);
 					}
-					saveLast(output.generated_text);
 				}
-			}
-		})();
+			})();
 		},
 		async cancel() {
 			await collections.conversations.updateOne(
