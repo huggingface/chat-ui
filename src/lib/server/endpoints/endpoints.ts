@@ -4,6 +4,7 @@ import { endpointTgi, endpointTgiParametersSchema } from "./tgi/endpointTgi";
 import { z } from "zod";
 import endpointAws, { endpointAwsParametersSchema } from "./aws/endpointAws";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
+import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/endpointLlamacpp";
 
 // parameters passed when generating text
 interface EndpointParameters {
@@ -29,11 +30,13 @@ export const endpoints = {
 	tgi: endpointTgi,
 	sagemaker: endpointAws,
 	openai: endpointOai,
+	llamacpp: endpointLlamacpp,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
 	endpointAwsParametersSchema,
 	endpointOAIParametersSchema,
 	endpointTgiParametersSchema,
+	endpointLlamacppParametersSchema,
 ]);
 export default endpoints;

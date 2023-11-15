@@ -97,6 +97,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 					return await endpoints.sagemaker(args);
 				} else if (args.type === "openai") {
 					return await endpoints.openai(args);
+				} else if (args.type === "llamacpp") {
+					return await endpoints.llamacpp(args);
 				} else {
 					throw new Error(`Unknown endpoint type`);
 				}
