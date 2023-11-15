@@ -171,6 +171,8 @@
 											convId: $page.params.id,
 										};
 									}
+								} else if (update.status === "error") {
+									$error = update.message ?? "An error has occurred";
 								}
 							}
 						} catch (parseError) {
