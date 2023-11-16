@@ -29,7 +29,7 @@ MONGODB_DIRECT_CONNECTION=false
 
 MODELS=`[
     {
-        "name": "Chile Atiende",
+        "name": "ChileAtiende",
         "endpoints": [{"url": "your_endpoint"}],
         "userMessageToken": "User: ",
         "assistantMessageToken": "Assistant: ",
@@ -42,7 +42,7 @@ MODELS=`[
     }
 ]`
 
-PUBLIC_APP_NAME="Chile Atiende"
+PUBLIC_APP_NAME="ChileAtiende"
 ```
 
 ## Run

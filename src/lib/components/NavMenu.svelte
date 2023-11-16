@@ -28,13 +28,12 @@
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
 	<a class="flex items-center rounded-xl text-lg font-semibold" href="{PUBLIC_ORIGIN}{base}/">
 		<Logo classNames="mr-1" />
-		{PUBLIC_APP_NAME}
 	</a>
 	<a
 		href={`${base}/`}
 		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700"
 	>
-		New Chat
+		Nuevo Chat
 	</a>
 </div>
 <div
@@ -61,7 +60,7 @@
 				type="submit"
 				class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md border bg-white px-2 text-gray-700 shadow-sm group-hover:flex hover:shadow-none dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
 			>
-				Sign Out
+				Cerrar sesión
 			</button>
 		</form>
 	{/if}
@@ -71,7 +70,7 @@
 			type="button"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			Login
+			Iniciar sesión
 		</button>
 	{/if}
 	<button
@@ -79,14 +78,14 @@
 		type="button"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
-		Theme
+		Tema
 	</button>
 	<button
 		on:click={() => dispatch("clickSettings")}
 		type="button"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
-		Settings
+		Configuración
 	</button>
 	{#if PUBLIC_APP_NAME === "HuggingChat"}
 		<a
@@ -101,7 +100,7 @@
 			href="{base}/privacy"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			About & Privacy
+			Información & Privacidad
 		</a>
 	{/if}
 </div>
