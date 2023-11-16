@@ -168,7 +168,65 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-#### OpenAI API compatible models
+#### chatPromptTemplate
+
+When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
+
+The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
+
+```prompt
+{{preprompt}}
+{{#each messages}}
+  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
+  {{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}
+{{/each}}
+{{assistantMessageToken}}
+```
+
+#### Multi modal model
+
+We currently only support IDEFICS as a multimodal model, hosted on TGI. You can enable it by using the followin config (if you have a PRO HF Api token):
+
+```env
+    {
+      "name": "HuggingFaceM4/idefics-80b-instruct",
+      "multimodal" : true,
+      "description": "IDEFICS is the new multimodal model by Hugging Face.",
+      "preprompt": "",
+      "chatPromptTemplate" : "{{#each messages}}{{#ifUser}}User: {{content}}{{/ifUser}}<end_of_utterance>\nAssistant: {{#ifAssistant}}{{content}}\n{{/ifAssistant}}{{/each}}",
+      "parameters": {
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "repetition_penalty": 1.2,
+        "top_k": 12,
+        "truncate": 1000,
+        "max_new_tokens": 1024,
+        "stop": ["<end_of_utterance>", "User:", "\nUser:"]
+      }
+    }
+```
+
+#### Running your own models using a custom endpoint
+
+If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
+
+A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference) endpoint. This is what is done in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
+
+To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
+
+```env
+{
+// rest of the model config here
+"endpoints": [{
+  "type" : "tgi",
+  "url": "https://HOST:PORT",
+  }]
+}
+```
+
+If `endpoints` are left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
+
+##### OpenAI API compatible models
 
 Chat UI can be used with any API server that supports OpenAI API compatibility, for example [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol).
 
@@ -217,7 +275,7 @@ MODELS=`[{
 }]`
 ```
 
-#### Llama.cpp API server
+##### Llama.cpp API server
 
 chat-ui also supports the llama.cpp API server directly without the need for an adapter. You can do this using the `llamacpp` endpoint type.
 
@@ -253,70 +311,29 @@ MODELS=[
 
 Start chat-ui with `npm run dev` and you should be able to chat with Zephyr locally.
 
-#### Custom prompt templates
+#### Amazon
 
-By default, the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
-
-However, these templates can be modified by setting the `chatPromptTemplate` and `webSearchQueryPromptTemplate` parameters. Note that if WebSearch is not enabled, only `chatPromptTemplate` needs to be set. The template language is <https://handlebarsjs.com>. The templates have access to the model's prompt parameters (`preprompt`, etc.). However, if the templates are specified it is recommended to inline the prompt parameters, as using the references (`{{preprompt}}`) is deprecated.
-
-For example:
-
-```prompt
-<System>You are an AI, called ChatAI.</System>
-{{#each messages}}
-  {{#ifUser}}<User>{{content}}</User>{{/ifUser}}
-  {{#ifAssistant}}<Assistant>{{content}}</Assistant>{{/ifAssistant}}
-{{/each}}
-<Assistant>
-```
-
-##### chatPromptTemplate
-
-When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
-
-The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
-
-```prompt
-{{preprompt}}
-{{#each messages}}
-  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
-  {{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}
-{{/each}}
-{{assistantMessageToken}}
-```
-
-##### webSearchQueryPromptTemplate
-
-When performing a websearch, the search query is constructed using the `webSearchQueryPromptTemplate` template. It is recommended that the prompt instructs the chat model to only return a few keywords.
-
-The following is the default `webSearchQueryPromptTemplate`.
-
-```prompt
-{{userMessageToken}}
-  My question is: {{message.content}}.
-
-Based on the conversation history (my previous questions are: {{previousMessages}}), give me an appropriate query to answer my question for web search. You should not say more than query. You should not say any words except the query. For the context, today is {{currentDate}}
-
-{{userMessageEndToken}}
-{{assistantMessageToken}}
-```
-
-#### Running your own models using a custom endpoint
-
-If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
-
-A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference) endpoint. This is what is done in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
-
-To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
+You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
 
 ```env
-{
-// rest of the model config here
-"endpoints": [{"url": "https://HOST:PORT"}]
-}
+"endpoints": [
+    {
+      "type" : "aws",
+      "service" : "sagemaker"
+      "url": "",
+      "accessKey": "",
+      "secretKey" : "",
+      "sessionToken": "",
+      "region": "",
+
+      "weight": 1
+    }
+]
 ```
 
-If `endpoints` are left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
+You can also set `"service" : "lambda"` to use a lambda instance.
+
+You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
 
 ### Custom endpoint authorization
 
@@ -343,55 +360,6 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
-### Amazon
-
-#### SageMaker
-
-You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
-
-```env
-"endpoints": [
-    {
-      "type" : "aws",
-      "service" : "sagemaker"
-      "url": "",
-      "accessKey": "",
-      "secretKey" : "",
-      "sessionToken": "",
-      "weight": 1
-    }
-]
-```
-
-#### Lambda
-
-You can also specify your Amazon Lambda instance as an endpoint for chat-ui. The config goes like this:
-
-```env
-"endpoints" : [
-  {
-        "type": "aws",
-        "service": "lambda",
-        "url": "",
-        "accessKey": "",
-        "secretKey": "",
-        "sessionToken": "",
-        "region": "",
-        "weight": 1
- }
-]
-```
-
-You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
-
-#### Client Certificate Authentication (mTLS)
-
-Custom endpoints may require client certificate authentication, depending on how you configure them. To enable mTLS between Chat UI and your custom endpoint, you will need to set the `USE_CLIENT_CERTIFICATE` to `true`, and add the `CERT_PATH` and `KEY_PATH` parameters to your `.env.local`. These parameters should point to the location of the certificate and key files on your local machine. The certificate and key files should be in PEM format. The key file can be encrypted with a passphrase, in which case you will also need to add the `CLIENT_KEY_PASSWORD` parameter to your `.env.local`.
-
-If you're using a certificate signed by a private CA, you will also need to add the `CA_PATH` parameter to your `.env.local`. This parameter should point to the location of the CA certificate file on your local machine.
-
-If you're using a self-signed certificate, e.g. for testing or development purposes, you can set the `REJECT_UNAUTHORIZED` parameter to `false` in your `.env.local`. This will disable certificate validation, and allow Chat UI to connect to your custom endpoint.
-
 #### Models hosted on multiple custom endpoints
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
@@ -408,8 +376,15 @@ If the model being hosted will be available on multiple servers/instances add th
 }
 ...
 ]
-
 ```
+
+#### Client Certificate Authentication (mTLS)
+
+Custom endpoints may require client certificate authentication, depending on how you configure them. To enable mTLS between Chat UI and your custom endpoint, you will need to set the `USE_CLIENT_CERTIFICATE` to `true`, and add the `CERT_PATH` and `KEY_PATH` parameters to your `.env.local`. These parameters should point to the location of the certificate and key files on your local machine. The certificate and key files should be in PEM format. The key file can be encrypted with a passphrase, in which case you will also need to add the `CLIENT_KEY_PASSWORD` parameter to your `.env.local`.
+
+If you're using a certificate signed by a private CA, you will also need to add the `CA_PATH` parameter to your `.env.local`. This parameter should point to the location of the CA certificate file on your local machine.
+
+If you're using a self-signed certificate, e.g. for testing or development purposes, you can set the `REJECT_UNAUTHORIZED` parameter to `false` in your `.env.local`. This will disable certificate validation, and allow Chat UI to connect to your custom endpoint.
 
 ## Deploying to a HF Space
 
