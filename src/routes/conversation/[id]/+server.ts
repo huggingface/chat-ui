@@ -12,6 +12,8 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
+import { uploadFile } from "$lib/server/files/uploadFile.js";
+import sizeof from "image-size";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -92,6 +94,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		id: messageId,
 		is_retry,
 		web_search: webSearch,
+		files: b64files,
 	} = z
 		.object({
 			inputs: z.string().trim().min(1),
@@ -99,8 +102,41 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			response_id: z.optional(z.string().uuid()),
 			is_retry: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
+			files: z.optional(z.array(z.string())),
 		})
 		.parse(json);
+
+	// files is an array of base64 strings encoding Blob objects
+	// we need to convert this array to an array of File objects
+
+	const files = b64files?.map((file) => {
+		const blob = Buffer.from(file, "base64");
+		return new File([blob], "image.png");
+	});
+
+	// check sizes
+	if (files) {
+		const filechecks = await Promise.all(
+			files.map(async (file) => {
+				const dimensions = sizeof(Buffer.from(await file.arrayBuffer()));
+				return (
+					file.size > 2 * 1024 * 1024 ||
+					(dimensions.width ?? 0) > 224 ||
+					(dimensions.height ?? 0) > 224
+				);
+			})
+		);
+
+		if (filechecks.some((check) => check)) {
+			throw error(413, "File too large, should be <2MB and 224x224 max.");
+		}
+	}
+
+	let hashes: undefined | string[];
+
+	if (files) {
+		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
+	}
 
 	// get the list of messages
 	// while checking for retries
@@ -113,7 +149,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
-				{ content: newPrompt, from: "user", id: messageId as Message["id"], updatedAt: new Date() },
+				{
+					content: newPrompt,
+					from: "user",
+					id: messageId as Message["id"],
+					updatedAt: new Date(),
+					files: conv.messages[retryMessageIdx]?.files,
+				},
 			];
 		} // else append the message at the bottom
 
@@ -125,6 +167,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				id: (messageId as Message["id"]) || crypto.randomUUID(),
 				createdAt: new Date(),
 				updatedAt: new Date(),
+				files: hashes,
 			},
 		];
 	})() satisfies Message[];
@@ -268,6 +311,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				type: "finalAnswer",
 				text: messages[messages.length - 1].content,
 			});
+
+			return;
 		},
 		async cancel() {
 			await collections.conversations.updateOne(

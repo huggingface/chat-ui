@@ -57,6 +57,7 @@ const modelConfig = z.object({
 		})
 		.passthrough()
 		.optional(),
+	multimodal: z.boolean().default(false),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));
@@ -144,4 +145,4 @@ export const smallModel = TASK_MODEL
 	  defaultModel
 	: defaultModel;
 
-export type BackendModel = Optional<typeof defaultModel, "preprompt" | "parameters">;
+export type BackendModel = Optional<typeof defaultModel, "preprompt" | "parameters" | "multimodal">;

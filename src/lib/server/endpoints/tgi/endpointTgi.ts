@@ -23,6 +23,7 @@ export function endpointTgi({
 			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
 			preprompt: conversation.preprompt,
 			model,
+			id: conversation._id,
 		});
 
 		return textGenerationStream({
