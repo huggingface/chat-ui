@@ -54,4 +54,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker image
-        run: docker build -t chat-ui:latest .
+        run: docker build --build-arg DOTENV_LOCAL=$(cat conf/.env.ci) -t chat-ui:latest .
