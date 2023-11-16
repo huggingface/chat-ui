@@ -9,6 +9,7 @@
 
 	export let data;
 	let loading = false;
+	let files: File[] = [];
 
 	async function createConversation(message: string) {
 		try {
@@ -33,7 +34,10 @@
 			const { conversationId } = await res.json();
 
 			// Ugly hack to use a store as temp storage, feel free to improve ^^
-			pendingMessage.set(message);
+			pendingMessage.set({
+				content: message,
+				files,
+			});
 
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
@@ -56,4 +60,5 @@
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.settings.activeModel)}
 	models={data.models}
 	settings={data.settings}
+	bind:files
 />

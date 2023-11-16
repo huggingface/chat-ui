@@ -31,9 +31,16 @@ export type StatusUpdate = {
 	message?: string;
 };
 
+export type ErrorUpdate = {
+	type: "error";
+	message: string;
+	name: string;
+};
+
 export type MessageUpdate =
 	| FinalAnswer
 	| TextStreamUpdate
 	| AgentUpdate
 	| WebSearchUpdate
-	| StatusUpdate;
+	| StatusUpdate
+	| ErrorUpdate;

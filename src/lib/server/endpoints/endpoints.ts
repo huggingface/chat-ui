@@ -11,6 +11,7 @@ interface EndpointParameters {
 	conversation: {
 		messages: Omit<Conversation["messages"][0], "id">[];
 		preprompt?: Conversation["preprompt"];
+		_id?: Conversation["_id"];
 	};
 }
 

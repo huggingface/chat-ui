@@ -6,7 +6,6 @@
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
-
 	// Approximate width from which we disable autofocus
 	const TABLET_VIEWPORT_WIDTH = 768;
 

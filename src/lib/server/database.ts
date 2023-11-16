@@ -1,5 +1,5 @@
 import { MONGODB_URL, MONGODB_DB_NAME, MONGODB_DIRECT_CONNECTION } from "$env/static/private";
-import { MongoClient } from "mongodb";
+import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { WebSearch } from "$lib/types/WebSearch";
@@ -29,6 +29,7 @@ const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
 const webSearches = db.collection<WebSearch>("webSearches");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
+const bucket = new GridFSBucket(db, { bucketName: "files" });
 
 export { client, db };
 export const collections = {
@@ -39,6 +40,7 @@ export const collections = {
 	users,
 	webSearches,
 	messageEvents,
+	bucket,
 };
 
 client.on("open", () => {
