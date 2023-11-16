@@ -83,6 +83,9 @@
 
 			const module = await import("browser-image-resizer");
 
+			// currently, only IDEFICS is supported by TGI
+			// the size of images is hardcoded to 224x224 in TGI
+			// this will need to be configurable when support for more models is added
 			const resizedImages = await Promise.all(
 				files.map(async (file) => {
 					return await module
