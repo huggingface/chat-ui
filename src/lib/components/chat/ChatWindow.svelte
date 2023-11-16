@@ -117,7 +117,7 @@
 				{#await source then src}
 					<div class="relative h-24 w-24 overflow-hidden rounded-lg shadow-lg">
 						<img
-							src={`data:image/png;base64,${src}`}
+							src={`data:image/*;base64,${src}`}
 							alt="input content"
 							class="h-full w-full rounded-lg bg-gray-400 object-cover dark:bg-gray-900"
 						/>
@@ -231,7 +231,7 @@
 						type="button"
 						on:click={() => dispatch("share")}
 					>
-						<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+						<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 						<div class="max-sm:hidden">Share this conversation</div>
 					</button>
 				{/if}

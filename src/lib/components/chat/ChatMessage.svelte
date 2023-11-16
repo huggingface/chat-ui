@@ -246,7 +246,7 @@
 							/>
 						{:else}
 							<img
-								src={"data:image/png;base64," + file}
+								src={"data:image/*;base64," + file}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>
