@@ -24,10 +24,10 @@
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
-	<a class="flex items-center rounded-xl text-lg font-semibold" href="{PUBLIC_ORIGIN}{base}/">
+	<div class="flex items-center h-10 w-20">
 		<Logo classNames="mr-1" />
-		{PUBLIC_APP_NAME}
-	</a>
+		<!-- {"chat ui"} -->
+	</div>
 	<a
 		href={`${base}/`}
 		class="flex rounded-lg border border-gray-200 bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none text-gray-500 hover:bg-gray-100"
@@ -43,7 +43,7 @@
 	{/each}
 </div>
 <div
-	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm"
+	class="mt-0.5 flex flex-col gap-1 rounded-r-xl bg-gradient-to-l from-gray-50 p-3 text-sm"
 >
 	{#if user?.username || user?.email}
 		<form

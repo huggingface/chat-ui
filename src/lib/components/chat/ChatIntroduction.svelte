@@ -28,12 +28,12 @@
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
-<div class="my-auto grid gap-8 lg:grid-cols-3">
-	<div class="lg:col-span-1">
+<div class="my-auto  gap-8 lg:grid-cols-3">
+	<div class="lg:col-span-1 flex items-center justify-center">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 flex-none" />
-				{PUBLIC_APP_NAME}
+				<!-- {PUBLIC_APP_NAME} -->
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
 				>

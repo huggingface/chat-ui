@@ -13,9 +13,9 @@
 	<div
 		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-primary-500/40 via-primary-500/10 to-primary-500/0 px-5 pb-8 pt-9 text-center"
 	>
-		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
+		<h2 class="flex items-center text-2xl font-semibold text-gray-800 h-10 w-20">
 			<Logo classNames="mr-1" />
-			{PUBLIC_APP_NAME}
+			<!-- {PUBLIC_APP_NAME} -->
 		</h2>
 		<p class="text-lg font-semibold leading-snug text-gray-800" style="text-wrap: balance;">
 			{PUBLIC_APP_DESCRIPTION}

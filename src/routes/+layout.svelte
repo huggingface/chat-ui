@@ -108,10 +108,10 @@
 
 <svelte:head>
 	<title>{PUBLIC_APP_NAME}</title>
-	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
+	<meta name="description" content="One stop shop for love" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
-	<meta property="og:title" content={PUBLIC_APP_NAME} />
+	<meta property="og:title" content={"PUBLIC_APP_NAME"} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
 	<meta
