@@ -13,8 +13,6 @@ interface buildPromptOptions {
 	webSearch?: WebSearch;
 	preprompt?: string;
 	files?: File[];
-	url?: URL;
-	fetch?: typeof fetch;
 }
 
 export async function buildPrompt({
@@ -22,8 +20,6 @@ export async function buildPrompt({
 	model,
 	webSearch,
 	preprompt,
-	url,
-	fetch,
 	id,
 }: buildPromptOptions): Promise<string> {
 	if (webSearch && webSearch.context) {
@@ -60,7 +56,7 @@ export async function buildPrompt({
 				let content = el.content;
 
 				if (el.from === "user") {
-					if (el?.files?.length > 0 && url && fetch && id) {
+					if (el?.files && el.files.length > 0 && id) {
 						const markdowns = await Promise.all(
 							el.files.map(async (hash) => {
 								try {

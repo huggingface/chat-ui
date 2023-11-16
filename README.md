@@ -168,6 +168,91 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
+#### OpenAI API compatible models
+
+Chat UI can be used with any API server that supports OpenAI API compatibility, for example [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol).
+
+The following example config makes Chat UI works with [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), the `endpoint.baseUrl` is the url of the OpenAI API compatible server, this overrides the baseUrl to be used by OpenAI instance. The `endpoint.completion` determine which endpoint to be used, default is `chat_completions` which uses `v1/chat/completions`, change to `endpoint.completion` to `completions` to use the `v1/completions` endpoint.
+
+```
+MODELS=`[
+  {
+    "name": "text-generation-webui",
+    "id": "text-generation-webui",
+    "parameters": {
+      "temperature": 0.9,
+      "top_p": 0.95,
+      "repetition_penalty": 1.2,
+      "top_k": 50,
+      "truncate": 1000,
+      "max_new_tokens": 1024,
+      "stop": []
+    },
+    "endpoints": [{
+      "type" : "openai",
+      "baseURL": "http://localhost:8000/v1"
+    }]
+  }
+]`
+
+```
+
+The `openai` type includes official OpenAI models. You can add, for example, GPT4/GPT3.5 as a "openai" model:
+
+```
+OPENAI_API_KEY=#your openai api key here
+MODELS=`[{
+      "name": "gpt-4",
+      "displayName": "GPT 4",
+      "endpoints" : [{
+        "type": "openai"
+      }]
+},
+      {
+      "name": "gpt-3.5-turbo",
+      "displayName": "GPT 3.5 Turbo",
+      "endpoints" : [{
+        "type": "openai"
+      }]
+}]`
+```
+
+#### Llama.cpp API server
+
+chat-ui also supports the llama.cpp API server directly without the need for an adapter. You can do this using the `llamacpp` endpoint type.
+
+If you want to run chat-ui with llama.cpp, you can do the following, using Zephyr as an example model:
+
+1. Get [the weights](https://huggingface.co/TheBloke/zephyr-7B-beta-GGUF/tree/main) from the hub
+2. Run the server with the following command: `./server -m models/zephyr-7b-beta.Q4_K_M.gguf -c 2048 -np 3`
+3. Add the following to your `.env.local`:
+
+```env
+MODELS=[
+  {
+      "name": "Local Zephyr",
+      "chatPromptTemplate": "<|system|>\n{{preprompt}}</s>\n{{#each messages}}{{#ifUser}}<|user|>\n{{content}}</s>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}</s>\n{{/ifAssistant}}{{/each}}",
+      "parameters": {
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "repetition_penalty": 1.2,
+        "top_k": 50,
+        "truncate": 1000,
+        "max_new_tokens": 2048,
+        "stop": ["</s>"]
+      },
+      "endpoints": [
+        {
+         "url": "http://127.0.0.1:8080",
+         "type": "llamacpp"
+        }
+      ]
+  }
+]
+```
+
+Start chat-ui with `npm run dev` and you should be able to chat with Zephyr locally.
+
 #### Custom prompt templates
 
 By default, the prompt is constructed using `userMessageToken`, `assistantMessageToken`, `userMessageEndToken`, `assistantMessageEndToken`, `preprompt` parameters and a series of default templates.
@@ -258,20 +343,42 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
-### Amazon SageMaker
+### Amazon
+
+#### SageMaker
 
 You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
 
 ```env
 "endpoints": [
     {
-      "host" : "sagemaker",
-      "url": "", // your aws sagemaker url here
+      "type" : "aws",
+      "service" : "sagemaker"
+      "url": "",
       "accessKey": "",
       "secretKey" : "",
-      "sessionToken": "", // optional
+      "sessionToken": "",
       "weight": 1
     }
+]
+```
+
+#### Lambda
+
+You can also specify your Amazon Lambda instance as an endpoint for chat-ui. The config goes like this:
+
+```env
+"endpoints" : [
+  {
+        "type": "aws",
+        "service": "lambda",
+        "url": "",
+        "accessKey": "",
+        "secretKey": "",
+        "sessionToken": "",
+        "region": "",
+        "weight": 1
+ }
 ]
 ```
 

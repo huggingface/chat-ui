@@ -168,6 +168,8 @@
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
 								reader.cancel();
+								loading = false;
+								pending = false;
 								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
 								pending = false;
@@ -196,6 +198,8 @@
 											convId: $page.params.id,
 										};
 									}
+								} else if (update.status === "error") {
+									$error = update.message ?? "An error has occurred";
 								}
 							} else if (update.type === "error") {
 								error.set(update.message);
