@@ -54,11 +54,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker image
-        run: |
-          docker build -t your_image_name:latest .
-          exit_code=$?
-
-          if [ $exit_code -ne 0 ]; then
-            echo "Docker build failed with exit code $exit_code"
-            exit 1
-          fi
+        run: docker build -t chat-ui:latest .
