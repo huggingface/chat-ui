@@ -195,6 +195,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					updates.push(newUpdate);
 				}
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
+
+				if (newUpdate.type === "finalAnswer") {
+					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
+					let placeholder = " ".repeat(4096);
+					controller.enqueue(placeholder);
+				}
+				if (newUpdate.token === "") {
+					return;
+				}
 			}
 
 			update({ type: "status", status: "started" });
