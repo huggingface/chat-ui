@@ -18,6 +18,7 @@
 	import { page } from "$app/stores";
 	import DisclaimerModal from "../DisclaimerModal.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
+	import ImageGallery from "./ImageGallery.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -28,11 +29,36 @@
 	export let settings: LayoutData["settings"];
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
+	type Image = {
+		id: string;
+		url: string;
+	};
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
 	let loginModalOpen = false;
 	let message: string;
+	let fileInput: HTMLInputElement;
+	let images: Array<Image> = [];
+	let imageGaleryOpened = false;
+	async function fetchAllOriginalImages() {
+		console.log("fetching images");
+		const response = await fetch(`http://127.0.0.1:8000/original_images_list/`, {
+			method: "GET",
+			headers: {
+				accept: "application/json",
+			},
+		});
+		console.log("response", response);
+
+		if (response.ok) {
+			const result = await response.json();
+			images = result;
+		} else {
+			console.log("Could not fetch all images URLs");
+			images = [];
+		}
+	}
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -44,10 +70,98 @@
 	const handleSubmit = () => {
 		if (loading) return;
 		dispatch("message", message);
+		console.log("dispatched message", message);
 		message = "";
 	};
-
 	$: lastIsError = messages[messages.length - 1]?.from === "user" && !loading;
+
+	// let imageUrl: string | undefined = undefined;
+
+	async function handleFileChange(event: Event) {
+		const files = (event.target as HTMLInputElement).files;
+		if (!files) return;
+		const file = files[0];
+		if (file) {
+			// Convert the image file to a URL that can be displayed
+			// const imageUrl = URL.createObjectURL(file);
+
+			// Prepare the file to be sent in a FormData object
+			const formData = new FormData();
+			formData.append("file", file);
+			console.log("file", file);
+			// POST the image file to the server
+			const response = await fetch(`http://127.0.0.1:8000/upload/`, {
+				method: "POST",
+				headers: {
+					accept: "application/json",
+				},
+				body: formData,
+			});
+
+			// Handle the response
+			console.log("response", response);
+			if (response.ok) {
+				// Use the returned URL
+				const result = await response.json();
+				console.log("result", result);
+				const json = { id: result.id, url: result.url };
+				console.log("json", json);
+				if (loading) return;
+				dispatch(
+					"message",
+					`A new image has been added to the image database with the details: ${JSON.stringify(
+						result
+					)}. Show in "ecole-image" format`
+				);
+				fetchAllOriginalImages();
+			} else {
+				console.error("Upload failed", response);
+			}
+		}
+	}
+	function onSelectImage(image: Image) {
+		dispatch(
+			"message",
+			`I chose this image: ${JSON.stringify(image)}. Show in "ecole-image" format.
+			`
+		);
+		console.log("dispatched message over here");
+	}
+
+	// async function annotateImage() {
+	// 	if (!imageUrl) {
+	// 		console.error("No image to annotate");
+	// 		return;
+	// 	}
+	// 	const image_id = imageUrl.split("/").pop();
+	// 	console.log("image_id", image_id);
+	// 	const response = await fetch(`http://localhost:8000/annotate/`, {
+	// 		method: "POST",
+	// 		body: JSON.stringify({ image_id: "654d7fbc9b4402bd9d1cf1f8", prompt: "Prompt 4" }),
+	// 		headers: {
+	// 			"Content-Type": "application/json",
+	// 		},
+	// 	});
+	// 	const result = await response.json();
+	// 	console.log("result", result);
+	// 	console.log("resultoverhere", result);
+	// 	if (response.ok) {
+	// 		// Use the returned URL
+	// 		imageUrl = result.url;
+	// 	} else {
+	// 		console.error("Upload failed", result);
+	// 	}
+	// }
+	function handleUploadClick(): void {
+		fileInput.click();
+	}
+	function handleImageGaleryClick(): void {
+		console.log("clicked");
+		imageGaleryOpened = !imageGaleryOpened;
+		if (imageGaleryOpened) {
+			fetchAllOriginalImages();
+		}
+	}
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -81,6 +195,7 @@
 		}}
 		on:vote
 		on:retry={(ev) => {
+			console.log(ev);
 			if (!loading) dispatch("retry", ev.detail);
 		}}
 	/>
@@ -105,6 +220,41 @@
 				/>
 			{/if}
 		</div>
+		<!-- <div class="flex flex-1 items-center">
+			{#if imageUrl}
+				<img class="image-preview" src={imageUrl} alt="Image preview..." />
+			{/if}
+		</div> -->
+		{#if imageGaleryOpened}
+			<div class="flex-2 flex items-center">
+				<ImageGallery {images} {onSelectImage} />
+			</div>
+		{/if}
+		<div class="flex-2 flex items-center">
+			<label for="imageUpload" class="custom-file-upload">
+				<input
+					type="file"
+					bind:this={fileInput}
+					id="imageUpload"
+					accept="image/*"
+					on:change={handleFileChange}
+					hidden
+				/>
+			</label>
+			<button
+				class="m-4 rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400"
+				on:click={handleUploadClick}
+			>
+				Upload Image
+			</button>
+			<button
+				class="m-4 rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400"
+				on:click={handleImageGaleryClick}
+			>
+				{imageGaleryOpened ? "Close" : "Open"} Image Gallery
+			</button>
+		</div>
+
 		<form
 			on:submit|preventDefault={handleSubmit}
 			class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
@@ -168,7 +318,7 @@
 					type="button"
 					on:click={() => dispatch("share")}
 				>
-					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+					<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
 			{/if}

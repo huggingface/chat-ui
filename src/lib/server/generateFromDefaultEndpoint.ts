@@ -50,6 +50,17 @@ export async function generateFromDefaultEndpoint(
 			},
 		});
 	} else {
+		console.log("requesthere", randomEndpoint.url, randomEndpoint.authorization, {
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: randomEndpoint.authorization,
+			},
+			method: "POST",
+			body: {
+				parameters: newParameters,
+				inputs: prompt,
+			},
+		});
 		resp = await fetch(randomEndpoint.url, {
 			headers: {
 				"Content-Type": "application/json",
@@ -62,6 +73,7 @@ export async function generateFromDefaultEndpoint(
 			}),
 			signal: abortController.signal,
 		});
+		console.log("\n \n \n response", resp);
 	}
 
 	if (!resp.ok) {

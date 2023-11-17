@@ -1,24 +1,25 @@
-import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT, JUPYTER_API_URL } from "$env/static/private";
+import { HF_ACCESS_TOKEN, MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
+import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { modelEndpoint } from "$lib/server/modelEndpoint";
 import { models } from "$lib/server/models";
+import { summarize } from "$lib/server/preprompting";
+import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import type { WebSearch } from "$lib/types/WebSearch";
+import { processMarkdownToExecuteRequestCodeBlock } from "$lib/utils/executingFunctions.js";
 import { trimPrefix } from "$lib/utils/trimPrefix";
 import { trimSuffix } from "$lib/utils/trimSuffix";
 import { textGenerationStream } from "@huggingface/inference";
 import { error } from "@sveltejs/kit";
+import { AwsClient } from "aws4fetch";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import { AwsClient } from "aws4fetch";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import type { WebSearch } from "$lib/types/WebSearch";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
-import { summarize } from "$lib/server/summarize";
 
 export async function POST({ request, fetch, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -149,8 +150,6 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 		}
 	);
 
-
-
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -194,6 +193,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 			}
 
 			// we can now build the prompt using the messages
+
 			const prompt = await buildPrompt({
 				messages,
 				model,
@@ -201,6 +201,7 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				preprompt: conv.preprompt ?? model.preprompt,
 				locals: locals,
 			});
+			console.log("prompt", prompt);
 
 			// fetch the endpoint
 			const randomEndpoint = modelEndpoint(model);
@@ -242,8 +243,10 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 							generated_text = generated_text.slice(0, -stop.length).trimEnd();
 						}
 					}
-					lastMessage.content = generated_text;
+					console.log("generated_text", generated_text);
+					generated_text = await processMarkdownToExecuteRequestCodeBlock(generated_text);
 
+					lastMessage.content = generated_text;
 					await collections.conversations.updateOne(
 						{
 							_id: convId,
@@ -257,13 +260,14 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 						}
 					);
 
-
 					update({
 						type: "finalAnswer",
 						text: generated_text,
 					});
+					console.log("final answer", generated_text);
 				}
 			}
+			console.log("streaming prompt", prompt);
 
 			const tokenStream = textGenerationStream(
 				{
@@ -281,94 +285,51 @@ export async function POST({ request, fetch, locals, params, getClientAddress })
 				}
 			);
 
-			(async () => {
-				for await (const output of tokenStream) {
-					// if not generated_text is here it means the generation is not done
-					if (!output.generated_text) {
-						// else we get the next token
-						if (!output.token.special) {
-							const lastMessage = messages[messages.length - 1];
-							update({
-								type: "stream",
-								token: output.token.text,
-							});
+			for await (const output of tokenStream) {
+				// if not generated_text is here it means the generation is not done
+				if (!output.generated_text) {
+					// else we get the next token
+					if (!output.token.special) {
+						const lastMessage = messages[messages.length - 1];
+						update({
+							type: "stream",
+							token: output.token.text,
+						});
 
-							// if the last message is not from assistant, it means this is the first token
-							if (lastMessage?.from !== "assistant") {
-								// so we create a new message
-								messages = [
-									...messages,
-									// id doesn't match the backend id but it's not important for assistant messages
-									// First token has a space at the beginning, trim it
-									{
-										from: "assistant",
-										content: output.token.text.trimStart(),
-										webSearch: webSearchResults,
-										updates: updates,
-										id: (responseId as Message["id"]) || crypto.randomUUID(),
-										createdAt: new Date(),
-										updatedAt: new Date(),
-									},
-								];
-							} else {
-								const date = abortedGenerations.get(convId.toString());
-								if (date && date > promptedAt) {
-
-									saveLast(lastMessage.content);
-								}
-								if (!output) {
-									break;
-								}
-
-								// otherwise we just concatenate tokens
-								lastMessage.content += output.token.text;
+						// if the last message is not from assistant, it means this is the first token
+						if (lastMessage?.from !== "assistant") {
+							// so we create a new message
+							messages = [
+								...messages,
+								// id doesn't match the backend id but it's not important for assistant messages
+								// First token has a space at the beginning, trim it
+								{
+									from: "assistant",
+									content: output.token.text.trimStart(),
+									webSearch: webSearchResults,
+									updates: updates,
+									id: (responseId as Message["id"]) || crypto.randomUUID(),
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+							];
+						} else {
+							const date = abortedGenerations.get(convId.toString());
+							if (date && date > promptedAt) {
+								saveLast(lastMessage.content);
 							}
+							if (!output) {
+								break;
+							}
+
+							// otherwise we just concatenate tokens
+							lastMessage.content += output.token.text;
 						}
-					} else {
-						const inputString = output.generated_text;
-
-						const pattern = /<execute>([\s\S]*?)<\/execute>/;
-						const match = inputString.match(pattern);
-
-						if (match) {
-							const substringBetweenExecuteTags = match[1].trim();
-							var result;
-							try {
-								const resFromJupyter = await fetch(JUPYTER_API_URL + "/execute", {
-									headers: {
-										'Content-Type': 'application/json',
-									},
-									method: "POST",
-									body: JSON.stringify({
-										convid: convId.toString(),
-										code: substringBetweenExecuteTags
-									}),
-								});
-								if (resFromJupyter.ok) {
-									const data = await resFromJupyter.json();
-									result = "\n" + "```result\n" + data["result"]
-								} else {
-									console.error('Request to Jupyter failed with status:', resFromJupyter.status);
-									result = "\n" + "```result\n" + "Request to Code Execution failed with status: " + resFromJupyter.status + ". Please try again."
-								}
-							} catch (error) {
-								console.error('Error making the request:', error);
-								result = "\n" + "```result\n" + "Error making the request: " + error + ". Please try again."
-							}
-
-							for (const token_ of result) {
-								update({
-									type: "stream",
-									token: token_,
-								});
-							}
-							output.generated_text += result;
-
-						}
-						saveLast(output.generated_text);
 					}
+				} else {
+					saveLast(output.generated_text);
 				}
-			})();
+			}
 		},
 		async cancel() {
 			await collections.conversations.updateOne(

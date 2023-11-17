@@ -21,8 +21,6 @@
 
 	function sanitizeMd(md: string) {
 		let ret = md
-			.replace(/<execute(\s)*(>)?(\s)*/g, '\n```python\n')
-			.replace(/<\/execute(>)?/g, '\n```')
 			.replace(/<\|[a-z]*$/, "")
 			.replace(/<\|[a-z]+\|$/, "")
 			.replace(/<$/, "")
@@ -37,6 +35,7 @@
 				ret = ret.slice(0, -stop.length).trim();
 			}
 		}
+
 		return ret;
 	}
 	function unsanitizeMd(md: string) {
@@ -89,7 +88,7 @@
 	);
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
-
+	$: console.log("tokensoverhere", tokens);
 	afterUpdate(() => {
 		loadingEl?.$destroy();
 		clearTimeout(pendingTimeout);
@@ -103,7 +102,7 @@
 						props: { classNames: "loading inline ml-2" },
 					});
 				}
-			}, 600);
+			}, 200);
 		}
 	});
 
@@ -239,7 +238,19 @@
 		<div
 			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
 		>
-			{message.content.trim()}
+			<div
+				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+				bind:this={contentEl}
+			>
+				{#each tokens as token}
+					{#if token.type === "code"}
+						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
+					{:else}
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html marked.parse(token.raw, options)}
+					{/if}
+				{/each}
+			</div>
 		</div>
 		{#if !loading}
 			<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">

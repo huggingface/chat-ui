@@ -2,6 +2,8 @@ import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 import { format } from "date-fns";
 import type { WebSearch } from "./types/WebSearch";
+import { prepromptImageDatabase, prepromptAccessibleFunction } from "$lib/server/preprompting.js";
+import { IMAGE_DATABASE_CONFIG, ALLOWED_FUNCTIONS } from "$env/static/private";
 /**
  * Convert [{user: "assistant", content: "hi"}, {user: "user", content: "hello"}] to:
  *
@@ -48,7 +50,33 @@ export async function buildPrompt({
 			},
 		];
 	}
+	{
+		const lastMsg = messages.slice(-1)[0];
+		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
+		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
 
+		const previousQuestions =
+			previousUserMessages.length > 0
+				? `Previous questions: \n${previousUserMessages
+						.map(({ content }) => `- ${content}`)
+						.join("\n")}`
+				: "";
+		messages = [
+			...messagesWithoutLastUsrMsg,
+			{
+				from: "user",
+				content: `Here is the context for prompt:
+					=====================
+					${IMAGE_DATABASE_CONFIG.length > 0 ? await prepromptImageDatabase(model) : ""}
+					
+					${ALLOWED_FUNCTIONS.length > 0 ? prepromptAccessibleFunction(model) : ""}
+					=====================	
+					${previousQuestions}
+					Answer the question: ${lastMsg.content}
+				`,
+			},
+		];
+	}
 	return (
 		model
 			.chatPromptRender({ messages, preprompt })

@@ -29,6 +29,7 @@ const endpoint = z.lazy(() =>
 
 const combinedEndpoint = endpoint.transform((data) => {
 	if (data.host === "tgi" || data.host === undefined) {
+		console.log("tgi endpoint", data);
 		return tgiEndpoint.merge(commonEndpoint).parse(data);
 	} else if (data.host === "sagemaker") {
 		return sagemakerEndpoint.merge(commonEndpoint).parse(data);

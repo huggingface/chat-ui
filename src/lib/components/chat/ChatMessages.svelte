@@ -35,6 +35,9 @@
 	$: if (browser && messages[messages.length - 1]?.from === "user") {
 		scrollToBottom();
 	}
+	if (messages) {
+		console.log("messages", messages);
+	}
 </script>
 
 <div

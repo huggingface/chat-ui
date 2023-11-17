@@ -1,0 +1,56 @@
+[
+    {
+        "name": "annotate_image",
+        "type": "async def",
+        "description": "annotate an image",
+        "parameters": [
+            {
+                "name": "image_id",
+                "type": "str",
+                "description": "The image to be annotated"
+            },
+            {
+                "name": "prompt",
+                "type": "str",
+                "description": "The prompt to be used for annotation"
+            },
+            {
+                "name": "box_threshold",
+                "type": "float",
+                "description": "The threshold for boxes"
+            },
+            {
+                "name": "text_threshold",
+                "type": "float",
+                "description": "The threshold for text"
+            }
+        ],
+        "return": [],
+        "example": "await annotate_image('image_id', 'prompt', 0.7, 0.4)"
+    },
+    {
+        "name": "segment_image",
+        "type": "async def",
+        "description": "segment an image",
+        "parameters": [
+            {
+                "name": "image_id",
+                "type": "str",
+                "description": "The image to be segmented"
+            },
+            {
+                "name": "prompt",
+                "type": "str",
+                "description": "The prompt to be used for segmentation"
+            }
+        ],
+        "return": [
+            {
+                "name": "segmented_image_id",
+                "type": "str",
+                "description": "The segmented image id"
+            }
+        ],
+        "example": "await segment_image('image_id', 'prompt')"
+    }
+]
