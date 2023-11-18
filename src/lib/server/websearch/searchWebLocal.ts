@@ -31,6 +31,7 @@ export async function searchWebLocal(query: string) {
 	}
 
 	// take url that start wirth /url?q=
+	// and do not contain google.com links
 	// and strip them up to '&sa='
 	const linksHref = Array.from(links)
 		.filter((el) => el.href?.startsWith("/url?q=") && !el.href.includes("google.com/"))
@@ -39,6 +40,6 @@ export async function searchWebLocal(query: string) {
 			return link.slice("/url?q=".length, link.indexOf("&sa="));
 		});
 
-	// combine text contents from paragraphs and then remove newlines and multiple spaces
+	// remove duplicate links and map links to the correct object shape
 	return { organic_results: [...new Set(linksHref)].map((link) => ({ link })) };
 }
