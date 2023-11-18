@@ -14,7 +14,8 @@ export function getWebSearchProvider() {
 export async function searchWeb(query: string) {
 	if (USE_LOCAL_WEBSEARCH) {
 		return await searchWebLocal(query);
-	} else if (SERPER_API_KEY) {
+	}
+	if (SERPER_API_KEY) {
 		return await searchWebSerper(query);
 	}
 	if (YDC_API_KEY) {
