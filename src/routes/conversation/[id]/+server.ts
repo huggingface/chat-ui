@@ -198,8 +198,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				if (newUpdate.type === "finalAnswer") {
 					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
-					let placeholder = " ".repeat(4096);
-					controller.enqueue(placeholder);
+					controller.enqueue(" ".repeat(4096));
 				}
 				if (newUpdate.token === "") {
 					return;
