@@ -15,6 +15,8 @@ import { getWebSearchProvider } from "./searchWeb";
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
 
+const DOMAIN_BLOCKLIST = ["youtube.com", "twitter.com"];
+
 export async function runWebSearch(
 	conv: Conversation,
 	prompt: string,
@@ -45,14 +47,14 @@ export async function runWebSearch(
 		const results = await searchWeb(webSearch.searchQuery);
 		webSearch.results =
 			(results.organic_results &&
-				results.organic_results.map((el: { title: string; link: string; text?: string }) => {
+				results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
 					const { title, link, text } = el;
 					const { hostname } = new URL(link);
 					return { title, link, hostname, text };
 				})) ??
 			[];
 		webSearch.results = webSearch.results
-			.filter(({ link }) => !link.includes("youtube.com")) // filter out youtube links
+			.filter(({ link }) => !DOMAIN_BLOCKLIST.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
 		let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
