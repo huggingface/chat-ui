@@ -26,12 +26,15 @@ export function endpointTgi({
 			id: conversation._id,
 		});
 
-		return textGenerationStream({
-			parameters: { ...model.parameters, return_full_text: false },
-			model: url,
-			inputs: prompt,
-			accessToken,
-		});
+		return textGenerationStream(
+			{
+				parameters: { ...model.parameters, return_full_text: false },
+				model: url,
+				inputs: prompt,
+				accessToken,
+			},
+			{ use_cache: false }
+		);
 	};
 }
 
