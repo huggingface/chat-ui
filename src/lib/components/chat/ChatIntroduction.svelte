@@ -28,24 +28,20 @@
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
-<div class="my-auto  gap-8 lg:grid-cols-3">
-	<div class="lg:col-span-1 flex items-center justify-center">
+<div class="my-auto  gap-8 ">
+	<div class="lg:col-span-1 flex items-center justify-center text-center">
 		<div>
-			<div class="mb-3 flex items-center text-2xl font-semibold">
-				<Logo classNames="mr-1 flex-none" />
-				<!-- {PUBLIC_APP_NAME} -->
-				<div
-					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400"
-				>
-					v{PUBLIC_VERSION}
-				</div>
-			</div>
 			<p class="text-base text-gray-600">
 				{PUBLIC_APP_DESCRIPTION ||
 					"Making the community's best AI chat models available to everyone."}
 			</p>
+			<p class="text-base text-gray-600 text-4xl font-semibold">
+				{PUBLIC_APP_NAME ||
+					"Making the community's best AI chat models available to everyone."}
+			</p>
 		</div>
 	</div>
+	
 	<div class="lg:col-span-2 lg:pl-24">
 		
 
@@ -54,12 +50,11 @@
 	</div>
 	{#if currentModelMetadata.promptExamples}
 		<div class="lg:col-span-3 lg:mt-6">
-			<p class="mb-3 text-gray-600">Examples</p>
 			<div class="grid gap-3 lg:grid-cols-3 lg:gap-5">
 				{#each currentModelMetadata.promptExamples as example}
 					<button
 						type="button"
-						class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 sm:p-4"
+						class="rounded-xl border bg-gray-100 p-2.5 text-black-600 sm:p-4"
 						on:click={() => dispatch("message", example.prompt)}
 					>
 						{example.title}

@@ -144,7 +144,7 @@
 			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 		/>
 		<div
-			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 bg-gray-100"
+			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2x  px-5 py-3.5 text-black-200 prose-pre:my-2 bg-gray-100"
 		>
 			{#if searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults
@@ -158,7 +158,7 @@
 			{/if}
 
 			<div
-				class="prose max-w-none max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 text-gray-500"
+				class="prose max-w-none max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 text-black-500"
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
@@ -198,7 +198,7 @@
 					{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 				"
 			>
-				<button
+				<!-- <button
 					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500
 					{message.score && message.score > 0
 						? 'text-green-500 hover:text-green-500'
@@ -220,7 +220,7 @@
 						dispatch("vote", { score: message.score === -1 ? 0 : -1, id: message.id })}
 				>
 					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
-				</button>
+				</button> -->
 				<CopyToClipBoardBtn
 					on:click={() => {
 						isCopied = true;
@@ -236,13 +236,13 @@
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
 		<div
-			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500"
+			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-balck-500"
 		>
 			{message.content.trim()}
 		</div>
 		{#if !loading}
 			<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
-				{#if downloadLink}
+				<!-- {#if downloadLink}
 					<a
 						class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden"
 						title="Download prompt and parameters"
@@ -252,7 +252,7 @@
 					>
 						<CarbonDownload />
 					</a>
-				{/if}
+				{/if} -->
 				{#if !readOnly}
 					<button
 						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2"

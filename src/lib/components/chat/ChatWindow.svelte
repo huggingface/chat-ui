@@ -156,9 +156,9 @@
 		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
 			<p>
 				 Generated content may be inaccurate
-				or false.
+				or false. Do not use this application for high-stakes decisions or advice.
 			</p>
-			{#if messages.length}
+			<!-- {#if messages.length}
 				<button
 					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5"
 					type="button"
@@ -167,7 +167,7 @@
 					<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 					<div class="max-sm:hidden">Share this conversation</div>
 				</button>
-			{/if}
+			{/if} -->
 		</div>
 	</div>
 </div>
