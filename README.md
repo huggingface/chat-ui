@@ -122,7 +122,9 @@ PUBLIC_APP_DISCLAIMER=
 
 ### Web Search config
 
-You can enable the web search by adding any of `YDC_API_KEY` ([docs.you.com](https://docs.you.com)) or `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
+You can enable the web search through an API by adding `YDC_API_KEY` ([docs.you.com](https://docs.you.com)) or `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
+
+You can also simply enable the local websearch by setting `USE_LOCAL_WEBSEARCH=true` in your `.env.local`.
 
 ### Custom models
 
