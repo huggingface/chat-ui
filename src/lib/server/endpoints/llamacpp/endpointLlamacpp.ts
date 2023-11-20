@@ -8,7 +8,7 @@ export const endpointLlamacppParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("llamacpp"),
-	url: z.string().url(),
+	url: z.string().url().default("http://127.0.0.1:8080"),
 	accessToken: z.string().min(1).default(HF_ACCESS_TOKEN),
 });
 

@@ -48,7 +48,7 @@ const modelConfig = z.object({
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(1),
-			truncate: z.number().int().positive(),
+			truncate: z.number().int().positive().optional(),
 			max_new_tokens: z.number().int().positive(),
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
@@ -99,10 +99,12 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				} else if (args.type === "openai") {
 					return await endpoints.openai(args);
 				} else if (args.type === "llamacpp") {
-					return await endpoints.llamacpp(args);
+					return endpoints.llamacpp(args);
+				} else if (args.type === "ollama") {
+					return endpoints.ollama(args);
 				} else {
 					// for legacy reason
-					return await endpoints.tgi(args);
+					return endpoints.tgi(args);
 				}
 			}
 			random -= endpoint.weight;
