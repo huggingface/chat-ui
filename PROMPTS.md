@@ -37,3 +37,9 @@ System: {{preprompt}}\nUser:{{#each messages}}{{#ifUser}}{{content}}\nFalcon:{{/
 ```env
 {{#each messages}}{{#ifUser}}User: {{content}}{{/ifUser}}<end_of_utterance>\nAssistant: {{#ifAssistant}}{{content}}\n{{/ifAssistant}}{{/each}}
 ```
+
+## OpenChat
+
+```env
+<s>{{#each messages}}{{#ifUser}}GPT4 User: {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}}<|end_of_turn|>GPT4 Assistant: {{/ifUser}}{{#ifAssistant}}{{content}}<|end_of_turn|>{{/ifAssistant}}{{/each}}
+```
