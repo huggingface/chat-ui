@@ -92,19 +92,21 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		for (const endpoint of m.endpoints) {
 			if (random < endpoint.weight) {
 				const args = { ...endpoint, model: m };
-				if (args.type === "tgi") {
-					return endpoints.tgi(args);
-				} else if (args.type === "aws") {
-					return await endpoints.aws(args);
-				} else if (args.type === "openai") {
-					return await endpoints.openai(args);
-				} else if (args.type === "llamacpp") {
-					return endpoints.llamacpp(args);
-				} else if (args.type === "ollama") {
-					return endpoints.ollama(args);
-				} else {
-					// for legacy reason
-					return endpoints.tgi(args);
+
+				switch (args.type) {
+					case "tgi":
+						return endpoints.tgi(args);
+					case "aws":
+						return await endpoints.aws(args);
+					case "openai":
+						return await endpoints.openai(args);
+					case "llamacpp":
+						return endpoints.llamacpp(args);
+					case "ollama":
+						return endpoints.ollama(args);
+					default:
+						// for legacy reason
+						return endpoints.tgi(args);
 				}
 			}
 			random -= endpoint.weight;
