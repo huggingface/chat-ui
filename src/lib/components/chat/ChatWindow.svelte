@@ -153,11 +153,10 @@
 				{/if}
 			</div>
 		</form>
-		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-sm:gap-2">
+		<div class="mt-2 flex justify-between self-stretch px-1 text-xs text-black max-sm:gap-2">
 			<p>
-				 Generated content may be inaccurate
-				or false. Do not use this application for high-stakes decisions or advice.
-			</p>
+				 Please remember that the stories generated here are purely fictional and for creative entertainment purpose only. No personal data is recorded or stored during your use of this tool. 
+ 			</p>
 			<!-- {#if messages.length}
 				<button
 					class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5"
