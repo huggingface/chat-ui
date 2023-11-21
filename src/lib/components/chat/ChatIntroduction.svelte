@@ -35,7 +35,7 @@
 				{PUBLIC_APP_DESCRIPTION ||
 					"Making the community's best AI chat models available to everyone."}
 			</p>
-			<p class="text-base text-gray-600 text-4xl font-semibold">
+			<p class="text-gray-600 text-3xl font-semibold">
 				{PUBLIC_APP_NAME ||
 					"Making the community's best AI chat models available to everyone."}
 			</p>
