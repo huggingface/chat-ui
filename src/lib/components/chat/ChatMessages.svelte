@@ -55,6 +55,7 @@
 				model={currentModel}
 				webSearchMessages={i === messages.length - 1 ? webSearchMessages : []}
 				on:retry
+				on:edit
 				on:vote
 			/>
 		{:else}

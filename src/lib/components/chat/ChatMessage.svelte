@@ -18,6 +18,7 @@
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import CarbonEdit from "~icons/carbon/edit";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -55,6 +56,7 @@
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
 		vote: { score: Message["score"]; id: Message["id"] };
+		edit: { id: Message["id"], content: Message["content"] };
 	}>();
 
 	let contentEl: HTMLElement;
@@ -130,6 +132,23 @@
 			isCopied = false;
 		}, 1000);
 	}
+
+	let isEditing = false;
+	let editedContent = message.content;
+
+	const startEditing = () => {
+		isEditing = true;
+	};
+
+	const saveChanges = () => {
+		dispatch("edit", { id: message.id, content: editedContent });
+		isEditing = false;
+	};
+
+	const cancelEditing = () => {
+    isEditing = false;
+  };
+
 </script>
 
 {#if message.from === "assistant"}
@@ -236,35 +255,65 @@
 {#if message.from === "user"}
 	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
 		<div class="mt-5 h-3 w-3 flex-none rounded-full" />
-		<div
-			class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
-		>
-			{message.content.trim()}
-		</div>
-		{#if !loading}
-			<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
-				{#if downloadLink}
-					<a
-						class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
-						title="Download prompt and parameters"
-						type="button"
-						target="_blank"
-						href={downloadLink}
-					>
-						<CarbonDownload />
-					</a>
-				{/if}
-				{#if !readOnly}
-					<button
-						class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-						title="Retry"
-						type="button"
-						on:click={() => dispatch("retry", { content: message.content, id: message.id })}
-					>
-						<CarbonRotate360 />
+		{#if isEditing}
+			<div class= "flex flex-grow flex-col max-w=full gap-3 gizmo:gap-0">
+				<input
+					bind:value={editedContent}
+					class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
+				/>
+				<div class="text-center mt-2 flex justify-center">
+					<button 
+						class="cursor-pointer rounded-lg p-2 group-hover:block bg-green-600 hover:bg-green-800 btn relative btn-primary mr-2"
+						on:click={saveChanges}>
+						
+						<div class = "flex w-full gap-w items-center justify-center">Save & Submit</div>
 					</button>
-				{/if}
+					<button 
+						class="cursor-pointer rounded-lg p-2 group-hover:block bg-gray-200 hover:bg-gray-500 btn relative btn-neutral"
+						on:click={cancelEditing}>
+						<div class = "flex w-full gap-w items-center justify-center">Cancel</div>
+					</button>
+				</div>
 			</div>
+		{:else}
+			<div
+				class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
+			>
+				{message.content.trim()}
+			</div>
+			{#if !loading}
+				<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
+					{#if downloadLink}
+						<a
+							class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
+							title="Download prompt and parameters"
+							type="button"
+							target="_blank"
+							href={downloadLink}
+						>
+							<CarbonDownload />
+						</a>
+					{/if}
+					{#if !readOnly}
+						<button
+							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+							title="Retry"
+							type="button"
+							on:click={() => dispatch("retry", { content: message.content, id: message.id })}
+						>
+							<CarbonRotate360 />
+						</button>
+						<button
+							type="button"
+							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+							title="Edit conversation message"
+							on:click={startEditing}
+						>
+							<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+						</button>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 	</div>
 {/if}

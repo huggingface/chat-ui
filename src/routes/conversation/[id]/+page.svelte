@@ -261,6 +261,18 @@
 				.finally(() => (loading = false));
 		}
 	}
+	async function onEdit(event: CustomEvent<{ id: Message["id"]; content: string }>) {
+		if (!data.shared) {
+			writeMessage(event.detail.content, event.detail.id);
+		} else {
+			convFromShared()
+				.then(async (convId) => {
+					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+				})
+				.then(() => writeMessage(event.detail.content, event.detail.id))
+				.finally(() => (loading = false));
+		}
+	}
 
 	$: $page.params.id, (isAborted = true);
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
@@ -285,6 +297,7 @@
 	bind:webSearchMessages
 	on:message={onMessage}
 	on:retry={onRetry}
+	on:edit ={onEdit}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (isAborted = true)}
