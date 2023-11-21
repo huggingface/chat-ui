@@ -7,6 +7,9 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
+		"out": "vite dev --port 8080 --host",
+		"start": "PORT=8080 HOST=0.0.0.0 node build/index.js",
+		"prod": "pm2 start npm -- out",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
@@ -63,6 +66,7 @@
 		"serpapi": "^1.1.1",
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.3.1",
-		"zod": "^3.22.3"
+		"zod": "^3.22.3",
+		"pm2": "5.3.0"
 	}
 }
