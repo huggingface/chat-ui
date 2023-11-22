@@ -140,7 +140,7 @@
 			const reader = response?.body?.pipeThrough(encoder).getReader();
 			let finalAnswer = "";
 
-			// set str queue 
+			// set str queue
 			// ex) if the last response is => {"type": "stream", "token":
 			// It should be => {"type": "stream", "token": "Hello"} = prev_input_chunk + "Hello"}
 			let prev_input_chunk = [""];
@@ -148,7 +148,6 @@
 			// this is a bit ugly
 			// we read the stream until we get the final answer
 			while (finalAnswer === "") {
-
 				// check for abort
 				if (isAborted) {
 					reader?.cancel();
