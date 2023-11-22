@@ -191,12 +191,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const updates: MessageUpdate[] = [];
 
 			function update(newUpdate: MessageUpdate) {
-				if (newUpdate.token === "") {
-					return;
-				}
-
 				if (newUpdate.type !== "stream") {
 					updates.push(newUpdate);
+				}
+
+				if (newUpdate.token === "") {
+					return;
 				}
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
 
