@@ -195,7 +195,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					updates.push(newUpdate);
 				}
 
-				if (newUpdate.token === "") {
+				if (newUpdate.type === "stream" && newUpdate.token === "") {
 					return;
 				}
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
