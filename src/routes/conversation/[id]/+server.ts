@@ -191,6 +191,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const updates: MessageUpdate[] = [];
 
 			function update(newUpdate: MessageUpdate) {
+				if (newUpdate.token === "") {
+					return;
+				}
+				
 				if (newUpdate.type !== "stream") {
 					updates.push(newUpdate);
 				}
@@ -199,9 +203,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				if (newUpdate.type === "finalAnswer") {
 					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
 					controller.enqueue(" ".repeat(4096));
-				}
-				if (newUpdate.type === "stream" && newUpdate.token === "") {
-					return;
 				}
 			}
 
