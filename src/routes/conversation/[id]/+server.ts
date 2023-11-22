@@ -194,7 +194,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				if (newUpdate.token === "") {
 					return;
 				}
-				
+
 				if (newUpdate.type !== "stream") {
 					updates.push(newUpdate);
 				}
