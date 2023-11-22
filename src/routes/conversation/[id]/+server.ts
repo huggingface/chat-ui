@@ -200,7 +200,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
 					controller.enqueue(" ".repeat(4096));
 				}
-				if (newUpdate.token === "") {
+				if (newUpdate.type === "stream" && newUpdate.token === "") {
 					return;
 				}
 			}
