@@ -4,6 +4,7 @@
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
+	import { isAborted } from "$lib/stores/isAborted";
 	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
@@ -21,6 +22,10 @@
 
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
+
+	function handleNewChatClick() {
+		isAborted.set(true);
+	}
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -30,6 +35,7 @@
 	</a>
 	<a
 		href={`${base}/`}
+		on:click={handleNewChatClick}
 		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700"
 	>
 		New Chat
