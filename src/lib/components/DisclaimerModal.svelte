@@ -4,6 +4,7 @@
 	import { PUBLIC_APP_DESCRIPTION, PUBLIC_APP_NAME } from "$env/static/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
+	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import type { LayoutData } from "../../routes/$types";
 	import Logo from "./icons/Logo.svelte";
 
@@ -46,6 +47,12 @@
 						class:bg-white={$page.data.loginEnabled}
 						class:text-gray-800={$page.data.loginEnabled}
 						class:hover:bg-slate-100={$page.data.loginEnabled}
+						on:click={(e) => {
+							if (!cookiesAreEnabled()) {
+								e.preventDefault();
+								window.open(window.location.href, "_blank");
+							}
+						}}
 					>
 						{#if $page.data.loginEnabled}
 							Try as guest
