@@ -299,6 +299,11 @@
 	}
 
 	$: $page.params.id, (($isAborted = true), (loading = false));
+
+	$: if ($isAborted) {
+		loading = false;
+	}
+
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 </script>
 
