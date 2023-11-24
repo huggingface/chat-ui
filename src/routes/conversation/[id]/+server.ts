@@ -194,7 +194,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				if (newUpdate.type !== "stream") {
 					updates.push(newUpdate);
 				}
+
+				if (newUpdate.type === "stream" && newUpdate.token === "") {
+					return;
+				}
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
+
+				if (newUpdate.type === "finalAnswer") {
+					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
+					controller.enqueue(" ".repeat(4096));
+				}
 			}
 
 			update({ type: "status", status: "started" });
