@@ -4,6 +4,7 @@
 	import { PUBLIC_APP_DESCRIPTION, PUBLIC_APP_NAME } from "$env/static/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
+	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import type { LayoutData } from "../../routes/$types";
 	import Logo from "./icons/Logo.svelte";
 
@@ -12,7 +13,7 @@
 
 <Modal>
 	<div
-		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-primary-500/40 via-primary-500/10 to-primary-500/0 px-5 pb-8 pt-9 text-center sm:px-6"
+		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center sm:px-6"
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="mr-1" />
@@ -46,6 +47,12 @@
 						class:bg-white={$page.data.loginEnabled}
 						class:text-gray-800={$page.data.loginEnabled}
 						class:hover:bg-slate-100={$page.data.loginEnabled}
+						on:click={(e) => {
+							if (!cookiesAreEnabled()) {
+								e.preventDefault();
+								window.open(window.location.href, "_blank");
+							}
+						}}
 					>
 						{#if $page.data.loginEnabled}
 							Try as guest
