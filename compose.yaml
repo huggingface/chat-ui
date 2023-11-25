@@ -1,0 +1,35 @@
+services:
+  mongo:
+    image: mongo:latest
+    restart: always
+    ports:
+      - 27017:27017
+
+  model:
+    image: ghcr.io/huggingface/text-generation-inference:1.1.1
+    command: --model-id HuggingFaceH4/zephyr-7b-beta
+    ports: 
+      - 8080:80
+    volumes:
+      - ./data:/data
+    deploy:
+          resources:
+            reservations:
+              devices:
+                - driver: nvidia
+                  count: 1
+                  capabilities: [gpu]
+
+  chat:
+    image: node:19
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017
+    working_dir: /app
+    ports:
+      - 5173:5173
+    volumes:
+      - ./:/app
+    depends_on:
+      - mongo
+      - model

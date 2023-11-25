@@ -2,8 +2,8 @@ import adapter from "@sveltejs/adapter-node";
 import { vitePreprocess } from "@sveltejs/kit/vite";
 import dotenv from "dotenv";
 
-dotenv.config({ path: "./.env.local" });
-dotenv.config({ path: "./.env" });
+dotenv.config({ path: "./chat.env.local" });
+dotenv.config({ path: "./chat.env" });
 
 process.env.PUBLIC_VERSION = process.env.npm_package_version;
 

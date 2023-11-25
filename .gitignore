@@ -12,3 +12,4 @@ vite.config.ts.timestamp-*
 SECRET_CONFIG
 .idea
 !conf/.env.ci
+data
