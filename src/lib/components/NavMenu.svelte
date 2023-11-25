@@ -42,14 +42,14 @@
 	</a>
 </div>
 <div
-	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl bg-gradient-to-l from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30"
+	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	{#each conversations as conv (conv.id)}
 		<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
 	{/each}
 </div>
 <div
-	class="mt-0.5 flex flex-col gap-1 rounded-r-xl bg-gradient-to-l from-gray-50 p-3 text-sm dark:from-gray-800/30"
+	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<form
