@@ -1,0 +1,17 @@
+#!/bin/bash
+
+model=$1
+
+if [ "$model" = "zephyr" ]; then
+    model_id=HuggingFaceH4/zephyr-7b-beta
+elif [ "$model" = "openhermes" ]; then
+    model_id=teknium/OpenHermes-2.5-Mistral-7B
+elif [ "$model" = "mistral" ]; then
+    model_id=mistralai/Mistral-7B-Instruct-v0.1
+elif [ "$model" = "neuralchat" ]; then
+    model_id=Intel/neural-chat-7b-v3-1
+else
+    echo "model not found"
+fi
+
+MODEL_ID=$model_id docker compose up

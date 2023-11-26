@@ -7,7 +7,7 @@ services:
 
   model:
     image: ghcr.io/huggingface/text-generation-inference:1.1.1
-    command: --model-id HuggingFaceH4/zephyr-7b-beta
+    command: --model-id ${MODEL_ID}
     ports: 
       - 8080:80
     volumes:
@@ -25,6 +25,7 @@ services:
     command: sh -c "npm install && npm run dev -- --host"
     environment:
       - MONGODB_URL=mongodb://mongo:27017
+      - MODEL_ID=${MODEL_ID}
     working_dir: /app
     ports:
       - 5173:5173

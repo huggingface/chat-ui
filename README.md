@@ -9,6 +9,20 @@ license: apache-2.0
 base_path: /chat
 app_port: 3000
 ---
+# Fork
+Supported models:
+
+| Model | ID |
+| --- | --- |
+| zephyr | HuggingFaceH4/zephyr-7b-beta |
+| openhermes | teknium/OpenHermes-2.5-Mistral-7B |
+| mistral | mistralai/Mistral-7B-Instruct-v0.1 |
+| neuralchat | Intel/neural-chat-7b-v3-1 |
+
+Run with:
+```bash
+./chat zephyr
+```
 
 # Chat UI
 

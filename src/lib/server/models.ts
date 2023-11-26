@@ -60,7 +60,8 @@ const modelConfig = z.object({
 	multimodal: z.boolean().default(false),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));
+let modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));
+modelsRaw = modelsRaw.filter((model) => model.name === process.env.MODEL_ID)
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
