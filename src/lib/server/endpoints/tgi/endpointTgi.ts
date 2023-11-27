@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN } from "$env/static/private";
+import { HF_ACCESS_TOKEN, CUSTOM_AUTHORIZATION_TOKEN } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { textGenerationStream } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
@@ -10,12 +10,14 @@ export const endpointTgiParametersSchema = z.object({
 	type: z.literal("tgi"),
 	url: z.string().url(),
 	accessToken: z.string().default(HF_ACCESS_TOKEN),
+	authorization: z.string().default(CUSTOM_AUTHORIZATION_TOKEN),
 });
 
 export function endpointTgi({
 	url,
 	accessToken,
 	model,
+	authorization,
 }: z.infer<typeof endpointTgiParametersSchema>): Endpoint {
 	return async ({ conversation }) => {
 		const prompt = await buildPrompt({
@@ -33,7 +35,23 @@ export function endpointTgi({
 				inputs: prompt,
 				accessToken,
 			},
-			{ use_cache: false }
+			{
+				use_cache: false,
+				fetch: async (url, info) => {
+					// authEmpty can be skipped
+					let authEmpty = typeof authorization === 'string' && authorization.length === 0;
+					let hfTokenEmpty = typeof accessToken === 'string' && accessToken.length === 0;
+					if (info && !authEmpty && hfTokenEmpty) {
+						// Set authorization header if it is defined and HF_ACCESS_TOKEN is empty
+						if (info.headers) {
+							info.headers.Authorization = authorization;
+						} else {
+							info.headers = {"Authorization": authorization};
+						}
+					}
+					return fetch(url, info)
+				}
+			}
 		);
 	};
 }

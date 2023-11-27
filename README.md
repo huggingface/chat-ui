@@ -397,6 +397,27 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
+#### API Key or other
+
+In case your custom endpoint does not support `Basic` or `Bearer` authentication and you need to pass an `API Key` or any other custom token in the authorization header, add the following to your `.env.local`:
+```env
+"endpoints": [
+{
+  "type": "tgi",
+  "url": "https://HOST:PORT",
+  "authorization": "API_KEY_OR_TOKEN",
+}
+]
+# or "authorization": "Key API_KEY_OR_TOKEN"
+```
+
+As an alternative, you can specify the `CUSTOM_AUTHORIZATION_TOKEN` in `.env.local` to use the same authorization header across all custom TGI endpoints:
+```env
+CUSTOM_AUTHORIZATION_TOKEN="API_KEY_OR_TOKEN"
+```
+
+Please note that if `HF_ACCESS_TOKEN` is also set or not empty, it will take precedence.
+
 #### Models hosted on multiple custom endpoints
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
