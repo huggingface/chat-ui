@@ -25,8 +25,7 @@
 		</p>
 
 		<p class="text-sm text-gray-500">
-			Disclaimer: AI is an area of active research with known problems such as biased generation and
-			misinformation. Do not use this application for high-stakes decisions or advice.
+			고지 사항: AI는 편향된 생성 및 잘못된 정보와 같은 문제가 발생할 수 있는 활발히 연구되고 있는 분야입니다. 이 서비스를 중요한 의사 결정이나 조언에 사용하지 마세요.
 		</p>
 
 		<div class="flex w-full flex-col items-center gap-2">

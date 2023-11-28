@@ -175,7 +175,7 @@
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
-								placeholder="Ask anything"
+								placeholder="무엇이든 물어보세요"
 								bind:value={message}
 								on:submit={handleSubmit}
 								on:keypress={(ev) => {
