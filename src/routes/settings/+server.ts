@@ -1,6 +1,4 @@
-import { base } from "$app/paths";
 import { collections } from "$lib/server/database";
-import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
 import { models, validateModel } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
