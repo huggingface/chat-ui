@@ -5,6 +5,8 @@
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/stores";
 	import { useSettingsStore } from "$lib/stores/settings";
+
+	import UserIcon from "~icons/carbon/user";
 	export let data;
 
 	let previousPage: string = base;
@@ -34,7 +36,6 @@
 				class="flex h-full max-h-[90dvh] w-full flex-col gap-4 overflow-y-auto bg-gray-200 p-4 pl-8 pt-8"
 			>
 				<h2 class="text-xl font-bold">Settings</h2>
-				<h3 class="text-sm font-light">Models</h3>
 				<div class="flex flex-col gap-2">
 					{#each data.models as model}
 						<a
@@ -53,12 +54,16 @@
 							{/if}
 						</a>
 					{/each}
+					<div class="w-full border-b-2 border-b-gray-300" />
 					<a
 						href="{base}/settings"
 						class="btn rounded-lg py-2"
 						class:bg-gray-300={$page.params.model === undefined}
-						class:font-bold={$page.params.model === undefined}>User Settings</a
+						class:font-bold={$page.params.model === undefined}
 					>
+						<UserIcon class="pr-1 text-lg" />
+						User Settings
+					</a>
 				</div>
 			</div>
 			<div class="col-span-3">
