@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from "$app/stores";
-	import Switch from "$lib/components/Switch.svelte";
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 
 	const settings = useSettingsStore();
 
@@ -19,6 +19,8 @@
 		$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt;
 
 	$: isActive = $settings.activeModel === $page.params.model;
+
+	$: model = $page.data.models.find((el: BackendModel) => el.id === $page.params.model);
 </script>
 
 <div class="flex w-full flex-col gap-5 p-6">
@@ -37,7 +39,49 @@
 				$settings.activeModel = $page.params.model;
 			}}>{isActive ? "Active" : "Activate"}</button
 		>
+		<div class="grid w-full grid-cols-3 gap-4">
+			<div>
+				<h6 class="font-semibold">Model page</h6>
+				<a
+					href={model.modelUrl || "https://huggingface.co/" + model.name}
+					target="_blank"
+					rel="noreferrer"
+					class="flex items-center truncate underline"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+					{model.modelUrl || "https://huggingface.co/" + model.name}
+				</a>
+			</div>
+			<div>
+				{#if model.datasetName || model.datasetUrl}
+					<h6 class="font-semibold">Dataset page</h6>
+					<a
+						href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
+						target="_blank"
+						rel="noreferrer"
+						class="flex items-center truncate underline"
+						><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+						{model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
+					</a>
+				{/if}
+			</div>
+
+			<div>
+				{#if model.websiteUrl}
+					<h6 class="font-semibold">Model website</h6>
+					<a
+						href={model.websiteUrl}
+						target="_blank"
+						class="flex items-center truncate underline"
+						rel="noreferrer"
+					>
+						<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+						{model.websiteUrl}
+					</a>
+				{/if}
+			</div>
+		</div>
 	</div>
+
 	<div class="flex w-full flex-col gap-2">
 		<div class="flex w-full flex-row content-between">
 			<h3 class="text-xl font-bold">System Prompt</h3>
