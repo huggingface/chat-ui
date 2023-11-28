@@ -7,7 +7,6 @@
 	import IconGear from "~icons/bi/gear-fill";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
-	import ModelsModal from "../ModelsModal.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import type { LayoutData } from "../../../routes/$types";
@@ -17,8 +16,6 @@
 	export let currentModel: Model;
 	export let settings: LayoutData["settings"];
 	export let models: Model[];
-
-	let isModelsModalOpen = false;
 
 	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
 
@@ -58,10 +55,6 @@
 				>
 			</AnnouncementBanner>
 		{/each}
-
-		{#if isModelsModalOpen}
-			<ModelsModal {settings} {models} on:close={() => (isModelsModalOpen = false)} />
-		{/if}
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="flex p-3">
 				<div>
@@ -69,7 +62,7 @@
 					<div class="font-semibold">{currentModel.displayName}</div>
 				</div>
 				<a
-					href="{base}/settings"
+					href="{base}/settings/{currentModel.id}"
 					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-gray-100 p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
 					><IconGear /></a
 				>

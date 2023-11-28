@@ -3,6 +3,8 @@
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { browser } from "$app/environment";
 	import { afterNavigate, goto } from "$app/navigation";
+	import { page } from "$app/stores";
+	import { useSettingsStore } from "$lib/stores/settings";
 	export let data;
 
 	let previousPage: string = base;
@@ -11,37 +13,57 @@
 		if (!from?.url.pathname.includes("settings")) {
 			previousPage = from?.url.pathname || previousPage;
 		}
-		console.log(previousPage);
 	});
+
+	const settings = useSettingsStore();
 </script>
 
-<dialog
-	class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm dark:bg-black/50"
-	use:clickOutside={() => {
-		if (browser) window;
-		goto(previousPage);
-	}}
+<div
+	class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
 >
-	<div
-		class="max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10"
+	<dialog
+		open
+		use:clickOutside={() => {
+			if (browser) window;
+			goto(previousPage);
+		}}
+		class="z-10 w-[90dvw] max-w-4xl overflow-x-hidden rounded-2xl bg-white p-0 shadow-2xl outline-none transition-all"
 	>
 		<div class="grid h-full w-full grid-cols-4 gap-4">
-			<div class="flex h-full w-full flex-col gap-4 bg-gray-200 p-4 pl-8 pt-8">
+			<div
+				class="flex h-full max-h-[90dvh] w-full flex-col gap-4 overflow-y-auto bg-gray-200 p-4 pl-8 pt-8"
+			>
 				<h2 class="text-xl font-bold">Settings</h2>
 				<h3 class="text-sm font-light">Models</h3>
 				<div class="flex flex-col gap-2">
 					{#each data.models as model}
-						<div class="flex flex-row items-center gap-2">
-							<a href="{base}/settings/{model.id}" class="btn btn-primary">Edit</a>
-							<span class="text-sm font-semibold">{model.displayName}</span>
-						</div>
+						<a
+							href="{base}/settings/{model.id}"
+							class=" flex flex-row items-start gap-4 rounded-lg p-2 font-light transition-all"
+							class:bg-gray-300={model.id === $page.params.model}
+						>
+							<span
+								class="w-full truncate text-sm transition-all hover:underline"
+								class:font-bold={model.id === $page.params.model}>{model.displayName}</span
+							>
+							{#if model.id === $settings.activeModel}
+								<span class="rounded-lg bg-blue-600 p-1 text-xs font-semibold text-white"
+									>Active</span
+								>
+							{/if}
+						</a>
 					{/each}
-					<a href="{base}/settings" class="btn btn-primary">Settings</a>
+					<a
+						href="{base}/settings"
+						class="btn rounded-lg py-2"
+						class:bg-gray-300={$page.params.model === undefined}
+						class:font-bold={$page.params.model === undefined}>User Settings</a
+					>
 				</div>
 			</div>
 			<div class="col-span-3">
 				<slot />
 			</div>
 		</div>
-	</div>
-</dialog>
+	</dialog>
+</div>

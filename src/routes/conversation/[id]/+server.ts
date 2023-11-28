@@ -12,7 +12,7 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
-import { uploadFile } from "$lib/server/files/uploadFile.js";
+import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
 
 export async function POST({ request, locals, params, getClientAddress }) {
@@ -302,7 +302,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 			} catch (e) {
-				console.error(e);
 				update({ type: "status", status: "error", message: (e as Error).message });
 			}
 			await collections.conversations.updateOne(

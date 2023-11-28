@@ -15,6 +15,7 @@
 	import Toast from "$lib/components/Toast.svelte";
 	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
 	import titleUpdate from "$lib/stores/titleUpdate";
+	import { createSettingsStore } from "$lib/stores/settings";
 
 	export let data;
 
@@ -102,6 +103,8 @@
 
 		$titleUpdate = null;
 	}
+
+	createSettingsStore(data.settings);
 </script>
 
 <svelte:head>
