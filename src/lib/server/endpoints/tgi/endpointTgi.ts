@@ -34,7 +34,6 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 			{
 				use_cache: false,
 				fetch: async (endpointUrl, info) => {
-					// authEmpty can be skipped
 					if (info && authorization && !accessToken) {
 						// Set authorization header if it is defined and HF_ACCESS_TOKEN is empty
 						info.headers = {
