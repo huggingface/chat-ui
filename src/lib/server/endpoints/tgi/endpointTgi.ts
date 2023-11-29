@@ -13,12 +13,8 @@ export const endpointTgiParametersSchema = z.object({
 	authorization: z.string().default(CUSTOM_AUTHORIZATION_TOKEN),
 });
 
-export function endpointTgi({
-	url,
-	accessToken,
-	model,
-	authorization,
-}: z.infer<typeof endpointTgiParametersSchema>): Endpoint {
+export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>): Endpoint {
+	const { url, accessToken, model, authorization } = endpointTgiParametersSchema.parse(input);
 	return async ({ conversation }) => {
 		const prompt = await buildPrompt({
 			messages: conversation.messages,
