@@ -1,0 +1,66 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "[0-9].*"
+      - "v*"
+  pull_request:
+    branches:
+      - "main"
+    types: [labeled]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  docker-build:
+    if: ${{ github.ref == 'refs/heads/main' || contains(github.ref, 'tags') || contains(github.event.pull_request.labels.*.name, 'action/build-docker') }}
+    runs-on: [self-hosted, docker]
+    env:
+      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login to GHCR using Docker
+        run: |
+          echo ${{secrets.GHEC_TOKEN}} | docker login ghcr.io -u ${{secrets.GHES_USERNAME}} --password-stdin
+      # If we pushed to main, generate a main tagged image
+      - name: Determine tag prod
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          echo "IMAGE_TAG=ghcr.io/expotech-mlops/main/${{github.repository}}:${{ github.sha }}" >> $GITHUB_ENV
+      # If we pushed to any other branch, generate a dev tagged image
+      - name: Determine tag dev
+        if: ${{ github.ref != 'refs/heads/main' && !contains(github.ref, 'tags') }}
+        run: |
+          echo "IMAGE_TAG=ghcr.io/expotech-mlops/dev/${{github.repository}}:${{ github.sha }}" >> $GITHUB_ENV
+      # If we pushed a tag, generate the correct tag version
+      - name: Determine tag version
+        if: ${{ contains(github.ref, 'tags') }}
+        run: |
+          echo "IMAGE_TAG=ghcr.io/expotech-mlops/${{github.repository}}:${{ github.ref_name }}" >> $GITHUB_ENV
+      - name: docker build
+        run: |
+          echo $IMAGE_TAG
+          docker build -t $IMAGE_TAG -f ./Dockerfile .
+      # Login and Push
+      - name: Login to GHCR using Docker, Push to registry and prune image from worker
+        run: |
+          docker push $IMAGE_TAG
+          docker system prune -f
+      # Add a comment only when we are in a PR
+      - name: Update PR with a comment
+        if: ${{  github.event.pull_request  }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { IMAGE_TAG } = process.env
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `:white_check_mark: A new image was pushed: \`` + IMAGE_TAG + `\``
+            })
