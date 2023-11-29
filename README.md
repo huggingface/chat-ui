@@ -10,19 +10,21 @@ base_path: /chat
 app_port: 3000
 ---
 # Fork
-Supported models:
-
-| Model | ID |
-| --- | --- |
-| zephyr | HuggingFaceH4/zephyr-7b-beta |
-| openhermes | teknium/OpenHermes-2.5-Mistral-7B |
-| mistral | mistralai/Mistral-7B-Instruct-v0.1 |
-| neuralchat | Intel/neural-chat-7b-v3-1 |
-
-Run with:
+Install huggingface_hub to download models:
 ```bash
-./chat zephyr
+pip install huggingface_hub
 ```
+
+Start the chat with:
+```bash
+python chat.py [MODEL_NAME]
+```
+
+Available models:
+- zephyr
+- hermes
+- mistral
+- neuralchat
 
 # Chat UI
 
