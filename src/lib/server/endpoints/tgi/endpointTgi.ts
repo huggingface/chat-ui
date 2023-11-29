@@ -37,20 +37,20 @@ export function endpointTgi({
 			},
 			{
 				use_cache: false,
-				fetch: async (url, info) => {
+				fetch: async (endpointUrl, info) => {
 					// authEmpty can be skipped
-					let authEmpty = typeof authorization === 'string' && authorization.length === 0;
-					let hfTokenEmpty = typeof accessToken === 'string' && accessToken.length === 0;
+					const authEmpty = typeof authorization === "string" && authorization.length === 0;
+					const hfTokenEmpty = typeof accessToken === "string" && accessToken.length === 0;
 					if (info && !authEmpty && hfTokenEmpty) {
 						// Set authorization header if it is defined and HF_ACCESS_TOKEN is empty
 						if (info.headers) {
 							info.headers.Authorization = authorization;
 						} else {
-							info.headers = {"Authorization": authorization};
+							info.headers = { Authorization: authorization };
 						}
 					}
-					return fetch(url, info)
-				}
+					return fetch(endpointUrl, info);
+				},
 			}
 		);
 	};
