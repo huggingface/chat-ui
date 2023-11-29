@@ -400,6 +400,7 @@ You can then add the generated information and the `authorization` parameter to 
 #### API Key or other
 
 In case your custom endpoint does not support `Basic` or `Bearer` authentication and you need to pass an `API Key` or any other custom token in the authorization header, add the following to your `.env.local`:
+
 ```env
 "endpoints": [
 {
@@ -412,6 +413,7 @@ In case your custom endpoint does not support `Basic` or `Bearer` authentication
 ```
 
 As an alternative, you can specify the `CUSTOM_AUTHORIZATION_TOKEN` in `.env.local` to use the same authorization header across all custom TGI endpoints:
+
 ```env
 CUSTOM_AUTHORIZATION_TOKEN="API_KEY_OR_TOKEN"
 ```
