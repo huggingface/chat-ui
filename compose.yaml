@@ -6,12 +6,16 @@ services:
       - 27017:27017
 
   model:
-    image: ghcr.io/huggingface/text-generation-inference:1.1.1
-    command: --model-id ${MODEL_ID}
+    image: ghcr.io/ggerganov/llama.cpp:full-cuda
+    environment:
+      - WEIGHTS_FILENAME=${WEIGHTS_FILENAME}
+      - NGL=${NGL}
+      - CONTEXT_LENGTH=${CONTEXT_LENGTH}
+    command: --server -m /models/${WEIGHTS_FILENAME} -c ${CONTEXT_LENGTH} -ngl ${NGL} --port 80 --host 0.0.0.0
     ports: 
       - 8080:80
     volumes:
-      - ./data:/data
+      - ./data:/models
     deploy:
           resources:
             reservations:
