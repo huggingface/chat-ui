@@ -39,13 +39,15 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	const model = models.find((m) => m.name === values.model);
+	// Use the model preprompt if there is no conversation/preprompt in the request body
+	preprompt = preprompt === undefined ? model?.preprompt : preprompt;
 
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		title: title || "New Chat",
 		messages,
 		model: values.model,
-		preprompt: preprompt === model?.preprompt ? undefined : preprompt,
+		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
