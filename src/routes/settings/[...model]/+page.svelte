@@ -47,7 +47,8 @@
 					target="_blank"
 					rel="noreferrer"
 					class="flex items-center truncate underline"
-					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+				>
+					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
 					{model.modelUrl || "https://huggingface.co/" + model.name}
 				</a>
 			</div>
@@ -59,7 +60,8 @@
 						target="_blank"
 						rel="noreferrer"
 						class="flex items-center truncate underline"
-						><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+					>
+						<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
 						{model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
 					</a>
 				{/if}
@@ -88,7 +90,8 @@
 			{#if hasCustomPreprompt}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
-					on:click|stopPropagation={() => ($settings.customPrompts[$page.params.model] = "")}
+					on:click|stopPropagation={() =>
+						($settings.customPrompts[$page.params.model] = model.preprompt)}
 				>
 					Reset
 				</button>
