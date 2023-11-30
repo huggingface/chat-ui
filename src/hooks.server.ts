@@ -41,7 +41,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.sessionId = token;
 	}
 
-	Object.freeze(event.locals);
+	// Object.freeze(event.locals);
 
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
