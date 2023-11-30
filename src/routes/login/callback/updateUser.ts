@@ -1,10 +1,11 @@
-import { authCondition, refreshSessionCookie } from "$lib/server/auth";
+import { refreshSessionCookie } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { z } from "zod";
 import type { UserinfoResponse } from "openid-client";
 import type { Cookies } from "@sveltejs/kit";
+import crypto from "crypto";
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -34,14 +35,18 @@ export async function updateUser(params: {
 	const existingUser = await collections.users.findOne({ hfUserId });
 	let userId = existingUser?._id;
 
+	// update session cookie on login
+	const previousSessionId = locals.sessionId;
+	locals.sessionId = crypto.randomUUID();
+
 	if (existingUser) {
 		// update existing user if any
 		await collections.users.updateOne(
 			{ _id: existingUser._id },
-			{ $set: { username, name, avatarUrl } }
+			{ $set: { username, name, avatarUrl, sessionId: locals.sessionId } }
 		);
 		// refresh session cookie
-		refreshSessionCookie(cookies, existingUser.sessionId);
+		refreshSessionCookie(cookies, locals.sessionId);
 	} else {
 		// user doesn't exist yet, create a new one
 		const { insertedId } = await collections.users.insertOne({
@@ -59,10 +64,13 @@ export async function updateUser(params: {
 		userId = insertedId;
 
 		// update pre-existing settings
-		const { matchedCount } = await collections.settings.updateOne(authCondition(locals), {
-			$set: { userId, updatedAt: new Date() },
-			$unset: { sessionId: "" },
-		});
+		const { matchedCount } = await collections.settings.updateOne(
+			{ sessionId: previousSessionId },
+			{
+				$set: { userId, updatedAt: new Date() },
+				$unset: { sessionId: "" },
+			}
+		);
 
 		if (!matchedCount) {
 			// create new default settings
@@ -77,8 +85,11 @@ export async function updateUser(params: {
 	}
 
 	// migrate pre-existing conversations
-	await collections.conversations.updateMany(authCondition(locals), {
-		$set: { userId },
-		$unset: { sessionId: "" },
-	});
+	await collections.conversations.updateMany(
+		{ sessionId: previousSessionId },
+		{
+			$set: { userId },
+			$unset: { sessionId: "" },
+		}
+	);
 }

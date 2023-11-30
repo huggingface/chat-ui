@@ -1,5 +1,5 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
-import { addHours, addYears } from "date-fns";
+import { addHours, addWeeks } from "date-fns";
 import {
 	COOKIE_NAME,
 	OPENID_CLIENT_ID,
@@ -50,7 +50,7 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 		sameSite: dev ? "lax" : "none",
 		secure: !dev,
 		httpOnly: true,
-		expires: addYears(new Date(), 1),
+		expires: addWeeks(new Date(), 1),
 	});
 }
 
