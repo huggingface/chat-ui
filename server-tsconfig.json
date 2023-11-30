@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "types": [
+            "node"
+        ],
+        "typeRoots": [
+            "node_modules/@types",
+            "./build"
+        ],
+        "outDir": "dist",
+        "sourceMap": true,
+        "removeComments": true,
+        "noImplicitAny": false
+    },
+    "include": [
+        "server/**/service.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

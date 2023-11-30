@@ -11,3 +11,4 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 SECRET_CONFIG
 .idea
+/dist
