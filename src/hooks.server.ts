@@ -13,9 +13,7 @@ import { ERROR_MESSAGES } from "$lib/stores/errors";
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
 
-	event.locals.sessionId = token || crypto.randomUUID();
-
-	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
+	const user = token ? await collections.users.findOne({ sessionId: token }) : null;
 
 	if (user) {
 		event.locals.user = user;
@@ -32,6 +30,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 			},
 		});
 	}
+
+	if (!token) {
+		const sessionId = crypto.randomUUID();
+		if (await collections.users.findOne({ sessionId })) {
+			return errorResponse(500, "Session ID collision");
+		}
+		event.locals.sessionId = sessionId;
+	} else {
+		event.locals.sessionId = token;
+	}
+
+	Object.freeze(event.locals);
 
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
