@@ -5,6 +5,8 @@
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/stores";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import CarbonClose from "~icons/carbon/close";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import UserIcon from "~icons/carbon/user";
 	export let data;
@@ -68,6 +70,23 @@
 			</div>
 			<div class="col-span-3">
 				<slot />
+				<span class="absolute right-0 top-0 p-4">
+					<button
+						class="btn rounded-lg"
+						on:click={() => {
+							if (browser) window;
+							goto(previousPage);
+						}}
+					>
+						<CarbonClose class="text-gray-900" />
+					</button>
+				</span>
+				{#if $settings.recentlySaved}
+					<div class="absolute bottom-0 right-0 m-2 inline p-2 text-gray-400">
+						<CarbonCheckmark class="inline text-lg" />
+						Saved
+					</div>
+				{/if}
 			</div>
 		</div>
 	</dialog>

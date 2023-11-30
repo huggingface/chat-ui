@@ -10,12 +10,15 @@ type SettingsStore = {
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
 	customPrompts: Record<string, string>;
+	recentlySaved: boolean;
 };
 export function useSettingsStore() {
 	return getContext<Writable<SettingsStore>>("settings");
 }
-export function createSettingsStore(initialValue: SettingsStore) {
-	const baseStore = writable(initialValue);
+
+export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlySaved">) {
+	const baseStore = writable({ ...initialValue, recentlySaved: false });
+
 	let timeoutId: NodeJS.Timeout;
 
 	async function setSettings(settings: Partial<SettingsStore>) {
@@ -38,8 +41,19 @@ export function createSettingsStore(initialValue: SettingsStore) {
 						...get(baseStore),
 					}),
 				});
-			}, 300);
 
+				// set savedRecently to true for 3s
+				baseStore.update((s) => ({
+					...s,
+					recentlySaved: true,
+				}));
+				setTimeout(() => {
+					baseStore.update((s) => ({
+						...s,
+						recentlySaved: false,
+					}));
+				}, 3000);
+			}, 300);
 			// debounce server calls by 300ms
 		}
 	}
