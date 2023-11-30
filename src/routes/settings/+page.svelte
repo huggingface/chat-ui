@@ -18,11 +18,11 @@
 	let settings = useSettingsStore();
 </script>
 
-<div class="flex w-full flex-col gap-5 p-6">
+<div class="flex w-full flex-col gap-5 p-6 max-sm:py-4">
 	<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
 		<h2>User Settings</h2>
 	</div>
-	<div class="flex h-full flex-col gap-5 pt-4">
+	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
 		<div class="flex flex-col gap-2">
 			<div>
 				<Switch

@@ -37,8 +37,8 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 						"Content-Type": "application/json",
 					},
 					body: JSON.stringify({
-						...settings,
 						...get(baseStore),
+						...settings,
 					}),
 				});
 

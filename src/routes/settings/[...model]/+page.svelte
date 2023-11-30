@@ -41,43 +41,40 @@
 		>
 		<div class="grid w-full grid-cols-3 gap-4">
 			<div>
-				<h6 class="font-semibold">Model page</h6>
 				<a
 					href={model.modelUrl || "https://huggingface.co/" + model.name}
 					target="_blank"
 					rel="noreferrer"
-					class="flex items-center truncate underline"
+					class="flex items-center truncate underline underline-offset-2"
 				>
 					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-					{model.modelUrl || "https://huggingface.co/" + model.name}
+					Model page
 				</a>
 			</div>
 			<div>
 				{#if model.datasetName || model.datasetUrl}
-					<h6 class="font-semibold">Dataset page</h6>
 					<a
 						href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
 						target="_blank"
 						rel="noreferrer"
-						class="flex items-center truncate underline"
+						class="flex items-center truncate underline underline-offset-2"
 					>
 						<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-						{model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
+						Dataset page
 					</a>
 				{/if}
 			</div>
 
 			<div>
 				{#if model.websiteUrl}
-					<h6 class="font-semibold">Model website</h6>
 					<a
 						href={model.websiteUrl}
 						target="_blank"
-						class="flex items-center truncate underline"
+						class="flex items-center truncate underline underline-offset-2"
 						rel="noreferrer"
 					>
 						<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-						{model.websiteUrl}
+						Model website
 					</a>
 				{/if}
 			</div>
