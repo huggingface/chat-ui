@@ -23,7 +23,7 @@
 	$: model = $page.data.models.find((el: BackendModel) => el.id === $page.params.model);
 </script>
 
-<div class="flex w-full flex-col gap-5 p-6">
+<div class="flex w-full flex-col gap-5 p-6 max-sm:pt-2">
 	<div>
 		<h2 class="inline text-xl font-semibold text-gray-800">
 			{$page.params.model}
