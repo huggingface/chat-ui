@@ -5,10 +5,8 @@ import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 
 export const actions = {
-	default: async function ({ cookies }) {
-		const sessionId = cookies.get(COOKIE_NAME);
-
-		await collections.sessions.deleteOne({ sessionId });
+	default: async function ({ cookies, locals }) {
+		await collections.sessions.deleteOne({ sessionId: locals.sessionId });
 
 		cookies.delete(COOKIE_NAME, {
 			path: "/",
