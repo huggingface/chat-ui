@@ -48,6 +48,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
+	event.locals.sessionId = sessionId;
+
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
 	/** https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#attr-enctype */
