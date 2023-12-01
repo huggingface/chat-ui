@@ -51,7 +51,7 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 		sameSite: dev ? "lax" : "none",
 		secure: !dev,
 		httpOnly: true,
-		expires: addWeeks(new Date(), 1),
+		expires: addWeeks(new Date(), 2),
 	});
 }
 
