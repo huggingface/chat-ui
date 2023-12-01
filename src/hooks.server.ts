@@ -7,13 +7,13 @@ import {
 } from "$env/static/public";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(COOKIE_NAME);
 
-	const user = token ? await collections.users.findOne({ sessionId: token }) : null;
+	const user = token ? await findUser(token) : null;
 
 	if (user) {
 		event.locals.user = user;
@@ -31,13 +31,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
+	// if the user doesn't have any cookie, we generate one for him
 	if (!token) {
 		const sessionId = crypto.randomUUID();
-		if (await collections.users.findOne({ sessionId })) {
+		if (await collections.sessions.findOne({ sessionId })) {
 			return errorResponse(500, "Session ID collision");
 		}
 		event.locals.sessionId = sessionId;
 	} else {
+		// else we just pass the cookie in the locals
 		event.locals.sessionId = token;
 	}
 
@@ -64,6 +66,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (!validOrigins.includes(new URL(referer).origin)) {
 			return errorResponse(403, "Invalid referer for POST request");
 		}
+
+		// if the request is a POST request we refresh the cookie
 		refreshSessionCookie(event.cookies, event.locals.sessionId);
 	}
 

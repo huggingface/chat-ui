@@ -14,6 +14,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
+import { collections } from "./database";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -54,6 +55,15 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	});
 }
 
+export async function findUser(sessionId: string) {
+	const session = await collections.sessions.findOne({ sessionId: sessionId });
+
+	if (!session) {
+		return null;
+	}
+
+	return await collections.users.findOne({ _id: session.userId });
+}
 export const authCondition = (locals: App.Locals) => {
 	return locals.user
 		? { userId: locals.user._id }

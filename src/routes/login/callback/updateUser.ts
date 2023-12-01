@@ -11,8 +11,11 @@ export async function updateUser(params: {
 	userData: UserinfoResponse;
 	locals: App.Locals;
 	cookies: Cookies;
+	userAgent?: string;
+	ip?: string;
 }) {
-	const { userData, locals, cookies } = params;
+	const { userData, locals, cookies, userAgent, ip } = params;
+
 	const {
 		preferred_username: username,
 		name,
@@ -32,6 +35,7 @@ export async function updateUser(params: {
 		})
 		.parse(userData);
 
+	// check if user already exists
 	const existingUser = await collections.users.findOne({ hfUserId });
 	let userId = existingUser?._id;
 
@@ -43,8 +47,21 @@ export async function updateUser(params: {
 		// update existing user if any
 		await collections.users.updateOne(
 			{ _id: existingUser._id },
-			{ $set: { username, name, avatarUrl, sessionId: locals.sessionId } }
+			{ $set: { username, name, avatarUrl } }
 		);
+
+		// remove previous session if it exists and add new one
+		await collections.sessions.deleteOne({ sessionId: previousSessionId });
+		await collections.sessions.insertOne({
+			_id: new ObjectId(),
+			sessionId: locals.sessionId,
+			userId: existingUser._id,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			userAgent,
+			ip,
+		});
+
 		// refresh session cookie
 		refreshSessionCookie(cookies, locals.sessionId);
 	} else {
@@ -58,12 +75,11 @@ export async function updateUser(params: {
 			email,
 			avatarUrl,
 			hfUserId,
-			sessionId: locals.sessionId,
 		});
 
 		userId = insertedId;
 
-		// update pre-existing settings
+		// move pre-existing settings to new user
 		const { matchedCount } = await collections.settings.updateOne(
 			{ sessionId: previousSessionId },
 			{
@@ -73,7 +89,7 @@ export async function updateUser(params: {
 		);
 
 		if (!matchedCount) {
-			// create new default settings
+			// if no settings found for user, create default settings
 			await collections.settings.insertOne({
 				userId,
 				ethicsModalAcceptedAt: new Date(),

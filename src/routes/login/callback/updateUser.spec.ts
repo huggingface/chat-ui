@@ -32,7 +32,6 @@ const insertRandomUser = async () => {
 		name: userData.name,
 		avatarUrl: userData.picture,
 		hfUserId: userData.sub,
-		sessionId: locals.sessionId,
 	});
 
 	return res.insertedId;
@@ -47,7 +46,6 @@ const insertRandomConversations = async (count: number) => {
 			model: defaultModel.id,
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			sessionId: locals.sessionId,
 		}))
 	);
 
