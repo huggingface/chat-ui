@@ -7,6 +7,7 @@ import type { UserinfoResponse } from "openid-client";
 import { error, type Cookies } from "@sveltejs/kit";
 import crypto from "crypto";
 import { sha256 } from "$lib/utils/sha256";
+import { addWeeks } from "date-fns";
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -68,6 +69,7 @@ export async function updateUser(params: {
 			updatedAt: new Date(),
 			userAgent,
 			ip,
+			expiresAt: addWeeks(new Date(), 2),
 		});
 
 		// refresh session cookie
@@ -95,6 +97,7 @@ export async function updateUser(params: {
 			updatedAt: new Date(),
 			userAgent,
 			ip,
+			expiresAt: addWeeks(new Date(), 2),
 		});
 
 		// move pre-existing settings to new user

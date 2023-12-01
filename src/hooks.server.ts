@@ -10,6 +10,7 @@ import { base } from "$app/paths";
 import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { sha256 } from "$lib/utils/sha256";
+import { addWeeks } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
 	function errorResponse(status: number, message: string) {
@@ -76,6 +77,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		// if the request is a POST request we refresh the cookie
 		refreshSessionCookie(event.cookies, secretSessionId);
+		collections.sessions.updateOne(
+			{ sessionId },
+			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
+		);
 	}
 
 	if (

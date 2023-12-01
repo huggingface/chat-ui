@@ -68,8 +68,7 @@ client.on("open", () => {
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
-	sessions
-		.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 7 }) // 7 days sessions
-		.catch(console.error);
+	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
 	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
+	sessions.createIndex({ userId: 1 }).catch(console.error);
 });
