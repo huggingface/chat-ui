@@ -7,6 +7,7 @@ import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
+import type { Session } from "$lib/types/Session";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -27,6 +28,7 @@ const sharedConversations = db.collection<SharedConversation>("sharedConversatio
 const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
 const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
+const sessions = db.collection<Session>("sessions");
 const webSearches = db.collection<WebSearch>("webSearches");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
 const bucket = new GridFSBucket(db, { bucketName: "files" });
@@ -38,6 +40,7 @@ export const collections = {
 	abortedGenerations,
 	settings,
 	users,
+	sessions,
 	webSearches,
 	messageEvents,
 	bucket,
@@ -65,4 +68,6 @@ client.on("open", () => {
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
+	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
+	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
 });

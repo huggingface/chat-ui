@@ -7,18 +7,12 @@ import {
 } from "$env/static/public";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
+import { sha256 } from "$lib/utils/sha256";
+import { addWeeks } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const token = event.cookies.get(COOKIE_NAME);
-
-	const user = token ? await collections.users.findOne({ sessionId: token }) : null;
-
-	if (user) {
-		event.locals.user = user;
-	}
-
 	function errorResponse(status: number, message: string) {
 		const sendJson =
 			event.request.headers.get("accept")?.includes("application/json") ||
@@ -31,17 +25,31 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
-	if (!token) {
-		const sessionId = crypto.randomUUID();
-		if (await collections.users.findOne({ sessionId })) {
+	const token = event.cookies.get(COOKIE_NAME);
+
+	let secretSessionId: string;
+	let sessionId: string;
+
+	if (token) {
+		secretSessionId = token;
+		sessionId = await sha256(token);
+
+		const user = await findUser(sessionId);
+
+		if (user) {
+			event.locals.user = user;
+		}
+	} else {
+		// if the user doesn't have any cookie, we generate one for him
+		secretSessionId = crypto.randomUUID();
+		sessionId = await sha256(secretSessionId);
+
+		if (await collections.sessions.findOne({ sessionId })) {
 			return errorResponse(500, "Session ID collision");
 		}
-		event.locals.sessionId = sessionId;
-	} else {
-		event.locals.sessionId = token;
 	}
 
-	Object.freeze(event.locals);
+	event.locals.sessionId = sessionId;
 
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
@@ -73,13 +81,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
+	if (event.request.method === "POST") {
+		// if the request is a POST request we refresh the cookie
+		refreshSessionCookie(event.cookies, secretSessionId);
+
+		await collections.sessions.updateOne(
+			{ sessionId },
+			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
+		);
+	}
+
 	if (
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
 		if (
-			!user &&
+			!event.locals.user &&
 			requiresUser &&
 			!((MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { base } from "$app/paths";
 import { updateUser } from "./updateUser";
 
-export async function load({ url, locals, cookies }) {
+export async function load({ url, locals, cookies, request, getClientAddress }) {
 	const { error: errorName, error_description: errorDescription } = z
 		.object({
 			error: z.string().optional(),
@@ -33,7 +33,13 @@ export async function load({ url, locals, cookies }) {
 
 	const { userData } = await getOIDCUserData({ redirectURI: validatedToken.redirectUrl }, code);
 
-	await updateUser({ userData, locals, cookies });
+	await updateUser({
+		userData,
+		locals,
+		cookies,
+		userAgent: request.headers.get("user-agent") ?? undefined,
+		ip: getClientAddress(),
+	});
 
 	throw redirect(302, `${base}/`);
 }
