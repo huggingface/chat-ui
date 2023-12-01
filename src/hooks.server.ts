@@ -41,8 +41,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.sessionId = token;
 	}
 
-	// Object.freeze(event.locals);
-
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
 	/** https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#attr-enctype */
@@ -66,6 +64,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (!validOrigins.includes(new URL(referer).origin)) {
 			return errorResponse(403, "Invalid referer for POST request");
 		}
+		refreshSessionCookie(event.cookies, event.locals.sessionId);
 	}
 
 	if (
@@ -99,8 +98,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		}
 	}
-
-	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
 
