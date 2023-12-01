@@ -4,8 +4,9 @@ import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { z } from "zod";
 import type { UserinfoResponse } from "openid-client";
-import type { Cookies } from "@sveltejs/kit";
+import { error, type Cookies } from "@sveltejs/kit";
 import crypto from "crypto";
+import { sha256 } from "$lib/utils/sha256";
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -41,7 +42,14 @@ export async function updateUser(params: {
 
 	// update session cookie on login
 	const previousSessionId = locals.sessionId;
-	locals.sessionId = crypto.randomUUID();
+	const secretSessionId = crypto.randomUUID();
+	const sessionId = await sha256(secretSessionId);
+
+	if (await collections.sessions.findOne({ sessionId })) {
+		throw error(500, "Session ID collision");
+	}
+
+	locals.sessionId = sessionId;
 
 	if (existingUser) {
 		// update existing user if any
@@ -63,7 +71,7 @@ export async function updateUser(params: {
 		});
 
 		// refresh session cookie
-		refreshSessionCookie(cookies, locals.sessionId);
+		refreshSessionCookie(cookies, secretSessionId);
 	} else {
 		// user doesn't exist yet, create a new one
 		const { insertedId } = await collections.users.insertOne({

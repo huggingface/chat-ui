@@ -9,16 +9,9 @@ import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
+import { sha256 } from "$lib/utils/sha256";
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const token = event.cookies.get(COOKIE_NAME);
-
-	const user = token ? await findUser(token) : null;
-
-	if (user) {
-		event.locals.user = user;
-	}
-
 	function errorResponse(status: number, message: string) {
 		const sendJson =
 			event.request.headers.get("accept")?.includes("application/json") ||
@@ -31,16 +24,28 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
-	// if the user doesn't have any cookie, we generate one for him
-	if (!token) {
-		const sessionId = crypto.randomUUID();
+	const token = event.cookies.get(COOKIE_NAME);
+
+	let secretSessionId: string;
+	let sessionId: string;
+
+	if (token) {
+		secretSessionId = token;
+		sessionId = await sha256(token);
+
+		const user = await findUser(sessionId);
+
+		if (user) {
+			event.locals.user = user;
+		}
+	} else {
+		// if the user doesn't have any cookie, we generate one for him
+		secretSessionId = crypto.randomUUID();
+		sessionId = await sha256(secretSessionId);
+
 		if (await collections.sessions.findOne({ sessionId })) {
 			return errorResponse(500, "Session ID collision");
 		}
-		event.locals.sessionId = sessionId;
-	} else {
-		// else we just pass the cookie in the locals
-		event.locals.sessionId = token;
 	}
 
 	// CSRF protection
@@ -68,7 +73,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 
 		// if the request is a POST request we refresh the cookie
-		refreshSessionCookie(event.cookies, event.locals.sessionId);
+		refreshSessionCookie(event.cookies, secretSessionId);
 	}
 
 	if (
@@ -77,7 +82,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
 		if (
-			!user &&
+			!event.locals.user &&
 			requiresUser &&
 			!((MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {
