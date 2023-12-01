@@ -70,5 +70,4 @@ client.on("open", () => {
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
 	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
-	sessions.createIndex({ userId: 1 }).catch(console.error);
 });
