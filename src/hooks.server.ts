@@ -51,20 +51,25 @@ export const handle: Handle = async ({ event, resolve }) => {
 		"application/x-www-form-urlencoded",
 		"text/plain",
 	];
-	if (event.request.method === "POST" && nativeFormContentTypes.includes(requestContentType)) {
-		const referer = event.request.headers.get("referer");
 
-		if (!referer) {
-			return errorResponse(403, "Non-JSON form requests need to have a referer");
-		}
+	if (event.request.method === "POST") {
+		refreshSessionCookie(event.cookies, event.locals.sessionId);
 
-		const validOrigins = [
-			new URL(event.request.url).origin,
-			...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
-		];
+		if (nativeFormContentTypes.includes(requestContentType)) {
+			const referer = event.request.headers.get("referer");
 
-		if (!validOrigins.includes(new URL(referer).origin)) {
-			return errorResponse(403, "Invalid referer for POST request");
+			if (!referer) {
+				return errorResponse(403, "Non-JSON form requests need to have a referer");
+			}
+
+			const validOrigins = [
+				new URL(event.request.url).origin,
+				...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
+			];
+
+			if (!validOrigins.includes(new URL(referer).origin)) {
+				return errorResponse(403, "Invalid referer for POST request");
+			}
 		}
 	}
 
@@ -99,8 +104,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		}
 	}
-
-	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
 
