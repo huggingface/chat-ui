@@ -74,10 +74,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (!validOrigins.includes(new URL(referer).origin)) {
 			return errorResponse(403, "Invalid referer for POST request");
 		}
+	}
 
+	if (event.request.method === "POST") {
 		// if the request is a POST request we refresh the cookie
 		refreshSessionCookie(event.cookies, secretSessionId);
-		collections.sessions.updateOne(
+
+		await collections.sessions.updateOne(
 			{ sessionId },
 			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
 		);
