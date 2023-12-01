@@ -79,6 +79,16 @@ export async function updateUser(params: {
 
 		userId = insertedId;
 
+		await collections.sessions.insertOne({
+			_id: new ObjectId(),
+			sessionId: locals.sessionId,
+			userId,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			userAgent,
+			ip,
+		});
+
 		// move pre-existing settings to new user
 		const { matchedCount } = await collections.settings.updateOne(
 			{ sessionId: previousSessionId },
