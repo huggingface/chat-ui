@@ -2,7 +2,6 @@ import { MONGODB_URL, MONGODB_DB_NAME, MONGODB_DIRECT_CONNECTION } from "$env/st
 import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
-import type { WebSearch } from "$lib/types/WebSearch";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
