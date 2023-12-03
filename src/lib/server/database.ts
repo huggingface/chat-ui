@@ -29,7 +29,6 @@ const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations"
 const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
 const sessions = db.collection<Session>("sessions");
-const webSearches = db.collection<WebSearch>("webSearches");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
 const bucket = new GridFSBucket(db, { bucketName: "files" });
 
@@ -41,7 +40,6 @@ export const collections = {
 	settings,
 	users,
 	sessions,
-	webSearches,
 	messageEvents,
 	bucket,
 };
