@@ -57,7 +57,6 @@ client.on("open", () => {
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
 		.catch(console.error);
-	webSearches.createIndex({ sessionId: 1, updatedAt: -1 }).catch(console.error);
 	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
 	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
