@@ -30,7 +30,7 @@ If you don't want to configure, setup, and launch your own Chat UI yourself, you
 
 You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
 
-Set `HUGGING_FACE_HUB_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
+Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
@@ -42,7 +42,7 @@ Start by creating a `.env.local` file in the root of the repository. The bare mi
 
 ```env
 MONGODB_URL=<the URL to your MongoDB instance>
-HF_ACCESS_TOKEN=<your access token>
+HF_TOKEN=<your access token>
 ```
 
 ### Database
@@ -397,7 +397,7 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
-Please note that if `HF_ACCESS_TOKEN` is also set or not empty, it will take precedence.
+Please note that if `HF_TOKEN` is also set or not empty, it will take precedence.
 
 #### Models hosted on multiple custom endpoints
 
