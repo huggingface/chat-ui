@@ -23,67 +23,58 @@
 	$: model = $page.data.models.find((el: BackendModel) => el.id === $page.params.model);
 </script>
 
-<div class="flex w-full flex-col gap-5 p-6 max-sm:pt-2">
-	<div>
-		<h2 class="inline text-xl font-semibold text-gray-800">
-			{$page.params.model}
-		</h2>
-		<button
-			class="m-2 inline rounded-lg p-2"
-			class:text-gray-500={isActive}
-			class:bg-gray-200={!isActive}
-			class:bg-gray-100={isActive}
-			disabled={isActive}
-			name="Activate model"
-			on:click|stopPropagation={() => {
-				$settings.activeModel = $page.params.model;
-			}}>{isActive ? "Active" : "Activate"}</button
-		>
-		<div class="grid w-full grid-cols-3 gap-4">
-			<div>
-				<a
-					href={model.modelUrl || "https://huggingface.co/" + model.name}
-					target="_blank"
-					rel="noreferrer"
-					class="flex items-center truncate underline underline-offset-2"
-				>
-					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-					Model page
-				</a>
-			</div>
-			<div>
-				{#if model.datasetName || model.datasetUrl}
-					<a
-						href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
-						target="_blank"
-						rel="noreferrer"
-						class="flex items-center truncate underline underline-offset-2"
-					>
-						<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-						Dataset page
-					</a>
-				{/if}
-			</div>
+<div class="flex flex-col items-start">
+	<h2 class="mb-2.5 text-xl font-semibold text-gray-800">
+		{$page.params.model}
+	</h2>
 
-			<div>
-				{#if model.websiteUrl}
-					<a
-						href={model.websiteUrl}
-						target="_blank"
-						class="flex items-center truncate underline underline-offset-2"
-						rel="noreferrer"
-					>
-						<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
-						Model website
-					</a>
-				{/if}
-			</div>
-		</div>
+	<div class="flex items-center gap-6">
+		<a
+			href={model.modelUrl || "https://huggingface.co/" + model.name}
+			target="_blank"
+			rel="noreferrer"
+			class="flex items-center truncate underline underline-offset-2"
+		>
+			<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+			Model page
+		</a>
+		{#if model.datasetName || model.datasetUrl}
+			<a
+				href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
+				target="_blank"
+				rel="noreferrer"
+				class="flex items-center truncate underline underline-offset-2"
+			>
+				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+				Dataset page
+			</a>
+		{/if}
+
+		{#if model.websiteUrl}
+			<a
+				href={model.websiteUrl}
+				target="_blank"
+				class="flex items-center truncate underline underline-offset-2"
+				rel="noreferrer"
+			>
+				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs text-gray-400" />
+				Model website
+			</a>
+		{/if}
 	</div>
+
+	<button
+		class="{isActive ? 'bg-gray-100' : 'bg-gray-200'} my-8"
+		disabled={isActive}
+		name="Activate model"
+		on:click|stopPropagation={() => {
+			$settings.activeModel = $page.params.model;
+		}}>{isActive ? "Active" : "Activate"}</button
+	>
 
 	<div class="flex w-full flex-col gap-2">
 		<div class="flex w-full flex-row content-between">
-			<h3 class="text-xl font-bold">System Prompt</h3>
+			<h3 class="mb-1.5 text-lg font-semibold text-gray-800">System Prompt</h3>
 			{#if hasCustomPreprompt}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
@@ -95,7 +86,8 @@
 			{/if}
 		</div>
 		<textarea
-			class="h-32 w-full resize-none rounded-md border-2 border-gray-300 p-2"
+			rows="12"
+			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
 			bind:value={$settings.customPrompts[$page.params.model]}
 		/>
 	</div>
