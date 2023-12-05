@@ -11,6 +11,7 @@
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { browser } from "$app/environment";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
+	import { page } from "$app/stores";
 
 	export let messages: Message[];
 	export let loading: boolean;
@@ -44,8 +45,8 @@
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
-			{#if i === 0 && preprompt}
-				<SystemPromptModal {preprompt} />
+			{#if i === 0 && preprompt !== $page.data.settings.customPrompts[currentModel.id]}
+				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 			<ChatMessage
 				loading={loading && i === messages.length - 1}
