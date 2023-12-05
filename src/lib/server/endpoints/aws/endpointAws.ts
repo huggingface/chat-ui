@@ -15,21 +15,18 @@ export const endpointAwsParametersSchema = z.object({
 	region: z.string().optional(),
 });
 
-export async function endpointAws({
-	url,
-	accessKey,
-	secretKey,
-	sessionToken,
-	model,
-	region,
-	service,
-}: z.infer<typeof endpointAwsParametersSchema>): Promise<Endpoint> {
+export async function endpointAws(
+	input: z.input<typeof endpointAwsParametersSchema>
+): Promise<Endpoint> {
 	let AwsClient;
 	try {
 		AwsClient = (await import("aws4fetch")).AwsClient;
 	} catch (e) {
 		throw new Error("Failed to import aws4fetch");
 	}
+
+	const { url, accessKey, secretKey, sessionToken, model, region, service } =
+		endpointAwsParametersSchema.parse(input);
 
 	const aws = new AwsClient({
 		accessKeyId: accessKey,

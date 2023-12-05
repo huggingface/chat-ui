@@ -16,12 +16,10 @@ export const endpointOAIParametersSchema = z.object({
 		.default("chat_completions"),
 });
 
-export async function endpointOai({
-	baseURL,
-	apiKey,
-	completion,
-	model,
-}: z.infer<typeof endpointOAIParametersSchema>): Promise<Endpoint> {
+export async function endpointOai(
+	input: z.input<typeof endpointOAIParametersSchema>
+): Promise<Endpoint> {
+	const { baseURL, apiKey, completion, model } = endpointOAIParametersSchema.parse(input);
 	let OpenAI;
 	try {
 		OpenAI = (await import("openai")).OpenAI;
