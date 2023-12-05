@@ -1,4 +1,4 @@
-import { HF_TOKEN } from "$env/static/private";
+import { HF_ACCESS_TOKEN, HF_TOKEN } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { textGenerationStream } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
@@ -9,7 +9,7 @@ export const endpointTgiParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("tgi"),
 	url: z.string().url(),
-	accessToken: z.string().default(HF_TOKEN),
+	accessToken: z.string().default(HF_TOKEN ?? HF_ACCESS_TOKEN),
 	authorization: z.string().optional(),
 });
 
