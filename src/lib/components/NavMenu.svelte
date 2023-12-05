@@ -20,8 +20,8 @@
 		title: string;
 		updatedAt: Date;
 	}
-	export let conversations: Array<Conv> = [];
 
+	export let conversations: Array<Conv> = [];
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
 
@@ -29,35 +29,29 @@
 		isAborted.set(true);
 	}
 
-	// group conversations based on conv.updatedAt property which is a date
-	// it should have the following groups: "Today", "This week", "This month", "Older"
+	const dateRanges = [
+		new Date().setDate(new Date().getDate() - 1),
+		new Date().setDate(new Date().getDate() - 7),
+		new Date().setMonth(new Date().getMonth() - 1),
+	];
 
-	$: groupedConversations = conversations.reduce(
-		(acc: Record<string, Array<Conv>>, conv: Conv) => {
-			const date = new Date(conv.updatedAt).valueOf();
+	$: groupedConversations = {
+		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
+		week: conversations.filter(
+			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
+		),
+		month: conversations.filter(
+			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
+		),
+		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+	};
 
-			// get dates for today, a week ago, and a month ago:
-
-			const today = new Date();
-			const yesterday = new Date().setDate(today.getDate() - 1);
-			const thisWeek = new Date().setDate(today.getDate() - 7);
-			const thisMonth = new Date().setMonth(today.getMonth() - 1);
-
-			// push date in the right group based on the date
-
-			if (date > yesterday) {
-				acc["Today"].push(conv);
-			} else if (date > thisWeek) {
-				acc["This week"].push(conv);
-			} else if (date > thisMonth) {
-				acc["This month"].push(conv);
-			} else {
-				acc["Older"].push(conv);
-			}
-			return acc;
-		},
-		{ Today: [], "This week": [], "This month": [], Older: [] }
-	);
+	const titles: { [key: string]: string } = {
+		today: "Today",
+		week: "This week",
+		month: "This month",
+		older: "Older",
+	} as const;
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -76,12 +70,12 @@
 <div
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	{#each Object.entries(groupedConversations) as entry}
-		{#if entry[1].length > 0}
-			<h4 class="mb-1.5 mt-4 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-				{entry[0]}
+	{#each Object.entries(groupedConversations) as [group, convs]}
+		{#if convs.length}
+			<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
+				{titles[group]}
 			</h4>
-			{#each entry[1] as conv}
+			{#each convs as conv}
 				<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
 			{/each}
 		{/if}
