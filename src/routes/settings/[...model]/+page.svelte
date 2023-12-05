@@ -6,7 +6,7 @@
 
 	const settings = useSettingsStore();
 
-	$: if (!$settings.customPrompts[$page.params.model]) {
+	$: if ($settings.customPrompts[$page.params.model] === undefined) {
 		$settings.customPrompts = {
 			...$settings.customPrompts,
 			[$page.params.model]:
