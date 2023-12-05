@@ -11,11 +11,9 @@ export const endpointOllamaParametersSchema = z.object({
 	ollamaName: z.string().min(1).optional(),
 });
 
-export function endpointOllama({
-	url,
-	model,
-	ollamaName,
-}: z.infer<typeof endpointOllamaParametersSchema>): Endpoint {
+export function endpointOllama(input: z.input<typeof endpointOllamaParametersSchema>): Endpoint {
+	const { url, model, ollamaName } = endpointOllamaParametersSchema.parse(input);
+
 	return async ({ conversation }) => {
 		const prompt = await buildPrompt({
 			messages: conversation.messages,
