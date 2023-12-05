@@ -76,9 +76,9 @@
 <div
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	{#each Object.entries(groupedConversations) as entry, idx}
+	{#each Object.entries(groupedConversations) as entry}
 		{#if entry[1].length > 0}
-			<h4 class:mt-6={idx > 0} class=" text-smd font-medium text-gray-500 dark:text-gray-400">
+			<h4 class="mb-1.5 mt-4 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
 				{entry[0]}
 			</h4>
 			{#each entry[1] as conv}
@@ -94,7 +94,7 @@
 		<form
 			action="{base}/logout"
 			method="post"
-			class="group flex items-center gap-1.5 rounded-lg pl-3 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
 			<span
 				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
@@ -112,7 +112,7 @@
 		<form action="{base}/login" method="POST" target="_parent">
 			<button
 				type="submit"
-				class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+				class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			>
 				Login
 			</button>
@@ -121,14 +121,14 @@
 	<button
 		on:click={switchTheme}
 		type="button"
-		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
 		Theme
 	</button>
 	<button
 		on:click={() => dispatch("clickSettings")}
 		type="button"
-		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
 		Settings
 	</button>
@@ -137,13 +137,13 @@
 			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
 			target="_blank"
 			rel="noreferrer"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			Feedback
 		</a>
 		<a
 			href="{base}/privacy"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			About & Privacy
 		</a>
