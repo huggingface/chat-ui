@@ -6,5 +6,5 @@ LICENSE
 README.md
 node_modules/
 .svelte-kit/
-config/*
-!config/.env
+.env*
+!.env

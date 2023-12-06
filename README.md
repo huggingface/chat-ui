@@ -36,7 +36,7 @@ Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker
 
 ## Setup
 
-The default config for Chat UI is stored in the `config/.env` file. You will need to override some values to get Chat UI to run locally. This is done in `config/.env.local`.
+The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. This is done in `.env.local`.
 
 Start by creating a `.env.local` file in the `conf` folder. The bare minimum config you need to get Chat UI to run locally is the following:
 
@@ -45,25 +45,28 @@ MONGODB_URL=<the URL to your MongoDB instance>
 HF_TOKEN=<your access token>
 ```
 
-### Database
+## Launch using Docker
 
-The chat history is stored in a MongoDB instance, and having a DB instance available is needed for Chat UI to work.
-
-You can use a local MongoDB instance. The easiest way is to spin one up using docker:
+Once you have your `.env.local` file ready, you can launch Chat UI locally using docker. Start by pulling the image
 
 ```bash
-docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+docker pull ghcr.io/huggingface/chat-ui:latest
 ```
 
-In which case the url of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
+Then run the image in the same folder where your `.env.local` is, with the following command:
 
-Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within their free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
+```bash
+DOTENV_LOCAL=$(<env.local) \
+docker run --rm \
+-e DOTENV_LOCAL \
+-e USE_LOCAL_DB=true \
+-p 3000:3000 \
+chat-ui
+```
 
-### Hugging Face Access Token
+`USE_LOCAL_DB` is optional, and will spin up a MongoDB instance inside the container. If you want to use your own MongoDB instance, just unset this variable and use `MONGODB_URL` in your `.env.local` file.
 
-If you use a remote inference endpoint, you will need a Hugging Face access token to run Chat UI locally. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
-
-## Launch
+## Launch in dev mode
 
 After you're done with the `.env.local` file you can run Chat UI locally with:
 

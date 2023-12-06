@@ -1,6 +1,6 @@
 # Prompt templates
 
-These are the templates used to format the conversation history for different models used in HuggingChat. Set them in your `config/.env.local` [like so](https://github.com/huggingface/chat-ui#chatprompttemplate).
+These are the templates used to format the conversation history for different models used in HuggingChat. Set them in your `.env.local` [like so](https://github.com/huggingface/chat-ui#chatprompttemplate).
 
 ## Llama 2
 

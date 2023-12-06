@@ -1,7 +1,7 @@
 import fs from "fs";
 
-const SECRET_CONFIG = fs.existsSync("config/.env.SECRET_CONFIG")
-	? fs.readFileSync("config/.env.SECRET_CONFIG", "utf8")
+const SECRET_CONFIG = fs.existsSync("env.SECRET_CONFIG")
+	? fs.readFileSync(".env.SECRET_CONFIG", "utf8")
 	: process.env.SECRET_CONFIG;
 
 if (!SECRET_CONFIG) {
@@ -11,10 +11,10 @@ if (!SECRET_CONFIG) {
 }
 
 // Read the content of the file .env.template
-const PUBLIC_CONFIG = fs.readFileSync("config/.env.template", "utf8");
+const PUBLIC_CONFIG = fs.readFileSync(".env.template", "utf8");
 
 // Prepend the content of the env variable SECRET_CONFIG
 const full_config = `${PUBLIC_CONFIG}\n${SECRET_CONFIG}`;
 
 // Write full_config to .env.local
-fs.writeFileSync("config/.env.local", full_config);
+fs.writeFileSync(".env.local", full_config);

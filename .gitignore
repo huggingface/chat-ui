@@ -9,6 +9,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 SECRET_CONFIG
 .idea
-!config/.env.ci
-!config/.env
-!config/.env.template
+!.env.ci
+!.env
+!.env.template
