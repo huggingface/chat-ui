@@ -1,4 +1,6 @@
-FROM node:20-slim as local
+FROM mongo:latest as mongo
+
+FROM node:20 as local
 
 WORKDIR /app
 
@@ -9,8 +11,13 @@ RUN --mount=type=cache,target=/app/.npm \
 
 RUN npm install -g pm2
 
-COPY --chown=1000 --link . .
+RUN apt-get update
+RUN apt-get install gnupg curl -y
 
+COPY --from=mongo /usr/bin/mongo* /usr/bin/
+
+# install mongodb
+COPY --chown=1000 --link . .
 RUN chmod +x /app/entrypoint.sh
 
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]

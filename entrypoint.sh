@@ -8,6 +8,17 @@ else
     cat <<< "$DOTENV_LOCAL" > /app/config/.env.local
 fi;
 
+if [ "$USE_LOCAL_DB" = true ] ; then
+    echo "USE_LOCAL_DB is set to true. Appending MONGODB_URL"
+
+    "\nMONGODB_URL=mongodb://localhost:27017" >> /app/config/.env.local
+
+    mkdir -p /data/db
+    mongod &
+    echo "Starting local MongoDB instance"
+
+fi;
+
 npm run build
 
 pm2 start /app/build/index.js --no-daemon
