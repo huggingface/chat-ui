@@ -1,6 +1,6 @@
 FROM mongo:latest as mongo
 
-FROM node:20 as local
+FROM node:20-slim as local
 
 WORKDIR /app
 
