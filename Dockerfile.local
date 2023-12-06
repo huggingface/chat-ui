@@ -9,8 +9,6 @@ RUN --mount=type=cache,target=/app/.npm \
         npm set cache /app/.npm && \
         npm ci 
 
-RUN npm install -g pm2
-
 RUN apt-get update
 RUN apt-get install gnupg curl -y
 
