@@ -79,6 +79,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 				id: conv._id.toString(),
 				title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
 				model: conv.model ?? defaultModel,
+				updatedAt: conv.updatedAt,
 			}))
 			.toArray(),
 		settings: {
