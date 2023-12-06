@@ -2,7 +2,6 @@ import { MONGODB_URL, MONGODB_DB_NAME, MONGODB_DIRECT_CONNECTION } from "$env/st
 import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
-import type { WebSearch } from "$lib/types/WebSearch";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
 import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
@@ -29,7 +28,6 @@ const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations"
 const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
 const sessions = db.collection<Session>("sessions");
-const webSearches = db.collection<WebSearch>("webSearches");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
 const bucket = new GridFSBucket(db, { bucketName: "files" });
 
@@ -41,7 +39,6 @@ export const collections = {
 	settings,
 	users,
 	sessions,
-	webSearches,
 	messageEvents,
 	bucket,
 };
@@ -59,7 +56,6 @@ client.on("open", () => {
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
 		.catch(console.error);
-	webSearches.createIndex({ sessionId: 1, updatedAt: -1 }).catch(console.error);
 	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
 	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
