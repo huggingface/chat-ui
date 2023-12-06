@@ -7,20 +7,12 @@ import {
 } from "$env/static/public";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
+import { sha256 } from "$lib/utils/sha256";
+import { addWeeks } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const token = event.cookies.get(COOKIE_NAME);
-
-	event.locals.sessionId = token || crypto.randomUUID();
-
-	const user = await collections.users.findOne({ sessionId: event.locals.sessionId });
-
-	if (user) {
-		event.locals.user = user;
-	}
-
 	function errorResponse(status: number, message: string) {
 		const sendJson =
 			event.request.headers.get("accept")?.includes("application/json") ||
@@ -33,6 +25,32 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
+	const token = event.cookies.get(COOKIE_NAME);
+
+	let secretSessionId: string;
+	let sessionId: string;
+
+	if (token) {
+		secretSessionId = token;
+		sessionId = await sha256(token);
+
+		const user = await findUser(sessionId);
+
+		if (user) {
+			event.locals.user = user;
+		}
+	} else {
+		// if the user doesn't have any cookie, we generate one for him
+		secretSessionId = crypto.randomUUID();
+		sessionId = await sha256(secretSessionId);
+
+		if (await collections.sessions.findOne({ sessionId })) {
+			return errorResponse(500, "Session ID collision");
+		}
+	}
+
+	event.locals.sessionId = sessionId;
+
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
 	/** https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#attr-enctype */
@@ -41,21 +59,36 @@ export const handle: Handle = async ({ event, resolve }) => {
 		"application/x-www-form-urlencoded",
 		"text/plain",
 	];
-	if (event.request.method === "POST" && nativeFormContentTypes.includes(requestContentType)) {
-		const referer = event.request.headers.get("referer");
 
-		if (!referer) {
-			return errorResponse(403, "Non-JSON form requests need to have a referer");
+	if (event.request.method === "POST") {
+		refreshSessionCookie(event.cookies, event.locals.sessionId);
+
+		if (nativeFormContentTypes.includes(requestContentType)) {
+			const referer = event.request.headers.get("referer");
+
+			if (!referer) {
+				return errorResponse(403, "Non-JSON form requests need to have a referer");
+			}
+
+			const validOrigins = [
+				new URL(event.request.url).origin,
+				...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
+			];
+
+			if (!validOrigins.includes(new URL(referer).origin)) {
+				return errorResponse(403, "Invalid referer for POST request");
+			}
 		}
+	}
 
-		const validOrigins = [
-			new URL(event.request.url).origin,
-			...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
-		];
+	if (event.request.method === "POST") {
+		// if the request is a POST request we refresh the cookie
+		refreshSessionCookie(event.cookies, secretSessionId);
 
-		if (!validOrigins.includes(new URL(referer).origin)) {
-			return errorResponse(403, "Invalid referer for POST request");
-		}
+		await collections.sessions.updateOne(
+			{ sessionId },
+			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
+		);
 	}
 
 	if (
@@ -64,7 +97,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
 		if (
-			!user &&
+			!event.locals.user &&
 			requiresUser &&
 			!((MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {
@@ -89,8 +122,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 		}
 	}
-
-	refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 	let replaced = false;
 

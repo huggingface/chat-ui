@@ -397,6 +397,8 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
+Please note that if `HF_ACCESS_TOKEN` is also set or not empty, it will take precedence.
+
 #### Models hosted on multiple custom endpoints
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
