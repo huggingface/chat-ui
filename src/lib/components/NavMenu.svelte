@@ -15,17 +15,43 @@
 		clickLogout: void;
 	}>();
 
-	export let conversations: Array<{
+	interface Conv {
 		id: string;
 		title: string;
-	}> = [];
+		updatedAt: Date;
+	}
 
+	export let conversations: Array<Conv> = [];
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
 
 	function handleNewChatClick() {
 		isAborted.set(true);
 	}
+
+	const dateRanges = [
+		new Date().setDate(new Date().getDate() - 1),
+		new Date().setDate(new Date().getDate() - 7),
+		new Date().setMonth(new Date().getMonth() - 1),
+	];
+
+	$: groupedConversations = {
+		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
+		week: conversations.filter(
+			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
+		),
+		month: conversations.filter(
+			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
+		),
+		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+	};
+
+	const titles: { [key: string]: string } = {
+		today: "Today",
+		week: "This week",
+		month: "This month",
+		older: "Older",
+	} as const;
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -42,20 +68,27 @@
 	</a>
 </div>
 <div
-	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl bg-gradient-to-l from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30"
+	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	{#each conversations as conv (conv.id)}
-		<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
+	{#each Object.entries(groupedConversations) as [group, convs]}
+		{#if convs.length}
+			<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
+				{titles[group]}
+			</h4>
+			{#each convs as conv}
+				<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
+			{/each}
+		{/if}
 	{/each}
 </div>
 <div
-	class="mt-0.5 flex flex-col gap-1 rounded-r-xl bg-gradient-to-l from-gray-50 p-3 text-sm dark:from-gray-800/30"
+	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<form
 			action="{base}/logout"
 			method="post"
-			class="group flex items-center gap-1.5 rounded-lg pl-3 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
 			<span
 				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
@@ -73,7 +106,7 @@
 		<form action="{base}/login" method="POST" target="_parent">
 			<button
 				type="submit"
-				class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+				class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			>
 				Login
 			</button>
@@ -82,14 +115,14 @@
 	<button
 		on:click={switchTheme}
 		type="button"
-		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
 		Theme
 	</button>
 	<button
 		on:click={() => dispatch("clickSettings")}
 		type="button"
-		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
 		Settings
 	</button>
@@ -98,13 +131,13 @@
 			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
 			target="_blank"
 			rel="noreferrer"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			Feedback
 		</a>
 		<a
 			href="{base}/privacy"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-3 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			About & Privacy
 		</a>

@@ -45,7 +45,7 @@
 	>
 </nav>
 <nav
-	class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white bg-gradient-to-l from-gray-50 dark:bg-gray-900 dark:from-gray-800/30 max-sm:rounded-t-2xl {isOpen
+	class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white dark:bg-gray-900 {isOpen
 		? 'block'
 		: 'hidden'}"
 >
