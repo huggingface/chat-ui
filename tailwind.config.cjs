@@ -2,7 +2,7 @@ const defaultTheme = require("tailwindcss/defaultTheme");
 const colors = require("tailwindcss/colors");
 
 import dotenv from "dotenv";
-dotenv.config({ path: "./.env" });
+dotenv.config({ path: "./config/.env" });
 
 /** @type {import('tailwindcss').Config} */
 export default {

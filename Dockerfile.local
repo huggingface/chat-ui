@@ -1,0 +1,16 @@
+FROM node:20-slim as local
+
+WORKDIR /app
+
+COPY --link --chown=1000 package-lock.json package.json ./
+RUN --mount=type=cache,target=/app/.npm \
+        npm set cache /app/.npm && \
+        npm ci 
+
+RUN npm install -g pm2
+
+COPY --chown=1000 --link . .
+
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]
