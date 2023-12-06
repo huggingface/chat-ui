@@ -24,7 +24,7 @@ jobs:
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
           OPENID_CONFIG: ${{ secrets.OPENID_CONFIG }}
           MONGODB_URL: ${{ secrets.MONGODB_URL }}
-          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+          HF_DEPLOYMENT_TOKEN: ${{ secrets.HF_DEPLOYMENT_TOKEN }}
         run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
@@ -39,5 +39,5 @@ jobs:
           lfs: true
       - name: Push to hub
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push https://nsarrazin:$HF_TOKEN@huggingface.co/spaces/huggingchat/chat-ui main
+          HF_DEPLOYMENT_TOKEN: ${{ secrets.HF_DEPLOYMENT_TOKEN }}
+        run: git push https://nsarrazin:$HF_DEPLOYMENT_TOKEN@huggingface.co/spaces/huggingchat/chat-ui main
