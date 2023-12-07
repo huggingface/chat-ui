@@ -3,12 +3,12 @@ if test -z "${DOTENV_LOCAL}" ; then
         echo "DOTENV_LOCAL was not found in the ENV variables and .env.local is not set using a bind volume. We are using the default .env config."
     fi;
 else
-    echo "DOTENV_LOCAL was found in the ENV variables. Creating env.local file."
+    echo "DOTENV_LOCAL was found in the ENV variables. Creating .env.local file."
     cat <<< "$DOTENV_LOCAL" > /app/.env.local
 fi;
 
-if [ "$USE_LOCAL_DB" = true ] ; then
-    echo "USE_LOCAL_DB is set to true. Appending MONGODB_URL"
+if [ "$INCLUDE_DB" = "true" ] ; then
+    echo "INCLUDE_DB is set to true. Appending MONGODB_URL"
 
     touch /app/.env.local
     echo -e "\nMONGODB_URL=mongodb://localhost:27017" >> /app/.env.local
