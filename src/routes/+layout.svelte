@@ -13,14 +13,13 @@
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
-	import SettingsModal from "$lib/components/SettingsModal.svelte";
 	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
 	import titleUpdate from "$lib/stores/titleUpdate";
+	import { createSettingsStore } from "$lib/stores/settings";
 
 	export let data;
 
 	let isNavOpen = false;
-	let isSettingsOpen = false;
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
@@ -104,6 +103,8 @@
 
 		$titleUpdate = null;
 	}
+
+	createSettingsStore(data.settings);
 </script>
 
 <svelte:head>
@@ -152,7 +153,6 @@
 			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:clickSettings={() => (isSettingsOpen = true)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</MobileNav>
@@ -163,19 +163,11 @@
 			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:clickSettings={() => (isSettingsOpen = true)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</nav>
 	{#if currentError}
 		<Toast message={currentError} />
-	{/if}
-	{#if isSettingsOpen}
-		<SettingsModal
-			on:close={() => (isSettingsOpen = false)}
-			settings={data.settings}
-			models={data.models}
-		/>
 	{/if}
 	<slot />
 </div>

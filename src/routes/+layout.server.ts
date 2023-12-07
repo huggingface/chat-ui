@@ -83,13 +83,14 @@ export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
 			}))
 			.toArray(),
 		settings: {
-			shareConversationsWithModelAuthors:
-				settings?.shareConversationsWithModelAuthors ??
-				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
+			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
+			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
-			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
+			shareConversationsWithModelAuthors:
+				settings?.shareConversationsWithModelAuthors ??
+				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 		},
 		models: models.map((model) => ({

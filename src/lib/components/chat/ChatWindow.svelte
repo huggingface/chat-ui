@@ -13,7 +13,6 @@
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
-	import type { LayoutData } from "../../../routes/$types";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
@@ -23,6 +22,7 @@
 	import RetryBtn from "../RetryBtn.svelte";
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -30,7 +30,6 @@
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
-	export let settings: LayoutData["settings"];
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
@@ -72,14 +71,15 @@
 	$: lastIsError = messages[messages.length - 1]?.from === "user" && !loading;
 
 	$: sources = files.map((file) => file2base64(file));
+
+	const settings = useSettingsStore();
 </script>
 
 <div class="relative min-h-0 min-w-0">
-	{#if !settings.ethicsModalAcceptedAt}
-		<DisclaimerModal {settings} />
+	{#if !$settings.ethicsModalAccepted}
+		<DisclaimerModal />
 	{:else if loginModalOpen}
 		<LoginModal
-			{settings}
 			on:close={() => {
 				loginModalOpen = false;
 			}}
@@ -88,7 +88,7 @@
 	<ChatMessages
 		{loading}
 		{pending}
-		{settings}
+		settings={$page.data.settings}
 		{currentModel}
 		{models}
 		{messages}
@@ -139,7 +139,7 @@
 			class="dark:via-gray-80 w-full bg-gradient-to-t from-white via-white/80 to-white/0 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:px-4 max-md:dark:bg-gray-900"
 		>
 			<div class="flex w-full pb-3 max-md:pt-3">
-				{#if settings?.searchEnabled}
+				{#if $page.data.settings?.searchEnabled}
 					<WebSearchToggle />
 				{/if}
 				{#if loading}

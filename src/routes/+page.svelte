@@ -59,6 +59,5 @@
 	{loading}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.settings.activeModel)}
 	models={data.models}
-	settings={data.settings}
 	bind:files
 />

@@ -4,9 +4,11 @@
 	import { PUBLIC_APP_DESCRIPTION, PUBLIC_APP_NAME } from "$env/static/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import type { LayoutData } from "../../routes/$types";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
-	export let settings: LayoutData["settings"];
+
+	const settings = useSettingsStore();
 </script>
 
 <Modal on:close>
@@ -42,13 +44,16 @@
 					{/if}
 				</button>
 			{:else}
-				<input type="hidden" name="ethicsModalAccepted" value={true} />
-				{#each Object.entries(settings) as [key, val]}
-					<input type="hidden" name={key} value={val} />
-				{/each}
 				<button
-					type="submit"
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+					on:click={(e) => {
+						if (!cookiesAreEnabled()) {
+							e.preventDefault();
+							window.open(window.location.href, "_blank");
+						}
+
+						$settings.ethicsModalAccepted = true;
+					}}
 				>
 					Start chatting
 				</button>

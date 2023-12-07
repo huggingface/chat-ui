@@ -46,6 +46,7 @@
 	"dependencies": {
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
+		"@iconify-json/bi": "^1.1.21",
 		"@xenova/transformers": "^2.6.0",
 		"autoprefixer": "^10.4.14",
 		"browser-image-resizer": "^2.4.1",
