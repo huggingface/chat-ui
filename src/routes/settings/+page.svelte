@@ -24,35 +24,27 @@
 	</div>
 
 	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
-		<label class="flex items-center" for="shareConversationsWithModelAuthors">
+		<!-- svelte-ignore a11y-label-has-associated-control -->
+		<label class="flex items-center">
 			<Switch
 				name="shareConversationsWithModelAuthors"
 				bind:checked={$settings.shareConversationsWithModelAuthors}
-				on:click={() => {
-					$settings.shareConversationsWithModelAuthors =
-						!$settings.shareConversationsWithModelAuthors;
-				}}
 			/>
-			<span class="inline cursor-pointer select-none items-center gap-2 pl-2">
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
 				Share conversations with model authors
-			</span>
+			</div>
 		</label>
 
 		<p class="text-sm text-gray-500">
 			Sharing your data will help improve the training data and make open models better over time.
 		</p>
 
-		<label class="mt-6 flex items-center" for="hideEmojiOnSidebar">
-			<Switch
-				name="hideEmojiOnSidebar"
-				bind:checked={$settings.hideEmojiOnSidebar}
-				on:click={() => {
-					$settings.hideEmojiOnSidebar = !$settings.hideEmojiOnSidebar;
-				}}
-			/>
-			<span class="inline cursor-pointer select-none items-center gap-2 pl-2">
+		<!-- svelte-ignore a11y-label-has-associated-control -->
+		<label class="mt-6 flex items-center">
+			<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
 				Hide emoticons in conversation topics
-			</span>
+			</div>
 		</label>
 
 		<button
