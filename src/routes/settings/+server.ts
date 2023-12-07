@@ -7,7 +7,6 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 export async function POST({ request, locals }) {
 	const body = await request.json();
 
-	console.log("settings update");
 	const { ethicsModalAccepted, ...settings } = z
 		.object({
 			shareConversationsWithModelAuthors: z
