@@ -68,7 +68,10 @@
 			{/each}
 			<a
 				href="{base}/settings"
-				class="group mt-auto flex h-11 flex-none items-center gap-3 rounded-xl pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first"
+				class="group mt-auto flex h-11 flex-none items-center gap-3 rounded-xl pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first {$page
+					.params.model === undefined
+					? '!bg-gray-100 !text-gray-800'
+					: ''}"
 			>
 				<UserIcon class="pr-1 text-lg" />
 				Application Settings
