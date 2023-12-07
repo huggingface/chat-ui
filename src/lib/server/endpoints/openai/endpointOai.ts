@@ -4,6 +4,7 @@ import { openAIChatToTextGenerationStream } from "./openAIChatToTextGenerationSt
 import { buildPrompt } from "$lib/buildPrompt";
 import { OPENAI_API_KEY } from "$env/static/private";
 import type { Endpoint } from "../endpoints";
+import { format } from "date-fns";
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -16,12 +17,10 @@ export const endpointOAIParametersSchema = z.object({
 		.default("chat_completions"),
 });
 
-export async function endpointOai({
-	baseURL,
-	apiKey,
-	completion,
-	model,
-}: z.infer<typeof endpointOAIParametersSchema>): Promise<Endpoint> {
+export async function endpointOai(
+	input: z.input<typeof endpointOAIParametersSchema>
+): Promise<Endpoint> {
+	const { baseURL, apiKey, completion, model } = endpointOAIParametersSchema.parse(input);
 	let OpenAI;
 	try {
 		OpenAI = (await import("openai")).OpenAI;
@@ -56,7 +55,37 @@ export async function endpointOai({
 		};
 	} else if (completion === "chat_completions") {
 		return async ({ conversation }) => {
-			const messages = conversation.messages.map((message) => ({
+			let messages = conversation.messages;
+			const webSearch = conversation.messages[conversation.messages.length - 1].webSearch;
+
+			if (webSearch && webSearch.context) {
+				const lastMsg = messages.slice(-1)[0];
+				const messagesWithoutLastUsrMsg = messages.slice(0, -1);
+				const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
+
+				const previousQuestions =
+					previousUserMessages.length > 0
+						? `Previous questions: \n${previousUserMessages
+								.map(({ content }) => `- ${content}`)
+								.join("\n")}`
+						: "";
+				const currentDate = format(new Date(), "MMMM d, yyyy");
+				messages = [
+					...messagesWithoutLastUsrMsg,
+					{
+						from: "user",
+						content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
+						=====================
+						${webSearch.context}
+						=====================
+						${previousQuestions}
+						Answer the question: ${lastMsg.content} 
+						`,
+					},
+				];
+			}
+
+			const messagesOpenAI = messages.map((message) => ({
 				role: message.from,
 				content: message.content,
 			}));
@@ -65,8 +94,8 @@ export async function endpointOai({
 				await openai.chat.completions.create({
 					model: model.id ?? model.name,
 					messages: conversation.preprompt
-						? [{ role: "system", content: conversation.preprompt }, ...messages]
-						: messages,
+						? [{ role: "system", content: conversation.preprompt }, ...messagesOpenAI]
+						: messagesOpenAI,
 					stream: true,
 					max_tokens: model.parameters?.max_new_tokens,
 					stop: model.parameters?.stop,

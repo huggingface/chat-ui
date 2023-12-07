@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN } from "$env/static/private";
+import { HF_ACCESS_TOKEN, HF_TOKEN } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import { textGenerationStream } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
@@ -9,14 +9,12 @@ export const endpointTgiParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("tgi"),
 	url: z.string().url(),
-	accessToken: z.string().default(HF_ACCESS_TOKEN),
+	accessToken: z.string().default(HF_TOKEN ?? HF_ACCESS_TOKEN),
+	authorization: z.string().optional(),
 });
 
-export function endpointTgi({
-	url,
-	accessToken,
-	model,
-}: z.infer<typeof endpointTgiParametersSchema>): Endpoint {
+export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>): Endpoint {
+	const { url, accessToken, model, authorization } = endpointTgiParametersSchema.parse(input);
 	return async ({ conversation }) => {
 		const prompt = await buildPrompt({
 			messages: conversation.messages,
@@ -33,7 +31,19 @@ export function endpointTgi({
 				inputs: prompt,
 				accessToken,
 			},
-			{ use_cache: false }
+			{
+				use_cache: false,
+				fetch: async (endpointUrl, info) => {
+					if (info && authorization && !accessToken) {
+						// Set authorization header if it is defined and HF_TOKEN is empty
+						info.headers = {
+							...info.headers,
+							Authorization: authorization,
+						};
+					}
+					return fetch(endpointUrl, info);
+				},
+			}
 		);
 	};
 }

@@ -1,4 +1,4 @@
-import { HF_ACCESS_TOKEN } from "$env/static/private";
+import { HF_ACCESS_TOKEN, HF_TOKEN } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
@@ -9,13 +9,16 @@ export const endpointLlamacppParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("llamacpp"),
 	url: z.string().url().default("http://127.0.0.1:8080"),
-	accessToken: z.string().min(1).default(HF_ACCESS_TOKEN),
+	accessToken: z
+		.string()
+		.min(1)
+		.default(HF_TOKEN ?? HF_ACCESS_TOKEN),
 });
 
-export function endpointLlamacpp({
-	url,
-	model,
-}: z.infer<typeof endpointLlamacppParametersSchema>): Endpoint {
+export function endpointLlamacpp(
+	input: z.input<typeof endpointLlamacppParametersSchema>
+): Endpoint {
+	const { url, model } = endpointLlamacppParametersSchema.parse(input);
 	return async ({ conversation }) => {
 		const prompt = await buildPrompt({
 			messages: conversation.messages,
