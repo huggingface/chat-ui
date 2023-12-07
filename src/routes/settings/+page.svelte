@@ -24,25 +24,28 @@
 	</div>
 
 	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
-		<label class="flex items-center" for="shareConversationsWithModelAuthors">
+		<div class="flex items-center">
 			<Switch
-				name="shareConversationsWithModelAuthors"
-				bind:checked={$settings.shareConversationsWithModelAuthors}
 				on:click={() => {
 					$settings.shareConversationsWithModelAuthors =
 						!$settings.shareConversationsWithModelAuthors;
 				}}
+				name="shareConversationsWithModelAuthors"
+				bind:checked={$settings.shareConversationsWithModelAuthors}
 			/>
-			<span class="inline cursor-pointer select-none items-center gap-2 pl-2">
+			<label
+				class="inline cursor-pointer select-none items-center gap-2 pl-2"
+				for="shareConversationsWithModelAuthors"
+			>
 				Share conversations with model authors
-			</span>
-		</label>
+			</label>
+		</div>
 
 		<p class="text-sm text-gray-500">
 			Sharing your data will help improve the training data and make open models better over time.
 		</p>
 
-		<label class="mt-6 flex items-center" for="hideEmojiOnSidebar">
+		<div class="mt-6 flex items-center">
 			<Switch
 				name="hideEmojiOnSidebar"
 				bind:checked={$settings.hideEmojiOnSidebar}
@@ -50,10 +53,13 @@
 					$settings.hideEmojiOnSidebar = !$settings.hideEmojiOnSidebar;
 				}}
 			/>
-			<span class="inline cursor-pointer select-none items-center gap-2 pl-2">
+			<label
+				class="inline cursor-pointer select-none items-center gap-2 pl-2"
+				for="hideEmojiOnSidebar"
+			>
 				Hide emoticons in conversation topics
-			</span>
-		</label>
+			</label>
+		</div>
 
 		<button
 			on:click|preventDefault={() => (isConfirmingDeletion = true)}
