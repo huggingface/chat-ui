@@ -1,6 +1,6 @@
 import fs from "fs";
 
-const SECRET_CONFIG = fs.existsSync("env.SECRET_CONFIG")
+const SECRET_CONFIG = fs.existsSync(".env.SECRET_CONFIG")
 	? fs.readFileSync(".env.SECRET_CONFIG", "utf8")
 	: process.env.SECRET_CONFIG;
 
