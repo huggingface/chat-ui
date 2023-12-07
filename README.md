@@ -38,7 +38,7 @@ Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker
 
 The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. This is done in `.env.local`.
 
-Start by creating a `.env.local` file in the `conf` folder. The bare minimum config you need to get Chat UI to run locally is the following:
+Start by creating a `.env.local` file in the root of the repo. The bare minimum config you need to get Chat UI to run locally is the following:
 
 ```env
 MONGODB_URL=<the URL to your MongoDB instance>
