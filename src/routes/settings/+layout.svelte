@@ -31,9 +31,9 @@
 			if (browser) window;
 			goto(previousPage);
 		}}
-		class="z-10 grid h-[700px] max-h-[90dvh] w-[90dvw] content-start gap-x-10 gap-y-6 overflow-x-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none max-sm:h-[90dvh] md:grid-cols-3 md:p-8 2xl:w-[1200px]"
+		class="z-10 grid h-[90dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 gap-y-6 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1100px]"
 	>
-		<div class="flex items-center justify-between md:col-span-3">
+		<div class="col-span-1 flex items-center justify-between md:col-span-3">
 			<h2 class="text-xl font-bold">Settings</h2>
 			<button
 				class="btn rounded-lg"
@@ -46,7 +46,7 @@
 			</button>
 		</div>
 		<div
-			class="col-span-1 flex flex-col overflow-hidden whitespace-nowrap max-md:h-[200px] max-md:overflow-y-auto"
+			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[160px] max-md:border md:pr-6"
 		>
 			{#each data.models as model}
 				<a
@@ -68,13 +68,13 @@
 			{/each}
 			<a
 				href="{base}/settings"
-				class="group flex h-11 flex-none items-center gap-3 rounded-xl pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first"
+				class="group mt-auto flex h-11 flex-none items-center gap-3 rounded-xl pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first"
 			>
 				<UserIcon class="pr-1 text-lg" />
 				Application Settings
 			</a>
 		</div>
-		<div class="md:col-span-2">
+		<div class="col-span-1 overflow-y-auto md:col-span-2">
 			<slot />
 		</div>
 

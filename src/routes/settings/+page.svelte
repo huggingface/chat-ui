@@ -22,8 +22,9 @@
 	<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
 		<h2>Application Settings</h2>
 	</div>
+
 	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
-		<label class="flex items-center">
+		<label class="flex items-center" for="shareConversationsWithModelAuthors">
 			<Switch
 				name="shareConversationsWithModelAuthors"
 				bind:checked={$settings.shareConversationsWithModelAuthors}
@@ -32,18 +33,16 @@
 						!$settings.shareConversationsWithModelAuthors;
 				}}
 			/>
-			<span class="inline cursor-pointer select-none items-center gap-2 pl-2 text-sm text-gray-500">
+			<span class="inline cursor-pointer select-none items-center gap-2 pl-2">
 				Share conversations with model authors
 			</span>
 		</label>
 
-		<p class="text-gray-800">
+		<p class="text-sm text-gray-500">
 			Sharing your data will help improve the training data and make open models better over time.
 		</p>
 
-		<div class="mt-auto w-full border-b-2 border-b-gray-300" />
-
-		<label class="flex items-center">
+		<label class="mt-6 flex items-center" for="hideEmojiOnSidebar">
 			<Switch
 				name="hideEmojiOnSidebar"
 				bind:checked={$settings.hideEmojiOnSidebar}
@@ -51,16 +50,15 @@
 					$settings.hideEmojiOnSidebar = !$settings.hideEmojiOnSidebar;
 				}}
 			/>
-			<span class="inline cursor-pointer select-none items-center gap-2 pl-2 text-sm text-gray-500">
+			<span class="inline cursor-pointer select-none items-center gap-2 pl-2">
 				Hide emoticons in conversation topics
 			</span>
 		</label>
 
-		<div class="mt-auto w-full border-b-2 border-b-gray-300" />
 		<button
 			on:click|preventDefault={() => (isConfirmingDeletion = true)}
 			type="submit"
-			class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+			class="mt-6 flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
 			><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
 		>
 	</div>

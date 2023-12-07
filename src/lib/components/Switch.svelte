@@ -3,7 +3,13 @@
 	export let name: string;
 </script>
 
-<input bind:checked type="checkbox" {name} class="peer pointer-events-none absolute opacity-0" />
+<input
+	bind:checked
+	type="checkbox"
+	{name}
+	id={name}
+	class="peer pointer-events-none absolute opacity-0"
+/>
 <div
 	aria-checked={checked}
 	aria-roledescription="switch"
