@@ -15,7 +15,7 @@
 	import type { Message } from "$lib/types/Message";
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
-	import file2base64 from "$lib/utils/file2base64.js";
+	import file2base64 from "$lib/utils/file2base64";
 	export let data;
 
 	let messages = data.messages;
@@ -336,5 +336,4 @@
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
-	settings={data.settings}
 />

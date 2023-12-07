@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import { createEventDispatcher } from "svelte";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
@@ -8,12 +7,6 @@
 	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
-
-	const dispatch = createEventDispatcher<{
-		shareConversation: { id: string; title: string };
-		clickSettings: void;
-		clickLogout: void;
-	}>();
 
 	interface Conv {
 		id: string;
@@ -119,13 +112,12 @@
 	>
 		Theme
 	</button>
-	<button
-		on:click={() => dispatch("clickSettings")}
-		type="button"
+	<a
+		href="{base}/settings"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
 		Settings
-	</button>
+	</a>
 	{#if PUBLIC_APP_NAME === "HuggingChat"}
 		<a
 			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
