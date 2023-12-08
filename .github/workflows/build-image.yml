@@ -56,7 +56,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           build-args: |
-            INCLUDE_DB="true"
+            INCLUDE_DB=true
   build-and-publish-image-nodb:
     runs-on: ubuntu-latest
     steps:
@@ -98,4 +98,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           build-args: |
-            INCLUDE_DB="false"
+            INCLUDE_DB=false
