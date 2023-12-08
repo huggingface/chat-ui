@@ -63,7 +63,7 @@
 	id="dropzone"
 	role="form"
 	on:drop={dropHandle}
-	class="relative flex w-full max-w-4xl flex-col items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500"
+	class="relative flex w-full max-w-4xl flex-col items-center rounded-xl border border-dashed bg-gray-100 focus-within:border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:focus-within:border-gray-500"
 >
 	<div class="object-center">
 		{#if file_error_message}
@@ -82,10 +82,10 @@
 			</div>
 		{/if}
 		<div class="mt-3 flex justify-center" class:opacity-0={file_error_message}>
-			<CarbonImage class="text-5xl text-gray-500 dark:text-gray-400" />
+			<CarbonImage class="text-xl text-gray-500 dark:text-gray-400" />
 		</div>
 		<p
-			class="mb-3 mt-3 text-sm text-gray-500 dark:text-gray-400"
+			class="mb-3 mt-1.5 text-sm text-gray-500 dark:text-gray-400"
 			class:opacity-0={file_error_message}
 		>
 			Drag and drop <span class="font-semibold">one image</span> here

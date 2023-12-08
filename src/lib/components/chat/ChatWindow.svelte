@@ -110,35 +110,35 @@
 	/>
 
 	<div
-		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center md:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
-			{#each sources as source, index}
-				{#await source then src}
-					<div class="relative h-24 w-24 overflow-hidden rounded-lg shadow-lg">
-						<img
-							src={`data:image/*;base64,${src}`}
-							alt="input content"
-							class="h-full w-full rounded-lg bg-gray-400 object-cover dark:bg-gray-900"
-						/>
-						<!-- add a button on top that deletes this image from sources -->
-						<button
-							class="absolute left-1 top-1"
-							on:click={() => {
-								files = files.filter((_, i) => i !== index);
-							}}
-						>
-							<CarbonClose class="text-md font-black text-gray-300  hover:text-gray-100" />
-						</button>
-					</div>
-				{/await}
-			{/each}
-		</div>
+		{#if sources.length}
+			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
+				{#each sources as source, index}
+					{#await source then src}
+						<div class="relative h-16 w-16 overflow-hidden rounded-lg shadow-lg">
+							<img
+								src={`data:image/*;base64,${src}`}
+								alt="input content"
+								class="h-full w-full rounded-lg bg-gray-400 object-cover dark:bg-gray-900"
+							/>
+							<!-- add a button on top that deletes this image from sources -->
+							<button
+								class="absolute left-1 top-1"
+								on:click={() => {
+									files = files.filter((_, i) => i !== index);
+								}}
+							>
+								<CarbonClose class="text-md font-black text-gray-300  hover:text-gray-100" />
+							</button>
+						</div>
+					{/await}
+				{/each}
+			</div>
+		{/if}
 
-		<div
-			class="dark:via-gray-80 w-full bg-gradient-to-t from-white via-white/80 to-white/0 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:px-4 max-md:dark:bg-gray-900"
-		>
-			<div class="flex w-full pb-3 max-md:pt-3">
+		<div class="w-full">
+			<div class="flex w-full pb-3">
 				{#if $page.data.settings?.searchEnabled}
 					<WebSearchToggle />
 				{/if}
@@ -184,7 +184,7 @@
 										loginModalOpen = true;
 									}
 								}}
-								maxRows={4}
+								maxRows={6}
 								disabled={isReadOnly || lastIsError}
 							/>
 						{/if}
