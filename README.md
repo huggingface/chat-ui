@@ -24,7 +24,7 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 5. [Deploying to a HF Space](#deploying-to-a-hf-space)
 6. [Building](#building)
 
-##  No Setup Deploy
+##  No Setup Deploy
 
 If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
 
@@ -38,35 +38,32 @@ Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker
 
 The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. This is done in `.env.local`.
 
-Start by creating a `.env.local` file in the root of the repo. The bare minimum config you need to get Chat UI to run locally is the following:
+Start by creating a `.env.local` file in the root of the repository. The bare minimum config you need to get Chat UI to run locally is the following:
 
 ```env
 MONGODB_URL=<the URL to your MongoDB instance>
 HF_TOKEN=<your access token>
 ```
 
-## Launch using Docker
+### Database
 
-Once you have your `.env.local` file ready, you can launch Chat UI locally using docker. Start by pulling the image
+The chat history is stored in a MongoDB instance, and having a DB instance available is needed for Chat UI to work.
 
-```bash
-docker pull ghcr.io/huggingface/chat-ui:latest
-```
-
-Then run the image in the same folder where your `.env.local` is, with the following command:
+You can use a local MongoDB instance. The easiest way is to spin one up using docker:
 
 ```bash
-DOTENV_LOCAL=$(<env.local) \
-docker run --rm \
--e DOTENV_LOCAL \
--e USE_LOCAL_DB=true \
--p 3000:3000 \
-chat-ui
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
-`USE_LOCAL_DB` is optional, and will spin up a MongoDB instance inside the container. If you want to use your own MongoDB instance, just unset this variable and use `MONGODB_URL` in your `.env.local` file.
+In which case the url of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
 
-## Launch in dev mode
+Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within their free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
+
+### Hugging Face Access Token
+
+If you use a remote inference endpoint, you will need a Hugging Face access token to run Chat UI locally. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
+
+## Launch
 
 After you're done with the `.env.local` file you can run Chat UI locally with:
 
