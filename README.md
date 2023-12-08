@@ -24,7 +24,7 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 5. [Deploying to a HF Space](#deploying-to-a-hf-space)
 6. [Building](#building)
 
-##  No Setup Deploy
+## No Setup Deploy
 
 If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
 
