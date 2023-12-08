@@ -5,10 +5,10 @@ node_modules
 /package
 .env
 .env.*
-!.env.example
-!.env.template
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 SECRET_CONFIG
 .idea
-!conf/.env.ci
+!.env.ci
+!.env
+!.env.template
