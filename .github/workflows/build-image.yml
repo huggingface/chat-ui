@@ -27,8 +27,7 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui-db
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
@@ -47,7 +46,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Publish Docker Image
+      - name: Build and Publish Docker Image with DB
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -70,8 +69,7 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
@@ -90,7 +88,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Publish Docker Image
+      - name: Build and Publish Docker Image without DB
         uses: docker/build-push-action@v5
         with:
           context: .
