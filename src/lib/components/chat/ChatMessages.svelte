@@ -5,20 +5,17 @@
 	import { tick } from "svelte";
 	import { randomUUID } from "$lib/utils/randomUuid";
 	import type { Model } from "$lib/types/Model";
-	import type { LayoutData } from "../../../routes/$types";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { browser } from "$app/environment";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
-	import { page } from "$app/stores";
 
 	export let messages: Message[];
 	export let loading: boolean;
 	export let pending: boolean;
 	export let isAuthor: boolean;
 	export let currentModel: Model;
-	export let settings: LayoutData["settings"];
 	export let models: Model[];
 	export let preprompt: string | undefined;
 	export let readOnly: boolean;
@@ -45,7 +42,7 @@
 >
 	<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
 		{#each messages as message, i}
-			{#if i === 0 && preprompt !== $page.data.settings.customPrompts[currentModel.id]}
+			{#if i === 0 && preprompt && preprompt != currentModel.preprompt}
 				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 			<ChatMessage
@@ -59,7 +56,7 @@
 				on:vote
 			/>
 		{:else}
-			<ChatIntroduction {settings} {models} {currentModel} on:message />
+			<ChatIntroduction {models} {currentModel} on:message />
 		{/each}
 		{#if pending}
 			<ChatMessage

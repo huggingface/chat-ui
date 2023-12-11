@@ -9,15 +9,16 @@
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
-	import type { LayoutData } from "../../../routes/$types";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { base } from "$app/paths";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let currentModel: Model;
-	export let settings: LayoutData["settings"];
 	export let models: Model[];
 
-	$: currentModelMetadata = findCurrentModel(models, settings.activeModel);
+	const settings = useSettingsStore();
+
+	$: currentModelMetadata = findCurrentModel(models, $settings.activeModel);
 
 	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS
 		? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
