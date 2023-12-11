@@ -16,6 +16,7 @@
 	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import { createSettingsStore } from "$lib/stores/settings";
+	import { browser } from "$app/environment";
 
 	export let data;
 
@@ -104,7 +105,14 @@
 		$titleUpdate = null;
 	}
 
-	createSettingsStore(data.settings);
+	const settings = createSettingsStore(data.settings);
+
+	$: if (browser && $page.url.searchParams.has("model")) {
+		if ($settings.activeModel === $page.url.searchParams.get("model")) {
+			goto("/?");
+		}
+		$settings.activeModel = $page.url.searchParams.get("model") ?? $settings.activeModel;
+	}
 </script>
 
 <svelte:head>

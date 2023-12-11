@@ -5,11 +5,14 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { findCurrentModel } from "$lib/utils/models";
 
 	export let data;
 	let loading = false;
 	let files: File[] = [];
+
+	const settings = useSettingsStore();
 
 	async function createConversation(message: string) {
 		try {
@@ -20,8 +23,8 @@
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					model: data.settings.activeModel,
-					preprompt: data.settings.customPrompts[data.settings.activeModel],
+					model: $settings.activeModel,
+					preprompt: $settings.customPrompts[data.settings.activeModel],
 				}),
 			});
 
@@ -57,7 +60,7 @@
 <ChatWindow
 	on:message={(ev) => createConversation(ev.detail)}
 	{loading}
-	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.settings.activeModel)}
+	currentModel={findCurrentModel([...data.models, ...data.oldModels], $settings.activeModel)}
 	models={data.models}
 	bind:files
 />

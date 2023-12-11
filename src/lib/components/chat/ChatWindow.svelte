@@ -88,7 +88,6 @@
 	<ChatMessages
 		{loading}
 		{pending}
-		settings={$page.data.settings}
 		{currentModel}
 		{models}
 		{messages}
