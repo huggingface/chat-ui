@@ -109,7 +109,7 @@
 
 	$: if (browser && $page.url.searchParams.has("model")) {
 		if ($settings.activeModel === $page.url.searchParams.get("model")) {
-			goto("/?");
+			goto(`${base}/?`);
 		}
 		$settings.activeModel = $page.url.searchParams.get("model") ?? $settings.activeModel;
 	}
