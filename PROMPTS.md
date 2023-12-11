@@ -43,3 +43,9 @@ System: {{preprompt}}\nUser:{{#each messages}}{{#ifUser}}{{content}}\nFalcon:{{/
 ```env
 <s>{{#each messages}}{{#ifUser}}GPT4 User: {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}}<|end_of_turn|>GPT4 Assistant: {{/ifUser}}{{#ifAssistant}}{{content}}<|end_of_turn|>{{/ifAssistant}}{{/each}}
 ```
+
+## Mixtral
+
+```env
+<s> {{#each messages}}{{#ifUser}}[INST]{{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}} {{content}} [/INST]{{/ifUser}}{{#ifAssistant}} {{content}}</s> {{/ifAssistant}}{{/each}}
+```
