@@ -24,7 +24,7 @@
 				},
 				body: JSON.stringify({
 					model: $settings.activeModel,
-					preprompt: $settings.customPrompts[data.settings.activeModel],
+					preprompt: $settings.customPrompts[$settings.activeModel],
 				}),
 			});
 
