@@ -48,7 +48,7 @@
 		<div
 			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[160px] max-md:border md:pr-6"
 		>
-			{#each data.models as model}
+			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
 					href="{base}/settings/{model.id}"
 					class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl {model.id ===
