@@ -10,6 +10,7 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import Switch from "$lib/components/Switch.svelte";
+	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
 
 	let isConfirmingDeletion = false;
 
@@ -24,21 +25,22 @@
 	</div>
 
 	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
-		<!-- svelte-ignore a11y-label-has-associated-control -->
-		<label class="flex items-center">
-			<Switch
-				name="shareConversationsWithModelAuthors"
-				bind:checked={$settings.shareConversationsWithModelAuthors}
-			/>
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
-				Share conversations with model authors
-			</div>
-		</label>
+		{#if PUBLIC_APP_DATA_SHARING === "1"}
+			<!-- svelte-ignore a11y-label-has-associated-control -->
+			<label class="flex items-center">
+				<Switch
+					name="shareConversationsWithModelAuthors"
+					bind:checked={$settings.shareConversationsWithModelAuthors}
+				/>
+				<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+					Share conversations with model authors
+				</div>
+			</label>
 
-		<p class="text-sm text-gray-500">
-			Sharing your data will help improve the training data and make open models better over time.
-		</p>
-
+			<p class="text-sm text-gray-500">
+				Sharing your data will help improve the training data and make open models better over time.
+			</p>
+		{/if}
 		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
