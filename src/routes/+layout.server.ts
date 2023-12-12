@@ -27,6 +27,17 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		});
 	}
 
+	// if the model is unlisted, set the active model to the default model
+	if (
+		settings?.activeModel &&
+		models.find((m) => m.id === settings?.activeModel)?.unlisted === true
+	) {
+		settings.activeModel = defaultModel.id;
+		await collections.settings.updateOne(authCondition(locals), {
+			$set: { activeModel: defaultModel.id },
+		});
+	}
+
 	// get the number of messages where `from === "assistant"` across all conversations.
 	const totalMessages =
 		(
@@ -89,6 +100,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
+			unlisted: model.unlisted,
 		})),
 		oldModels,
 		user: locals.user && {
