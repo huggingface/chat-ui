@@ -39,6 +39,15 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	const model = models.find((m) => m.name === values.model);
+
+	if (!model) {
+		throw error(400, "Invalid model");
+	}
+
+	if (model.unlisted) {
+		throw error(400, "Can't start a conversation with an unlisted model");
+	}
+
 	// Use the model preprompt if there is no conversation/preprompt in the request body
 	preprompt = preprompt === undefined ? model?.preprompt : preprompt;
 
