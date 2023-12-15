@@ -10,4 +10,5 @@ export interface SharedConversation extends Timestamps {
 	title: string;
 	messages: Message[];
 	preprompt?: string;
+	assistantId?: string;
 }

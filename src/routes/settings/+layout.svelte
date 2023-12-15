@@ -7,6 +7,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonAdd from "~icons/carbon/add";
 
 	import UserIcon from "~icons/carbon/user";
 	export let data;
@@ -48,13 +49,13 @@
 		<div
 			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[160px] max-md:border md:pr-6"
 		>
+			<h3 class="pb-3 text-xs">Models</h3>
+
 			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
 					href="{base}/settings/{model.id}"
-					class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl {model.id ===
-					$page.params.model
-						? '!bg-gray-100 !text-gray-800'
-						: ''}"
+					class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+					{model.id === $page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					<div class="truncate">{model.displayName}</div>
 					{#if model.id === $settings.activeModel}
@@ -66,12 +67,52 @@
 					{/if}
 				</a>
 			{/each}
+			{#if !data.disableAssistants}
+				<h3 class="pb-3 pt-5 text-xs">Assistants</h3>
+				{#each data.assistants as assistant}
+					<a
+						href="{base}/settings/assistants/{assistant._id.toString()}"
+						class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+						{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+					>
+						{#if assistant.avatar}
+							<img
+								src="{base}/settings/assistants/{assistant._id.toString()}/avatar"
+								alt="Avatar"
+								class="h-6 w-6 rounded-full object-cover"
+							/>
+						{:else}
+							<div
+								class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300 font-bold text-gray-500"
+							>
+								{assistant.name[0].toLocaleUpperCase()}
+							</div>
+						{/if}
+						<div class="truncate">{assistant.name}</div>
+						{#if assistant._id.toString() === $settings.activeModel}
+							<div
+								class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							>
+								Active
+							</div>
+						{/if}
+					</a>
+				{/each}
+
+				<a
+					href="{base}/settings/assistants/new"
+					class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+					{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+				>
+					<CarbonAdd />
+					<div class="truncate">Create new assistant</div>
+				</a>
+			{/if}
+
 			<a
 				href="{base}/settings"
-				class="group mt-auto flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl {$page
-					.params.model === undefined
-					? '!bg-gray-100 !text-gray-800'
-					: ''}"
+				class="group mt-auto flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
+				{$page.url.pathname === `${base}/settings` ? '!bg-gray-100 !text-gray-800' : ''}"
 			>
 				<UserIcon class="pr-1 text-lg" />
 				Application Settings

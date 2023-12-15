@@ -8,7 +8,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
 
-	export let conv: { id: string; title: string };
+	export let conv: { id: string; title: string; avatarId: string };
 
 	let confirmDelete = false;
 
@@ -32,6 +32,9 @@
 	<div class="flex-1 truncate">
 		{#if confirmDelete}
 			<span class="font-semibold"> Delete </span>
+		{/if}
+		{#if conv.avatarId}
+			{conv.avatarId}
 		{/if}
 		{conv.title}
 	</div>

@@ -11,7 +11,9 @@ import {
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
+	DISABLE_ASSISTANTS,
 } from "$env/static/private";
+import { ObjectId } from "mongodb";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { conversations } = collections;
@@ -20,7 +22,11 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const settings = await collections.settings.findOne(authCondition(locals));
 
 	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
-	if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
+	if (
+		settings &&
+		!validateModel(models).safeParse(settings?.activeModel).success &&
+		!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
+	) {
 		settings.activeModel = defaultModel.id;
 		await collections.settings.updateOne(authCondition(locals), {
 			$set: { activeModel: defaultModel.id },
@@ -58,6 +64,20 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
 
+	const disableAssistants = DISABLE_ASSISTANTS === "true";
+
+	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
+
+	const assistant = assistantActive
+		? JSON.parse(
+				JSON.stringify(
+					await collections.assistants.findOne({
+						_id: new ObjectId(settings?.activeModel),
+					})
+				)
+		  )
+		: null;
+
 	return {
 		conversations: await conversations
 			.find(authCondition(locals))
@@ -86,6 +106,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				settings?.shareConversationsWithModelAuthors ??
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
+			assistants: settings?.assistants?.map((el) => el.toString()) ?? [],
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -104,10 +125,13 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		})),
 		oldModels,
 		user: locals.user && {
+			id: locals.user._id.toString(),
 			username: locals.user.username,
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
 		},
+		assistant,
+		disableAssistants,
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,

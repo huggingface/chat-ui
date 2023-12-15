@@ -23,6 +23,7 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import type { Assistant } from "$lib/types/Assistant";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -30,6 +31,7 @@
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
+	export let assistant: Assistant | undefined;
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
@@ -90,6 +92,7 @@
 		{pending}
 		{currentModel}
 		{models}
+		{assistant}
 		{messages}
 		readOnly={isReadOnly}
 		isAuthor={!shared}
