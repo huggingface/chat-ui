@@ -35,17 +35,17 @@
 </script>
 
 <button
-	class="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-600 dark:hover:border-gray-400 {classNames}
-		{!isSuccess && 'text-gray-200 dark:text-gray-200'}
-		{isSuccess && 'text-green-500'}
-	"
+	class="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:hover:border-gray-500 {classNames}"
 	title={"Copy to clipboard"}
 	type="button"
 	on:click
 	on:click={handleClick}
 >
-	<span class="relative">
-		<IconCopy />
+	<div class="relative">
+		<slot>
+			<IconCopy />
+		</slot>
+
 		<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
-	</span>
+	</div>
 </button>

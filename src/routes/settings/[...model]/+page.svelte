@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from "$app/stores";
 	import type { BackendModel } from "$lib/server/models";
-	import { copy } from "$lib/actions/copyToClipboard";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
 
@@ -72,14 +72,14 @@
 				Model website
 			</a>
 		{/if}
-		<button
-			class="flex items-center truncate underline underline-offset-2"
-			use:copy={`${$page.url.origin}/?model=${model.id}`}
-			on:svelte-copy={() => alert("Link copied to clipboard!")}
+		<CopyToClipBoardBtn
+			value="{$page.url.origin}/?model={model.id}"
+			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
-			<CarbonLink class="mr-1.5 shrink-0 text-xs " />
-			Copy direct link to model
-		</button>
+			<div class="flex items-center gap-1.5">
+				<CarbonLink />Copy direct link to model
+			</div>
+		</CopyToClipBoardBtn>
 	</div>
 
 	<button
