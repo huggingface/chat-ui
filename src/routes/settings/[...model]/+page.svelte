@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { page } from "$app/stores";
 	import type { BackendModel } from "$lib/server/models";
+	import { copy } from "$lib/actions/copyToClipboard";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import CarbonLink from "~icons/carbon/link";
 
 	const settings = useSettingsStore();
 
@@ -24,7 +26,7 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<h2 class="mb-0.5 text-xl font-semibold">
+	<h2 class="mb-1.5 text-lg font-semibold md:mb-0.5 md:text-xl">
 		{$page.params.model}
 	</h2>
 
@@ -34,7 +36,7 @@
 		</p>
 	{/if}
 
-	<div class="flex items-center gap-4">
+	<div class="flex flex-wrap items-center gap-2 md:gap-4">
 		<a
 			href={model.modelUrl || "https://huggingface.co/" + model.name}
 			target="_blank"
@@ -68,6 +70,14 @@
 				Model website
 			</a>
 		{/if}
+		<button
+			class="flex items-center truncate underline underline-offset-2"
+			use:copy={`${$page.url.origin}/?model=${model.id}`}
+			on:svelte-copy={() => alert("Link copied to clipboard!")}
+		>
+			<CarbonLink class="mr-1.5 shrink-0 text-xs " />
+			Copy direct link to model
+		</button>
 	</div>
 
 	<button
