@@ -31,7 +31,7 @@
 			if (browser) window;
 			goto(previousPage);
 		}}
-		class="z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 gap-y-6 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1100px]"
+		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 gap-y-6 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
 	>
 		<div class="col-span-1 flex items-center justify-between md:col-span-3">
 			<h2 class="text-xl font-bold">Settings</h2>
@@ -46,7 +46,7 @@
 			</button>
 		</div>
 		<div
-			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[160px] max-md:border md:pr-6"
+			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[245px] max-md:border md:pr-6"
 		>
 			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
@@ -82,8 +82,10 @@
 		</div>
 
 		{#if $settings.recentlySaved}
-			<div class="absolute bottom-0 right-0 m-2 inline p-2 text-gray-400">
-				<CarbonCheckmark class="inline text-lg" />
+			<div
+				class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-200 px-3 py-1 text-black"
+			>
+				<CarbonCheckmark />
 				Saved
 			</div>
 		{/if}
