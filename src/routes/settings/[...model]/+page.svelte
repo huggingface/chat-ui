@@ -24,9 +24,15 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<h2 class="mb-2.5 text-xl font-semibold">
+	<h2 class="mb-0.5 text-xl font-semibold">
 		{$page.params.model}
 	</h2>
+
+	{#if model.description}
+		<p class="mb-5 text-gray-600">
+			{model.description}
+		</p>
+	{/if}
 
 	<div class="flex items-center gap-4">
 		<a
