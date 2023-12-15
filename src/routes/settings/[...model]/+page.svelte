@@ -26,15 +26,17 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<h2 class="mb-1.5 text-lg font-semibold md:mb-0.5 md:text-xl">
-		{$page.params.model}
-	</h2>
+	<div class="mb-5 flex flex-col gap-1.5">
+		<h2 class="text-lg font-semibold md:text-xl">
+			{$page.params.model}
+		</h2>
 
-	{#if model.description}
-		<p class="mb-5 text-gray-600">
-			{model.description}
-		</p>
-	{/if}
+		{#if model.description}
+			<p class=" text-gray-600">
+				{model.description}
+			</p>
+		{/if}
+	</div>
 
 	<div class="flex flex-wrap items-center gap-2 md:gap-4">
 		<a
