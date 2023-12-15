@@ -56,6 +56,16 @@
 				>
 			</AnnouncementBanner>
 		{/each}
+			<!-- Start of new button addition -->
+	<div class="my-4 flex justify-center lg:justify-start">
+		<button
+			type="button"
+			class="rounded-xl border bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+			on:click={() => dispatch("message", "Attach File")}
+		>
+			Attach File
+		</button>
+	</div>
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="flex p-3">
 				<div>
