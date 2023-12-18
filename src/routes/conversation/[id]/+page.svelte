@@ -279,7 +279,7 @@
 		uploadPdfStatus = PdfUploadStatus.Uploading;
 
 		const formData = new FormData();
-        formData.append('pdf', file);
+		formData.append("pdf", file);
 
 		const res = await fetch(`${base}/conversation/${$page.params.id}/upload-pdf`, {
 			method: "POST",
@@ -298,10 +298,10 @@
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
-			if($pendingMessage.content){
+			if ($pendingMessage.content) {
 				await writeMessage($pendingMessage.content);
 			}
-			if($pendingMessage.pdfFile){
+			if ($pendingMessage.pdfFile) {
 				await uploadPdf($pendingMessage.pdfFile);
 			}
 			$pendingMessage = undefined;
@@ -354,7 +354,7 @@
 	{messages}
 	shared={data.shared}
 	preprompt={data.preprompt}
-	bind:RAGMessages={RAGMessages}
+	bind:RAGMessages
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}

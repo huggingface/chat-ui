@@ -109,14 +109,14 @@
 
 	let searchUpdates: WebSearchUpdate[] = [];
 
-	$: searchUpdates = ((RAGMessages.filter(({type}) => type === "webSearch").length > 0
-		? RAGMessages.filter(({type}) => type === "webSearch")
+	$: searchUpdates = ((RAGMessages.filter(({ type }) => type === "webSearch").length > 0
+		? RAGMessages.filter(({ type }) => type === "webSearch")
 		: message.updates?.filter(({ type }) => type === "webSearch")) ?? []) as WebSearchUpdate[];
-	
+
 	let pdfUpdates: PdfSearchUpdate[] = [];
 
-	$: pdfUpdates = ((RAGMessages.filter(({type}) => type === "pdfSearch").length > 0
-		? RAGMessages.filter(({type}) => type === "pdfSearch")
+	$: pdfUpdates = ((RAGMessages.filter(({ type }) => type === "pdfSearch").length > 0
+		? RAGMessages.filter(({ type }) => type === "pdfSearch")
 		: message.updates?.filter(({ type }) => type === "pdfSearch")) ?? []) as PdfSearchUpdate[];
 
 	$: downloadLink =

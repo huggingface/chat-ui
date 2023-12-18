@@ -244,7 +244,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let pdfSearchResults: PdfSearch | undefined;
 			const pdfSearch = await collections.files.findOne({ filename: `${convId.toString()}-pdf` });
-			if(pdfSearch){
+			if (pdfSearch) {
 				pdfSearchResults = await runPdfSearch(conv, newPrompt, update);
 			}
 

@@ -50,7 +50,7 @@ export async function buildPrompt({
 				`,
 			},
 		];
-	}else if (pdfSearch && pdfSearch.context) {
+	} else if (pdfSearch && pdfSearch.context) {
 		const lastMsg = messages.slice(-1)[0];
 		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
 		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
@@ -61,7 +61,7 @@ export async function buildPrompt({
 						.map(({ content }) => `- ${content}`)
 						.join("\n")}`
 				: "";
-		
+
 		messages = [
 			...messagesWithoutLastUsrMsg,
 			{

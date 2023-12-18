@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { PdfUploadStatus } from "$lib/types/PdfChat";
-	import {createEventDispatcher, onDestroy} from "svelte";
+	import { createEventDispatcher, onDestroy } from "svelte";
 	import CarbonUpload from "~icons/carbon/upload";
 
 	export let classNames = "";
 	export let multimodal = false;
 	export let files: File[];
 	export let uploadPdfStatus: PdfUploadStatus;
-	
+
 	const accept = multimodal ? "image/*,.pdf" : ".pdf";
 	const label = multimodal ? "Upload image or PDF" : "Upload PDF";
 	let fileInput: HTMLInputElement;
 	let interval: ReturnType<typeof setInterval>;
 
 	$: uploading = uploadPdfStatus === PdfUploadStatus.Uploading;
-	$:{
-		if(uploadPdfStatus === PdfUploadStatus.Uploaded){
+	$: {
+		if (uploadPdfStatus === PdfUploadStatus.Uploaded) {
 			interval = setInterval(() => {
 				uploadPdfStatus = PdfUploadStatus.Ready;
 			}, 1500);
@@ -27,25 +27,25 @@
 	}>();
 
 	function onChange() {
-		if(!fileInput.files){
+		if (!fileInput.files) {
 			return;
 		}
-		
+
 		const file = fileInput.files?.[0];
 		if (file?.type === "application/pdf") {
 			// pdf upload
 			dispatch("uploadpdf", file);
-		}else{
+		} else {
 			// image files for multimodal models
 			files = Array.from(fileInput.files);
 		}
 	}
 
 	onDestroy(() => {
-		if(interval){
+		if (interval) {
 			clearInterval(interval);
 		}
-	})
+	});
 </script>
 
 <button

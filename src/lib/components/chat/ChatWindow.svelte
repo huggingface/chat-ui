@@ -176,7 +176,13 @@
 							})}
 					/>
 				{/if}
-				<UploadBtn bind:files on:uploadpdf classNames="ml-auto" multimodal={currentModel.multimodal} {uploadPdfStatus} />
+				<UploadBtn
+					bind:files
+					on:uploadpdf
+					classNames="ml-auto"
+					multimodal={currentModel.multimodal}
+					{uploadPdfStatus}
+				/>
 			</div>
 			<form
 				on:dragover={onDragOver}

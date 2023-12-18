@@ -21,7 +21,11 @@ export async function uploadImgFile(file: Blob, conv: Conversation): Promise<str
 	});
 }
 
-export async function uploadPdfEmbeddings(embeddings: Tensor, textChunks: string[], conv: Conversation): Promise<void> {
+export async function uploadPdfEmbeddings(
+	embeddings: Tensor,
+	textChunks: string[],
+	conv: Conversation
+): Promise<void> {
 	const filename = `${conv._id}-pdf`;
 
 	// Step 1: Check if the file exists

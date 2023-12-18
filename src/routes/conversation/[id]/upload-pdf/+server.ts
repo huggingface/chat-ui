@@ -19,17 +19,17 @@ export async function POST({ request, params, locals }) {
 	}
 
 	const formData = await request.formData();
-	const file = formData.get('pdf'); // 'pdf' is the name used in FormData on the frontend
-	const data = new Uint8Array(await file.arrayBuffer())
+	const file = formData.get("pdf"); // 'pdf' is the name used in FormData on the frontend
+	const data = new Uint8Array(await file.arrayBuffer());
 	const loadingTask = pdfjsLib.getDocument({ data });
 	const pdf = await loadingTask.promise;
 
 	const N_MAX_PAGES = 20;
-	let text = '';
+	let text = "";
 	for (let i = 1; i <= Math.min(pdf.numPages, N_MAX_PAGES); i++) {
 		const page = await pdf.getPage(i);
 		const content = await page.getTextContent();
-		text += content.items.map(item => item.str).join(' ');
+		text += content.items.map((item) => item.str).join(" ");
 	}
 
 	const textChunks = chunk(text, CHUNK_CAR_LEN);

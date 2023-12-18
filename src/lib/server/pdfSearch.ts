@@ -1,8 +1,5 @@
 import type { PdfSearch } from "$lib/types/PdfChat";
-import {
-	createEmbeddings,
-	findSimilarSentences,
-} from "$lib/server/embeddings";
+import { createEmbeddings, findSimilarSentences } from "$lib/server/embeddings";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { downloadPdfEmbeddings } from "./files/downloadFile";
@@ -29,11 +26,15 @@ export async function runPdfSearch(
 		const { content, textChunks, dims } = await downloadPdfEmbeddings(conv._id);
 		// reconstruct pdfEmbeddings
 		const buffer = Buffer.from(content);
-		const data = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / Float32Array.BYTES_PER_ELEMENT);
-		const pdfEmbeddings = new Tensor('float32', data, dims);
+		const data = new Float32Array(
+			buffer.buffer,
+			buffer.byteOffset,
+			buffer.length / Float32Array.BYTES_PER_ELEMENT
+		);
+		const pdfEmbeddings = new Tensor("float32", data, dims);
 		const promptEmbeddings = await createEmbeddings([prompt]);
 
-		const indices = findSimilarSentences(pdfEmbeddings, promptEmbeddings, {topK: 5});
+		const indices = findSimilarSentences(pdfEmbeddings, promptEmbeddings, { topK: 5 });
 		pdfSearch.context = indices.map((idx) => textChunks[idx]).join(" ");
 
 		appendUpdate("Done", [], "done");

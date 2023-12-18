@@ -40,7 +40,7 @@ export async function downloadPdfEmbeddings(
 ) {
 	const fileId = collections.bucket.find({ filename: `${convId.toString()}-pdf` });
 	let textChunks: string[] = [];
-	let dims: number[] = []
+	let dims: number[] = [];
 
 	const content = await fileId.next().then(async (file) => {
 		if (!file) {
