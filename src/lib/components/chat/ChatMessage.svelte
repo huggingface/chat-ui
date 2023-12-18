@@ -17,7 +17,8 @@
 	import type { Model } from "$lib/types/Model";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import OpenPdfSearchResults from "../OpenPdfSearchResults.svelte";
+	import type { RAGUpdate, WebSearchUpdate, PdfSearchUpdate } from "$lib/types/MessageUpdate";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -49,7 +50,7 @@
 	export let readOnly = false;
 	export let isTapped = false;
 
-	export let webSearchMessages: WebSearchUpdate[];
+	export let RAGMessages: RAGUpdate[];
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
@@ -108,9 +109,15 @@
 
 	let searchUpdates: WebSearchUpdate[] = [];
 
-	$: searchUpdates = ((webSearchMessages.length > 0
-		? webSearchMessages
+	$: searchUpdates = ((RAGMessages.filter(({type}) => type === "webSearch").length > 0
+		? RAGMessages.filter(({type}) => type === "webSearch")
 		: message.updates?.filter(({ type }) => type === "webSearch")) ?? []) as WebSearchUpdate[];
+	
+	let pdfUpdates: PdfSearchUpdate[] = [];
+
+	$: pdfUpdates = ((RAGMessages.filter(({type}) => type === "pdfSearch").length > 0
+		? RAGMessages.filter(({type}) => type === "pdfSearch")
+		: message.updates?.filter(({ type }) => type === "pdfSearch")) ?? []) as PdfSearchUpdate[];
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
@@ -153,7 +160,14 @@
 					loading={!(searchUpdates[searchUpdates.length - 1]?.messageType === "sources")}
 				/>
 			{/if}
-			{#if !message.content && (webSearchIsDone || (webSearchMessages && webSearchMessages.length === 0))}
+			{#if pdfUpdates && pdfUpdates.length > 0}
+				<OpenPdfSearchResults
+					classNames={tokens.length ? "mb-3.5" : ""}
+					pdfSearchMessages={pdfUpdates}
+					loading={!(pdfUpdates[pdfUpdates.length - 1]?.messageType === "done")}
+				/>
+			{/if}
+			{#if !message.content && (webSearchIsDone || (RAGMessages && RAGMessages.length === 0))}
 				<IconLoading />
 			{/if}
 

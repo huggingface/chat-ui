@@ -25,6 +25,15 @@ export type WebSearchUpdate = {
 	sources?: WebSearchSource[];
 };
 
+export type PdfSearchUpdate = {
+	type: "pdfSearch";
+	messageType: "update" | "error" | "done";
+	message: string;
+	args?: string[];
+};
+
+export type RAGUpdate = WebSearchUpdate | PdfSearchUpdate;
+
 export type StatusUpdate = {
 	type: "status";
 	status: "started" | "pending" | "finished" | "error" | "title";
@@ -42,5 +51,6 @@ export type MessageUpdate =
 	| TextStreamUpdate
 	| AgentUpdate
 	| WebSearchUpdate
+	| PdfSearchUpdate
 	| StatusUpdate
 	| ErrorUpdate;

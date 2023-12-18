@@ -1,4 +1,5 @@
 import type { MessageUpdate } from "./MessageUpdate";
+import type { PdfSearch } from "./PdfChat";
 import type { Timestamps } from "./Timestamps";
 import type { WebSearch } from "./WebSearch";
 
@@ -9,6 +10,7 @@ export type Message = Partial<Timestamps> & {
 	updates?: MessageUpdate[];
 	webSearchId?: WebSearch["_id"]; // legacy version
 	webSearch?: WebSearch;
+	pdfSearch?: PdfSearch;
 	score?: -1 | 0 | 1;
 	files?: string[]; // can contain either the hash of the file or the b64 encoded image data on the client side when uploading
 };

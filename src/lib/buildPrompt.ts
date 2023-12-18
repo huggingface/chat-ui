@@ -2,7 +2,8 @@ import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 import { format } from "date-fns";
 import type { WebSearch } from "./types/WebSearch";
-import { downloadFile } from "./server/files/downloadFile";
+import type { PdfSearch } from "./types/PdfChat";
+import { downloadImgFile } from "./server/files/downloadFile";
 import type { Conversation } from "./types/Conversation";
 
 interface buildPromptOptions {
@@ -11,6 +12,7 @@ interface buildPromptOptions {
 	model: BackendModel;
 	locals?: App.Locals;
 	webSearch?: WebSearch;
+	pdfSearch?: PdfSearch;
 	preprompt?: string;
 	files?: File[];
 }
@@ -19,6 +21,7 @@ export async function buildPrompt({
 	messages,
 	model,
 	webSearch,
+	pdfSearch,
 	preprompt,
 	id,
 }: buildPromptOptions): Promise<string> {
@@ -47,6 +50,31 @@ export async function buildPrompt({
 				`,
 			},
 		];
+	}else if (pdfSearch && pdfSearch.context) {
+		const lastMsg = messages.slice(-1)[0];
+		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
+		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
+
+		const previousQuestions =
+			previousUserMessages.length > 0
+				? `Previous questions: \n${previousUserMessages
+						.map(({ content }) => `- ${content}`)
+						.join("\n")}`
+				: "";
+		
+		messages = [
+			...messagesWithoutLastUsrMsg,
+			{
+				from: "user",
+				content: `Below are the information I extracted from a PDF file that might be useful:
+				=====================
+				${pdfSearch.context}
+				=====================
+				${previousQuestions}
+				Answer the question: ${lastMsg.content} 
+				`,
+			},
+		];
 	}
 
 	// section to handle potential files input
@@ -60,7 +88,7 @@ export async function buildPrompt({
 						const markdowns = await Promise.all(
 							el.files.map(async (hash) => {
 								try {
-									const { content: image, mime } = await downloadFile(hash, id);
+									const { content: image, mime } = await downloadImgFile(hash, id);
 									const b64 = image.toString("base64");
 									return `![](data:${mime};base64,${b64})})`;
 								} catch (e) {

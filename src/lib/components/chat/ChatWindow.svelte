@@ -16,7 +16,7 @@
 	import type { Model } from "$lib/types/Model";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { RAGUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/stores";
 	import DisclaimerModal from "../DisclaimerModal.svelte";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -24,6 +24,7 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import type { PdfUploadStatus } from "$lib/types/PdfChat";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -31,9 +32,10 @@
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let RAGMessages: RAGUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
+	export let uploadPdfStatus: PdfUploadStatus;
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
@@ -114,7 +116,7 @@
 		{messages}
 		readOnly={isReadOnly}
 		isAuthor={!shared}
-		{webSearchMessages}
+		{RAGMessages}
 		{preprompt}
 		on:message={(ev) => {
 			if ($page.data.loginRequired) {
@@ -173,9 +175,8 @@
 								content: messages[messages.length - 1].content,
 							})}
 					/>
-				{:else if currentModel.multimodal}
-					<UploadBtn bind:files classNames="ml-auto" />
 				{/if}
+				<UploadBtn bind:files on:uploadpdf classNames="ml-auto" multimodal={currentModel.multimodal} {uploadPdfStatus} />
 			</div>
 			<form
 				on:dragover={onDragOver}

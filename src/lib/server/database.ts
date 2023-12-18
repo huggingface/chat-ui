@@ -29,7 +29,10 @@ const settings = db.collection<Settings>("settings");
 const users = db.collection<User>("users");
 const sessions = db.collection<Session>("sessions");
 const messageEvents = db.collection<MessageEvent>("messageEvents");
-const bucket = new GridFSBucket(db, { bucketName: "files" });
+
+const bucketName = "files";
+const bucket = new GridFSBucket(db, { bucketName });
+const files = db.collection(`${bucketName}.files`);
 
 export { client, db };
 export const collections = {
@@ -41,6 +44,7 @@ export const collections = {
 	sessions,
 	messageEvents,
 	bucket,
+	files,
 };
 
 client.on("open", () => {

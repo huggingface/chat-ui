@@ -9,10 +9,12 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
+import { runPdfSearch } from "$lib/server/pdfSearch";
 import type { WebSearch } from "$lib/types/WebSearch";
+import type { PdfSearch } from "$lib/types/PdfChat";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
-import { uploadFile } from "$lib/server/files/uploadFile";
+import { uploadImgFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
 
 export async function POST({ request, locals, params, getClientAddress }) {
@@ -135,7 +137,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	let hashes: undefined | string[];
 
 	if (files) {
-		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
+		hashes = await Promise.all(files.map(async (file) => await uploadImgFile(file, conv)));
 	}
 
 	// get the list of messages
@@ -239,6 +241,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			messages[messages.length - 1].webSearch = webSearchResults;
+
+			let pdfSearchResults: PdfSearch | undefined;
+			const pdfSearch = await collections.files.findOne({ filename: `${convId.toString()}-pdf` });
+			if(pdfSearch){
+				pdfSearchResults = await runPdfSearch(conv, newPrompt, update);
+			}
+
+			messages[messages.length - 1].pdfSearch = pdfSearchResults;
 
 			conv.messages = messages;
 

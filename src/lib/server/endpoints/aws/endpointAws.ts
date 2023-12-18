@@ -40,6 +40,7 @@ export async function endpointAws(
 		const prompt = await buildPrompt({
 			messages: conversation.messages,
 			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
+			pdfSearch: conversation.messages[conversation.messages.length - 1].pdfSearch,
 			preprompt: conversation.preprompt,
 			model,
 		});
