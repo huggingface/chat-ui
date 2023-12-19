@@ -6,6 +6,7 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
+import { defaultEmbeddingModel, embeddingModels, validateEmbeddingModel } from "$lib/server/embeddingModels";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -17,6 +18,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
+			embeddingModel: validateEmbeddingModel(embeddingModels).optional(),
 			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
@@ -35,10 +37,13 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		title = conversation.title;
 		messages = conversation.messages;
 		values.model = conversation.model;
+		values.embeddingModel = conversation.embeddingModel;
 		preprompt = conversation.preprompt;
 	}
 
 	const model = models.find((m) => m.name === values.model);
+
+	values.embeddingModel = values.embeddingModel ?? model?.embeddingModelName ?? defaultEmbeddingModel.name
 
 	if (!model) {
 		throw error(400, "Invalid model");
@@ -59,6 +64,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		embeddingModel: values.embeddingModel,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
