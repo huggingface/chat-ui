@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onDestroy } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -23,6 +24,7 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { isConversationShared } from "$lib/stores/shareConversation";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -38,6 +40,7 @@
 
 	let loginModalOpen = false;
 	let message: string;
+	let timeout: ReturnType<typeof setTimeout>;
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -73,6 +76,23 @@
 	$: sources = files.map((file) => file2base64(file));
 
 	const settings = useSettingsStore();
+
+	$: {
+		if ($isConversationShared) {
+			if (timeout) {
+				clearTimeout(timeout);
+			}
+			timeout = setTimeout(() => {
+				$isConversationShared = false;
+			}, 2000);
+		}
+	}
+
+	onDestroy(() => {
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+	});
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -226,12 +246,19 @@
 				</p>
 				{#if messages.length}
 					<button
-						class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
+						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
+						class:hover:underline={!$isConversationShared}
 						on:click={() => dispatch("share")}
+						disabled={$isConversationShared}
 					>
-						<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
-						<div class="max-sm:hidden">Share this conversation</div>
+						{#if $isConversationShared}
+							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-500" />
+							<div class="text-green-600 max-sm:hidden">Copied to clipboard</div>
+						{:else}
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+							<div class="max-sm:hidden">Share this conversation</div>
+						{/if}
 					</button>
 				{/if}
 			</div>
