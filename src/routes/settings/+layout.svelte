@@ -99,14 +99,16 @@
 					</a>
 				{/each}
 
-				<a
-					href="{base}/settings/assistants/new"
-					class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+				{#if data.loginEnabled && !!data.user}
+					<a
+						href="{base}/settings/assistants/new"
+						class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
 					{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
-				>
-					<CarbonAdd />
-					<div class="truncate">Create new assistant</div>
-				</a>
+					>
+						<CarbonAdd />
+						<div class="truncate">Create new assistant</div>
+					</a>
+				{/if}
 			{/if}
 
 			<a

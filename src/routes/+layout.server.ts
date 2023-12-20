@@ -16,7 +16,6 @@ import {
 import { ObjectId } from "mongodb";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
-	const { conversations } = collections;
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
@@ -47,7 +46,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	// get the number of messages where `from === "assistant"` across all conversations.
 	const totalMessages =
 		(
-			await conversations
+			await collections.conversations
 				.aggregate([
 					{ $match: authCondition(locals) },
 					{ $project: { messages: 1 } },
@@ -78,24 +77,39 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		  )
 		: null;
 
+	const conversations = await collections.conversations
+		.find(authCondition(locals))
+		.sort({ updatedAt: -1 })
+		.project<
+			Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId">
+		>({
+			title: 1,
+			model: 1,
+			_id: 1,
+			updatedAt: 1,
+			createdAt: 1,
+			assistantId: 1,
+		})
+		.toArray();
+
+	const assistantIds = conversations
+		.map((conv) => conv.assistantId)
+		.filter((el) => !!el) as ObjectId[];
+
+	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
+
 	return {
-		conversations: await conversations
-			.find(authCondition(locals))
-			.sort({ updatedAt: -1 })
-			.project<Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt">>({
-				title: 1,
-				model: 1,
-				_id: 1,
-				updatedAt: 1,
-				createdAt: 1,
-			})
-			.map((conv) => ({
-				id: conv._id.toString(),
-				title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
-				model: conv.model ?? defaultModel,
-				updatedAt: conv.updatedAt,
-			}))
-			.toArray(),
+		conversations: conversations.map((conv) => ({
+			id: conv._id.toString(),
+			title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
+			model: conv.model ?? defaultModel,
+			updatedAt: conv.updatedAt,
+			avatarId:
+				conv.assistantId &&
+				assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar
+					? conv.assistantId?.toString()
+					: undefined,
+		})),
 		settings: {
 			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,

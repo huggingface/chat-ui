@@ -12,7 +12,7 @@
 		id: string;
 		title: string;
 		updatedAt: Date;
-		// avatarId: string;
+		avatarId?: string;
 	}
 
 	export let conversations: Array<Conv> = [];

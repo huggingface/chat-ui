@@ -7,15 +7,19 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
+	import { useSettingsStore } from "$lib/stores/settings";
 
-	export let conv: { id: string; title: string; avatarId: string };
+	export let conv: { id: string; title: string; avatarId?: string };
 
+	console.log(conv);
 	let confirmDelete = false;
 
 	const dispatch = createEventDispatcher<{
 		deleteConversation: string;
 		editConversationTitle: { id: string; title: string };
 	}>();
+
+	const settings = useSettingsStore();
 </script>
 
 <a
@@ -33,10 +37,16 @@
 		{#if confirmDelete}
 			<span class="font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarId}
-			{conv.avatarId}
+		{#if conv.avatarId && !$settings.hideEmojiOnSidebar}
+			<img
+				src="{base}/settings/assistants/{conv.avatarId}/avatar"
+				alt="Assistant avatar"
+				class="mr-1 inline h-4 w-4 rounded-full"
+			/>
+			{conv.title.replace(/\p{Emoji}/gu, "")}
+		{:else}
+			{conv.title}
 		{/if}
-		{conv.title}
 	</div>
 
 	{#if confirmDelete}

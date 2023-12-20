@@ -4,6 +4,7 @@
 	import { onMount } from "svelte";
 	import type { ActionData, PageData } from "./$types";
 	import type { readAndCompressImage } from "browser-image-resizer";
+	import { base } from "$app/paths";
 
 	export let data: PageData;
 	export let form: ActionData;
@@ -16,11 +17,17 @@
 		const module = await import("browser-image-resizer");
 		compress = module.readAndCompressImage;
 	});
+
+	let inputMessage1: string;
+	let inputMessage2: string;
+	let inputMessage3: string;
+	let inputMessage4: string;
 </script>
 
 <form
 	method="POST"
 	class="h-full"
+	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		const avatar = formData.get("avatar");
 
@@ -38,9 +45,9 @@
 	<h2 class="mb-8 text-xl font-semibold">Create new assistant</h2>
 	<div class="grid grid-cols-2 gap-2">
 		<div class="flex flex-col gap-4 px-2">
-			<label>
+			<label class="truncate">
 				<span class="block text-sm font-semibold">Avatar</span>
-				<input type="file" accept="image/*" name="avatar" class="mx-auto" />
+				<input type="file" accept="image/*" name="avatar" class="crop mx-auto" />
 			</label>
 
 			<label>
@@ -74,10 +81,34 @@
 
 			<label>
 				<span class="text-sm font-semibold">Start messages</span>
-				<input
-					name="exampleInputs"
-					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-				/>
+				<div class="flex max-h-32 flex-col gap-2 overflow-y-scroll">
+					<input
+						name="exampleInput1"
+						bind:value={inputMessage1}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					/>
+					{#if !!inputMessage1 || !!inputMessage2}
+						<input
+							name="exampleInput2"
+							bind:value={inputMessage2}
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						/>
+					{/if}
+					{#if !!inputMessage2 || !!inputMessage3}
+						<input
+							name="exampleInput3"
+							bind:value={inputMessage3}
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						/>
+					{/if}
+					{#if !!inputMessage3 || !!inputMessage4}
+						<input
+							name="exampleInput4"
+							bind:value={inputMessage4}
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						/>
+					{/if}
+				</div>
 			</label>
 		</div>
 
@@ -102,7 +133,9 @@
 	{/if}
 
 	<div class="mt-5 flex flex-row justify-around">
-		<button class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</button>
+		<a href="{base}/settings" class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600"
+			>Cancel</a
+		>
 
 		<button type="submit" class="rounded-full bg-black px-20 py-2 font-semibold text-white"
 			>Create</button

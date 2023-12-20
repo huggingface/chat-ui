@@ -12,7 +12,10 @@ const newAsssistantSchema = z.object({
 	modelId: z.string().min(1),
 	preprompt: z.string().min(1),
 	description: z.string().optional(),
-	exampleInputs: z.string().optional(),
+	exampleInput1: z.string().optional(),
+	exampleInput2: z.string().optional(),
+	exampleInput3: z.string().optional(),
+	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
 });
 
@@ -59,6 +62,13 @@ export const actions: Actions = {
 
 		const newAssistantId = new ObjectId();
 
+		const exampleInputs: string[] = [
+			parse?.data?.exampleInput1 ?? "",
+			parse?.data?.exampleInput2 ?? "",
+			parse?.data?.exampleInput3 ?? "",
+			parse?.data?.exampleInput4 ?? "",
+		].filter((input) => !!input);
+
 		if (parse.data.avatar && parse.data.avatar.size > 0) {
 			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
 
@@ -74,8 +84,8 @@ export const actions: Actions = {
 			createdById,
 			createdByName: locals.user?.username,
 			...parse.data,
+			exampleInputs,
 			avatar: (parse?.data?.avatar?.size ?? 0) > 0,
-			exampleInputs: [parse.data.exampleInputs ?? ""],
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		});
