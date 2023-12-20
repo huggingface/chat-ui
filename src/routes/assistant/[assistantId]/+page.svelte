@@ -30,7 +30,7 @@
 			if (browser) window;
 			goto(previousPage);
 		}}
-		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-2 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
+		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-2 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 	>
 		{#if data.assistant.avatar}
 			<img
@@ -61,9 +61,19 @@
 			</a>
 		</p>
 
+		<button
+			class="mt-4 w-full rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
+			on:click={() => {
+				if (browser) window;
+				goto(previousPage);
+			}}
+		>
+			Cancel
+		</button>
 		<form
 			method="POST"
 			action="{base}/settings/assistants/{data.assistant._id}?/subscribe"
+			class="w-full"
 			use:enhance={() => {
 				return async ({ result }) => {
 					// `result` is an `ActionResult` object
@@ -76,7 +86,12 @@
 				};
 			}}
 		>
-			<button type="submit" class="rounded-lg bg-black px-3 py-1 text-white"> Add preset </button>
+			<button
+				type="submit"
+				class=" w-full rounded-full bg-black px-4 py-2 font-semibold text-white"
+			>
+				Add preset and start chatting
+			</button>
 		</form>
 	</dialog>
 </div>

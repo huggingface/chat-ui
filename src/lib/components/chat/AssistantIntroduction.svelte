@@ -16,7 +16,7 @@
 	<div
 		class="relative mt-auto rounded-xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300"
 	>
-		<div class="flex items-center gap-4 p-8">
+		<div class="flex items-center gap-4 p-8 pr-10 pt-10">
 			{#if assistant.avatar}
 				<img
 					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar`}
@@ -43,18 +43,24 @@
 				</p>
 
 				<p class="pt-2 text-sm text-gray-400 dark:text-gray-500">
-					Created by {assistant.createdByName}
+					Created by <a
+						class="hover:underline"
+						href="https://hf.co/{assistant.createdByName}"
+						target="_blank"
+					>
+						{assistant.createdByName}
+					</a>
 				</p>
 			</div>
 		</div>
 		<a
 			href="{base}/settings/assistants/{assistant._id.toString()}"
-			class="absolute bottom-4 right-4
+			class="absolute right-3 top-3
             inline text-gray-400 hover:text-gray-600
             dark:text-gray-500 dark:hover:text-gray-400
             "
 		>
-			<IconGear class="h-6 w-6" />
+			<IconGear class="h-5 w-5" />
 		</a>
 	</div>
 	{#if assistant.exampleInputs}
