@@ -63,7 +63,7 @@
 
 		<form
 			method="POST"
-			action="{base}/settings/assistants/{data.assistant.id}?/subscribe"
+			action="{base}/settings/assistants/{data.assistant._id}?/subscribe"
 			use:enhance={(event) => {
 				return async ({ result }) => {
 					// `result` is an `ActionResult` object
