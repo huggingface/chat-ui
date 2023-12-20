@@ -17,12 +17,10 @@
 	import LoginModal from "../LoginModal.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/stores";
-	import DisclaimerModal from "../DisclaimerModal.svelte";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import type { Assistant } from "$lib/types/Assistant";
 
 	export let messages: Message[] = [];
@@ -73,14 +71,10 @@
 	$: lastIsError = messages[messages.length - 1]?.from === "user" && !loading;
 
 	$: sources = files.map((file) => file2base64(file));
-
-	const settings = useSettingsStore();
 </script>
 
 <div class="relative min-h-0 min-w-0">
-	{#if !$settings.ethicsModalAccepted}
-		<DisclaimerModal />
-	{:else if loginModalOpen}
+	{#if loginModalOpen}
 		<LoginModal
 			on:close={() => {
 				loginModalOpen = false;

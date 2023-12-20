@@ -37,8 +37,9 @@
 					class:text-gray-800={$page.data.loginEnabled}
 					class:hover:bg-slate-100={$page.data.loginEnabled}
 					on:click={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
 						if (!cookiesAreEnabled()) {
-							e.preventDefault();
 							window.open(window.location.href, "_blank");
 						}
 

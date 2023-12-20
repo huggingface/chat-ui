@@ -17,6 +17,7 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { browser } from "$app/environment";
+	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 
 	export let data;
 
@@ -146,6 +147,10 @@
 		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/manifest.json"
 	/>
 </svelte:head>
+
+{#if !$settings.ethicsModalAccepted}
+	<DisclaimerModal />
+{/if}
 
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd dark:text-gray-300 md:grid-cols-[280px,1fr] md:grid-rows-[1fr]"

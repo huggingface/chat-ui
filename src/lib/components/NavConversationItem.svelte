@@ -11,7 +11,6 @@
 
 	export let conv: { id: string; title: string; avatarId?: string };
 
-	console.log(conv);
 	let confirmDelete = false;
 
 	const dispatch = createEventDispatcher<{
