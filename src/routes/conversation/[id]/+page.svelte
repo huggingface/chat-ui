@@ -138,6 +138,7 @@
 			// eslint-disable-next-line no-undef
 			const encoder = new TextDecoderStream();
 			const reader = response?.body?.pipeThrough(encoder).getReader();
+			let importantUpdates: MessageUpdate[] = [];
 			let finalAnswer = "";
 
 			// set str queue
@@ -173,7 +174,9 @@
 					inputs.forEach(async (el: string) => {
 						try {
 							const update = JSON.parse(el) as MessageUpdate;
+							
 							if (update.type === "finalAnswer") {
+								importantUpdates.push(update);
 								finalAnswer = update.text;
 								reader.cancel();
 								loading = false;
@@ -194,8 +197,10 @@
 									messages = [...messages];
 								}
 							} else if (update.type === "webSearch") {
+								importantUpdates.push(update);
 								webSearchMessages = [...webSearchMessages, update];
 							} else if (update.type === "status") {
+								importantUpdates.push(update);
 								if (update.status === "title" && update.message) {
 									const conv = data.conversations.find(({ id }) => id === $page.params.id);
 									if (conv) {
@@ -210,6 +215,7 @@
 									$error = update.message ?? "An error has occurred";
 								}
 							} else if (update.type === "error") {
+								importantUpdates.push(update);
 								error.set(update.message);
 								reader.cancel();
 							}
@@ -225,7 +231,11 @@
 				});
 			}
 
+			const lastMessage = messages[messages.length - 1];
+			lastMessage.updates = importantUpdates;
+
 			// reset the websearchmessages
+			importantUpdates = []
 			webSearchMessages = [];
 
 			await invalidate(UrlDependency.ConversationList);
