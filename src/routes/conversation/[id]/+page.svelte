@@ -174,7 +174,7 @@
 					inputs.forEach(async (el: string) => {
 						try {
 							const update = JSON.parse(el) as MessageUpdate;
-							
+
 							if (update.type === "finalAnswer") {
 								importantUpdates.push(update);
 								finalAnswer = update.text;
@@ -235,7 +235,7 @@
 			lastMessage.updates = importantUpdates;
 
 			// reset the websearchmessages
-			importantUpdates = []
+			importantUpdates = [];
 			webSearchMessages = [];
 
 			await invalidate(UrlDependency.ConversationList);

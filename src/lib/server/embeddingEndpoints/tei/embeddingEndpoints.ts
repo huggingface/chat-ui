@@ -9,7 +9,6 @@ export const embeddingEndpointTeiParametersSchema = z.object({
 	url: z.string().url(),
 });
 
-
 const getModelInfoByUrl = async (url: string) => {
 	const { origin } = new URL(url);
 
@@ -17,13 +16,13 @@ const getModelInfoByUrl = async (url: string) => {
 		headers: {
 			Accept: "application/json",
 			"Content-Type": "application/json",
-		}
+		},
 	});
 
 	const info = await response.json();
 
 	return info;
-}
+};
 
 export async function embeddingEndpointTei(
 	input: z.input<typeof embeddingEndpointTeiParametersSchema>
@@ -31,12 +30,15 @@ export async function embeddingEndpointTei(
 	const { url, model } = embeddingEndpointTeiParametersSchema.parse(input);
 
 	const { max_client_batch_size, max_batch_tokens } = await getModelInfoByUrl(url);
-	const maxBatchSize = Math.min(max_client_batch_size, Math.floor(max_batch_tokens / model.maxSequenceLength))
+	const maxBatchSize = Math.min(
+		max_client_batch_size,
+		Math.floor(max_batch_tokens / model.maxSequenceLength)
+	);
 
 	return async ({ inputs }) => {
 		const { origin } = new URL(url);
 
-		const batchesInputs = chunk(inputs, maxBatchSize)
+		const batchesInputs = chunk(inputs, maxBatchSize);
 
 		const batchesResults = await Promise.all(
 			batchesInputs.map(async (batchInputs) => {
@@ -52,9 +54,9 @@ export async function embeddingEndpointTei(
 				const embeddings: number[][] = await response.json();
 				return embeddings;
 			})
-		)
+		);
 
-		const allEmbeddings = batchesResults.flatMap(embeddings => embeddings)
+		const allEmbeddings = batchesResults.flatMap((embeddings) => embeddings);
 
 		return allEmbeddings;
 	};
