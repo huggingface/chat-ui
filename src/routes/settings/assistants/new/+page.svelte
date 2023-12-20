@@ -42,7 +42,10 @@
 		}
 	}}
 >
-	<h2 class="mb-8 text-xl font-semibold">Create new assistant</h2>
+	<h2 class="text-xl font-semibold">Create new assistant</h2>
+	<p class="mb-8 text-sm text-gray-500">
+		Assistants are public, and can be accessed by anyone with the link.
+	</p>
 	<div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4 px-2">
 			<label class="truncate">

@@ -11,6 +11,7 @@
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonFollow from "~icons/carbon/user-follow";
+	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 
 	export let data: PageData;
 
@@ -74,7 +75,7 @@
 
 		<p class="pb-2 text-sm text-gray-500">
 			{#if assistant?.createdByMe}
-				Created by you!
+				By sharing this URL, other people can use your assistant.
 			{:else}
 				Created by <a
 					class=" hover:underline"
@@ -86,11 +87,10 @@
 				</a>
 			{/if}
 		</p>
-		<div class="flex w-full flex-row gap-2 rounded-full border-2 border-gray-200 bg-gray-100">
+
+		<div class="flex flex-row gap-2 rounded-full border-2 border-gray-200 bg-gray-100">
 			<input disabled class="w-full px-3 py-1" value={shareUrl} />
-			<button class="rounded-full bg-gray-100 pr-2 text-gray-400 hover:underline" type="button">
-				Copy
-			</button>
+			<CopyToClipBoardBtn value={shareUrl} classNames="border-0 text-gray-500 text-lg mr-4" />
 		</div>
 	</div>
 
