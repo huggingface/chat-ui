@@ -15,7 +15,7 @@ export async function findSimilarSentences(
 	const inputs = [query, ...sentences];
 
 	const embeddingEndpoint = await embeddingModel.getEndpoint();
-	const output = await embeddingEndpoint({ inputs })
+	const output = await embeddingEndpoint({ inputs });
 
 	const queryEmbedding: number[] = output[0];
 	const sentencesEmbeddings: number[][] = output.slice([1, inputs.length - 1]);

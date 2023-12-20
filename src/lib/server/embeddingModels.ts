@@ -1,10 +1,11 @@
-import {
-	TEXT_EMBEDDING_MODELS,
-} from "$env/static/private";
+import { TEXT_EMBEDDING_MODELS } from "$env/static/private";
 
 import { z } from "zod";
 import { sum } from "$lib/utils/sum";
-import embeddingEndpoints, { embeddingEndpointSchema, type EmbeddingEndpoint } from "./embeddingEndpoints/embeddingEndpoints";
+import embeddingEndpoints, {
+	embeddingEndpointSchema,
+	type EmbeddingEndpoint,
+} from "./embeddingEndpoints/embeddingEndpoints";
 import embeddingEndpointXenova from "./embeddingEndpoints/xenova/embeddingEndpoints";
 
 const modelConfig = z.object({
@@ -61,7 +62,9 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processEmbeddingModel>>) => ({
 	},
 });
 
-export const embeddingModels = await Promise.all(embeddingModelsRaw.map((e) => processEmbeddingModel(e).then(addEndpoint)));
+export const embeddingModels = await Promise.all(
+	embeddingModelsRaw.map((e) => processEmbeddingModel(e).then(addEndpoint))
+);
 
 export const defaultEmbeddingModel = embeddingModels[0];
 
@@ -69,6 +72,5 @@ export const validateEmbeddingModel = (_models: EmbeddingBackendModel[]) => {
 	// Zod enum function requires 2 parameters
 	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
 };
-
 
 export type EmbeddingBackendModel = typeof defaultEmbeddingModel;

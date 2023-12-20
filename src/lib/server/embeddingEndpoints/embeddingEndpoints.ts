@@ -1,10 +1,15 @@
-import { embeddingEndpointTei, embeddingEndpointTeiParametersSchema } from "./tei/embeddingEndpoints";
+import {
+	embeddingEndpointTei,
+	embeddingEndpointTeiParametersSchema,
+} from "./tei/embeddingEndpoints";
 import { z } from "zod";
-import embeddingEndpointXenova, { embeddingEndpointXenovaParametersSchema } from "./xenova/embeddingEndpoints";
+import embeddingEndpointXenova, {
+	embeddingEndpointXenovaParametersSchema,
+} from "./xenova/embeddingEndpoints";
 
 // parameters passed when generating text
 interface EmbeddingEndpointParameters {
-	inputs: string[]
+	inputs: string[];
 }
 
 interface CommonEmbeddingEndpoint {
@@ -12,22 +17,22 @@ interface CommonEmbeddingEndpoint {
 }
 
 // type signature for the endpoint
-export type EmbeddingEndpoint = (
-	params: EmbeddingEndpointParameters
-) => Promise<any>; // TODO: type
+export type EmbeddingEndpoint = (params: EmbeddingEndpointParameters) => Promise<number[][]>;
 
 // generator function that takes in parameters for defining the endpoint and return the endpoint
-export type EmbeddingEndpointGenerator<T extends CommonEmbeddingEndpoint> = (parameters: T) => EmbeddingEndpoint;
+export type EmbeddingEndpointGenerator<T extends CommonEmbeddingEndpoint> = (
+	parameters: T
+) => EmbeddingEndpoint;
 
 // list of all endpoint generators
 export const embeddingEndpoints = {
 	tei: embeddingEndpointTei,
-	xenova: embeddingEndpointXenova
+	xenova: embeddingEndpointXenova,
 };
 
 export const embeddingEndpointSchema = z.discriminatedUnion("type", [
 	embeddingEndpointTeiParametersSchema,
-	embeddingEndpointXenovaParametersSchema
+	embeddingEndpointXenovaParametersSchema,
 ]);
 
 export default embeddingEndpoints;
