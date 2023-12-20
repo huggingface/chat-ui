@@ -12,7 +12,10 @@ export async function findSimilarSentences(
 	sentences: string[],
 	{ topK = 5 }: { topK: number }
 ): Promise<number[]> {
-	const inputs = [query, ...sentences];
+	const inputs = [
+		`${embeddingModel.preQuery}${query}`,
+		...sentences.map((sentence) => `${embeddingModel.prePassage}${sentence}`),
+	];
 
 	const embeddingEndpoint = await embeddingModel.getEndpoint();
 	const output = await embeddingEndpoint({ inputs });

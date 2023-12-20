@@ -19,6 +19,8 @@ const modelConfig = z.object({
 	modelUrl: z.string().url().optional(),
 	endpoints: z.array(embeddingEndpointSchema).optional(),
 	maxSequenceLength: z.number().positive(),
+	preQuery: z.string().default(""),
+	prePassage: z.string().default(""),
 });
 
 const embeddingModelsRaw = z.array(modelConfig).parse(JSON.parse(TEXT_EMBEDDING_MODELS));
