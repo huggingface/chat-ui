@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { page } from "$app/stores";
+	import { base } from "$app/paths";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import CarbonLink from "~icons/carbon/link";
 
 	const settings = useSettingsStore();
 
@@ -24,11 +28,19 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<h2 class="mb-2.5 text-xl font-semibold">
-		{$page.params.model}
-	</h2>
+	<div class="mb-5 flex flex-col gap-1.5">
+		<h2 class="text-lg font-semibold md:text-xl">
+			{$page.params.model}
+		</h2>
 
-	<div class="flex items-center gap-4">
+		{#if model.description}
+			<p class=" text-gray-600">
+				{model.description}
+			</p>
+		{/if}
+	</div>
+
+	<div class="flex flex-wrap items-center gap-2 md:gap-4">
 		<a
 			href={model.modelUrl || "https://huggingface.co/" + model.name}
 			target="_blank"
@@ -62,6 +74,14 @@
 				Model website
 			</a>
 		{/if}
+		<CopyToClipBoardBtn
+			value="{PUBLIC_ORIGIN || $page.url.origin}{base}?model={model.id}"
+			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
+		>
+			<div class="flex items-center gap-1.5">
+				<CarbonLink />Copy direct link to model
+			</div>
+		</CopyToClipBoardBtn>
 	</div>
 
 	<button
