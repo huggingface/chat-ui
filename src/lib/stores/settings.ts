@@ -14,7 +14,7 @@ type SettingsStore = {
 	activeModel: string;
 	customPrompts: Record<string, string>;
 	recentlySaved: boolean;
-	assistants: ObjectId[];
+	assistants: Array<ObjectId | string>;
 };
 
 export function useSettingsStore() {

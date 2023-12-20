@@ -29,7 +29,7 @@
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
-	export let assistant: Assistant | undefined;
+	export let assistant: Assistant | undefined = undefined;
 	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
