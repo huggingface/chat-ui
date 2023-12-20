@@ -47,9 +47,9 @@
 			</button>
 		</div>
 		<div
-			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[160px] max-md:border md:pr-6"
+			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap border-b-gray-400 max-md:-mx-4 max-md:h-[160px] max-md:border max-md:border-b-2 md:pr-6"
 		>
-			<h3 class="pb-3 text-xs">Models</h3>
+			<h3 class="pb-3 pt-5 text-xs max-md:w-full max-md:text-center">Models</h3>
 
 			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
@@ -68,7 +68,7 @@
 				</a>
 			{/each}
 			{#if !data.disableAssistants}
-				<h3 class="pb-3 pt-5 text-xs">Assistants</h3>
+				<h3 class="pb-3 pt-5 text-xs max-md:w-full max-md:text-center">Assistants</h3>
 				{#each data.assistants as assistant}
 					<a
 						href="{base}/settings/assistants/{assistant._id.toString()}"

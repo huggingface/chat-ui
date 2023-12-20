@@ -108,7 +108,7 @@
 					Delete assistant</button
 				>
 			</form>
-			<form method="POST" action="?/edit" use:enhance>
+			<form method="POST" action="?/edit" use:enhance class="hidden">
 				<button type="submit" class="underline">
 					<CarbonPen class="mr-1.5 inline" />
 					Edit assistant</button

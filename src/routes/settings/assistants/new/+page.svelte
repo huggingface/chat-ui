@@ -43,7 +43,7 @@
 	}}
 >
 	<h2 class="mb-8 text-xl font-semibold">Create new assistant</h2>
-	<div class="grid grid-cols-2 gap-2">
+	<div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4 px-2">
 			<label class="truncate">
 				<span class="block text-sm font-semibold">Avatar</span>
@@ -81,7 +81,7 @@
 
 			<label>
 				<span class="text-sm font-semibold">Start messages</span>
-				<div class="flex max-h-32 flex-col gap-2 overflow-y-scroll">
+				<div class="flex flex-col gap-2 md:max-h-32 md:overflow-y-scroll">
 					<input
 						name="exampleInput1"
 						bind:value={inputMessage1}
@@ -114,11 +114,8 @@
 
 		<div class="flex flex-col gap-4 px-2">
 			<label class="h-full">
-				Instructions (system prompt)
-				<h6 class="pb-3 text-sm font-light text-gray-700">
-					Lorem ipsum dolor sit amet consectetur. Hendrerit ullamcorper malesuada dignissim egestas.
-					Iaculis ultrices felis facilisis ullamcorper mi egestas. In et ultrices ut nulla semper.
-				</h6>
+				<span class="text-sm font-semibold"> Instructions (system prompt) </span>
+
 				<textarea
 					name="preprompt"
 					class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
@@ -132,12 +129,12 @@
 		<p class="text-red-500">{JSON.stringify(form.errors)}</p>
 	{/if}
 
-	<div class="mt-5 flex flex-row justify-around">
+	<div class="mx-4 mt-5 flex w-full flex-row justify-around gap-2">
 		<a href="{base}/settings" class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600"
 			>Cancel</a
 		>
 
-		<button type="submit" class="rounded-full bg-black px-20 py-2 font-semibold text-white"
+		<button type="submit" class="rounded-full bg-black px-8 py-2 font-semibold text-white md:px-20"
 			>Create</button
 		>
 	</div>
