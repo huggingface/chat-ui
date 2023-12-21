@@ -26,10 +26,6 @@
 	function getError(field: string, returnForm: ActionData) {
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
-
-	// put form.errors message next to the input with the correct name
-	// errors is the form Array<{field: nameOfInput, message: string}>
-	// append as sibling to the relevant input element in the dom. clear out all errors on $form changes
 </script>
 
 <form
