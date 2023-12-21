@@ -22,11 +22,19 @@
 	let inputMessage2: string;
 	let inputMessage3: string;
 	let inputMessage4: string;
+
+	function getError(field: string, returnForm: ActionData) {
+		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
+	}
+
+	// put form.errors message next to the input with the correct name
+	// errors is the form Array<{field: nameOfInput, message: string}>
+	// append as sibling to the relevant input element in the dom. clear out all errors on $form changes
 </script>
 
 <form
 	method="POST"
-	class="h-full"
+	class="h-full w-full overflow-x-clip"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		const avatar = formData.get("avatar");
@@ -51,6 +59,8 @@
 			<label class="truncate">
 				<span class="block text-sm font-semibold">Avatar</span>
 				<input type="file" accept="image/*" name="avatar" class="crop mx-auto" />
+				<span class="text-xs text-gray-500">Click to upload</span>
+				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 			</label>
 
 			<label>
@@ -60,6 +70,7 @@
 					class=" w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="My awesome model"
 				/>
+				<p class="text-xs text-red-500">{getError("name", form)}</p>
 			</label>
 
 			<label>
@@ -69,6 +80,7 @@
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="He knows everything about python"
 				/>
+				<p class="text-xs text-red-500">{getError("description", form)}</p>
 			</label>
 
 			<label>
@@ -79,6 +91,7 @@
 							>{model.displayName}</option
 						>
 					{/each}
+					<p class="text-xs text-red-500">{getError("modelId", form)}</p>
 				</select>
 			</label>
 
@@ -112,6 +125,7 @@
 						/>
 					{/if}
 				</div>
+				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 			</label>
 		</div>
 
@@ -124,13 +138,11 @@
 					class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
 				/>
+
+				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 			</label>
 		</div>
 	</div>
-
-	{#if form?.error}
-		<p class="text-red-500">{JSON.stringify(form.errors)}</p>
-	{/if}
 
 	<div class="mx-4 mt-5 flex w-full flex-row justify-around gap-2">
 		<a href="{base}/settings" class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600"

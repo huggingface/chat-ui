@@ -55,7 +55,8 @@ export const actions: Actions = {
 
 		// can only create assistants when logged in, IF login is setup
 		if (!locals.user && requiresUser) {
-			return fail(401, { error: true, message: "Unauthorized" });
+			const errors = [{ field: "preprompt", message: "Must be logged in. Unauthorized" }];
+			return fail(400, { error: true, errors });
 		}
 
 		const createdById = locals.user?._id ?? locals.sessionId;
@@ -73,7 +74,8 @@ export const actions: Actions = {
 			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
 
 			if ((dims.height ?? 1000) > 512 || (dims.width ?? 1000) > 512) {
-				return fail(400, { error: true, message: "Avatar too big" });
+				const errors = [{ field: "avatar", message: "Avatar too big" }];
+				return fail(400, { error: true, errors });
 			}
 
 			await uploadAvatar(parse.data.avatar, newAssistantId);
