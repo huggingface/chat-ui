@@ -121,7 +121,7 @@
 					Remove assistant</button
 				>
 			</form>
-			<form method="POST" action="?/edit" use:enhance>
+			<form method="POST" action="?/edit" use:enhance class="hidden">
 				<button type="submit" class="underline">
 					<CarbonCopy class="mr-1.5 inline" />
 					Duplicate assistant</button
