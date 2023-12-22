@@ -12,6 +12,7 @@ import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
 import endpointTgi from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
+import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -66,7 +67,7 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
-	embeddingModelName: z.string().optional(),
+	embeddingModelName: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));

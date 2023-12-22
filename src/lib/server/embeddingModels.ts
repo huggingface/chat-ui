@@ -71,8 +71,16 @@ export const embeddingModels = await Promise.all(
 
 export const defaultEmbeddingModel = embeddingModels[0];
 
-export const validateEmbeddingModel = (_models: EmbeddingBackendModel[]) => {
-	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
+const validateEmbeddingModel = (_models: EmbeddingBackendModel[], key: "id" | "name") => {
+	return z.enum([_models[0][key], ..._models.slice(1).map((m) => m[key])]);
+};
+
+export const validateEmbeddingModelById = (_models: EmbeddingBackendModel[]) => {
+	return validateEmbeddingModel(_models, "id");
+};
+
+export const validateEmbeddingModelByName = (_models: EmbeddingBackendModel[]) => {
+	return validateEmbeddingModel(_models, "name");
 };
 
 export type EmbeddingBackendModel = typeof defaultEmbeddingModel;

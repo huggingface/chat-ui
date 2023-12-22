@@ -9,7 +9,7 @@ import { models, validateModel } from "$lib/server/models";
 import {
 	defaultEmbeddingModel,
 	embeddingModels,
-	validateEmbeddingModel,
+	validateEmbeddingModelById,
 } from "$lib/server/embeddingModels";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -22,12 +22,12 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
-			embeddingModel: validateEmbeddingModel(embeddingModels).optional(),
 			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
 
 	let preprompt = values.preprompt;
+	let embeddingModelName: string;
 
 	if (values.fromShare) {
 		const conversation = await collections.sharedConversations.findOne({
@@ -41,18 +41,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		title = conversation.title;
 		messages = conversation.messages;
 		values.model = conversation.model;
-		values.embeddingModel = conversation.embeddingModel;
+		embeddingModelName = conversation.embeddingModel;
 		preprompt = conversation.preprompt;
 	}
 
 	const model = models.find((m) => m.name === values.model);
 
-	values.embeddingModel =
-		values.embeddingModel ?? model?.embeddingModelName ?? defaultEmbeddingModel.name;
-
 	if (!model) {
 		throw error(400, "Invalid model");
 	}
+
+	embeddingModelName ??= model.embeddingModelName ?? defaultEmbeddingModel.name;
 
 	if (model.unlisted) {
 		throw error(400, "Can't start a conversation with an unlisted model");
