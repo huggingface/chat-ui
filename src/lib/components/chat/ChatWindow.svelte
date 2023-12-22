@@ -40,8 +40,8 @@
 	let loginModalOpen = false;
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
-	let isSharedRecently = false;  
-    $: $page.params.id && (isSharedRecently = false);
+	let isSharedRecently = false;
+	$: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -78,15 +78,15 @@
 
 	const settings = useSettingsStore();
 
-	function onShare(){
-		dispatch("share");  
+	function onShare() {
+		dispatch("share");
 		isSharedRecently = true;
 		if (timeout) {
-				clearTimeout(timeout);
-			}
-			timeout = setTimeout(() => {
-				isSharedRecently = false;
-			}, 2000);
+			clearTimeout(timeout);
+		}
+		timeout = setTimeout(() => {
+			isSharedRecently = false;
+		}, 2000);
 	}
 
 	onDestroy(() => {
