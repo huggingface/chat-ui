@@ -78,5 +78,5 @@ Current Question: Where is it being hosted ?`,
 		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
 	});
 
-	return queryModifier + " " + webQuery;
+	return (queryModifier + " " + webQuery).trim();
 }
