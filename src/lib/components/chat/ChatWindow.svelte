@@ -24,7 +24,6 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { isConversationShared } from "$lib/stores/shareConversation";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -41,6 +40,8 @@
 	let loginModalOpen = false;
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
+	let isSharedRecently = false;  
+    $: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -77,15 +78,15 @@
 
 	const settings = useSettingsStore();
 
-	$: {
-		if ($isConversationShared) {
-			if (timeout) {
+	function onShare(){
+		dispatch("share");  
+		isSharedRecently = true;
+		if (timeout) {
 				clearTimeout(timeout);
 			}
 			timeout = setTimeout(() => {
-				$isConversationShared = false;
+				isSharedRecently = false;
 			}, 2000);
-		}
 	}
 
 	onDestroy(() => {
@@ -248,11 +249,11 @@
 					<button
 						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
-						class:hover:underline={!$isConversationShared}
-						on:click={() => dispatch("share")}
-						disabled={$isConversationShared}
+						class:hover:underline={!isSharedRecently}
+						on:click={onShare}
+						disabled={isSharedRecently}
 					>
-						{#if $isConversationShared}
+						{#if isSharedRecently}
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-500" />
 							<div class="text-green-600 max-sm:hidden">Copied to clipboard</div>
 						{:else}
