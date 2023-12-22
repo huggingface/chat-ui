@@ -55,10 +55,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				_id: new ObjectId(values.assistantId),
 			});
 			return assistant?.preprompt;
-		} else if (values.preprompt) {
-			return values.preprompt;
 		} else {
-			return model?.preprompt;
+			return values?.preprompt ?? model?.preprompt;
 		}
 	})();
 
