@@ -226,8 +226,6 @@
 				});
 			}
 
-			const lastMessage = messages[messages.length - 1];
-
 			// reset the websearchMessages
 			webSearchMessages = [];
 
