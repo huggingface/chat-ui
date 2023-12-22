@@ -8,8 +8,9 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
-	export let conv: { id: string; title: string; assistantId?: string; avatarHash?: string };
+	export let conv: ConvSidebar;
 
 	let confirmDelete = false;
 

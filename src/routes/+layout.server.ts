@@ -14,6 +14,7 @@ import {
 	DISABLE_ASSISTANTS,
 } from "$env/static/private";
 import { ObjectId } from "mongodb";
+import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -108,7 +109,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			avatarHash:
 				conv.assistantId &&
 				assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
-		})),
+		})) satisfies Array<ConvSidebar>,
 		settings: {
 			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
