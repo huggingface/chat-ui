@@ -10,7 +10,7 @@ import {
 	defaultEmbeddingModel,
 	embeddingModels,
 	validateEmbeddingModel,
-} from "$lib/types/embeddingModels";
+} from "$lib/server/embeddingModels";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();

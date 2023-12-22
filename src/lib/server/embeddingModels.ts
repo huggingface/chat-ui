@@ -6,7 +6,7 @@ import {
 	embeddingEndpoints,
 	embeddingEndpointSchema,
 	type EmbeddingEndpoint,
-} from "$lib/server/embeddingEndpoints/embeddingEndpoints";
+} from "$lib/types/EmbeddingEndpoints";
 import { embeddingEndpointTransformersJS } from "$lib/server/embeddingEndpoints/transformersjs/embeddingEndpoints";
 
 const modelConfig = z.object({
@@ -61,7 +61,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processEmbeddingModel>>) => ({
 			random -= endpoint.weight;
 		}
 
-		throw new Error(`Failed to select endpoint`);
+		throw new Error(`Failed to select embedding endpoint`);
 	},
 });
 
@@ -72,7 +72,6 @@ export const embeddingModels = await Promise.all(
 export const defaultEmbeddingModel = embeddingModels[0];
 
 export const validateEmbeddingModel = (_models: EmbeddingBackendModel[]) => {
-	// Zod enum function requires 2 parameters
 	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
 };
 
