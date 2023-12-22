@@ -6,11 +6,7 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
-import {
-	defaultEmbeddingModel,
-	embeddingModels,
-	validateEmbeddingModelById,
-} from "$lib/server/embeddingModels";
+import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -68,7 +64,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		embeddingModel: values.embeddingModel,
+		embeddingModel: embeddingModelName,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
