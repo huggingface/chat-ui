@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
-			assistantId: z.string().optional(),
+			assistantId: z.instanceof(ObjectId).optional(),
 			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
