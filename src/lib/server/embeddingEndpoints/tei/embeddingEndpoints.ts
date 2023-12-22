@@ -56,10 +56,8 @@ export async function embeddingEndpointTei(
 			})
 		);
 
-		const allEmbeddings = batchesResults.flatMap((embeddings) => embeddings);
+		const flatAllEmbeddings = batchesResults.flat();
 
-		return allEmbeddings;
+		return flatAllEmbeddings;
 	};
 }
-
-export default embeddingEndpointTei;

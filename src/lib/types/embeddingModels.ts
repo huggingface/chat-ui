@@ -2,11 +2,12 @@ import { TEXT_EMBEDDING_MODELS } from "$env/static/private";
 
 import { z } from "zod";
 import { sum } from "$lib/utils/sum";
-import embeddingEndpoints, {
+import {
+	embeddingEndpoints,
 	embeddingEndpointSchema,
 	type EmbeddingEndpoint,
-} from "./embeddingEndpoints/embeddingEndpoints";
-import embeddingEndpointXenova from "./embeddingEndpoints/xenova/embeddingEndpoints";
+} from "$lib/server/embeddingEndpoints/embeddingEndpoints";
+import { embeddingEndpointTransformersJS } from "$lib/server/embeddingEndpoints/transformersjs/embeddingEndpoints";
 
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
@@ -34,8 +35,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processEmbeddingModel>>) => ({
 	...m,
 	getEndpoint: async (): Promise<EmbeddingEndpoint> => {
 		if (!m.endpoints) {
-			return embeddingEndpointXenova({
-				type: "xenova",
+			return embeddingEndpointTransformersJS({
+				type: "transformersjs",
 				weight: 1,
 				model: m,
 			});
@@ -52,8 +53,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processEmbeddingModel>>) => ({
 				switch (args.type) {
 					case "tei":
 						return embeddingEndpoints.tei(args);
-					case "xenova":
-						return embeddingEndpoints.xenova(args);
+					case "transformersjs":
+						return embeddingEndpoints.transformersjs(args);
 				}
 			}
 

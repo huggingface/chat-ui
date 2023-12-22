@@ -8,7 +8,7 @@ import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
-import { embeddingModels } from "../embeddingModels";
+import { embeddingModels } from "$lib/types/embeddingModels";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
