@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { clickOutside } from "$lib/actions/clickOutside";
-	import { browser } from "$app/environment";
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/stores";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -29,7 +28,6 @@
 	<dialog
 		open
 		use:clickOutside={() => {
-			if (browser) window;
 			goto(previousPage);
 		}}
 		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 gap-y-6 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
@@ -39,7 +37,6 @@
 			<button
 				class="btn rounded-lg"
 				on:click={() => {
-					if (browser) window;
 					goto(previousPage);
 				}}
 			>
@@ -77,7 +74,7 @@
 					>
 						{#if assistant.avatar}
 							<img
-								src="{base}/settings/assistants/{assistant._id.toString()}/avatar"
+								src="{base}/settings/assistants/{assistant._id.toString()}/avatar?hash={assistant.avatar}"
 								alt="Avatar"
 								class="h-6 w-6 rounded-full object-cover"
 							/>

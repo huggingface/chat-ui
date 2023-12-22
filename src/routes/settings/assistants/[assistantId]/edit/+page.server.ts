@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { authCondition, requiresUser } from "$lib/server/auth";
+import { requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { fail, type Actions, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -38,7 +38,19 @@ const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals }) => {
+	default: async ({ request, locals, params }) => {
+		const assistant = await collections.assistants.findOne({
+			_id: new ObjectId(params.assistantId),
+		});
+
+		if (!assistant) {
+			throw Error("Assistant not found");
+		}
+
+		if (assistant.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString()) {
+			throw Error("You are not the author of this assistant");
+		}
+
 		const formData = Object.fromEntries(await request.formData());
 
 		const parse = newAsssistantSchema.safeParse(formData);
@@ -61,10 +73,6 @@ export const actions: Actions = {
 			return fail(400, { error: true, errors });
 		}
 
-		const createdById = locals.user?._id ?? locals.sessionId;
-
-		const newAssistantId = new ObjectId();
-
 		const exampleInputs: string[] = [
 			parse?.data?.exampleInput1 ?? "",
 			parse?.data?.exampleInput2 ?? "",
@@ -81,26 +89,37 @@ export const actions: Actions = {
 				return fail(400, { error: true, errors });
 			}
 
-			hash = await uploadAvatar(parse.data.avatar, newAssistantId);
+			const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
+
+			// Step 2: Delete the existing file if it exists
+			let fileId = await fileCursor.next();
+			while (fileId) {
+				await collections.bucket.delete(fileId._id);
+				fileId = await fileCursor.next();
+			}
+
+			hash = await uploadAvatar(parse.data.avatar, assistant._id);
 		}
 
-		const { insertedId } = await collections.assistants.insertOne({
-			_id: newAssistantId,
-			createdById,
-			createdByName: locals.user?.username,
-			...parse.data,
-			exampleInputs,
-			avatar: hash,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		});
+		const { acknowledged } = await collections.assistants.replaceOne(
+			{
+				_id: assistant._id,
+			},
+			{
+				createdById: assistant?.createdById,
+				createdByName: locals.user?.username,
+				...parse.data,
+				exampleInputs,
+				avatar: hash ?? assistant.avatar,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}
+		);
 
-		// add insertedId to user settings
-
-		await collections.settings.updateOne(authCondition(locals), {
-			$push: { assistants: insertedId },
-		});
-
-		throw redirect(302, `${base}/settings/assistants/${insertedId}`);
+		if (acknowledged) {
+			throw redirect(302, `${base}/settings/assistants/${assistant._id}`);
+		} else {
+			throw Error("Update failed");
+		}
 	},
 };

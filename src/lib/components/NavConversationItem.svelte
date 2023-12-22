@@ -9,7 +9,7 @@
 	import CarbonEdit from "~icons/carbon/edit";
 	import { useSettingsStore } from "$lib/stores/settings";
 
-	export let conv: { id: string; title: string; avatarId?: string };
+	export let conv: { id: string; title: string; assistantId?: string; avatarHash?: string };
 
 	let confirmDelete = false;
 
@@ -36,9 +36,9 @@
 		{#if confirmDelete}
 			<span class="font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarId && !$settings.hideEmojiOnSidebar}
+		{#if conv.avatarHash && !$settings.hideEmojiOnSidebar}
 			<img
-				src="{base}/settings/assistants/{conv.avatarId}/avatar"
+				src="{base}/settings/assistants/{conv.assistantId}/avatar?hash={conv.avatarHash}"
 				alt="Assistant avatar"
 				class="mr-1 inline h-4 w-4 rounded-full"
 			/>

@@ -31,7 +31,7 @@
 		{#if assistant?.avatar}
 			<!-- crop image if not square  -->
 			<img
-				src={`${base}/settings/assistants/${assistant?._id}/avatar`}
+				src={`${base}/settings/assistants/${assistant?._id}/avatar?hash=${assistant?.avatar}`}
 				alt="Avatar"
 				class="h-24 w-24 rounded-full object-cover"
 			/>
@@ -108,12 +108,10 @@
 					Delete assistant</button
 				>
 			</form>
-			<form method="POST" action="?/edit" use:enhance class="hidden">
-				<button type="submit" class="underline">
-					<CarbonPen class="mr-1.5 inline" />
-					Edit assistant</button
-				>
-			</form>
+			<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline">
+				<CarbonPen class="mr-1.5 inline" />
+				Edit assistant
+			</a>
 		{:else}
 			<form method="POST" action="?/unsubscribe" use:enhance>
 				<button type="submit" class="underline">

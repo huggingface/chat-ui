@@ -1,21 +1,19 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import { onMount } from "svelte";
-	import type { ActionData, PageData } from "./$types";
+	import type { PageData, ActionData } from "./$types";
 	import type { readAndCompressImage } from "browser-image-resizer";
 	import { base } from "$app/paths";
+	import { page } from "$app/stores";
 
 	import CarbonPen from "~icons/carbon/pen";
 
 	export let data: PageData;
 	export let form: ActionData;
 
-	let files: FileList | null = null;
-
-	const settings = useSettingsStore();
-
 	let compress: typeof readAndCompressImage | null = null;
+
+	let files: FileList | null = null;
 
 	onMount(async () => {
 		const module = await import("browser-image-resizer");
@@ -30,6 +28,15 @@
 	function getError(field: string, returnForm: ActionData) {
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
+
+	onMount(() => {
+		inputMessage1 = assistant?.exampleInputs[0] ?? "";
+		inputMessage2 = assistant?.exampleInputs[1] ?? "";
+		inputMessage3 = assistant?.exampleInputs[2] ?? "";
+		inputMessage4 = assistant?.exampleInputs[3] ?? "";
+	});
+
+	$: assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
 </script>
 
 <form
@@ -50,9 +57,9 @@
 		}
 	}}
 >
-	<h2 class="text-xl font-semibold">Create new assistant</h2>
+	<h2 class="text-xl font-semibold">Edit {assistant?.name ?? ""}</h2>
 	<p class="mb-8 text-sm text-gray-500">
-		Assistants are public, and can be accessed by anyone with the link.
+		Modifying an existing assistant will propagate those changes to all users.
 	</p>
 	<div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4 px-2">
@@ -65,13 +72,22 @@
 					class="invisible z-10 block h-0 w-0"
 					bind:files
 				/>
-				{#if files && files[0]}
+				{#if (files && files[0]) || assistant?.avatar}
 					<div class="group relative mx-auto h-12 w-12">
-						<img
-							src={URL.createObjectURL(files[0])}
-							alt="avatar"
-							class="crop mx-auto h-12 w-12 cursor-pointer rounded-full"
-						/>
+						{#if files && files[0]}
+							<img
+								src={URL.createObjectURL(files[0])}
+								alt="avatar"
+								class="crop mx-auto h-12 w-12 cursor-pointer rounded-full"
+							/>
+						{:else if assistant?.avatar}
+							<img
+								src="{base}/settings/assistants/{assistant._id}/avatar?hash={assistant.avatar}"
+								alt="avatar"
+								class="crop mx-auto h-12 w-12 cursor-pointer rounded-full"
+							/>
+						{/if}
+
 						<div
 							class="invisible absolute bottom-0 h-12 w-12 rounded-full bg-black bg-opacity-50 p-1 group-hover:visible hover:visible"
 						>
@@ -80,16 +96,13 @@
 					</div>
 					<button
 						type="button"
-						on:click={(e) => {
-							e.stopPropagation();
-							files = null;
-						}}
+						on:click={() => (files = null)}
 						class="mx-auto w-full text-center text-xs text-gray-600"
 					>
 						Reset
 					</button>
 				{:else}
-					<span class="cursor-pointer text-xs text-gray-500">Click to upload</span>
+					<span class="text-xs text-gray-500">Click to upload</span>
 				{/if}
 				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 			</label>
@@ -100,6 +113,7 @@
 					name="name"
 					class=" w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="My awesome model"
+					value={assistant?.name}
 				/>
 				<p class="text-xs text-red-500">{getError("name", form)}</p>
 			</label>
@@ -110,6 +124,7 @@
 					name="description"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="He knows everything about python"
+					value={assistant?.description}
 				/>
 				<p class="text-xs text-red-500">{getError("description", form)}</p>
 			</label>
@@ -118,7 +133,7 @@
 				<span class="text-sm font-semibold">Model</span>
 				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
 					{#each data.models as model}
-						<option value={model.id} selected={$settings.activeModel === model.id}
+						<option value={model.id} selected={assistant?.modelId === model.id}
 							>{model.displayName}</option
 						>
 					{/each}
@@ -168,6 +183,7 @@
 					name="preprompt"
 					class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
+					value={assistant?.preprompt}
 				/>
 
 				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
@@ -176,12 +192,13 @@
 	</div>
 
 	<div class="mx-4 mt-5 flex w-full flex-row justify-around gap-2">
-		<a href="{base}/settings" class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600"
-			>Cancel</a
+		<a
+			href="{base}/settings/assistants/{assistant?._id}"
+			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
 		>
 
 		<button type="submit" class="rounded-full bg-black px-8 py-2 font-semibold text-white md:px-20"
-			>Create</button
+			>Save</button
 		>
 	</div>
 </form>

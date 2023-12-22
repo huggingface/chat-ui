@@ -39,19 +39,6 @@ export const actions: Actions = {
 
 		throw redirect(302, `${base}/settings`);
 	},
-
-	edit: async ({ params, locals }) => {
-		let assistant;
-
-		try {
-			assistant = await assistantOnlyIfAuthor(locals, params.assistantId);
-		} catch (e) {
-			return fail(400, { error: true, message: (e as Error).message });
-		}
-
-		throw redirect(303, `${base}/settings/assistant/new?from=${assistant._id}`);
-	},
-
 	report: async ({ params, locals }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({

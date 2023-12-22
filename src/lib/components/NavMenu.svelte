@@ -12,7 +12,8 @@
 		id: string;
 		title: string;
 		updatedAt: Date;
-		avatarId?: string;
+		assistantId?: string;
+		avatarHash?: string;
 	}
 
 	export let conversations: Array<Conv> = [];

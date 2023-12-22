@@ -104,11 +104,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
 			model: conv.model ?? defaultModel,
 			updatedAt: conv.updatedAt,
-			avatarId:
+			assistantId: conv.assistantId?.toString(),
+			avatarHash:
 				conv.assistantId &&
-				assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar
-					? conv.assistantId?.toString()
-					: undefined,
+				assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
 		})),
 		settings: {
 			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),

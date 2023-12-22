@@ -54,7 +54,8 @@
 				>
 					{#if $page.data?.assistant.avatar}
 						<img
-							src="{base}/settings/assistants/{$page.data?.assistant._id.toString()}/avatar"
+							src="{base}/settings/assistants/{$page.data?.assistant._id.toString()}/avatar?hash=${$page
+								.data?.assistant.avatar}"
 							alt="Avatar"
 							class="h-6 w-6 rounded-full object-cover"
 						/>
