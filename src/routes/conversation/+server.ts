@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
-			assistantId: z.instanceof(ObjectId).optional(),
+			assistantId: z.string().optional(),
 			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
@@ -35,7 +35,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		messages = conversation.messages;
 		values.model = conversation.model;
 		values.preprompt = conversation.preprompt;
-		values.assistantId = conversation.assistantId;
+		values.assistantId = conversation.assistantId?.toString();
 	}
 
 	const model = models.find((m) => m.name === values.model);
