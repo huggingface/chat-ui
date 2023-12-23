@@ -18,13 +18,26 @@ const modelConfig = z.object({
 	description: z.string().min(1).optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
-	endpoints: z.array(embeddingEndpointSchema).optional(),
+	endpoints: z.array(embeddingEndpointSchema).nonempty(),
 	maxSequenceLength: z.number().positive(),
 	preQuery: z.string().default(""),
 	prePassage: z.string().default(""),
 });
 
-const embeddingModelsRaw = z.array(modelConfig).parse(JSON.parse(TEXT_EMBEDDING_MODELS));
+// Default embedding model for backward compatibility
+const rawEmbeddingModelJSON =
+	TEXT_EMBEDDING_MODELS ||
+	`[
+	{
+	  "name": "Xenova/gte-small",
+	  "maxSequenceLength": 512,
+	  "endpoints": [
+		{ "type": "transformersjs" }
+	  ]
+	}
+]`;
+
+const embeddingModelsRaw = z.array(modelConfig).parse(JSON.parse(rawEmbeddingModelJSON));
 
 const processEmbeddingModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,

@@ -78,9 +78,43 @@ Chat UI features a powerful Web Search feature. It works by:
 
 1. Generating an appropriate search query from the user prompt.
 2. Performing web search and extracting content from webpages.
-3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+3. Creating embeddings from texts using a text embedding model.
 4. From these embeddings, find the ones that are closest to the user query using a vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that an LLM can use this information).
+
+### Text Embedding Models
+
+By default (for backward compatibility) when not defining TEXT_EMBEDDING_MODELS environment variable It will use [transformers.js](https://huggingface.co/docs/transformers.js), specifically, [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+
+You can customize the embedding model by setting TEXT_EMBEDDING_MODELS in your `.env.local`, for example
+
+```env
+TEXT_EMBEDDING_MODELS = `[
+  {
+    "name": "Xenova/gte-small",
+    "displayName": "Xenova/gte-small",
+    "description": "locally running embedding",
+    "maxSequenceLength": 512,
+    "endpoints": [
+      {"type": "xenova"}
+    ]
+  },
+  {
+    "name": "intfloat/e5-base-v2",
+    "displayName": "intfloat/e5-base-v2",
+    "description": "hosted embedding model",
+    "maxSequenceLength": 512,
+    "endpoints": [
+      {"type": "tei", "url": "http://127.0.0.1:8080/"}
+    ]
+  }
+]`
+```
+
+The required fields are `name`, `maxSequenceLength` and `endpoints`.
+It supports [transformers.js](https://huggingface.co/docs/transformers.js) and [TEI](https://github.com/huggingface/text-embeddings-inference), transformers.js model run locally, and TEI models run in a different environment. each `endpoints` provided supports a `weight` parameter which will be used to determine the probability of requesting a particular endpoint.
+
+When defining more than one embedding model, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModelName` to the name of the model.
 
 ## Extra parameters
 
@@ -424,6 +458,44 @@ Custom endpoints may require client certificate authentication, depending on how
 If you're using a certificate signed by a private CA, you will also need to add the `CA_PATH` parameter to your `.env.local`. This parameter should point to the location of the CA certificate file on your local machine.
 
 If you're using a self-signed certificate, e.g. for testing or development purposes, you can set the `REJECT_UNAUTHORIZED` parameter to `false` in your `.env.local`. This will disable certificate validation, and allow Chat UI to connect to your custom endpoint.
+
+#### Specific Embedding Model
+
+A model can use any of the embedding models defined in `.env.local`, (currently used when web searching),
+by default it will use the first embedding model, but it can be changed with the field `embeddingModelName`:
+
+```env
+TEXT_EMBEDDING_MODELS = `[
+  {
+    "name": "Xenova/gte-small",
+    "maxSequenceLength": 512,
+    "endpoints": [
+      {"type": "xenova"}
+    ]
+  },
+  {
+    "name": "intfloat/e5-base-v2",
+    "maxSequenceLength": 512,
+    "endpoints": [
+      ...
+    ]
+  }
+]`
+
+MODELS=[
+  {
+      "name": "Ollama Mistral",
+      "chatPromptTemplate": "...",
+      "embeddingModelName": "intfloat/e5-base-v2"
+      "parameters": {
+        ...
+      },
+      "endpoints": [
+        ...
+      ]
+  }
+]
+```
 
 ## Deploying to a HF Space
 
