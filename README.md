@@ -103,7 +103,9 @@ TEXT_EMBEDDING_MODELS = `[
     "name": "intfloat/e5-base-v2",
     "displayName": "intfloat/e5-base-v2",
     "description": "hosted embedding model",
-    "maxSequenceLength": 512,
+    "maxSequenceLength": 768,
+    "preQuery": "query: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
+    "prePassage": "passage: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
     "endpoints": [
       {"type": "tei", "url": "http://127.0.0.1:8080/"}
     ]
@@ -475,7 +477,7 @@ TEXT_EMBEDDING_MODELS = `[
   },
   {
     "name": "intfloat/e5-base-v2",
-    "maxSequenceLength": 512,
+    "maxSequenceLength": 768,
     "endpoints": [
       ...
     ]
