@@ -78,7 +78,7 @@
 			value="{PUBLIC_ORIGIN || $page.url.origin}{base}?model={model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
-			<div class="flex items-center gap-1.5">
+			<div class="flex items-center gap-1.5 hover:underline">
 				<CarbonLink />Copy direct link to model
 			</div>
 		</CopyToClipBoardBtn>
