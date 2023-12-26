@@ -14,7 +14,7 @@
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center">
 	<div
-		class="relative mt-auto rounded-xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300"
+		class="relative mt-auto rounded-xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 md:px-5"
 	>
 		<div class="flex items-center gap-2 p-4 pr-10 pt-10 md:gap-4 md:p-8">
 			{#if assistant.avatar}
@@ -23,19 +23,19 @@
 						assistant.avatar
 					}`}
 					alt="avatar"
-					class="mr-4 h-24 w-24 rounded-full object-cover md:h-32 md:w-32"
+					class="mr-4 h-12 w-12 rounded-full object-cover md:h-32 md:w-32"
 				/>
 			{:else}
 				<div
-					class="mr-4 flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 object-cover text-4xl font-bold text-gray-500 md:h-32 md:w-32"
+					class="mr-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-300 object-cover text-4xl font-bold text-gray-500 md:h-32 md:w-32"
 				>
 					{assistant?.name[0].toLocaleUpperCase()}
 				</div>
 			{/if}
 
-			<div class="flex flex-col">
+			<div class="flex h-full flex-col content-end">
 				<p
-					class="mb-2 w-fit rounded-full bg-gray-200 px-4 py-2 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400 md:mb-4"
+					class="mb-2 w-fit truncate text-ellipsis rounded-full bg-gray-200 px-4 py-2 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
 				>
 					{assistant.modelId}
 				</p>
@@ -55,15 +55,13 @@
 				</p>
 			</div>
 		</div>
-		<a
-			href="{base}/settings/assistants/{assistant._id.toString()}"
-			class="absolute right-3 top-3
-            inline text-gray-400 hover:text-gray-600
-            dark:text-gray-500 dark:hover:text-gray-400
-            "
-		>
-			<IconGear class="h-5 w-5" />
-		</a>
+		<div class="absolute right-2 top-2">
+			<a
+				href="{base}/settings/assistants/{assistant._id.toString()}"
+				class="flex h-7 w-7 items-center justify-center rounded-full border bg-gray-200 p-1 text-xs hover:bg-gray-100 dark:border-gray-500 dark:bg-gray-700 dark:hover:bg-gray-600"
+				><IconGear /></a
+			>
+		</div>
 	</div>
 	{#if assistant.exampleInputs}
 		<div class="mx-auto mt-auto w-full gap-8">
