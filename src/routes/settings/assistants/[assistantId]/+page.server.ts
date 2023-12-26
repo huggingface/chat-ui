@@ -37,6 +37,16 @@ export const actions: Actions = {
 			}
 		);
 
+		// and delete all avatars
+		const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
+
+		// Step 2: Delete the existing file if it exists
+		let fileId = await fileCursor.next();
+		while (fileId) {
+			await collections.bucket.delete(fileId._id);
+			fileId = await fileCursor.next();
+		}
+
 		throw redirect(302, `${base}/settings`);
 	},
 	report: async ({ params, locals }) => {
