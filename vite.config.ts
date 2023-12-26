@@ -9,4 +9,7 @@ export default defineConfig({
 			compiler: "svelte",
 		}),
 	],
+	optimizeDeps: {
+		include: ["browser-image-resizer"],
+	},
 });
