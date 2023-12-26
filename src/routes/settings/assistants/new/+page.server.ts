@@ -49,7 +49,7 @@ Description: ${description}
 	return generateFromDefaultEndpoint({
 		messages: [{ from: "user", content: textPrompt }],
 		preprompt:
-			"You are an assistant tasked with generating simple image descriptions. The user will ask you for an image, baed on the name and a description of what they want, and you should reply with a short, concise, safe, descriptive sentence.",
+			"You are an assistant tasked with generating simple image descriptions. The user will ask you for an image, based on the name and a description of what they want, and you should reply with a short, concise, safe, descriptive sentence.",
 	});
 };
 
