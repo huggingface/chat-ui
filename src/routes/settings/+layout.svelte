@@ -33,9 +33,9 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 gap-y-6 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
+		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
 	>
-		<div class="col-span-1 flex items-center justify-between md:col-span-3">
+		<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
 			<h2 class="text-xl font-bold">Settings</h2>
 			<button
 				class="btn rounded-lg"
@@ -120,7 +120,7 @@
 				Application Settings
 			</a>
 		</div>
-		<div class="col-span-1 overflow-y-auto md:col-span-2">
+		<div class="col-span-1 overflow-y-auto pt-5 md:col-span-2">
 			<slot />
 		</div>
 
