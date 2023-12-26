@@ -16,18 +16,18 @@
 	<div
 		class="relative mt-auto rounded-xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300"
 	>
-		<div class="flex items-center gap-4 p-8 pr-10 pt-10">
+		<div class="flex items-center gap-2 p-4 pr-10 pt-10 md:gap-4 md:p-8">
 			{#if assistant.avatar}
 				<img
 					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
 						assistant.avatar
 					}`}
 					alt="avatar"
-					class="mr-4 h-32 w-32 rounded-full object-cover"
+					class="mr-4 h-24 w-24 rounded-full object-cover md:h-32 md:w-32"
 				/>
 			{:else}
 				<div
-					class="mr-4 flex h-32 w-32 items-center justify-center rounded-full bg-gray-300 object-cover text-4xl font-bold text-gray-500"
+					class="mr-4 flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 object-cover text-4xl font-bold text-gray-500 md:h-32 md:w-32"
 				>
 					{assistant?.name[0].toLocaleUpperCase()}
 				</div>
@@ -35,7 +35,7 @@
 
 			<div class="flex flex-col">
 				<p
-					class="mb-4 w-fit rounded-full bg-gray-200 px-4 py-2 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+					class="mb-2 w-fit rounded-full bg-gray-200 px-4 py-2 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400 md:mb-4"
 				>
 					{assistant.modelId}
 				</p>
@@ -67,8 +67,8 @@
 	</div>
 	{#if assistant.exampleInputs}
 		<div class="mx-auto mt-auto w-full gap-8">
-			<div class="lg:col-span-2 lg:mt-6">
-				<div class="grid gap-3 lg:grid-cols-2 lg:gap-5">
+			<div class="md:col-span-2 md:mt-6">
+				<div class="grid gap-3 overflow-y-scroll max-md:h-32 md:grid-cols-2 md:gap-5">
 					{#each assistant.exampleInputs as example}
 						<button
 							type="button"
