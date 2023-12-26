@@ -9,6 +9,7 @@
 	import CarbonAdd from "~icons/carbon/add";
 
 	import UserIcon from "~icons/carbon/user";
+	import { fade, fly } from "svelte/transition";
 	export let data;
 
 	let previousPage: string = base;
@@ -24,8 +25,10 @@
 
 <div
 	class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
+	in:fade
 >
 	<dialog
+		in:fly={{ y: 100 }}
 		open
 		use:clickOutside={() => {
 			goto(previousPage);
