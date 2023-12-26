@@ -7,6 +7,7 @@
 	import { base } from "$app/paths";
 
 	import CarbonPen from "~icons/carbon/pen";
+	import IconLoading from "$lib/components/icons/IconLoading.svelte";
 
 	export let data: PageData;
 	export let form: ActionData;
@@ -30,6 +31,8 @@
 	function getError(field: string, returnForm: ActionData) {
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
+
+	let loading = false;
 </script>
 
 <form
@@ -37,6 +40,7 @@
 	class="h-full w-full overflow-x-clip"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
+		loading = true;
 		const avatar = formData.get("avatar");
 
 		if (avatar && typeof avatar !== "string" && avatar.size > 0 && compress) {
@@ -180,8 +184,19 @@
 			>Cancel</a
 		>
 
-		<button type="submit" class="rounded-full bg-black px-8 py-2 font-semibold text-white md:px-20"
-			>Create</button
+		<button
+			type="submit"
+			disabled={loading}
+			aria-disabled={loading}
+			class="rounded-full bg-black px-8 py-2 font-semibold md:px-20"
+			class:bg-gray-200={loading}
+			class:text-gray-600={loading}
+			class:text-white={!loading}
 		>
+			Create
+			{#if loading}
+				<IconLoading classNames="ml-2 h-min" />
+			{/if}
+		</button>
 	</div>
 </form>

@@ -7,6 +7,9 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import sizeof from "image-size";
 import { sha256 } from "$lib/utils/sha256";
+import { HfInference } from "@huggingface/inference";
+import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN, TEXT_TO_IMAGE_MODEL } from "$env/static/private";
+import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -34,6 +37,19 @@ const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string
 		upload.once("finish", () => resolve(hash));
 		upload.once("error", reject);
 		setTimeout(() => reject(new Error("Upload timed out")), 10000);
+	});
+};
+
+const generateAvatar = (description?: string, name?: string): Promise<string> => {
+	const textPrompt = `Generate a prompt for an image-generation model for the following: 
+Name: ${name}
+Description: ${description}
+`;
+
+	return generateFromDefaultEndpoint({
+		messages: [{ from: "user", content: textPrompt }],
+		preprompt:
+			"You are an assistant tasked with generating simple image descriptions. The user will ask you for an image, baed on the name and a description of what they want, and you should reply with a short, concise, safe, descriptive sentence.",
 	});
 };
 
@@ -82,6 +98,15 @@ export const actions: Actions = {
 			}
 
 			hash = await uploadAvatar(parse.data.avatar, newAssistantId);
+		} else if (ASSISTANTS_GENERATE_AVATAR === "true" && HF_TOKEN !== "") {
+			const hf = new HfInference(HF_TOKEN);
+
+			const blob = await hf.textToImage({
+				inputs: await generateAvatar(parse.data.description, parse.data.name),
+				model: TEXT_TO_IMAGE_MODEL,
+			});
+
+			hash = await uploadAvatar(new File([blob], "avatar.png"), newAssistantId);
 		}
 
 		const { insertedId } = await collections.assistants.insertOne({
