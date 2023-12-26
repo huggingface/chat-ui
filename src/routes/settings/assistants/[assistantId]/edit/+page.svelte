@@ -102,7 +102,7 @@
 						Reset
 					</button>
 				{:else}
-					<span class="text-xs text-gray-500">Click to upload</span>
+					<span class="text-xs text-gray-500 hover:underline">Click to upload</span>
 				{/if}
 				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 			</label>
