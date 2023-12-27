@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { enhance } from "$app/forms";
+	import { enhance, applyAction } from "$app/forms";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { onMount } from "svelte";
 	import type { ActionData, PageData } from "./$types";
@@ -52,6 +52,11 @@
 				formData.set("avatar", resizedImage);
 			});
 		}
+
+		return async ({ result }) => {
+			loading = false;
+			await applyAction(result);
+		};
 	}}
 >
 	<h2 class="text-xl font-semibold">Create new assistant</h2>
@@ -96,6 +101,12 @@
 					<span class="cursor-pointer text-xs text-gray-500 hover:underline">Click to upload</span>
 				{/if}
 				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
+				{#if !files || !files[0]}
+					<label class="text-xs text-gray-500">
+						<input type="checkbox" name="generateAvatar" class="text-xs text-gray-500" />
+						Generate avatar using a text-to-image model.
+					</label>
+				{/if}
 			</label>
 
 			<label>

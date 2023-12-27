@@ -10,6 +10,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { HfInference } from "@huggingface/inference";
 import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN, TEXT_TO_IMAGE_MODEL } from "$env/static/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
+import { timeout } from "$lib/utils/timeout";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -21,6 +22,10 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
+	generateAvatar: z
+		.literal("on")
+		.optional()
+		.transform((el) => !!el),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -40,18 +45,26 @@ const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string
 	});
 };
 
-const generateAvatar = (description?: string, name?: string): Promise<string> => {
-	const textPrompt = `Generate a prompt for an image-generation model for the following: 
+async function generateAvatar(description?: string, name?: string): Promise<File> {
+	const queryPrompt = `Generate a prompt for an image-generation model for the following: 
 Name: ${name}
 Description: ${description}
 `;
-
-	return generateFromDefaultEndpoint({
-		messages: [{ from: "user", content: textPrompt }],
+	const imagePrompt = await generateFromDefaultEndpoint({
+		messages: [{ from: "user", content: queryPrompt }],
 		preprompt:
 			"You are an assistant tasked with generating simple image descriptions. The user will ask you for an image, based on the name and a description of what they want, and you should reply with a short, concise, safe, descriptive sentence.",
 	});
-};
+
+	const hf = new HfInference(HF_TOKEN);
+
+	const blob = await hf.textToImage({
+		inputs: imagePrompt,
+		model: TEXT_TO_IMAGE_MODEL,
+	});
+
+	return new File([blob], "avatar.png");
+}
 
 export const actions: Actions = {
 	default: async ({ request, locals }) => {
@@ -98,15 +111,29 @@ export const actions: Actions = {
 			}
 
 			hash = await uploadAvatar(parse.data.avatar, newAssistantId);
-		} else if (ASSISTANTS_GENERATE_AVATAR === "true" && HF_TOKEN !== "") {
-			const hf = new HfInference(HF_TOKEN);
+		} else if (
+			ASSISTANTS_GENERATE_AVATAR === "true" &&
+			HF_TOKEN !== "" &&
+			parse.data.generateAvatar
+		) {
+			try {
+				const avatar = await timeout(
+					generateAvatar(parse.data.description, parse.data.name),
+					30000
+				);
 
-			const blob = await hf.textToImage({
-				inputs: await generateAvatar(parse.data.description, parse.data.name),
-				model: TEXT_TO_IMAGE_MODEL,
-			});
-
-			hash = await uploadAvatar(new File([blob], "avatar.png"), newAssistantId);
+				hash = await uploadAvatar(avatar, newAssistantId);
+			} catch (err) {
+				return fail(400, {
+					error: true,
+					errors: [
+						{
+							field: "avatar",
+							message: "Avatar generation failed. Try again or disable the feature.",
+						},
+					],
+				});
+			}
 		}
 
 		const { insertedId } = await collections.assistants.insertOne({
