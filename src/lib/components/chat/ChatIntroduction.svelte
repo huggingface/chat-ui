@@ -1,14 +1,12 @@
 <script lang="ts">
-	import { PUBLIC_APP_NAME, PUBLIC_VERSION } from "$env/static/public";
+	import { PUBLIC_APP_NAME } from "$env/static/public";
 	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
 	import { PUBLIC_APP_DESCRIPTION } from "$env/static/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconGear from "~icons/bi/gear-fill";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import type { Model } from "$lib/types/Model";
-	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { base } from "$app/paths";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -57,16 +55,15 @@
 			</AnnouncementBanner>
 		{/each}
 		<a href="{base}/settings/{currentModel.id}">
-			<div class="overflow-hidden rounded-xl border dark:border-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600">
+			<div
+				class="overflow-hidden rounded-xl border hover:bg-gray-100 dark:border-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-600"
+			>
 				<div class="flex p-3">
 					<div>
 						<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
 						<div class="font-semibold">{currentModel.displayName}</div>
 					</div>
-					<div
-						class="btn ml-auto flex h-7 w-7 self-start rounded-full"
-						><IconGear /></div
-					>
+					<div class="btn ml-auto flex h-7 w-7 self-start rounded-full"><IconGear /></div>
 				</div>
 				<!-- <ModelCardMetadata variant="dark" model={currentModel} /> -->
 			</div>

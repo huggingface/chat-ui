@@ -309,7 +309,7 @@
 	}
 
 	$: $page.params.id, (($isAborted = true), (loading = false));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+	// $: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 </script>
 
 <svelte:head>

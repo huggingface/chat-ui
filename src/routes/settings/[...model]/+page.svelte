@@ -5,7 +5,6 @@
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
 
 	const settings = useSettingsStore();

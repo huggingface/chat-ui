@@ -216,8 +216,9 @@
 				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
 			>
 				<p>
-					Model: {currentModel.displayName}<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
-					or false.
+					Model: {currentModel.displayName}<span class="max-sm:hidden">·</span><br
+						class="sm:hidden"
+					/> Generated content may be inaccurate or false.
 				</p>
 				{#if messages.length}
 					<button
