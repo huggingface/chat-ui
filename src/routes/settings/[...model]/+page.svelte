@@ -41,7 +41,7 @@
 	</div>
 
 	<div class="flex flex-wrap items-center gap-2 md:gap-4">
-		<a
+		<!-- <a
 			href={model.modelUrl || "https://huggingface.co/" + model.name}
 			target="_blank"
 			rel="noreferrer"
@@ -73,7 +73,7 @@
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Model website
 			</a>
-		{/if}
+		{/if} -->
 		<CopyToClipBoardBtn
 			value="{PUBLIC_ORIGIN || $page.url.origin}{base}?model={model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
