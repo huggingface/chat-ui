@@ -30,7 +30,7 @@
 </script>
 
 <nav
-	class="flex h-12 items-center justify-between border-b bg-gray-50 px-4 dark:border-gray-800 dark:bg-gray-800/70 md:hidden"
+	class="flex h-12 items-center justify-between border-b bg-gray-50 px-4 md:hidden dark:border-gray-800 dark:bg-gray-800/70"
 >
 	<button
 		type="button"

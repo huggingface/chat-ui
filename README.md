@@ -288,7 +288,7 @@ If you want to run chat-ui with llama.cpp, you can do the following, using Zephy
 3. Add the following to your `.env.local`:
 
 ```env
-MODELS=[
+MODELS=`[
   {
       "name": "Local Zephyr",
       "chatPromptTemplate": "<|system|>\n{{preprompt}}</s>\n{{#each messages}}{{#ifUser}}<|user|>\n{{content}}</s>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}</s>\n{{/ifAssistant}}{{/each}}",
@@ -308,7 +308,7 @@ MODELS=[
         }
       ]
   }
-]
+]`
 ```
 
 Start chat-ui with `npm run dev` and you should be able to chat with Zephyr locally.
@@ -324,7 +324,7 @@ ollama run mistral
 Then specify the endpoints like so:
 
 ```env
-MODELS=[
+MODELS=`[
   {
       "name": "Ollama Mistral",
       "chatPromptTemplate": "<s>{{#each messages}}{{#ifUser}}[INST] {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}} {{content}} [/INST]{{/ifUser}}{{#ifAssistant}}{{content}}</s> {{/ifAssistant}}{{/each}}",
@@ -345,7 +345,7 @@ MODELS=[
         }
       ]
   }
-]
+]`
 ```
 
 #### Amazon
