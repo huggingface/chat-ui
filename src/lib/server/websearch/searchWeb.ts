@@ -1,6 +1,6 @@
 import type { YouWebSearch } from "../../types/WebSearch";
 import { WebSearchProvider } from "../../types/WebSearch";
-import { SERPAPI_KEY, SERPER_API_KEY, SERPSTACKAPI_KEY, USE_LOCAL_WEBSEARCH, YDC_API_KEY } from "$env/static/private";
+import { SERPAPI_KEY, SERPER_API_KEY, SERPSTACK_API_KEY, USE_LOCAL_WEBSEARCH, YDC_API_KEY } from "$env/static/private";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 import { searchWebLocal } from "./searchWebLocal";
@@ -24,7 +24,7 @@ export async function searchWeb(query: string) {
 	if (SERPAPI_KEY) {
 		return await searchWebSerpApi(query);
 	}
-	if (SERPSTACKAPI_KEY) {
+	if (SERPSTACK_API_KEY) {
 		return await searchSerpStack(query);
 	}
 	throw new Error("No You.com or Serper.dev or SerpAPI key found");
@@ -105,7 +105,7 @@ export async function searchWebYouApi(query: string) {
 }
 
 export async function searchSerpStack(query: string) {
-	const response = await fetch(`http://api.serpstack.com/search?access_key=${SERPSTACKAPI_KEY}&query=${query}&hl=en&gl=us`, {
+	const response = await fetch(`http://api.serpstack.com/search?access_key=${SERPSTACK_API_KEY}&query=${query}&hl=en&gl=us`, {
 		method: "GET",
 		headers: {
 			"Content-type": "application/json; charset=UTF-8",
