@@ -11,7 +11,7 @@ import {
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
-	ASSISTANTS_DISABLE,
+	ENABLE_ASSISTANTS,
 } from "$env/static/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
@@ -64,7 +64,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
 
-	const disableAssistants = ASSISTANTS_DISABLE === "true";
+	const disableAssistants = !(ENABLE_ASSISTANTS === "true");
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 

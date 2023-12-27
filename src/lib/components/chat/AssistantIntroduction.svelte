@@ -14,7 +14,7 @@
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center">
 	<div
-		class="relative mt-auto rounded-xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 md:px-5"
+		class="relative mt-auto rounded-xl bg-gray-100 text-gray-600 md:px-5 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300"
 	>
 		<div class="flex items-center gap-2 p-4 pr-10 pt-10 md:gap-4 md:p-8">
 			{#if assistant.avatar}
@@ -70,7 +70,7 @@
 					{#each assistant.exampleInputs as example}
 						<button
 							type="button"
-							class="rounded-xl border bg-gray-50 p-2.5 text-left text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-4"
+							class="rounded-xl border bg-gray-50 p-2.5 text-left text-gray-600 hover:bg-gray-100 sm:p-4 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 							on:click={() => dispatch("message", example)}
 						>
 							{example}
