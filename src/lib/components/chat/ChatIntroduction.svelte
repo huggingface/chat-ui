@@ -48,12 +48,12 @@
 	<div class="lg:col-span-2 lg:pl-24">
 		{#each announcementBanners as banner}
 			<AnnouncementBanner classNames="mb-4" title={banner.title}>
-				<a
+				<!-- <a
 					target="_blank"
 					href={banner.linkHref}
 					class="mr-2 flex items-center underline hover:no-underline"
 					><CarbonArrowUpRight class="mr-1.5 text-xs" /> {banner.linkTitle}</a
-				>
+				> -->
 			</AnnouncementBanner>
 		{/each}
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
