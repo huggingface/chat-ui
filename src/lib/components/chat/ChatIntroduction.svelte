@@ -33,11 +33,11 @@
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 flex-none" />
 				{PUBLIC_APP_NAME}
-				<div
+				<!-- <div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
 					v{PUBLIC_VERSION}
-				</div>
+				</div> -->
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
 				{PUBLIC_APP_DESCRIPTION ||
