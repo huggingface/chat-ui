@@ -118,6 +118,12 @@ export async function getOIDCUserData(settings: OIDCSettings, code: string): Pro
 	const token = await client.callback(settings.redirectURI, { code });
 	const userData = await client.userinfo(token);
 
+	let  claims = token.claims();
+	userData["name"] = claims.unique_name;
+	userData["email"] = claims.upn;
+	userData["preferred_username"] = claims.unique_name;
+	userData["picture"] = "";
+
 	return { token, userData };
 }
 
