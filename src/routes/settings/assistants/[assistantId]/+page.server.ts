@@ -94,6 +94,9 @@ export const actions: Actions = {
 			$push: { assistants: assistant._id },
 		});
 
+		// increase userCount by one
+		await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: 1 } });
+
 		return { from: "subscribe", ok: true, message: "Assistant added" };
 	},
 
@@ -106,9 +109,12 @@ export const actions: Actions = {
 			return fail(404, { error: true, message: "Assistant not found" });
 		}
 
+		// decrease user count by one
 		await collections.settings.updateOne(authCondition(locals), {
 			$pull: { assistants: assistant._id },
 		});
+
+		await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
 
 		throw redirect(302, `${base}/settings`);
 	},

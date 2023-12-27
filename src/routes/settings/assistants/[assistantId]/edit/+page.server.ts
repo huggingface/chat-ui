@@ -106,12 +106,12 @@ export const actions: Actions = {
 				_id: assistant._id,
 			},
 			{
+				...assistant,
 				createdById: assistant?.createdById,
 				createdByName: locals.user?.username,
 				...parse.data,
 				exampleInputs,
 				avatar: hash ?? assistant.avatar,
-				createdAt: new Date(),
 				updatedAt: new Date(),
 			}
 		);
