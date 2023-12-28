@@ -116,7 +116,13 @@ export async function getOIDCAuthorizationUrl(
 export async function getOIDCUserData(settings: OIDCSettings, code: string): Promise<OIDCUserInfo> {
 	const client = await getOIDCClient(settings);
 	const token = await client.callback(settings.redirectURI, { code });
-	const userData = await client.userinfo(token);
+	const userData: UserinfoResponse = await client.userinfo(token);
+
+	const claims = token.claims();
+	userData["name"] = claims.unique_name as string;
+	userData["email"] = claims.upn as string;
+	userData["preferred_username"] = claims.unique_name as string;
+	userData["picture"] = "";
 
 	return { token, userData };
 }
