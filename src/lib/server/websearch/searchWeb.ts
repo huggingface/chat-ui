@@ -1,6 +1,12 @@
 import type { YouWebSearch } from "../../types/WebSearch";
 import { WebSearchProvider } from "../../types/WebSearch";
-import { SERPAPI_KEY, SERPER_API_KEY, USE_LOCAL_WEBSEARCH, YDC_API_KEY } from "$env/static/private";
+import {
+	SERPAPI_KEY,
+	SERPER_API_KEY,
+	SERPSTACK_API_KEY,
+	USE_LOCAL_WEBSEARCH,
+	YDC_API_KEY,
+} from "$env/static/private";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 import { searchWebLocal } from "./searchWebLocal";
@@ -23,6 +29,9 @@ export async function searchWeb(query: string) {
 	}
 	if (SERPAPI_KEY) {
 		return await searchWebSerpApi(query);
+	}
+	if (SERPSTACK_API_KEY) {
+		return await searchSerpStack(query);
 	}
 	throw new Error("No You.com or Serper.dev or SerpAPI key found");
 }
@@ -98,5 +107,38 @@ export async function searchWebYouApi(query: string) {
 
 	return {
 		organic_results: formattedResultsWithSnippets,
+	};
+}
+
+export async function searchSerpStack(query: string) {
+	const response = await fetch(
+		`http://api.serpstack.com/search?access_key=${SERPSTACK_API_KEY}&query=${query}&hl=en&gl=us`,
+		{
+			method: "GET",
+			headers: {
+				"Content-type": "application/json; charset=UTF-8",
+			},
+		}
+	);
+
+	const data = (await response.json()) as Record<string, any>;
+
+	if (!response.ok) {
+		throw new Error(
+			data["error"] ??
+				`SerpStack API returned error code ${response.status} - ${response.statusText}`
+		);
+	}
+
+	const resultsWithSnippets = data["organic_results"].map(
+		({ title, url, snippet }: { title: string; url: string; snippet: string | undefined }) => ({
+			title,
+			link: url,
+			text: snippet || "",
+		})
+	);
+
+	return {
+		organic_results: resultsWithSnippets ?? [],
 	};
 }
