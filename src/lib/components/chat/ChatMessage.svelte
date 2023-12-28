@@ -5,6 +5,9 @@
 	import { afterUpdate, createEventDispatcher } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
+	import { base } from "$app/paths";
+	import { PUBLIC_ORIGIN } from "$env/static/public";
+	import { PUBLIC_APP_ASSETS } from "$env/static/public";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
@@ -140,7 +143,8 @@
 	>
 		<img
 			alt=""
-			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
+			src="{PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/2edb18bd0206c16b433841a47f53fa8e.svg"
 			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 		/>
 		<div

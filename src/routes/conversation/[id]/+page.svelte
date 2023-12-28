@@ -16,6 +16,7 @@
 	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
+	import { PUBLIC_APP_NAME } from "$env/static/public";
 	export let data;
 
 	let messages = data.messages;
@@ -308,17 +309,11 @@
 	}
 
 	$: $page.params.id, (($isAborted = true), (loading = false));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+	// $: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 </script>
 
 <svelte:head>
-	<title>{title}</title>
-	<link
-		rel="stylesheet"
-		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"
-		integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn"
-		crossorigin="anonymous"
-	/>
+	<title>{PUBLIC_APP_NAME}</title>
 </svelte:head>
 
 <ChatWindow

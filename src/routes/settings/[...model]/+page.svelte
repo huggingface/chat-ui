@@ -5,7 +5,6 @@
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
 
 	const settings = useSettingsStore();
@@ -41,7 +40,7 @@
 	</div>
 
 	<div class="flex flex-wrap items-center gap-2 md:gap-4">
-		<a
+		<!-- <a
 			href={model.modelUrl || "https://huggingface.co/" + model.name}
 			target="_blank"
 			rel="noreferrer"
@@ -73,7 +72,7 @@
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Model website
 			</a>
-		{/if}
+		{/if} -->
 		<CopyToClipBoardBtn
 			value="{PUBLIC_ORIGIN || $page.url.origin}{base}?model={model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
