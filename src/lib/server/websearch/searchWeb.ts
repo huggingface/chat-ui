@@ -1,6 +1,12 @@
 import type { YouWebSearch } from "../../types/WebSearch";
 import { WebSearchProvider } from "../../types/WebSearch";
-import { SERPAPI_KEY, SERPER_API_KEY, SERPSTACK_API_KEY, USE_LOCAL_WEBSEARCH, YDC_API_KEY } from "$env/static/private";
+import {
+	SERPAPI_KEY,
+	SERPER_API_KEY,
+	SERPSTACK_API_KEY,
+	USE_LOCAL_WEBSEARCH,
+	YDC_API_KEY,
+} from "$env/static/private";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 import { searchWebLocal } from "./searchWebLocal";
@@ -105,14 +111,16 @@ export async function searchWebYouApi(query: string) {
 }
 
 export async function searchSerpStack(query: string) {
-	const response = await fetch(`http://api.serpstack.com/search?access_key=${SERPSTACK_API_KEY}&query=${query}&hl=en&gl=us`, {
-		method: "GET",
-		headers: {
-			"Content-type": "application/json; charset=UTF-8",
-		},
-	});
+	const response = await fetch(
+		`http://api.serpstack.com/search?access_key=${SERPSTACK_API_KEY}&query=${query}&hl=en&gl=us`,
+		{
+			method: "GET",
+			headers: {
+				"Content-type": "application/json; charset=UTF-8",
+			},
+		}
+	);
 
-	/* eslint-disable @typescript-eslint/no-explicit-any */
 	const data = (await response.json()) as Record<string, any>;
 
 	if (!response.ok) {
@@ -122,12 +130,13 @@ export async function searchSerpStack(query: string) {
 		);
 	}
 
-	const resultsWithSnippets =  data["organic_results"]
-	.map(({ title, url, snippet }: { title: string; url: string; snippet: string | undefined }) => ({
-		title,
-		link: url,
-		text: snippet || "",
-	}))
+	const resultsWithSnippets = data["organic_results"].map(
+		({ title, url, snippet }: { title: string; url: string; snippet: string | undefined }) => ({
+			title,
+			link: url,
+			text: snippet || "",
+		})
+	);
 
 	return {
 		organic_results: resultsWithSnippets ?? [],
