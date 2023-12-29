@@ -64,7 +64,7 @@
 	<div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4 px-2">
 			<label class="truncate">
-				<span class="block text-sm font-semibold">Avatar</span>
+				<span class="mb-1 block text-sm font-semibold">Avatar</span>
 				<input
 					type="file"
 					accept="image/*"
@@ -73,7 +73,7 @@
 					bind:files
 				/>
 				{#if (files && files[0]) || assistant?.avatar}
-					<div class="group relative mx-auto h-12 w-12">
+					<div class="group relative h-12 w-12">
 						{#if files && files[0]}
 							<img
 								src={URL.createObjectURL(files[0])}
@@ -108,7 +108,7 @@
 			</label>
 
 			<label>
-				<span class="text-sm font-semibold">Name</span>
+				<span class="mb-1 text-sm font-semibold">Name</span>
 				<input
 					name="name"
 					class=" w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
@@ -119,7 +119,7 @@
 			</label>
 
 			<label>
-				<span class="text-sm font-semibold">Description</span>
+				<span class="mb-1 text-sm font-semibold">Description</span>
 				<textarea
 					name="description"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
@@ -130,7 +130,7 @@
 			</label>
 
 			<label>
-				<span class="text-sm font-semibold">Model</span>
+				<span class="mb-1 text-sm font-semibold">Model</span>
 				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
 					{#each data.models as model}
 						<option value={model.id} selected={assistant?.modelId === model.id}
@@ -142,7 +142,7 @@
 			</label>
 
 			<label>
-				<span class="text-sm font-semibold">Start messages</span>
+				<span class="mb-1 text-sm font-semibold">Start messages</span>
 				<div class="flex flex-col gap-2 md:max-h-32 md:overflow-y-scroll">
 					<input
 						name="exampleInput1"
@@ -175,20 +175,18 @@
 			</label>
 		</div>
 
-		<div class="flex flex-col gap-4 px-2">
-			<label class="h-full">
-				<span class="text-sm font-semibold"> Instructions (system prompt) </span>
+		<label class="h-full">
+			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 
-				<textarea
-					name="preprompt"
-					class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-					placeholder="You'll act as..."
-					value={assistant?.preprompt}
-				/>
+			<textarea
+				name="preprompt"
+				class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+				placeholder="You'll act as..."
+				value={assistant?.preprompt}
+			/>
 
-				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
-			</label>
-		</div>
+			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
+		</label>
 	</div>
 
 	<div class="mx-4 mt-5 flex w-full flex-row justify-around gap-2">

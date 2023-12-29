@@ -49,12 +49,12 @@
 		<div
 			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap border-b-gray-400 max-md:-mx-4 max-md:h-[245px] max-md:border max-md:border-b-2 md:pr-6"
 		>
-			<h3 class="pb-3 pt-5 text-xs max-md:w-full max-md:text-center">Models</h3>
+			<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1">Models</h3>
 
 			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
 					href="{base}/settings/{model.id}"
-					class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
 					{model.id === $page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					<div class="truncate">{model.displayName}</div>
@@ -68,11 +68,11 @@
 				</a>
 			{/each}
 			{#if !data.disableAssistants}
-				<h3 class="pb-3 pt-5 text-xs max-md:w-full max-md:text-center">Assistants</h3>
+				<h3 class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">Assistants</h3>
 				{#each data.assistants as assistant}
 					<a
 						href="{base}/settings/assistants/{assistant._id.toString()}"
-						class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
 						{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 					>
 						{#if assistant.avatar}
@@ -102,7 +102,7 @@
 				{#if data.loginEnabled && !!data.user}
 					<a
 						href="{base}/settings/assistants/new"
-						class="group flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 md:rounded-xl
+						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
 					{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
 					>
 						<CarbonAdd />
@@ -113,14 +113,14 @@
 
 			<a
 				href="{base}/settings"
-				class="group mt-auto flex h-11 flex-none items-center gap-3 pl-3 pr-2 text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
+				class="group mt-auto flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
 				{$page.url.pathname === `${base}/settings` ? '!bg-gray-100 !text-gray-800' : ''}"
 			>
-				<UserIcon class="pr-1 text-lg" />
+				<UserIcon class="text-lg" />
 				Application Settings
 			</a>
 		</div>
-		<div class="col-span-1 overflow-y-auto pt-5 md:col-span-2">
+		<div class="col-span-1 overflow-y-auto md:col-span-2">
 			<slot />
 		</div>
 
