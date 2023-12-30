@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onDestroy } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -38,6 +39,9 @@
 
 	let loginModalOpen = false;
 	let message: string;
+	let timeout: ReturnType<typeof setTimeout>;
+	let isSharedRecently = false;
+	$: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -73,6 +77,23 @@
 	$: sources = files.map((file) => file2base64(file));
 
 	const settings = useSettingsStore();
+
+	function onShare() {
+		dispatch("share");
+		isSharedRecently = true;
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+		timeout = setTimeout(() => {
+			isSharedRecently = false;
+		}, 2000);
+	}
+
+	onDestroy(() => {
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+	});
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -226,12 +247,19 @@
 				</p>
 				{#if messages.length}
 					<button
-						class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
+						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
-						on:click={() => dispatch("share")}
+						class:hover:underline={!isSharedRecently}
+						on:click={onShare}
+						disabled={isSharedRecently}
 					>
-						<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
-						<div class="max-sm:hidden">Share this conversation</div>
+						{#if isSharedRecently}
+							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
+							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
+						{:else}
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+							<div class="max-sm:hidden">Share this conversation</div>
+						{/if}
 					</button>
 				{/if}
 			</div>
