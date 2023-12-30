@@ -95,7 +95,7 @@ async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 		client_secret: OIDConfig.CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
-		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
+		[custom.clock_tolerance]: Number(OIDConfig.TOLERANCE) || undefined,
 	});
 }
 
