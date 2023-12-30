@@ -3,9 +3,14 @@ import ChatThumbnail from "./ChatThumbnail.svelte";
 import { collections } from "$lib/server/database";
 import { error, type RequestHandler } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
-import { image_from_component as imageFromComponent } from "svelte-component-to-image";
+import type { SvelteComponent } from "svelte";
 
-export const GET: RequestHandler = (async ({ url, params }) => {
+import { Resvg } from "@resvg/resvg-js";
+import satori from "satori";
+import { html } from "satori-html";
+import { base } from "$app/paths";
+
+export const GET: RequestHandler = (async ({ url, params, fetch }) => {
 	const assistant = await collections.assistants.findOne({
 		_id: new ObjectId(params.assistantId),
 	});
@@ -14,31 +19,54 @@ export const GET: RequestHandler = (async ({ url, params }) => {
 		throw error(404, "Assistant not found.");
 	}
 
-	try {
-		const response = new Response(
-			await imageFromComponent(ChatThumbnail, {
-				width: 700,
-				height: 370,
-				props: {
-					name: assistant.name,
-					description: assistant.description,
-					avatarUrl: assistant.avatar
-						? url.origin + APP_BASE + "/settings/assistants/" + assistant._id + "/avatar"
-						: undefined,
-				},
-				fonts: [
-					{
-						name: "Inter",
-						url: "https://cdn.jsdelivr.net/npm/inter-font@3.19.0/ttf/Inter-Medium.ttf",
-						weight: 500,
-					},
-				],
-			})
-		);
-		response.headers.append("Content-Type", "image/png");
-		// response.headers.append("Cache-Control", "s-maxage=604800, stale-while-revalidate=604800");
-		return response;
-	} catch (e) {
-		throw error(500, "Error trying to generate image from component.");
-	}
+	const renderedComponent = (ChatThumbnail as unknown as SvelteComponent).render({
+		name: assistant.name,
+		description: assistant.description,
+		avatarUrl: assistant.avatar
+			? url.origin + APP_BASE + "/settings/assistants/" + assistant._id + "/avatar"
+			: undefined,
+	});
+
+	const reactLike = html(
+		"<style>" + renderedComponent.css.code + "</style>" + renderedComponent.html
+	);
+
+	const svg = await satori(reactLike, {
+		width: 700,
+		height: 370,
+		fonts: [
+			{
+				name: "Inter",
+				data: await fetch(base + "/fonts/Inter-Regular.ttf").then((r) => r.arrayBuffer()),
+				weight: 500,
+			},
+			{
+				name: "Inter",
+				data: await fetch(base + "/fonts/Inter-Bold.ttf").then((r) => r.arrayBuffer()),
+				weight: 700,
+			},
+			{
+				name: "Inter",
+				data: await fetch(base + "/fonts/Inter-ExtraBold.ttf").then((r) => r.arrayBuffer()),
+				weight: 800,
+			},
+			{
+				name: "Inter",
+				data: await fetch(base + "/fonts/Inter-Black.ttf").then((r) => r.arrayBuffer()),
+				weight: 900,
+			},
+		],
+	});
+
+	const png = new Resvg(svg, {
+		fitTo: { mode: "original" },
+	})
+		.render()
+		.asPng();
+
+	return new Response(png, {
+		headers: {
+			"Content-Type": "image/png",
+		},
+	});
 }) satisfies RequestHandler;
