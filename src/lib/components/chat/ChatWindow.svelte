@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import { createEventDispatcher } from "svelte";
+	import { createEventDispatcher, onDestroy } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -38,6 +39,9 @@
 
 	let loginModalOpen = false;
 	let message: string;
+	let timeout: ReturnType<typeof setTimeout>;
+	let isSharedRecently = false;
+	$: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -73,6 +77,23 @@
 	$: sources = files.map((file) => file2base64(file));
 
 	const settings = useSettingsStore();
+
+	function onShare() {
+		dispatch("share");
+		isSharedRecently = true;
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+		timeout = setTimeout(() => {
+			isSharedRecently = false;
+		}, 2000);
+	}
+
+	onDestroy(() => {
+		if (timeout) {
+			clearTimeout(timeout);
+		}
+	});
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -109,7 +130,7 @@
 	/>
 
 	<div
-		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 max-md:border-t max-md:bg-white sm:px-5 md:py-8 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:dark:bg-gray-900 [&>*]:pointer-events-auto"
 	>
 		{#if sources.length}
 			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
@@ -190,13 +211,13 @@
 
 						{#if loading}
 							<button
-								class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:hidden"
+								class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 md:hidden dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
 								on:click={() => dispatch("stop")}
 							>
 								<CarbonStopFilledAlt />
 							</button>
 							<div
-								class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100 md:flex"
+								class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 md:flex dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
 							>
 								<EosIconsLoading />
 							</div>
@@ -226,12 +247,19 @@
 				</p>
 				{#if messages.length}
 					<button
-						class="flex flex-none items-center hover:text-gray-400 hover:underline max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
+						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
-						on:click={() => dispatch("share")}
+						class:hover:underline={!isSharedRecently}
+						on:click={onShare}
+						disabled={isSharedRecently}
 					>
-						<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
-						<div class="max-sm:hidden">Share this conversation</div>
+						{#if isSharedRecently}
+							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
+							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
+						{:else}
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+							<div class="max-sm:hidden">Share this conversation</div>
+						{/if}
 					</button>
 				{/if}
 			</div>

@@ -158,7 +158,7 @@
 			{/if}
 
 			<div
-				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+				class="prose max-w-none max-sm:prose-sm dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}
 			>
 				{#each tokens as token}
@@ -266,7 +266,7 @@
 				<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
 					{#if downloadLink}
 						<a
-							class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
+							class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 							title="Download prompt and parameters"
 							type="button"
 							target="_blank"
@@ -277,7 +277,7 @@
 					{/if}
 					{#if !readOnly}
 						<button
-							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 							title="Retry"
 							type="button"
 							on:click={() => dispatch("retry", { content: message.content, id: message.id })}

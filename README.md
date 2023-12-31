@@ -158,7 +158,7 @@ PUBLIC_APP_DISCLAIMER=
 
 ### Web Search config
 
-You can enable the web search through an API by adding `YDC_API_KEY` ([docs.you.com](https://docs.you.com)) or `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) to your `.env.local`.
+You can enable the web search through an API by adding `YDC_API_KEY` ([docs.you.com](https://docs.you.com)) or `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) or `SERPSTACK_API_KEY` ([serpstack.com](https://serpstack.com/)) to your `.env.local`.
 
 You can also simply enable the local websearch by setting `USE_LOCAL_WEBSEARCH=true` in your `.env.local`.
 
@@ -324,7 +324,7 @@ If you want to run chat-ui with llama.cpp, you can do the following, using Zephy
 3. Add the following to your `.env.local`:
 
 ```env
-MODELS=[
+MODELS=`[
   {
       "name": "Local Zephyr",
       "chatPromptTemplate": "<|system|>\n{{preprompt}}</s>\n{{#each messages}}{{#ifUser}}<|user|>\n{{content}}</s>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}</s>\n{{/ifAssistant}}{{/each}}",
@@ -344,7 +344,7 @@ MODELS=[
         }
       ]
   }
-]
+]`
 ```
 
 Start chat-ui with `npm run dev` and you should be able to chat with Zephyr locally.
@@ -360,7 +360,7 @@ ollama run mistral
 Then specify the endpoints like so:
 
 ```env
-MODELS=[
+MODELS=`[
   {
       "name": "Ollama Mistral",
       "chatPromptTemplate": "<s>{{#each messages}}{{#ifUser}}[INST] {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}} {{content}} [/INST]{{/ifUser}}{{#ifAssistant}}{{content}}</s> {{/ifAssistant}}{{/each}}",
@@ -381,7 +381,7 @@ MODELS=[
         }
       ]
   }
-]
+]`
 ```
 
 #### Amazon

@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import {
 	SERPAPI_KEY,
 	SERPER_API_KEY,
+	SERPSTACK_API_KEY,
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
@@ -77,7 +78,13 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			}))
 			.toArray(),
 		settings: {
-			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
+			searchEnabled: !!(
+				SERPAPI_KEY ||
+				SERPER_API_KEY ||
+				SERPSTACK_API_KEY ||
+				YDC_API_KEY ||
+				USE_LOCAL_WEBSEARCH
+			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
