@@ -10,18 +10,18 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 
 	type ActionData = {
-        error: boolean;
-        errors: {
-            field: string | number;
-            message: string;
-        }[];
-    } | null
+		error: boolean;
+		errors: {
+			field: string | number;
+			message: string;
+		}[];
+	} | null;
 
-	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string; }
+	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
 
 	export let form: ActionData;
 	export let assistant: AssistantFront | undefined = undefined;
-    export let models: Model[] = [];
+	export let models: Model[] = [];
 
 	let files: FileList | null = null;
 
@@ -40,8 +40,8 @@
 	let inputMessage4 = assistant?.exampleInputs[3] ?? "";
 
 	function onFilesChange(e: Event) {
-		const inputEl = e.target as HTMLInputElement
-		if(inputEl.files?.length){
+		const inputEl = e.target as HTMLInputElement;
+		if (inputEl.files?.length) {
 			files = inputEl.files;
 		}
 	}
@@ -69,18 +69,17 @@
 		}
 	}}
 >
-
-    {#if assistant}
+	{#if assistant}
 		<h2 class="text-xl font-semibold">Edit {assistant?.name ?? ""}</h2>
 		<p class="mb-8 text-sm text-gray-500">
 			Modifying an existing assistant will propagate those changes to all users.
 		</p>
-    {:else}
+	{:else}
 		<h2 class="text-xl font-semibold">Create new assistant</h2>
-        <p class="mb-8 text-sm text-gray-500">
-            Assistants are public, and can be accessed by anyone with the link.
-        </p>
-    {/if}
+		<p class="mb-8 text-sm text-gray-500">
+			Assistants are public, and can be accessed by anyone with the link.
+		</p>
+	{/if}
 
 	<div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4 px-2">
@@ -118,7 +117,7 @@
 					<button
 						type="button"
 						on:click|stopPropagation|preventDefault={() => (files = null)}
-						class="text-xs text-gray-600 hover:underline mt-1"
+						class="mt-1 text-xs text-gray-600 hover:underline"
 					>
 						Reset
 					</button>
@@ -134,7 +133,7 @@
 					name="name"
 					class=" w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="My awesome model"
-                    value={assistant?.name ?? ""}
+					value={assistant?.name ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("name", form)}</p>
 			</label>
@@ -145,22 +144,25 @@
 					name="description"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="He knows everything about python"
-                    value={assistant?.description ?? ""}
+					value={assistant?.description ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("description", form)}</p>
 			</label>
-            
-            <label>
-                <span class="mb-1 text-sm font-semibold">Model</span>
-                <select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
-                    {#each models as model}
-                        <option value={model.id} selected={assistant ? assistant?.modelId === model.id : $settings.activeModel === model.id}
-                            >{model.displayName}</option
-                        >
-                    {/each}
-                    <p class="text-xs text-red-500">{getError("modelId", form)}</p>
-                </select>
-            </label>
+
+			<label>
+				<span class="mb-1 text-sm font-semibold">Model</span>
+				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
+					{#each models as model}
+						<option
+							value={model.id}
+							selected={assistant
+								? assistant?.modelId === model.id
+								: $settings.activeModel === model.id}>{model.displayName}</option
+						>
+					{/each}
+					<p class="text-xs text-red-500">{getError("modelId", form)}</p>
+				</select>
+			</label>
 
 			<label>
 				<span class="mb-1 text-sm font-semibold">Start messages</span>
@@ -204,7 +206,7 @@
 					name="preprompt"
 					class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
-                    value={assistant?.preprompt ?? ""}
+					value={assistant?.preprompt ?? ""}
 				/>
 
 				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
@@ -213,8 +215,9 @@
 	</div>
 
 	<div class="my-3">
-		<a href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings` } class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600"
-			>Cancel</a
+		<a
+			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
+			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
 		>
 
 		<button type="submit" class="rounded-full bg-black px-8 py-2 font-semibold text-white md:px-20"
