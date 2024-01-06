@@ -13,8 +13,10 @@ interface EmbeddingEndpointParameters {
 	inputs: string[];
 }
 
+export type Embedding = number[];
+
 // type signature for the endpoint
-export type EmbeddingEndpoint = (params: EmbeddingEndpointParameters) => Promise<number[][]>;
+export type EmbeddingEndpoint = (params: EmbeddingEndpointParameters) => Promise<Embedding[]>;
 
 export const embeddingEndpointSchema = z.discriminatedUnion("type", [
 	embeddingEndpointTeiParametersSchema,

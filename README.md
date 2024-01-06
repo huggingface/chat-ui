@@ -20,9 +20,10 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 1. [Setup](#setup)
 2. [Launch](#launch)
 3. [Web Search](#web-search)
-4. [Extra parameters](#extra-parameters)
-5. [Deploying to a HF Space](#deploying-to-a-hf-space)
-6. [Building](#building)
+4. [Text Embedding Models](#text-embedding-models)
+5. [Extra parameters](#extra-parameters)
+6. [Deploying to a HF Space](#deploying-to-a-hf-space)
+7. [Building](#building)
 
 ## No Setup Deploy
 
@@ -82,7 +83,7 @@ Chat UI features a powerful Web Search feature. It works by:
 4. From these embeddings, find the ones that are closest to the user query using a vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that an LLM can use this information).
 
-### Text Embedding Models
+## Text Embedding Models
 
 By default (for backward compatibility), when `TEXT_EMBEDDING_MODELS` environment variable is not defined, [transformers.js](https://huggingface.co/docs/transformers.js) embedding models will be used for embedding tasks, specifically, [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
 
@@ -116,7 +117,7 @@ TEXT_EMBEDDING_MODELS = `[
 The required fields are `name`, `maxSequenceLength` and `endpoints`.
 Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js) and [`TEI`](https://github.com/huggingface/text-embeddings-inference). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint.
 
-When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModelName` to the name of the model.
+When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModel` to the name of the model.
 
 ## Extra parameters
 
@@ -464,7 +465,7 @@ If you're using a self-signed certificate, e.g. for testing or development purpo
 #### Specific Embedding Model
 
 A model can use any of the embedding models defined in `.env.local`, (currently used when web searching),
-by default it will use the first embedding model, but it can be changed with the field `embeddingModelName`:
+by default it will use the first embedding model, but it can be changed with the field `embeddingModel`:
 
 ```env
 TEXT_EMBEDDING_MODELS = `[
@@ -488,7 +489,7 @@ MODELS=[
   {
       "name": "Ollama Mistral",
       "chatPromptTemplate": "...",
-      "embeddingModelName": "intfloat/e5-base-v2"
+      "embeddingModel": "intfloat/e5-base-v2"
       "parameters": {
         ...
       },

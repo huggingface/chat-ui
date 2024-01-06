@@ -23,7 +23,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.parse(JSON.parse(body));
 
 	let preprompt = values.preprompt;
-	let embeddingModelName: string;
+	let embeddingModel: string;
 
 	if (values.fromShare) {
 		const conversation = await collections.sharedConversations.findOne({
@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		title = conversation.title;
 		messages = conversation.messages;
 		values.model = conversation.model;
-		embeddingModelName = conversation.embeddingModel;
+		embeddingModel = conversation.embeddingModel;
 		preprompt = conversation.preprompt;
 	}
 
@@ -47,7 +47,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		throw error(400, "Invalid model");
 	}
 
-	embeddingModelName ??= model.embeddingModelName ?? defaultEmbeddingModel.name;
+	embeddingModel ??= model.embeddingModel ?? defaultEmbeddingModel.name;
 
 	if (model.unlisted) {
 		throw error(400, "Can't start a conversation with an unlisted model");
@@ -64,7 +64,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		embeddingModel: embeddingModelName,
+		embeddingModel: embeddingModel,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});

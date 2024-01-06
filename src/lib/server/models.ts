@@ -67,7 +67,7 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
-	embeddingModelName: validateEmbeddingModelByName(embeddingModels).optional(),
+	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));
