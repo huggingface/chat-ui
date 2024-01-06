@@ -84,7 +84,7 @@ Chat UI features a powerful Web Search feature. It works by:
 
 ### Text Embedding Models
 
-By default (for backward compatibility) when not defining TEXT_EMBEDDING_MODELS environment variable It will use [transformers.js](https://huggingface.co/docs/transformers.js), specifically, [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+By default (for backward compatibility), when `TEXT_EMBEDDING_MODELS` environment variable is not defined, [transformers.js](https://huggingface.co/docs/transformers.js) embedding models will be used for embedding tasks, specifically, [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
 
 You can customize the embedding model by setting TEXT_EMBEDDING_MODELS in your `.env.local`, for example
 
