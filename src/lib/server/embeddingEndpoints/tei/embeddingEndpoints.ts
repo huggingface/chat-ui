@@ -19,9 +19,8 @@ const getModelInfoByUrl = async (url: string) => {
 		},
 	});
 
-	const info = await response.json();
-
-	return info;
+	const json = await response.json();
+	return json;
 };
 
 export async function embeddingEndpointTei(

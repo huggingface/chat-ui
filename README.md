@@ -114,9 +114,9 @@ TEXT_EMBEDDING_MODELS = `[
 ```
 
 The required fields are `name`, `maxSequenceLength` and `endpoints`.
-It supports [transformers.js](https://huggingface.co/docs/transformers.js) and [TEI](https://github.com/huggingface/text-embeddings-inference), transformers.js model run locally, and TEI models run in a different environment. each `endpoints` provided supports a `weight` parameter which will be used to determine the probability of requesting a particular endpoint.
+Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js) and [`TEI`](https://github.com/huggingface/text-embeddings-inference). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint.
 
-When defining more than one embedding model, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModelName` to the name of the model.
+When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModelName` to the name of the model.
 
 ## Extra parameters
 
