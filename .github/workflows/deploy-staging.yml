@@ -20,5 +20,5 @@ jobs:
           lfs: true
       - name: Push to hub
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_TOKEN: ${{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}}
         run: git push https://nsarrazin:$HF_TOKEN@huggingface.co/spaces/huggingchat/chat-ui-staging main
