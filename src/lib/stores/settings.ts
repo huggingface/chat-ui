@@ -1,5 +1,7 @@
 import { browser } from "$app/environment";
+import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
+import { UrlDependency } from "$lib/types/UrlDependency";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
@@ -53,6 +55,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 						recentlySaved: false,
 					}));
 				}, 3000);
+				invalidate(UrlDependency.ConversationList);
 			}, 300);
 			// debounce server calls by 300ms
 		}
