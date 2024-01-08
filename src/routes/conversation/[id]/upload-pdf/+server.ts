@@ -5,7 +5,7 @@ import { uploadPdfEmbeddings } from "$lib/server/files/uploadFile";
 import { chunk } from "$lib/utils/chunk";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import { getDocument } from "pdfjs-dist";
 
 export async function POST({ request, params, locals }) {
 	const conversationId = new ObjectId(params.id);
@@ -21,8 +21,7 @@ export async function POST({ request, params, locals }) {
 	const formData = await request.formData();
 	const file = formData.get("pdf"); // 'pdf' is the name used in FormData on the frontend
 	const data = new Uint8Array(await file.arrayBuffer());
-	const loadingTask = pdfjsLib.getDocument({ data });
-	const pdf = await loadingTask.promise;
+	const pdf = await getDocument({ data }).promise;
 
 	const N_MAX_PAGES = 20;
 	let text = "";
