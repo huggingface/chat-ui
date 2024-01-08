@@ -97,7 +97,7 @@ TEXT_EMBEDDING_MODELS = `[
     "description": "locally running embedding",
     "maxSequenceLength": 512,
     "endpoints": [
-      {"type": "xenova"}
+      {"type": "transformersjs"}
     ]
   },
   {
@@ -473,14 +473,15 @@ TEXT_EMBEDDING_MODELS = `[
     "name": "Xenova/gte-small",
     "maxSequenceLength": 512,
     "endpoints": [
-      {"type": "xenova"}
+      {"type": "transformersjs"}
     ]
   },
   {
     "name": "intfloat/e5-base-v2",
     "maxSequenceLength": 768,
     "endpoints": [
-      ...
+      {"type": "tei", "url": "http://127.0.0.1:8080/", "authorization": "Basic VVNFUjpQQVNT"},
+      {"type": "tei", "url": "http://127.0.0.1:8081/"}
     ]
   }
 ]`
