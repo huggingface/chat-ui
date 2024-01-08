@@ -6,8 +6,7 @@
 	export let classNames = "";
 	export let multimodal = false;
 	export let files: File[];
-	export let uploadPdfStatus: PdfUploadStatus;
-
+	export let uploadPdfStatus: PdfUploadStatus | undefined = undefined;
 	const accept = multimodal ? "image/*,.pdf" : ".pdf";
 	const label = multimodal ? "Upload image or PDF" : "Upload PDF";
 	let fileInput: HTMLInputElement;

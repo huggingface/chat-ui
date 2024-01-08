@@ -35,7 +35,7 @@
 	export let RAGMessages: RAGUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
-	export let uploadPdfStatus: PdfUploadStatus;
+	export let uploadPdfStatus: PdfUploadStatus | undefined = undefined;
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
