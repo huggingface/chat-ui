@@ -71,7 +71,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				createdAt: 1,
 			})
 			.map((conv) => {
-				// remove emojis if settings say to
+				// remove emojis if settings say so
 				if (settings?.hideEmojiOnSidebar) {
 					conv.title = conv.title.replace(/\p{Emoji}/gu, "");
 				}
