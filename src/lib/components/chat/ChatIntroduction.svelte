@@ -12,6 +12,7 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { base } from "$app/paths";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import JSON5 from "json5";
 
 	export let currentModel: Model;
 	export let models: Model[];
@@ -21,7 +22,7 @@
 	$: currentModelMetadata = findCurrentModel(models, $settings.activeModel);
 
 	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS
-		? JSON.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
+		? JSON5.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
 		: [];
 
 	const dispatch = createEventDispatcher<{ message: string }>();

@@ -48,11 +48,17 @@ export async function runWebSearch(
 		webSearch.results =
 			(results.organic_results &&
 				results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
-					const { title, link, text } = el;
-					const { hostname } = new URL(link);
-					return { title, link, hostname, text };
+					try {
+						const { title, link, text } = el;
+						const { hostname } = new URL(link);
+						return { title, link, hostname, text };
+					} catch (e) {
+						// Ignore Errors
+						return null;
+					}
 				})) ??
 			[];
+		webSearch.results = webSearch.results.filter((value) => value !== null);
 		webSearch.results = webSearch.results
 			.filter(({ link }) => !DOMAIN_BLOCKLIST.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only

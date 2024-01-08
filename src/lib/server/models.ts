@@ -13,6 +13,8 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 import endpointTgi from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
 
+import JSON5 from "json5";
+
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
 const modelConfig = z.object({
@@ -68,7 +70,7 @@ const modelConfig = z.object({
 	unlisted: z.boolean().default(false),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON.parse(MODELS));
+const modelsRaw = z.array(modelConfig).parse(JSON5.parse(MODELS));
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
@@ -138,7 +140,7 @@ export const oldModels = OLD_MODELS
 					displayName: z.string().min(1).optional(),
 				})
 			)
-			.parse(JSON.parse(OLD_MODELS))
+			.parse(JSON5.parse(OLD_MODELS))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
@@ -151,7 +153,7 @@ export const validateModel = (_models: BackendModel[]) => {
 
 export const smallModel = TASK_MODEL
 	? (models.find((m) => m.name === TASK_MODEL) ||
-			(await processModel(modelConfig.parse(JSON.parse(TASK_MODEL))).then((m) =>
+			(await processModel(modelConfig.parse(JSON5.parse(TASK_MODEL))).then((m) =>
 				addEndpoint(m)
 			))) ??
 	  defaultModel

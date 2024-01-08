@@ -3,11 +3,12 @@ import { format } from "date-fns";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
 import { z } from "zod";
+import JSON5 from "json5";
 
 const listSchema = z.array(z.string()).default([]);
 
-const allowList = listSchema.parse(JSON.parse(WEBSEARCH_ALLOWLIST));
-const blockList = listSchema.parse(JSON.parse(WEBSEARCH_BLOCKLIST));
+const allowList = listSchema.parse(JSON5.parse(WEBSEARCH_ALLOWLIST));
+const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
 
 const queryModifier = [
 	...allowList.map((item) => "site:" + item),
