@@ -34,7 +34,7 @@
 		if (file?.type === "application/pdf") {
 			// pdf upload
 			dispatch("uploadpdf", file);
-		} else {
+		} else if(multimodal && file?.type.startsWith("image")){
 			// image files for multimodal models
 			files = Array.from(fileInput.files);
 		}
