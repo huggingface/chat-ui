@@ -486,7 +486,7 @@ TEXT_EMBEDDING_MODELS = `[
   }
 ]`
 
-MODELS=[
+MODELS=`[
   {
       "name": "Ollama Mistral",
       "chatPromptTemplate": "...",
@@ -498,7 +498,7 @@ MODELS=[
         ...
       ]
   }
-]
+]`
 ```
 
 ## Deploying to a HF Space
