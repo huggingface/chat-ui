@@ -15,6 +15,7 @@ import { z } from "zod";
 import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
 import { collections } from "./database";
+import JSON5 from "json5";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -40,7 +41,7 @@ const OIDConfig = z
 		TOLERANCE: stringWithDefault(OPENID_TOLERANCE),
 		RESOURCE: stringWithDefault(OPENID_RESOURCE),
 	})
-	.parse(JSON.parse(OPENID_CONFIG));
+	.parse(JSON5.parse(OPENID_CONFIG));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
