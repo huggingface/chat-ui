@@ -70,12 +70,21 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				updatedAt: 1,
 				createdAt: 1,
 			})
-			.map((conv) => ({
-				id: conv._id.toString(),
-				title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
-				model: conv.model ?? defaultModel,
-				updatedAt: conv.updatedAt,
-			}))
+			.map((conv) => {
+				// remove emojis if settings say so
+				if (settings?.hideEmojiOnSidebar) {
+					conv.title = conv.title.replace(/\p{Emoji}/gu, "");
+				}
+
+				// remove invalid unicode and trim whitespaces
+				conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
+				return {
+					id: conv._id.toString(),
+					title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
+					model: conv.model ?? defaultModel,
+					updatedAt: conv.updatedAt,
+				};
+			})
 			.toArray(),
 		settings: {
 			searchEnabled: !!(
