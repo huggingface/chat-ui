@@ -80,8 +80,7 @@
 					</div>
 					<button
 						type="button"
-						on:click={(e) => {
-							e.stopPropagation();
+						on:click|stopPropagation={() => {
 							files = null;
 						}}
 						class="mx-auto w-full text-center text-xs text-gray-600"
