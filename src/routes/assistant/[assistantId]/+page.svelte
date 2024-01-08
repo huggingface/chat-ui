@@ -55,9 +55,9 @@
 			/>
 		{:else}
 			<div
-				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold text-gray-500"
+				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 			>
-				{data.assistant.name[0].toLocaleUpperCase()}
+				{data.assistant.name[0]}
 			</div>
 		{/if}
 		<h1 class="text-2xl font-bold">

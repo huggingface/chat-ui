@@ -83,9 +83,9 @@
 							/>
 						{:else}
 							<div
-								class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300 font-bold text-gray-500"
+								class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 							>
-								{assistant.name[0].toLocaleUpperCase()}
+								{assistant.name[0]}
 							</div>
 						{/if}
 						<div class="truncate">{assistant.name}</div>

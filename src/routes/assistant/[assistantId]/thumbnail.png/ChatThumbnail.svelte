@@ -9,9 +9,9 @@
 		<img class="h-24 w-24 rounded-full" src={avatarUrl} alt="avatar" />
 	{:else}
 		<div
-			class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold text-gray-500"
+			class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 		>
-			{name[0].toLocaleUpperCase()}
+			{name[0]}
 		</div>
 	{/if}
 	<h1 class="pt-2 text-3xl font-black">
