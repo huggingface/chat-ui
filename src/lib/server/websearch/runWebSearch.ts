@@ -58,7 +58,7 @@ export async function runWebSearch(
 					}
 				})) ??
 			[];
-		webSearch.results = webSearch.results.filter(value => value !== null);
+		webSearch.results = webSearch.results.filter((value) => value !== null);
 		webSearch.results = webSearch.results
 			.filter(({ link }) => !DOMAIN_BLOCKLIST.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
