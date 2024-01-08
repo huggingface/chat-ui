@@ -77,7 +77,13 @@ export const actions: Actions = {
 			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
 
 			if ((dims.height ?? 1000) > 512 || (dims.width ?? 1000) > 512) {
-				const errors = [{ field: "avatar", message: "Avatar too big" }];
+				const errors = [
+					{
+						field: "avatar",
+						message:
+							"Avatar is too big. Please make sure the size of your avatar is no bigger than 512px by 512px.",
+					},
+				];
 				return fail(400, { error: true, errors });
 			}
 
