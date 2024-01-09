@@ -296,7 +296,7 @@
 
 	async function deletePdf() {
 		pdfUpload = undefined;
-		
+
 		const res = await fetch(`${base}/conversation/${$page.params.id}/upload-pdf`, {
 			method: "DELETE",
 		});
