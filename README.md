@@ -109,7 +109,7 @@ TEXT_EMBEDDING_MODELS = `[
     "prePassage": "passage: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
     "endpoints": [
       {
-        "type": "tei", 
+        "type": "tei",
         "url": "http://127.0.0.1:8080/",
         "authorization": "TOKEN_TYPE TOKEN" // optional authorization field. Example: "Basic VVNFUjpQQVNT"
       }
