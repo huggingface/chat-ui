@@ -24,7 +24,8 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import type { PdfUploadStatus } from "$lib/types/PdfChat";
+	import type { PdfUpload } from "$lib/types/PdfChat";
+	import UploadedPdfStatus from "../UploadedPdfStatus.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -35,7 +36,7 @@
 	export let RAGMessages: RAGUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
-	export let uploadPdfStatus: PdfUploadStatus | undefined = undefined;
+	export let pdfUpload: PdfUpload | undefined = undefined;
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
@@ -176,13 +177,12 @@
 							})}
 					/>
 				{/if}
-				<UploadBtn
-					bind:files
-					on:uploadpdf
-					classNames="ml-auto"
-					multimodal={currentModel.multimodal}
-					{uploadPdfStatus}
-				/>
+				<div class="ml-auto flex items-center gap-x-3">
+					{#if pdfUpload?.name}
+						<UploadedPdfStatus on:deletepdf {pdfUpload} />
+					{/if}
+					<UploadBtn bind:files on:uploadpdf multimodal={currentModel.multimodal} {pdfUpload} />
+				</div>
 			</div>
 			<form
 				on:dragover={onDragOver}

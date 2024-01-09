@@ -21,13 +21,7 @@ export async function uploadImgFile(file: Blob, conv: Conversation): Promise<str
 	});
 }
 
-export async function uploadPdfEmbeddings(
-	embeddings: Tensor,
-	textChunks: string[],
-	conv: Conversation
-): Promise<void> {
-	const filename = `${conv._id}-pdf`;
-
+export async function deleteFile(filename: string){
 	// Step 1: Check if the file exists
 	const existingFile = await collections.files.findOne({ filename });
 
@@ -35,8 +29,19 @@ export async function uploadPdfEmbeddings(
 	if (existingFile) {
 		await collections.bucket.delete(existingFile._id);
 	}
+}
 
-	// Step 3: Upload the new file
+export async function uploadPdfEmbeddings(
+	embeddings: Tensor,
+	textChunks: string[],
+	conv: Conversation
+): Promise<void> {
+	const filename = `${conv._id}-pdf`;
+
+	// Step 1: Delete the existing file if it exists
+	await deleteFile(filename);
+
+	// Step 2: Upload the new file
 	const upload = collections.bucket.openUploadStream(filename, {
 		metadata: { conversation: conv._id.toString(), textChunks, dims: embeddings.dims },
 	});

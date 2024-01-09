@@ -16,7 +16,7 @@
 	import type { MessageUpdate, RAGUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
-	import { PdfUploadStatus } from "$lib/types/PdfChat.js";
+	import { PdfUploadStatus, type PdfUpload } from "$lib/types/PdfChat.js";
 	export let data;
 
 	let messages = data.messages;
@@ -32,7 +32,7 @@
 
 	let loading = false;
 	let pending = false;
-	let uploadPdfStatus: PdfUploadStatus;
+	let pdfUpload: PdfUpload | undefined = undefined;
 
 	let files: File[] = [];
 
@@ -276,7 +276,7 @@
 	}
 
 	async function uploadPdf(file: File) {
-		uploadPdfStatus = PdfUploadStatus.Uploading;
+		pdfUpload = { status: PdfUploadStatus.Uploading, name: file.name };
 
 		const formData = new FormData();
 		formData.append("pdf", file);
@@ -291,7 +291,20 @@
 			console.error("Error while uploading PDF: " + (await res.text()));
 		}
 
-		uploadPdfStatus = PdfUploadStatus.Uploaded;
+		pdfUpload.status = PdfUploadStatus.Uploaded;
+	}
+
+	async function deletePdf() {
+		const res = await fetch(`${base}/conversation/${$page.params.id}/upload-pdf`, {
+			method: "DELETE",
+		});
+
+		if (!res.ok) {
+			error.set("Error while deleting PDF, try again.");
+			console.error("Error while deleting PDF: " + (await res.text()));
+		}
+
+		pdfUpload = undefined;
 	}
 
 	onMount(async () => {
@@ -360,7 +373,8 @@
 	on:retry={onRetry}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:uploadpdf={(event) => uploadPdf(event.detail)}
-	{uploadPdfStatus}
+	on:deletepdf={deletePdf}
+	{pdfUpload}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}

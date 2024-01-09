@@ -1,7 +1,7 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { MAX_SEQ_LEN as CHUNK_CAR_LEN, createEmbeddings } from "$lib/server/embeddings";
-import { uploadPdfEmbeddings } from "$lib/server/files/uploadFile";
+import { deleteFile, uploadPdfEmbeddings } from "$lib/server/files/uploadFile";
 import { chunk } from "$lib/utils/chunk";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -38,6 +38,24 @@ export async function POST({ request, params, locals }) {
 	const embeddings = await createEmbeddings(textChunks);
 
 	await uploadPdfEmbeddings(embeddings, textChunks, conversation);
+
+	return new Response();
+}
+
+export async function DELETE({ params, locals }) {
+	const conversationId = new ObjectId(params.id);
+	const conversation = await collections.conversations.findOne({
+		_id: conversationId,
+		...authCondition(locals),
+	});
+
+	if (!conversation) {
+		throw error(404, "Conversation not found");
+	}
+
+	const filename = `${conversation._id}-pdf`;
+
+	await deleteFile(filename);
 
 	return new Response();
 }

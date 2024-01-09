@@ -12,3 +12,8 @@ export enum PdfUploadStatus {
 	Uploading = "Uploading",
 	Uploaded = "Uploaded",
 }
+
+export interface PdfUpload {
+	status: PdfUploadStatus;
+	name: string;
+}
