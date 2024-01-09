@@ -440,3 +440,29 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+
+## Config changes for HuggingChat
+
+The config file for HuggingChat is stored in the `.env.template` file at the root of the repository. It is the single source of truth that is used to generate the actual `.env.local` file using our CI/CD pipeline. See [updateProdEnv](https://github.com/huggingface/chat-ui/blob/cdb33a9583f5339ade724db615347393ef48f5cd/scripts/updateProdEnv.ts) for more details.
+
+> [!TIP]
+> If you want to make changes to model config for HuggingChat, you should do so against `.env.template`.
+
+We currently use the following secrets for deploying HuggingChat in addition to the `.env.template` above:
+
+- `MONGODB_URL`
+- `HF_TOKEN`
+- `OPENID_CONFIG`
+- `SERPER_API_KEY`
+
+They are defined as secrets in the repository.
+
+### Testing config changes locally
+
+You can test the config changes locally by first creating an `.env.SECRET_CONFIG` file with the secrets defined above. Then you can run the following command to generate the `.env.local` file:
+
+```bash
+npm run updateLocalEnv
+```
+
+This will replace your `.env.local` file with the one that will be used in prod (simply taking `.env.template + .env.SECRET_CONFIG`).
