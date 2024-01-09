@@ -35,7 +35,7 @@
 			method="post"
 			action="{base}/settings"
 		>
-			{#if PUBLIC_APP_DATA_SHARING}
+			<!-- {#if PUBLIC_APP_DATA_SHARING}
 				<label class="flex cursor-pointer select-none items-center gap-2 text-gray-500">
 					{#each Object.entries(settings).filter(([k]) => !(k === "shareConversationsWithModelAuthors" || k === "customPrompts")) as [key, val]}
 						<input type="hidden" name={key} value={val} />
@@ -74,7 +74,7 @@
 						{/each}
 					</ul>
 				</div>
-			{/if}
+			{/if} -->
 			<label class="flex cursor-pointer select-none items-center gap-2 text-sm text-gray-500">
 				<input
 					type="checkbox"
