@@ -12,6 +12,7 @@ import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
 import endpointTgi from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
+import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
 import JSON5 from "json5";
 
@@ -68,6 +69,7 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
+	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(MODELS));
