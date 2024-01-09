@@ -8,7 +8,7 @@ import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
-import { embeddingModels } from "$lib/server/embeddingModels";
+import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -56,7 +56,8 @@ export async function runWebSearch(
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
 		// fetch the model
-		const embeddingModel = embeddingModels.find((m) => m.id === conv.embeddingModel);
+		const embeddingModel = embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
+		
 		if (!embeddingModel) {
 			throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
 		}
