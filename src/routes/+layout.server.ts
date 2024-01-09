@@ -65,7 +65,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
 
-	const disableAssistants = !(ENABLE_ASSISTANTS === "true");
+	const disableAssistants = ENABLE_ASSISTANTS !== "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
