@@ -6,6 +6,7 @@ import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { defaultModel } from "$lib/server/models";
 import { findUser } from "$lib/server/auth";
+import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 const userData = {
 	preferred_username: "new-username",
@@ -46,6 +47,7 @@ const insertRandomConversations = async (count: number) => {
 			title: "random title",
 			messages: [],
 			model: defaultModel.id,
+			embeddingModel: defaultEmbeddingModel.id,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			sessionId: locals.sessionId,

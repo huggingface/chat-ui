@@ -173,6 +173,7 @@
 					inputs.forEach(async (el: string) => {
 						try {
 							const update = JSON.parse(el) as MessageUpdate;
+
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
 								reader.cancel();
@@ -225,7 +226,7 @@
 				});
 			}
 
-			// reset the websearchmessages
+			// reset the websearchMessages
 			webSearchMessages = [];
 
 			await invalidate(UrlDependency.ConversationList);

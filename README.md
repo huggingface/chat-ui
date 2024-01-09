@@ -20,9 +20,10 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 1. [Setup](#setup)
 2. [Launch](#launch)
 3. [Web Search](#web-search)
-4. [Extra parameters](#extra-parameters)
-5. [Deploying to a HF Space](#deploying-to-a-hf-space)
-6. [Building](#building)
+4. [Text Embedding Models](#text-embedding-models)
+5. [Extra parameters](#extra-parameters)
+6. [Deploying to a HF Space](#deploying-to-a-hf-space)
+7. [Building](#building)
 
 ## No Setup Deploy
 
@@ -78,9 +79,49 @@ Chat UI features a powerful Web Search feature. It works by:
 
 1. Generating an appropriate search query from the user prompt.
 2. Performing web search and extracting content from webpages.
-3. Creating embeddings from texts using [transformers.js](https://huggingface.co/docs/transformers.js). Specifically, using [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+3. Creating embeddings from texts using a text embedding model.
 4. From these embeddings, find the ones that are closest to the user query using a vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that an LLM can use this information).
+
+## Text Embedding Models
+
+By default (for backward compatibility), when `TEXT_EMBEDDING_MODELS` environment variable is not defined, [transformers.js](https://huggingface.co/docs/transformers.js) embedding models will be used for embedding tasks, specifically, [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+
+You can customize the embedding model by setting `TEXT_EMBEDDING_MODELS` in your `.env.local` file. For example:
+
+```env
+TEXT_EMBEDDING_MODELS = `[
+  {
+    "name": "Xenova/gte-small",
+    "displayName": "Xenova/gte-small",
+    "description": "locally running embedding",
+    "chunkCharLength": 512,
+    "endpoints": [
+      {"type": "transformersjs"}
+    ]
+  },
+  {
+    "name": "intfloat/e5-base-v2",
+    "displayName": "intfloat/e5-base-v2",
+    "description": "hosted embedding model",
+    "chunkCharLength": 768,
+    "preQuery": "query: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
+    "prePassage": "passage: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
+    "endpoints": [
+      {
+        "type": "tei",
+        "url": "http://127.0.0.1:8080/",
+        "authorization": "TOKEN_TYPE TOKEN" // optional authorization field. Example: "Basic VVNFUjpQQVNT"
+      }
+    ]
+  }
+]`
+```
+
+The required fields are `name`, `chunkCharLength` and `endpoints`.
+Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js) and [`TEI`](https://github.com/huggingface/text-embeddings-inference). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint.
+
+When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModel` to the name of the model.
 
 ## Extra parameters
 
@@ -424,6 +465,45 @@ Custom endpoints may require client certificate authentication, depending on how
 If you're using a certificate signed by a private CA, you will also need to add the `CA_PATH` parameter to your `.env.local`. This parameter should point to the location of the CA certificate file on your local machine.
 
 If you're using a self-signed certificate, e.g. for testing or development purposes, you can set the `REJECT_UNAUTHORIZED` parameter to `false` in your `.env.local`. This will disable certificate validation, and allow Chat UI to connect to your custom endpoint.
+
+#### Specific Embedding Model
+
+A model can use any of the embedding models defined in `.env.local`, (currently used when web searching),
+by default it will use the first embedding model, but it can be changed with the field `embeddingModel`:
+
+```env
+TEXT_EMBEDDING_MODELS = `[
+  {
+    "name": "Xenova/gte-small",
+    "chunkCharLength": 512,
+    "endpoints": [
+      {"type": "transformersjs"}
+    ]
+  },
+  {
+    "name": "intfloat/e5-base-v2",
+    "chunkCharLength": 768,
+    "endpoints": [
+      {"type": "tei", "url": "http://127.0.0.1:8080/", "authorization": "Basic VVNFUjpQQVNT"},
+      {"type": "tei", "url": "http://127.0.0.1:8081/"}
+    ]
+  }
+]`
+
+MODELS=`[
+  {
+      "name": "Ollama Mistral",
+      "chatPromptTemplate": "...",
+      "embeddingModel": "intfloat/e5-base-v2"
+      "parameters": {
+        ...
+      },
+      "endpoints": [
+        ...
+      ]
+  }
+]`
+```
 
 ## Deploying to a HF Space
 

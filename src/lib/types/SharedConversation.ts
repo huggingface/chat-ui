@@ -7,6 +7,8 @@ export interface SharedConversation extends Timestamps {
 	hash: string;
 
 	model: string;
+	embeddingModel: string;
+
 	title: string;
 	messages: Message[];
 	preprompt?: string;
