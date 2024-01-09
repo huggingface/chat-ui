@@ -178,10 +178,12 @@
 					/>
 				{/if}
 				<div class="ml-auto flex items-center gap-x-3">
-					{#if pdfUpload?.name}
+					{#if $page.data.enablePdfChat && pdfUpload?.name}
 						<UploadedPdfStatus on:deletepdf {pdfUpload} />
 					{/if}
-					<UploadBtn bind:files on:uploadpdf multimodal={currentModel.multimodal} {pdfUpload} />
+					{#if currentModel.multimodal || $page.data.enablePdfChat}
+						 <UploadBtn bind:files on:uploadpdf multimodal={currentModel.multimodal} pdfChat={$page.data.enablePdfChat} {pdfUpload} />
+					{/if}
 				</div>
 			</div>
 			<form

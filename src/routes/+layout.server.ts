@@ -12,6 +12,7 @@ import {
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
+	ENABLE_PDF_CHAT,
 } from "$env/static/private";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
@@ -58,6 +59,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const userHasExceededMessages = messagesBeforeLogin > 0 && totalMessages > messagesBeforeLogin;
 
 	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
+
+	const enablePdfChat = ENABLE_PDF_CHAT === "true";
 
 	return {
 		conversations: await conversations
@@ -127,5 +130,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
+		enablePdfChat,
 	};
 };
