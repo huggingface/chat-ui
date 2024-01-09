@@ -56,8 +56,9 @@ export async function runWebSearch(
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
 		// fetch the model
-		const embeddingModel = embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
-		
+		const embeddingModel =
+			embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
+
 		if (!embeddingModel) {
 			throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
 		}
