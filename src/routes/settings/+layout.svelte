@@ -67,7 +67,7 @@
 					{/if}
 				</a>
 			{/each}
-			{#if !data.disableAssistants}
+			{#if data.enableAssistants}
 				<h3 class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">Assistants</h3>
 				{#each data.assistants as assistant}
 					<a
