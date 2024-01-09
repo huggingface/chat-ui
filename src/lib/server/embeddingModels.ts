@@ -19,7 +19,7 @@ const modelConfig = z.object({
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
 	endpoints: z.array(embeddingEndpointSchema).nonempty(),
-	maxSequenceLength: z.number().positive(),
+	chunkCharLength: z.number().positive(),
 	preQuery: z.string().default(""),
 	prePassage: z.string().default(""),
 });
@@ -30,7 +30,7 @@ const rawEmbeddingModelJSON =
 	`[
 	{
 	  "name": "Xenova/gte-small",
-	  "maxSequenceLength": 512,
+	  "chunkCharLength": 512,
 	  "endpoints": [
 		{ "type": "transformersjs" }
 	  ]

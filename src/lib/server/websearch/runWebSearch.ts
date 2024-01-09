@@ -77,7 +77,7 @@ export async function runWebSearch(
 					}
 				}
 				const MAX_N_CHUNKS = 100;
-				const texts = chunk(text, embeddingModel.maxSequenceLength).slice(0, MAX_N_CHUNKS);
+				const texts = chunk(text, embeddingModel.chunkCharLength).slice(0, MAX_N_CHUNKS);
 				return texts.map((t) => ({ source: result, text: t }));
 			});
 			const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);

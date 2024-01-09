@@ -95,7 +95,7 @@ TEXT_EMBEDDING_MODELS = `[
     "name": "Xenova/gte-small",
     "displayName": "Xenova/gte-small",
     "description": "locally running embedding",
-    "maxSequenceLength": 512,
+    "chunkCharLength": 512,
     "endpoints": [
       {"type": "transformersjs"}
     ]
@@ -104,7 +104,7 @@ TEXT_EMBEDDING_MODELS = `[
     "name": "intfloat/e5-base-v2",
     "displayName": "intfloat/e5-base-v2",
     "description": "hosted embedding model",
-    "maxSequenceLength": 768,
+    "chunkCharLength": 768,
     "preQuery": "query: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
     "prePassage": "passage: ", # See https://huggingface.co/intfloat/e5-base-v2#faq
     "endpoints": [
@@ -114,7 +114,7 @@ TEXT_EMBEDDING_MODELS = `[
 ]`
 ```
 
-The required fields are `name`, `maxSequenceLength` and `endpoints`.
+The required fields are `name`, `chunkCharLength` and `endpoints`.
 Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js) and [`TEI`](https://github.com/huggingface/text-embeddings-inference). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint.
 
 When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModel` to the name of the model.
@@ -471,14 +471,14 @@ by default it will use the first embedding model, but it can be changed with the
 TEXT_EMBEDDING_MODELS = `[
   {
     "name": "Xenova/gte-small",
-    "maxSequenceLength": 512,
+    "chunkCharLength": 512,
     "endpoints": [
       {"type": "transformersjs"}
     ]
   },
   {
     "name": "intfloat/e5-base-v2",
-    "maxSequenceLength": 768,
+    "chunkCharLength": 768,
     "endpoints": [
       {"type": "tei", "url": "http://127.0.0.1:8080/", "authorization": "Basic VVNFUjpQQVNT"},
       {"type": "tei", "url": "http://127.0.0.1:8081/"}

@@ -33,7 +33,7 @@ export async function embeddingEndpointTei(
 	const { max_client_batch_size, max_batch_tokens } = await getModelInfoByUrl(url);
 	const maxBatchSize = Math.min(
 		max_client_batch_size,
-		Math.floor(max_batch_tokens / model.maxSequenceLength)
+		Math.floor(max_batch_tokens / model.chunkCharLength)
 	);
 
 	return async ({ inputs }) => {
