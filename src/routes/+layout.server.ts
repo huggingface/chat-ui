@@ -101,16 +101,25 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
 	return {
-		conversations: conversations.map((conv) => ({
-			id: conv._id.toString(),
-			title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
-			model: conv.model ?? defaultModel,
-			updatedAt: conv.updatedAt,
-			assistantId: conv.assistantId?.toString(),
-			avatarHash:
-				conv.assistantId &&
-				assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
-		})) satisfies ConvSidebar[],
+		conversations: conversations.map((conv) => {
+			if (settings?.hideEmojiOnSidebar) {
+				conv.title = conv.title.replace(/\p{Emoji}/gu, "");
+			}
+
+			// remove invalid unicode and trim whitespaces
+			conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
+
+			return {
+				id: conv._id.toString(),
+				title: conv.title,
+				model: conv.model ?? defaultModel,
+				updatedAt: conv.updatedAt,
+				assistantId: conv.assistantId?.toString(),
+				avatarHash:
+					conv.assistantId &&
+					assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
+			};
+		}) satisfies ConvSidebar[],
 		settings: {
 			searchEnabled: !!(
 				SERPAPI_KEY ||

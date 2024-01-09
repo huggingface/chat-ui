@@ -59,6 +59,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 						recentlySaved: false,
 					}));
 				}, 3000);
+				invalidate(UrlDependency.ConversationList);
 			}, 300);
 			// debounce server calls by 300ms
 		}
