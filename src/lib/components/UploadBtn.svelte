@@ -10,9 +10,10 @@
 	export let files: File[];
 	export let pdfUpload: PdfUpload | undefined = undefined;
 
-	const accept = (multimodal && pdfChat) ? "image/*,.pdf" : multimodal ? "image/*" : ".pdf";
-	const label = (multimodal && pdfChat) ? "Upload image or PDF" :  multimodal ? "Upload image" : "Upload PDF";
-	
+	const accept = multimodal && pdfChat ? "image/*,.pdf" : multimodal ? "image/*" : ".pdf";
+	const label =
+		multimodal && pdfChat ? "Upload image or PDF" : multimodal ? "Upload image" : "Upload PDF";
+
 	let fileInput: HTMLInputElement;
 	let interval: ReturnType<typeof setInterval>;
 
