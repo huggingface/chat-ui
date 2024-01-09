@@ -21,7 +21,7 @@ export async function uploadImgFile(file: Blob, conv: Conversation): Promise<str
 	});
 }
 
-export async function deleteFile(filename: string){
+export async function deleteFile(filename: string) {
 	// Step 1: Check if the file exists
 	const existingFile = await collections.files.findOne({ filename });
 

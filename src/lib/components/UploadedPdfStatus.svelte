@@ -20,9 +20,9 @@
 	title={pdfUpload.name}
 >
 	<button
-		class="-mr-1 block md:hidden shrink-0 opacity-70 group-hover:block"
+		class="-mr-1 block shrink-0 opacity-70 group-hover:block md:hidden"
 		on:click={() => dispatch("deletepdf")}><CarbonClose /></button
 	>
 	<CarbonDocumentBlank class="shrink-0" />
-	<p class="truncate hidden md:block">{pdfUpload.name}</p>
+	<p class="hidden truncate md:block">{pdfUpload.name}</p>
 </div>
