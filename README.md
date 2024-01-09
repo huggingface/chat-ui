@@ -443,12 +443,13 @@ You can preview the production build with `npm run preview`.
 
 ## Config changes for HuggingChat
 
-The config file for HuggingChat is stored in the `.env.template` file at the root of the repository. It is the single source of truth that is used to generate the actual `.env.local` file using our CI/CD pipeline. See [updateProdEnv](https://github.com/huggingface/chat-ui/blob/cdb33a9583f5339ade724db615347393ef48f5cd/scripts/updateProdEnv.ts) for more details. 
+The config file for HuggingChat is stored in the `.env.template` file at the root of the repository. It is the single source of truth that is used to generate the actual `.env.local` file using our CI/CD pipeline. See [updateProdEnv](https://github.com/huggingface/chat-ui/blob/cdb33a9583f5339ade724db615347393ef48f5cd/scripts/updateProdEnv.ts) for more details.
 
 > [!TIP]
 > If you want to make changes to model config for HuggingChat, you should do so against `.env.template`.
 
- We currently use the following secrets for deploying HuggingChat in addition to the `.env.template` above:
+We currently use the following secrets for deploying HuggingChat in addition to the `.env.template` above:
+
 - `MONGODB_URL`
 - `HF_TOKEN`
 - `OPENID_CONFIG`
