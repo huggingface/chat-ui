@@ -295,6 +295,8 @@
 	}
 
 	async function deletePdf() {
+		pdfUpload = undefined;
+		
 		const res = await fetch(`${base}/conversation/${$page.params.id}/upload-pdf`, {
 			method: "DELETE",
 		});
@@ -303,8 +305,6 @@
 			error.set("Error while deleting PDF, try again.");
 			console.error("Error while deleting PDF: " + (await res.text()));
 		}
-
-		pdfUpload = undefined;
 	}
 
 	onMount(async () => {
