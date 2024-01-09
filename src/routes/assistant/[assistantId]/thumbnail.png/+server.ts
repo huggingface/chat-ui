@@ -20,6 +20,7 @@ export const GET: RequestHandler = (async ({ url, params, fetch }) => {
 	}
 
 	const renderedComponent = (ChatThumbnail as unknown as SvelteComponent).render({
+		href: url.origin,
 		name: assistant.name,
 		description: assistant.description,
 		avatarUrl: assistant.avatar
