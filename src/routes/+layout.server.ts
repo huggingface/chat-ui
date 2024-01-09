@@ -161,7 +161,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			email: locals.user.email,
 		},
 		assistant,
-		disableAssistants,
+		enableAssistants,
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
