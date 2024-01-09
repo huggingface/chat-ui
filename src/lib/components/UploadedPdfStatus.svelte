@@ -14,7 +14,7 @@
 </script>
 
 <div
-	class="max-w-48 group flex items-center gap-x-1"
+	class="group flex max-w-48 items-center gap-x-1"
 	class:animate-pulse={uploading}
 	class:pointer-events-none={uploading}
 	title={pdfUpload.name}

@@ -182,7 +182,13 @@
 						<UploadedPdfStatus on:deletepdf {pdfUpload} />
 					{/if}
 					{#if currentModel.multimodal || $page.data.enablePdfChat}
-						 <UploadBtn bind:files on:uploadpdf multimodal={currentModel.multimodal} pdfChat={$page.data.enablePdfChat} {pdfUpload} />
+						<UploadBtn
+							bind:files
+							on:uploadpdf
+							multimodal={currentModel.multimodal}
+							pdfChat={$page.data.enablePdfChat}
+							{pdfUpload}
+						/>
 					{/if}
 				</div>
 			</div>
