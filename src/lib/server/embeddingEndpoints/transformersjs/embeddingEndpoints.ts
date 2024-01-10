@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { EmbeddingEndpoint } from "$lib/types/EmbeddingEndpoints";
+import type { EmbeddingEndpoint } from "../embeddingEndpoints";
 import type { Tensor, Pipeline } from "@xenova/transformers";
 import { pipeline } from "@xenova/transformers";
 

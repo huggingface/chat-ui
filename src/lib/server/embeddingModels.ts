@@ -6,7 +6,7 @@ import {
 	embeddingEndpoints,
 	embeddingEndpointSchema,
 	type EmbeddingEndpoint,
-} from "$lib/types/EmbeddingEndpoints";
+} from "$lib/server/embeddingEndpoints/embeddingEndpoints";
 import { embeddingEndpointTransformersJS } from "$lib/server/embeddingEndpoints/transformersjs/embeddingEndpoints";
 
 const modelConfig = z.object({
