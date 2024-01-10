@@ -3,8 +3,6 @@
 # you will also find guides on how best to write your Dockerfile
 FROM node:19 as builder-production
 
-ARG ENV_FILE=.env.live
-
 WORKDIR /app
 
 COPY --link --chown=1000 package-lock.json package.json ./
@@ -20,7 +18,7 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN --mount=type=secret,id=DOTENV_LOCAL,dst=${ENV_FILE} \
+RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local \
     npm run build
 
 FROM node:19-slim
