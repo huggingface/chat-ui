@@ -30,8 +30,8 @@
 		{:else}
 			<CarbonCheckmark class="my-auto text-gray-500" />
 		{/if}
-		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}
-			>Web search
+		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}>
+			Web search
 		</span>
 		<div class="my-auto transition-all" class:rotate-90={detailsOpen}>
 			<CarbonCaretRight />
