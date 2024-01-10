@@ -2,11 +2,11 @@ import { z } from "zod";
 import {
 	embeddingEndpointTei,
 	embeddingEndpointTeiParametersSchema,
-} from "$lib/server/embeddingEndpoints/tei/embeddingEndpoints";
+} from "./tei/embeddingEndpoints";
 import {
 	embeddingEndpointTransformersJS,
 	embeddingEndpointTransformersJSParametersSchema,
-} from "$lib/server/embeddingEndpoints/transformersjs/embeddingEndpoints";
+} from "./transformersjs/embeddingEndpoints";
 
 // parameters passed when generating text
 interface EmbeddingEndpointParameters {

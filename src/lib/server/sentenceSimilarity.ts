@@ -1,6 +1,6 @@
 import { dot } from "@xenova/transformers";
 import type { EmbeddingBackendModel } from "$lib/server/embeddingModels";
-import type { Embedding } from "$lib/types/EmbeddingEndpoints";
+import type { Embedding } from "$lib/server/embeddingEndpoints/embeddingEndpoints";
 
 // see here: https://github.com/nmslib/hnswlib/blob/359b2ba87358224963986f709e593d799064ace6/README.md?plain=1#L34
 function innerProduct(embeddingA: Embedding, embeddingB: Embedding) {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { EmbeddingEndpoint, Embedding } from "$lib/types/EmbeddingEndpoints";
+import type { EmbeddingEndpoint, Embedding } from "../embeddingEndpoints";
 import { chunk } from "$lib/utils/chunk";
 
 export const embeddingEndpointTeiParametersSchema = z.object({
