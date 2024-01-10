@@ -27,7 +27,7 @@
 				<img class=" mr-2 h-8 w-8" src={imgUrl} alt="app logo" />
 				Chat with
 			</h1>
-			<span class="-mt-5 max-w-[65vw] text-wrap break-words break-all text-3xl font-black">
+			<span class="-mt-5 max-w-[65vw] text-3xl font-black">
 				{name}
 			</span>
 			<h3 class="mt-2 font-medium text-gray-400">
@@ -36,7 +36,7 @@
 			</h3>
 		</div>
 	</div>
-	<h2 class="w-fit max-w-[90vw] items-center truncate text-center font-medium text-gray-400">
+	<h2 class="max-w-[90vw] items-center text-center font-medium text-gray-400">
 		{description.slice(0, 200)}
 		{#if description.length > 200}...{/if}
 		<!-- line clamping doesnt work with satori hence this character based approach -->
