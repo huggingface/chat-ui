@@ -40,8 +40,7 @@ export async function endpointOai(
 					model: model.id ?? model.name,
 					prompt: await buildPrompt({
 						messages: conversation.messages,
-						webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-						pdfSearch: conversation.messages[conversation.messages.length - 1].pdfSearch,
+						ragContext: conversation.messages[conversation.messages.length - 1].ragContext,
 						preprompt: conversation.preprompt,
 						model,
 					}),

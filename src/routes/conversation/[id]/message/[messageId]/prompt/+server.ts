@@ -38,8 +38,7 @@ export async function GET({ params, locals }) {
 
 	const prompt = await buildPrompt({
 		preprompt: conv.preprompt,
-		webSearch: messagesUpTo[messagesUpTo.length - 1].webSearch,
-		pdfSearch: messagesUpTo[messagesUpTo.length - 1].pdfSearch,
+		ragContext: messagesUpTo[messagesUpTo.length - 1].ragContext,
 		messages: messagesUpTo,
 		model: model,
 	});

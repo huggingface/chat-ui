@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { RAGUpdate } from "$lib/types/MessageUpdate";
+	import type { RAGType } from "$lib/types/rag";
 	import CarbonCaretRight from "~icons/carbon/caret-right";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
@@ -9,11 +10,21 @@
 
 	export let loading = false;
 	export let classNames = "";
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let ragUpdates: RAGUpdate[] = [];
+
+	const TITLE_MAPPING: Record<RAGType, string> = {
+		webSearch: "Web search", 
+		pdfChat: "PDF Chat"
+	}
 
 	let detailsOpen: boolean;
 	let error: boolean;
-	$: error = webSearchMessages[webSearchMessages.length - 1]?.messageType === "error";
+	$: error = ragUpdates[ragUpdates.length - 1]?.messageType === "error";
+
+	$: ragType = ragUpdates[0].type;
+
+	$: loading =
+		ragUpdates.length > 0 && !["sources", "done"].includes(ragUpdates[ragUpdates.length - 1].messageType);
 </script>
 
 <details
@@ -31,7 +42,7 @@
 			<CarbonCheckmark class="my-auto text-gray-500" />
 		{/if}
 		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}>
-			Web search
+			{TITLE_MAPPING[ragType]}
 		</span>
 		<div class="my-auto transition-all" class:rotate-90={detailsOpen}>
 			<CarbonCaretRight />
@@ -39,13 +50,13 @@
 	</summary>
 
 	<div class="content px-5 pb-5 pt-4">
-		{#if webSearchMessages.length === 0}
+		{#if ragUpdates.length === 0}
 			<div class="mx-auto w-fit">
 				<EosIconsLoading class="mb-3 h-4 w-4" />
 			</div>
 		{:else}
 			<ol>
-				{#each webSearchMessages as message}
+				{#each ragUpdates as message}
 					{#if message.messageType === "update"}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">

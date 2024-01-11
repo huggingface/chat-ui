@@ -1,4 +1,5 @@
 import type { WebSearchSource } from "./WebSearch";
+import type { RAGType } from "./rag";
 
 export type FinalAnswer = {
 	type: "finalAnswer";
@@ -17,22 +18,23 @@ export type AgentUpdate = {
 	binary?: Blob;
 };
 
-export type WebSearchUpdate = {
-	type: "webSearch";
-	messageType: "update" | "error" | "sources";
+export interface RAGUpdate {
+	type: RAGType;
+	messageType: "update" | "error" | "done" | string;
 	message: string;
 	args?: string[];
+};
+
+export interface WebSearchUpdate extends RAGUpdate {
+	type: "websearch",
+	messageType: RAGUpdate["messageType"] | "sources";
 	sources?: WebSearchSource[];
 };
 
-export type PdfSearchUpdate = {
-	type: "pdfSearch";
-	messageType: "update" | "error" | "done";
-	message: string;
-	args?: string[];
+export interface PdfSearchUpdate extends RAGUpdate {
+	type: "pdfChat";
 };
 
-export type RAGUpdate = WebSearchUpdate | PdfSearchUpdate;
 
 export type StatusUpdate = {
 	type: "status";
@@ -50,7 +52,6 @@ export type MessageUpdate =
 	| FinalAnswer
 	| TextStreamUpdate
 	| AgentUpdate
-	| WebSearchUpdate
-	| PdfSearchUpdate
+	| RAGUpdate
 	| StatusUpdate
 	| ErrorUpdate;
