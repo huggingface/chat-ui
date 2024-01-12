@@ -1,5 +1,5 @@
-import type { YouWebSearch } from "../../types/WebSearch";
-import { WebSearchProvider } from "../../types/WebSearch";
+import type { YouWebSearch } from "../../../types/WebSearch";
+import { WebSearchProvider } from "../../../types/WebSearch";
 import {
 	SERPAPI_KEY,
 	SERPER_API_KEY,

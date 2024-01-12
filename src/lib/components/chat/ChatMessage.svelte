@@ -16,9 +16,9 @@
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
 
-	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
-	import OpenPdfSearchResults from "../OpenPdfSearchResults.svelte";
-	import type { RAGUpdate, WebSearchUpdate, PdfSearchUpdate } from "$lib/types/MessageUpdate";
+	import OpenRAGResults from "../OpenRAGResults.svelte";
+	import type { RAGUpdate } from "$lib/types/MessageUpdate";
+	import { ragTypes } from "$lib/types/rag";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -61,6 +61,7 @@
 	let loadingEl: IconLoading;
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 	let isCopied = false;
+	let ragIsLoading = false;
 
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
@@ -107,29 +108,17 @@
 		}
 	});
 
-	let searchUpdates: WebSearchUpdate[] = [];
+	let ragUpdates: RAGUpdate[] = [];
 
-	$: searchUpdates = ((RAGMessages.filter(({ type }) => type === "webSearch").length > 0
-		? RAGMessages.filter(({ type }) => type === "webSearch")
-		: message.updates?.filter(({ type }) => type === "webSearch")) ?? []) as WebSearchUpdate[];
-
-	let pdfUpdates: PdfSearchUpdate[] = [];
-
-	$: pdfUpdates = ((RAGMessages.filter(({ type }) => type === "pdfSearch").length > 0
-		? RAGMessages.filter(({ type }) => type === "pdfSearch")
-		: message.updates?.filter(({ type }) => type === "pdfSearch")) ?? []) as PdfSearchUpdate[];
+	$: ragUpdates = ((RAGMessages.length > 0
+		? RAGMessages
+		: message.updates?.filter(({ type }) => ragTypes.includes(type))) ?? []) as RAGUpdate[];
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
-	let webSearchIsDone = true;
-
-	$: webSearchIsDone =
-		searchUpdates.length > 0 && searchUpdates[searchUpdates.length - 1].messageType === "sources";
-
 	$: webSearchSources =
-		searchUpdates &&
-		searchUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
+		ragUpdates && ragUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
 
 	$: if (isCopied) {
 		setTimeout(() => {
@@ -153,21 +142,14 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if searchUpdates && searchUpdates.length > 0}
-				<OpenWebSearchResults
+			{#if ragUpdates && ragUpdates.length > 0}
+				<OpenRAGResults
 					classNames={tokens.length ? "mb-3.5" : ""}
-					webSearchMessages={searchUpdates}
-					loading={!(searchUpdates[searchUpdates.length - 1]?.messageType === "sources")}
+					{ragUpdates}
+					bind:loading={ragIsLoading}
 				/>
 			{/if}
-			{#if pdfUpdates && pdfUpdates.length > 0}
-				<OpenPdfSearchResults
-					classNames={tokens.length ? "mb-3.5" : ""}
-					pdfSearchMessages={pdfUpdates}
-					loading={!(pdfUpdates[pdfUpdates.length - 1]?.messageType === "done")}
-				/>
-			{/if}
-			{#if !message.content && (webSearchIsDone || (RAGMessages && RAGMessages.length === 0))}
+			{#if !message.content && (!ragIsLoading || (RAGMessages && RAGMessages.length === 0))}
 				<IconLoading />
 			{/if}
 

@@ -8,14 +8,12 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { runPdfSearch } from "$lib/server/pdfSearch";
-import type { WebSearch } from "$lib/types/WebSearch";
-import type { PdfSearch } from "$lib/types/PdfChat";
+import type { RagContextWebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadImgFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
+import RAGs from "$lib/server/rag/rag";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -234,21 +232,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			);
 
-			let webSearchResults: WebSearch | undefined;
+			let webSearchResults: RagContextWebSearch | undefined;
 
 			if (webSearch) {
-				webSearchResults = await runWebSearch(conv, newPrompt, update);
+				webSearchResults = await RAGs["webSearch"].retrieveRagContext(conv, newPrompt, update);
 			}
 
-			messages[messages.length - 1].webSearch = webSearchResults;
+			messages[messages.length - 1].ragContext = webSearchResults;
 
 			let pdfSearchResults: PdfSearch | undefined;
 			const pdfSearch = await collections.files.findOne({ filename: `${convId.toString()}-pdf` });
 			if (pdfSearch) {
-				pdfSearchResults = await runPdfSearch(conv, newPrompt, update);
+				pdfSearchResults = await RAGs["pdfChat"].retrieveRagContext(conv, newPrompt, update);
 			}
 
-			messages[messages.length - 1].pdfSearch = pdfSearchResults;
+			messages[messages.length - 1].ragContext = pdfSearchResults;
 
 			conv.messages = messages;
 

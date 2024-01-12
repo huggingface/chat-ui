@@ -1,16 +1,9 @@
-import type { ObjectId } from "mongodb";
-import type { Conversation } from "./Conversation";
-import type { Timestamps } from "./Timestamps";
+import type { RagContext } from "./rag";
 
-export interface WebSearch extends Timestamps {
-	_id?: ObjectId;
-	convId?: Conversation["_id"];
-
+export interface RagContextWebSearch extends RagContext {
 	prompt: string;
-
 	searchQuery: string;
 	results: WebSearchSource[];
-	context: string;
 	contextSources: WebSearchSource[];
 }
 

@@ -17,6 +17,7 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { PdfUploadStatus, type PdfUpload } from "$lib/types/PdfChat.js";
+	import { ragTypes } from "$lib/types/rag.js";
 	export let data;
 
 	let messages = data.messages;
@@ -196,7 +197,7 @@
 									lastMessage.content += update.token;
 									messages = [...messages];
 								}
-							} else if (update.type === "webSearch" || update.type === "pdfSearch") {
+							} else if (ragTypes.includes(update.type)) {
 								RAGMessages = [...RAGMessages, update];
 							} else if (update.type === "status") {
 								if (update.status === "title" && update.message) {

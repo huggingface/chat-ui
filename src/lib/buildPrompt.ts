@@ -1,18 +1,18 @@
 import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
-import { format } from "date-fns";
-import type { WebSearch } from "./types/WebSearch";
-import type { PdfSearch } from "./types/PdfChat";
 import { downloadImgFile } from "./server/files/downloadFile";
 import type { Conversation } from "./types/Conversation";
+import RAGs from "./server/rag/rag";
+import type { RagContext } from "./types/rag";
+
+export type BuildPromptMessage = Pick<Message, "from" | "content" | "files">;
 
 interface buildPromptOptions {
-	messages: Pick<Message, "from" | "content" | "files">[];
+	messages: BuildPromptMessage[];
 	id?: Conversation["_id"];
 	model: BackendModel;
 	locals?: App.Locals;
-	webSearch?: WebSearch;
-	pdfSearch?: PdfSearch;
+	ragContext?: RagContext;
 	preprompt?: string;
 	files?: File[];
 }
@@ -20,61 +20,13 @@ interface buildPromptOptions {
 export async function buildPrompt({
 	messages,
 	model,
-	webSearch,
-	pdfSearch,
+	ragContext,
 	preprompt,
 	id,
 }: buildPromptOptions): Promise<string> {
-	if (webSearch && webSearch.context) {
-		const lastMsg = messages.slice(-1)[0];
-		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
-		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
-
-		const previousQuestions =
-			previousUserMessages.length > 0
-				? `Previous questions: \n${previousUserMessages
-						.map(({ content }) => `- ${content}`)
-						.join("\n")}`
-				: "";
-		const currentDate = format(new Date(), "MMMM d, yyyy");
-		messages = [
-			...messagesWithoutLastUsrMsg,
-			{
-				from: "user",
-				content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
-				=====================
-				${webSearch.context}
-				=====================
-				${previousQuestions}
-				Answer the question: ${lastMsg.content} 
-				`,
-			},
-		];
-	} else if (pdfSearch && pdfSearch.context) {
-		const lastMsg = messages.slice(-1)[0];
-		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
-		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
-
-		const previousQuestions =
-			previousUserMessages.length > 0
-				? `Previous questions: \n${previousUserMessages
-						.map(({ content }) => `- ${content}`)
-						.join("\n")}`
-				: "";
-
-		messages = [
-			...messagesWithoutLastUsrMsg,
-			{
-				from: "user",
-				content: `Below are the information I extracted from a PDF file that might be useful:
-				=====================
-				${pdfSearch.context}
-				=====================
-				${previousQuestions}
-				Answer the question: ${lastMsg.content} 
-				`,
-			},
-		];
+	if (ragContext) {
+		const { type: ragType } = ragContext;
+		messages = RAGs[ragType].buildPrompt(messages, ragContext);
 	}
 
 	// section to handle potential files input
