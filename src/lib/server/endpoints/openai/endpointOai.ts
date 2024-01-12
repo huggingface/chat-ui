@@ -5,6 +5,7 @@ import { buildPrompt } from "$lib/buildPrompt";
 import { OPENAI_API_KEY } from "$env/static/private";
 import type { Endpoint } from "../endpoints";
 import { format } from "date-fns";
+import type { RagContextWebSearch } from "$lib/types/WebSearch";
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -56,9 +57,10 @@ export async function endpointOai(
 	} else if (completion === "chat_completions") {
 		return async ({ conversation }) => {
 			let messages = conversation.messages;
-			const webSearch = conversation.messages[conversation.messages.length - 1].webSearch;
+			const ragContext = conversation.messages[conversation.messages.length - 1].ragContext;
 
-			if (webSearch && webSearch.context) {
+			if (ragContext && ragContext.type === "webSearch") {
+				const webSearchContext = ragContext as RagContextWebSearch;
 				const lastMsg = messages.slice(-1)[0];
 				const messagesWithoutLastUsrMsg = messages.slice(0, -1);
 				const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
@@ -74,9 +76,9 @@ export async function endpointOai(
 					...messagesWithoutLastUsrMsg,
 					{
 						from: "user",
-						content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
+						content: `I searched the web using the query: ${webSearchContext.searchQuery}. Today is ${currentDate} and here are the results:
 						=====================
-						${webSearch.context}
+						${webSearchContext.context}
 						=====================
 						${previousQuestions}
 						Answer the question: ${lastMsg.content} 

@@ -26,7 +26,7 @@ export interface RAGUpdate {
 }
 
 export interface WebSearchUpdate extends RAGUpdate {
-	type: "websearch";
+	type: "webSearch";
 	messageType: RAGUpdate["messageType"] | "sources";
 	sources?: WebSearchSource[];
 }
@@ -51,6 +51,7 @@ export type MessageUpdate =
 	| FinalAnswer
 	| TextStreamUpdate
 	| AgentUpdate
-	| RAGUpdate
+	| WebSearchUpdate
+	| PdfSearchUpdate
 	| StatusUpdate
 	| ErrorUpdate;

@@ -17,7 +17,7 @@
 	import type { Model } from "$lib/types/Model";
 
 	import OpenRAGResults from "../OpenRAGResults.svelte";
-	import type { RAGUpdate } from "$lib/types/MessageUpdate";
+	import type { RAGUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { ragTypes } from "$lib/types/rag";
 
 	function sanitizeMd(md: string) {
@@ -117,8 +117,10 @@
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
-	$: webSearchSources =
-		ragUpdates && ragUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
+	$: webSearchSources = (
+		ragUpdates &&
+		(ragUpdates?.filter(({ messageType }) => messageType === "sources")?.[0] as WebSearchUpdate)
+	)?.sources;
 
 	$: if (isCopied) {
 		setTimeout(() => {

@@ -4,6 +4,7 @@ import { downloadImgFile } from "./server/files/downloadFile";
 import type { Conversation } from "./types/Conversation";
 import RAGs from "./server/rag/rag";
 import type { RagContext } from "./types/rag";
+import type { RagContextWebSearch } from "./types/WebSearch";
 
 export type BuildPromptMessage = Pick<Message, "from" | "content" | "files">;
 
@@ -26,7 +27,7 @@ export async function buildPrompt({
 }: buildPromptOptions): Promise<string> {
 	if (ragContext) {
 		const { type: ragType } = ragContext;
-		messages = RAGs[ragType].buildPrompt(messages, ragContext);
+		messages = RAGs[ragType].buildPrompt(messages, ragContext as RagContextWebSearch);
 	}
 
 	// section to handle potential files input

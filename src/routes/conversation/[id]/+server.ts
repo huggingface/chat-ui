@@ -14,6 +14,7 @@ import { summarize } from "$lib/server/summarize";
 import { uploadImgFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
 import RAGs from "$lib/server/rag/rag";
+import type { RagContext } from "$lib/types/rag";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -235,12 +236,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			let webSearchResults: RagContextWebSearch | undefined;
 
 			if (webSearch) {
-				webSearchResults = await RAGs["webSearch"].retrieveRagContext(conv, newPrompt, update);
+				webSearchResults = (await RAGs["webSearch"].retrieveRagContext(
+					conv,
+					newPrompt,
+					update
+				)) as RagContextWebSearch;
 			}
 
 			messages[messages.length - 1].ragContext = webSearchResults;
 
-			let pdfSearchResults: PdfSearch | undefined;
+			let pdfSearchResults: RagContext | undefined;
 			const pdfSearch = await collections.files.findOne({ filename: `${convId.toString()}-pdf` });
 			if (pdfSearch) {
 				pdfSearchResults = await RAGs["pdfChat"].retrieveRagContext(conv, newPrompt, update);
@@ -274,7 +279,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 									{
 										from: "assistant",
 										content: output.token.text.trimStart(),
-										webSearch: webSearchResults,
+										ragContext: webSearchResults,
 										updates: updates,
 										id: (responseId as Message["id"]) || crypto.randomUUID(),
 										createdAt: new Date(),
