@@ -9,7 +9,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
-import type { RAG } from "../RAG";
+import type { RAG } from "../rag";
 import type { BuildPromptMessage } from "$lib/buildPrompt";
 import { format } from "date-fns";
 

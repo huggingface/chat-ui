@@ -13,7 +13,7 @@ import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadImgFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
-import RAGs from "$lib/server/rag/RAG";
+import RAGs from "$lib/server/rag/rag";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);

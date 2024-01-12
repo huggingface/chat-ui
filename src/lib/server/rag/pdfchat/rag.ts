@@ -3,7 +3,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { downloadPdfEmbeddings } from "../../files/downloadFile";
 import { Tensor } from "@xenova/transformers";
-import type { RAG } from "../RAG";
+import type { RAG } from "../rag";
 import type { RagContext } from "$lib/types/rag";
 import type { BuildPromptMessage } from "$lib/buildPrompt";
 

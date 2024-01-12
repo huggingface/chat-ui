@@ -2,7 +2,7 @@ import type { BackendModel } from "./server/models";
 import type { Message } from "./types/Message";
 import { downloadImgFile } from "./server/files/downloadFile";
 import type { Conversation } from "./types/Conversation";
-import RAGs from "./server/rag/RAG";
+import RAGs from "./server/rag/rag";
 import type { RagContext } from "./types/rag";
 
 export type BuildPromptMessage = Pick<Message, "from" | "content" | "files">;
