@@ -6,6 +6,7 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
+import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -22,6 +23,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		})
 		.parse(JSON.parse(body));
 
+	let embeddingModel: string;
+
 	if (values.fromShare) {
 		const conversation = await collections.sharedConversations.findOne({
 			_id: values.fromShare,
@@ -36,6 +39,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		values.model = conversation.model;
 		values.preprompt = conversation.preprompt;
 		values.assistantId = conversation.assistantId?.toString();
+		embeddingModel = conversation.embeddingModel;
 	}
 
 	const model = models.find((m) => m.name === values.model);
@@ -43,6 +47,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!model) {
 		throw error(400, "Invalid model");
 	}
+
+	embeddingModel ??= model.embeddingModel ?? defaultEmbeddingModel.name;
 
 	if (model.unlisted) {
 		throw error(400, "Can't start a conversation with an unlisted model");
@@ -69,6 +75,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		assistantId: values.assistantId ? new ObjectId(values.assistantId) : undefined,
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		embeddingModel: embeddingModel,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});

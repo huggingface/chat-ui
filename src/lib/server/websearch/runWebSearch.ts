@@ -4,13 +4,11 @@ import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
-import {
-	MAX_SEQ_LEN as CHUNK_CAR_LEN,
-	findSimilarSentences,
-} from "$lib/server/websearch/sentenceSimilarity";
+import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
+import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -48,14 +46,28 @@ export async function runWebSearch(
 		webSearch.results =
 			(results.organic_results &&
 				results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
-					const { title, link, text } = el;
-					const { hostname } = new URL(link);
-					return { title, link, hostname, text };
+					try {
+						const { title, link, text } = el;
+						const { hostname } = new URL(link);
+						return { title, link, hostname, text };
+					} catch (e) {
+						// Ignore Errors
+						return null;
+					}
 				})) ??
 			[];
+		webSearch.results = webSearch.results.filter((value) => value !== null);
 		webSearch.results = webSearch.results
 			.filter(({ link }) => !DOMAIN_BLOCKLIST.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
+
+		// fetch the model
+		const embeddingModel =
+			embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
+
+		if (!embeddingModel) {
+			throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
+		}
 
 		let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
 		if (webSearch.results.length > 0) {
@@ -72,7 +84,7 @@ export async function runWebSearch(
 					}
 				}
 				const MAX_N_CHUNKS = 100;
-				const texts = chunk(text, CHUNK_CAR_LEN).slice(0, MAX_N_CHUNKS);
+				const texts = chunk(text, embeddingModel.chunkCharLength).slice(0, MAX_N_CHUNKS);
 				return texts.map((t) => ({ source: result, text: t }));
 			});
 			const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
@@ -87,7 +99,7 @@ export async function runWebSearch(
 		appendUpdate("Extracting relevant information");
 		const topKClosestParagraphs = 8;
 		const texts = paragraphChunks.map(({ text }) => text);
-		const indices = await findSimilarSentences(prompt, texts, {
+		const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
 			topK: topKClosestParagraphs,
 		});
 		webSearch.context = indices.map((idx) => texts[idx]).join("");

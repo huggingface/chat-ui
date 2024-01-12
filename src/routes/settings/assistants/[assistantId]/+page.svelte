@@ -37,9 +37,9 @@
 			/>
 		{:else}
 			<div
-				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 text-4xl font-bold text-gray-500"
+				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 text-4xl font-bold uppercase text-gray-500"
 			>
-				{assistant?.name[0].toLocaleUpperCase()}
+				{assistant?.name[0]}
 			</div>
 		{/if}
 

@@ -7,10 +7,9 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import sizeof from "image-size";
 import { sha256 } from "$lib/utils/sha256";
-import { HfInference } from "@huggingface/inference";
-import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN, TEXT_TO_IMAGE_MODEL } from "$env/static/private";
-import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
+import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN } from "$env/static/private";
 import { timeout } from "$lib/utils/timeout";
+import { generateAvatar } from "$lib/utils/generateAvatar";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -44,27 +43,6 @@ const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string
 		setTimeout(() => reject(new Error("Upload timed out")), 10000);
 	});
 };
-
-async function generateAvatar(description?: string, name?: string): Promise<File> {
-	const queryPrompt = `Generate a prompt for an image-generation model for the following: 
-Name: ${name}
-Description: ${description}
-`;
-	const imagePrompt = await generateFromDefaultEndpoint({
-		messages: [{ from: "user", content: queryPrompt }],
-		preprompt:
-			"You are an assistant tasked with generating simple image descriptions. The user will ask you for an image, based on the name and a description of what they want, and you should reply with a short, concise, safe, descriptive sentence.",
-	});
-
-	const hf = new HfInference(HF_TOKEN);
-
-	const blob = await hf.textToImage({
-		inputs: imagePrompt,
-		model: TEXT_TO_IMAGE_MODEL,
-	});
-
-	return new File([blob], "avatar.png");
-}
 
 export const actions: Actions = {
 	default: async ({ request, locals }) => {
@@ -106,7 +84,13 @@ export const actions: Actions = {
 			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
 
 			if ((dims.height ?? 1000) > 512 || (dims.width ?? 1000) > 512) {
-				const errors = [{ field: "avatar", message: "Avatar too big" }];
+				const errors = [
+					{
+						field: "avatar",
+						message:
+							"Avatar is too big. Please make sure the size of your avatar is no bigger than 512px by 512px.",
+					},
+				];
 				return fail(400, { error: true, errors });
 			}
 

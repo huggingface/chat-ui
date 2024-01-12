@@ -6,6 +6,8 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
 	import { applyAction, enhance } from "$app/forms";
+	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
+	import { page } from "$app/stores";
 
 	export let data: PageData;
 
@@ -19,6 +21,21 @@
 
 	const settings = useSettingsStore();
 </script>
+
+<svelte:head>
+	<meta property="og:title" content={data.assistant.name + " - " + PUBLIC_APP_NAME} />
+	<meta property="og:type" content="link" />
+	<meta
+		property="og:description"
+		content={`Use the ${data.assistant.name} assistant inside of ${PUBLIC_APP_NAME}`}
+	/>
+	<meta
+		property="og:image"
+		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/assistant/{data.assistant._id}/thumbnail.png"
+	/>
+	<meta property="og:url" content={$page.url.href} />
+	<meta name="twitter:card" content="summary_large_image" />
+</svelte:head>
 
 <div
 	class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
@@ -38,9 +55,9 @@
 			/>
 		{:else}
 			<div
-				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold text-gray-500"
+				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 			>
-				{data.assistant.name[0].toLocaleUpperCase()}
+				{data.assistant.name[0]}
 			</div>
 		{/if}
 		<h1 class="text-2xl font-bold">

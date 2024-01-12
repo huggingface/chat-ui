@@ -7,7 +7,6 @@ export const GET: RequestHandler = async ({ params }) => {
 		_id: new ObjectId(params.assistantId),
 	});
 
-	// check user
 	if (!assistant) {
 		throw error(404, "No assistant found");
 	}

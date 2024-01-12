@@ -4,7 +4,7 @@
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import { base } from "$app/paths";
-	import { PUBLIC_ORIGIN } from "$env/static/public";
+	import { PUBLIC_APP_DESCRIPTION, PUBLIC_ORIGIN } from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -121,13 +121,19 @@
 	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
-	<meta property="og:title" content={PUBLIC_APP_NAME} />
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
-	<meta
-		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/thumbnail.png"
-	/>
+
+	<!-- use those meta tags everywhere except on the share assistant page -->
+	<!-- feel free to refacto if there's a better way -->
+	{#if !$page.url.pathname.includes("/assistant/")}
+		<meta property="og:title" content={PUBLIC_APP_NAME} />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
+		<meta
+			property="og:image"
+			content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/thumbnail.png"
+		/>
+		<meta property="og:description" content={PUBLIC_APP_DESCRIPTION} />
+	{/if}
 	<link
 		rel="icon"
 		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.ico"

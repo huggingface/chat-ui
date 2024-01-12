@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import {
 	SERPAPI_KEY,
 	SERPER_API_KEY,
+	SERPSTACK_API_KEY,
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
@@ -66,7 +67,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
 
-	const disableAssistants = !(ENABLE_ASSISTANTS === "true");
+	const enableAssistants = ENABLE_ASSISTANTS === "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
@@ -102,18 +103,33 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
 	return {
-		conversations: conversations.map((conv) => ({
-			id: conv._id.toString(),
-			title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
-			model: conv.model ?? defaultModel,
-			updatedAt: conv.updatedAt,
-			assistantId: conv.assistantId?.toString(),
-			avatarHash:
-				conv.assistantId &&
-				assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
-		})) satisfies Array<ConvSidebar>,
+		conversations: conversations.map((conv) => {
+			if (settings?.hideEmojiOnSidebar) {
+				conv.title = conv.title.replace(/\p{Emoji}/gu, "");
+			}
+
+			// remove invalid unicode and trim whitespaces
+			conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
+
+			return {
+				id: conv._id.toString(),
+				title: conv.title,
+				model: conv.model ?? defaultModel,
+				updatedAt: conv.updatedAt,
+				assistantId: conv.assistantId?.toString(),
+				avatarHash:
+					conv.assistantId &&
+					assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
+			};
+		}) satisfies ConvSidebar[],
 		settings: {
-			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
+			searchEnabled: !!(
+				SERPAPI_KEY ||
+				SERPER_API_KEY ||
+				SERPSTACK_API_KEY ||
+				YDC_API_KEY ||
+				USE_LOCAL_WEBSEARCH
+			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
@@ -147,8 +163,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			email: locals.user.email,
 		},
 		assistant,
-		disableAssistants,
 		avatarGeneration: ASSISTANTS_GENERATE_AVATAR === "true" && TEXT_TO_IMAGE_MODEL !== "",
+		enableAssistants,
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
