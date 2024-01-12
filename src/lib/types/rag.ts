@@ -5,7 +5,7 @@ import type { Timestamps } from "./Timestamps";
 export interface RagContext extends Timestamps {
 	_id?: ObjectId;
 	convId?: Conversation["_id"];
-	type: RAGType
+	type: RAGType;
 	context: string;
 }
 

@@ -24,7 +24,7 @@ export async function buildPrompt({
 	preprompt,
 	id,
 }: buildPromptOptions): Promise<string> {
-	if(ragContext){
+	if (ragContext) {
 		const { type: ragType } = ragContext;
 		messages = RAGs[ragType].buildPrompt(messages, ragContext);
 	}

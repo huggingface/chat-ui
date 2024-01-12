@@ -54,7 +54,7 @@ async function runPdfSearch(
 	return pdfSearch;
 }
 
-function buildPrompt(messages: BuildPromptMessage[], context: RagContext){
+function buildPrompt(messages: BuildPromptMessage[], context: RagContext) {
 	const lastMsg = messages.slice(-1)[0];
 	const messagesWithoutLastUsrMsg = messages.slice(0, -1);
 	const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
@@ -83,7 +83,7 @@ function buildPrompt(messages: BuildPromptMessage[], context: RagContext){
 }
 
 export const ragPdfchat: RAG = {
-	type: "pdfChat", 
+	type: "pdfChat",
 	retrieveRagContext: runPdfSearch,
 	buildPrompt,
-}
+};

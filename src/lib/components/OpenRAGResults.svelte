@@ -13,9 +13,9 @@
 	export let ragUpdates: RAGUpdate[] = [];
 
 	const TITLE_MAPPING: Record<RAGType, string> = {
-		webSearch: "Web search", 
-		pdfChat: "PDF Chat"
-	}
+		webSearch: "Web search",
+		pdfChat: "PDF Chat",
+	};
 
 	let detailsOpen: boolean;
 	let error: boolean;
@@ -24,7 +24,8 @@
 	$: ragType = ragUpdates[0].type;
 
 	$: loading =
-		ragUpdates.length > 0 && !["sources", "done"].includes(ragUpdates[ragUpdates.length - 1].messageType);
+		ragUpdates.length > 0 &&
+		!["sources", "done"].includes(ragUpdates[ragUpdates.length - 1].messageType);
 </script>
 
 <details

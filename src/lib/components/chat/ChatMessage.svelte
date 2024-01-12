@@ -118,8 +118,7 @@
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
 	$: webSearchSources =
-		ragUpdates &&
-		ragUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
+		ragUpdates && ragUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
 
 	$: if (isCopied) {
 		setTimeout(() => {

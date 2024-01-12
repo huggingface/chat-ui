@@ -23,18 +23,17 @@ export interface RAGUpdate {
 	messageType: "update" | "error" | "done" | string;
 	message: string;
 	args?: string[];
-};
+}
 
 export interface WebSearchUpdate extends RAGUpdate {
-	type: "websearch",
+	type: "websearch";
 	messageType: RAGUpdate["messageType"] | "sources";
 	sources?: WebSearchSource[];
-};
+}
 
 export interface PdfSearchUpdate extends RAGUpdate {
 	type: "pdfChat";
-};
-
+}
 
 export type StatusUpdate = {
 	type: "status";
