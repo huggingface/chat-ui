@@ -3,7 +3,7 @@ import { collections } from "../database";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 
-export async function downloadFile(
+export async function downloadImgFile(
 	sha256: string,
 	convId: Conversation["_id"] | SharedConversation["_id"]
 ) {
@@ -33,4 +33,37 @@ export async function downloadFile(
 	});
 
 	return { content, mime };
+}
+
+export async function downloadPdfEmbeddings(
+	convId: Conversation["_id"] | SharedConversation["_id"]
+) {
+	const fileId = collections.bucket.find({ filename: `${convId.toString()}-pdf` });
+	let textChunks: string[] = [];
+	let dims: number[] = [];
+
+	const content = await fileId.next().then(async (file) => {
+		if (!file) {
+			throw error(404, "File not found");
+		}
+		if (file.metadata?.conversation !== convId.toString()) {
+			throw error(403, "You don't have access to this file.");
+		}
+
+		textChunks = file.metadata?.textChunks;
+		dims = file.metadata?.dims;
+
+		const fileStream = collections.bucket.openDownloadStream(file._id);
+
+		const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+			const chunks: Uint8Array[] = [];
+			fileStream.on("data", (chunk) => chunks.push(chunk));
+			fileStream.on("error", reject);
+			fileStream.on("end", () => resolve(Buffer.concat(chunks)));
+		});
+
+		return fileBuffer;
+	});
+
+	return { content, textChunks, dims };
 }

@@ -4,7 +4,7 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { RequestHandler } from "./$types";
-import { downloadFile } from "$lib/server/files/downloadFile";
+import { downloadImgFile } from "$lib/server/files/downloadFile";
 
 export const GET: RequestHandler = async ({ locals, params }) => {
 	const sha256 = z.string().parse(params.sha256);
@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		}
 	}
 
-	const { content, mime } = await downloadFile(sha256, params.id);
+	const { content, mime } = await downloadImgFile(sha256, params.id);
 
 	return new Response(content, {
 		headers: {

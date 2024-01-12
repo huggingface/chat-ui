@@ -16,7 +16,7 @@
 	import type { Model } from "$lib/types/Model";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { RAGUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/stores";
 	import DisclaimerModal from "../DisclaimerModal.svelte";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -24,6 +24,8 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import type { PdfUpload } from "$lib/types/PdfChat";
+	import UploadedPdfStatus from "../UploadedPdfStatus.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -31,9 +33,10 @@
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let RAGMessages: RAGUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
+	export let pdfUpload: PdfUpload | undefined = undefined;
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
@@ -114,7 +117,7 @@
 		{messages}
 		readOnly={isReadOnly}
 		isAuthor={!shared}
-		{webSearchMessages}
+		{RAGMessages}
 		{preprompt}
 		on:message={(ev) => {
 			if ($page.data.loginRequired) {
@@ -173,9 +176,21 @@
 								content: messages[messages.length - 1].content,
 							})}
 					/>
-				{:else if currentModel.multimodal}
-					<UploadBtn bind:files classNames="ml-auto" />
 				{/if}
+				<div class="ml-auto flex items-center gap-x-3">
+					{#if $page.data.enablePdfChat && pdfUpload?.name}
+						<UploadedPdfStatus on:deletepdf {pdfUpload} />
+					{/if}
+					{#if currentModel.multimodal || $page.data.enablePdfChat}
+						<UploadBtn
+							bind:files
+							on:uploadpdf
+							multimodal={currentModel.multimodal}
+							pdfChat={$page.data.enablePdfChat}
+							{pdfUpload}
+						/>
+					{/if}
+				</div>
 			</div>
 			<form
 				on:dragover={onDragOver}

@@ -1,6 +1,6 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
-import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
+import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
 import { z } from "zod";
 import JSON5 from "json5";

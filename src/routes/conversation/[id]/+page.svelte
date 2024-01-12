@@ -13,15 +13,16 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate, RAGUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
+	import { PdfUploadStatus, type PdfUpload } from "$lib/types/PdfChat";
 	export let data;
 
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
 
-	let webSearchMessages: WebSearchUpdate[] = [];
+	let RAGMessages: RAGUpdate[] = [];
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -31,6 +32,7 @@
 
 	let loading = false;
 	let pending = false;
+	let pdfUpload: PdfUpload | undefined = undefined;
 
 	let files: File[] = [];
 
@@ -194,8 +196,8 @@
 									lastMessage.content += update.token;
 									messages = [...messages];
 								}
-							} else if (update.type === "webSearch") {
-								webSearchMessages = [...webSearchMessages, update];
+							} else if (update.type === "webSearch" || update.type === "pdfChat") {
+								RAGMessages = [...RAGMessages, update];
 							} else if (update.type === "status") {
 								if (update.status === "title" && update.message) {
 									const conv = data.conversations.find(({ id }) => id === $page.params.id);
@@ -226,8 +228,8 @@
 				});
 			}
 
-			// reset the websearchMessages
-			webSearchMessages = [];
+			// reset the RAGMessages
+			RAGMessages = [];
 
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
@@ -273,11 +275,48 @@
 		}
 	}
 
+	async function uploadPdf(file: File) {
+		pdfUpload = { status: PdfUploadStatus.Uploading, name: file.name };
+
+		const formData = new FormData();
+		formData.append("pdf", file);
+
+		const res = await fetch(`${base}/conversation/${$page.params.id}/upload-pdf`, {
+			method: "POST",
+			body: formData,
+		});
+
+		if (!res.ok) {
+			error.set("Error while uploading PDF, try again.");
+			console.error("Error while uploading PDF: " + (await res.text()));
+		}
+
+		pdfUpload.status = PdfUploadStatus.Uploaded;
+	}
+
+	async function deletePdf() {
+		pdfUpload = undefined;
+
+		const res = await fetch(`${base}/conversation/${$page.params.id}/upload-pdf`, {
+			method: "DELETE",
+		});
+
+		if (!res.ok) {
+			error.set("Error while deleting PDF, try again.");
+			console.error("Error while deleting PDF: " + (await res.text()));
+		}
+	}
+
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
-			await writeMessage($pendingMessage.content);
+			if ($pendingMessage.content) {
+				await writeMessage($pendingMessage.content);
+			}
+			if ($pendingMessage.pdfFile) {
+				await uploadPdf($pendingMessage.pdfFile);
+			}
 			$pendingMessage = undefined;
 		}
 	});
@@ -328,11 +367,14 @@
 	{messages}
 	shared={data.shared}
 	preprompt={data.preprompt}
-	bind:webSearchMessages
+	bind:RAGMessages
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
+	on:uploadpdf={(event) => uploadPdf(event.detail)}
+	on:deletepdf={deletePdf}
+	{pdfUpload}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}

@@ -1,21 +1,24 @@
-import { searchWeb } from "$lib/server/websearch/searchWeb";
+import { searchWeb } from "$lib/server/rag/websearch/searchWeb";
 import type { Message } from "$lib/types/Message";
-import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
-import { generateQuery } from "$lib/server/websearch/generateQuery";
-import { parseWeb } from "$lib/server/websearch/parseWeb";
+import type { RagContextWebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import { generateQuery } from "$lib/server/rag/websearch/generateQuery";
+import { parseWeb } from "$lib/server/rag/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
+import type { RAG } from "../rag";
+import type { BuildPromptMessage } from "$lib/buildPrompt";
+import { format } from "date-fns";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
 
 const DOMAIN_BLOCKLIST = ["youtube.com", "twitter.com"];
 
-export async function runWebSearch(
+async function runWebSearch(
 	conv: Conversation,
 	prompt: string,
 	updatePad: (upd: MessageUpdate) => void
@@ -24,7 +27,8 @@ export async function runWebSearch(
 		return [...conv.messages, { content: prompt, from: "user", id: crypto.randomUUID() }];
 	})() satisfies Message[];
 
-	const webSearch: WebSearch = {
+	const webSearch: RagContextWebSearch = {
+		type: "webSearch",
 		prompt: prompt,
 		searchQuery: "",
 		results: [],
@@ -130,3 +134,37 @@ export async function runWebSearch(
 
 	return webSearch;
 }
+
+function buildPrompt(messages: BuildPromptMessage[], context: RagContextWebSearch) {
+	const lastMsg = messages.slice(-1)[0];
+	const messagesWithoutLastUsrMsg = messages.slice(0, -1);
+	const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
+
+	const previousQuestions =
+		previousUserMessages.length > 0
+			? `Previous questions: \n${previousUserMessages
+					.map(({ content }) => `- ${content}`)
+					.join("\n")}`
+			: "";
+	const currentDate = format(new Date(), "MMMM d, yyyy");
+	messages = [
+		...messagesWithoutLastUsrMsg,
+		{
+			from: "user",
+			content: `I searched the web using the query: ${context.searchQuery}. Today is ${currentDate} and here are the results:
+			=====================
+			${context.context}
+			=====================
+			${previousQuestions}
+			Answer the question: ${lastMsg.content} 
+			`,
+		},
+	];
+	return messages;
+}
+
+export const ragWebsearch: RAG<RagContextWebSearch> = {
+	type: "webSearch",
+	retrieveRagContext: runWebSearch,
+	buildPrompt,
+};

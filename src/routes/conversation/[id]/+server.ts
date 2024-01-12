@@ -8,12 +8,13 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import type { WebSearch } from "$lib/types/WebSearch";
+import type { RagContextWebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
-import { uploadFile } from "$lib/server/files/uploadFile";
+import { uploadImgFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
+import RAGs from "$lib/server/rag/rag";
+import type { RagContext } from "$lib/types/rag";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -135,7 +136,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	let hashes: undefined | string[];
 
 	if (files) {
-		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
+		hashes = await Promise.all(files.map(async (file) => await uploadImgFile(file, conv)));
 	}
 
 	// get the list of messages
@@ -232,13 +233,25 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			);
 
-			let webSearchResults: WebSearch | undefined;
+			let webSearchResults: RagContextWebSearch | undefined;
 
 			if (webSearch) {
-				webSearchResults = await runWebSearch(conv, newPrompt, update);
+				webSearchResults = (await RAGs["webSearch"].retrieveRagContext(
+					conv,
+					newPrompt,
+					update
+				)) as RagContextWebSearch;
 			}
 
-			messages[messages.length - 1].webSearch = webSearchResults;
+			messages[messages.length - 1].ragContext = webSearchResults;
+
+			let pdfSearchResults: RagContext | undefined;
+			const pdfSearch = await collections.files.findOne({ filename: `${convId.toString()}-pdf` });
+			if (pdfSearch) {
+				pdfSearchResults = await RAGs["pdfChat"].retrieveRagContext(conv, newPrompt, update);
+			}
+
+			messages[messages.length - 1].ragContext = pdfSearchResults;
 
 			conv.messages = messages;
 
@@ -266,7 +279,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 									{
 										from: "assistant",
 										content: output.token.text.trimStart(),
-										webSearch: webSearchResults,
+										ragContext: webSearchResults,
 										updates: updates,
 										id: (responseId as Message["id"]) || crypto.randomUUID(),
 										createdAt: new Date(),

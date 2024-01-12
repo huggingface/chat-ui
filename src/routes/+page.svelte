@@ -14,7 +14,7 @@
 
 	const settings = useSettingsStore();
 
-	async function createConversation(message: string) {
+	async function createConversation() {
 		try {
 			loading = true;
 			const res = await fetch(`${base}/conversation`, {
@@ -36,12 +36,6 @@
 
 			const { conversationId } = await res.json();
 
-			// Ugly hack to use a store as temp storage, feel free to improve ^^
-			pendingMessage.set({
-				content: message,
-				files,
-			});
-
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (err) {
@@ -51,6 +45,25 @@
 			loading = false;
 		}
 	}
+
+	async function createConversationWithMsg(message: string) {
+		// Ugly hack to use a store as temp storage, feel free to improve ^^
+		pendingMessage.set({
+			content: message,
+			files,
+		});
+
+		await createConversation();
+	}
+
+	async function createConversationWithPdf(pdfFile: File) {
+		pendingMessage.set({
+			files,
+			pdfFile,
+		});
+
+		await createConversation();
+	}
 </script>
 
 <svelte:head>
@@ -58,7 +71,8 @@
 </svelte:head>
 
 <ChatWindow
-	on:message={(ev) => createConversation(ev.detail)}
+	on:message={(ev) => createConversationWithMsg(ev.detail)}
+	on:uploadpdf={(ev) => createConversationWithPdf(ev.detail)}
 	{loading}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], $settings.activeModel)}
 	models={data.models}
