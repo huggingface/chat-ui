@@ -4,10 +4,12 @@
 	import type { Assistant } from "$lib/types/Assistant";
 
 	import { onMount } from "svelte";
-	import { enhance } from "$app/forms";
+	import { applyAction, enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { page } from "$app/stores";
+	import IconLoading from "./icons/IconLoading.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -49,6 +51,10 @@
 	function getError(field: string, returnForm: ActionData) {
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
+
+	let loading = false;
+
+	let generateAvatar = false;
 </script>
 
 <form
@@ -56,6 +62,7 @@
 	class="h-full w-full overflow-x-clip"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
+		loading = true;
 		const avatar = formData.get("avatar");
 
 		if (avatar && typeof avatar !== "string" && avatar.size > 0 && compress) {
@@ -67,6 +74,11 @@
 				formData.set("avatar", resizedImage);
 			});
 		}
+
+		return async ({ result }) => {
+			loading = false;
+			await applyAction(result);
+		};
 	}}
 >
 	{#if assistant}
@@ -90,6 +102,7 @@
 					accept="image/*"
 					name="avatar"
 					class="invisible z-10 block h-0 w-0"
+					disabled={generateAvatar}
 					on:change={onFilesChange}
 				/>
 				{#if (files && files[0]) || assistant?.avatar}
@@ -122,9 +135,24 @@
 						Reset
 					</button>
 				{:else}
-					<span class="text-xs text-gray-500 hover:underline">Click to upload</span>
+					<span
+						class="text-xs text-gray-500"
+						class:hover:underline={!generateAvatar}
+						class:cursor-pointer={!generateAvatar}>Click to upload</span
+					>
 				{/if}
 				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
+				{#if !files?.[0] && $page.data.avatarGeneration && !assistant?.avatar}
+					<label class="text-xs text-gray-500">
+						<input
+							type="checkbox"
+							name="generateAvatar"
+							class="text-xs text-gray-500"
+							bind:checked={generateAvatar}
+						/>
+						Generate avatar from description
+					</label>
+				{/if}
 			</label>
 
 			<label>
@@ -220,8 +248,19 @@
 			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
 		>
 
-		<button type="submit" class="rounded-full bg-black px-8 py-2 font-semibold text-white md:px-20"
-			>{assistant ? "Save" : "Create"}</button
+		<button
+			type="submit"
+			disabled={loading}
+			aria-disabled={loading}
+			class="rounded-full bg-black px-8 py-2 font-semibold md:px-20"
+			class:bg-gray-200={loading}
+			class:text-gray-600={loading}
+			class:text-white={!loading}
 		>
+			{assistant ? "Save" : "Create"}
+			{#if loading}
+				<IconLoading classNames="ml-2 h-min" />
+			{/if}
+		</button>
 	</div>
 </form>
