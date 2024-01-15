@@ -11,6 +11,6 @@ export async function GET({ locals }) {
 
 		return Response.json(res);
 	} else {
-		return Response.error();
+		return Response.json({ error: "Must have session cookie" }, { status: 401 });
 	}
 }
