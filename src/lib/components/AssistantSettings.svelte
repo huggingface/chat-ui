@@ -53,6 +53,8 @@
 	}
 
 	let loading = false;
+
+	let generateAvatar = false;
 </script>
 
 <form
@@ -100,6 +102,7 @@
 					accept="image/*"
 					name="avatar"
 					class="invisible z-10 block h-0 w-0"
+					disabled={generateAvatar}
 					on:change={onFilesChange}
 				/>
 				{#if (files && files[0]) || assistant?.avatar}
@@ -132,13 +135,22 @@
 						Reset
 					</button>
 				{:else}
-					<span class="text-xs text-gray-500 hover:underline">Click to upload</span>
+					<span
+						class="text-xs text-gray-500"
+						class:hover:underline={!generateAvatar}
+						class:cursor-pointer={!generateAvatar}>Click to upload</span
+					>
 				{/if}
 				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 				{#if !files?.[0] && $page.data.avatarGeneration && !assistant?.avatar}
 					<label class="text-xs text-gray-500">
-						<input type="checkbox" name="generateAvatar" class="text-xs text-gray-500" />
-						Generate avatar using a text-to-image model.
+						<input
+							type="checkbox"
+							name="generateAvatar"
+							class="text-xs text-gray-500"
+							bind:checked={generateAvatar}
+						/>
+						Generate avatar from description
 					</label>
 				{/if}
 			</label>
