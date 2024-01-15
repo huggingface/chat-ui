@@ -163,7 +163,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			email: locals.user.email,
 		},
 		assistant,
-		avatarGeneration: ASSISTANTS_GENERATE_AVATAR === "true" && !TEXT_TO_IMAGE_MODEL,
+		avatarGeneration: ASSISTANTS_GENERATE_AVATAR === "true" && !!TEXT_TO_IMAGE_MODEL,
 		enableAssistants,
 		loginRequired,
 		loginEnabled: requiresUser,
