@@ -135,7 +135,7 @@
 					<span class="text-xs text-gray-500 hover:underline">Click to upload</span>
 				{/if}
 				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
-				{#if (!files || !files[0]) && $page.data.avatarGeneration && !assistant?.avatar}
+				{#if !files?.[0] && $page.data.avatarGeneration && !assistant?.avatar}
 					<label class="text-xs text-gray-500">
 						<input type="checkbox" name="generateAvatar" class="text-xs text-gray-500" />
 						Generate avatar using a text-to-image model.
