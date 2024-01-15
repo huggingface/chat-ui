@@ -1,10 +1,11 @@
 import { collections } from "$lib/server/database";
+import { authCondition } from "$lib/server/auth";
 
 export async function GET({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
 		const res = await collections.conversations
 			.find({
-				...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
+				...authCondition(locals),
 			})
 			.toArray();
 
