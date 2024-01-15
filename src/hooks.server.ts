@@ -13,7 +13,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (event.url.pathname.startsWith(`${base}/api`) && EXPOSE_API !== "true") {
+	if (event.url.pathname.startsWith(`${base}/api/`) && EXPOSE_API !== "true") {
 		return new Response("API is disabled", { status: 403 });
 	}
 
