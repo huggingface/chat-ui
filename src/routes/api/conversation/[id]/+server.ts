@@ -14,7 +14,21 @@ export async function GET({ locals, params }) {
 		});
 
 		if (conv) {
-			return Response.json(conv);
+			const res = {
+				id: conv._id,
+				title: conv.title,
+				updatedAt: conv.updatedAt,
+				modelId: conv.model,
+				messages: conv.messages.map((message) => ({
+					content: message.content,
+					from: message.from,
+					id: message.id,
+					createdAt: message.createdAt,
+					updatedAt: message.updatedAt,
+					webSearch: message.webSearch,
+				})),
+			};
+			return Response.json(res);
 		} else {
 			return Response.json({ message: "Conversation not found" }, { status: 404 });
 		}
