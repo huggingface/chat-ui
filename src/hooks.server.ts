@@ -1,4 +1,4 @@
-import { COOKIE_NAME, MESSAGES_BEFORE_LOGIN } from "$env/static/private";
+import { COOKIE_NAME, EXPOSE_API, MESSAGES_BEFORE_LOGIN } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
@@ -13,6 +13,10 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (event.url.pathname.startsWith(`${base}/api/`) && EXPOSE_API !== "true") {
+		return new Response("API is disabled", { status: 403 });
+	}
+
 	function errorResponse(status: number, message: string) {
 		const sendJson =
 			event.request.headers.get("accept")?.includes("application/json") ||
