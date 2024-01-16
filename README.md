@@ -29,16 +29,23 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 
 If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
 
+<details>
+  <summary>More info</summary>
+
 You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
 
 Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
+</details>
 
 ## Setup
 
 The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. This is done in `.env.local`.
 
+<details>
+  <summary>More info</summary>
+  
 Start by creating a `.env.local` file in the root of the repository. The bare minimum config you need to get Chat UI to run locally is the following:
 
 ```env
@@ -63,6 +70,8 @@ Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricin
 ### Hugging Face Access Token
 
 If you use a remote inference endpoint, you will need a Hugging Face access token to run Chat UI locally. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
+</details>
+
 
 ## Launch
 
@@ -75,17 +84,25 @@ npm run dev
 
 ## Web Search
 
-Chat UI features a powerful Web Search feature. It works by:
+Chat UI features a powerful Web Search feature. 
 
+<details>
+  <summary>More info</summary>
+
+It works by:
 1. Generating an appropriate search query from the user prompt.
 2. Performing web search and extracting content from webpages.
 3. Creating embeddings from texts using a text embedding model.
 4. From these embeddings, find the ones that are closest to the user query using a vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that an LLM can use this information).
+</details>
 
 ## Text Embedding Models
 
 By default (for backward compatibility), when `TEXT_EMBEDDING_MODELS` environment variable is not defined, [transformers.js](https://huggingface.co/docs/transformers.js) embedding models will be used for embedding tasks, specifically, [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) model.
+
+<details>
+  <summary>More info</summary>
 
 You can customize the embedding model by setting `TEXT_EMBEDDING_MODELS` in your `.env.local` file. For example:
 
@@ -122,9 +139,13 @@ The required fields are `name`, `chunkCharLength` and `endpoints`.
 Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js) and [`TEI`](https://github.com/huggingface/text-embeddings-inference). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint.
 
 When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModel` to the name of the model.
+</details>
+
 
 ## Extra parameters
 
+<details>
+  <summary>More info</summary>
 ### OpenID connect
 
 The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
@@ -504,6 +525,8 @@ MODELS=`[
   }
 ]`
 ```
+</details>
+
 
 ## Deploying to a HF Space
 
@@ -516,6 +539,9 @@ To create a production version of your app:
 ```bash
 npm run build
 ```
+
+<details>
+  <summary>More info</summary>
 
 You can preview the production build with `npm run preview`.
 
@@ -546,3 +572,4 @@ npm run updateLocalEnv
 ```
 
 This will replace your `.env.local` file with the one that will be used in prod (simply taking `.env.template + .env.SECRET_CONFIG`).
+</details>
