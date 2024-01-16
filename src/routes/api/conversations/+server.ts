@@ -1,5 +1,6 @@
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
+import type { Conversation } from "$lib/types/Conversation";
 
 export async function GET({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
@@ -7,7 +8,7 @@ export async function GET({ locals }) {
 			.find({
 				...authCondition(locals),
 			})
-			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "modelId">>({
+			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
 				title: 1,
 				updatedAt: 1,
 				model: 1,
