@@ -7,6 +7,7 @@ export async function GET({ locals }) {
 			.find({
 				...authCondition(locals),
 			})
+			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "modelId">>({title: 1, updatedAt: 1, model: 1})
 			.sort({ updatedAt: -1 })
 			.toArray();
 
