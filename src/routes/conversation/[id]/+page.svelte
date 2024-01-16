@@ -111,14 +111,12 @@
 
 			files = [];
 
-			const responseId = randomUUID();
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					inputs: message,
 					id: messageId,
-					response_id: responseId,
 					is_retry: isRetry,
 					web_search: $webSearchParameters.useSearch,
 					files: isRetry ? undefined : resizedImages,

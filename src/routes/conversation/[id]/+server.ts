@@ -90,7 +90,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	const {
 		inputs: newPrompt,
-		response_id: responseId,
 		id: messageId,
 		is_retry,
 		web_search: webSearch,
@@ -99,7 +98,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		.object({
 			inputs: z.string().trim().min(1),
 			id: z.optional(z.string().uuid()),
-			response_id: z.optional(z.string().uuid()),
 			is_retry: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
 			files: z.optional(z.array(z.string())),
@@ -268,7 +266,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 										content: output.token.text.trimStart(),
 										webSearch: webSearchResults,
 										updates: updates,
-										id: (responseId as Message["id"]) || crypto.randomUUID(),
+										id: crypto.randomUUID(),
 										createdAt: new Date(),
 										updatedAt: new Date(),
 									},
