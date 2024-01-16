@@ -7,6 +7,7 @@ export async function GET({ locals }) {
 			.find({
 				...authCondition(locals),
 			})
+			.sort({ updatedAt: -1 })
 			.toArray();
 
 		return Response.json(res);
