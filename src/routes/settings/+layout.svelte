@@ -33,7 +33,7 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-10 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
+		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-8 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
 	>
 		<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
 			<h2 class="text-xl font-bold">Settings</h2>
@@ -60,7 +60,7 @@
 					<div class="truncate">{model.displayName}</div>
 					{#if model.id === $settings.activeModel}
 						<div
-							class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
 						>
 							Active
 						</div>
@@ -91,7 +91,7 @@
 						<div class="truncate">{assistant.name}</div>
 						{#if assistant._id.toString() === $settings.activeModel}
 							<div
-								class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
 							>
 								Active
 							</div>

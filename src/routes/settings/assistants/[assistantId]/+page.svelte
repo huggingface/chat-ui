@@ -124,40 +124,34 @@
 
 	<div class="mt-5 flex gap-4">
 		{#if assistant?.createdByMe}
-			<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline">
-				<CarbonPen class="mr-1.5 inline" />
-				Edit assistant
-			</a>
+			<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
+				><CarbonPen class="mr-1.5 inline" />Edit assistant</a
+			>
 			<form method="POST" action="?/delete" use:enhance>
 				<button type="submit" class="flex items-center underline">
-					<CarbonTrash class="mr-1.5 inline" />
-					Delete assistant</button
+					<CarbonTrash class="mr-1.5 inline" />Delete assistant</button
 				>
 			</form>
 		{:else}
 			<form method="POST" action="?/unsubscribe" use:enhance>
 				<button type="submit" class="underline">
-					<CarbonTrash class="mr-1.5 inline" />
-					Remove assistant</button
+					<CarbonTrash class="mr-1.5 inline" />Remove assistant</button
 				>
 			</form>
 			<form method="POST" action="?/edit" use:enhance class="hidden">
 				<button type="submit" class="underline">
-					<CarbonCopy class="mr-1.5 inline" />
-					Duplicate assistant</button
+					<CarbonCopy class="mr-1.5 inline" />Duplicate assistant</button
 				>
 			</form>
 			{#if !assistant?.reported}
 				<form method="POST" action="?/report" use:enhance>
 					<button type="submit" class="underline">
-						<CarbonFlag class="mr-1.5 inline" />
-						Report assistant</button
+						<CarbonFlag class="mr-1.5 inline" />Report assistant</button
 					>
 				</form>
 			{:else}
 				<button type="button" disabled class="text-gray-700">
-					<CarbonFlag class="mr-1.5 inline" />
-					Reported</button
+					<CarbonFlag class="mr-1.5 inline" />Reported</button
 				>
 			{/if}
 		{/if}

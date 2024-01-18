@@ -14,20 +14,20 @@
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center">
 	<div
-		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300"
+		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
-		<div class="flex items-center gap-4 p-4 pr-10 pt-10 md:gap-4 md:p-8">
+		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10">
 			{#if assistant.avatar}
 				<img
 					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
 						assistant.avatar
 					}`}
 					alt="avatar"
-					class="mr-4 size-14 rounded-full object-cover md:size-32 md:h-32"
+					class="size-16 rounded-full object-cover md:size-32"
 				/>
 			{:else}
 				<div
-					class="flex size-12 items-center justify-center rounded-full bg-gray-300 object-cover text-4xl font-bold uppercase text-gray-500 md:h-32 md:w-32 dark:bg-gray-600"
+					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 sm:text-4xl md:h-32 md:w-32 dark:bg-gray-600"
 				>
 					{assistant?.name[0]}
 				</div>
@@ -37,9 +37,9 @@
 				<p
 					class="mb-2 w-fit truncate text-ellipsis rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
 				>
-					{assistant.modelId}
+					Assistant
 				</p>
-				<p class="text-2xl font-bold">{assistant.name}</p>
+				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
 				<p class="text-sm text-gray-500 dark:text-gray-400">
 					{assistant.description}
 				</p>
@@ -55,7 +55,7 @@
 				</p>
 			</div>
 		</div>
-		<div class="absolute right-2 top-2">
+		<div class="absolute right-2 top-3 sm:top-2">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"
 				class="flex size-7 items-center justify-center rounded-full border bg-gray-200 p-1 text-xs hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"

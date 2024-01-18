@@ -59,7 +59,7 @@
 
 <form
 	method="POST"
-	class="flex flex-col"
+	class="flex h-full flex-col"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
