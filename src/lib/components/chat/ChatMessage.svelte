@@ -13,7 +13,6 @@
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
-	import CarbonContinue from "~icons/carbon/continue";
 
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
@@ -50,14 +49,12 @@
 	export let isAuthor = true;
 	export let readOnly = false;
 	export let isTapped = false;
-	export let isLast = false;
 
 	export let webSearchMessages: WebSearchUpdate[];
 
 	const dispatch = createEventDispatcher<{
 		retry: { content: string; id: Message["id"] };
 		vote: { score: Message["score"]; id: Message["id"] };
-		continue: { id: Message["id"] };
 	}>();
 
 	let contentEl: HTMLElement;
@@ -232,16 +229,6 @@
 					classNames="ml-1.5 !rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 dark:!text-gray-400 dark:hover:!text-gray-300 !border-none !shadow-none"
 					value={message.content}
 				/>
-				{#if !readOnly && message.interrupted && isLast}
-					<button
-						class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
-						title="Continue"
-						type="button"
-						on:click={() => dispatch("continue", { id: message.id })}
-					>
-						<CarbonContinue />
-					</button>
-				{/if}
 			</div>
 		{/if}
 	</div>
