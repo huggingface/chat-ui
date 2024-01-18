@@ -124,6 +124,7 @@
 			}
 		}}
 		on:vote
+		on:continue
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);
 		}}

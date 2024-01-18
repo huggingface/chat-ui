@@ -54,6 +54,8 @@
 				webSearchMessages={i === messages.length - 1 ? webSearchMessages : []}
 				on:retry
 				on:vote
+				on:continue
+				isLast={i === messages.length - 1}
 			/>
 		{:else}
 			<ChatIntroduction {models} {currentModel} on:message />
