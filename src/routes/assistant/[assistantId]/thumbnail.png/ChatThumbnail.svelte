@@ -21,7 +21,9 @@
 				<img class="mr-1.5 h-8 w-8" src={imgUrl} alt="app logo" />
 				AI assistant
 			</p>
-			<h1 class="m-0 {name.length < 38 ? 'text-5xl' : ''} text-balance font-black">{name}</h1>
+			<h1 class="m-0 {name.length < 38 ? 'text-5xl' : 'text-4xl'} text-balance font-black">
+				{name}
+			</h1>
 			<p class="mb-8 text-pretty text-2xl">
 				{description.slice(0, 160)}
 				{#if description.length > 160}...{/if}
