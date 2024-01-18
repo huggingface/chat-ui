@@ -10,7 +10,6 @@
 	import CarbonTrash from "~icons/carbon/trash-can";
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
-	import CarbonFollow from "~icons/carbon/user-follow";
 	import CarbonLink from "~icons/carbon/link";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 
@@ -77,15 +76,13 @@
 		<h2 class="text-lg font-semibold">Direct URL</h2>
 
 		<p class="pb-2 text-sm text-gray-500">
-			{#if assistant?.createdByMe}
-				People with this link will be able to use your assistant.
-			{:else}
+			People with this link will be able to use your assistant.
+			{#if !assistant?.createdByMe}
 				Created by <a
-					class=" hover:underline"
+					class="underline"
 					target="_blank"
 					href={"https://hf.co/" + assistant?.createdByName}
 				>
-					<CarbonFollow class="inline" />
 					{assistant?.createdByName}
 				</a>
 			{/if}
