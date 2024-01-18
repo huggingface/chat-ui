@@ -23,7 +23,7 @@ export const GET: RequestHandler = (async ({ url, params, fetch }) => {
 		href: url.origin,
 		name: assistant.name,
 		description: assistant.description,
-		createdByName: assistant.createdByName ?? "",
+		createdByName: assistant.createdByName,
 		avatarUrl: assistant.avatar
 			? url.origin + APP_BASE + "/settings/assistants/" + assistant._id + "/avatar"
 			: undefined,

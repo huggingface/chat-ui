@@ -137,7 +137,7 @@ export const actions: Actions = {
 			},
 			{
 				createdById: assistant?.createdById,
-				createdByName: locals.user?.username,
+				createdByName: locals.user?.username ?? locals.user?.name,
 				...parse.data,
 				exampleInputs,
 				avatar: hash ?? assistant.avatar,

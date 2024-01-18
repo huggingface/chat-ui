@@ -5,7 +5,7 @@
 	export let href: string = "";
 	export let name: string;
 	export let description: string = "";
-	export let createdByName = "";
+	export let createdByName: string | undefined;
 	export let avatarUrl: string | undefined;
 
 	const imgUrl = `${href}${base}/${PUBLIC_APP_ASSETS}/icon.svg`;
@@ -30,10 +30,12 @@
 			<span class="-mt-5 max-w-[65vw] text-3xl font-black">
 				{name}
 			</span>
-			<h3 class="mt-2 font-medium text-gray-400">
-				Created by
-				<span class="ml-1 underline">{createdByName}</span>
-			</h3>
+			{#if createdByName}
+				<h3 class="mt-2 font-medium text-gray-400">
+					Created by
+					<span class="ml-1 underline">{createdByName}</span>
+				</h3>
+			{/if}
 		</div>
 	</div>
 	<h2 class="max-w-[90vw] items-center text-center font-medium text-gray-400">

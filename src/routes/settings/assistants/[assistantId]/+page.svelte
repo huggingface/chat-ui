@@ -77,7 +77,7 @@
 
 		<p class="pb-2 text-sm text-gray-500">
 			People with this link will be able to use your assistant.
-			{#if !assistant?.createdByMe}
+			{#if !assistant?.createdByMe && assistant?.createdByName}
 				Created by <a
 					class="underline"
 					target="_blank"

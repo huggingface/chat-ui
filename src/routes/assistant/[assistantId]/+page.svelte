@@ -66,16 +66,17 @@
 		<h3 class="text-sm text-gray-700">
 			{data.assistant.description}
 		</h3>
-		<p class="text-sm text-gray-500">
-			Created by <a
-				class="hover:underline"
-				href="https://hf.co/{data.assistant.createdByName}"
-				target="_blank"
-			>
-				{data.assistant.createdByName}
-			</a>
-		</p>
-
+		{#if data.assistant.createdByName}
+			<p class="text-sm text-gray-500">
+				Created by <a
+					class="hover:underline"
+					href="https://hf.co/{data.assistant.createdByName}"
+					target="_blank"
+				>
+					{data.assistant.createdByName}
+				</a>
+			</p>
+		{/if}
 		<button
 			class="mt-4 w-full rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
 			on:click={() => {

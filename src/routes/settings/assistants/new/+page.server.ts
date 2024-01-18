@@ -123,7 +123,7 @@ export const actions: Actions = {
 		const { insertedId } = await collections.assistants.insertOne({
 			_id: newAssistantId,
 			createdById,
-			createdByName: locals.user?.username,
+			createdByName: locals.user?.username ?? locals.user?.name,
 			...parse.data,
 			exampleInputs,
 			avatar: hash,
