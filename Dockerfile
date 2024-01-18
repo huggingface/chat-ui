@@ -3,6 +3,9 @@
 # you will also find guides on how best to write your Dockerfile
 FROM node:19 as builder-production
 
+ARG SECRET_CHECKSUM
+ENV SECRET_CHECKSUM=${SECRET_CHECKSUM}
+
 WORKDIR /app
 
 COPY --link --chown=1000 package-lock.json package.json ./
