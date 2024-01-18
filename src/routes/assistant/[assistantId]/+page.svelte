@@ -45,7 +45,7 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-2 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
+		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-2 overflow-hidden rounded-2xl bg-white p-4 text-center shadow-2xl outline-none max-sm:px-6 md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 	>
 		{#if data.assistant.avatar}
 			<img
@@ -103,9 +103,9 @@
 		>
 			<button
 				type="submit"
-				class=" w-full rounded-full bg-black px-4 py-2 font-semibold text-white"
+				class=" w-full rounded-full bg-black px-4 py-3 font-semibold text-white"
 			>
-				Add assistant and start chatting
+				Start chatting
 			</button>
 		</form>
 	</dialog>

@@ -34,8 +34,8 @@ export const GET: RequestHandler = (async ({ url, params, fetch }) => {
 	);
 
 	const svg = await satori(reactLike, {
-		width: 700,
-		height: 370,
+		width: 1200,
+		height: 648,
 		fonts: [
 			{
 				name: "Inter",
@@ -46,16 +46,6 @@ export const GET: RequestHandler = (async ({ url, params, fetch }) => {
 				name: "Inter",
 				data: await fetch(base + "/fonts/Inter-Bold.ttf").then((r) => r.arrayBuffer()),
 				weight: 700,
-			},
-			{
-				name: "Inter",
-				data: await fetch(base + "/fonts/Inter-ExtraBold.ttf").then((r) => r.arrayBuffer()),
-				weight: 800,
-			},
-			{
-				name: "Inter",
-				data: await fetch(base + "/fonts/Inter-Black.ttf").then((r) => r.arrayBuffer()),
-				weight: 900,
 			},
 		],
 	});
