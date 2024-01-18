@@ -11,6 +11,7 @@
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonFollow from "~icons/carbon/user-follow";
+	import CarbonLink from "~icons/carbon/link";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 
 	export let data: PageData;
@@ -27,7 +28,7 @@
 </script>
 
 <div class="flex h-full flex-col gap-2">
-	<div class="flex flex-row gap-8">
+	<div class="flex gap-6">
 		{#if assistant?.avatar}
 			<!-- crop image if not square  -->
 			<img
@@ -37,20 +38,22 @@
 			/>
 		{:else}
 			<div
-				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 text-4xl font-bold uppercase text-gray-500"
+				class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24"
 			>
 				{assistant?.name[0]}
 			</div>
 		{/if}
 
 		<div>
-			<h1 class="text-xl font-bold">
+			<h1 class="text-xl font-semibold">
 				{assistant?.name}
 			</h1>
 
-			<p class="pb-2 text-sm text-gray-500">
-				{assistant?.description}
-			</p>
+			{#if assistant?.description}
+				<p class="pb-2 text-sm text-gray-500">
+					{assistant.description}
+				</p>
+			{/if}
 
 			<p class="text-sm text-gray-500">
 				Model: <span class="font-semibold"> {assistant?.modelId} </span>
@@ -65,17 +68,17 @@
 					$settings.activeModel = $page.params.assistantId;
 				}}
 			>
-				{isActive ? "Active model" : "Activate"}
+				{isActive ? "Active" : "Activate"}
 			</button>
 		</div>
 	</div>
 
 	<div>
-		<h2 class="text-lg font-bold">Direct URL</h2>
+		<h2 class="text-lg font-semibold">Direct URL</h2>
 
 		<p class="pb-2 text-sm text-gray-500">
 			{#if assistant?.createdByMe}
-				By sharing this URL, other people can use your assistant.
+				People with this link will be able to use your assistant.
 			{:else}
 				Created by <a
 					class=" hover:underline"
@@ -88,30 +91,49 @@
 			{/if}
 		</p>
 
-		<div class="flex flex-row gap-2 rounded-full border-2 border-gray-200 bg-gray-100">
-			<input disabled class="w-full px-3 py-1" value={shareUrl} />
-			<CopyToClipBoardBtn value={shareUrl} classNames="border-0 text-gray-500 text-lg mr-4" />
+		<div
+			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
+		>
+			<input disabled class="flex-1 truncate" value={shareUrl} />
+			<CopyToClipBoardBtn
+				value={shareUrl}
+				classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
+			>
+				<div class="flex items-center gap-1.5 text-gray-500 hover:underline">
+					<CarbonLink />Copy
+				</div>
+			</CopyToClipBoardBtn>
 		</div>
 	</div>
 
-	<h2 class="text-lg font-bold">System Instructions</h2>
+	<!-- <div>
+		<h2 class="mb-2 text-lg font-semibold">Model used</h2>
 
-	<textarea disabled class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+		<div
+			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
+		>
+			<input disabled class="flex-1" value="Model" />
+		</div>
+	</div> -->
+
+	<h2 class="mt-4 text-lg font-semibold">System Instructions</h2>
+
+	<textarea disabled class="h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 		>{assistant?.preprompt}</textarea
 	>
 
-	<div class="mt-5 flex w-full flex-row justify-around gap-4">
+	<div class="mt-5 flex gap-4">
 		{#if assistant?.createdByMe}
+			<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline">
+				<CarbonPen class="mr-1.5 inline" />
+				Edit assistant
+			</a>
 			<form method="POST" action="?/delete" use:enhance>
 				<button type="submit" class="flex items-center underline">
 					<CarbonTrash class="mr-1.5 inline" />
 					Delete assistant</button
 				>
 			</form>
-			<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline">
-				<CarbonPen class="mr-1.5 inline" />
-				Edit assistant
-			</a>
 		{:else}
 			<form method="POST" action="?/unsubscribe" use:enhance>
 				<button type="submit" class="underline">

@@ -47,7 +47,7 @@
 			</button>
 		</div>
 		<div
-			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap border-b-gray-400 max-md:-mx-4 max-md:h-[245px] max-md:border max-md:border-b-2 md:pr-6"
+			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[245px] max-md:border max-md:border-b-2 md:pr-6"
 		>
 			<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1">Models</h3>
 
@@ -72,7 +72,7 @@
 				{#each data.assistants as assistant}
 					<a
 						href="{base}/settings/assistants/{assistant._id.toString()}"
-						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
+						class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
 						{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 					>
 						{#if assistant.avatar}
@@ -83,7 +83,7 @@
 							/>
 						{:else}
 							<div
-								class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
+								class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 							>
 								{assistant.name[0]}
 							</div>
@@ -120,7 +120,7 @@
 				Application Settings
 			</a>
 		</div>
-		<div class="col-span-1 overflow-y-auto md:col-span-2">
+		<div class="col-span-1 overflow-y-auto max-md:pt-6 md:col-span-2">
 			<slot />
 		</div>
 
@@ -128,7 +128,7 @@
 			<div
 				class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-200 px-3 py-1 text-black"
 			>
-				<CarbonCheckmark />
+				<CarbonCheckmark class="text-green-500" />
 				Saved
 			</div>
 		{/if}

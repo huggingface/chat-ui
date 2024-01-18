@@ -33,7 +33,7 @@
 		? 'bg-gray-100 dark:bg-gray-700'
 		: ''}"
 >
-	<div class="flex-1 truncate">
+	<div class="flex flex-1 items-center truncate">
 		{#if confirmDelete}
 			<span class="font-semibold"> Delete </span>
 		{/if}

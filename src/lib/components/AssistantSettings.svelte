@@ -59,7 +59,7 @@
 
 <form
 	method="POST"
-	class="h-full w-full overflow-x-clip"
+	class="flex flex-col"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
@@ -82,19 +82,19 @@
 	}}
 >
 	{#if assistant}
-		<h2 class="text-xl font-semibold">Edit {assistant?.name ?? ""}</h2>
-		<p class="mb-8 text-sm text-gray-500">
+		<h2 class="text-xl font-semibold">Edit assistant ({assistant?.name ?? ""})</h2>
+		<p class="mb-6 text-sm text-gray-500">
 			Modifying an existing assistant will propagate those changes to all users.
 		</p>
 	{:else}
 		<h2 class="text-xl font-semibold">Create new assistant</h2>
-		<p class="mb-8 text-sm text-gray-500">
+		<p class="mb-6 text-sm text-gray-500">
 			Assistants are public, and can be accessed by anyone with the link.
 		</p>
 	{/if}
 
-	<div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-		<div class="flex flex-col gap-4 px-2">
+	<div class="grid flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
+		<div class="flex flex-col gap-4">
 			<label class="truncate">
 				<span class="mb-1 block text-sm font-semibold">Avatar</span>
 				<input
@@ -194,7 +194,7 @@
 
 			<label>
 				<span class="mb-1 text-sm font-semibold">Start messages</span>
-				<div class="flex flex-col gap-2 md:max-h-32 md:overflow-y-scroll">
+				<div class="flex flex-col gap-2 md:max-h-32">
 					<input
 						name="exampleInput1"
 						bind:value={inputMessage1}
@@ -226,23 +226,21 @@
 			</label>
 		</div>
 
-		<div class="flex flex-col gap-4 px-2">
-			<label class="h-full">
-				<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
+		<label class="flex flex-col">
+			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 
-				<textarea
-					name="preprompt"
-					class="h-64 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-					placeholder="You'll act as..."
-					value={assistant?.preprompt ?? ""}
-				/>
+			<textarea
+				name="preprompt"
+				class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+				placeholder="You'll act as..."
+				value={assistant?.preprompt ?? ""}
+			/>
 
-				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
-			</label>
-		</div>
+			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
+		</label>
 	</div>
 
-	<div class="my-3">
+	<div class="mt-5 flex justify-end gap-2">
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
