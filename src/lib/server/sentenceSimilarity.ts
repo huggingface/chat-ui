@@ -28,7 +28,7 @@ export async function findSimilarSentences(
 		(sentenceEmbedding: Embedding, index: number) => {
 			return {
 				distance: innerProduct(queryEmbedding, sentenceEmbedding),
-				index: index,
+				index,
 			};
 		}
 	);

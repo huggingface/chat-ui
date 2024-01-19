@@ -25,7 +25,7 @@ export async function runWebSearch(
 	})() satisfies Message[];
 
 	const webSearch: WebSearch = {
-		prompt: prompt,
+		prompt,
 		searchQuery: "",
 		results: [],
 		context: "",
