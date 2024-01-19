@@ -35,7 +35,7 @@ export async function runWebSearch(
 	};
 
 	function appendUpdate(message: string, args?: string[], type?: "error" | "update") {
-		updatePad({ type: "webSearch", messageType: type ?? "update", message: message, args: args });
+		updatePad({ type: "webSearch", messageType: type ?? "update", message, args });
 	}
 
 	try {
