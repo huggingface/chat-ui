@@ -173,7 +173,7 @@
 						try {
 							const update = JSON.parse(el) as MessageUpdate;
 
-							if(update.type !== "stream"){
+							if (update.type !== "stream") {
 								messageUpdates.push(update);
 							}
 
@@ -230,7 +230,7 @@
 			}
 
 			webSearchMessages = [];
-			
+
 			const lastMessage = messages[messages.length - 1];
 			lastMessage.updates = messageUpdates;
 
