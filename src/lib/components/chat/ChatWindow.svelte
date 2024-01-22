@@ -23,6 +23,8 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import type { Assistant } from "$lib/types/Assistant";
+	import { base } from "$app/paths";
+	import id from "date-fns/locale/id";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -236,18 +238,12 @@
 				<p>
 					Model:
 					{#if !assistant}
-						<a
-							href={currentModel.modelUrl || "https://huggingface.co/" + currentModel.name}
-							target="_blank"
-							rel="noreferrer"
-							class="hover:underline">{currentModel.displayName}</a
+						<a href="{base}/settings/{currentModel.id}" class="hover:underline"
+							>{currentModel.displayName}</a
 						>{:else}
 						{@const model = models.find((m) => m.id === assistant?.modelId)}
-						<a
-							href={model?.modelUrl || "https://huggingface.co/" + model?.name}
-							target="_blank"
-							rel="noreferrer"
-							class="hover:underline">{model?.displayName}</a
+						<a href="{base}/settings/assistants/{assistant._id}" class="hover:underline"
+							>{model?.displayName}</a
 						>{/if} <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may
 					be inaccurate or false.
 				</p>
