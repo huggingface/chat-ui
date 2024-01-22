@@ -59,7 +59,7 @@
 		{:else}
 			<ChatIntroduction {models} {currentModel} on:message />
 		{/each}
-		{#if pending}
+		{#if pending && messages[messages.length - 1]?.from === "user"}
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}
