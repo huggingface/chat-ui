@@ -139,10 +139,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// can only call isContinue on the last message id
-	if (
-		isContinue &&
-		conv.messages[conv.messages.length - 1].id !== messageId
-	) {
+	if (isContinue && conv.messages[conv.messages.length - 1].id !== messageId) {
 		throw error(400, "Can only continue the last message");
 	}
 
@@ -170,7 +167,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			];
 		} else if (isContinue && messageId) {
 			// for continue we do nothing and expand the last assistant message
-			return [...conv.messages];
+			return conv.messages;
 		} else {
 			// in normal conversation we add an extra user message
 			return [
