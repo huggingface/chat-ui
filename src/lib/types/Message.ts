@@ -11,4 +11,5 @@ export type Message = Partial<Timestamps> & {
 	webSearch?: WebSearch;
 	score?: -1 | 0 | 1;
 	files?: string[]; // can contain either the hash of the file or the b64 encoded image data on the client side when uploading
+	interrupted?: boolean;
 };

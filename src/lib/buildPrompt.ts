@@ -13,6 +13,7 @@ interface buildPromptOptions {
 	webSearch?: WebSearch;
 	preprompt?: string;
 	files?: File[];
+	continue?: boolean;
 }
 
 export async function buildPrompt({
@@ -22,37 +23,38 @@ export async function buildPrompt({
 	preprompt,
 	id,
 }: buildPromptOptions): Promise<string> {
-	if (webSearch && webSearch.context) {
-		const lastMsg = messages.slice(-1)[0];
-		const messagesWithoutLastUsrMsg = messages.slice(0, -1);
-		const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
+	let modifiedMessages = [...messages];
 
+	if (webSearch && webSearch.context) {
+		// find index of the last user message
+		const lastUsrMsgIndex = modifiedMessages.map((el) => el.from).lastIndexOf("user");
+
+		// combine all the other previous questions into one string
+		const previousUserMessages = modifiedMessages.filter((el) => el.from === "user").slice(0, -1);
 		const previousQuestions =
 			previousUserMessages.length > 0
 				? `Previous questions: \n${previousUserMessages
 						.map(({ content }) => `- ${content}`)
 						.join("\n")}`
 				: "";
+
 		const currentDate = format(new Date(), "MMMM d, yyyy");
-		messages = [
-			...messagesWithoutLastUsrMsg,
-			{
-				from: "user",
-				content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
+
+		// update the last user message directly (that way if the last message is an assistant partial answer, we keep the beginning of that answer)
+		modifiedMessages[lastUsrMsgIndex] = {
+			from: "user",
+			content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
 				=====================
 				${webSearch.context}
 				=====================
 				${previousQuestions}
-				Answer the question: ${lastMsg.content} 
-				`,
-			},
-		];
+				Answer the question: ${messages[lastUsrMsgIndex].content} 				`,
+		};
 	}
-
 	// section to handle potential files input
 	if (model.multimodal) {
-		messages = await Promise.all(
-			messages.map(async (el) => {
+		modifiedMessages = await Promise.all(
+			modifiedMessages.map(async (el) => {
 				let content = el.content;
 
 				if (el.from === "user") {
@@ -83,7 +85,7 @@ export async function buildPrompt({
 
 	return (
 		model
-			.chatPromptRender({ messages, preprompt })
+			.chatPromptRender({ messages: modifiedMessages, preprompt })
 			// Not super precise, but it's truncated in the model's backend anyway
 			.split(" ")
 			.slice(-(model.parameters?.truncate ?? 0))

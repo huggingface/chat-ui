@@ -14,6 +14,7 @@ interface EndpointParameters {
 		preprompt?: Conversation["preprompt"];
 		_id?: Conversation["_id"];
 	};
+	continue?: boolean;
 }
 
 interface CommonEndpoint {
