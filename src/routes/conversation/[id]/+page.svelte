@@ -317,27 +317,36 @@
 
 	async function onMessage(event: CustomEvent<string>) {
 		if (!data.shared) {
-			writeMessage({ prompt: event.detail });
+			await writeMessage({ prompt: event.detail });
 		} else {
-			convFromShared()
+			await convFromShared()
 				.then(async (convId) => {
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
-				.then(() => writeMessage({ prompt: event.detail }))
+				.then(async () => await writeMessage({ prompt: event.detail }))
 				.finally(() => (loading = false));
 		}
 	}
 
 	async function onRetry(event: CustomEvent<{ id: Message["id"]; content: string }>) {
 		if (!data.shared) {
-			writeMessage({ prompt: event.detail.content, messageId: event.detail.id, isRetry: true });
+			await writeMessage({
+				prompt: event.detail.content,
+				messageId: event.detail.id,
+				isRetry: true,
+			});
 		} else {
-			convFromShared()
+			await convFromShared()
 				.then(async (convId) => {
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
-				.then(() =>
-					writeMessage({ prompt: event.detail.content, messageId: event.detail.id, isRetry: true })
+				.then(
+					async () =>
+						await writeMessage({
+							prompt: event.detail.content,
+							messageId: event.detail.id,
+							isRetry: true,
+						})
 				)
 				.finally(() => (loading = false));
 		}
