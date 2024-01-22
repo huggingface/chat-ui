@@ -24,6 +24,7 @@
 	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import ContinueBtn from "../ContinueBtn.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -48,6 +49,7 @@
 		share: void;
 		stop: void;
 		retry: { id: Message["id"]; content: string };
+		continue: { id: Message["id"] };
 	}>();
 
 	const handleSubmit = () => {
@@ -124,6 +126,7 @@
 			}
 		}}
 		on:vote
+		on:continue
 		on:retry={(ev) => {
 			if (!loading) dispatch("retry", ev.detail);
 		}}
@@ -173,8 +176,20 @@
 								content: messages[messages.length - 1].content,
 							})}
 					/>
-				{:else if currentModel.multimodal}
-					<UploadBtn bind:files classNames="ml-auto" />
+				{:else}
+					<div class="ml-auto gap-2">
+						{#if currentModel.multimodal}
+							<UploadBtn bind:files classNames="ml-auto" />
+						{/if}
+						{#if messages && messages[messages.length - 1]?.interrupted && !isReadOnly}
+							<ContinueBtn
+								on:click={() =>
+									dispatch("continue", {
+										id: messages[messages.length - 1].id,
+									})}
+							/>
+						{/if}
+					</div>
 				{/if}
 			</div>
 			<form

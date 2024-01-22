@@ -91,14 +91,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const {
 		inputs: newPrompt,
 		id: messageId,
-		is_retry,
+		is_retry: isRetry,
+		is_continue: isContinue,
 		web_search: webSearch,
 		files: b64files,
 	} = z
 		.object({
-			inputs: z.string().trim().min(1),
+			inputs: z.optional(z.string().trim().min(1)),
 			id: z.optional(z.string().uuid()),
 			is_retry: z.optional(z.boolean()),
+			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
 			files: z.optional(z.array(z.string())),
 		})
@@ -136,38 +138,50 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
 	}
 
+	// can only call isContinue on the last message id
+	if (isContinue && conv.messages[conv.messages.length - 1].id !== messageId) {
+		throw error(400, "Can only continue the last message");
+	}
+
 	// get the list of messages
 	// while checking for retries
 	let messages = (() => {
-		if (is_retry && messageId) {
+		// for retries we slice and rewrite the last user message
+		if (isRetry && messageId) {
 			// if the message is a retry, replace the message and remove the messages after it
 			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
+
 			if (retryMessageIdx === -1) {
 				retryMessageIdx = conv.messages.length;
 			}
+
 			return [
 				...conv.messages.slice(0, retryMessageIdx),
 				{
-					content: newPrompt,
+					content: conv.messages[retryMessageIdx]?.content,
 					from: "user",
 					id: messageId as Message["id"],
 					updatedAt: new Date(),
 					files: conv.messages[retryMessageIdx]?.files,
 				},
 			];
+		} else if (isContinue && messageId) {
+			// for continue we do nothing and expand the last assistant message
+			return conv.messages;
+		} else {
+			// in normal conversation we add an extra user message
+			return [
+				...conv.messages,
+				{
+					content: newPrompt ?? "",
+					from: "user",
+					id: (messageId as Message["id"]) || crypto.randomUUID(),
+					createdAt: new Date(),
+					updatedAt: new Date(),
+					files: hashes,
+				},
+			];
 		} // else append the message at the bottom
-
-		return [
-			...conv.messages,
-			{
-				content: newPrompt,
-				from: "user",
-				id: (messageId as Message["id"]) || crypto.randomUUID(),
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				files: hashes,
-			},
-		];
 	})() satisfies Message[];
 
 	await collections.conversations.updateOne(
@@ -183,10 +197,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		}
 	);
 
+	let doneStreaming = false;
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
-			const updates: MessageUpdate[] = [];
+			const updates: MessageUpdate[] = isContinue
+				? conv.messages[conv.messages.length - 1].updates ?? []
+				: [];
 
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
@@ -209,7 +227,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const summarizeIfNeeded = (async () => {
 				if (conv.title === "New Chat" && messages.length === 1) {
 					try {
-						conv.title = (await summarize(newPrompt)) ?? conv.title;
+						conv.title = (await summarize(messages[0].content)) ?? conv.title;
 						update({ type: "status", status: "title", message: conv.title });
 					} catch (e) {
 						console.error(e);
@@ -232,17 +250,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let webSearchResults: WebSearch | undefined;
 
-			if (webSearch) {
-				webSearchResults = await runWebSearch(conv, newPrompt, update);
+			if (webSearch && !isContinue) {
+				webSearchResults = await runWebSearch(conv, messages[messages.length - 1].content, update);
+				messages[messages.length - 1].webSearch = webSearchResults;
+			} else if (isContinue) {
+				webSearchResults = messages[messages.length - 1].webSearch;
 			}
-
-			messages[messages.length - 1].webSearch = webSearchResults;
 
 			conv.messages = messages;
 
+			const previousContent = isContinue
+				? conv.messages.find((message) => message.id === messageId)?.content ?? ""
+				: "";
+
 			try {
 				const endpoint = await model.getEndpoint();
-				for await (const output of await endpoint({ conversation: conv })) {
+				for await (const output of await endpoint({ conversation: conv, continue: isContinue })) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
 						// else we get the next token
@@ -292,7 +315,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							...messages.slice(0, -1),
 							{
 								...messages[messages.length - 1],
-								content: output.generated_text,
+								content: previousContent + output.generated_text,
+								interrupted: !output.token.special, // if its a special token it finished on its own, else it was interrupted
 								updates,
 								updatedAt: new Date(),
 							},
@@ -302,6 +326,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			} catch (e) {
 				update({ type: "status", status: "error", message: (e as Error).message });
 			}
+
 			await collections.conversations.updateOne(
 				{
 					_id: convId,
@@ -315,6 +340,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			);
 
+			// used to detect if cancel() is called bc of interrupt or just because the connection closes
+			doneStreaming = true;
+
 			update({
 				type: "finalAnswer",
 				text: messages[messages.length - 1].content,
@@ -324,18 +352,20 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			return;
 		},
 		async cancel() {
-			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						messages,
-						title: conv.title,
-						updatedAt: new Date(),
+			if (!doneStreaming) {
+				await collections.conversations.updateOne(
+					{
+						_id: convId,
 					},
-				}
-			);
+					{
+						$set: {
+							messages,
+							title: conv.title,
+							updatedAt: new Date(),
+						},
+					}
+				);
+			}
 		},
 	});
 

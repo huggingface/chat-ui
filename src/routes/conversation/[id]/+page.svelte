@@ -64,9 +64,17 @@
 		}
 	}
 	// this function is used to send new message to the backends
-	async function writeMessage(message: string, messageId = randomUUID()) {
-		if (!message.trim()) return;
-
+	async function writeMessage({
+		prompt,
+		messageId = randomUUID(),
+		isRetry = false,
+		isContinue = false,
+	}: {
+		prompt?: string;
+		messageId?: ReturnType<typeof randomUUID>;
+		isRetry?: boolean;
+		isContinue?: boolean;
+	}): Promise<void> {
 		try {
 			$isAborted = false;
 			loading = true;
@@ -74,12 +82,20 @@
 
 			// first we check if the messageId already exists, indicating a retry
 
-			let retryMessageIndex = messages.findIndex((msg) => msg.id === messageId);
-			const isRetry = retryMessageIndex !== -1;
-			// if it's not a retry we just use the whole array
-			if (!isRetry) {
-				retryMessageIndex = messages.length;
+			let msgIndex = messages.findIndex((msg) => msg.id === messageId);
+
+			if (msgIndex === -1) {
+				msgIndex = messages.length - 1;
 			}
+			if (isRetry && messages[msgIndex].from === "assistant") {
+				throw new Error("Trying to retry a message that is not from user");
+			}
+
+			if (isContinue && messages[msgIndex].from === "user") {
+				throw new Error("Trying to continue a message that is not from assistant");
+			}
+
+			// const isNewMessage = !isRetry && !isContinue;
 
 			const module = await import("browser-image-resizer");
 
@@ -99,15 +115,31 @@
 			);
 
 			// slice up to the point of the retry
-			messages = [
-				...messages.slice(0, retryMessageIndex),
-				{
-					from: "user",
-					content: message,
-					id: messageId,
-					files: isRetry ? messages[retryMessageIndex].files : resizedImages,
-				},
-			];
+			if (isRetry) {
+				messages = [
+					...messages.slice(0, msgIndex),
+					{
+						from: "user",
+						content: messages[msgIndex].content,
+						id: messageId,
+						files: messages[msgIndex].files,
+					},
+				];
+			} else if (!isContinue) {
+				// or add a new message if its not a continue request
+				if (!prompt) {
+					throw new Error("Prompt is undefined");
+				}
+				messages = [
+					...messages,
+					{
+						from: "user",
+						content: prompt ?? "",
+						id: messageId,
+						files: resizedImages,
+					},
+				];
+			}
 
 			files = [];
 
@@ -115,9 +147,10 @@
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					inputs: message,
+					inputs: prompt,
 					id: messageId,
 					is_retry: isRetry,
+					is_continue: isContinue,
 					web_search: $webSearchParameters.useSearch,
 					files: isRetry ? undefined : resizedImages,
 				}),
@@ -282,34 +315,51 @@
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
-			await writeMessage($pendingMessage.content);
+			await writeMessage({ prompt: $pendingMessage.content });
 			$pendingMessage = undefined;
 		}
 	});
 
 	async function onMessage(event: CustomEvent<string>) {
 		if (!data.shared) {
-			writeMessage(event.detail);
+			await writeMessage({ prompt: event.detail });
 		} else {
-			convFromShared()
+			await convFromShared()
 				.then(async (convId) => {
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
-				.then(() => writeMessage(event.detail))
+				.then(async () => await writeMessage({ prompt: event.detail }))
 				.finally(() => (loading = false));
 		}
 	}
 
 	async function onRetry(event: CustomEvent<{ id: Message["id"]; content: string }>) {
 		if (!data.shared) {
-			writeMessage(event.detail.content, event.detail.id);
+			await writeMessage({
+				prompt: event.detail.content,
+				messageId: event.detail.id,
+				isRetry: true,
+			});
 		} else {
-			convFromShared()
+			await convFromShared()
 				.then(async (convId) => {
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
-				.then(() => writeMessage(event.detail.content, event.detail.id))
+				.then(
+					async () =>
+						await writeMessage({
+							prompt: event.detail.content,
+							messageId: event.detail.id,
+							isRetry: true,
+						})
+				)
 				.finally(() => (loading = false));
+		}
+	}
+
+	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
+		if (!data.shared) {
+			writeMessage({ messageId: event.detail.id, isContinue: true });
 		}
 	}
 
@@ -337,6 +387,7 @@
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}
+	on:continue={onContinue}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
