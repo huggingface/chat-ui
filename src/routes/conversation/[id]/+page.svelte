@@ -115,7 +115,6 @@
 			);
 
 			// slice up to the point of the retry
-
 			if (isRetry) {
 				messages = [
 					...messages.slice(0, msgIndex),
@@ -126,9 +125,8 @@
 						files: messages[msgIndex].files,
 					},
 				];
-			} else if (isContinue) {
-				console.log("isContinue");
-			} else {
+			} else if (!isContinue) {
+				// or add a new message if its not a continue request
 				if (!prompt) {
 					throw new Error("Prompt is undefined");
 				}
