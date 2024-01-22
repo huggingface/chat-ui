@@ -64,7 +64,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		embeddingModel: embeddingModel,
+		embeddingModel,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});

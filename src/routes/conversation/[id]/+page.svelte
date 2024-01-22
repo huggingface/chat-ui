@@ -260,7 +260,7 @@
 		messages = messages.map((message) => {
 			if (message.id === messageId) {
 				oldScore = message.score;
-				return { ...message, score: score };
+				return { ...message, score };
 			}
 			return message;
 		});

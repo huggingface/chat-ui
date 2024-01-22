@@ -25,7 +25,7 @@ export async function runWebSearch(
 	})() satisfies Message[];
 
 	const webSearch: WebSearch = {
-		prompt: prompt,
+		prompt,
 		searchQuery: "",
 		results: [],
 		context: "",
@@ -35,7 +35,7 @@ export async function runWebSearch(
 	};
 
 	function appendUpdate(message: string, args?: string[], type?: "error" | "update") {
-		updatePad({ type: "webSearch", messageType: type ?? "update", message: message, args: args });
+		updatePad({ type: "webSearch", messageType: type ?? "update", message, args });
 	}
 
 	try {

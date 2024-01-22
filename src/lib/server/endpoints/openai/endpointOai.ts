@@ -30,7 +30,7 @@ export async function endpointOai(
 
 	const openai = new OpenAI({
 		apiKey: apiKey ?? "sk-",
-		baseURL: baseURL,
+		baseURL,
 	});
 
 	if (completion === "completions") {
