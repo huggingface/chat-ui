@@ -39,7 +39,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// register the event for ratelimiting
 	await collections.messageEvents.insertOne({
-		userId: userId,
+		userId,
 		createdAt: new Date(),
 		ip: getClientAddress(),
 	});
@@ -288,7 +288,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 										from: "assistant",
 										content: output.token.text.trimStart(),
 										webSearch: webSearchResults,
-										updates: updates,
+										updates,
 										id: crypto.randomUUID(),
 										createdAt: new Date(),
 										updatedAt: new Date(),
@@ -316,8 +316,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							{
 								...messages[messages.length - 1],
 								content: previousContent + output.generated_text,
-								updates: updates,
 								interrupted: !output.token.special, // if its a special token it finished on its own, else it was interrupted
+								updates,
 								updatedAt: new Date(),
 							},
 						];

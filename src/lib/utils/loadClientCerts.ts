@@ -42,7 +42,7 @@ export function loadClientCertificates(
 			key: clientKey,
 			ca: caCert,
 			passphrase: clientKeyPassword,
-			rejectUnauthorized: rejectUnauthorized,
+			rejectUnauthorized,
 		},
 	});
 
