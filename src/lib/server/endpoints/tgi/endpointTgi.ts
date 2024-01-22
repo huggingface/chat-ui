@@ -26,6 +26,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 		});
 
 		if (messageContinue) {
+			// start with the full prompt, and for each stop token, try to remove it from the end of the prompt
 			prompt = model.parameters.stop.reduce((acc: string, curr: string) => {
 				if (acc.endsWith(curr)) {
 					return acc.slice(0, acc.length - curr.length);
