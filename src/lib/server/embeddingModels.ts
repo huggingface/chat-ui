@@ -9,6 +9,8 @@ import {
 } from "$lib/server/embeddingEndpoints/embeddingEndpoints";
 import { embeddingEndpointTransformersJS } from "$lib/server/embeddingEndpoints/transformersjs/embeddingEndpoints";
 
+import JSON5 from "json5";
+
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
@@ -37,7 +39,7 @@ const rawEmbeddingModelJSON =
 	}
 ]`;
 
-const embeddingModelsRaw = z.array(modelConfig).parse(JSON.parse(rawEmbeddingModelJSON));
+const embeddingModelsRaw = z.array(modelConfig).parse(JSON5.parse(rawEmbeddingModelJSON));
 
 const processEmbeddingModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
