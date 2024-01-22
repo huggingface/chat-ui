@@ -137,6 +137,7 @@
 			const encoder = new TextDecoderStream();
 			const reader = response?.body?.pipeThrough(encoder).getReader();
 			let finalAnswer = "";
+			const messageUpdates: MessageUpdate[] = [];
 
 			// set str queue
 			// ex) if the last response is => {"type": "stream", "token":
@@ -171,6 +172,10 @@
 					inputs.forEach(async (el: string) => {
 						try {
 							const update = JSON.parse(el) as MessageUpdate;
+
+							if (update.type !== "stream") {
+								messageUpdates.push(update);
+							}
 
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
@@ -224,8 +229,10 @@
 				});
 			}
 
-			// reset the websearchMessages
 			webSearchMessages = [];
+
+			const lastMessage = messages[messages.length - 1];
+			lastMessage.updates = messageUpdates;
 
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
