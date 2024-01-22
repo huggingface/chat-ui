@@ -141,7 +141,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// can only call isContinue on the last message id
 	if (
 		isContinue &&
-		conv.messages.findIndex((message) => message.id === messageId) !== conv.messages.length - 1
+		conv.messages[conv.messages.length - 1].id !== messageId
 	) {
 		throw error(400, "Can only continue the last message");
 	}
