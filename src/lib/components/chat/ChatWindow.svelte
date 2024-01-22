@@ -24,7 +24,6 @@
 	import file2base64 from "$lib/utils/file2base64";
 	import type { Assistant } from "$lib/types/Assistant";
 	import { base } from "$app/paths";
-	import id from "date-fns/locale/id";
 
 	export let messages: Message[] = [];
 	export let loading = false;
