@@ -1,4 +1,9 @@
-import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN, RATE_LIMIT } from "$env/static/private";
+import {
+	ASSISTANTS_GENERATE_AVATAR,
+	HF_TOKEN,
+	IMAGE_RATE_LIMIT,
+	RATE_LIMIT,
+} from "$env/static/private";
 import { requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database.js";
 import { ERROR_MESSAGES } from "$lib/stores/errors.js";
@@ -13,7 +18,7 @@ const avatarSchema = z.object({
 });
 
 export async function POST({ request, locals, getClientAddress }) {
-	if (ASSISTANTS_GENERATE_AVATAR === "true" && HF_TOKEN !== "") {
+	if (ASSISTANTS_GENERATE_AVATAR !== "true" || !HF_TOKEN) {
 		throw new Error("ASSISTANTS_GENERATE_AVATAR is not true, or HF_TOKEN is not set");
 	}
 
@@ -32,11 +37,11 @@ export async function POST({ request, locals, getClientAddress }) {
 		await collections.messageEvents.countDocuments({ ip: getClientAddress(), type: "image" })
 	);
 
-	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
+	if (RATE_LIMIT != "" && nEvents > parseInt(IMAGE_RATE_LIMIT ?? RATE_LIMIT)) {
 		throw error(429, ERROR_MESSAGES.rateLimited);
 	}
 
-	const formData = Object.fromEntries(await request.formData());
+	const formData = await request.json();
 
 	// can only create assistants when logged in, IF login is setup
 	if (!locals.user && requiresUser) {
@@ -46,7 +51,7 @@ export async function POST({ request, locals, getClientAddress }) {
 	const parse = avatarSchema.safeParse(formData);
 
 	if (!parse.success) {
-		throw error(400, "Avatar generation failed. Input validation failed.");
+		throw error(400, "Missing the name and description.");
 	}
 
 	try {
@@ -57,6 +62,6 @@ export async function POST({ request, locals, getClientAddress }) {
 			},
 		});
 	} catch (e) {
-		throw error(400, "Avatar generation failed. Try again or disable the feature.");
+		throw error(400, "Avatar generation timed-out.");
 	}
 }

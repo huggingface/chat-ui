@@ -7,9 +7,11 @@
 	import { applyAction, enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
+	import CarbonUpload from "~icons/carbon/upload";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { page } from "$app/stores";
 	import IconLoading from "./icons/IconLoading.svelte";
+	import GenerateAvatarBtn from "./GenerateAvatarBtn.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -45,6 +47,7 @@
 		const inputEl = e.target as HTMLInputElement;
 		if (inputEl.files?.length) {
 			files = inputEl.files;
+			form = null;
 		}
 	}
 
@@ -53,8 +56,48 @@
 	}
 
 	let loading = false;
+	let generatingAvatar = false;
 
-	let generateAvatar = false;
+	async function onGenerate() {
+		generatingAvatar = true;
+		form = null;
+
+		const generatedAvatar = await fetch(base + "/generate", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				description,
+				name,
+			}),
+		})
+			.then(async (res) => {
+				if (!res.ok) {
+					throw new Error((await res.json()).message);
+				} else {
+					return res.blob();
+				}
+			})
+			.catch((error) => {
+				form = {
+					error: true,
+					errors: [{ field: "avatar", message: error.message }],
+				};
+				generatingAvatar = false;
+			});
+
+		if (generatedAvatar) {
+			files = [
+				new File([generatedAvatar], "avatar.png", { type: "image/png" }),
+			] as unknown as FileList;
+		}
+
+		generatingAvatar = false;
+	}
+
+	let name = assistant?.name ?? "";
+	let description = assistant?.description ?? "";
 </script>
 
 <form
@@ -95,18 +138,19 @@
 
 	<div class="grid flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4">
-			<label class="truncate">
-				<span class="mb-1 block text-sm font-semibold">Avatar</span>
-				<input
-					type="file"
-					accept="image/*"
-					name="avatar"
-					class="invisible z-10 block h-0 w-0"
-					disabled={generateAvatar}
-					on:change={onFilesChange}
-				/>
+			<div>
+				<span class="mb-1 block pb-2 text-sm font-semibold">Avatar</span>
 				{#if (files && files[0]) || assistant?.avatar}
-					<div class="group relative h-12 w-12">
+					<div class="group relative mx-auto h-12 w-12">
+						<input
+							type="file"
+							accept="image/*"
+							name="avatar"
+							id="avatar"
+							class="invisible z-10 block h-0 w-0"
+							on:change={onFilesChange}
+						/>
+
 						{#if files && files[0]}
 							<img
 								src={URL.createObjectURL(files[0])}
@@ -121,39 +165,45 @@
 							/>
 						{/if}
 
-						<div
+						<label
+							for="avatar"
 							class="invisible absolute bottom-0 h-12 w-12 rounded-full bg-black bg-opacity-50 p-1 group-hover:visible hover:visible"
 						>
 							<CarbonPen class="mx-auto my-auto h-full cursor-pointer text-center text-white" />
-						</div>
+						</label>
 					</div>
-					<button
-						type="button"
-						on:click|stopPropagation|preventDefault={() => (files = null)}
-						class="mt-1 text-xs text-gray-600 hover:underline"
-					>
-						Reset
-					</button>
+					<div class="mx-auto w-max pt-1">
+						<button
+							type="button"
+							on:click|stopPropagation|preventDefault={() => (files = null)}
+							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
+						>
+							Reset
+						</button>
+					</div>
 				{:else}
-					<span
-						class="text-xs text-gray-500"
-						class:hover:underline={!generateAvatar}
-						class:cursor-pointer={!generateAvatar}>Click to upload</span
-					>
-				{/if}
-				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
-				{#if !files?.[0] && $page.data.avatarGeneration && !assistant?.avatar}
-					<label class="text-xs text-gray-500">
+					<div class="mx-auto mb-1 flex w-max flex-row content-around items-center gap-4">
 						<input
-							type="checkbox"
-							name="generateAvatar"
-							class="text-xs text-gray-500"
-							bind:checked={generateAvatar}
+							type="file"
+							accept="image/*"
+							name="avatar"
+							id="avatar"
+							class="invisible z-10 h-0 w-0"
+							on:change={onFilesChange}
 						/>
-						Generate avatar from description
-					</label>
+						<label
+							for="avatar"
+							class="btn flex h-6 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100"
+						>
+							<CarbonUpload class="mr-2 text-xs " /> Upload
+						</label>
+						{#if !files?.[0] && $page.data.avatarGeneration && !assistant?.avatar}
+							<GenerateAvatarBtn on:click={onGenerate} generating={generatingAvatar} />
+						{/if}
+					</div>
+					<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 				{/if}
-			</label>
+			</div>
 
 			<label>
 				<span class="mb-1 text-sm font-semibold">Name</span>
@@ -161,7 +211,7 @@
 					name="name"
 					class=" w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="My awesome model"
-					value={assistant?.name ?? ""}
+					bind:value={name}
 				/>
 				<p class="text-xs text-red-500">{getError("name", form)}</p>
 			</label>
@@ -172,7 +222,7 @@
 					name="description"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="He knows everything about python"
-					value={assistant?.description ?? ""}
+					bind:value={description}
 				/>
 				<p class="text-xs text-red-500">{getError("description", form)}</p>
 			</label>
@@ -228,14 +278,12 @@
 
 		<label class="flex flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
-
 			<textarea
 				name="preprompt"
 				class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
 			/>
-
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</label>
 	</div>
@@ -245,7 +293,6 @@
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
 		>
-
 		<button
 			type="submit"
 			disabled={loading}
