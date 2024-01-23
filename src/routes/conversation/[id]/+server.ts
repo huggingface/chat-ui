@@ -40,6 +40,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// register the event for ratelimiting
 	await collections.messageEvents.insertOne({
 		userId,
+		type: "message",
 		createdAt: new Date(),
 		ip: getClientAddress(),
 	});
@@ -70,8 +71,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// check if the user is rate limited
 	const nEvents = Math.max(
-		await collections.messageEvents.countDocuments({ userId }),
-		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+		await collections.messageEvents.countDocuments({ userId, type: "message" }),
+		await collections.messageEvents.countDocuments({ ip: getClientAddress(), type: "message" })
 	);
 
 	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
