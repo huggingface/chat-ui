@@ -20,7 +20,37 @@
 	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
 	bind:open={detailsOpen}
 >
-	<summary
+	<summary class="grid min-w-72 select-none grid-cols-[4rem,1fr] items-center">
+		<div class="m-3.5 grid aspect-square place-content-center rounded-lg bg-white dark:bg-gray-800">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="1em"
+				height="1em"
+				class="text-xl"
+				viewBox="0 0 20 20"
+				><g fill="currentColor"
+					><path
+						fill-rule="evenodd"
+						d="M1.5 10a8.5 8.5 0 1 0 17 0a8.5 8.5 0 0 0-17 0m16 0a7.5 7.5 0 1 1-15 0a7.5 7.5 0 0 1 15 0"
+						clip-rule="evenodd"
+					/><path
+						fill-rule="evenodd"
+						d="M6.5 10c0 4.396 1.442 8 3.5 8s3.5-3.604 3.5-8s-1.442-8-3.5-8s-3.5 3.604-3.5 8m6 0c0 3.889-1.245 7-2.5 7s-2.5-3.111-2.5-7S8.745 3 10 3s2.5 3.111 2.5 7"
+						clip-rule="evenodd"
+					/><path
+						d="m3.735 5.312l.67-.742c.107.096.221.19.343.281c1.318.988 3.398 1.59 5.665 1.59c1.933 0 3.737-.437 5.055-1.19a5.59 5.59 0 0 0 .857-.597l.65.76c-.298.255-.636.49-1.01.704c-1.477.845-3.452 1.323-5.552 1.323c-2.47 0-4.762-.663-6.265-1.79a5.81 5.81 0 0 1-.413-.34m0 9.389l.67.74c.107-.096.221-.19.343-.28c1.318-.988 3.398-1.59 5.665-1.59c1.933 0 3.737.436 5.055 1.19c.321.184.608.384.857.596l.65-.76a6.583 6.583 0 0 0-1.01-.704c-1.477-.844-3.452-1.322-5.552-1.322c-2.47 0-4.762.663-6.265 1.789c-.146.11-.284.223-.413.34M2 10.5v-1h16v1z"
+					/></g
+				></svg
+			>
+		</div>
+		<dl class="-ml-1 leading-4 text-white">
+			<dd class="max-sm:text-sm">Web Search</dd>
+			<dt class="truncate text-xs text-gray-400 sm:text-sm">
+				{webSearchMessages[webSearchMessages.length - 1].message}
+			</dt>
+		</dl>
+	</summary>
+	<!-- <summary
 		class="align-center flex cursor-pointer select-none list-none py-1 pl-2.5 pr-2 align-text-top transition-all"
 	>
 		{#if error}
@@ -33,10 +63,7 @@
 		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}>
 			Web search
 		</span>
-		<div class="my-auto transition-all" class:rotate-90={detailsOpen}>
-			<CarbonCaretRight />
-		</div>
-	</summary>
+	</summary> -->
 
 	<div class="content px-5 pb-5 pt-4">
 		{#if webSearchMessages.length === 0}
