@@ -4,7 +4,6 @@
 	export let classNames = "";
 	export let generating = false;
 	import EosIconsLoading from "~icons/eos-icons/loading";
-
 </script>
 
 <button
