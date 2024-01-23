@@ -140,17 +140,17 @@
 		<div class="flex flex-col gap-4">
 			<div>
 				<span class="mb-1 block pb-2 text-sm font-semibold">Avatar</span>
+				<input
+					type="file"
+					accept="image/*"
+					name="avatar"
+					id="avatar"
+					class="hidden"
+					on:change={onFilesChange}
+				/>
+
 				{#if (files && files[0]) || assistant?.avatar}
 					<div class="group relative mx-auto h-12 w-12">
-						<input
-							type="file"
-							accept="image/*"
-							name="avatar"
-							id="avatar"
-							class="invisible z-10 block h-0 w-0"
-							on:change={onFilesChange}
-						/>
-
 						{#if files && files[0]}
 							<img
 								src={URL.createObjectURL(files[0])}
@@ -183,14 +183,6 @@
 					</div>
 				{:else}
 					<div class="mx-auto mb-1 flex w-max flex-row content-around items-center gap-4">
-						<input
-							type="file"
-							accept="image/*"
-							name="avatar"
-							id="avatar"
-							class="invisible z-10 h-0 w-0"
-							on:change={onFilesChange}
-						/>
 						<label
 							for="avatar"
 							class="btn flex h-6 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100"
