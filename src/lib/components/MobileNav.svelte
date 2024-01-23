@@ -3,6 +3,7 @@
 	import { createEventDispatcher } from "svelte";
 	import { browser } from "$app/environment";
 	import { base } from "$app/paths";
+	import { page } from "$app/stores";
 
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonAdd from "~icons/carbon/add";
@@ -34,14 +35,16 @@
 >
 	<button
 		type="button"
-		class="-ml-3 flex h-9 w-9 shrink-0 items-center justify-center"
+		class="-ml-3 flex h-9 w-9 shrink-0 items-center justify-center text-lg"
 		on:click={() => dispatch("toggle", true)}
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
 	<span class="truncate px-4">{title}</span>
-	<a href={`${base}/`} class="-mr-3 flex h-9 w-9 shrink-0 items-center justify-center"
-		><CarbonAdd /></a
+	<a
+		class:invisible={!$page.params.id}
+		href="{base}/"
+		class="-mr-3 flex h-9 w-9 shrink-0 items-center justify-center text-lg"><CarbonAdd /></a
 	>
 </nav>
 <nav
@@ -52,7 +55,7 @@
 	<div class="flex h-12 items-center px-4">
 		<button
 			type="button"
-			class="-mr-3 ml-auto flex h-9 w-9 items-center justify-center"
+			class="-mr-3 ml-auto flex h-9 w-9 items-center justify-center text-lg"
 			on:click={() => dispatch("toggle", false)}
 			aria-label="Close menu"
 			bind:this={closeEl}><CarbonClose /></button
