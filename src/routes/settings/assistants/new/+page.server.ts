@@ -7,9 +7,6 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import sizeof from "image-size";
 import { sha256 } from "$lib/utils/sha256";
-import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN } from "$env/static/private";
-import { timeout } from "$lib/utils/timeout";
-import { generateAvatar } from "$lib/utils/generateAvatar";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -21,10 +18,6 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
-	generateAvatar: z
-		.literal("on")
-		.optional()
-		.transform((el) => !!el),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -95,29 +88,6 @@ export const actions: Actions = {
 			}
 
 			hash = await uploadAvatar(parse.data.avatar, newAssistantId);
-		} else if (
-			ASSISTANTS_GENERATE_AVATAR === "true" &&
-			HF_TOKEN !== "" &&
-			parse.data.generateAvatar
-		) {
-			try {
-				const avatar = await timeout(
-					generateAvatar(parse.data.description, parse.data.name),
-					30000
-				);
-
-				hash = await uploadAvatar(avatar, newAssistantId);
-			} catch (err) {
-				return fail(400, {
-					error: true,
-					errors: [
-						{
-							field: "avatar",
-							message: "Avatar generation failed. Try again or disable the feature.",
-						},
-					],
-				});
-			}
 		}
 
 		const { insertedId } = await collections.assistants.insertOne({

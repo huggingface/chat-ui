@@ -43,11 +43,19 @@
 	let inputMessage3 = assistant?.exampleInputs[2] ?? "";
 	let inputMessage4 = assistant?.exampleInputs[3] ?? "";
 
+	function resetErrors() {
+		if (form) {
+			form.errors = [];
+			form.error = false;
+		}
+	}
+
 	function onFilesChange(e: Event) {
 		const inputEl = e.target as HTMLInputElement;
 		if (inputEl.files?.length) {
 			files = inputEl.files;
-			form = null;
+			resetErrors();
+			deleteExistingAvatar = false;
 		}
 	}
 
@@ -55,14 +63,16 @@
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
 
+	let deleteExistingAvatar = false;
+
 	let loading = false;
 	let generatingAvatar = false;
 
 	async function onGenerate() {
 		generatingAvatar = true;
-		form = null;
+		resetErrors();
 
-		const generatedAvatar = await fetch(base + "/generate", {
+		const generatedAvatar = await fetch(base + "/generate-avatar", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -91,6 +101,8 @@
 			files = [
 				new File([generatedAvatar], "avatar.png", { type: "image/png" }),
 			] as unknown as FileList;
+
+			deleteExistingAvatar = false;
 		}
 
 		generatingAvatar = false;
@@ -106,16 +118,18 @@
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
-		const avatar = formData.get("avatar");
-
-		if (avatar && typeof avatar !== "string" && avatar.size > 0 && compress) {
-			await compress(avatar, {
+		if (files?.[0] && files[0].size > 0 && compress) {
+			await compress(files[0], {
 				maxWidth: 500,
 				maxHeight: 500,
 				quality: 1,
 			}).then((resizedImage) => {
 				formData.set("avatar", resizedImage);
 			});
+		}
+
+		if (deleteExistingAvatar === true) {
+			formData.set("avatar", "null");
 		}
 
 		return async ({ result }) => {
@@ -149,7 +163,7 @@
 					on:change={onFilesChange}
 				/>
 
-				{#if (files && files[0]) || assistant?.avatar}
+				{#if (files && files[0]) || (assistant?.avatar && !deleteExistingAvatar)}
 					<div class="group relative mx-auto h-12 w-12">
 						{#if files && files[0]}
 							<img
@@ -175,10 +189,13 @@
 					<div class="mx-auto w-max pt-1">
 						<button
 							type="button"
-							on:click|stopPropagation|preventDefault={() => (files = null)}
+							on:click|stopPropagation|preventDefault={() => {
+								files = null;
+								if (assistant?.avatar) deleteExistingAvatar = true;
+							}}
 							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
 						>
-							Reset
+							Delete
 						</button>
 					</div>
 				{:else}
@@ -189,7 +206,7 @@
 						>
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>
-						{#if !files?.[0] && $page.data.avatarGeneration && !assistant?.avatar}
+						{#if (!files?.[0] || deleteExistingAvatar || !assistant?.avatar) && $page.data.avatarGeneration}
 							<GenerateAvatarBtn on:click={onGenerate} generating={generatingAvatar} />
 						{/if}
 					</div>
