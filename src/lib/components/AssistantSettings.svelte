@@ -136,7 +136,7 @@
 		</p>
 	{/if}
 
-	<div class="grid flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
+	<div class="mx-1 grid flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4">
 			<div>
 				<span class="mb-1 block pb-2 text-sm font-semibold">Avatar</span>
@@ -209,7 +209,7 @@
 				<span class="mb-1 text-sm font-semibold">Name</span>
 				<input
 					name="name"
-					class=" w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="My awesome model"
 					bind:value={name}
 				/>
