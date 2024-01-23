@@ -59,7 +59,10 @@
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Confirm delete action"
-			on:click|preventDefault={() => dispatch("deleteConversation", conv.id)}
+			on:click|preventDefault={() => {
+				confirmDelete = false;
+				dispatch("deleteConversation", conv.id);
+			}}
 		>
 			<CarbonCheckmark class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
@@ -67,9 +70,7 @@
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Cancel delete action"
-			on:click|preventDefault={() => {
-				confirmDelete = false;
-			}}
+			on:click|preventDefault={() => (confirmDelete = false)}
 		>
 			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>

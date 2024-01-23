@@ -81,6 +81,7 @@
 				webSearchMessages={i === messages.length - 1 ? webSearchMessages : []}
 				on:retry
 				on:vote
+				on:continue
 			/>
 		{:else}
 			{#if !assistant}
@@ -89,7 +90,7 @@
 				<AssistantIntroduction {assistant} on:message />
 			{/if}
 		{/each}
-		{#if pending}
+		{#if pending && messages[messages.length - 1]?.from === "user"}
 			<ChatMessage
 				message={{ from: "assistant", content: "", id: randomUUID() }}
 				model={currentModel}

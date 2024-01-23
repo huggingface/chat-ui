@@ -21,7 +21,6 @@ export async function generateFromDefaultEndpoint({
 					generated_text = generated_text.slice(0, -stop.length).trimEnd();
 				}
 			}
-			tokenStream.return();
 			return generated_text;
 		}
 	}

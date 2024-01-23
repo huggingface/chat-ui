@@ -40,7 +40,7 @@ export async function GET({ params, locals }) {
 		preprompt: conv.preprompt,
 		webSearch: messagesUpTo[messagesUpTo.length - 1].webSearch,
 		messages: messagesUpTo,
-		model: model,
+		model,
 	});
 
 	return new Response(
