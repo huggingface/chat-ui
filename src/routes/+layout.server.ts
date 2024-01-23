@@ -12,6 +12,7 @@ import {
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
+	CONVERSATION_BRANCHING,
 } from "$env/static/private";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
@@ -127,5 +128,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
+		conversationBranching: CONVERSATION_BRANCHING === "true",
 	};
 };

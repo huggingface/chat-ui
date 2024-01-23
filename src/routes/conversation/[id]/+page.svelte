@@ -293,7 +293,7 @@
 		}
 	}
 
-	async function onRetry(event: CustomEvent<{ id: Message["id"]; content: string }>) {
+	async function onRetry(event: CustomEvent<{ id: Message["id"]; content?: string }>) {
 		if (!data.shared) {
 			writeMessage(event.detail.content, event.detail.id);
 		} else {

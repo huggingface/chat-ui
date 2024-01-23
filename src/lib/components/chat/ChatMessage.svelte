@@ -13,6 +13,8 @@
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
+	import CarbonPen from "~icons/carbon/pen";
+
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
 
@@ -52,7 +54,7 @@
 	export let webSearchMessages: WebSearchUpdate[];
 
 	const dispatch = createEventDispatcher<{
-		retry: { content: string; id: Message["id"] };
+		retry: { content?: string; id: Message["id"] };
 		vote: { score: Message["score"]; id: Message["id"] };
 	}>();
 
@@ -129,6 +131,8 @@
 			isCopied = false;
 		}, 1000);
 	}
+
+	let editMode = false;
 </script>
 
 {#if message.from === "assistant"}
@@ -257,11 +261,11 @@
 				</div>
 			{/if}
 
-			<div
-				class="max-w-full whitespace-break-spaces break-words rounded-2xl px-5 py-3.5 text-gray-500 dark:text-gray-400"
-			>
-				{message.content.trim()}
-			</div>
+			<input
+				class="disabled w-max appearance-none whitespace-break-spaces break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+				value={message.content.trim()}
+				disabled
+			/>
 			{#if !loading}
 				<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
 					{#if downloadLink}
@@ -280,10 +284,20 @@
 							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 							title="Retry"
 							type="button"
-							on:click={() => dispatch("retry", { content: message.content, id: message.id })}
+							on:click={() => dispatch("retry", { id: message.id })}
 						>
 							<CarbonRotate360 />
 						</button>
+						{#if $page.data.conversationBranching}
+							<button
+								class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+								title="Branch"
+								type="button"
+								on:click={() => (editMode = !editMode)}
+							>
+								<CarbonPen />
+							</button>
+						{/if}
 					{/if}
 				</div>
 			{/if}
