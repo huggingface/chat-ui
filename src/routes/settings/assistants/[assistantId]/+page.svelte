@@ -91,7 +91,7 @@
 		<div
 			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
 		>
-			<input disabled class="flex-1 truncate" value={shareUrl} />
+			<input disabled class="flex-1 truncate bg-inherit" value={shareUrl} />
 			<CopyToClipBoardBtn
 				value={shareUrl}
 				classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
