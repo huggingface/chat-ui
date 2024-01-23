@@ -10,6 +10,7 @@
 
 	import UserIcon from "~icons/carbon/user";
 	import { fade, fly } from "svelte/transition";
+	import { PUBLIC_APP_ASSETS } from "$env/static/public";
 	export let data;
 
 	let previousPage: string = base;
@@ -21,6 +22,8 @@
 	});
 
 	const settings = useSettingsStore();
+
+	const isHuggingChat = PUBLIC_APP_ASSETS === "huggingchat";
 </script>
 
 <div
@@ -67,7 +70,8 @@
 					{/if}
 				</a>
 			{/each}
-			{#if data.enableAssistants}
+			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
+			{#if data.enableAssistants && (!isHuggingChat || data.assistants.length >= 1)}
 				<h3 class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">Assistants</h3>
 				{#each data.assistants as assistant}
 					<a
