@@ -199,10 +199,10 @@
 						</button>
 					</div>
 				{:else}
-					<div class="mx-auto mb-1 flex w-max flex-row content-around items-center gap-4">
+					<div class="mb-1 flex w-max flex-row gap-4">
 						<label
 							for="avatar"
-							class="btn flex h-6 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100"
+							class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100"
 						>
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>

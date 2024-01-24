@@ -10,7 +10,7 @@
 	type="button"
 	on:click
 	disabled={generating}
-	class="btn flex h-6 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all {classNames}"
+	class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all {classNames}"
 	class:hover:bg-gray-100={!generating}
 >
 	{#if generating}
