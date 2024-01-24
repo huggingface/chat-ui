@@ -41,7 +41,7 @@
 			<img
 				src="{base}/settings/assistants/{conv.assistantId}/avatar?hash={conv.avatarHash}"
 				alt="Assistant avatar"
-				class="mr-1.5 inline size-4 rounded-full"
+				class="mr-1.5 inline size-4 rounded-full object-cover"
 			/>
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else if conv.assistantId}

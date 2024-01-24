@@ -7,9 +7,6 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import sizeof from "image-size";
 import { sha256 } from "$lib/utils/sha256";
-import { ASSISTANTS_GENERATE_AVATAR, HF_TOKEN } from "$env/static/private";
-import { generateAvatar } from "$lib/utils/generateAvatar";
-import { timeout } from "$lib/utils/timeout";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -20,11 +17,7 @@ const newAsssistantSchema = z.object({
 	exampleInput2: z.string().optional(),
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
-	avatar: z.instanceof(File).optional(),
-	generateAvatar: z
-		.literal("on")
-		.optional()
-		.transform((el) => !!el),
+	avatar: z.union([z.instanceof(File), z.literal("null")]).optional(),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -87,8 +80,10 @@ export const actions: Actions = {
 			parse?.data?.exampleInput4 ?? "",
 		].filter((input) => !!input);
 
+		const deleteAvatar = parse.data.avatar === "null";
+
 		let hash;
-		if (parse.data.avatar && parse.data.avatar.size > 0) {
+		if (parse.data.avatar && parse.data.avatar !== "null" && parse.data.avatar.size > 0) {
 			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
 
 			if ((dims.height ?? 1000) > 512 || (dims.width ?? 1000) > 512) {
@@ -106,28 +101,14 @@ export const actions: Actions = {
 			}
 
 			hash = await uploadAvatar(parse.data.avatar, assistant._id);
-		} else if (
-			ASSISTANTS_GENERATE_AVATAR === "true" &&
-			HF_TOKEN !== "" &&
-			parse.data.generateAvatar
-		) {
-			try {
-				const avatar = await timeout(
-					generateAvatar(parse.data.description, parse.data.name),
-					30000
-				);
+		} else if (deleteAvatar) {
+			// delete the avatar
+			const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
 
-				hash = await uploadAvatar(avatar, assistant._id);
-			} catch (err) {
-				return fail(400, {
-					error: true,
-					errors: [
-						{
-							field: "avatar",
-							message: "Avatar generation failed. Try again or disable the feature.",
-						},
-					],
-				});
+			let fileId = await fileCursor.next();
+			while (fileId) {
+				await collections.bucket.delete(fileId._id);
+				fileId = await fileCursor.next();
 			}
 		}
 
@@ -140,7 +121,7 @@ export const actions: Actions = {
 				createdByName: locals.user?.username ?? locals.user?.name,
 				...parse.data,
 				exampleInputs,
-				avatar: hash ?? assistant.avatar,
+				avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			}
