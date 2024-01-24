@@ -7,14 +7,9 @@
 	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
+	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
-	interface Conv {
-		id: string;
-		title: string;
-		updatedAt: Date;
-	}
-
-	export let conversations: Array<Conv> = [];
+	export let conversations: ConvSidebar[] = [];
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
 

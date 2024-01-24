@@ -2,6 +2,7 @@ import type { ObjectId } from "mongodb";
 import type { Message } from "./Message";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
+import type { Assistant } from "./Assistant";
 
 export interface Conversation extends Timestamps {
 	_id: ObjectId;
@@ -20,4 +21,5 @@ export interface Conversation extends Timestamps {
 	};
 
 	preprompt?: string;
+	assistantId?: Assistant["_id"];
 }
