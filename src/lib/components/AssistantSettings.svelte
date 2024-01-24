@@ -83,7 +83,13 @@
 		}
 
 		if (deleteExistingAvatar === true) {
-			formData.set("avatar", "null");
+			if (assistant?.avatar) {
+				// if there is an avatar we explicitly removei t
+				formData.set("avatar", "null");
+			} else {
+				// else we just remove it from the input
+				formData.delete("avatar");
+			}
 		}
 
 		return async ({ result }) => {
@@ -145,7 +151,7 @@
 							type="button"
 							on:click|stopPropagation|preventDefault={() => {
 								files = null;
-								if (assistant?.avatar) deleteExistingAvatar = true;
+								deleteExistingAvatar = true;
 							}}
 							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
 						>
