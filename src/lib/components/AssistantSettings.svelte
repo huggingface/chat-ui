@@ -246,7 +246,7 @@
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 			<textarea
 				name="preprompt"
-				class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
 			/>
