@@ -9,9 +9,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { page } from "$app/stores";
 	import IconLoading from "./icons/IconLoading.svelte";
-	import GenerateAvatarBtn from "./GenerateAvatarBtn.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -66,50 +64,6 @@
 	let deleteExistingAvatar = false;
 
 	let loading = false;
-	let generatingAvatar = false;
-
-	async function onGenerate() {
-		generatingAvatar = true;
-		resetErrors();
-
-		const generatedAvatar = await fetch(base + "/generate-avatar", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				description,
-				name,
-			}),
-		})
-			.then(async (res) => {
-				if (!res.ok) {
-					throw new Error((await res.json()).message);
-				} else {
-					return res.blob();
-				}
-			})
-			.catch((error) => {
-				form = {
-					error: true,
-					errors: [{ field: "avatar", message: error.message }],
-				};
-				generatingAvatar = false;
-			});
-
-		if (generatedAvatar) {
-			files = [
-				new File([generatedAvatar], "avatar.png", { type: "image/png" }),
-			] as unknown as FileList;
-
-			deleteExistingAvatar = false;
-		}
-
-		generatingAvatar = false;
-	}
-
-	let name = assistant?.name ?? "";
-	let description = assistant?.description ?? "";
 </script>
 
 <form
@@ -206,9 +160,6 @@
 						>
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>
-						{#if (!files?.[0] || deleteExistingAvatar || !assistant?.avatar) && $page.data.avatarGeneration}
-							<GenerateAvatarBtn on:click={onGenerate} generating={generatingAvatar} />
-						{/if}
 					</div>
 					<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 				{/if}
@@ -220,7 +171,7 @@
 					name="name"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="My awesome model"
-					bind:value={name}
+					value={assistant?.name ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("name", form)}</p>
 			</label>
@@ -231,7 +182,7 @@
 					name="description"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="He knows everything about python"
-					bind:value={description}
+					value={assistant?.description ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("description", form)}</p>
 			</label>
