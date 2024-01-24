@@ -349,6 +349,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			});
 
 			await summarizeIfNeeded;
+			controller.close();
 			return;
 		},
 		async cancel() {
