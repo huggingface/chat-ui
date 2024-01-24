@@ -8,9 +8,11 @@ import type { SvelteComponent } from "svelte";
 import { Resvg } from "@resvg/resvg-js";
 import satori from "satori";
 import { html } from "satori-html";
-import { base } from "$app/paths";
 
-export const GET: RequestHandler = (async ({ url, params, fetch }) => {
+import InterRegular from "../../../../../static/fonts/Inter-Regular.ttf";
+import InterBold from "../../../../../static/fonts/Inter-Bold.ttf";
+
+export const GET: RequestHandler = (async ({ url, params }) => {
 	const assistant = await collections.assistants.findOne({
 		_id: new ObjectId(params.assistantId),
 	});
@@ -39,12 +41,12 @@ export const GET: RequestHandler = (async ({ url, params, fetch }) => {
 		fonts: [
 			{
 				name: "Inter",
-				data: await fetch(base + "/fonts/Inter-Regular.ttf").then((r) => r.arrayBuffer()),
+				data: InterRegular as unknown as ArrayBuffer,
 				weight: 500,
 			},
 			{
 				name: "Inter",
-				data: await fetch(base + "/fonts/Inter-Bold.ttf").then((r) => r.arrayBuffer()),
+				data: InterBold as unknown as ArrayBuffer,
 				weight: 700,
 			},
 		],
