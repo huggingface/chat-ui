@@ -174,36 +174,33 @@ You can customize the parameters passed to the model or even use a new model by 
 ```env
 MODELS=`[
   {
-    "name": "OpenAssistant/oasst-sft-4-pythia-12b-epoch-3.5",
-    "datasetName": "OpenAssistant/oasst1",
-    "description": "A good alternative to ChatGPT",
-    "websiteUrl": "https://open-assistant.io",
-    "userMessageToken": "<|prompter|>", # This does not need to be a token, can be any string
-    "assistantMessageToken": "<|assistant|>", # This does not need to be a token, can be any string
-    "userMessageEndToken": "<|endoftext|>", # Applies only to user messages. Can be any string.
-    "assistantMessageEndToken": "<|endoftext|>", # Applies only to assistant messages. Can be any string.
-    "preprompt": "Below are a series of dialogues between various people and an AI assistant. The AI tries to be helpful, polite, honest, sophisticated, emotionally aware, and humble but knowledgeable. The assistant is happy to help with almost anything and will do its best to understand exactly what is needed. It also tries to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer. That said, the assistant is practical and really does its best, and doesn't let caution get too much in the way of being useful.\n-----\n",
+    "name": "mistralai/Mistral-7B-Instruct-v0.2",
+    "displayName": "mistralai/Mistral-7B-Instruct-v0.2",
+    "description": "Mistral 7B is a new Apache 2.0 model, released by Mistral AI that outperforms Llama2 13B in benchmarks.",
+    "websiteUrl": "https://mistral.ai/news/announcing-mistral-7b/",
+    "preprompt": "",
+    "chatPromptTemplate" : "<s>{{#each messages}}{{#ifUser}}[INST] {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}} [/INST]{{/ifUser}}{{#ifAssistant}}{{content}}</s>{{/ifAssistant}}{{/each}}",
+    "parameters": {
+      "temperature": 0.3,
+      "top_p": 0.95,
+      "repetition_penalty": 1.2,
+      "top_k": 50,
+      "truncate": 3072,
+      "max_new_tokens": 1024,
+      "stop": ["</s>"]
+    },
     "promptExamples": [
       {
         "title": "Write an email from bullet list",
         "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
       }, {
         "title": "Code a snake game",
-        "prompt": "Code a basic snake game in python and give explanations for each step."
+        "prompt": "Code a basic snake game in python, give explanations for each step."
       }, {
         "title": "Assist in a task",
         "prompt": "How do I make a delicious lemon cheesecake?"
       }
-    ],
-    "parameters": {
-      "temperature": 0.9,
-      "top_p": 0.95,
-      "repetition_penalty": 1.2,
-      "top_k": 50,
-      "truncate": 1000,
-      "max_new_tokens": 1024,
-      "stop": ["<|endoftext|>"]  # This does not need to be tokens, can be any list of strings
-    }
+    ]
   }
 ]`
 
