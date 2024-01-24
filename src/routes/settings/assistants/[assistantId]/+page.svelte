@@ -33,7 +33,7 @@
 			<img
 				src={`${base}/settings/assistants/${assistant?._id}/avatar?hash=${assistant?.avatar}`}
 				alt="Avatar"
-				class="h-24 w-24 rounded-full object-cover"
+				class="size-16 flex-none rounded-full object-cover sm:size-24"
 			/>
 		{:else}
 			<div
@@ -115,7 +115,9 @@
 
 	<h2 class="mt-4 text-lg font-semibold">System Instructions</h2>
 
-	<textarea disabled class="h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+	<textarea
+		disabled
+		class="min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 2xl:min-h-[12lh]"
 		>{assistant?.preprompt}</textarea
 	>
 
