@@ -124,7 +124,7 @@
 				Application Settings
 			</a>
 		</div>
-		<div class="col-span-1 overflow-y-auto max-md:pt-6 md:col-span-2">
+		<div class="col-span-1 overflow-y-auto px-4 max-md:-mx-4 max-md:pt-6 md:col-span-2">
 			<slot />
 		</div>
 
