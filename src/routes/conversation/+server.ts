@@ -18,11 +18,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
+			assistantId: z.string().optional(),
 			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
 
-	let preprompt = values.preprompt;
 	let embeddingModel: string;
 
 	if (values.fromShare) {
@@ -37,8 +37,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		title = conversation.title;
 		messages = conversation.messages;
 		values.model = conversation.model;
+		values.preprompt = conversation.preprompt;
+		values.assistantId = conversation.assistantId?.toString();
 		embeddingModel = conversation.embeddingModel;
-		preprompt = conversation.preprompt;
 	}
 
 	const model = models.find((m) => m.name === values.model);
@@ -54,7 +55,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	// Use the model preprompt if there is no conversation/preprompt in the request body
-	preprompt = preprompt === undefined ? model?.preprompt : preprompt;
+	const preprompt = await (async () => {
+		if (values.assistantId) {
+			const assistant = await collections.assistants.findOne({
+				_id: new ObjectId(values.assistantId),
+			});
+			return assistant?.preprompt;
+		} else {
+			return values?.preprompt ?? model?.preprompt;
+		}
+	})();
 
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
@@ -62,6 +72,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		messages,
 		model: values.model,
 		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
+		assistantId: values.assistantId ? new ObjectId(values.assistantId) : undefined,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		embeddingModel,

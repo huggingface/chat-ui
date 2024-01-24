@@ -44,11 +44,21 @@ export const load = async ({ params, depends, locals }) => {
 			throw error(404, "Conversation not found.");
 		}
 	}
+
 	return {
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
 		preprompt: conversation.preprompt,
+		assistant: conversation.assistantId
+			? JSON.parse(
+					JSON.stringify(
+						await collections.assistants.findOne({
+							_id: new ObjectId(conversation.assistantId),
+						})
+					)
+			  )
+			: null,
 		shared,
 	};
 };

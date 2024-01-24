@@ -1,3 +1,4 @@
+import type { Assistant } from "./Assistant";
 import type { Message } from "./Message";
 import type { Timestamps } from "./Timestamps";
 
@@ -12,4 +13,5 @@ export interface SharedConversation extends Timestamps {
 	title: string;
 	messages: Message[];
 	preprompt?: string;
+	assistantId?: Assistant["_id"];
 }
