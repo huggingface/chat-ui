@@ -23,7 +23,7 @@
 						assistant.avatar
 					}`}
 					alt="avatar"
-					class="size-16 rounded-full object-cover md:size-32"
+					class="size-16 flex-none rounded-full object-cover md:size-32"
 				/>
 			{:else}
 				<div
@@ -40,7 +40,7 @@
 					Assistant
 				</p>
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
-				<p class="text-sm text-gray-500 dark:text-gray-400">
+				<p class="text-balance text-sm text-gray-500 dark:text-gray-400">
 					{assistant.description}
 				</p>
 
@@ -57,7 +57,7 @@
 				{/if}
 			</div>
 		</div>
-		<div class="absolute right-2 top-3 sm:top-2">
+		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"
 				class="flex size-7 items-center justify-center rounded-full border bg-gray-200 p-1 text-xs hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
