@@ -45,17 +45,17 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-2 overflow-hidden rounded-2xl bg-white p-4 text-center shadow-2xl outline-none max-sm:px-6 md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
+		class="z-10 flex max-w-[90dvw] flex-col content-center items-center gap-x-10 gap-y-2 overflow-hidden rounded-2xl bg-white p-4 text-center shadow-2xl outline-none max-sm:px-6 md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 	>
 		{#if data.assistant.avatar}
 			<img
-				class="h-24 w-24 rounded-full object-cover"
+				class="size-16 flex-none rounded-full object-cover sm:size-24"
 				src="{base}/settings/assistants/{data.assistant._id}/avatar?hash={data.assistant.avatar}"
 				alt="avatar"
 			/>
 		{:else}
 			<div
-				class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
+				class="flex size-24 flex-none items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 			>
 				{data.assistant.name[0]}
 			</div>
@@ -63,7 +63,7 @@
 		<h1 class="text-2xl font-bold">
 			{data.assistant.name}
 		</h1>
-		<h3 class="text-sm text-gray-700">
+		<h3 class="text-balance text-sm text-gray-700">
 			{data.assistant.description}
 		</h3>
 		{#if data.assistant.createdByName}
