@@ -1,4 +1,3 @@
-import { APP_BASE } from "$env/static/private";
 import ChatThumbnail from "./ChatThumbnail.svelte";
 import { collections } from "$lib/server/database";
 import { error, type RequestHandler } from "@sveltejs/kit";
@@ -11,8 +10,9 @@ import { html } from "satori-html";
 
 import InterRegular from "../../../../../static/fonts/Inter-Regular.ttf";
 import InterBold from "../../../../../static/fonts/Inter-Bold.ttf";
+import sharp from "sharp";
 
-export const GET: RequestHandler = (async ({ url, params }) => {
+export const GET: RequestHandler = (async ({ params }) => {
 	const assistant = await collections.assistants.findOne({
 		_id: new ObjectId(params.assistantId),
 	});
@@ -21,14 +21,31 @@ export const GET: RequestHandler = (async ({ url, params }) => {
 		throw error(404, "Assistant not found.");
 	}
 
+	let avatar = "";
+	const fileId = collections.bucket.find({ filename: assistant._id.toString() });
+	const file = await fileId.next();
+	if (file) {
+		avatar = await (async () => {
+			const fileStream = collections.bucket.openDownloadStream(file?._id);
+
+			const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+				const chunks: Uint8Array[] = [];
+				fileStream.on("data", (chunk) => chunks.push(chunk));
+				fileStream.on("error", reject);
+				fileStream.on("end", () => resolve(Buffer.concat(chunks)));
+			});
+
+			return fileBuffer;
+		})()
+			.then(async (buf) => sharp(buf).jpeg().toBuffer()) // convert to jpeg bc satori png is really slow
+			.then(async (buf) => "data:image/jpeg;base64," + buf.toString("base64"));
+	}
+
 	const renderedComponent = (ChatThumbnail as unknown as SvelteComponent).render({
-		href: url.origin,
 		name: assistant.name,
 		description: assistant.description,
 		createdByName: assistant.createdByName,
-		avatarUrl: assistant.avatar
-			? url.origin + APP_BASE + "/settings/assistants/" + assistant._id + "/avatar"
-			: undefined,
+		avatar,
 	});
 
 	const reactLike = html(
