@@ -10,7 +10,7 @@
 <div class="flex h-full w-full flex-col items-center justify-center bg-black p-2">
 	<div class="flex w-full max-w-[540px] items-start justify-center text-white">
 		{#if avatar}
-			<img class="h-64 w-64 rounded-full" src={avatar} alt="avatar" />
+			<img class="h-64 w-64 rounded-full" style="object-fit: cover;" src={avatar} alt="avatar" />
 		{/if}
 		<div class="ml-10 flex flex-col items-start">
 			<p class="mb-2 mt-0 text-3xl font-normal text-gray-400">
