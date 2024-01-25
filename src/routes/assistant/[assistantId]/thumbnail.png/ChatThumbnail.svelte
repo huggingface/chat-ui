@@ -1,24 +1,23 @@
 <script lang="ts">
-	import { base } from "$app/paths";
-	import { PUBLIC_APP_ASSETS } from "$env/static/public";
-
-	export let href: string = "";
 	export let name: string;
 	export let description: string = "";
 	export let createdByName: string | undefined;
-	export let avatarUrl: string | undefined;
+	export let avatar: string | undefined;
 
-	const imgUrl = `${href}${base}/${PUBLIC_APP_ASSETS}/logo.svg`;
+	import logo from "../../../../../static/huggingchat/logo.svg?raw";
 </script>
 
 <div class="flex h-full w-full flex-col items-center justify-center bg-black p-2">
 	<div class="flex w-full max-w-[540px] items-start justify-center text-white">
-		{#if avatarUrl}
-			<img class="h-64 w-64 rounded-full" src={avatarUrl} alt="avatar" />
+		{#if avatar}
+			<img class="h-64 w-64 rounded-full" src={avatar} alt="avatar" />
 		{/if}
 		<div class="ml-10 flex flex-col items-start">
 			<p class="mb-2 mt-0 text-3xl font-normal text-gray-400">
-				<img class="mr-1.5 h-8 w-8" src={imgUrl} alt="app logo" />
+				<span class="mr-1.5 h-8 w-8">
+					<!-- eslint-disable-next-line -->
+					{@html logo}
+				</span>
 				AI assistant
 			</p>
 			<h1 class="m-0 {name.length < 38 ? 'text-5xl' : 'text-4xl'} font-black">
