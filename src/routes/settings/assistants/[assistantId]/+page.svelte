@@ -43,13 +43,13 @@
 			</div>
 		{/if}
 
-		<div>
+		<div class="flex-1">
 			<h1 class="text-xl font-semibold">
 				{assistant?.name}
 			</h1>
 
 			{#if assistant?.description}
-				<p class="pb-2 text-sm text-gray-500">
+				<p class="mb-1 text-sm text-gray-500">
 					{assistant.description}
 				</p>
 			{/if}
@@ -57,18 +57,54 @@
 			<p class="text-sm text-gray-500">
 				Model: <span class="font-semibold"> {assistant?.modelId} </span>
 			</p>
-			<button
-				class="{isActive
-					? 'bg-gray-100'
-					: 'bg-black text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1"
-				disabled={isActive}
-				name="Activate model"
-				on:click|stopPropagation={() => {
-					$settings.activeModel = $page.params.assistantId;
-				}}
+			<div
+				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
 			>
-				{isActive ? "Active" : "Activate"}
-			</button>
+				<button
+					class="{isActive
+						? 'bg-gray-100 text-gray-800'
+						: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
+					disabled={isActive}
+					name="Activate model"
+					on:click|stopPropagation={() => {
+						$settings.activeModel = $page.params.assistantId;
+					}}
+				>
+					{isActive ? "Active" : "Activate"}
+				</button>
+				{#if assistant?.createdByMe}
+					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
+						><CarbonPen class="mr-1.5 inline text-xs" />Edit
+					</a>
+					<form method="POST" action="?/delete" use:enhance>
+						<button type="submit" class="flex items-center underline">
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+						>
+					</form>
+				{:else}
+					<form method="POST" action="?/unsubscribe" use:enhance>
+						<button type="submit" class="underline">
+							<CarbonTrash class="mr-1.5 inline text-xs" />Remove</button
+						>
+					</form>
+					<form method="POST" action="?/edit" use:enhance class="hidden">
+						<button type="submit" class="underline">
+							<CarbonCopy class="mr-1.5 inline text-xs" />Duplicate</button
+						>
+					</form>
+					{#if !assistant?.reported}
+						<form method="POST" action="?/report" use:enhance>
+							<button type="submit" class="underline">
+								<CarbonFlag class="mr-1.5 inline text-xs" />Report</button
+							>
+						</form>
+					{:else}
+						<button type="button" disabled class="text-gray-700">
+							<CarbonFlag class="mr-1.5 inline text-xs" />Reported</button
+						>
+					{/if}
+				{/if}
+			</div>
 		</div>
 	</div>
 
@@ -117,42 +153,7 @@
 
 	<textarea
 		disabled
-		class="min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 2xl:min-h-[12lh]"
+		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-gray-600 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
 		>{assistant?.preprompt}</textarea
 	>
-
-	<div class="mt-5 flex gap-4">
-		{#if assistant?.createdByMe}
-			<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
-				><CarbonPen class="mr-1.5 inline" />Edit assistant</a
-			>
-			<form method="POST" action="?/delete" use:enhance>
-				<button type="submit" class="flex items-center underline">
-					<CarbonTrash class="mr-1.5 inline" />Delete assistant</button
-				>
-			</form>
-		{:else}
-			<form method="POST" action="?/unsubscribe" use:enhance>
-				<button type="submit" class="underline">
-					<CarbonTrash class="mr-1.5 inline" />Remove assistant</button
-				>
-			</form>
-			<form method="POST" action="?/edit" use:enhance class="hidden">
-				<button type="submit" class="underline">
-					<CarbonCopy class="mr-1.5 inline" />Duplicate assistant</button
-				>
-			</form>
-			{#if !assistant?.reported}
-				<form method="POST" action="?/report" use:enhance>
-					<button type="submit" class="underline">
-						<CarbonFlag class="mr-1.5 inline" />Report assistant</button
-					>
-				</form>
-			{:else}
-				<button type="button" disabled class="text-gray-700">
-					<CarbonFlag class="mr-1.5 inline" />Reported</button
-				>
-			{/if}
-		{/if}
-	</div>
 </div>
