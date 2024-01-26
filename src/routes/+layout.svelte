@@ -22,12 +22,15 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { browser } from "$app/environment";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
+	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 
 	export let data;
 
 	let isNavOpen = false;
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
+
+	let isExpanded = false;
 
 	async function onError() {
 		// If a new different error comes, wait for the current error to hide first
@@ -176,8 +179,17 @@
 	<DisclaimerModal />
 {/if}
 
+<ExpandNavigation
+	{isExpanded}
+	on:click={() => (isExpanded = !isExpanded)}
+	classNames="absolute inset-y-0 z-10 my-auto {isExpanded
+		? 'left-[280px]'
+		: 'left-0'} transition-[300ms]"
+/>
 <div
-	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd md:grid-cols-[280px,1fr] md:grid-rows-[1fr] dark:text-gray-300"
+	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {isExpanded
+		? 'md:grid-cols-[280px,1fr]'
+		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] md:grid-rows-[1fr] dark:text-gray-300"
 >
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
 		<NavMenu
@@ -189,7 +201,9 @@
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</MobileNav>
-	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
+	<nav
+		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+	>
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
