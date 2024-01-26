@@ -90,7 +90,7 @@ By default (for backward compatibility), when `TEXT_EMBEDDING_MODELS` environmen
 
 You can customize the embedding model by setting `TEXT_EMBEDDING_MODELS` in your `.env.local` file. For example:
 
-```env
+```json
 TEXT_EMBEDDING_MODELS = `[
   {
     "name": "Xenova/gte-small",
@@ -130,7 +130,7 @@ When more than one embedding models are supplied in `.env.local` file, the first
 
 The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
 
-```env
+```json
 OPENID_CONFIG=`{
   PROVIDER_URL: "<your OIDC issuer>",
   CLIENT_ID: "<your OIDC client ID>",
@@ -172,7 +172,7 @@ You can also simply enable the local websearch by setting `USE_LOCAL_WEBSEARCH=t
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
-```env
+```json
 MODELS=`[
   {
     "name": "mistralai/Mistral-7B-Instruct-v0.2",
@@ -228,7 +228,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 We currently only support IDEFICS as a multimodal model, hosted on TGI. You can enable it by using the followin config (if you have a PRO HF Api token):
 
-```env
+```json
     {
       "name": "HuggingFaceM4/idefics-80b-instruct",
       "multimodal" : true,
@@ -255,7 +255,7 @@ A good option is to hit a [text-generation-inference](https://github.com/hugging
 
 To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
-```env
+```json
 {
 // rest of the model config here
 "endpoints": [{
@@ -326,7 +326,7 @@ If you want to run chat-ui with llama.cpp, you can do the following, using Zephy
 2. Run the server with the following command: `./server -m models/zephyr-7b-beta.Q4_K_M.gguf -c 2048 -np 3`
 3. Add the following to your `.env.local`:
 
-```env
+```json
 MODELS=`[
   {
       "name": "Local Zephyr",
@@ -362,7 +362,7 @@ ollama run mistral
 
 Then specify the endpoints like so:
 
-```env
+```json
 MODELS=`[
   {
       "name": "Ollama Mistral",
@@ -391,7 +391,7 @@ MODELS=`[
 
 You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
 
-```env
+```json
 "endpoints": [
     {
       "type" : "aws",
@@ -427,7 +427,7 @@ For `Bearer` you can use a token, which can be grabbed from [here](https://huggi
 
 You can then add the generated information and the `authorization` parameter to your `.env.local`.
 
-```env
+```json
 "endpoints": [
 {
 "url": "https://HOST:PORT",
@@ -442,7 +442,7 @@ Please note that if `HF_TOKEN` is also set or not empty, it will take precedence
 
 If the model being hosted will be available on multiple servers/instances add the `weight` parameter to your `.env.local`. The `weight` will be used to determine the probability of requesting a particular endpoint.
 
-```env
+```json
 "endpoints": [
 {
 "url": "https://HOST:PORT",
@@ -469,7 +469,7 @@ If you're using a self-signed certificate, e.g. for testing or development purpo
 A model can use any of the embedding models defined in `.env.local`, (currently used when web searching),
 by default it will use the first embedding model, but it can be changed with the field `embeddingModel`:
 
-```env
+```json
 TEXT_EMBEDDING_MODELS = `[
   {
     "name": "Xenova/gte-small",
