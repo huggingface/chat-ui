@@ -16,6 +16,7 @@ export interface Settings extends Timestamps {
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
 	hideEmojiOnSidebar?: boolean;
+	collapsedNavigation?: boolean;
 
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,
 	activeModel: defaultModel.id,
 	hideEmojiOnSidebar: false,
+	collapsedNavigation: false,
 	customPrompts: {},
 	assistants: [],
 };
