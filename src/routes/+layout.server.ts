@@ -146,7 +146,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
-			collapsedNavigation: settings?.collapsedNavigation ?? false,
 			shareConversationsWithModelAuthors:
 				settings?.shareConversationsWithModelAuthors ??
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,

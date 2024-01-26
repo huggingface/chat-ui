@@ -30,6 +30,8 @@
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
+	let isExpanded = false;
+
 	async function onError() {
 		// If a new different error comes, wait for the current error to hide first
 		if ($error && currentError && $error !== currentError) {
@@ -178,17 +180,14 @@
 {/if}
 
 <ExpandNavigation
-	isCollapsed={$settings.collapsedNavigation}
-	on:click={() => {
-		$settings.collapsedNavigation = !$settings.collapsedNavigation;
-	}}
-	classNames="absolute max-md:hidden inset-y-0 z-10 my-auto {!$settings.collapsedNavigation
+	{isExpanded}
+	on:click={() => (isExpanded = !isExpanded)}
+	classNames="absolute inset-y-0 z-10 my-auto {isExpanded
 		? 'left-[280px]'
 		: 'left-0'} transition-[300ms]"
 />
-
 <div
-	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!$settings.collapsedNavigation
+	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {isExpanded
 		? 'md:grid-cols-[280px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] md:grid-rows-[1fr] dark:text-gray-300"
 >
