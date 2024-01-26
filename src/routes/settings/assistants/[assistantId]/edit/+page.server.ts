@@ -112,7 +112,7 @@ export const actions: Actions = {
 			}
 		}
 
-		const { acknowledged } = await collections.assistants.replaceOne(
+		const { acknowledged } = await collections.assistants.updateOne(
 			{
 				_id: assistant._id,
 			},
@@ -122,7 +122,6 @@ export const actions: Actions = {
 				...parse.data,
 				exampleInputs,
 				avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
-				createdAt: new Date(),
 				updatedAt: new Date(),
 			}
 		);

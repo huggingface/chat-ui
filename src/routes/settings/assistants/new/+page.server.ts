@@ -99,12 +99,14 @@ export const actions: Actions = {
 			avatar: hash,
 			createdAt: new Date(),
 			updatedAt: new Date(),
+			userCount: 1,
+			featured: false,
 		});
 
 		// add insertedId to user settings
 
 		await collections.settings.updateOne(authCondition(locals), {
-			$push: { assistants: insertedId },
+			$addToSet: { assistants: insertedId },
 		});
 
 		throw redirect(302, `${base}/settings/assistants/${insertedId}`);

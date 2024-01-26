@@ -12,4 +12,7 @@ export interface Assistant extends Timestamps {
 	modelId: string;
 	exampleInputs: string[];
 	preprompt: string;
+
+	userCount?: number;
+	featured?: boolean;
 }
