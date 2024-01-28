@@ -41,7 +41,7 @@ export async function endpointOai(
 					model: model.id ?? model.name,
 					prompt: await buildPrompt({
 						messages: conversation.messages,
-						ragContext: conversation.messages[conversation.messages.length - 1].ragContext,
+						ragContexts: conversation.messages[conversation.messages.length - 1].ragContexts,
 						preprompt: conversation.preprompt,
 						model,
 					}),
@@ -57,7 +57,7 @@ export async function endpointOai(
 	} else if (completion === "chat_completions") {
 		return async ({ conversation }) => {
 			let messages = conversation.messages;
-			const ragContext = conversation.messages[conversation.messages.length - 1].ragContext;
+			const ragContext = conversation.messages[conversation.messages.length - 1].ragContexts;
 
 			if (ragContext && ragContext.type === "webSearch") {
 				const webSearchContext = ragContext as RagContextWebSearch;
