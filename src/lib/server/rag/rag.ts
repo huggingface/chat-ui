@@ -28,4 +28,5 @@ namespace RAGs {
 	export const webSearch = ragWebsearch;
 	export const pdfChat = ragPdfchat;
 }
+
 export default RAGs;

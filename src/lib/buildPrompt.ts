@@ -39,10 +39,6 @@ export async function buildPrompt({
 			}
 		}
 	}
-	// if (ragContext) {
-	// 	const { type: ragType } = ragContext;
-	// 	messages = RAGs[ragType].buildPrompt(messages, ragContext as RagContextWebSearch);
-	// }
 
 	// section to handle potential files input
 	if (model.multimodal) {
