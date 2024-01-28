@@ -13,7 +13,11 @@ interface buildPromptOptions {
 	id?: Conversation["_id"];
 	model: BackendModel;
 	locals?: App.Locals;
-	ragContext?: RagContext;
+	ragContexts?: {
+		webSearch?: RagContextWebSearch;
+		pdfChat?: RagContext;
+		// Add more context types as needed
+	};
 	preprompt?: string;
 	files?: File[];
 }
@@ -21,14 +25,24 @@ interface buildPromptOptions {
 export async function buildPrompt({
 	messages,
 	model,
-	ragContext,
+	ragContexts,
 	preprompt,
 	id,
 }: buildPromptOptions): Promise<string> {
-	if (ragContext) {
-		const { type: ragType } = ragContext;
-		messages = RAGs[ragType].buildPrompt(messages, ragContext as RagContextWebSearch);
+	if (ragContexts) {
+		for (const [ragKey, ragContext] of Object.entries(ragContexts)) {
+			if (ragKey == "webSearch" && ragContext) {
+				messages = RAGs.webSearch.buildPrompt(messages, ragContext as RagContextWebSearch);
+			}
+			if (ragKey == "pdfChat" && ragContext) {
+				messages = RAGs.pdfChat.buildPrompt(messages, ragContext as RagContext);
+			}
+		}
 	}
+	// if (ragContext) {
+	// 	const { type: ragType } = ragContext;
+	// 	messages = RAGs[ragType].buildPrompt(messages, ragContext as RagContextWebSearch);
+	// }
 
 	// section to handle potential files input
 	if (model.multimodal) {

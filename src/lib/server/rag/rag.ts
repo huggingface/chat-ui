@@ -24,13 +24,8 @@ export interface RAG<T extends RagContext = RagContext> {
 }
 
 type RAGUnion = RAG<RagContext> | RAG<RagContextWebSearch>;
-
-// list of all rags
-export const RAGs: {
-	[Key in RAGType]: RAGUnion;
-} = {
-	webSearch: ragWebsearch,
-	pdfChat: ragPdfchat,
-};
-
+namespace RAGs {
+	export const webSearch = ragWebsearch;
+	export const pdfChat = ragPdfchat;
+}
 export default RAGs;
