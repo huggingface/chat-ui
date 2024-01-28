@@ -59,7 +59,7 @@ export async function endpointOai(
 			let messages = conversation.messages;
 			const ragContext = conversation.messages[conversation.messages.length - 1].ragContexts;
 
-			if (ragContext && ragContext.type === "webSearch") {
+			if (ragContext && ragContext.webSearch) {
 				const webSearchContext = ragContext as RagContextWebSearch;
 				const lastMsg = messages.slice(-1)[0];
 				const messagesWithoutLastUsrMsg = messages.slice(0, -1);
