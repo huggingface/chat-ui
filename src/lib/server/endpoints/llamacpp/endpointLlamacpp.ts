@@ -22,7 +22,7 @@ export function endpointLlamacpp(
 	return async ({ conversation }) => {
 		const prompt = await buildPrompt({
 			messages: conversation.messages,
-			ragContext: conversation.messages[conversation.messages.length - 1].ragContext,
+			ragContexts: conversation.messages[conversation.messages.length - 1].ragContexts,
 			preprompt: conversation.preprompt,
 			model,
 		});

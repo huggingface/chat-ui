@@ -9,7 +9,10 @@ export type Message = Partial<Timestamps> & {
 	content: string;
 	updates?: MessageUpdate[];
 	webSearchId?: RagContextWebSearch["_id"]; // legacy version
-	ragContext?: RagContext;
+	ragContexts?: {
+		webSearch?: RagContextWebSearch;
+		pdfChat?: RagContext;
+	};
 	score?: -1 | 0 | 1;
 	files?: string[]; // can contain either the hash of the file or the b64 encoded image data on the client side when uploading
 };

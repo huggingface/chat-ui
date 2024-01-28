@@ -233,25 +233,27 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			);
 
-			let webSearchResults: RagContextWebSearch | undefined;
+			//
+			const webSearchResults = webSearch
+				? await RAGs["webSearch"].retrieveRagContext(conv, newPrompt, update)
+				: undefined;
 
-			if (webSearch) {
-				webSearchResults = (await RAGs["webSearch"].retrieveRagContext(
-					conv,
-					newPrompt,
-					update
-				)) as RagContextWebSearch;
-			}
-
-			messages[messages.length - 1].ragContext = webSearchResults;
-
-			let pdfSearchResults: RagContext | undefined;
 			const pdfSearch = await collections.files.findOne({ filename: `${convId.toString()}-pdf` });
-			if (pdfSearch) {
-				pdfSearchResults = await RAGs["pdfChat"].retrieveRagContext(conv, newPrompt, update);
+			const pdfSearchResults = pdfSearch
+				? await RAGs["pdfChat"].retrieveRagContext(conv, newPrompt, update)
+				: undefined;
+
+			const lastMessage = messages[messages.length - 1];
+			lastMessage.ragContexts = lastMessage.ragContexts || {}; // Ensure the object exists
+
+			if (webSearchResults) {
+				lastMessage.ragContexts["webSearch"] = webSearchResults as RagContextWebSearch;
 			}
 
-			messages[messages.length - 1].ragContext = pdfSearchResults;
+			if (pdfSearchResults) {
+				lastMessage.ragContexts["pdfChat"] = pdfSearchResults;
+			}
+			//
 
 			conv.messages = messages;
 
@@ -279,7 +281,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 									{
 										from: "assistant",
 										content: output.token.text.trimStart(),
-										ragContext: webSearchResults,
+										ragContexts: lastMessage.ragContexts,
 										updates: updates,
 										id: (responseId as Message["id"]) || crypto.randomUUID(),
 										createdAt: new Date(),
