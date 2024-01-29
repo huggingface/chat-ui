@@ -60,7 +60,7 @@
 			>
 		</div>
 		<dl class="leading-[1.15rem]">
-			<dd class="max-sm:text-sm">Web Search</dd>
+			<dd class="text-sm">Web Search</dd>
 			<dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">
 				{#if error}
 					{error.message}
