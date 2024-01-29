@@ -48,7 +48,7 @@
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
 		"@resvg/resvg-js": "^2.6.0",
-		"@xenova/transformers": "^2.6.0",
+		"@xenova/transformers": "^2.14.1",
 		"autoprefixer": "^10.4.14",
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
