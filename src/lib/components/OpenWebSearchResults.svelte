@@ -15,7 +15,7 @@
 <details
 	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
 >
-	<summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2.5">
+	<summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2">
 		<div
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
