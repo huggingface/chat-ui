@@ -429,10 +429,10 @@ You can then add the generated information and the `authorization` parameter to 
 
 ```env
 "endpoints": [
-{
-"url": "https://HOST:PORT",
-"authorization": "Basic VVNFUjpQQVNT",
-}
+  {
+    "url": "https://HOST:PORT",
+    "authorization": "Basic VVNFUjpQQVNT",
+  }
 ]
 ```
 
@@ -444,15 +444,15 @@ If the model being hosted will be available on multiple servers/instances add th
 
 ```env
 "endpoints": [
-{
-"url": "https://HOST:PORT",
-"weight": 1
-}
-{
-"url": "https://HOST:PORT",
-"weight": 2
-}
-...
+  {
+    "url": "https://HOST:PORT",
+    "weight": 1
+  },
+  {
+    "url": "https://HOST:PORT",
+    "weight": 2
+  }
+  ...
 ]
 ```
 
