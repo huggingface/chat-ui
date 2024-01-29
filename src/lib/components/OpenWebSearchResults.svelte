@@ -59,7 +59,7 @@
 				/></svg
 			>
 		</div>
-		<dl class="leading-[1.15rem]">
+		<dl class="leading-4">
 			<dd class="text-sm">Web Search</dd>
 			<dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">
 				{#if error}
