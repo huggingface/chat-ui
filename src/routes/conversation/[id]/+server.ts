@@ -310,13 +310,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 						}
 					} else {
+						let interrupted = !output.token.special;
 						// add output.generated text to the last message
+						// strip end tokens from the output.generated_text
+						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
+							if (acc.endsWith(curr)) {
+								interrupted = false;
+								return acc.slice(0, acc.length - curr.length);
+							}
+							return acc;
+						}, output.generated_text.trimEnd());
+
 						messages = [
 							...messages.slice(0, -1),
 							{
 								...messages[messages.length - 1],
-								content: previousContent + output.generated_text,
-								interrupted: !output.token.special, // if its a special token it finished on its own, else it was interrupted
+								content: previousContent + text,
+								interrupted, // if its a special token it finished on its own, else it was interrupted
 								updates,
 								updatedAt: new Date(),
 							},
