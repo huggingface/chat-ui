@@ -105,28 +105,8 @@
 </details>
 
 <style>
-	details[open] .content {
-		animation-name: grow;
-		animation-duration: 300ms;
-		animation-delay: 0ms;
-	}
-
 	details summary::-webkit-details-marker {
 		display: none;
-	}
-
-	@keyframes grow {
-		0% {
-			font-size: 0;
-			opacity: 0;
-		}
-		30% {
-			font-size: 1em;
-			opacity: 0;
-		}
-		100% {
-			opacity: 1;
-		}
 	}
 
 	.loading-path {
