@@ -22,4 +22,9 @@ export interface Conversation extends Timestamps {
 
 	preprompt?: string;
 	assistantId?: Assistant["_id"];
+
+	branches?: Array<{
+		parents: ObjectId[];
+		messages: Message[];
+	}>;
 }
