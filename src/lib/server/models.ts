@@ -22,7 +22,7 @@ const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
 	/** Used to link to the model page, and for inference */
-	name: z.string().min(1),
+	name: z.string().default(""),
 	displayName: z.string().min(1).optional(),
 	description: z.string().min(1).optional(),
 	websiteUrl: z.string().url().optional(),
