@@ -312,6 +312,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					} else {
 						let interrupted = !output.token.special;
 						// add output.generated text to the last message
+						// strip end tokens from the output.generated_text
 						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
 							if (acc.endsWith(curr)) {
 								interrupted = false;
