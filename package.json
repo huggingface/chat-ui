@@ -39,7 +39,7 @@
 		"tslib": "^2.4.1",
 		"typescript": "^5.0.0",
 		"unplugin-icons": "^0.16.1",
-		"vite": "^4.3.9",
+		"vite": "^4.5.2",
 		"vitest": "^0.31.0"
 	},
 	"type": "module",
@@ -47,6 +47,7 @@
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
+		"@resvg/resvg-js": "^2.6.0",
 		"@xenova/transformers": "^2.6.0",
 		"autoprefixer": "^10.4.14",
 		"browser-image-resizer": "^2.4.1",
@@ -64,7 +65,10 @@
 		"parquetjs": "^0.11.2",
 		"postcss": "^8.4.31",
 		"saslprep": "^1.0.3",
+		"satori": "^0.10.11",
+		"satori-html": "^0.3.2",
 		"serpapi": "^1.1.1",
+		"sharp": "^0.33.2",
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.4.0",
 		"zod": "^3.22.3"

@@ -2,6 +2,7 @@ import { browser } from "$app/environment";
 import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
 import { UrlDependency } from "$lib/types/UrlDependency";
+import type { ObjectId } from "mongodb";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
@@ -13,7 +14,9 @@ type SettingsStore = {
 	activeModel: string;
 	customPrompts: Record<string, string>;
 	recentlySaved: boolean;
+	assistants: Array<ObjectId | string>;
 };
+
 export function useSettingsStore() {
 	return getContext<Writable<SettingsStore>>("settings");
 }
@@ -44,6 +47,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					}),
 				});
 
+				invalidate(UrlDependency.ConversationList);
 				// set savedRecently to true for 3s
 				baseStore.update((s) => ({
 					...s,

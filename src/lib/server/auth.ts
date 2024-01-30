@@ -57,7 +57,7 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 }
 
 export async function findUser(sessionId: string) {
-	const session = await collections.sessions.findOne({ sessionId: sessionId });
+	const session = await collections.sessions.findOne({ sessionId });
 
 	if (!session) {
 		return null;

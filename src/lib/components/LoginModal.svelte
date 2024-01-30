@@ -51,7 +51,6 @@
 							e.preventDefault();
 							window.open(window.location.href, "_blank");
 						}
-
 						$settings.ethicsModalAccepted = true;
 					}}
 				>

@@ -4,7 +4,7 @@ import { collections } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 
 export const actions = {
-	delete: async function ({ locals }) {
+	async delete({ locals }) {
 		// double check we have a user to delete conversations for
 		if (locals.user?._id || locals.sessionId) {
 			await collections.conversations.deleteMany({

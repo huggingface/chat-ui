@@ -154,7 +154,6 @@
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
 					webSearchMessages={searchUpdates}
-					loading={!(searchUpdates[searchUpdates.length - 1]?.messageType === "sources")}
 				/>
 			{/if}
 			{#if !message.content && (webSearchIsDone || (webSearchMessages && webSearchMessages.length === 0))}

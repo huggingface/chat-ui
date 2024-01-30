@@ -1,6 +1,5 @@
 import { collections } from "$lib/server/database";
 import { z } from "zod";
-import { models, validateModel } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
@@ -14,7 +13,7 @@ export async function POST({ request, locals }) {
 				.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
 			hideEmojiOnSidebar: z.boolean().default(DEFAULT_SETTINGS.hideEmojiOnSidebar),
 			ethicsModalAccepted: z.boolean().optional(),
-			activeModel: validateModel(models).default(DEFAULT_SETTINGS.activeModel),
+			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 			customPrompts: z.record(z.string()).default({}),
 		})
 		.parse(body);

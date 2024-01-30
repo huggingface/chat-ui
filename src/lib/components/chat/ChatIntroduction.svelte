@@ -5,7 +5,6 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconGear from "~icons/bi/gear-fill";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
@@ -52,8 +51,7 @@
 				<a
 					target="_blank"
 					href={banner.linkHref}
-					class="mr-2 flex items-center underline hover:no-underline"
-					><CarbonArrowUpRight class="mr-1.5 text-xs" /> {banner.linkTitle}</a
+					class="mr-2 flex items-center underline hover:no-underline">{banner.linkTitle}</a
 				>
 			</AnnouncementBanner>
 		{/each}
