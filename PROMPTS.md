@@ -55,3 +55,9 @@ System: {{preprompt}}\nUser:{{#each messages}}{{#ifUser}}{{content}}\nFalcon:{{/
 ```env
 {{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}
 ```
+
+## CodeLlama 70B
+
+````env
+<s>{{#if @root.preprompt}}\nSource: system\n\n {{@root.preprompt}} <step> {{/if}}{{#each messages}}{{#ifUser}}\nSource: user\n\n {{content}} <step> {{/ifUser}}{{#ifAssistant}}\nSource: assistant\n\n {{content}} <step> {{/ifAssistant}}{{/each}}\n\n Source: assistant\nDestination: user```
+````
