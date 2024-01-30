@@ -44,11 +44,11 @@ export async function buildPrompt({
 		modifiedMessages[lastUsrMsgIndex] = {
 			from: "user",
 			content: `I searched the web using the query: ${webSearch.searchQuery}. Today is ${currentDate} and here are the results:
-				=====================
-				${webSearch.context}
-				=====================
-				${previousQuestions}
-				Answer the question: ${messages[lastUsrMsgIndex].content} 				`,
+=====================
+${webSearch.context}
+=====================
+${previousQuestions}
+Answer the question: ${messages[lastUsrMsgIndex].content}`,
 		};
 	}
 	// section to handle potential files input
