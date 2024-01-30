@@ -1,41 +1,58 @@
 <script lang="ts">
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
-	import CarbonCaretRight from "~icons/carbon/caret-right";
 
-	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
 	import CarbonError from "~icons/carbon/error-filled";
-
 	import EosIconsLoading from "~icons/eos-icons/loading";
+	import IconInternet from "./icons/IconInternet.svelte";
 
-	export let loading = false;
 	export let classNames = "";
 	export let webSearchMessages: WebSearchUpdate[] = [];
 
-	let detailsOpen: boolean;
-	let error: boolean;
-	$: error = webSearchMessages[webSearchMessages.length - 1]?.messageType === "error";
+	$: sources = webSearchMessages.find((m) => m.sources)?.sources;
+	$: error = webSearchMessages.find((m) => m.messageType === "error");
+	$: loading = !sources && !error;
 </script>
 
 <details
 	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
-	bind:open={detailsOpen}
 >
-	<summary
-		class="align-center flex cursor-pointer select-none list-none py-1 pl-2.5 pr-2 align-text-top transition-all"
-	>
-		{#if error}
-			<CarbonError class="my-auto text-red-700 dark:text-red-500" />
-		{:else if loading}
-			<EosIconsLoading class="my-auto text-gray-500" />
-		{:else}
-			<CarbonCheckmark class="my-auto text-gray-500" />
-		{/if}
-		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}>
-			Web search
-		</span>
-		<div class="my-auto transition-all" class:rotate-90={detailsOpen}>
-			<CarbonCaretRight />
+	<summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2">
+		<div
+			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
+		>
+			<svg
+				class="absolute inset-0 text-gray-300 transition-opacity dark:text-gray-700 {loading
+					? 'opacity-100'
+					: 'opacity-0'}"
+				width="40"
+				height="40"
+				viewBox="0 0 38 38"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<path
+					class="loading-path"
+					d="M8 2.5H30C30 2.5 35.5 2.5 35.5 8V30C35.5 30 35.5 35.5 30 35.5H8C8 35.5 2.5 35.5 2.5 30V8C2.5 8 2.5 2.5 8 2.5Z"
+					stroke="currentColor"
+					stroke-width="1"
+					stroke-linecap="round"
+					id="shape"
+				/>
+			</svg>
+			<IconInternet classNames="relative fill-current text-xl" />
 		</div>
+		<dl class="leading-4">
+			<dd class="text-sm">Web Search</dd>
+			<dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">
+				{#if error}
+					{error.message}
+				{:else if sources}
+					Completed
+				{:else}
+					{webSearchMessages[webSearchMessages.length - 1].message}
+				{/if}
+			</dt>
+		</dl>
 	</summary>
 
 	<div class="content px-5 pb-5 pt-4">
@@ -88,27 +105,18 @@
 </details>
 
 <style>
-	@keyframes grow {
-		0% {
-			font-size: 0;
-			opacity: 0;
-		}
-		30% {
-			font-size: 1em;
-			opacity: 0;
-		}
-		100% {
-			opacity: 1;
-		}
-	}
-
-	details[open] .content {
-		animation-name: grow;
-		animation-duration: 300ms;
-		animation-delay: 0ms;
-	}
-
 	details summary::-webkit-details-marker {
 		display: none;
+	}
+
+	.loading-path {
+		stroke-dasharray: 61.45;
+		animation: loading 2s linear infinite;
+	}
+
+	@keyframes loading {
+		to {
+			stroke-dashoffset: 122.9;
+		}
 	}
 </style>

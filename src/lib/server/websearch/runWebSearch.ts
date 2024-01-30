@@ -120,11 +120,7 @@ export async function runWebSearch(
 		});
 	} catch (searchError) {
 		if (searchError instanceof Error) {
-			appendUpdate(
-				"An error occurred with the web search",
-				[JSON.stringify(searchError.message)],
-				"error"
-			);
+			appendUpdate("An error occurred", [JSON.stringify(searchError.message)], "error");
 		}
 	}
 
