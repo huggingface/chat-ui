@@ -1,15 +1,16 @@
 <script lang="ts">
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+
 	import CarbonError from "~icons/carbon/error-filled";
-
 	import EosIconsLoading from "~icons/eos-icons/loading";
+	import IconInternet from "./icons/IconInternet.svelte";
 
-	export let loading = false;
 	export let classNames = "";
 	export let webSearchMessages: WebSearchUpdate[] = [];
 
 	$: sources = webSearchMessages.find((m) => m.sources)?.sources;
 	$: error = webSearchMessages.find((m) => m.messageType === "error");
+	$: loading = !sources && !error;
 </script>
 
 <details
@@ -20,8 +21,7 @@
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
 			<svg
-				class="absolute inset-0 text-gray-300 transition-opacity dark:text-gray-700 {!sources &&
-				!error
+				class="absolute inset-0 text-gray-300 transition-opacity dark:text-gray-700 {loading
 					? 'opacity-100'
 					: 'opacity-0'}"
 				width="40"
@@ -39,6 +39,7 @@
 					id="shape"
 				/>
 			</svg>
+			<IconInternet classNames="relative fill-current text-xl" />
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="1em"
