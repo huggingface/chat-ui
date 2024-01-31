@@ -64,7 +64,9 @@
 							{assistant.name[0]}
 						</div>
 					{/if}
-					<h3 class="mb-2 line-clamp-2 text-center text-sm font-semibold leading-snug">
+					<h3
+						class="mb-2 line-clamp-2 max-w-full break-words text-center text-sm font-semibold leading-snug"
+					>
 						{assistant.name}
 					</h3>
 					<p class="line-clamp-4 text-xs text-gray-700 sm:line-clamp-2 dark:text-gray-500">
