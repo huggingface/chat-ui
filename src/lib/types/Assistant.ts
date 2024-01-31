@@ -14,5 +14,4 @@ export interface Assistant extends Timestamps {
 	preprompt: string;
 
 	userCount?: number;
-	featured?: boolean;
 }
