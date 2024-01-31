@@ -16,7 +16,7 @@
 	<div
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
-		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10">
+		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10 xl:gap-8">
 			{#if assistant.avatar}
 				<img
 					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
@@ -33,7 +33,7 @@
 				</div>
 			{/if}
 
-			<div class="flex h-full flex-col">
+			<div class="flex h-full flex-col gap-2">
 				<p
 					class="mb-2 w-fit truncate text-ellipsis rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
 				>

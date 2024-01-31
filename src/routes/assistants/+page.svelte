@@ -17,61 +17,67 @@
 	};
 </script>
 
-<div class="mx-auto w-full max-w-4xl">
-	<h1 class="mt-10 w-full text-center text-2xl font-bold">Popular assistants</h1>
-	<h3 class="mt-2 w-full text-center text-sm">
-		These are the most popular assistants on the platform.
-	</h3>
-
-	<label class="mt-10 text-sm">
-		Filter by model:
-		<select
-			class="mx-auto mt-2 rounded-md border border-gray-300 pl-1 text-center text-sm dark:border-gray-700 dark:bg-gray-700"
-			bind:value={selectedModel}
-			on:change={onModelChange}
-		>
-			<option value="">All</option>
-			{#each data.models as model}
-				<option value={model.name}>{model.name}</option>
-			{/each}
-		</select>
-	</label>
-	<div class="mt-10 grid w-fit grid-cols-1 gap-4 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-		{#each data.assistants as assistant}
-			<a
-				href="{base}/assistant/{assistant._id}"
-				class="flex h-72 flex-col items-center gap-2 rounded-xl border-2 border-gray-300 bg-gray-100 bg-gradient-to-tr from-gray-200 to-gray-50 p-4 transition-all dark:border-gray-700 dark:bg-gray-800 dark:from-gray-900 dark:to-gray-800"
+<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-24">
+	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
+		<h1 class="text-2xl font-bold">Assistants</h1>
+		<h3 class="text-gray-500">Browse popular community made assistants</h3>
+		<div class="mt-6 flex items-center justify-between">
+			<select
+				class="mt-1 rounded-lg border border-gray-300 bg-gray-50 p-2 text-xs text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				bind:value={selectedModel}
+				on:change={onModelChange}
 			>
-				{#if assistant.avatar}
-					<img
-						src="{base}/settings/assistants/{assistant._id}/avatar"
-						alt="Avatar"
-						class="h-24 w-24 rounded-full object-cover"
-					/>
-				{:else}
-					<div
-						class="flex h-24 min-h-24 w-24 min-w-24 items-center justify-center rounded-full bg-gray-300 font-bold text-gray-500"
-					>
-						{assistant.name[0].toLocaleUpperCase()}
-					</div>
-				{/if}
-				<h3 class="text-center text-sm font-semibold">{assistant.name}</h3>
-				<span
-					class="clip overflow-hidden text-ellipsis text-wrap break-words text-sm text-gray-700 dark:text-gray-300"
-					>{assistant.description}</span
-				>
-				{#if assistant.createdByName}
-					<p class="mt-auto pt-2 text-sm text-gray-400 dark:text-gray-500">
-						Created by <a
-							class="hover:underline"
-							href="https://hf.co/{assistant.createdByName}"
-							target="_blank"
-						>
-							{assistant.createdByName}
-						</a>
-					</p>
-				{/if}
+				<option value="">All models</option>
+				{#each data.models as model}
+					<option value={model.name}>{model.name}</option>
+				{/each}
+			</select>
+
+			<a
+				href={`${base}/settings/assistants/new`}
+				class="flex items-center gap-2 rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700"
+			>
+				+ Create New assistant
 			</a>
-		{/each}
+		</div>
+		<div class="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
+			{#each [...data.assistants, ...data.assistants, ...data.assistants] as assistant}
+				<a
+					href="{base}/assistant/{assistant._id}"
+					class="flex flex-col items-center justify-center overflow-hidden rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 dark:border-gray-800 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+				>
+					{#if assistant.avatar}
+						<img
+							src="{base}/settings/assistants/{assistant._id}/avatar"
+							alt="Avatar"
+							class="mb-2 aspect-square size-12 flex-none rounded-full object-cover sm:mb-6 sm:size-20"
+						/>
+					{:else}
+						<div
+							class="mb-2 flex aspect-square size-12 flex-none items-center justify-center rounded-full bg-gray-300 text-2xl font-bold text-gray-500 sm:mb-6 sm:size-20 dark:bg-gray-800"
+						>
+							{assistant.name[0].toLocaleUpperCase()}
+						</div>
+					{/if}
+					<h3 class="mb-2 line-clamp-2 text-center text-sm font-semibold leading-snug">
+						{assistant.name}
+					</h3>
+					<p class="line-clamp-4 text-xs text-gray-700 sm:line-clamp-2 dark:text-gray-500">
+						{assistant.description}
+					</p>
+					{#if assistant.createdByName}
+						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
+							Created by <a
+								class="hover:underline"
+								href="https://hf.co/{assistant.createdByName}"
+								target="_blank"
+							>
+								{assistant.createdByName}
+							</a>
+						</p>
+					{/if}
+				</a>
+			{/each}
+		</div>
 	</div>
 </div>
