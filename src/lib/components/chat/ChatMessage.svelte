@@ -236,8 +236,8 @@
 	</div>
 {/if}
 {#if message.from === "user"}
-	<div class="group relative flex items-start justify-start gap-4 max-sm:text-sm">
-		<div class="flex flex-col">
+	<div class="group relative flex w-full items-start justify-start gap-4 max-sm:text-sm">
+		<div class="flex w-full flex-col">
 			{#if message.files && message.files.length > 0}
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
@@ -260,46 +260,74 @@
 				</div>
 			{/if}
 
-			<input
-				class="disabled w-max appearance-none whitespace-break-spaces break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
-				value={message.content.trim()}
-				disabled
-			/>
-			{#if !loading}
-				<div class="absolute right-0 top-3.5 flex gap-2 lg:-right-2">
-					{#if downloadLink}
-						<a
-							class="rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-							title="Download prompt and parameters"
-							type="button"
-							target="_blank"
-							href={downloadLink}
-						>
-							<CarbonDownload />
-						</a>
-					{/if}
-					{#if !readOnly}
-						<button
-							class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-							title="Retry"
-							type="button"
-							on:click={() => dispatch("retry", { id: message.id })}
-						>
-							<CarbonRotate360 />
-						</button>
-						{#if $page.data.conversationBranching}
+			<div class="flex w-full flex-row flex-nowrap">
+				{#if !editMode}
+					<p
+						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+					>
+						{message.content.trim()}
+					</p>
+				{:else}
+					<div class="flex w-full flex-col">
+						<textarea
+							class="w-full whitespace-break-spaces break-words rounded-lg bg-gray-800 bg-inherit px-5 py-3.5 text-gray-500 *:h-max dark:text-gray-400"
+							value={message.content.trim()}
+						/>
+						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
-								class="cursor-pointer rounded-lg border border-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-								title="Branch"
-								type="button"
-								on:click={() => (editMode = !editMode)}
+								class="btn rounded-lg bg-gray-200 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 							>
-								<CarbonPen />
+								Submit
 							</button>
-						{/if}
-					{/if}
-				</div>
-			{/if}
+							<button
+								class="btn rounded-sm p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
+								on:click={() => {
+									editMode = false;
+								}}
+							>
+								Cancel
+							</button>
+						</div>
+					</div>
+				{/if}
+				{#if !loading && !editMode}
+					<div class="absolute right-0 top-3.5 z-10 h-max">
+						<div class="mx-auto flex flex-row flex-nowrap gap-2">
+							{#if downloadLink}
+								<a
+									class="rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+									title="Download prompt and parameters"
+									type="button"
+									target="_blank"
+									href={downloadLink}
+								>
+									<CarbonDownload />
+								</a>
+							{/if}
+							{#if !readOnly}
+								<button
+									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+									title="Retry"
+									type="button"
+									on:click={() => dispatch("retry", { id: message.id })}
+								>
+									<CarbonRotate360 />
+								</button>
+								{#if $page.data.conversationBranching}
+									<button
+										class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+										title="Branch"
+										type="button"
+										on:click={() => (editMode = !editMode)}
+									>
+										<CarbonPen />
+									</button>
+								{/if}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 {/if}
