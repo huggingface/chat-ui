@@ -3,6 +3,9 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import type { PageData } from "./$types";
+
+	import CarbonAdd from "~icons/carbon/add";
+
 	export let data: PageData;
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
 
@@ -17,11 +20,11 @@
 	};
 </script>
 
-<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-24">
+<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<h1 class="text-2xl font-bold">Assistants</h1>
-		<h3 class="text-gray-500">Browse popular community made assistants</h3>
-		<div class="mt-6 flex items-center justify-between">
+		<h3 class="text-gray-500">Browse popular assistants made by the community</h3>
+		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 rounded-lg border border-gray-300 bg-gray-50 p-2 text-xs text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 				bind:value={selectedModel}
@@ -35,9 +38,9 @@
 
 			<a
 				href={`${base}/settings/assistants/new`}
-				class="flex items-center gap-2 rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700"
+				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 text-center shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
-				+ Create New assistant
+				<CarbonAdd class="text-orange-600" />Create New assistant
 			</a>
 		</div>
 		<div class="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">

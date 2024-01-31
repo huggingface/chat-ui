@@ -49,7 +49,7 @@
 			</h1>
 
 			{#if assistant?.description}
-				<p class="mb-1 text-sm text-gray-500">
+				<p class="mb-1 line-clamp-2 text-sm text-gray-500">
 					{assistant.description}
 				</p>
 			{/if}
@@ -112,7 +112,9 @@
 		<h2 class="text-lg font-semibold">Direct URL</h2>
 
 		<p class="pb-2 text-sm text-gray-500">
-			People with this link will be able to use your assistant.
+			People with this link will be able to use your assistant. {assistant?.createdByMe
+				? "Sharing this url makes your assistant public."
+				: ""}
 			{#if !assistant?.createdByMe && assistant?.createdByName}
 				Created by <a
 					class="underline"

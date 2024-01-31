@@ -35,7 +35,7 @@
 
 			<div class="flex h-full flex-col gap-2">
 				<p
-					class="mb-2 w-fit truncate text-ellipsis rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+					class="w-fit truncate text-ellipsis rounded-full border bg-white px-3 py-1 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-400"
 				>
 					Assistant
 				</p>
