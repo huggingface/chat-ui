@@ -111,9 +111,7 @@
 	{#if $page.data.enableAssistants}
 		<a
 			href="{base}/assistants"
-			class={`flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 ${
-				$page.url.pathname === base + "/assistants" && "bg-gray-100 dark:bg-gray-700"
-			}`}
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			Assistants
 			<span

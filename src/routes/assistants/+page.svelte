@@ -1,12 +1,14 @@
 <script lang="ts">
+	import type { PageData } from "./$types";
+
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import type { PageData } from "./$types";
 
 	import CarbonAdd from "~icons/carbon/add";
 
 	export let data: PageData;
+
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
 
 	const onModelChange = (e: Event) => {
@@ -57,9 +59,9 @@
 						/>
 					{:else}
 						<div
-							class="mb-2 flex aspect-square size-12 flex-none items-center justify-center rounded-full bg-gray-300 text-2xl font-bold text-gray-500 sm:mb-6 sm:size-20 dark:bg-gray-800"
+							class="mb-2 flex aspect-square size-12 flex-none items-center justify-center rounded-full bg-gray-300 text-2xl font-bold uppercase text-gray-500 sm:mb-6 sm:size-20 dark:bg-gray-800"
 						>
-							{assistant.name[0].toLocaleUpperCase()}
+							{assistant.name[0]}
 						</div>
 					{/if}
 					<h3 class="mb-2 line-clamp-2 text-center text-sm font-semibold leading-snug">
