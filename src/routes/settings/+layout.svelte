@@ -11,7 +11,7 @@
 
 	import UserIcon from "~icons/carbon/user";
 	import { fade, fly } from "svelte/transition";
-	import { PUBLIC_APP_ASSETS } from "$env/static/public";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	export let data;
 
 	let previousPage: string = base;
@@ -23,8 +23,6 @@
 	});
 
 	const settings = useSettingsStore();
-
-	const isHuggingChat = PUBLIC_APP_ASSETS === "huggingchat";
 </script>
 
 <div
