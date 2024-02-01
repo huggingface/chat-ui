@@ -129,14 +129,6 @@
 	</a>
 	{#if PUBLIC_APP_NAME === "HuggingChat"}
 		<a
-			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
-			target="_blank"
-			rel="noreferrer"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			Feedback
-		</a>
-		<a
 			href="{base}/privacy"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
