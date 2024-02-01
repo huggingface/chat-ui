@@ -33,7 +33,7 @@
 				on:change={onModelChange}
 			>
 				<option value="">All models</option>
-				{#each data.models as model}
+				{#each data.models.filter((model) => !model.unlisted) as model}
 					<option value={model.name}>{model.name}</option>
 				{/each}
 			</select>

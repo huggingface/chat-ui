@@ -196,7 +196,7 @@
 			<label>
 				<span class="mb-1 text-sm font-semibold">Model</span>
 				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
-					{#each models as model}
+					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
 							selected={assistant
