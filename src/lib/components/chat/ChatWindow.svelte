@@ -160,7 +160,7 @@
 
 		<div class="w-full">
 			<div class="flex w-full pb-3">
-				{#if $page.data.settings?.searchEnabled && !$page.data.assistant}
+				{#if $page.data.settings?.searchEnabled && !assistant}
 					<WebSearchToggle />
 				{/if}
 				{#if loading}

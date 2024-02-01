@@ -393,4 +393,5 @@
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
+	assistant={data.assistant}
 />
