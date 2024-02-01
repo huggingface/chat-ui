@@ -45,11 +45,11 @@
 				<CarbonAdd class="text-orange-600" />Create New assistant
 			</a>
 		</div>
-		<div class="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
+		<div class="mt-10 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant}
 				<a
 					href="{base}/assistant/{assistant._id}"
-					class="flex flex-col items-center justify-center overflow-hidden rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 dark:border-gray-800 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="flex flex-col items-center justify-center overflow-hidden rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
 					{#if assistant.avatar}
 						<img
