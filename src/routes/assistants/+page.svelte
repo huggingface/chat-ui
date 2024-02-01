@@ -69,11 +69,13 @@
 					>
 						{assistant.name}
 					</h3>
-					<p class="line-clamp-4 text-xs text-gray-700 sm:line-clamp-2 dark:text-gray-500">
+					<p
+						class="line-clamp-4 text-xxs text-gray-700 sm:line-clamp-2 sm:text-xs dark:text-gray-500"
+					>
 						{assistant.description}
 					</p>
 					{#if assistant.createdByName}
-						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
+						<p class="mt-auto pt-2 text-xxs text-gray-400 sm:text-xs dark:text-gray-500">
 							Created by <a
 								class="hover:underline"
 								href="https://hf.co/{assistant.createdByName}"
