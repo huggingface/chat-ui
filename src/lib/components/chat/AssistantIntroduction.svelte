@@ -33,14 +33,11 @@
 				</div>
 			{/if}
 
-			<div class="flex h-full flex-col gap-2">
-				<p
-					class="w-fit truncate text-ellipsis rounded-full border bg-white px-3 py-1 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-400"
-				>
-					Assistant
-				</p>
+			<div class="flex h-full flex-col gap-2 text-balance">
+				<p class="-mb-1">Assistant</p>
+
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
-				<p class="line-clamp-6 text-balance text-sm text-gray-500 dark:text-gray-400">
+				<p class="line-clamp-6 text-sm text-gray-500 dark:text-gray-400">
 					{assistant.description}
 				</p>
 
@@ -60,8 +57,8 @@
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"
-				class="flex size-7 items-center justify-center rounded-full border bg-gray-200 p-1 text-xs hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
-				><IconGear /></a
+				class="flex items-center gap-1.5 rounded-full border bg-white py-1 pl-3 pr-2.5 text-sm text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
+				><IconGear class="text-xxs" />Settings</a
 			>
 		</div>
 	</div>
