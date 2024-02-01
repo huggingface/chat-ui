@@ -44,9 +44,14 @@
 		{/if}
 
 		<div class="flex-1">
-			<h1 class="text-xl font-semibold">
-				{assistant?.name}
-			</h1>
+			<div class="mb-1.5">
+				<h1 class="mr-2 inline text-xl font-semibold">
+					{assistant?.name}
+				</h1>
+				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+					>public</span
+				>
+			</div>
 
 			{#if assistant?.description}
 				<p class="mb-1 line-clamp-2 text-sm text-gray-500">
