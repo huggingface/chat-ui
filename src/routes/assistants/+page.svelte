@@ -49,7 +49,7 @@
 			{#each data.assistants as assistant}
 				<a
 					href="{base}/assistant/{assistant._id}"
-					class="flex flex-col items-center justify-center overflow-hidden rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="flex flex-col items-center justify-center overflow-hidden rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
 					{#if assistant.avatar}
 						<img
