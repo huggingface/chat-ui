@@ -34,7 +34,7 @@
 		</h2>
 
 		{#if model.description}
-			<p class=" text-gray-600">
+			<p class="whitespace-pre-wrap text-gray-600">
 				{model.description}
 			</p>
 		{/if}
