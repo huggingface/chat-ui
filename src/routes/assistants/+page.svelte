@@ -24,7 +24,12 @@
 
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
-		<h1 class="text-2xl font-bold">Assistants</h1>
+		<div class="flex items-center">
+			<h1 class="text-2xl font-bold">Assistants</h1>
+			<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
+				beta
+			</div>
+		</div>
 		<h3 class="text-gray-500">Browse popular assistants made by the community</h3>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
@@ -42,7 +47,7 @@
 				href={`${base}/settings/assistants/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 text-center shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
-				<CarbonAdd class="text-orange-600" />Create New assistant
+				<CarbonAdd />Create New assistant
 			</a>
 		</div>
 		<div class="mt-10 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
@@ -70,7 +75,7 @@
 						{assistant.name}
 					</h3>
 					<p
-						class="line-clamp-4 text-xxs text-gray-700 sm:line-clamp-2 sm:text-xs dark:text-gray-500"
+						class="line-clamp-4 text-balance text-xxs text-gray-700 sm:line-clamp-2 sm:text-xs dark:text-gray-400"
 					>
 						{assistant.description}
 					</p>
