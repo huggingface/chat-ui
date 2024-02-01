@@ -151,7 +151,7 @@
 
 	<textarea
 		disabled
-		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-gray-600 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
+		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
 		>{assistant?.preprompt}</textarea
 	>
 </div>
