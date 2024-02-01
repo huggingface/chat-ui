@@ -31,7 +31,7 @@
 		{#if assistant?.avatar}
 			<!-- crop image if not square  -->
 			<img
-				src={`${base}/settings/assistants/${assistant?._id}/avatar?hash=${assistant?.avatar}`}
+				src={`${base}/settings/assistants/${assistant?._id}/avatar.jpg?hash=${assistant?.avatar}`}
 				alt="Avatar"
 				class="size-16 flex-none rounded-full object-cover sm:size-24"
 			/>

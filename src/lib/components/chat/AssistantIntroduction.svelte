@@ -19,7 +19,7 @@
 		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10 xl:gap-8">
 			{#if assistant.avatar}
 				<img
-					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
+					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar.jpg?hash=${
 						assistant.avatar
 					}`}
 					alt="avatar"
