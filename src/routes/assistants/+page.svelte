@@ -65,7 +65,7 @@
 						</div>
 					{/if}
 					<h3
-						class="mb-2 line-clamp-2 max-w-full break-words text-center text-sm font-semibold leading-snug"
+						class="mb-2 line-clamp-2 max-w-full break-words text-center text-[.8rem] font-semibold leading-snug sm:text-sm"
 					>
 						{assistant.name}
 					</h3>
@@ -84,6 +84,8 @@
 						</p>
 					{/if}
 				</a>
+			{:else}
+				No assistants found
 			{/each}
 		</div>
 	</div>

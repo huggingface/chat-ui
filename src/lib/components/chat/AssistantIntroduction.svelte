@@ -23,11 +23,11 @@
 						assistant.avatar
 					}`}
 					alt="avatar"
-					class="size-16 flex-none rounded-full object-cover md:size-32"
+					class="size-16 flex-none rounded-full object-cover max-sm:self-start md:size-32"
 				/>
 			{:else}
 				<div
-					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 sm:text-4xl md:h-32 md:w-32 dark:bg-gray-600"
+					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 max-sm:self-start sm:text-4xl md:size-32 dark:bg-gray-600"
 				>
 					{assistant?.name[0]}
 				</div>
@@ -40,7 +40,7 @@
 					Assistant
 				</p>
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
-				<p class="text-balance text-sm text-gray-500 dark:text-gray-400">
+				<p class="line-clamp-6 text-balance text-sm text-gray-500 dark:text-gray-400">
 					{assistant.description}
 				</p>
 
