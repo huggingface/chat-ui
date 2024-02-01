@@ -90,9 +90,14 @@ export const actions: Actions = {
 			return fail(400, { error: true, message: "Already subscribed" });
 		}
 
-		await collections.settings.updateOne(authCondition(locals), {
-			$push: { assistants: assistant._id },
+		const result = await collections.settings.updateOne(authCondition(locals), {
+			$addToSet: { assistants: assistant._id },
 		});
+
+		// reduce count only if push succeeded
+		if (result.modifiedCount > 0) {
+			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: 1 } });
+		}
 
 		return { from: "subscribe", ok: true, message: "Assistant added" };
 	},
@@ -106,9 +111,14 @@ export const actions: Actions = {
 			return fail(404, { error: true, message: "Assistant not found" });
 		}
 
-		await collections.settings.updateOne(authCondition(locals), {
+		const result = await collections.settings.updateOne(authCondition(locals), {
 			$pull: { assistants: assistant._id },
 		});
+
+		// reduce count only if pull succeeded
+		if (result.modifiedCount > 0) {
+			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
+		}
 
 		throw redirect(302, `${base}/settings`);
 	},
