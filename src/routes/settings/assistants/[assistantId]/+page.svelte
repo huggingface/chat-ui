@@ -44,18 +44,27 @@
 		{/if}
 
 		<div class="flex-1">
-			<h1 class="text-xl font-semibold">
-				{assistant?.name}
-			</h1>
+			<div class="mb-1.5">
+				<h1 class="mr-2 inline text-xl font-semibold">
+					{assistant?.name}
+				</h1>
+				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+					>public</span
+				>
+			</div>
 
 			{#if assistant?.description}
-				<p class="mb-1 text-sm text-gray-500">
+				<p class="mb-2 line-clamp-2 text-sm text-gray-500">
 					{assistant.description}
 				</p>
 			{/if}
 
 			<p class="text-sm text-gray-500">
 				Model: <span class="font-semibold"> {assistant?.modelId} </span>
+				<span class="text-gray-300">•</span> Created by
+				<a class="underline" target="_blank" href={"https://hf.co/" + assistant?.createdByName}>
+					{assistant?.createdByName}
+				</a>
 			</p>
 			<div
 				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
@@ -111,18 +120,7 @@
 	<div>
 		<h2 class="text-lg font-semibold">Direct URL</h2>
 
-		<p class="pb-2 text-sm text-gray-500">
-			People with this link will be able to use your assistant.
-			{#if !assistant?.createdByMe && assistant?.createdByName}
-				Created by <a
-					class="underline"
-					target="_blank"
-					href={"https://hf.co/" + assistant?.createdByName}
-				>
-					{assistant?.createdByName}
-				</a>
-			{/if}
-		</p>
+		<p class="pb-2 text-sm text-gray-500">Share this link for people to use your assistant.</p>
 
 		<div
 			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"

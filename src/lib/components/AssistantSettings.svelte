@@ -106,7 +106,9 @@
 	{:else}
 		<h2 class="text-xl font-semibold">Create new assistant</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Assistants are public, and can be accessed by anyone with the link.
+			Create and share your own AI Assistant. All assistants are <span
+				class="rounded-full border px-2 py-0.5 leading-none">public</span
+			>
 		</p>
 	{/if}
 
@@ -196,7 +198,7 @@
 			<label>
 				<span class="mb-1 text-sm font-semibold">Model</span>
 				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
-					{#each models as model}
+					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
 							selected={assistant

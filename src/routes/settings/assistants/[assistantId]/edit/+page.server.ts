@@ -112,18 +112,20 @@ export const actions: Actions = {
 			}
 		}
 
-		const { acknowledged } = await collections.assistants.replaceOne(
+		const { acknowledged } = await collections.assistants.updateOne(
 			{
 				_id: assistant._id,
 			},
 			{
-				createdById: assistant?.createdById,
-				createdByName: locals.user?.username ?? locals.user?.name,
-				...parse.data,
-				exampleInputs,
-				avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
-				createdAt: new Date(),
-				updatedAt: new Date(),
+				$set: {
+					name: parse.data.name,
+					description: parse.data.description,
+					modelId: parse.data.modelId,
+					preprompt: parse.data.preprompt,
+					exampleInputs,
+					avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
+					updatedAt: new Date(),
+				},
 			}
 		);
 

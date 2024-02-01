@@ -4,6 +4,7 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
@@ -49,12 +50,21 @@
 			</div>
 		</label>
 
-		<button
-			on:click|preventDefault={() => (isConfirmingDeletion = true)}
-			type="submit"
-			class="mt-6 flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
-			><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
-		>
+		<div class="mt-12 flex flex-col gap-3">
+			<a
+				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
+				target="_blank"
+				rel="noreferrer"
+				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " /> Give your feedback on HuggingChat</a
+			>
+			<button
+				on:click|preventDefault={() => (isConfirmingDeletion = true)}
+				type="submit"
+				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+				><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
+			>
+		</div>
 	</div>
 
 	{#if isConfirmingDeletion}

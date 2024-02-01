@@ -16,31 +16,31 @@
 	<div
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
-		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10">
+		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10 xl:gap-8">
 			{#if assistant.avatar}
 				<img
 					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
 						assistant.avatar
 					}`}
 					alt="avatar"
-					class="size-16 flex-none rounded-full object-cover md:size-32"
+					class="size-16 flex-none rounded-full object-cover max-sm:self-start md:size-32"
 				/>
 			{:else}
 				<div
-					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 sm:text-4xl md:h-32 md:w-32 dark:bg-gray-600"
+					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 max-sm:self-start sm:text-4xl md:size-32 dark:bg-gray-600"
 				>
 					{assistant?.name[0]}
 				</div>
 			{/if}
 
-			<div class="flex h-full flex-col">
+			<div class="flex h-full flex-col gap-2">
 				<p
-					class="mb-2 w-fit truncate text-ellipsis rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+					class="w-fit truncate text-ellipsis rounded-full border bg-white px-3 py-1 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-400"
 				>
 					Assistant
 				</p>
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
-				<p class="text-balance text-sm text-gray-500 dark:text-gray-400">
+				<p class="line-clamp-6 text-balance text-sm text-gray-500 dark:text-gray-400">
 					{assistant.description}
 				</p>
 
