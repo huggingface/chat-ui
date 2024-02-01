@@ -37,7 +37,7 @@
 		{#if confirmDelete}
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarHash && !$settings.hideEmojiOnSidebar}
+		{#if conv.avatarHash}
 			<img
 				src="{base}/settings/assistants/{conv.assistantId}/avatar?hash={conv.avatarHash}"
 				alt="Assistant avatar"
