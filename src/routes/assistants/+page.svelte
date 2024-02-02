@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
+	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -21,6 +24,24 @@
 		goto(newUrl);
 	};
 </script>
+
+<svelte:head>
+	{#if isHuggingChat}
+		<title>HuggingChat - Assistants</title>
+		<meta property="og:title" content="HuggingChat - Assistants" />
+		<meta property="og:type" content="link" />
+		<meta
+			property="og:description"
+			content="Browse HuggingChat assistants made by the community."
+		/>
+		<meta
+			property="og:image"
+			content="{PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+		/>
+		<meta property="og:url" content={$page.url.href} />
+	{/if}
+</svelte:head>
 
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
