@@ -137,21 +137,11 @@
 		</div>
 	</div>
 
-	<!-- <div>
-		<h2 class="mb-2 text-lg font-semibold">Model used</h2>
-
-		<div
-			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
-		>
-			<input disabled class="flex-1" value="Model" />
-		</div>
-	</div> -->
-
 	<h2 class="mt-4 text-lg font-semibold">System Instructions</h2>
 
 	<textarea
 		disabled
-		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-gray-600 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
+		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
 		>{assistant?.preprompt}</textarea
 	>
 </div>

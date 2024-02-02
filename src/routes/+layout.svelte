@@ -124,7 +124,7 @@
 
 	<!-- use those meta tags everywhere except on the share assistant page -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !$page.url.pathname.includes("/assistant/")}
+	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants"}
 		<meta property="og:title" content={PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />

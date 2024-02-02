@@ -7,7 +7,6 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	export let conv: ConvSidebar;
@@ -18,8 +17,6 @@
 		deleteConversation: string;
 		editConversationTitle: { id: string; title: string };
 	}>();
-
-	const settings = useSettingsStore();
 </script>
 
 <a
@@ -37,7 +34,7 @@
 		{#if confirmDelete}
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarHash && !$settings.hideEmojiOnSidebar}
+		{#if conv.avatarHash}
 			<img
 				src="{base}/settings/assistants/{conv.assistantId}/avatar?hash={conv.avatarHash}"
 				alt="Assistant avatar"

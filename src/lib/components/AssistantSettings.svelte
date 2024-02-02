@@ -211,7 +211,7 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Start messages</span>
+				<span class="mb-1 text-sm font-semibold">User start messages</span>
 				<div class="flex flex-col gap-2 md:max-h-32">
 					<input
 						name="exampleInput1"
