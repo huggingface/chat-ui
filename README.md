@@ -379,7 +379,7 @@ MODELS=`[{
       {
           "type": "openai",
           "baseURL": "https://api.deepinfra.com/v1/openai",
-          "apiKey": "abc...xyz" 
+          "apiKey": "abc...xyz"
       }
   ]
 }]`

@@ -21,7 +21,8 @@ export const endpointOAIParametersSchema = z.object({
 export async function endpointOai(
 	input: z.input<typeof endpointOAIParametersSchema>
 ): Promise<Endpoint> {
-	const { baseURL, apiKey, completion, model, defaultHeaders } = endpointOAIParametersSchema.parse(input);
+	const { baseURL, apiKey, completion, model, defaultHeaders } =
+		endpointOAIParametersSchema.parse(input);
 	let OpenAI;
 	try {
 		OpenAI = (await import("openai")).OpenAI;
@@ -32,7 +33,7 @@ export async function endpointOai(
 	const openai = new OpenAI({
 		apiKey: apiKey ?? "sk-",
 		baseURL,
-		defaultHeaders
+		defaultHeaders,
 	});
 
 	if (completion === "completions") {
@@ -68,8 +69,8 @@ export async function endpointOai(
 				const previousQuestions =
 					previousUserMessages.length > 0
 						? `Previous questions: \n${previousUserMessages
-							.map(({ content }) => `- ${content}`)
-							.join("\n")}`
+								.map(({ content }) => `- ${content}`)
+								.join("\n")}`
 						: "";
 				const currentDate = format(new Date(), "MMMM d, yyyy");
 				messages = [
