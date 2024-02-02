@@ -16,7 +16,7 @@
 	<div
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
-		<div class="flex items-center gap-4 p-4 pr-10 md:p-8 md:pt-10 xl:gap-8">
+		<div class="flex items-center gap-4 p-4 pr-10 max-sm:min-w-[80dvw] md:p-8 md:pt-10 xl:gap-8">
 			{#if assistant.avatar}
 				<img
 					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
