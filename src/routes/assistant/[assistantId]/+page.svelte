@@ -50,7 +50,8 @@
 		{#if data.assistant.avatar}
 			<img
 				class="size-16 flex-none rounded-full object-cover sm:size-24"
-				src="{base}/settings/assistants/{data.assistant._id}/avatar?hash={data.assistant.avatar}"
+				src="{base}/settings/assistants/{data.assistant._id}/avatar.jpg?hash={data.assistant
+					.avatar}"
 				alt="avatar"
 			/>
 		{:else}

@@ -99,7 +99,7 @@
 					>
 						{#if assistant.avatar}
 							<img
-								src="{base}/settings/assistants/{assistant._id.toString()}/avatar?hash={assistant.avatar}"
+								src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
 								alt="Avatar"
 								class="h-6 w-6 rounded-full object-cover"
 							/>

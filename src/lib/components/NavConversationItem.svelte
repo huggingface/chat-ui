@@ -36,7 +36,7 @@
 		{/if}
 		{#if conv.avatarHash}
 			<img
-				src="{base}/settings/assistants/{conv.assistantId}/avatar?hash={conv.avatarHash}"
+				src="{base}/settings/assistants/{conv.assistantId}/avatar.jpg?hash={conv.avatarHash}"
 				alt="Assistant avatar"
 				class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
 			/>
