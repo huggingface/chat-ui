@@ -57,7 +57,7 @@
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"
-				class="flex items-center gap-1.5 rounded-full border bg-white py-1 pl-3 pr-2.5 text-sm text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
+				class="flex items-center gap-1.5 rounded-full border bg-white py-1 pl-3 pr-2.5 text-xs text-gray-800 shadow-sm hover:shadow-inner md:text-sm dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
 				><IconGear class="text-xxs" />Settings</a
 			>
 		</div>
