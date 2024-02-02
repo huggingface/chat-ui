@@ -5,8 +5,9 @@ import { fail, type Actions, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 import { z } from "zod";
-import sizeof from "image-size";
 import { sha256 } from "$lib/utils/sha256";
+
+import sharp from "sharp";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -84,10 +85,14 @@ export const actions: Actions = {
 
 		let hash;
 		if (parse.data.avatar && parse.data.avatar !== "null" && parse.data.avatar.size > 0) {
-			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
-
-			if ((dims.height ?? 1000) > 512 || (dims.width ?? 1000) > 512) {
-				const errors = [{ field: "avatar", message: "Avatar too big" }];
+			let image;
+			try {
+				image = await sharp(await parse.data.avatar.arrayBuffer())
+					.resize(512, 512, { fit: "inside" })
+					.jpeg({ quality: 80 })
+					.toBuffer();
+			} catch (e) {
+				const errors = [{ field: "avatar", message: (e as Error).message }];
 				return fail(400, { error: true, errors });
 			}
 
@@ -100,7 +105,7 @@ export const actions: Actions = {
 				fileId = await fileCursor.next();
 			}
 
-			hash = await uploadAvatar(parse.data.avatar, assistant._id);
+			hash = await uploadAvatar(new File([image], "avatar.jpg"), assistant._id);
 		} else if (deleteAvatar) {
 			// delete the avatar
 			const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
