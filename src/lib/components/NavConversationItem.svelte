@@ -7,7 +7,6 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	export let conv: ConvSidebar;
@@ -18,8 +17,6 @@
 		deleteConversation: string;
 		editConversationTitle: { id: string; title: string };
 	}>();
-
-	const settings = useSettingsStore();
 </script>
 
 <a
