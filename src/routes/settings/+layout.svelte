@@ -12,7 +12,6 @@
 
 	import UserIcon from "~icons/carbon/user";
 	import { fade, fly } from "svelte/transition";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	export let data;
 
 	let previousPage: string = base;
@@ -78,11 +77,10 @@
 				</a>
 			{/each}
 			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
-			{#if data.enableAssistants && (!isHuggingChat || data.assistants.length >= 1)}
+			{#if data.enableAssistants}
 				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
 					Assistants
 				</h3>
-
 				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
 					<a
 						href="{base}/settings/assistants/new"
