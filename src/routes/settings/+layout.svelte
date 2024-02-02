@@ -18,6 +18,12 @@
 	let previousPage: string = base;
 	let assistantsSection: HTMLHeadingElement;
 
+	onMount(() => {
+		if ($page.params?.assistantId) {
+			assistantsSection.scrollIntoView();
+		}
+	});
+
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("settings")) {
 			previousPage = from?.url.pathname || previousPage;
@@ -25,12 +31,6 @@
 	});
 
 	const settings = useSettingsStore();
-
-	onMount(() => {
-		if ($page.params?.assistantId) {
-			assistantsSection.scrollIntoView();
-		}
-	});
 </script>
 
 <div

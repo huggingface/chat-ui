@@ -65,7 +65,11 @@
 	{#if assistant.exampleInputs}
 		<div class="mx-auto mt-auto w-full gap-8 sm:-mb-8">
 			<div class="md:col-span-2 md:mt-6">
-				<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+				<div
+					class="grid grid-cols-1 gap-3 {assistant.exampleInputs.length > 1
+						? 'md:grid-cols-2'
+						: ''}"
+				>
 					{#each assistant.exampleInputs as example}
 						<button
 							type="button"
