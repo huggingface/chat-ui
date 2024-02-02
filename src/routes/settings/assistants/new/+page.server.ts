@@ -5,8 +5,8 @@ import { fail, type Actions, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 import { z } from "zod";
-import sizeof from "image-size";
 import { sha256 } from "$lib/utils/sha256";
+import sharp from "sharp";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -74,20 +74,18 @@ export const actions: Actions = {
 
 		let hash;
 		if (parse.data.avatar && parse.data.avatar.size > 0) {
-			const dims = sizeof(Buffer.from(await parse.data.avatar.arrayBuffer()));
-
-			if ((dims.height ?? 1000) > 512 || (dims.width ?? 1000) > 512) {
-				const errors = [
-					{
-						field: "avatar",
-						message:
-							"Avatar is too big. Please make sure the size of your avatar is no bigger than 512px by 512px.",
-					},
-				];
+			let image;
+			try {
+				image = await sharp(await parse.data.avatar.arrayBuffer())
+					.resize(512, 512, { fit: "inside" })
+					.jpeg({ quality: 80 })
+					.toBuffer();
+			} catch (e) {
+				const errors = [{ field: "avatar", message: (e as Error).message }];
 				return fail(400, { error: true, errors });
 			}
 
-			hash = await uploadAvatar(parse.data.avatar, newAssistantId);
+			hash = await uploadAvatar(new File([image], "avatar.jpg"), newAssistantId);
 		}
 
 		const { insertedId } = await collections.assistants.insertOne({

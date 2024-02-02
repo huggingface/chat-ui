@@ -21,7 +21,7 @@
 		>
 			{#if assistant.avatar}
 				<img
-					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar?hash=${
+					src={`${base}/settings/assistants/${assistant._id.toString()}/avatar.jpg?hash=${
 						assistant.avatar
 					}`}
 					alt="avatar"
