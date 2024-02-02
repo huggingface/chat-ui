@@ -9,6 +9,7 @@
 	import { page } from "$app/stores";
 
 	import CarbonAdd from "~icons/carbon/add";
+	import CarbonHelpFilled from "~icons/carbon/help-filled";
 
 	export let data: PageData;
 
@@ -47,11 +48,20 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Assistants</h1>
-			<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
-				beta
-			</div>
+			{#if isHuggingChat}
+				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
+					beta
+				</div>
+				<a
+					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/357"
+					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
+					target="_blank"
+				>
+					<CarbonHelpFilled />
+				</a>
+			{/if}
 		</div>
-		<h3 class="text-gray-500">Browse popular assistants made by the community</h3>
+		<h3 class="text-gray-500">Popular assistants made by the community</h3>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
