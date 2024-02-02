@@ -88,8 +88,8 @@ export const actions: Actions = {
 			let image;
 			try {
 				image = await sharp(await parse.data.avatar.arrayBuffer())
-					.resize(512, 512)
-					.jpeg()
+					.resize(512, 512, { fit: "inside" })
+					.jpeg({ quality: 80 })
 					.toBuffer();
 			} catch (e) {
 				const errors = [{ field: "avatar", message: (e as Error).message }];
