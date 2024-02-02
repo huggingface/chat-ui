@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
+	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -22,6 +25,24 @@
 	};
 </script>
 
+<svelte:head>
+	{#if isHuggingChat}
+		<title>HuggingChat - Assistants</title>
+		<meta property="og:title" content="HuggingChat - Assistants" />
+		<meta property="og:type" content="link" />
+		<meta
+			property="og:description"
+			content="Browse HuggingChat assistants made by the community."
+		/>
+		<meta
+			property="og:image"
+			content="{PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+		/>
+		<meta property="og:url" content={$page.url.href} />
+	{/if}
+</svelte:head>
+
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
@@ -33,7 +54,7 @@
 		<h3 class="text-gray-500">Browse popular assistants made by the community</h3>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
-				class="mt-1 rounded-lg border border-gray-300 bg-gray-50 p-2 text-xs text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 				bind:value={selectedModel}
 				on:change={onModelChange}
 			>
@@ -45,16 +66,16 @@
 
 			<a
 				href={`${base}/settings/assistants/new`}
-				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 text-center shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
+				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
 				<CarbonAdd />Create New assistant
 			</a>
 		</div>
-		<div class="mt-10 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+		<div class="mt-10 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant}
 				<a
 					href="{base}/assistant/{assistant._id}"
-					class="flex flex-col items-center justify-center overflow-hidden rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
 					{#if assistant.avatar}
 						<img
@@ -74,13 +95,11 @@
 					>
 						{assistant.name}
 					</h3>
-					<p
-						class="line-clamp-4 text-balance text-xxs text-gray-700 sm:line-clamp-2 sm:text-xs dark:text-gray-400"
-					>
+					<p class="line-clamp-4 text-xs text-gray-700 sm:line-clamp-2 dark:text-gray-400">
 						{assistant.description}
 					</p>
 					{#if assistant.createdByName}
-						<p class="mt-auto pt-2 text-xxs text-gray-400 sm:text-xs dark:text-gray-500">
+						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
 							Created by <a
 								class="hover:underline"
 								href="https://hf.co/{assistant.createdByName}"

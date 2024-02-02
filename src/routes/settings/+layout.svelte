@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import { base } from "$app/paths";
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { afterNavigate, goto } from "$app/navigation";
@@ -15,6 +16,13 @@
 	export let data;
 
 	let previousPage: string = base;
+	let assistantsSection: HTMLHeadingElement;
+
+	onMount(() => {
+		if ($page.params?.assistantId) {
+			assistantsSection.scrollIntoView();
+		}
+	});
 
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("settings")) {
@@ -71,7 +79,9 @@
 			{/each}
 			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
 			{#if data.enableAssistants && (!isHuggingChat || data.assistants.length >= 1)}
-				<h3 class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">Assistants</h3>
+				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
+					Assistants
+				</h3>
 
 				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
 					<a
