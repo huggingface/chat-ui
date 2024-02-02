@@ -100,6 +100,7 @@ export const actions: Actions = {
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			userCount: 1,
+			featured: false,
 		});
 
 		// add insertedId to user settings
