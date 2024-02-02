@@ -13,7 +13,7 @@ export const load = async ({ url }) => {
 
 	// fetch the top 10 assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
 	const assistants = await collections.assistants
-		.find({ userCount: { $gt: 1 }, modelId: modelId ?? { $exists: true } })
+		.find({ userCount: { $gt: 1 }, modelId: modelId ?? { $exists: true }, featured: true })
 		.sort({ userCount: -1 })
 		.limit(10)
 		.toArray();
