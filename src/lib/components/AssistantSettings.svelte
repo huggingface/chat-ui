@@ -50,7 +50,14 @@
 
 	function onFilesChange(e: Event) {
 		const inputEl = e.target as HTMLInputElement;
-		if (inputEl.files?.length) {
+		if (inputEl.files?.length && inputEl.files[0].size > 0) {
+			if (!inputEl.files[0].type.includes("image")) {
+				inputEl.files = null;
+				files = null;
+
+				form = { error: true, errors: [{ field: "avatar", message: "Only images are allowed" }] };
+				return;
+			}
 			files = inputEl.files;
 			resetErrors();
 			deleteExistingAvatar = false;
@@ -88,6 +95,10 @@
 				formData.set("avatar", "null");
 			} else {
 				// else we just remove it from the input
+				formData.delete("avatar");
+			}
+		} else {
+			if (files === null) {
 				formData.delete("avatar");
 			}
 		}
@@ -169,8 +180,8 @@
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>
 					</div>
-					<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 				{/if}
+				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 			</div>
 
 			<label>
