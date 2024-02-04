@@ -10,10 +10,12 @@
 
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import Pagination from "$lib/components/Pagination.svelte";
 
 	export let data: PageData;
 
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
+	let pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
 
 	const onModelChange = (e: Event) => {
 		const newUrl = new URL($page.url);
@@ -22,6 +24,13 @@
 		} else {
 			newUrl.searchParams.set("modelId", (e.target as HTMLSelectElement).value);
 		}
+		goto(newUrl);
+	};
+
+	const onPaginationChange = (newPageIndex: number) => {
+		pageIndex = newPageIndex;
+		const newUrl = new URL($page.url);
+		newUrl.searchParams.set("p", newPageIndex.toString());
 		goto(newUrl);
 	};
 </script>
@@ -124,5 +133,12 @@
 				No assistants found
 			{/each}
 		</div>
+		<Pagination
+			classNames="w-full flex justify-center mt-14 mb-4"
+			numItemsPerPage={data.numItemsPerPage}
+			numTotalItems={data.numTotalItems}
+			{pageIndex}
+			onChange={onPaginationChange}
+		/>
 	</div>
 </div>
