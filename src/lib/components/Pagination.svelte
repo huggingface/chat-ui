@@ -80,7 +80,7 @@
 							? 'bg-gray-50 font-semibold ring-1 ring-inset ring-gray-200 dark:bg-gray-800 dark:text-yellow-500 dark:ring-gray-700'
 							: ''}
 						"
-						class:pointer-events-none={pageIdx === ELLIPSIS_IDX}
+						class:pointer-events-none={pageIdx === ELLIPSIS_IDX || pageIndex === pageIdx}
 						href={getHref(pageIdx)}
 					>
 						{pageIdx === ELLIPSIS_IDX ? "..." : pageIdx + 1}
