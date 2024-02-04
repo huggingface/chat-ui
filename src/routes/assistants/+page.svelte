@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
+	import type { LayoutData } from "../../routes/$types";
 
 	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
@@ -13,6 +14,7 @@
 	import Pagination from "$lib/components/Pagination.svelte";
 
 	export let data: PageData;
+	export let user: LayoutData["user"];
 
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
 	let pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
@@ -31,6 +33,22 @@
 		pageIndex = newPageIndex;
 		const newUrl = new URL($page.url);
 		newUrl.searchParams.set("p", newPageIndex.toString());
+		goto(newUrl);
+	};
+
+	const getAssistantsByUser = (username?: string | null) => {
+		const newUrl = new URL($page.url);
+
+		// reset other query params
+		newUrl.searchParams.delete("modelId");
+		newUrl.searchParams.delete("p");
+
+		if (!username) {
+			// get all community featured assistants
+			newUrl.searchParams.delete("user");
+		} else {
+			newUrl.searchParams.set("user", username);
+		}
 		goto(newUrl);
 	};
 </script>
@@ -70,7 +88,21 @@
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular assistants made by the community</h3>
+		{#if !data.createdByMe}
+			<!-- if the assistants were created by me, don't show any text -->
+			{#if data.createdByUser}
+				<h3 class="text-gray-500">
+					Assistants created by <a
+						class="hover:underline"
+						href="https://hf.co/{data.createdByUser}"
+						target="_blank">{data.createdByUser}</a
+					>. Click <a class="hover:underline" href="/assistants">here</a> to see all community created
+					assistants
+				</h3>
+			{:else}
+				<h3 class="text-gray-500">Popular assistants made by the community</h3>
+			{/if}
+		{/if}
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
@@ -90,6 +122,32 @@
 				<CarbonAdd />Create New assistant
 			</a>
 		</div>
+		{#if user?.username}
+			<div class="mt-10 flex gap-x-2">
+				{#if data.createdByUser && !data.createdByMe}
+					<button
+						class="rounded-lg px-3 py-1"
+						class:bg-gray-200={!data.createdByMe}
+						class:dark:bg-gray-800={!data.createdByMe}
+						on:click={() => getAssistantsByUser(data.createdByUser)}
+						>{data.createdByUser}'s Assistants</button
+					>
+				{:else}
+					<button
+						class="rounded-lg px-3 py-1"
+						class:bg-gray-200={!data.createdByMe}
+						class:dark:bg-gray-800={!data.createdByMe}
+						on:click={() => getAssistantsByUser()}>Community</button
+					>
+				{/if}
+				<button
+					class="rounded-lg px-3 py-1"
+					class:bg-gray-200={data.createdByMe}
+					class:dark:bg-gray-800={data.createdByMe}
+					on:click={() => getAssistantsByUser(user?.username)}>My Assistants</button
+				>
+			</div>
+		{/if}
 		<div class="mt-10 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant}
 				<a
