@@ -8,7 +8,9 @@
 </script>
 
 <button
-	class="flex items-center rounded-lg px-2.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 {isDisabled ? 'pointer-events-none opacity-50' : ''}"
+	class="flex items-center rounded-lg px-2.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 {isDisabled
+		? 'pointer-events-none opacity-50'
+		: ''}"
 	on:click|preventDefault={() => onClick(direction)}
 >
 	{#if direction === "previous"}
