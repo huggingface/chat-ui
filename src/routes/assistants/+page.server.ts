@@ -16,9 +16,9 @@ export const load = async ({ url, locals }) => {
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const createdByName = url.searchParams.get("user");
 
-	if(createdByName){
+	if (createdByName) {
 		const existingUser = await collections.users.findOne({ hfUserId: createdByName });
-		if(!existingUser){
+		if (!existingUser) {
 			throw error(404, `User "${createdByName}" doesn't exist`);
 		}
 	}
