@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from "$app/stores";
 	import PaginationArrow from "./PaginationArrow.svelte";
 
 	interface PageLink {
@@ -21,12 +22,11 @@
 	export let classNames = "";
 	export let numItemsPerPage: number;
 	export let numTotalItems: number;
-	export let onChange: (newPageIndex: number) => void = () => {};
-	export let pageIndex: number;
 
 	let pageLinks: PageLink[] = [];
 
 	const numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
+	const pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
 
 	$: {
 		let pageIndexes = [
@@ -69,15 +69,10 @@
 		});
 	}
 
-	function handleClickDirection(direction: "next" | "previous") {
-		const newPageIndex = pageIndex + (direction === "next" ? 1 : -1);
-		handleClickNumber(newPageIndex);
-	}
-
-	function handleClickNumber(newPageIndex: number) {
-		if (newPageIndex >= 0 && newPageIndex < numTotalPages) {
-			onChange(newPageIndex);
-		}
+	function getHref(pageIdx: number) {
+		const newUrl = new URL($page.url);
+		newUrl.searchParams.set("p", pageIdx.toString());
+		return newUrl.toString();
 	}
 </script>
 
@@ -88,14 +83,14 @@
 		>
 			<li>
 				<PaginationArrow
+					href={getHref(pageIndex - 1)}
 					direction="previous"
 					isDisabled={pageIndex - 1 < 0}
-					onClick={handleClickDirection}
 				/>
 			</li>
 			{#each pageLinks as pageLink}
 				<li class="hidden sm:block">
-					<button
+					<a
 						class="
 							rounded-lg px-2.5 py-1
 							{pageLink.isActive
@@ -103,17 +98,17 @@
 							: ''}
 						"
 						class:pointer-events-none={pageLink.label === ellipsis.label}
-						on:click|preventDefault={() => handleClickNumber(pageLink.pageIndex)}
+						href={getHref(pageLink.pageIndex)}
 					>
 						{pageLink.label}
-					</button>
+					</a>
 				</li>
 			{/each}
 			<li>
 				<PaginationArrow
+					href={getHref(pageIndex + 1)}
 					direction="next"
 					isDisabled={pageIndex + 1 >= numTotalPages}
-					onClick={handleClickDirection}
 				/>
 			</li>
 		</ul>
