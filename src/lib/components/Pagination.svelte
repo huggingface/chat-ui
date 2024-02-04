@@ -2,77 +2,60 @@
 	import { page } from "$app/stores";
 	import PaginationArrow from "./PaginationArrow.svelte";
 
-	interface PageLink {
-		isActive: boolean;
-		label: string;
-		pageIndex: number;
-	}
-
-	/**
-	 * The number of page links to show on either side of the current page link.
-	 */
-	const NUM_EXTRA_BUTTONS = 2;
-
-	const ellipsis: PageLink = {
-		isActive: false,
-		label: "...",
-		pageIndex: -1,
-	};
-
 	export let classNames = "";
 	export let numItemsPerPage: number;
 	export let numTotalItems: number;
 
-	let pageLinks: PageLink[] = [];
+	const ELLIPSIS_IDX = -1 as const;
 
 	const numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
 	$: pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
-
-	$: {
-		let pageIndexes = [
-			0,
-			...new Array(NUM_EXTRA_BUTTONS).fill(0).map((_, i) => pageIndex + i - NUM_EXTRA_BUTTONS),
-			pageIndex,
-			...new Array(NUM_EXTRA_BUTTONS).fill(0).map((_, i) => pageIndex + i + 1),
-			numTotalPages - 1,
-		].filter((n) => n >= 0 && n < numTotalPages);
-
-		pageIndexes = [...new Set(pageIndexes)];
-
-		if (pageIndexes.length >= 2 && pageIndexes[1] !== pageIndexes[0] + 1) {
-			pageIndexes = [pageIndexes[0], -1, ...pageIndexes.slice(1)];
-		}
-
-		const pageAtNegOne = pageIndexes.at(-1);
-		const pageAtNegTwo = pageIndexes.at(-2);
-
-		if (
-			pageAtNegOne !== undefined &&
-			pageAtNegTwo !== undefined &&
-			pageIndexes.length >= 2 &&
-			pageIndexes.at(-1) !== pageAtNegTwo + 1 &&
-			pageIndexes.at(-2) !== -1
-		) {
-			pageIndexes = [...pageIndexes.slice(0, -1), -1, pageAtNegOne];
-		}
-
-		pageLinks = pageIndexes.map((index) => {
-			if (index === -1) {
-				return ellipsis;
-			}
-
-			return {
-				isActive: index === pageIndex,
-				label: `${(index + 1).toLocaleString("en-US")}`,
-				pageIndex: index,
-			};
-		});
-	}
+	$: pageIndexes = getPageIndexes(pageIndex);
 
 	function getHref(pageIdx: number) {
 		const newUrl = new URL($page.url);
 		newUrl.searchParams.set("p", pageIdx.toString());
 		return newUrl.toString();
+	}
+
+	function getPageIndexes(pageIdx: number) {
+		let pageIdxs: number[] = [];
+
+		const NUM_EXTRA_BUTTONS = 2; // The number of page links to show on either side of the current page link.
+
+		const minIdx = 0;
+		const maxIdx = numTotalPages - 1;
+
+		pageIdxs = [pageIdx];
+
+		// forward
+		for (let i = 1; i < NUM_EXTRA_BUTTONS + 1; i++) {
+			const newPageIdx = pageIdx + i;
+			if (newPageIdx > maxIdx) {
+				continue;
+			}
+			pageIdxs.push(newPageIdx);
+		}
+		if (maxIdx - pageIdxs[pageIdxs.length - 1] > 1) {
+			pageIdxs.push(...[ELLIPSIS_IDX, maxIdx]);
+		} else if (maxIdx - pageIdxs[pageIdxs.length - 1] === 1) {
+			pageIdxs.push(maxIdx);
+		}
+
+		// backward
+		for (let i = 1; i < NUM_EXTRA_BUTTONS + 1; i++) {
+			const newPageIdx = pageIdx - i;
+			if (newPageIdx < minIdx) {
+				continue;
+			}
+			pageIdxs.unshift(newPageIdx);
+		}
+		if (pageIdxs[0] - minIdx > 1) {
+			pageIdxs.unshift(...[minIdx, ELLIPSIS_IDX]);
+		} else if (pageIdxs[0] - minIdx === 1) {
+			pageIdxs.unshift(minIdx);
+		}
+		return pageIdxs;
 	}
 </script>
 
@@ -88,19 +71,19 @@
 					isDisabled={pageIndex - 1 < 0}
 				/>
 			</li>
-			{#each pageLinks as pageLink}
+			{#each pageIndexes as pageIdx}
 				<li class="hidden sm:block">
 					<a
 						class="
 							rounded-lg px-2.5 py-1
-							{pageLink.isActive
+							{pageIndex === pageIdx
 							? 'bg-gray-50 font-semibold ring-1 ring-inset ring-gray-200 dark:bg-gray-800 dark:text-yellow-500 dark:ring-gray-700'
 							: ''}
 						"
-						class:pointer-events-none={pageLink.label === ellipsis.label}
-						href={getHref(pageLink.pageIndex)}
+						class:pointer-events-none={pageIdx === ELLIPSIS_IDX}
+						href={getHref(pageIdx)}
 					>
-						{pageLink.label}
+						{pageIdx === ELLIPSIS_IDX ? "..." : pageIdx + 1}
 					</a>
 				</li>
 			{/each}
