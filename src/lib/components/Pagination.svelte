@@ -26,7 +26,7 @@
 	let pageLinks: PageLink[] = [];
 
 	const numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
-	const pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
+	$: pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
 
 	$: {
 		let pageIndexes = [
