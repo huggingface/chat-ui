@@ -250,7 +250,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let webSearchResults: WebSearch | undefined;
 
-			if (webSearch && !isContinue) {
+			if (webSearch && !isContinue && !conv.assistantId) {
 				webSearchResults = await runWebSearch(conv, messages[messages.length - 1].content, update);
 				messages[messages.length - 1].webSearch = webSearchResults;
 			} else if (isContinue) {

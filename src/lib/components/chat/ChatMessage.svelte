@@ -19,6 +19,7 @@
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import { base } from "$app/paths";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -139,11 +140,19 @@
 		on:click={() => (isTapped = !isTapped)}
 		on:keypress={() => (isTapped = !isTapped)}
 	>
-		<img
-			alt=""
-			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
-		/>
+		{#if $page.data?.assistant?.avatar}
+			<img
+				src="{base}/settings/assistants/{$page.data.assistant._id}/avatar.jpg"
+				alt="Avatar"
+				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
+			/>
+		{:else}
+			<img
+				alt=""
+				src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
+				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
+			/>
+		{/if}
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
