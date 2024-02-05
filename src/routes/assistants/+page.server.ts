@@ -28,7 +28,7 @@ export const load = async ({ url }) => {
 		userCount: { $gt: 1 },
 		modelId: modelId ?? { $exists: true },
 		featured: true,
-		createdByName: createdByName ?? undefined,
+		...(createdByName && { createdByName }),
 	};
 	const assistants = await collections.assistants
 		.find(filter)
