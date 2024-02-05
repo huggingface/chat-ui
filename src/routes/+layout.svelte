@@ -157,8 +157,8 @@
 		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/manifest.json"
 	/>
 
-	{#if PUBLIC_PLAUSIBLE_DOMAIN}
-		<script defer data-domain={PUBLIC_PLAUSIBLE_DOMAIN} src="/js/script.js"></script>
+	{#if PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		<script defer data-domain={new URL(PUBLIC_ORIGIN).hostname} src={PUBLIC_PLAUSIBLE_SCRIPT_URL}></script>
 	{/if}
 </svelte:head>
 
