@@ -21,7 +21,7 @@
 </script>
 
 <div class="flex w-full flex-col gap-5">
-	<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
+	<div class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-300">
 		<h2>Application Settings</h2>
 	</div>
 
@@ -33,19 +33,19 @@
 					name="shareConversationsWithModelAuthors"
 					bind:checked={$settings.shareConversationsWithModelAuthors}
 				/>
-				<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+				<div class="inline cursor-pointer select-none items-center gap-2 pl-2 dark:text-gray-300">
 					Share conversations with model authors
 				</div>
 			</label>
 
-			<p class="text-sm text-gray-500">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Sharing your data will help improve the training data and make open models better over time.
 			</p>
 		{/if}
 		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 dark:text-gray-300">
 				Hide emoticons in conversation topics
 			</div>
 		</label>
@@ -55,13 +55,13 @@
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
 				target="_blank"
 				rel="noreferrer"
-				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:text-gray-300 dark:decoration-gray-700 dark:hover:decoration-gray-300"
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
 			<button
 				on:click|preventDefault={() => (isConfirmingDeletion = true)}
 				type="submit"
-				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:text-gray-300 dark:decoration-gray-700 dark:hover:decoration-gray-300"
 				><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
 			>
 		</div>
@@ -75,24 +75,24 @@
 				}}
 				method="post"
 				action="{base}/conversations?/delete"
-				class="flex w-full flex-col gap-5 p-6"
+				class="flex w-full flex-col gap-5 p-6 dark:bg-gray-900"
 			>
-				<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
+				<div class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-300">
 					<h2>Are you sure?</h2>
 					<button
 						type="button"
 						class="group"
 						on:click|stopPropagation={() => (isConfirmingDeletion = false)}
 					>
-						<CarbonClose class="text-gray-900 group-hover:text-gray-500" />
+						<CarbonClose class="text-gray-900 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-200" />
 					</button>
 				</div>
-				<p class="text-gray-800">
+				<p class="text-gray-800 dark:text-gray-300">
 					This action will delete all your conversations. This cannot be undone.
 				</p>
 				<button
 					type="submit"
-					class="mt-2 rounded-full bg-red-700 px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-all focus-visible:outline-none focus-visible:ring hover:ring"
+					class="mt-2 rounded-full bg-red-700 px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-all focus-visible:outline-none focus-visible:ring hover:ring dark:text-gray-300 dark:ring-offset-gray-900"
 				>
 					Confirm deletion
 				</button>

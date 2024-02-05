@@ -110,13 +110,13 @@
 	}}
 >
 	{#if assistant}
-		<h2 class="text-xl font-semibold">Edit assistant ({assistant?.name ?? ""})</h2>
-		<p class="mb-6 text-sm text-gray-500">
+		<h2 class="text-xl font-semibold dark:text-gray-300">Edit assistant ({assistant?.name ?? ""})</h2>
+		<p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
 			Modifying an existing assistant will propagate those changes to all users.
 		</p>
 	{:else}
-		<h2 class="text-xl font-semibold">Create new assistant</h2>
-		<p class="mb-6 text-sm text-gray-500">
+		<h2 class="text-xl font-semibold dark:text-gray-300">Create new assistant</h2>
+		<p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
 			Create and share your own AI Assistant. All assistants are <span
 				class="rounded-full border px-2 py-0.5 leading-none">public</span
 			>
@@ -126,7 +126,7 @@
 	<div class="mx-1 grid flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4">
 			<div>
-				<span class="mb-1 block pb-2 text-sm font-semibold">Avatar</span>
+				<span class="mb-1 block pb-2 text-sm font-semibold dark:text-gray-300">Avatar</span>
 				<input
 					type="file"
 					accept="image/*"
@@ -166,7 +166,7 @@
 								files = null;
 								deleteExistingAvatar = true;
 							}}
-							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
+							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline dark:text-gray-400"
 						>
 							Delete
 						</button>
@@ -175,7 +175,7 @@
 					<div class="mb-1 flex w-max flex-row gap-4">
 						<label
 							for="avatar"
-							class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100"
+							class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
 						>
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>
@@ -185,10 +185,10 @@
 			</div>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Name</span>
+				<span class="mb-1 text-sm font-semibold dark:text-gray-300">Name</span>
 				<input
 					name="name"
-					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 					placeholder="My awesome model"
 					value={assistant?.name ?? ""}
 				/>
@@ -196,10 +196,10 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Description</span>
+				<span class="mb-1 text-sm font-semibold dark:text-gray-300">Description</span>
 				<textarea
 					name="description"
-					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 					placeholder="He knows everything about python"
 					value={assistant?.description ?? ""}
 				/>
@@ -207,8 +207,8 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Model</span>
-				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
+				<span class="mb-1 text-sm font-semibold dark:text-gray-300">Model</span>
+				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300">
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
@@ -222,32 +222,32 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">User start messages</span>
+				<span class="mb-1 text-sm font-semibold dark:text-gray-300">User start messages</span>
 				<div class="flex flex-col gap-2 md:max-h-32">
 					<input
 						name="exampleInput1"
 						bind:value={inputMessage1}
-						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 					/>
 					{#if !!inputMessage1 || !!inputMessage2}
 						<input
 							name="exampleInput2"
 							bind:value={inputMessage2}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 						/>
 					{/if}
 					{#if !!inputMessage2 || !!inputMessage3}
 						<input
 							name="exampleInput3"
 							bind:value={inputMessage3}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 						/>
 					{/if}
 					{#if !!inputMessage3 || !!inputMessage4}
 						<input
 							name="exampleInput4"
 							bind:value={inputMessage4}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 						/>
 					{/if}
 				</div>
@@ -256,10 +256,10 @@
 		</div>
 
 		<label class="flex flex-col">
-			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
+			<span class="mb-1 text-sm font-semibold dark:text-gray-300"> Instructions (system prompt) </span>
 			<textarea
 				name="preprompt"
-				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
 			/>
@@ -270,13 +270,13 @@
 	<div class="mt-5 flex justify-end gap-2">
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
-			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
+			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600 dark:text-gray-300 dark:bg-gray-700">Cancel</a
 		>
 		<button
 			type="submit"
 			disabled={loading}
 			aria-disabled={loading}
-			class="rounded-full bg-black px-8 py-2 font-semibold md:px-20"
+			class="rounded-full bg-black px-8 py-2 font-semibold md:px-20 dark:bg-gray-300 dark:text-gray-900"
 			class:bg-gray-200={loading}
 			class:text-gray-600={loading}
 			class:text-white={!loading}

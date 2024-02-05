@@ -42,34 +42,34 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-8 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
+		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-8 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh] dark:bg-gray-900"
 	>
 		<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
-			<h2 class="text-xl font-bold">Settings</h2>
+			<h2 class="text-xl font-bold dark:text-gray-300">Settings</h2>
 			<button
 				class="btn rounded-lg"
 				on:click={() => {
 					goto(previousPage);
 				}}
 			>
-				<CarbonClose class="text-xl text-gray-900 hover:text-black" />
+				<CarbonClose class="text-xl text-gray-900 hover:text-black dark:text-gray-400 dark:hover:text-gray-200" />
 			</button>
 		</div>
 		<div
 			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-[245px] max-md:border max-md:border-b-2 md:pr-6"
 		>
-			<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1">Models</h3>
+			<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1 dark:text-gray-300">Models</h3>
 
 			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
 					href="{base}/settings/{model.id}"
-					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-					{model.id === $page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
+					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800
+					{model.id === $page.params.model ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
 				>
 					<div class="truncate">{model.displayName}</div>
 					{#if model.id === $settings.activeModel}
 						<div
-							class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white dark:bg-gray-300 dark:text-gray-900"
 						>
 							Active
 						</div>
@@ -78,14 +78,14 @@
 			{/each}
 			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
 			{#if data.enableAssistants}
-				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
+				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1 dark:text-gray-300">
 					Assistants
 				</h3>
 				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
 					<a
 						href="{base}/settings/assistants/new"
-						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-					{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800
+					{$page.url.pathname === `${base}/settings/assistants/new` ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
 					>
 						<CarbonAdd />
 						<div class="truncate">Create new assistant</div>
@@ -94,8 +94,8 @@
 				{#each data.assistants as assistant}
 					<a
 						href="{base}/settings/assistants/{assistant._id.toString()}"
-						class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-					{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+						class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800
+					{assistant._id.toString() === $page.params.assistantId ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
 					>
 						{#if assistant.avatar}
 							<img
@@ -113,7 +113,7 @@
 						<div class="truncate">{assistant.name}</div>
 						{#if assistant._id.toString() === $settings.activeModel}
 							<div
-								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white dark:bg-gray-300 dark:text-gray-900"
 							>
 								Active
 							</div>
@@ -122,7 +122,7 @@
 				{/each}
 				<a
 					href="{base}/assistants"
-					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl"
+					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800 dark:text-gray-400"
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 					<div class="truncate">Browse Assistants</div>
 				</a>
@@ -130,8 +130,8 @@
 
 			<a
 				href="{base}/settings"
-				class="group mt-auto flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
-				{$page.url.pathname === `${base}/settings` ? '!bg-gray-100 !text-gray-800' : ''}"
+				class="group mt-auto flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm hover:bg-gray-100 max-md:order-first md:rounded-xl dark:hover:bg-gray-800
+				{$page.url.pathname === `${base}/settings` ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
 			>
 				<UserIcon class="text-sm" />
 				Application Settings
@@ -143,7 +143,7 @@
 
 		{#if $settings.recentlySaved}
 			<div
-				class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-200 px-3 py-1 text-black"
+				class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-200 px-3 py-1 text-black dark:border-gray-500 dark:bg-gray-600 dark:text-gray-300"
 			>
 				<CarbonCheckmark class="text-green-500" />
 				Saved

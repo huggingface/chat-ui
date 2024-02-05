@@ -29,12 +29,12 @@
 
 <div class="flex flex-col items-start">
 	<div class="mb-5 flex flex-col gap-1.5">
-		<h2 class="text-lg font-semibold md:text-xl">
+		<h2 class="text-lg font-semibold md:text-xl dark:text-gray-300">
 			{$page.params.model}
 		</h2>
 
 		{#if model.description}
-			<p class="whitespace-pre-wrap text-gray-600">
+			<p class="whitespace-pre-wrap text-gray-600 dark:text-gray-400">
 				{model.description}
 			</p>
 		{/if}
@@ -46,7 +46,7 @@
 				href={model.modelUrl || "https://huggingface.co/" + model.name}
 				target="_blank"
 				rel="noreferrer"
-				class="flex items-center truncate underline underline-offset-2"
+				class="flex items-center truncate underline underline-offset-2 dark:text-gray-300"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Model page
@@ -58,7 +58,7 @@
 				href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
 				target="_blank"
 				rel="noreferrer"
-				class="flex items-center truncate underline underline-offset-2"
+				class="flex items-center truncate underline underline-offset-2 dark:text-gray-300"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Dataset page
@@ -69,7 +69,7 @@
 			<a
 				href={model.websiteUrl}
 				target="_blank"
-				class="flex items-center truncate underline underline-offset-2"
+				class="flex items-center truncate underline underline-offset-2 dark:text-gray-300"
 				rel="noreferrer"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
@@ -80,7 +80,7 @@
 			value="{PUBLIC_ORIGIN || $page.url.origin}{base}?model={model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
-			<div class="flex items-center gap-1.5 hover:underline">
+			<div class="flex items-center gap-1.5 hover:underline dark:text-gray-300">
 				<CarbonLink />Copy direct link to model
 			</div>
 		</CopyToClipBoardBtn>
@@ -88,8 +88,8 @@
 
 	<button
 		class="{isActive
-			? 'bg-gray-100'
-			: 'bg-black text-white'} my-8 flex items-center rounded-full px-3 py-1"
+			? 'bg-gray-100 dark:bg-gray-300 dark:text-gray-900'
+			: 'bg-black text-white dark:bg-gray-800 dark:text-gray-300'} my-8 flex items-center rounded-full px-3 py-1"
 		disabled={isActive}
 		name="Activate model"
 		on:click|stopPropagation={() => {
@@ -101,10 +101,10 @@
 
 	<div class="flex w-full flex-col gap-2">
 		<div class="flex w-full flex-row content-between">
-			<h3 class="mb-1.5 text-lg font-semibold text-gray-800">System Prompt</h3>
+			<h3 class="mb-1.5 text-lg font-semibold text-gray-800 dark:text-gray-300">System Prompt</h3>
 			{#if hasCustomPreprompt}
 				<button
-					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
+					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700 dark:text-gray-300 dark:decoration-gray-500 dark:hover:decoration-gray-300"
 					on:click|stopPropagation={() =>
 						($settings.customPrompts[$page.params.model] = model.preprompt)}
 				>
@@ -114,7 +114,7 @@
 		</div>
 		<textarea
 			rows="10"
-			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
+			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 			bind:value={$settings.customPrompts[$page.params.model]}
 		/>
 	</div>

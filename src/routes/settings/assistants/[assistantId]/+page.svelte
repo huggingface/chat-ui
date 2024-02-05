@@ -45,34 +45,34 @@
 
 		<div class="flex-1">
 			<div class="mb-1.5">
-				<h1 class="mr-2 inline text-xl font-semibold">
+				<h1 class="mr-2 inline text-xl font-semibold dark:text-gray-300">
 					{assistant?.name}
 				</h1>
-				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500 dark:text-gray-400"
 					>public</span
 				>
 			</div>
 
 			{#if assistant?.description}
-				<p class="mb-2 line-clamp-2 text-sm text-gray-500">
+				<p class="mb-2 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
 					{assistant.description}
 				</p>
 			{/if}
 
-			<p class="text-sm text-gray-500">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Model: <span class="font-semibold"> {assistant?.modelId} </span>
-				<span class="text-gray-300">•</span> Created by
+				<span class="text-gray-300 dark:text-gray-500">•</span> Created by
 				<a class="underline" target="_blank" href={"https://hf.co/" + assistant?.createdByName}>
 					{assistant?.createdByName}
 				</a>
 			</p>
 			<div
-				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
+				class="flex items-center gap-4 whitespace-nowrap text-sm"
 			>
 				<button
 					class="{isActive
-						? 'bg-gray-100 text-gray-800'
-						: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
+						? 'bg-gray-100 text-gray-800 dark:bg-gray-300 dark:text-gray-900'
+						: 'bg-black text-white dark:bg-gray-800 dark:text-gray-300'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
 					disabled={isActive}
 					name="Activate model"
 					on:click|stopPropagation={() => {
@@ -82,33 +82,33 @@
 					{isActive ? "Active" : "Activate"}
 				</button>
 				{#if assistant?.createdByMe}
-					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
+					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
 					</a>
 					<form method="POST" action="?/delete" use:enhance>
-						<button type="submit" class="flex items-center underline">
+						<button type="submit" class="flex items-center underline text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300">
 							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
 						>
 					</form>
 				{:else}
 					<form method="POST" action="?/unsubscribe" use:enhance>
-						<button type="submit" class="underline">
+						<button type="submit" class="underline  text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300">
 							<CarbonTrash class="mr-1.5 inline text-xs" />Remove</button
 						>
 					</form>
 					<form method="POST" action="?/edit" use:enhance class="hidden">
-						<button type="submit" class="underline">
+						<button type="submit" class="underline  text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300">
 							<CarbonCopy class="mr-1.5 inline text-xs" />Duplicate</button
 						>
 					</form>
 					{#if !assistant?.reported}
 						<form method="POST" action="?/report" use:enhance>
-							<button type="submit" class="underline">
+							<button type="submit" class="underline  text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300">
 								<CarbonFlag class="mr-1.5 inline text-xs" />Report</button
 							>
 						</form>
 					{:else}
-						<button type="button" disabled class="text-gray-700">
+						<button type="button" disabled class="text-gray-700  hover:text-gray-800 dark:text-gray-200 dark:hover:text-gray-300">
 							<CarbonFlag class="mr-1.5 inline text-xs" />Reported</button
 						>
 					{/if}
@@ -118,30 +118,30 @@
 	</div>
 
 	<div>
-		<h2 class="text-lg font-semibold">Direct URL</h2>
+		<h2 class="text-lg font-semibold dark:text-gray-300">Direct URL</h2>
 
-		<p class="pb-2 text-sm text-gray-500">Share this link for people to use your assistant.</p>
+		<p class="pb-2 text-sm text-gray-500 dark:text-gray-400">Share this link for people to use your assistant.</p>
 
 		<div
-			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
+			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 		>
 			<input disabled class="flex-1 truncate bg-inherit" value={shareUrl} />
 			<CopyToClipBoardBtn
 				value={shareUrl}
 				classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 			>
-				<div class="flex items-center gap-1.5 text-gray-500 hover:underline">
+				<div class="flex items-center gap-1.5 text-gray-500 hover:underline dark:text-gray-400">
 					<CarbonLink />Copy
 				</div>
 			</CopyToClipBoardBtn>
 		</div>
 	</div>
 
-	<h2 class="mt-4 text-lg font-semibold">System Instructions</h2>
+	<h2 class="mt-4 text-lg font-semibold dark:text-gray-300">System Instructions</h2>
 
 	<textarea
 		disabled
-		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
+		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:min-h-[12lh] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 		>{assistant?.preprompt}</textarea
 	>
 </div>
