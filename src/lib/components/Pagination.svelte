@@ -8,9 +8,9 @@
 
 	const ELLIPSIS_IDX = -1 as const;
 
-	const numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
+	$: numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
 	$: pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
-	$: pageIndexes = getPageIndexes(pageIndex);
+	$: pageIndexes = getPageIndexes(pageIndex, numTotalPages);
 
 	function getHref(pageIdx: number) {
 		const newUrl = new URL($page.url);
@@ -18,13 +18,13 @@
 		return newUrl.toString();
 	}
 
-	function getPageIndexes(pageIdx: number) {
+	function getPageIndexes(pageIdx: number, nTotalPages: number) {
 		let pageIdxs: number[] = [];
 
 		const NUM_EXTRA_BUTTONS = 2; // The number of page links to show on either side of the current page link.
 
 		const minIdx = 0;
-		const maxIdx = numTotalPages - 1;
+		const maxIdx = nTotalPages - 1;
 
 		pageIdxs = [pageIdx];
 
