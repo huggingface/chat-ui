@@ -154,7 +154,7 @@
 					id: messageId,
 					is_retry: isRetry,
 					is_continue: isContinue,
-					web_search: !hasAssistant && $webSearchParameters.useSearch
+					web_search: !hasAssistant && $webSearchParameters.useSearch,
 					files: isRetry ? undefined : resizedImages,
 				}),
 			});
