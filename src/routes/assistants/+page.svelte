@@ -80,21 +80,7 @@
 				</a>
 			{/if}
 		</div>
-		{#if !data.createdByMe}
-			<!-- if the assistants were created by me, don't show any text -->
-			{#if data.createdByUser}
-				<h3 class="text-gray-500">
-					Assistants created by <a
-						class="hover:underline"
-						href="https://hf.co/{data.createdByUser}"
-						target="_blank">{data.createdByUser}</a
-					>. Click <a class="hover:underline" href="/assistants">here</a> to see all community created
-					assistants
-				</h3>
-			{:else}
-				<h3 class="text-gray-500">Popular assistants made by the community</h3>
-			{/if}
-		{/if}
+		<h3 class="text-gray-500">Popular assistants made by the community</h3>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
