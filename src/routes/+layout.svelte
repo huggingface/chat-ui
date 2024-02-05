@@ -7,7 +7,7 @@
 	import {
 		PUBLIC_APP_DESCRIPTION,
 		PUBLIC_ORIGIN,
-		PUBLIC_PLAUSIBLE_DOMAIN,
+		PUBLIC_PLAUSIBLE_SCRIPT_URL,
 	} from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
@@ -158,7 +158,11 @@
 	/>
 
 	{#if PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		<script defer data-domain={new URL(PUBLIC_ORIGIN).hostname} src={PUBLIC_PLAUSIBLE_SCRIPT_URL}></script>
+		<script
+			defer
+			data-domain={new URL(PUBLIC_ORIGIN).hostname}
+			src={PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		></script>
 	{/if}
 </svelte:head>
 
