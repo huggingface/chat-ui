@@ -43,7 +43,5 @@ export const load = async ({ url, locals }) => {
 		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,
 		numTotalItems,
 		numItemsPerPage: NUM_PER_PAGE,
-		createdByUser: createdByName,
-		createdByMe: createdByName === (locals.user?.username ?? locals.user?.name),
 	};
 };

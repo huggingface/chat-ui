@@ -15,6 +15,8 @@
 	export let data: PageData;
 
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
+	let assistantsCreator = $page.url.searchParams.get("user");
+	let createdByMe = data.user?.username && data.user.username === assistantsCreator;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = new URL($page.url);
@@ -26,21 +28,18 @@
 		goto(newUrl);
 	};
 
-	const getAssistantsByUser = (username?: string | null) => {
+	function getHref(keysAdd: { key: string; val: string }[], keysDelete?: string[]) {
 		const newUrl = new URL($page.url);
-
-		// reset other query params
-		newUrl.searchParams.delete("modelId");
-		newUrl.searchParams.delete("p");
-
-		if (!username) {
-			// get all community featured assistants
-			newUrl.searchParams.delete("user");
-		} else {
-			newUrl.searchParams.set("user", username);
+		if (keysDelete) {
+			for (const key of keysDelete) {
+				newUrl.searchParams.delete(key);
+			}
 		}
-		goto(newUrl);
-	};
+		for (const { key, val } of keysAdd) {
+			newUrl.searchParams.set(key, val);
+		}
+		return newUrl.toString();
+	}
 </script>
 
 <svelte:head>
@@ -100,27 +99,22 @@
 		</div>
 		{#if data.user?.username}
 			<div class="mt-10 flex gap-x-2">
-				{#if data.createdByUser && !data.createdByMe}
-					<button
-						class="rounded-lg px-3 py-1"
-						class:bg-gray-200={!data.createdByMe}
-						class:dark:bg-gray-800={!data.createdByMe}
-						on:click={() => getAssistantsByUser(data.createdByUser)}
-						>{data.createdByUser}'s Assistants</button
+				{#if assistantsCreator && !createdByMe}
+					<a
+						class="rounded-lg bg-gray-200 px-3 py-1 dark:bg-gray-800"
+						href={getHref([{ key: "user", val: assistantsCreator }], ["modelId", "p"])}
+						>{assistantsCreator}'s Assistants</a
 					>
 				{:else}
-					<button
-						class="rounded-lg px-3 py-1"
-						class:bg-gray-200={!data.createdByMe}
-						class:dark:bg-gray-800={!data.createdByMe}
-						on:click={() => getAssistantsByUser()}>Community</button
+					<a
+						class="rounded-lg px-3 py-1 {!createdByMe ? 'bg-gray-200 dark:bg-gray-800' : ''}"
+						href={getHref([], ["user", "modelId", "p"])}>Community</a
 					>
 				{/if}
-				<button
-					class="rounded-lg px-3 py-1"
-					class:bg-gray-200={data.createdByMe}
-					class:dark:bg-gray-800={data.createdByMe}
-					on:click={() => getAssistantsByUser(data.user?.username)}>My Assistants</button
+				<a
+					class="rounded-lg px-3 py-1 {createdByMe ? 'bg-gray-200 dark:bg-gray-800' : ''}"
+					href={getHref([{ key: "user", val: data.user.username }], ["modelId", "p"])}
+					>My Assistants</a
 				>
 			</div>
 		{/if}
