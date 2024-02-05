@@ -5,7 +5,7 @@ import type { Assistant } from "$lib/types/Assistant";
 import { redirect } from "@sveltejs/kit";
 import type { Filter } from "mongodb";
 
-const NUM_PER_PAGE = 10;
+const NUM_PER_PAGE = 24;
 
 export const load = async ({ url }) => {
 	if (!ENABLE_ASSISTANTS) {
