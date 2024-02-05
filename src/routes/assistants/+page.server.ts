@@ -28,8 +28,10 @@ export const load = async ({ url }) => {
 		userCount: { $gt: 1 },
 		modelId: modelId ?? { $exists: true },
 		featured: true,
-		createdByName: createdByName ?? undefined,
 	};
+	if (createdByName) {
+		filter["createdByName"] = createdByName;
+	}
 	const assistants = await collections.assistants
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
