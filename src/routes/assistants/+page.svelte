@@ -100,10 +100,9 @@
 		{#if data.user?.username}
 			<div class="mt-10 flex gap-x-2">
 				{#if assistantsCreator && !createdByMe}
-					<a
+					<div
 						class="rounded-lg bg-gray-200 px-3 py-1 dark:bg-gray-800"
-						href={getHref([{ key: "user", val: assistantsCreator }], ["modelId", "p"])}
-						>{assistantsCreator}'s Assistants</a
+						>{assistantsCreator}'s Assistants</div
 					>
 				{:else}
 					<a
