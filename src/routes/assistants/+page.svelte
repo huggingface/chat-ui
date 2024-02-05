@@ -10,6 +10,7 @@
 
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import Pagination from "$lib/components/Pagination.svelte";
 
 	export let data: PageData;
 
@@ -124,5 +125,10 @@
 				No assistants found
 			{/each}
 		</div>
+		<Pagination
+			classNames="w-full flex justify-center mt-14 mb-4"
+			numItemsPerPage={data.numItemsPerPage}
+			numTotalItems={data.numTotalItems}
+		/>
 	</div>
 </div>
