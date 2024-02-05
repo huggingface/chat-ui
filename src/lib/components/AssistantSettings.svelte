@@ -50,7 +50,14 @@
 
 	function onFilesChange(e: Event) {
 		const inputEl = e.target as HTMLInputElement;
-		if (inputEl.files?.length) {
+		if (inputEl.files?.length && inputEl.files[0].size > 0) {
+			if (!inputEl.files[0].type.includes("image")) {
+				inputEl.files = null;
+				files = null;
+
+				form = { error: true, errors: [{ field: "avatar", message: "Only images are allowed" }] };
+				return;
+			}
 			files = inputEl.files;
 			resetErrors();
 			deleteExistingAvatar = false;
@@ -90,6 +97,10 @@
 				// else we just remove it from the input
 				formData.delete("avatar");
 			}
+		} else {
+			if (files === null) {
+				formData.delete("avatar");
+			}
 		}
 
 		return async ({ result }) => {
@@ -106,7 +117,9 @@
 	{:else}
 		<h2 class="text-xl font-semibold">Create new assistant</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Assistants are public, and can be accessed by anyone with the link.
+			Create and share your own AI Assistant. All assistants are <span
+				class="rounded-full border px-2 py-0.5 leading-none">public</span
+			>
 		</p>
 	{/if}
 
@@ -133,7 +146,7 @@
 							/>
 						{:else if assistant?.avatar}
 							<img
-								src="{base}/settings/assistants/{assistant._id}/avatar?hash={assistant.avatar}"
+								src="{base}/settings/assistants/{assistant._id}/avatar.jpg?hash={assistant.avatar}"
 								alt="avatar"
 								class="crop mx-auto h-12 w-12 cursor-pointer rounded-full object-cover"
 							/>
@@ -167,8 +180,8 @@
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>
 					</div>
-					<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 				{/if}
+				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
 			</div>
 
 			<label>
@@ -196,7 +209,7 @@
 			<label>
 				<span class="mb-1 text-sm font-semibold">Model</span>
 				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
-					{#each models as model}
+					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
 							selected={assistant
@@ -209,7 +222,7 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Start messages</span>
+				<span class="mb-1 text-sm font-semibold">User start messages</span>
 				<div class="flex flex-col gap-2 md:max-h-32">
 					<input
 						name="exampleInput1"

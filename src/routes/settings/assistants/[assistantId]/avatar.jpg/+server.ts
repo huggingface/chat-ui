@@ -17,11 +17,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	const fileId = collections.bucket.find({ filename: assistant._id.toString() });
 
-	let mime = "";
-
 	const content = await fileId.next().then(async (file) => {
-		mime = file?.metadata?.mime;
-
 		if (!file?._id) {
 			throw error(404, "Avatar not found");
 		}
@@ -40,7 +36,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	return new Response(content, {
 		headers: {
-			"Content-Type": mime ?? "application/octet-stream",
+			"Content-Type": "image/jpeg",
 		},
 	});
 };
