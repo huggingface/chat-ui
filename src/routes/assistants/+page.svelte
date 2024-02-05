@@ -15,8 +15,8 @@
 	export let data: PageData;
 
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
-	let assistantsCreator = $page.url.searchParams.get("user");
-	let createdByMe = data.user?.username && data.user.username === assistantsCreator;
+	$: assistantsCreator = $page.url.searchParams.get("user");
+	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = new URL($page.url);
