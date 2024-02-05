@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
-	import type { LayoutData } from "../../routes/$types";
 
 	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
