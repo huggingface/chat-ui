@@ -4,7 +4,11 @@
 	import { page } from "$app/stores";
 	import "../styles/main.css";
 	import { base } from "$app/paths";
-	import { PUBLIC_APP_DESCRIPTION, PUBLIC_ORIGIN } from "$env/static/public";
+	import {
+		PUBLIC_APP_DESCRIPTION,
+		PUBLIC_ORIGIN,
+		PUBLIC_PLAUSIBLE_DOMAIN,
+	} from "$env/static/public";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
@@ -152,6 +156,10 @@
 		rel="manifest"
 		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/manifest.json"
 	/>
+
+	{#if PUBLIC_PLAUSIBLE_DOMAIN}
+		<script defer data-domain={PUBLIC_PLAUSIBLE_DOMAIN} src="/js/script.js"></script>
+	{/if}
 </svelte:head>
 
 {#if !$settings.ethicsModalAccepted}
