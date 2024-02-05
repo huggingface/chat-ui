@@ -100,10 +100,9 @@
 		{#if data.user?.username}
 			<div class="mt-10 flex gap-x-2">
 				{#if assistantsCreator && !createdByMe}
-					<div
-						class="rounded-lg bg-gray-200 px-3 py-1 dark:bg-gray-800"
-						>{assistantsCreator}'s Assistants</div
-					>
+					<div class="rounded-lg bg-gray-200 px-3 py-1 dark:bg-gray-800">
+						{assistantsCreator}'s Assistants
+					</div>
 				{:else}
 					<a
 						class="rounded-lg px-3 py-1 {!createdByMe ? 'bg-gray-200 dark:bg-gray-800' : ''}"
