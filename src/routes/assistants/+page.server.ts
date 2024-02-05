@@ -7,7 +7,7 @@ import type { Filter } from "mongodb";
 
 const NUM_PER_PAGE = 24;
 
-export const load = async ({ url, locals }) => {
+export const load = async ({ url }) => {
 	if (!ENABLE_ASSISTANTS) {
 		throw redirect(302, `${base}/`);
 	}
@@ -28,7 +28,7 @@ export const load = async ({ url, locals }) => {
 		userCount: { $gt: 1 },
 		modelId: modelId ?? { $exists: true },
 		featured: true,
-		createdByName,
+		createdByName: createdByName ?? undefined,
 	};
 	const assistants = await collections.assistants
 		.find(filter)
