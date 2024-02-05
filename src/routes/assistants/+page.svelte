@@ -14,8 +14,6 @@
 
 	export let data: PageData;
 
-	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
-
 	const onModelChange = (e: Event) => {
 		const newUrl = new URL($page.url);
 		newUrl.search = ""; // clear searchParams (such as "p" for pagination)
@@ -65,7 +63,7 @@
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-				bind:value={selectedModel}
+				bind:value={data.selectedModel}
 				on:change={onModelChange}
 			>
 				<option value="">All models</option>

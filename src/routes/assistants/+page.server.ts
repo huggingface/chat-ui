@@ -32,6 +32,7 @@ export const load = async ({ url }) => {
 
 	return {
 		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,
+		selectedModel: modelId ?? "",
 		numTotalItems,
 		numItemsPerPage: NUM_PER_PAGE,
 	};
