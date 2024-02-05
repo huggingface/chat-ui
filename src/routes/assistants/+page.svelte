@@ -14,7 +14,6 @@
 	import Pagination from "$lib/components/Pagination.svelte";
 
 	export let data: PageData;
-	export let user: LayoutData["user"];
 
 	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
 
@@ -100,7 +99,7 @@
 				<CarbonAdd />Create New assistant
 			</a>
 		</div>
-		{#if user?.username}
+		{#if data.user?.username}
 			<div class="mt-10 flex gap-x-2">
 				{#if data.createdByUser && !data.createdByMe}
 					<button
@@ -122,7 +121,7 @@
 					class="rounded-lg px-3 py-1"
 					class:bg-gray-200={data.createdByMe}
 					class:dark:bg-gray-800={data.createdByMe}
-					on:click={() => getAssistantsByUser(user?.username)}>My Assistants</button
+					on:click={() => getAssistantsByUser(data.user?.username)}>My Assistants</button
 				>
 			</div>
 		{/if}
