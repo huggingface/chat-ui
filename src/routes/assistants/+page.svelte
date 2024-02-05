@@ -18,9 +18,8 @@
 
 	const onModelChange = (e: Event) => {
 		const newUrl = new URL($page.url);
-		if ((e.target as HTMLSelectElement).value === "") {
-			newUrl.searchParams.delete("modelId");
-		} else {
+		newUrl.search = ""; // clear searchParams (such as "p" for pagination)
+		if ((e.target as HTMLSelectElement).value) {
 			newUrl.searchParams.set("modelId", (e.target as HTMLSelectElement).value);
 		}
 		goto(newUrl);
