@@ -143,6 +143,9 @@
 
 			files = [];
 
+			// disable websearch if assistant is present
+			const hasAssistant = !!$page.data.assistant;
+
 			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -151,7 +154,7 @@
 					id: messageId,
 					is_retry: isRetry,
 					is_continue: isContinue,
-					web_search: $webSearchParameters.useSearch,
+					web_search: !hasAssistant && $webSearchParameters.useSearch,
 					files: isRetry ? undefined : resizedImages,
 				}),
 			});
