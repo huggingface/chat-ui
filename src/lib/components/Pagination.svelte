@@ -8,7 +8,7 @@
 
 	const ELLIPSIS_IDX = -1 as const;
 
-	const numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
+	$: numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
 	$: pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
 	$: pageIndexes = getPageIndexes(pageIndex);
 
