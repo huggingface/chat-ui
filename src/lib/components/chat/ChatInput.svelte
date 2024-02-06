@@ -21,7 +21,7 @@
 		// submit on enter
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
-			// call blur to close keyboard on mobile
+			// blur to close keyboard on mobile
 			textareaElement.blur();
 			// refocus so that user on desktop can start typing without needing to reclick on textarea
 			textareaElement.focus();
