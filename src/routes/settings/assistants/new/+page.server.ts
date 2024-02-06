@@ -18,6 +18,7 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
+	featured: z.string().optional(),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -42,7 +43,6 @@ export const actions: Actions = {
 		const formData = Object.fromEntries(await request.formData());
 
 		const parse = newAsssistantSchema.safeParse(formData);
-
 		if (!parse.success) {
 			// Loop through the errors array and create a custom errors array
 			const errors = parse.error.errors.map((error) => {
@@ -51,7 +51,6 @@ export const actions: Actions = {
 					message: error.message,
 				};
 			});
-
 			return fail(400, { error: true, errors });
 		}
 
@@ -88,6 +87,8 @@ export const actions: Actions = {
 			hash = await uploadAvatar(new File([image], "avatar.jpg"), newAssistantId);
 		}
 
+		const featured = Boolean(parse.data.featured)
+		
 		const { insertedId } = await collections.assistants.insertOne({
 			_id: newAssistantId,
 			createdById,
@@ -98,7 +99,7 @@ export const actions: Actions = {
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			userCount: 1,
-			featured: false,
+			featured
 		});
 
 		// add insertedId to user settings

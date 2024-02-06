@@ -20,22 +20,16 @@
 	} | null;
 
 	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
-
 	export let form: ActionData;
 	export let assistant: AssistantFront | undefined = undefined;
 	export let models: Model[] = [];
-
 	let files: FileList | null = null;
-
 	const settings = useSettingsStore();
-
 	let compress: typeof readAndCompressImage | null = null;
-
 	onMount(async () => {
 		const module = await import("browser-image-resizer");
 		compress = module.readAndCompressImage;
 	});
-
 	let inputMessage1 = assistant?.exampleInputs[0] ?? "";
 	let inputMessage2 = assistant?.exampleInputs[1] ?? "";
 	let inputMessage3 = assistant?.exampleInputs[2] ?? "";
@@ -102,7 +96,6 @@
 				formData.delete("avatar");
 			}
 		}
-
 		return async ({ result }) => {
 			loading = false;
 			await applyAction(result);
@@ -252,6 +245,14 @@
 					{/if}
 				</div>
 				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
+			</label>
+
+			<label>
+				<span class="mb-1 text-sm font-semibold">Featured</span>
+				<div>
+					<input type="hidden" name="featured" value={assistant?.featured ?? null}>
+					<input type="checkbox" name="featured" value={assistant?.featured ?? true}>
+				</div>
 			</label>
 		</div>
 
