@@ -21,6 +21,7 @@
 		// submit on enter
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
+			textareaElement.blur();
 			dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 		}
 	}
