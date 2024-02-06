@@ -88,7 +88,7 @@ export const actions: Actions = {
 		}
 
 		const featured = Boolean(parse.data.featured)
-		
+
 		const { insertedId } = await collections.assistants.insertOne({
 			_id: newAssistantId,
 			createdById,
@@ -98,7 +98,7 @@ export const actions: Actions = {
 			avatar: hash,
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			userCount: 1,
+			userCount: 2,
 			featured
 		});
 
