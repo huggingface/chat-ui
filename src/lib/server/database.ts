@@ -73,5 +73,7 @@ client.on("open", () => {
 	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
 	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
 	assistants.createIndex({ createdBy: 1 }).catch(console.error);
+	assistants.createIndex({ userCount: 1 }).catch(console.error);
+	assistants.createIndex({ featured: 1 }).catch(console.error);
 	reports.createIndex({ assistantId: 1 }).catch(console.error);
 });
