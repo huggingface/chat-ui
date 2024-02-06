@@ -52,7 +52,9 @@
 					goto(previousPage);
 				}}
 			>
-				<CarbonClose class="text-xl text-gray-900 hover:text-black dark:text-gray-400 dark:hover:text-gray-200" />
+				<CarbonClose
+					class="text-xl text-gray-900 hover:text-black dark:text-gray-400 dark:hover:text-gray-200"
+				/>
 			</button>
 		</div>
 		<div
@@ -64,7 +66,9 @@
 				<a
 					href="{base}/settings/{model.id}"
 					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800
-					{model.id === $page.params.model ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
+					{model.id === $page.params.model
+						? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+						: 'text-gray-500 dark:text-gray-400'}"
 				>
 					<div class="truncate">{model.displayName}</div>
 					{#if model.id === $settings.activeModel}
@@ -78,14 +82,19 @@
 			{/each}
 			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
 			{#if data.enableAssistants}
-				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1 dark:text-gray-300">
+				<h3
+					bind:this={assistantsSection}
+					class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1 dark:text-gray-300"
+				>
 					Assistants
 				</h3>
 				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
 					<a
 						href="{base}/settings/assistants/new"
 						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800
-					{$page.url.pathname === `${base}/settings/assistants/new` ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
+					{$page.url.pathname === `${base}/settings/assistants/new`
+							? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+							: 'text-gray-500 dark:text-gray-400'}"
 					>
 						<CarbonAdd />
 						<div class="truncate">Create new assistant</div>
@@ -95,7 +104,9 @@
 					<a
 						href="{base}/settings/assistants/{assistant._id.toString()}"
 						class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800
-					{assistant._id.toString() === $page.params.assistantId ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
+					{assistant._id.toString() === $page.params.assistantId
+							? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+							: 'text-gray-500 dark:text-gray-400'}"
 					>
 						{#if assistant.avatar}
 							<img
@@ -122,7 +133,7 @@
 				{/each}
 				<a
 					href="{base}/assistants"
-					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl dark:hover:bg-gray-800 dark:text-gray-400"
+					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl dark:text-gray-400 dark:hover:bg-gray-800"
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 					<div class="truncate">Browse Assistants</div>
 				</a>
@@ -131,7 +142,9 @@
 			<a
 				href="{base}/settings"
 				class="group mt-auto flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm hover:bg-gray-100 max-md:order-first md:rounded-xl dark:hover:bg-gray-800
-				{$page.url.pathname === `${base}/settings` ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}"
+				{$page.url.pathname === `${base}/settings`
+					? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+					: 'text-gray-500 dark:text-gray-400'}"
 			>
 				<UserIcon class="text-sm" />
 				Application Settings

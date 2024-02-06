@@ -21,7 +21,9 @@
 </script>
 
 <div class="flex w-full flex-col gap-5">
-	<div class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-300">
+	<div
+		class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-300"
+	>
 		<h2>Application Settings</h2>
 	</div>
 
@@ -77,14 +79,18 @@
 				action="{base}/conversations?/delete"
 				class="flex w-full flex-col gap-5 p-6 dark:bg-gray-900"
 			>
-				<div class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-300">
+				<div
+					class="flex items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-300"
+				>
 					<h2>Are you sure?</h2>
 					<button
 						type="button"
 						class="group"
 						on:click|stopPropagation={() => (isConfirmingDeletion = false)}
 					>
-						<CarbonClose class="text-gray-900 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-200" />
+						<CarbonClose
+							class="text-gray-900 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-200"
+						/>
 					</button>
 				</div>
 				<p class="text-gray-800 dark:text-gray-300">

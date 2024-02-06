@@ -110,7 +110,9 @@
 	}}
 >
 	{#if assistant}
-		<h2 class="text-xl font-semibold dark:text-gray-300">Edit assistant ({assistant?.name ?? ""})</h2>
+		<h2 class="text-xl font-semibold dark:text-gray-300">
+			Edit assistant ({assistant?.name ?? ""})
+		</h2>
 		<p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
 			Modifying an existing assistant will propagate those changes to all users.
 		</p>
@@ -208,7 +210,10 @@
 
 			<label>
 				<span class="mb-1 text-sm font-semibold dark:text-gray-300">Model</span>
-				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300">
+				<select
+					name="modelId"
+					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+				>
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
@@ -227,27 +232,27 @@
 					<input
 						name="exampleInput1"
 						bind:value={inputMessage1}
-						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 					/>
 					{#if !!inputMessage1 || !!inputMessage2}
 						<input
 							name="exampleInput2"
 							bind:value={inputMessage2}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 						/>
 					{/if}
 					{#if !!inputMessage2 || !!inputMessage3}
 						<input
 							name="exampleInput3"
 							bind:value={inputMessage3}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 						/>
 					{/if}
 					{#if !!inputMessage3 || !!inputMessage4}
 						<input
 							name="exampleInput4"
 							bind:value={inputMessage4}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 						/>
 					{/if}
 				</div>
@@ -256,10 +261,12 @@
 		</div>
 
 		<label class="flex flex-col">
-			<span class="mb-1 text-sm font-semibold dark:text-gray-300"> Instructions (system prompt) </span>
+			<span class="mb-1 text-sm font-semibold dark:text-gray-300">
+				Instructions (system prompt)
+			</span>
 			<textarea
 				name="preprompt"
-				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm  dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
 			/>
@@ -270,7 +277,8 @@
 	<div class="mt-5 flex justify-end gap-2">
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
-			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600 dark:text-gray-300 dark:bg-gray-700">Cancel</a
+			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+			>Cancel</a
 		>
 		<button
 			type="submit"
