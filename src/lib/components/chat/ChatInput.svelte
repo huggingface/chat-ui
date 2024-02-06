@@ -24,7 +24,9 @@
 			// blur to close keyboard on mobile
 			textareaElement.blur();
 			// refocus so that user on desktop can start typing without needing to reclick on textarea
-			textareaElement.focus();
+			if (innerWidth > TABLET_VIEWPORT_WIDTH) {
+				textareaElement.focus();
+			}
 			dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 		}
 	}
