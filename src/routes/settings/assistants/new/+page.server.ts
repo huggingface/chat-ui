@@ -98,7 +98,7 @@ export const actions: Actions = {
 			avatar: hash,
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			userCount: 2,
+			userCount: featured ? 2 : 1,
 			featured
 		});
 
