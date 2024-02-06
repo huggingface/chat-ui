@@ -15,7 +15,7 @@
 
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("settings")) {
-			previousPage = from?.url.pathname || previousPage;
+			previousPage = from?.url.toString() || previousPage;
 		}
 	});
 
