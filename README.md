@@ -316,6 +316,75 @@ MODELS=`[{
 }]`
 ```
 
+You may also consume any model provider that provides compatible OpenAI API endpoint. For example, you may self-host [Portkey](https://github.com/Portkey-AI/gateway) gateway and experiment with Claude or GPTs offered by Azure OpenAI. Example for Claude from Anthropic:
+
+```
+MODELS=`[{
+  "name": "claude-2.1",
+  "displayName": "Claude 2.1",
+  "description": "Anthropic has been founded by former OpenAI researchers...",
+  "parameters": {
+      "temperature": 0.5,
+      "max_new_tokens": 4096,
+  },
+  "endpoints": [
+      {
+          "type": "openai",
+          "baseURL": "https://gateway.example.com/v1",
+          "defaultHeaders": {
+              "x-portkey-config": '{"provider":"anthropic","api_key":"sk-ant-abc...xyz"}'
+          }
+      }
+  ]
+}]`
+```
+
+Example for GPT 4 deployed on Azure OpenAI:
+
+```
+MODELS=`[{
+  "id": "gpt-4-1106-preview",
+  "name": "gpt-4-1106-preview",
+  "displayName": "gpt-4-1106-preview",
+  "parameters": {
+      "temperature": 0.5,
+      "max_new_tokens": 4096,
+  },
+  "endpoints": [
+      {
+          "type": "openai",
+          "baseURL": "https://gateway.example.com/v1",
+          "defaultHeaders": {
+              "x-portkey-config": '{"provider":"azure-openai","resource_name":"abc-fr","deployment_id":"gpt-4-1106-preview","api_version":"2023-03-15-preview","api_key":"abc...xyz"}'
+          }
+      }
+  ]
+}]`
+```
+
+Or try Mistral from [Deepinfra](https://deepinfra.com/mistralai/Mistral-7B-Instruct-v0.1/api?example=openai-http):
+
+> Note, apiKey can either be set custom per endpoint, or globally using `OPENAI_API_KEY` variable.
+
+```
+MODELS=`[{
+  "name": "mistral-7b",
+  "displayName": "Mistral 7B",
+  "description": "A 7B dense Transformer, fast-deployed and easily customisable. Small, yet powerful for a variety of use cases. Supports English and code, and a 8k context window.",
+  "parameters": {
+      "temperature": 0.5,
+      "max_new_tokens": 4096,
+  },
+  "endpoints": [
+      {
+          "type": "openai",
+          "baseURL": "https://api.deepinfra.com/v1/openai",
+          "apiKey": "abc...xyz"
+      }
+  ]
+}]`
+```
+
 ##### Llama.cpp API server
 
 chat-ui also supports the llama.cpp API server directly without the need for an adapter. You can do this using the `llamacpp` endpoint type.
