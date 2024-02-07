@@ -3,6 +3,8 @@ import { type Actions, fail, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
+import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
+import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
 
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
@@ -49,7 +51,7 @@ export const actions: Actions = {
 
 		throw redirect(302, `${base}/settings`);
 	},
-	report: async ({ params, locals }) => {
+	report: async ({ params, locals, url }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
 			assistantId: new ObjectId(params.assistantId),
@@ -71,6 +73,31 @@ export const actions: Actions = {
 		if (!acknowledged) {
 			return fail(500, { error: true, message: "Failed to report assistant" });
 		}
+
+		if (WEBHOOK_URL_REPORT_ASSISTANT) {
+			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
+			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
+
+			const assistant = await collections.assistants.findOne(
+				{ _id: new ObjectId(params.assistantId) },
+				{ projection: { name: 1 } }
+			);
+
+			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
+				method: "POST",
+				headers: {
+					"Content-type": "application/json",
+				},
+				body: JSON.stringify({
+					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>`,
+				}),
+			});
+
+			if (!res.ok) {
+				console.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
+			}
+		}
+
 		return { from: "report", ok: true, message: "Assistant reported" };
 	},
 
