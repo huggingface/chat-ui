@@ -233,6 +233,14 @@
 				>
 					<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 				</button>
+				<button
+					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
+					title="Retry"
+					type="button"
+					on:click={() => dispatch("retry", { id: message.id })}
+				>
+					<CarbonRotate360 />
+				</button>
 				<CopyToClipBoardBtn
 					on:click={() => {
 						isCopied = true;
@@ -313,25 +321,15 @@
 									<CarbonDownload />
 								</a>
 							{/if}
-							{#if !readOnly}
+							{#if !readOnly && $page.data.conversationBranching}
 								<button
 									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-									title="Retry"
+									title="Branch"
 									type="button"
-									on:click={() => dispatch("retry", { id: message.id })}
+									on:click={() => (editMode = !editMode)}
 								>
-									<CarbonRotate360 />
+									<CarbonPen />
 								</button>
-								{#if $page.data.conversationBranching}
-									<button
-										class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-										title="Branch"
-										type="button"
-										on:click={() => (editMode = !editMode)}
-									>
-										<CarbonPen />
-									</button>
-								{/if}
 							{/if}
 						</div>
 					</div>

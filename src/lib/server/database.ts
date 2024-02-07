@@ -62,6 +62,12 @@ client.on("open", () => {
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
 		.catch(console.error);
+	conversations
+		.createIndex(
+			{ "message.id": 1, "message.ancestors": 1 },
+			{ partialFilterExpression: { userId: { $exists: true } } }
+		)
+		.catch(console.error);
 	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
 	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
