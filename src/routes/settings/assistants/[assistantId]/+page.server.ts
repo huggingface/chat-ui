@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
 import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
-import { SLACK_URL_REPORT_ASSISTANT } from "$env/static/private";
+import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
 
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
@@ -74,7 +74,7 @@ export const actions: Actions = {
 			return fail(500, { error: true, message: "Failed to report assistant" });
 		}
 
-		if (SLACK_URL_REPORT_ASSISTANT) {
+		if (WEBHOOK_URL_REPORT_ASSISTANT) {
 			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
@@ -83,7 +83,7 @@ export const actions: Actions = {
 				{ projection: { name: 1 } }
 			);
 
-			const res = await fetch(SLACK_URL_REPORT_ASSISTANT, {
+			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
 				method: "POST",
 				headers: {
 					"Content-type": "application/json",
@@ -94,7 +94,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				console.error(`Slack assistant report failed. ${res.statusText} ${res.text}`);
+				console.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
 			}
 		}
 
