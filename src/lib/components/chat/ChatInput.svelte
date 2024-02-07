@@ -53,7 +53,7 @@
 		on:keydown={handleKeydown}
 		on:compositionstart={() => (isCompositionOn = true)}
 		on:compositionend={() => (isCompositionOn = false)}
-		on:keypress
+		on:beforeinput
 		{placeholder}
 	/>
 </div>
