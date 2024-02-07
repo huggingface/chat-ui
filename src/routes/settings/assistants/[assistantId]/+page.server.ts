@@ -78,7 +78,7 @@ export const actions: Actions = {
 			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
-			const assisntant = await collections.assistants.findOne(
+			const assistant = await collections.assistants.findOne(
 				{ _id: new ObjectId(params.assistantId) },
 				{ projection: { name: 1 } }
 			);
@@ -89,7 +89,7 @@ export const actions: Actions = {
 					"Content-type": "application/json",
 				},
 				body: JSON.stringify({
-					text: `Assistant <${assistantUrl}|${assisntant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>`,
+					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>`,
 				}),
 			});
 
