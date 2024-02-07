@@ -17,7 +17,6 @@
 
 	export let data: PageData;
 
-	let selectedModel = $page.url.searchParams.get("modelId") ?? "";
 	$: assistantsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
 
