@@ -146,7 +146,7 @@ describe("inserting conversations", () => {
 
 	it("should insert a side branches conversation", async () => {
 		const id = await insertSideBranchesConversation();
-		await insertSideBranchesConversation();
+		expect(id).toBeDefined();
 	});
 });
 afterEach(async () => {

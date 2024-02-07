@@ -2,7 +2,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 
 export function buildSubtree(
-	conv: Pick<Conversation, "_id" | "messages" | "rootMessageId">,
+	conv: Pick<Conversation, "messages" | "rootMessageId">,
 	id: Message["id"]
 ): Message[] {
 	if (!conv.rootMessageId) {

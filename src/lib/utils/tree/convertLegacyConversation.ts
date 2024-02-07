@@ -1,8 +1,8 @@
 import type { Conversation } from "$lib/types/Conversation";
 
 export function convertLegacyConversation(
-	conv: Pick<Conversation, "_id" | "messages" | "rootMessageId">
-): Pick<Conversation, "_id" | "messages" | "rootMessageId"> {
+	conv: Pick<Conversation, "messages" | "rootMessageId">
+): Pick<Conversation, "messages" | "rootMessageId"> {
 	if (conv.rootMessageId) return conv; // not a legacy conversation
 	if (conv.messages.length === 0) return conv; // empty conversation
 	const messages = conv.messages;
