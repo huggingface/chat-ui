@@ -73,8 +73,7 @@
 			<p class="mt-2 text-sm text-gray-500">
 				Created by <a
 					class="hover:underline"
-					href="https://hf.co/{data.assistant.createdByName}"
-					target="_blank"
+					href="{base}/assistants?user={data.assistant.createdByName}"
 				>
 					{data.assistant.createdByName}
 				</a>
