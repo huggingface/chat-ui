@@ -1,3 +1,4 @@
+import type { ObjectId } from "mongodb";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { WebSearch } from "./WebSearch";
@@ -12,4 +13,5 @@ export type Message = Partial<Timestamps> & {
 	score?: -1 | 0 | 1;
 	files?: string[]; // can contain either the hash of the file or the b64 encoded image data on the client side when uploading
 	interrupted?: boolean;
+	branches?: ObjectId[]; // list of branch ids deriving from this message
 };
