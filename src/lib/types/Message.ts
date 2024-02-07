@@ -15,5 +15,4 @@ export type Message = Partial<Timestamps> & {
 
 	// needed for conversation trees
 	ancestors?: Message["id"][];
-	parent?: Message["id"] | null;
 };
