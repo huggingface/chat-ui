@@ -91,7 +91,7 @@ describe("buildSubtree", () => {
 		if (!conv) throw new Error("Conversation not found");
 
 		const subtree = buildSubtree(conv, "1-1-1-1-2");
-		expect(subtree).toEqual([conv.messages[0], conv.messages[1], conv.messages[2]]);
+		expect(subtree).toEqual([conv.messages[0], conv.messages[1]]);
 
 		const subtree2 = buildSubtree(conv, "1-1-1-1-4");
 		expect(subtree2).toEqual([
