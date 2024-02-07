@@ -11,6 +11,7 @@
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import Pagination from "$lib/components/Pagination.svelte";
 
@@ -100,7 +101,7 @@
 			</a>
 		</div>
 
-		<div class="mt-7 flex gap-x-2 text-sm">
+		<div class="mt-7 flex items-center gap-x-2 text-sm">
 			{#if assistantsCreator && !createdByMe}
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -112,6 +113,15 @@
 						/></a
 					>
 				</div>
+				{#if isHuggingChat}
+					<a
+						href="https://hf.co/{assistantsCreator}"
+						target="_blank"
+						class="ml-auto flex items-center text-xs text-gray-500 underline"
+						><CarbonArrowUpRight class="mr-1 flex-none text-[0.58rem]" target="_blank" />View {assistantsCreator}
+						on HF</a
+					>
+				{/if}
 			{:else}
 				<a
 					href={getHref([], ["user", "modelId", "p"])}
