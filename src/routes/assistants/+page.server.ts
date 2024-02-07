@@ -17,7 +17,7 @@ export const load = async ({ url }) => {
 	const createdByName = url.searchParams.get("user");
 
 	if (createdByName) {
-		const existingUser = await collections.users.findOne({ hfUserId: createdByName });
+		const existingUser = await collections.users.findOne({ username: createdByName });
 		if (!existingUser) {
 			throw error(404, `User "${createdByName}" doesn't exist`);
 		}
