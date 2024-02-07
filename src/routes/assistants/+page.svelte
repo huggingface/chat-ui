@@ -29,16 +29,45 @@
 		goto(newUrl);
 	};
 
-	function getHref(keysAdd: { key: string; val: string }[], keysDelete?: string[]) {
-		const newUrl = new URL($page.url);
-		if (keysDelete) {
-			for (const key of keysDelete) {
-				newUrl.searchParams.delete(key);
+	function getHref(
+		url: URL | string,
+		modifications: {
+			newKeys?: Record<string, string | undefined | null>;
+			existingKeys?: { behaviour: "delete_except" | "delete"; keys: string[] };
+		}
+	) {
+		const newUrl = new URL(url);
+		const { newKeys, existingKeys } = modifications;
+
+		// exsiting keys logic
+		if (existingKeys) {
+			const { behaviour, keys } = existingKeys;
+			if (behaviour === "delete") {
+				for (const key of keys) {
+					newUrl.searchParams.delete(key);
+				}
+			} else {
+				// delete_except
+				const keysToPreserve = keys;
+				for (const key of newUrl.searchParams.keys()) {
+					if (!keysToPreserve.includes(key)) {
+						newUrl.searchParams.delete(key);
+					}
+				}
 			}
 		}
-		for (const { key, val } of keysAdd) {
-			newUrl.searchParams.set(key, val);
+
+		// new keys logic
+		if (newKeys) {
+			for (const [key, val] of Object.entries(newKeys)) {
+				if (val) {
+					newUrl.searchParams.set(key, val);
+				} else {
+					newUrl.searchParams.delete(key);
+				}
+			}
 		}
+
 		return newUrl.toString();
 	}
 </script>
@@ -105,7 +134,11 @@
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 				>
 					{assistantsCreator}'s Assistants
-					<a href={getHref([], ["user", "modelId", "p"])} class="group"
+					<a
+						href={getHref($page.url, {
+							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+						})}
+						class="group"
 						><CarbonClose
 							class="text-xs group-hover:text-gray-800 dark:group-hover:text-gray-300"
 						/></a
@@ -122,7 +155,9 @@
 				{/if}
 			{:else}
 				<a
-					href={getHref([], ["user", "modelId", "p"])}
+					href={getHref($page.url, {
+						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+					})}
 					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
 						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
@@ -132,7 +167,10 @@
 				</a>
 				{#if data.user?.username}
 					<a
-						href={getHref([{ key: "user", val: data.user.username }], ["modelId", "p"])}
+						href={getHref($page.url, {
+							newKeys: { user: data.user.username },
+							existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+						})}
 						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
 						createdByMe
 							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
