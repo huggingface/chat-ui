@@ -117,7 +117,7 @@
 					<a
 						href="https://hf.co/{assistantsCreator}"
 						target="_blank"
-						class="ml-auto flex items-center text-xs text-gray-500 underline"
+						class="ml-auto flex items-center text-xs text-gray-500 underline hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 						><CarbonArrowUpRight class="mr-1 flex-none text-[0.58rem]" target="_blank" />View {assistantsCreator}
 						on HF</a
 					>
