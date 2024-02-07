@@ -10,6 +10,8 @@
 
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import CarbonClose from "~icons/carbon/close";
+	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import Pagination from "$lib/components/Pagination.svelte";
 
 	export let data: PageData;
@@ -97,26 +99,43 @@
 				<CarbonAdd />Create New assistant
 			</a>
 		</div>
-		{#if data.user?.username}
-			<div class="mt-10 flex gap-x-2">
-				{#if assistantsCreator && !createdByMe}
-					<div class="rounded-lg bg-gray-200 px-3 py-1 dark:bg-gray-800">
-						{assistantsCreator}'s Assistants
-					</div>
-				{:else}
-					<a
-						class="rounded-lg px-3 py-1 {!createdByMe ? 'bg-gray-200 dark:bg-gray-800' : ''}"
-						href={getHref([], ["user", "modelId", "p"])}>Community</a
-					>
-				{/if}
-				<a
-					class="rounded-lg px-3 py-1 {createdByMe ? 'bg-gray-200 dark:bg-gray-800' : ''}"
-					href={getHref([{ key: "user", val: data.user.username }], ["modelId", "p"])}
-					>My Assistants</a
+
+		<div class="mt-7 flex gap-x-2 text-sm">
+			{#if assistantsCreator && !createdByMe}
+				<div
+					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 				>
-			</div>
-		{/if}
-		<div class="mt-10 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+					{assistantsCreator}'s Assistants
+					<a href={getHref([], ["user", "modelId", "p"])} class="group"
+						><CarbonClose
+							class="text-xs group-hover:text-gray-800 dark:group-hover:text-gray-300"
+						/></a
+					>
+				</div>
+			{:else}
+				<a
+					href={getHref([], ["user", "modelId", "p"])}
+					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
+						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+				>
+					<CarbonEarthAmerica class="text-xs" />
+					Community
+				</a>
+				{#if data.user?.username}
+					<a
+						href={getHref([{ key: "user", val: data.user.username }], ["modelId", "p"])}
+						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+						createdByMe
+							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+							: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+						>{data.user.username}
+					</a>
+				{/if}
+			{/if}
+		</div>
+
+		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant (assistant._id)}
 				<a
 					href="{base}/assistant/{assistant._id}"
