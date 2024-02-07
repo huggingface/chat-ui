@@ -94,7 +94,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				console.error(`Slack assisntant report failed. ${res.statusText} ${res.text}`);
+				console.error(`Slack assistant report failed. ${res.statusText} ${res.text}`);
 			}
 		}
 
