@@ -25,6 +25,7 @@ jobs:
           OPENID_CONFIG: ${{ secrets.OPENID_CONFIG }}
           MONGODB_URL: ${{ secrets.MONGODB_URL }}
           HF_DEPLOYMENT_TOKEN: ${{ secrets.HF_DEPLOYMENT_TOKEN }}
+          WEBHOOK_URL_REPORT_ASSISTANT: ${{ secrets.WEBHOOK_URL_REPORT_ASSISTANT }}
         run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
