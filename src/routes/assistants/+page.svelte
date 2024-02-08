@@ -111,7 +111,7 @@
 						on HF</a
 					>
 				{/if}
-			{:else}
+			{:else if data.user?.username}
 				<a
 					href={getHref($page.url, {
 						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
@@ -123,19 +123,17 @@
 					<CarbonEarthAmerica class="text-xs" />
 					Community
 				</a>
-				{#if data.user?.username}
-					<a
-						href={getHref($page.url, {
-							newKeys: { user: data.user.username },
-							existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
-						})}
-						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
-						createdByMe
-							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
-							: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
-						>{data.user.username}
-					</a>
-				{/if}
+				<a
+					href={getHref($page.url, {
+						newKeys: { user: data.user.username },
+						existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+					})}
+					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+					createdByMe
+						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+					>{data.user.username}
+				</a>
 			{/if}
 		</div>
 
