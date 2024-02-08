@@ -7,17 +7,18 @@ import { addChildren } from "./addChildren";
 import type { Message } from "$lib/types/Message";
 import { getChildren } from "./getChildren";
 
+const newMessage: Omit<Message, "id"> = {
+	content: "new message",
+	from: "user",
+};
+
+Object.freeze(newMessage);
+
 describe("addChildren", async () => {
 	it("should let you append on legacy conversations", async () => {
 		const convId = await insertLegacyConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
-
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
-		};
 
 		const convLength = conv.messages.length;
 
@@ -29,12 +30,6 @@ describe("addChildren", async () => {
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
-		};
-
 		expect(() => addChildren(conv, newMessage, conv.messages[0].id)).toThrow();
 	});
 	it("should not let you create a message that already exists", async () => {
@@ -42,24 +37,18 @@ describe("addChildren", async () => {
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
-		const newMessage: Message = {
+		const messageThatAlreadyExists: Message = {
 			id: conv.messages[0].id,
 			content: "new message",
 			from: "user",
 		};
 
-		expect(() => addChildren(conv, newMessage, conv.messages[0].id)).toThrow();
+		expect(() => addChildren(conv, messageThatAlreadyExists, conv.messages[0].id)).toThrow();
 	});
 	it("should let you create branches on conversations with subtrees", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
-
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
-		};
 
 		const parentId = conv.messages[0].id;
 		const nChildren = getChildren(conv, parentId).length;
@@ -71,12 +60,6 @@ describe("addChildren", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
-
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
-		};
 
 		const parentId = conv.messages[conv.messages.length - 1].id;
 		const nChildren = getChildren(conv, parentId).length;
@@ -90,18 +73,12 @@ describe("addChildren", async () => {
 		const conv = {
 			_id: new ObjectId(),
 			rootMessageId: undefined,
-			messages: [],
-		};
-
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
+			messages: [] as Message[],
 		};
 
 		addChildren(conv, newMessage);
 		expect(conv.messages.length).toEqual(1);
-		expect(conv.rootMessageId).toEqual(newMessage.id);
+		expect(conv.rootMessageId).toEqual(conv.messages[0].id);
 	});
 
 	it("should throw if you don't specify a parentId in a conversation with messages", async () => {
@@ -109,27 +86,16 @@ describe("addChildren", async () => {
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
-		};
-
 		expect(() => addChildren(conv, newMessage)).toThrow();
 	});
+
 	it("should return the id of the new message", async () => {
 		const convId = await insertLegacyConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
-		const newMessage: Message = {
-			id: "2-2-2-2-2",
-			content: "new message",
-			from: "user",
-		};
-
 		expect(addChildren(conv, newMessage, conv.messages[conv.messages.length - 1].id)).toEqual(
-			newMessage.id
+			conv.messages[conv.messages.length - 1].id
 		);
 	});
 });
