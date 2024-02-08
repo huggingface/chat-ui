@@ -118,7 +118,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		files: b64files,
 	} = z
 		.object({
-			id: z.string().uuid().refine(isMessageId), // parent message id to append to for a normal message, or the message id for a retry/continue
+			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
 			inputs: z.optional(z.string().trim().min(1)),
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
@@ -164,13 +164,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (isContinue) {
+	if (isContinue && messageId) {
 		// if it's the last message and we continue then we build the prompt up to the last message
 		// we will strip the end tokens afterwards when the prompt is built
 		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
 			throw error(400, "Can only continue the last message");
 		}
-	} else if (isRetry) {
+	} else if (isRetry && messageId) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message
 		// if we're retrying on an assistant message, newPrompt cannot be set
@@ -312,6 +312,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				convId
 			);
 
+			const previousText = messageToWriteTo.content;
+
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
@@ -352,7 +354,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							return acc;
 						}, output.generated_text.trimEnd());
 
-						messageToWriteTo.content += text;
+						messageToWriteTo.content = previousText + text;
 						messageToWriteTo.updatedAt = new Date();
 						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), ...updates];
 					}

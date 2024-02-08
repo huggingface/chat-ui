@@ -66,7 +66,7 @@
 	// this function is used to send new message to the backends
 	async function writeMessage({
 		prompt,
-		messageId = randomUUID(),
+		messageId = messages[messages.length - 1]?.id ?? undefined,
 		isRetry = false,
 		isContinue = false,
 	}: {
@@ -95,10 +95,7 @@
 				throw new Error("Trying to continue a message that is not from assistant");
 			}
 
-			// const isNewMessage = !isRetry && !isContinue;
-
 			const module = await import("browser-image-resizer");
-
 			// currently, only IDEFICS is supported by TGI
 			// the size of images is hardcoded to 224x224 in TGI
 			// this will need to be configurable when support for more models is added
