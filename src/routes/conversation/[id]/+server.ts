@@ -19,6 +19,7 @@ import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
+import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -301,13 +302,25 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			);
 
+			// perform websearch if needed
 			if (webSearch && !isContinue && !conv.assistantId) {
 				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update);
 			}
 
+			// inject websearch result & optionally images into the messages
+			const processedMessages = await preprocessMessages(
+				messagesForPrompt,
+				model.multimodal,
+				convId
+			);
+
 			try {
 				const endpoint = await model.getEndpoint();
-				for await (const output of await endpoint({ conversation: conv, continue: isContinue })) {
+				for await (const output of await endpoint({
+					messages: processedMessages,
+					preprompt: conv.preprompt,
+					continueMessage: isContinue,
+				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
 						// else we get the next token
