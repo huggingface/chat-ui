@@ -62,8 +62,8 @@
 
 			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Model: <span class="font-semibold"> {assistant?.modelId} </span>
-				<span class="text-gray-300 dark:text-gray-500">•</span> Created by
-				<a class="underline" target="_blank" href={"https://hf.co/" + assistant?.createdByName}>
+				<span class="text-gray-300  dark:text-gray-500">•</span> Created by
+				<a class="underline" href="{base}/assistants?user={assistant?.createdByName}">
 					{assistant?.createdByName}
 				</a>
 			</p>
