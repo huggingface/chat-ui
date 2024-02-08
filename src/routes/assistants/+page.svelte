@@ -146,11 +146,11 @@
 					href="{base}/assistant/{assistant._id}"
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
-					{#if assistant.userCount && assistant.userCount > 1}
+					<!-- {#if assistant.userCount && assistant.userCount > 1}
 						<div class="absolute right-2 top-2" title="share with others to make it public">
 							<CarbonViewOff class="opacity-70" />
 						</div>
-					{/if}
+					{/if} -->
 					{#if assistant.avatar}
 						<img
 							src="{base}/settings/assistants/{assistant._id}/avatar.jpg"
