@@ -13,6 +13,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
+	// import CarbonViewOff from "~icons/carbon/view-off-filled";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { getHref } from "$lib/utils/getHref";
 
@@ -111,7 +112,7 @@
 						on HF</a
 					>
 				{/if}
-			{:else if data.user?.username}
+			{:else}
 				<a
 					href={getHref($page.url, {
 						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
@@ -123,17 +124,19 @@
 					<CarbonEarthAmerica class="text-xs" />
 					Community
 				</a>
-				<a
-					href={getHref($page.url, {
-						newKeys: { user: data.user.username },
-						existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
-					})}
-					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
-					createdByMe
-						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
-						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
-					>{data.user.username}
-				</a>
+				{#if data.user?.username}
+					<a
+						href={getHref($page.url, {
+							newKeys: { user: data.user.username },
+							existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+						})}
+						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+						createdByMe
+							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+							: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+						>{data.user.username}
+					</a>
+				{/if}
 			{/if}
 		</div>
 
@@ -141,8 +144,13 @@
 			{#each data.assistants as assistant (assistant._id)}
 				<a
 					href="{base}/assistant/{assistant._id}"
-					class="flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
+					<!-- {#if assistant.userCount && assistant.userCount > 1}
+						<div class="absolute right-2 top-2" title="share with others to make it public">
+							<CarbonViewOff class="opacity-70" />
+						</div>
+					{/if} -->
 					{#if assistant.avatar}
 						<img
 							src="{base}/settings/assistants/{assistant._id}/avatar.jpg"
