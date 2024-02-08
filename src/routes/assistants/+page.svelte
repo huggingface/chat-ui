@@ -10,16 +10,22 @@
 
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import CarbonClose from "~icons/carbon/close";
+	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import Pagination from "$lib/components/Pagination.svelte";
+	import { getHref } from "$lib/utils/getHref";
 
 	export let data: PageData;
 
+	$: assistantsCreator = $page.url.searchParams.get("user");
+	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
+
 	const onModelChange = (e: Event) => {
-		const newUrl = new URL($page.url);
-		newUrl.search = ""; // clear searchParams (such as "p" for pagination)
-		if ((e.target as HTMLSelectElement).value) {
-			newUrl.searchParams.set("modelId", (e.target as HTMLSelectElement).value);
-		}
+		const newUrl = getHref($page.url, {
+			newKeys: { modelId: (e.target as HTMLSelectElement).value },
+			existingKeys: { behaviour: "delete_except", keys: ["user"] },
+		});
 		goto(newUrl);
 	};
 </script>
@@ -79,8 +85,60 @@
 				<CarbonAdd />Create New assistant
 			</a>
 		</div>
-		<div class="mt-10 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-			{#each data.assistants as assistant}
+
+		<div class="mt-7 flex items-center gap-x-2 text-sm">
+			{#if assistantsCreator && !createdByMe}
+				<div
+					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+				>
+					{assistantsCreator}'s Assistants
+					<a
+						href={getHref($page.url, {
+							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+						})}
+						class="group"
+						><CarbonClose
+							class="text-xs group-hover:text-gray-800 dark:group-hover:text-gray-300"
+						/></a
+					>
+				</div>
+				{#if isHuggingChat}
+					<a
+						href="https://hf.co/{assistantsCreator}"
+						target="_blank"
+						class="ml-auto flex items-center text-xs text-gray-500 underline hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+						><CarbonArrowUpRight class="mr-1 flex-none text-[0.58rem]" target="_blank" />View {assistantsCreator}
+						on HF</a
+					>
+				{/if}
+			{:else if data.user?.username}
+				<a
+					href={getHref($page.url, {
+						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+					})}
+					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
+						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+				>
+					<CarbonEarthAmerica class="text-xs" />
+					Community
+				</a>
+				<a
+					href={getHref($page.url, {
+						newKeys: { user: data.user.username },
+						existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+					})}
+					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+					createdByMe
+						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+					>{data.user.username}
+				</a>
+			{/if}
+		</div>
+
+		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+			{#each data.assistants as assistant (assistant._id)}
 				<a
 					href="{base}/assistant/{assistant._id}"
 					class="flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
@@ -110,8 +168,7 @@
 						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
 							Created by <a
 								class="hover:underline"
-								href="https://hf.co/{assistant.createdByName}"
-								target="_blank"
+								href="{base}/assistants?user={assistant.createdByName}"
 							>
 								{assistant.createdByName}
 							</a>
