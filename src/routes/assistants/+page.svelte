@@ -13,7 +13,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
-	import CarbonViewOff from "~icons/carbon/view-off-filled";
+	// import CarbonViewOff from "~icons/carbon/view-off-filled";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { getHref } from "$lib/utils/getHref";
 
