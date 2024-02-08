@@ -44,7 +44,7 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 	// Filter by allowed user emails
 	if (allowedUserEmails.length > 0) {
 		if (!userData.email) {
-			throw error(403, "User not allowed");
+			throw error(403, "User not allowed: email not returned");
 		}
 		const emailVerified = userData.email_verified ?? true;
 		if (!emailVerified) {
