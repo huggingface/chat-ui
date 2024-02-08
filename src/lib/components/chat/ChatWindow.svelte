@@ -212,7 +212,7 @@
 								placeholder="Ask anything"
 								bind:value={message}
 								on:submit={handleSubmit}
-								on:keypress={(ev) => {
+								on:beforeinput={(ev) => {
 									if ($page.data.loginRequired) {
 										ev.preventDefault();
 										loginModalOpen = true;
