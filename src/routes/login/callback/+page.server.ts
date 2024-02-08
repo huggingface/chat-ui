@@ -7,7 +7,7 @@ import { ALLOWED_USER_EMAILS } from "$env/static/private";
 import JSON5 from "json5";
 
 const allowedUserEmails = z
-	.array(z.string())
+	.array(z.string().email())
 	.optional()
 	.default([])
 	.parse(JSON5.parse(ALLOWED_USER_EMAILS));
