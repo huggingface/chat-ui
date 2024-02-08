@@ -47,8 +47,7 @@
 					<p class="pt-2 text-sm text-gray-400 dark:text-gray-500">
 						Created by <a
 							class="hover:underline"
-							href="https://hf.co/{assistant.createdByName}"
-							target="_blank"
+							href="{base}/assistants?user={assistant.createdByName}"
 						>
 							{assistant.createdByName}
 						</a>

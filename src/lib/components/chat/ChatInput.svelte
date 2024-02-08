@@ -11,6 +11,7 @@
 
 	let innerWidth = 0;
 	let textareaElement: HTMLTextAreaElement;
+	let isCompositionOn = false;
 
 	const dispatch = createEventDispatcher<{ submit: void }>();
 
@@ -19,7 +20,7 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		// submit on enter
-		if (event.key === "Enter" && !event.shiftKey) {
+		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
 			event.preventDefault();
 			// blur to close keyboard on mobile
 			textareaElement.blur();
@@ -56,7 +57,9 @@
 		bind:this={textareaElement}
 		{disabled}
 		on:keydown={handleKeydown}
-		on:keypress
+		on:compositionstart={() => (isCompositionOn = true)}
+		on:compositionend={() => (isCompositionOn = false)}
+		on:beforeinput
 		{placeholder}
 	/>
 </div>

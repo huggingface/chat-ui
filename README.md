@@ -226,7 +226,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 #### Multi modal model
 
-We currently only support IDEFICS as a multimodal model, hosted on TGI. You can enable it by using the followin config (if you have a PRO HF Api token):
+We currently only support IDEFICS as a multimodal model, hosted on TGI. You can enable it by using the following config (if you have a PRO HF Api token):
 
 ```env
     {
