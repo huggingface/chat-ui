@@ -18,7 +18,7 @@ export function getHref(
 		} else {
 			// delete_except
 			const keysToPreserve = keys;
-			for (const key of newUrl.searchParams.keys()) {
+			for (const key of [...newUrl.searchParams.keys()]) {
 				if (!keysToPreserve.includes(key)) {
 					newUrl.searchParams.delete(key);
 				}
