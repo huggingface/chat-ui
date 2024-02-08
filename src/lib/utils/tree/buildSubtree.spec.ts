@@ -1,6 +1,6 @@
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
 	insertLegacyConversation,
@@ -107,8 +107,4 @@ describe("buildSubtree", () => {
 		const subtree4 = buildSubtree(conv, "1-1-1-1-7");
 		expect(subtree4).toEqual([conv.messages[0], conv.messages[4], conv.messages[6]]);
 	});
-});
-
-afterEach(async () => {
-	await collections.conversations.deleteMany({});
 });

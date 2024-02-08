@@ -1,6 +1,8 @@
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+
+// function used to insert conversations used for testing
 
 export const insertLegacyConversation = async () => {
 	const res = await collections.conversations.insertOne({
@@ -148,7 +150,4 @@ describe("inserting conversations", () => {
 		const id = await insertSideBranchesConversation();
 		expect(id).toBeDefined();
 	});
-});
-afterEach(async () => {
-	await collections.conversations.deleteMany({});
 });

@@ -1,6 +1,6 @@
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { convertLegacyConversation } from "./convertLegacyConversation";
 import { insertLegacyConversation, insertLinearBranchConversation } from "./treeHelpers.spec";
@@ -36,8 +36,4 @@ describe("convertLegacyConversation", () => {
 		expect(newConv.rootMessageId).toBe(undefined);
 		expect(newConv.messages).toEqual([]);
 	});
-});
-
-afterEach(async () => {
-	await collections.conversations.deleteMany({});
 });
