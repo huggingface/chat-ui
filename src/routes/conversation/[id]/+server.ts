@@ -33,6 +33,29 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// check if the user has access to the conversation
+	const convBeforeCheck = await collections.conversations.findOne({
+		_id: convId,
+		...authCondition(locals),
+	});
+
+	if (convBeforeCheck && !convBeforeCheck.rootMessageId) {
+		const res = await collections.conversations.updateOne(
+			{
+				_id: convId,
+			},
+			{
+				$set: {
+					...convBeforeCheck,
+					...convertLegacyConversation(convBeforeCheck),
+				},
+			}
+		);
+
+		if (!res.acknowledged) {
+			throw error(500, "Failed to convert conversation");
+		}
+	}
+
 	const conv = await collections.conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
@@ -40,22 +63,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	if (!conv) {
 		throw error(404, "Conversation not found");
-	}
-
-	if (!conv.rootMessageId) {
-		// need to convert the conversation if it's not a tree like one
-		const res = await collections.conversations.updateOne(
-			{
-				_id: convId,
-			},
-			{
-				$set: { ...convertLegacyConversation(conv) },
-			}
-		);
-
-		if (!res.acknowledged) {
-			throw error(500, "Failed to convert conversation");
-		}
 	}
 
 	// register the event for ratelimiting
