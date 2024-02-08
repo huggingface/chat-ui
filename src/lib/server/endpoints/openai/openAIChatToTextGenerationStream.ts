@@ -22,7 +22,7 @@ export async function* openAIChatToTextGenerationStream(
 				id: tokenId++,
 				text: content ?? "",
 				logprob: 0,
-				special: false,
+				special: last,
 			},
 			generated_text: last ? generatedText : null,
 			details: null,
