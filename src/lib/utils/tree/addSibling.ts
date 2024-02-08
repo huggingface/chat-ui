@@ -1,6 +1,5 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
-import { addChildren } from "./addChildren";
 
 export function addSibling(
 	conv: Pick<Conversation, "messages" | "rootMessageId">,
@@ -24,5 +23,23 @@ export function addSibling(
 		throw new Error("The sibling message is the root message, therefore we can't add a sibling");
 	}
 
-	return addChildren(conv, message, sibling.ancestors[sibling.ancestors.length - 1]);
+	const messageId = crypto.randomUUID();
+
+	conv.messages.push({
+		...message,
+		id: messageId,
+		ancestors: sibling.ancestors,
+		children: [],
+	});
+
+	const nearestAncestorId = sibling.ancestors[sibling.ancestors.length - 1];
+	const nearestAncestor = conv.messages.find((m) => m.id === nearestAncestorId);
+
+	if (nearestAncestor) {
+		if (nearestAncestor.children) {
+			nearestAncestor.children.push(messageId);
+		} else nearestAncestor.children = [messageId];
+	}
+
+	return messageId;
 }

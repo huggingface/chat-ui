@@ -14,7 +14,6 @@ import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
-import { getChildren } from "$lib/utils/tree/getChildren";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
@@ -168,10 +167,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (isContinue) {
 		// if it's the last message and we continue then we build the prompt up to the last message
 		// we will strip the end tokens afterwards when the prompt is built
-		if (getChildren(conv, messageId).length > 0)
+		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
 			throw error(400, "Can only continue the last message");
-		messageToWriteToId = messageId;
-		messagesForPrompt = buildSubtree(conv, messageId);
+		}
 	} else if (isRetry) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message

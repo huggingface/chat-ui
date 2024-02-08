@@ -37,7 +37,16 @@ export function addChildren(
 		...message,
 		ancestors,
 		id: messageId,
+		children: [],
 	});
+
+	const parent = conv.messages.find((m) => m.id === parentId);
+
+	if (parent) {
+		if (parent.children) {
+			parent.children.push(messageId);
+		} else parent.children = [messageId];
+	}
 
 	return messageId;
 }

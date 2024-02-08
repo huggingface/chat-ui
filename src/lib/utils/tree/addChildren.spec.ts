@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { insertLegacyConversation, insertSideBranchesConversation } from "./treeHelpers.spec";
 import { addChildren } from "./addChildren";
 import type { Message } from "$lib/types/Message";
-import { getChildren } from "./getChildren";
 
 const newMessage: Omit<Message, "id"> = {
 	content: "new message",
@@ -50,25 +49,27 @@ describe("addChildren", async () => {
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
-		const parentId = conv.messages[0].id;
-		const nChildren = getChildren(conv, parentId).length;
-
-		addChildren(conv, newMessage, parentId);
-		expect(getChildren(conv, parentId).length).toEqual(nChildren + 1);
+		const nChildren = conv.messages[0].children?.length;
+		if (!nChildren) throw new Error("No children found");
+		addChildren(conv, newMessage, conv.messages[0].id);
+		expect(conv.messages[0].children?.length).toEqual(nChildren + 1);
 	});
+
 	it("should let you create a new leaf", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		const parentId = conv.messages[conv.messages.length - 1].id;
-		const nChildren = getChildren(conv, parentId).length;
+		const nChildren = conv.messages[conv.messages.length - 1].children?.length;
 
+		if (nChildren === undefined) throw new Error("No children found");
 		expect(nChildren).toEqual(0);
 
 		addChildren(conv, newMessage, parentId);
-		expect(getChildren(conv, parentId).length).toEqual(nChildren + 1);
+		expect(conv.messages[conv.messages.length - 2].children?.length).toEqual(nChildren + 1);
 	});
+
 	it("should let you append to an empty conversation without specifying a parentId", async () => {
 		const conv = {
 			_id: new ObjectId(),

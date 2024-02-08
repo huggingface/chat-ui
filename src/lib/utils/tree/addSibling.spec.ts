@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { insertLegacyConversation, insertSideBranchesConversation } from "./treeHelpers.spec";
 import type { Message } from "$lib/types/Message";
 import { addSibling } from "./addSibling";
-import { getChildren } from "./getChildren";
 
 const newMessage: Omit<Message, "id"> = {
 	content: "new message",
@@ -65,14 +64,17 @@ describe("addSibling", async () => {
 		if (!conv) throw new Error("Conversation not found");
 
 		// add sibling and check children count for parnets
-		const nChildren = getChildren(conv, conv.messages[4].id).length;
-		const siblingId = addSibling(conv, newMessage, conv.messages[4].id);
-		const nChildrenNew = getChildren(conv, conv.messages[4].id).length;
+
+		const nChildren = conv.messages[1].children?.length;
+		const siblingId = addSibling(conv, newMessage, conv.messages[2].id);
+		const nChildrenNew = conv.messages[1].children?.length;
+
+		if (!nChildren) throw new Error("No children found");
 
 		expect(nChildrenNew).toBe(nChildren + 1);
 
 		// make sure siblings have the same ancestors
 		const sibling = conv.messages.find((m) => m.id === siblingId);
-		expect(sibling?.ancestors).toEqual(conv.messages[4].ancestors);
+		expect(sibling?.ancestors).toEqual(conv.messages[2].ancestors);
 	});
 });

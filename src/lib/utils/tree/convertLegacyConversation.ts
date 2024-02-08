@@ -13,6 +13,7 @@ export function convertLegacyConversation(
 		return {
 			...message,
 			ancestors: messages.slice(0, index).map((m) => m.id),
+			children: index < messages.length - 1 ? [messages[index + 1].id] : [],
 		};
 	});
 
