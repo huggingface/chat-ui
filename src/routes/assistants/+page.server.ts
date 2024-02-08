@@ -15,8 +15,7 @@ export const load = async ({ url, locals }) => {
 	const modelId = url.searchParams.get("modelId");
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const createdByName = url.searchParams.get("user");
-	const createdByCurrentUser =
-		locals.user?.username && locals.user.username === url.searchParams.get("user");
+	const createdByCurrentUser = locals.user?.username && locals.user.username === createdByName;
 
 	if (createdByName) {
 		const existingUser = await collections.users.findOne({ username: createdByName });
