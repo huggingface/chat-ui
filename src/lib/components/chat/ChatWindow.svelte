@@ -50,7 +50,7 @@
 		message: string;
 		share: void;
 		stop: void;
-		retry: { id: Message["id"]; content: string };
+		retry: { id: Message["id"]; content?: string };
 		continue: { id: Message["id"] };
 	}>();
 

@@ -50,6 +50,7 @@ export const load = async ({ params, depends, locals }) => {
 		title: conversation.title,
 		model: conversation.model,
 		preprompt: conversation.preprompt,
+		rootMessageId: conversation.rootMessageId,
 		assistant: conversation.assistantId
 			? JSON.parse(
 					JSON.stringify(

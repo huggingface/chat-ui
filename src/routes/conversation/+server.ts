@@ -23,6 +23,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		})
 		.parse(JSON.parse(body));
 
+	let rootMessageId: Message["id"] | undefined = undefined;
 	let embeddingModel: string;
 
 	if (values.fromShare) {
@@ -36,6 +37,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 		title = conversation.title;
 		messages = conversation.messages;
+		rootMessageId = conversation.rootMessageId;
 		values.model = conversation.model;
 		values.preprompt = conversation.preprompt;
 		values.assistantId = conversation.assistantId?.toString();
@@ -69,6 +71,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		title: title || "New Chat",
+		rootMessageId,
 		messages,
 		model: values.model,
 		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
