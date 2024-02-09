@@ -346,22 +346,26 @@
 	</div>
 {/if}
 
-<!-- show one button for each children that sets childrenToRender-->
-
-{#if message.children && message.children.length > 1}
-	<div class="mt-2 flex justify-center gap-2">
-		{#each message.children as _, i}
-			<button
-				class="btn rounded-lg bg-gray-100 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-				on:click={() => (childrenToRender = i)}
-			>
-				{i + 1}
-			</button>
-		{/each}
-	</div>
-{/if}
-
 {#if message?.children?.length ?? 0 > 0}
+	<div class="mx-5 w-full border-b-2 border-b-gray-200 dark:border-b-gray-800" />
+	<!-- show one button for each children that sets childrenToRender-->
+	{#if message.children && message.children.length > 1}
+		<div class="mt-2 flex justify-center gap-2">
+			{#each message.children as _, i}
+				<button
+					class="btn rounded-lg bg-gray-100 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+					class:bg-gray-200={childrenToRender === i}
+					class:text-gray-500={childrenToRender === i}
+					class:dark:bg-gray-500={childrenToRender === i}
+					class:dark:text-gray-400={childrenToRender === i}
+					on:click={() => (childrenToRender = i)}
+				>
+					{i + 1}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	<svelte:self
 		{loading}
 		{webSearchMessages}
