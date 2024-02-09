@@ -36,6 +36,7 @@
 	export let messages: Message[] = [];
 	export let loading = false;
 	export let pending = false;
+
 	export let shared = false;
 	export let currentModel: Model;
 	export let models: Model[];
@@ -171,6 +172,23 @@
 						on:continue
 					/>
 				</div>
+			{:else if pending}
+				<ChatMessage
+					loading={true}
+					messages={[
+						{
+							id: "0-0-0-0-0",
+							content: "",
+							from: "assistant",
+							children: [],
+						},
+					]}
+					id={"0-0-0-0-0"}
+					{webSearchMessages}
+					isAuthor={!shared}
+					readOnly={isReadOnly}
+					model={currentModel}
+				/>
 			{:else if !assistant}
 				<ChatIntroduction {models} {currentModel} on:message />
 			{:else}
