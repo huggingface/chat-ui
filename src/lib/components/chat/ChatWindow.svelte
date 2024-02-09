@@ -35,7 +35,6 @@
 	import { useLeafConversationTree } from "$lib/stores/leafConversationTree";
 
 	export let messages: Message[] = [];
-	export let rootMessageId: Message["id"];
 	export let loading = false;
 	export let pending = false;
 
@@ -163,13 +162,13 @@
 				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 
-			{#if rootMessageId && messages.length > 0}
+			{#if messages.length > 0}
 				<div class="flex h-max flex-col gap-6 pb-44">
 					<ChatMessage
 						{loading}
 						{webSearchMessages}
 						{messages}
-						id={rootMessageId}
+						id={messages[0].id}
 						isAuthor={!shared}
 						readOnly={isReadOnly}
 						model={currentModel}

@@ -185,11 +185,6 @@
 			}
 
 			messages = [...messages];
-
-			if (!data.rootMessageId) {
-				data.rootMessageId = messageToWriteToId;
-			}
-
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 
 			if (!messageToWriteTo) {
@@ -425,7 +420,6 @@
 	{loading}
 	{pending}
 	{messages}
-	rootMessageId={data.rootMessageId ?? messages[0].id}
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:webSearchMessages
