@@ -5,11 +5,13 @@ import {
 	SERPER_API_KEY,
 	SERPSTACK_API_KEY,
 	USE_LOCAL_WEBSEARCH,
+	USE_LOCAL_SEARXNG_URL,
 	YDC_API_KEY,
 } from "$env/static/private";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 import { searchWebLocal } from "./searchWebLocal";
+import { searchSearxng } from "./searchSearxng";
 
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
@@ -20,6 +22,9 @@ export function getWebSearchProvider() {
 export async function searchWeb(query: string) {
 	if (USE_LOCAL_WEBSEARCH) {
 		return await searchWebLocal(query);
+	}
+	if (USE_LOCAL_SEARXNG_URL) {
+		return await searchSearxng(query);
 	}
 	if (SERPER_API_KEY) {
 		return await searchWebSerper(query);
