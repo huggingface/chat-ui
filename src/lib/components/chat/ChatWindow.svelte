@@ -157,18 +157,20 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<ChatMessage
-					{loading}
-					{webSearchMessages}
-					{messages}
-					id={messages[0].id}
-					isAuthor={!shared}
-					readOnly={isReadOnly}
-					model={currentModel}
-					on:retry
-					on:vote
-					on:continue
-				/>
+				<div class="flex h-full flex-col gap-6 overflow-x-clip overflow-y-scroll">
+					<ChatMessage
+						{loading}
+						{webSearchMessages}
+						{messages}
+						id={messages[0].id}
+						isAuthor={!shared}
+						readOnly={isReadOnly}
+						model={currentModel}
+						on:retry
+						on:vote
+						on:continue
+					/>
+				</div>
 			{:else if !assistant}
 				<ChatIntroduction {models} {currentModel} on:message />
 			{:else}

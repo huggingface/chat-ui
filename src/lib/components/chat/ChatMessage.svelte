@@ -2,7 +2,7 @@
 	import { marked } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher } from "svelte";
+	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -136,12 +136,22 @@
 	}
 
 	let editMode = false;
+	let editContentEl: HTMLTextAreaElement;
+
+	$: if (editMode) {
+		tick();
+		if (editContentEl) {
+			editContentEl.value = message.content;
+			editContentEl?.focus();
+		}
+	}
 
 	$: message = messages.find((m) => m.id === id) ?? ({} as Message);
 
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
 	$: childrenToRender = 0;
+	$: message.id, (childrenToRender = 0);
 
 	const leafId = useLeafConversationTree();
 
@@ -300,11 +310,16 @@
 					<div class="flex w-full flex-col">
 						<textarea
 							class="w-full whitespace-break-spaces break-words rounded-lg bg-gray-800 bg-inherit px-5 py-3.5 text-gray-500 *:h-max dark:text-gray-400"
+							bind:this={editContentEl}
 							value={message.content.trim()}
 						/>
 						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
 								class="btn rounded-lg bg-gray-200 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+								on:click={() => {
+									dispatch("retry", { content: editContentEl.value, id: message.id });
+									editMode = false;
+								}}
 							>
 								Submit
 							</button>
@@ -352,17 +367,16 @@
 {/if}
 
 {#if message?.children?.length ?? 0 > 0}
-	<div class="mx-5 w-full border-b-2 border-b-gray-200 dark:border-b-gray-800" />
+	<!-- <div class="mx-5 mt-5 w-full border-b-2 border-b-gray-200 dark:border-b-gray-800" /> -->
 	<!-- show one button for each children that sets childrenToRender-->
 	{#if message.children && message.children.length > 1}
 		<div class="mt-2 flex justify-center gap-2">
 			{#each message.children as _, i}
 				<button
-					class="btn rounded-lg bg-gray-100 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-					class:bg-gray-200={childrenToRender === i}
-					class:text-gray-500={childrenToRender === i}
-					class:dark:bg-gray-500={childrenToRender === i}
-					class:dark:text-gray-400={childrenToRender === i}
+					class="btn rounded-lg p-2 text-sm transition-none focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+					 {childrenToRender === i
+						? 'bg-gray-200 text-gray-500 dark:bg-gray-500 dark:text-gray-400'
+						: 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-300'}"
 					on:click={() => (childrenToRender = i)}
 				>
 					{i + 1}
