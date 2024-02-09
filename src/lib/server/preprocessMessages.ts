@@ -29,7 +29,7 @@ ${message.webSearch.context}
 ${previousQuestions}
 Answer the question: ${messages[lastUsrMsgIndex].content}`;
 			}
-
+			// handle files if model is multimodal
 			if (multimodal) {
 				if (message.files && message.files.length > 0) {
 					const markdowns = await Promise.all(

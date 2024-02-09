@@ -21,6 +21,7 @@
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
+	import { useLeafConversationTree } from "$lib/stores/leafConversationTree";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -141,6 +142,10 @@
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
 	$: childrenToRender = 0;
+
+	const leafId = useLeafConversationTree();
+
+	$: if (message.children?.length === 0) $leafId = message.id;
 </script>
 
 {#if message.from === "assistant"}
