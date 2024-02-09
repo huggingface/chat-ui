@@ -157,7 +157,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-full flex-col gap-6 overflow-x-clip overflow-y-scroll">
+				<div class="flex h-max flex-col gap-6 pb-44">
 					<ChatMessage
 						{loading}
 						{webSearchMessages}
