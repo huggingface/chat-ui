@@ -32,6 +32,7 @@
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
+	import { useLeafConversationTree } from "$lib/stores/leafConversationTree";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -83,7 +84,11 @@
 	const onDragOver = (e: DragEvent) => {
 		e.preventDefault();
 	};
-	$: lastIsError = messages[messages.length - 1]?.from === "user" && !loading;
+
+	const leafId = useLeafConversationTree();
+
+	$: lastMessage = browser && (messages.find((m) => m.id == $leafId) as Message);
+	$: lastIsError = lastMessage && lastMessage.from === "user" && !loading;
 
 	$: sources = files.map((file) => file2base64(file));
 
@@ -112,7 +117,7 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	$: if (browser && messages[messages.length - 1]?.from === "user") {
+	$: if (lastMessage && lastMessage.from === "user") {
 		scrollToBottom();
 	}
 </script>
@@ -238,23 +243,28 @@
 				{:else if lastIsError}
 					<RetryBtn
 						classNames="ml-auto"
-						on:click={() =>
-							dispatch("retry", {
-								id: messages[messages.length - 1].id,
-								content: messages[messages.length - 1].content,
-							})}
+						on:click={() => {
+							if (lastMessage && lastMessage.ancestors) {
+								dispatch("retry", {
+									id: lastMessage.ancestors[lastMessage.ancestors.length - 1],
+								});
+							}
+						}}
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
 						{#if currentModel.multimodal}
 							<UploadBtn bind:files classNames="ml-auto" />
 						{/if}
-						{#if messages && messages[messages.length - 1]?.interrupted && !isReadOnly}
+						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
-								on:click={() =>
-									dispatch("continue", {
-										id: messages[messages.length - 1].id,
-									})}
+								on:click={() => {
+									if (lastMessage && lastMessage.ancestors) {
+										dispatch("continue", {
+											id: lastMessage?.id,
+										});
+									}
+								}}
 							/>
 						{/if}
 					</div>
