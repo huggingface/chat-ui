@@ -204,7 +204,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			// just add a sibling to the assistant answer where we can write to
 			messageToWriteToId = addSibling(conv, { from: "assistant", content: "" }, messageId);
 			messagesForPrompt = buildSubtree(conv, messageId);
-			messagesForPrompt.slice(0, -1); // don't need the latest assistant message in the prompt since we're retrying it
+			messagesForPrompt.pop(); // don't need the latest assistant message in the prompt since we're retrying it
 		}
 	} else {
 		// just a normal linear conversation, so we add the user message
