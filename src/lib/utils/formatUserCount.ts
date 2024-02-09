@@ -1,5 +1,6 @@
-export function formatUserCount(userCount: number): string | null {
+export function formatUserCount(userCount: number): string {
 	const userCountRanges: Array<{ min: number; max: number; label: string }> = [
+		{ min: 0, max: 1, label: "1" },
 		{ min: 2, max: 9, label: "1-10" },
 		{ min: 10, max: 99, label: "+10" },
 		{ min: 100, max: 299, label: "+100" },
@@ -12,5 +13,5 @@ export function formatUserCount(userCount: number): string | null {
 	];
 
 	const range = userCountRanges.find(({ min, max }) => userCount >= min && userCount <= max);
-	return range?.label ?? null;
+	return range?.label ?? "";
 }
