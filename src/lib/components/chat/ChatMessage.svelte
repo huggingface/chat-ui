@@ -46,7 +46,8 @@
 	}
 
 	export let model: Model;
-	export let message: Message;
+	export let id: Message["id"];
+	export let messages: Message[];
 	export let loading = false;
 	export let isAuthor = true;
 	export let readOnly = false;
@@ -97,7 +98,7 @@
 		clearTimeout(pendingTimeout);
 
 		// Add loading animation to the last message if update takes more than 600ms
-		if (loading) {
+		if (loading && isLast) {
 			pendingTimeout = setTimeout(() => {
 				if (contentEl) {
 					loadingEl = new IconLoading({
@@ -134,6 +135,12 @@
 	}
 
 	let editMode = false;
+
+	$: message = messages.find((m) => m.id === id) ?? ({} as Message);
+
+	$: isLast = (message && message.children?.length === 0) ?? false;
+
+	$: childrenToRender = 0;
 </script>
 
 {#if message.from === "assistant"}
@@ -159,7 +166,7 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if searchUpdates && searchUpdates.length > 0}
+			{#if isLast && searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
 					webSearchMessages={searchUpdates}
@@ -321,7 +328,7 @@
 									<CarbonDownload />
 								</a>
 							{/if}
-							{#if !readOnly && $page.data.conversationBranching}
+							{#if !readOnly}
 								<button
 									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 									title="Branch"
@@ -337,4 +344,34 @@
 			</div>
 		</div>
 	</div>
+{/if}
+
+<!-- show one button for each children that sets childrenToRender-->
+
+{#if message.children && message.children.length > 1}
+	<div class="mt-2 flex justify-center gap-2">
+		{#each message.children as _, i}
+			<button
+				class="btn rounded-lg bg-gray-100 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+				on:click={() => (childrenToRender = i)}
+			>
+				{i + 1}
+			</button>
+		{/each}
+	</div>
+{/if}
+
+{#if message?.children?.length ?? 0 > 0}
+	<svelte:self
+		{loading}
+		{webSearchMessages}
+		{messages}
+		{isAuthor}
+		{readOnly}
+		{model}
+		id={messages.find((m) => m.id === id)?.children?.[childrenToRender]}
+		on:retry
+		on:vote
+		on:continue
+	/>
 {/if}

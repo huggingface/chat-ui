@@ -87,8 +87,8 @@
 			if (msgIndex === -1) {
 				msgIndex = messages.length - 1;
 			}
-			if (isRetry && messages[msgIndex].from === "assistant") {
-				throw new Error("Trying to retry a message that is not from user");
+			if (isRetry && messages[msgIndex].from === "user") {
+				throw new Error("Trying to retry a message that is not from assistant");
 			}
 
 			if (isContinue && messages[msgIndex].from === "user") {
