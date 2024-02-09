@@ -33,7 +33,9 @@ export const actions: Actions = {
 
 		// and remove it from all users settings
 		await collections.settings.updateMany(
-			{},
+			{
+				assistants: { $in: [assistant._id] },
+			},
 			{
 				$pull: { assistants: assistant._id },
 			}
