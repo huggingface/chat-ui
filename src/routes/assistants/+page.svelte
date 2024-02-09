@@ -13,8 +13,9 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
-	// import CarbonViewOff from "~icons/carbon/view-off-filled";
+	import CarbonUserMultiple from "~icons/carbon/user-multiple";
 	import Pagination from "$lib/components/Pagination.svelte";
+	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
 
 	export let data: PageData;
@@ -144,13 +145,16 @@
 			{#each data.assistants as assistant (assistant._id)}
 				<a
 					href="{base}/assistant/{assistant._id}"
-					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
-					<!-- {#if assistant.userCount && assistant.userCount > 1}
-						<div class="absolute right-2 top-2" title="share with others to make it public">
-							<CarbonViewOff class="opacity-70" />
+					{#if assistant.userCount && assistant.userCount > 1}
+						<div
+							class="absolute right-3 top-3 flex items-center gap-1 text-xs text-gray-400"
+							title="Number of users"
+						>
+							<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)}
 						</div>
-					{/if} -->
+					{/if}
 					{#if assistant.avatar}
 						<img
 							src="{base}/settings/assistants/{assistant._id}/avatar.jpg"
