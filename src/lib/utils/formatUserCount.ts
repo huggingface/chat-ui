@@ -2,7 +2,8 @@ export function formatUserCount(userCount: number): string {
 	const userCountRanges: Array<{ min: number; max: number; label: string }> = [
 		{ min: 0, max: 1, label: "1" },
 		{ min: 2, max: 9, label: "1-10" },
-		{ min: 10, max: 99, label: "+10" },
+		{ min: 10, max: 49, label: "+10" },
+		{ min: 50, max: 99, label: "+50" },
 		{ min: 100, max: 299, label: "+100" },
 		{ min: 300, max: 499, label: "+300" },
 		{ min: 500, max: 999, label: "+500" },
