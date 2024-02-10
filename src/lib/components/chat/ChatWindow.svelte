@@ -7,6 +7,7 @@
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonCaretDown from "~icons/carbon/caret-down";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -211,7 +212,7 @@
 								placeholder="Ask anything"
 								bind:value={message}
 								on:submit={handleSubmit}
-								on:keypress={(ev) => {
+								on:beforeinput={(ev) => {
 									if ($page.data.loginRequired) {
 										ev.preventDefault();
 										loginModalOpen = true;
@@ -256,8 +257,10 @@
 							>{currentModel.displayName}</a
 						>{:else}
 						{@const model = models.find((m) => m.id === assistant?.modelId)}
-						<a href="{base}/settings/assistants/{assistant._id}" class="hover:underline"
-							>{model?.displayName}</a
+						<a
+							href="{base}/settings/assistants/{assistant._id}"
+							class="inline-flex items-center border-b hover:text-gray-600 dark:border-gray-700 dark:hover:text-gray-300"
+							>{model?.displayName}<CarbonCaretDown class="text-xxs" /></a
 						>{/if} <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may
 					be inaccurate or false.
 				</p>

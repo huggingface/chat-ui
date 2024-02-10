@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { PUBLIC_APP_DESCRIPTION, PUBLIC_APP_NAME } from "$env/static/public";
+	import {
+		PUBLIC_APP_DESCRIPTION,
+		PUBLIC_APP_NAME,
+		PUBLIC_APP_DISCLAIMER_MESSAGE,
+	} from "$env/static/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -25,8 +29,7 @@
 		</p>
 
 		<p class="text-sm text-gray-500">
-			Disclaimer: AI is an area of active research with known problems such as biased generation and
-			misinformation. Do not use this application for high-stakes decisions or advice.
+			{PUBLIC_APP_DISCLAIMER_MESSAGE}
 		</p>
 
 		<div class="flex w-full flex-col items-center gap-2">

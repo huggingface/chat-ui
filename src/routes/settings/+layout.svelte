@@ -1,29 +1,35 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import { base } from "$app/paths";
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/stores";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
+	import CarbonArrowUpRight from "~icons/carbon/ArrowUpRight";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonAdd from "~icons/carbon/add";
 
 	import UserIcon from "~icons/carbon/user";
 	import { fade, fly } from "svelte/transition";
-	import { PUBLIC_APP_ASSETS } from "$env/static/public";
 	export let data;
 
 	let previousPage: string = base;
+	let assistantsSection: HTMLHeadingElement;
+
+	onMount(() => {
+		if ($page.params?.assistantId) {
+			assistantsSection.scrollIntoView();
+		}
+	});
 
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("settings")) {
-			previousPage = from?.url.pathname || previousPage;
+			previousPage = from?.url.toString() || previousPage;
 		}
 	});
 
 	const settings = useSettingsStore();
-
-	const isHuggingChat = PUBLIC_APP_ASSETS === "huggingchat";
 </script>
 
 <div
@@ -71,17 +77,29 @@
 				</a>
 			{/each}
 			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
-			{#if data.enableAssistants && (!isHuggingChat || data.assistants.length >= 1)}
-				<h3 class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">Assistants</h3>
+			{#if data.enableAssistants}
+				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
+					Assistants
+				</h3>
+				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
+					<a
+						href="{base}/settings/assistants/new"
+						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
+					{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+					>
+						<CarbonAdd />
+						<div class="truncate">Create new assistant</div>
+					</a>
+				{/if}
 				{#each data.assistants as assistant}
 					<a
 						href="{base}/settings/assistants/{assistant._id.toString()}"
 						class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-						{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+					{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 					>
 						{#if assistant.avatar}
 							<img
-								src="{base}/settings/assistants/{assistant._id.toString()}/avatar?hash={assistant.avatar}"
+								src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
 								alt="Avatar"
 								class="h-6 w-6 rounded-full object-cover"
 							/>
@@ -102,17 +120,12 @@
 						{/if}
 					</a>
 				{/each}
-
-				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
-					<a
-						href="{base}/settings/assistants/new"
-						class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-					{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
-					>
-						<CarbonAdd />
-						<div class="truncate">Create new assistant</div>
-					</a>
-				{/if}
+				<a
+					href="{base}/assistants"
+					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
+					<div class="truncate">Browse Assistants</div>
+				</a>
 			{/if}
 
 			<a
@@ -120,7 +133,7 @@
 				class="group mt-auto flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
 				{$page.url.pathname === `${base}/settings` ? '!bg-gray-100 !text-gray-800' : ''}"
 			>
-				<UserIcon class="text-lg" />
+				<UserIcon class="text-sm" />
 				Application Settings
 			</a>
 		</div>

@@ -7,7 +7,6 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	export let conv: ConvSidebar;
@@ -18,8 +17,6 @@
 		deleteConversation: string;
 		editConversationTitle: { id: string; title: string };
 	}>();
-
-	const settings = useSettingsStore();
 </script>
 
 <a
@@ -37,16 +34,16 @@
 		{#if confirmDelete}
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarHash && !$settings.hideEmojiOnSidebar}
+		{#if conv.avatarHash}
 			<img
-				src="{base}/settings/assistants/{conv.assistantId}/avatar?hash={conv.avatarHash}"
+				src="{base}/settings/assistants/{conv.assistantId}/avatar.jpg?hash={conv.avatarHash}"
 				alt="Assistant avatar"
-				class="mr-1.5 inline size-4 rounded-full object-cover"
+				class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
 			/>
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else if conv.assistantId}
 			<div
-				class="mr-1.5 flex size-4 items-center justify-center rounded-full bg-gray-300 text-xs font-bold uppercase text-gray-500"
+				class="mr-1.5 flex size-4 flex-none items-center justify-center rounded-full bg-gray-300 text-xs font-bold uppercase text-gray-500"
 			/>
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else}
