@@ -67,6 +67,7 @@ client.on("open", () => {
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
 	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	settings.createIndex({ assistants: 1 }).catch(console.error);
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
