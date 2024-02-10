@@ -96,7 +96,7 @@
 					// `result` is an `ActionResult` object
 					if (result.type === "success") {
 						$settings.activeModel = data.assistant._id;
-						goto(`${base}`);
+						goto(`${base}` || "/");
 					} else {
 						await applyAction(result);
 					}
