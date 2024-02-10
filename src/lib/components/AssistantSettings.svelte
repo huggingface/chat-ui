@@ -71,6 +71,14 @@
 	let deleteExistingAvatar = false;
 
 	let loading = false;
+
+	let ragMode: false | "links" | "domains" | "all" = assistant?.rag?.allowAll
+		? "all"
+		: assistant?.rag?.links?.length ?? 0 > 0
+		? "links"
+		: (assistant?.rag?.allowList?.length ?? 0) > 0
+		? "domains"
+		: false;
 </script>
 
 <form
@@ -101,6 +109,24 @@
 			if (files === null) {
 				formData.delete("avatar");
 			}
+		}
+
+		formData.delete("ragMode");
+
+		if (ragMode === false) {
+			formData.set("ragAllowAll", "false");
+			formData.set("ragLinkList", "");
+			formData.set("ragDomainList", "");
+		} else if (ragMode === "all") {
+			formData.set("ragAllowAll", "true");
+			formData.set("ragLinkList", "");
+			formData.set("ragDomainList", "");
+		} else if (ragMode === "links") {
+			formData.set("ragAllowAll", "false");
+			formData.set("ragDomainList", "");
+		} else if (ragMode === "domains") {
+			formData.set("ragAllowAll", "false");
+			formData.set("ragLinkList", "");
 		}
 
 		return async ({ result }) => {
@@ -255,7 +281,7 @@
 			</label>
 		</div>
 
-		<label class="flex flex-col">
+		<div class="flex flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 			<textarea
 				name="preprompt"
@@ -264,7 +290,89 @@
 				value={assistant?.preprompt ?? ""}
 			/>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
-		</label>
+			<div class="flex min-h-44 flex-col flex-nowrap">
+				<span class="my-2 text-smd font-semibold"> RAG Settings</span>
+
+				<label>
+					<input
+						checked={!ragMode}
+						on:change={() => (ragMode = false)}
+						type="radio"
+						name="ragMode"
+						value={false}
+					/>
+					<span class="my-2 text-sm" class:font-semibold={!ragMode}> Disabled </span>
+					{#if !ragMode}
+						<span class="block text-xs text-gray-500">
+							Assistant won't look for information on the web.
+						</span>
+					{/if}
+				</label>
+
+				<label>
+					<input
+						checked={ragMode === "all"}
+						on:change={() => (ragMode = "all")}
+						type="radio"
+						name="ragMode"
+						value={"all"}
+					/>
+					<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Enabled </span>
+					{#if ragMode === "all"}
+						<span class="block text-xs text-gray-500">
+							Assistant can access any content on the web.
+						</span>
+					{/if}
+				</label>
+				<label>
+					<input
+						checked={ragMode === "links"}
+						on:change={() => (ragMode = "links")}
+						type="radio"
+						name="ragMode"
+						value={false}
+					/>
+					<span class="my-2 text-sm" class:font-semibold={ragMode === "links"}> Links </span>
+				</label>
+				{#if ragMode === "links"}
+					<span class="mb-2 text-xs text-gray-500">
+						Specify max 3 direct URLs the assistant will access. HTML & plaintext only. Separate the
+						list elements with a semicolon.
+					</span>
+					<input
+						name="ragLinkList"
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
+						value={assistant?.rag?.links.join(";") ?? ""}
+					/>
+					<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
+				{/if}
+
+				<label>
+					<input
+						checked={ragMode === "domains"}
+						on:change={() => (ragMode = "domains")}
+						type="radio"
+						name="ragMode"
+						value={false}
+					/>
+					<span class="my-2 text-sm" class:font-semibold={ragMode === "domains"}> Domains </span>
+				</label>
+				{#if ragMode === "domains"}
+					<span class="mb-2 text-xs text-gray-500">
+						Specify allowed domains for web search, separe the list elements with a semicolon.
+					</span>
+
+					<input
+						name="ragDomainList"
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						placeholder="wikipedia.org;bbc.com"
+						value={assistant?.rag?.allowList?.join(";") ?? ""}
+					/>
+					<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
+				{/if}
+			</div>
+		</div>
 	</div>
 
 	<div class="mt-5 flex justify-end gap-2">
