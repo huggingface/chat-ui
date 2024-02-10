@@ -13,12 +13,21 @@ import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingMod
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
 
-const DOMAIN_BLOCKLIST = ["youtube.com", "twitter.com"];
+import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
+import { z } from "zod";
+import JSON5 from "json5";
+import type { Assistant } from "$lib/types/Assistant";
+
+const listSchema = z.array(z.string()).default([]);
+
+const allowList = listSchema.parse(JSON5.parse(WEBSEARCH_ALLOWLIST));
+const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
 
 export async function runWebSearch(
 	conv: Conversation,
 	prompt: string,
-	updatePad: (upd: MessageUpdate) => void
+	updatePad: (upd: MessageUpdate) => void,
+	ragSettings?: Assistant["rag"]
 ) {
 	const messages = (() => {
 		return [...conv.messages, { content: prompt, from: "user", id: crypto.randomUUID() }];
@@ -39,26 +48,48 @@ export async function runWebSearch(
 	}
 
 	try {
-		webSearch.searchQuery = await generateQuery(messages);
-		const searchProvider = getWebSearchProvider();
-		appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
-		const results = await searchWeb(webSearch.searchQuery);
-		webSearch.results =
-			(results.organic_results &&
-				results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
-					try {
-						const { title, link, text } = el;
-						const { hostname } = new URL(link);
-						return { title, link, hostname, text };
-					} catch (e) {
-						// Ignore Errors
-						return null;
-					}
-				})) ??
-			[];
+		// if the assistant specified direct links, skip the websearch
+		if (ragSettings && ragSettings?.links.length > 0) {
+			appendUpdate("Using links specified in assistant directly. Skipping websearch");
+			webSearch.results = ragSettings.links.map((link) => {
+				return { link, hostname: new URL(link).hostname, title: "", text: "" };
+			});
+		} else {
+			webSearch.searchQuery = await generateQuery(messages);
+			const searchProvider = getWebSearchProvider();
+			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
+
+			if (ragSettings && ragSettings?.allowList.length > 0) {
+				appendUpdate("Filtering results to only domains specified in assistant");
+				webSearch.searchQuery +=
+					" " + ragSettings.allowList.map((item) => "site:" + item).join(" ");
+			}
+
+			// handle the global lists
+			webSearch.searchQuery +=
+				allowList.map((item) => "site:" + item).join(" ") +
+				" " +
+				blockList.map((item) => "-site:" + item).join(" ");
+
+			const results = await searchWeb(webSearch.searchQuery);
+			webSearch.results =
+				(results.organic_results &&
+					results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
+						try {
+							const { title, link, text } = el;
+							const { hostname } = new URL(link);
+							return { title, link, hostname, text };
+						} catch (e) {
+							// Ignore Errors
+							return null;
+						}
+					})) ??
+				[];
+		}
+
 		webSearch.results = webSearch.results.filter((value) => value !== null);
 		webSearch.results = webSearch.results
-			.filter(({ link }) => !DOMAIN_BLOCKLIST.some((el) => link.includes(el))) // filter out blocklist links
+			.filter(({ link }) => !blockList.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
 		// fetch the model
