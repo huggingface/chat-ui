@@ -250,13 +250,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let webSearchResults: WebSearch | undefined;
 
-			if (webSearch && !isContinue && !conv.assistantId) {
-				webSearchResults = await runWebSearch(conv, messages[messages.length - 1].content, update);
+			// check if assistant has a rag
+			const assistantRAG = await collections.assistants
+				.findOne({ _id: conv.assistantId })
+				.then((a) => {
+					return a?.rag;
+				});
+
+			const assistantHasRAG =
+				assistantRAG &&
+				(assistantRAG.links.length > 0 ||
+					assistantRAG.allowList.length > 0 ||
+					assistantRAG.allowAll);
+
+			// if websearch is enabled and the assistant is not specified or it is and has a rag
+			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
+				webSearchResults = await runWebSearch(
+					conv,
+					messages[messages.length - 1].content,
+					update,
+					assistantRAG
+				);
 				messages[messages.length - 1].webSearch = webSearchResults;
 			} else if (isContinue) {
 				webSearchResults = messages[messages.length - 1].webSearch;
 			}
-
 			conv.messages = messages;
 
 			const previousContent = isContinue
