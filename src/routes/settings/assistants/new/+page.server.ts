@@ -7,6 +7,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
+import { parseStringToList } from "$lib/utils/parseStringToList";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -18,6 +19,9 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
+	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(3)),
+	ragDomainList: z.preprocess(parseStringToList, z.string().array()),
+	ragAllowAll: z.preprocess((v) => v === "true", z.boolean()),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -99,6 +103,11 @@ export const actions: Actions = {
 			updatedAt: new Date(),
 			userCount: 1,
 			featured: false,
+			rag: {
+				links: parse.data.ragLinkList,
+				allowList: parse.data.ragDomainList,
+				allowAll: parse.data.ragAllowAll,
+			},
 		});
 
 		// add insertedId to user settings
