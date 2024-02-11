@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -76,7 +76,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	// guest mode check
 	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
@@ -346,7 +346,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			const assistantHasRAG =
-				ENABLE_ASSISTANTS_RAG === "true" &&
+				env.ENABLE_ASSISTANTS_RAG === "true" &&
 				assistant &&
 				((assistant.rag &&
 					(assistant.rag.allowedLinks.length > 0 ||
@@ -369,7 +369,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let preprompt = conv.preprompt;
 
-			if (assistant?.dynamicPrompt && preprompt && ENABLE_ASSISTANTS_RAG === "true") {
+			if (assistant?.dynamicPrompt && preprompt && env.ENABLE_ASSISTANTS_RAG === "true") {
 				// process the preprompt
 				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 				let match;

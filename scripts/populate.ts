@@ -2,7 +2,7 @@ import readline from "readline";
 import minimist from "minimist";
 
 // @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
-import { MONGODB_URL } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 import { faker } from "@faker-js/faker";
 import { ObjectId } from "mongodb";
@@ -241,7 +241,7 @@ async function seed() {
 	try {
 		rl.question(
 			"You're about to run a seeding script on the following MONGODB_URL: \x1b[31m" +
-				MONGODB_URL +
+				env.MONGODB_URL +
 				"\x1b[0m\n\n With the following flags: \x1b[31m" +
 				flags.join("\x1b[0m , \x1b[31m") +
 				"\x1b[0m\n \n\n Are you sure you want to continue? (yes/no): ",

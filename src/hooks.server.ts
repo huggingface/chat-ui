@@ -1,17 +1,5 @@
-import {
-	ADMIN_API_SECRET,
-	COOKIE_NAME,
-	ENABLE_ASSISTANTS,
-	EXPOSE_API,
-	MESSAGES_BEFORE_LOGIN,
-	PARQUET_EXPORT_SECRET,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import type { Handle } from "@sveltejs/kit";
-import {
-	PUBLIC_GOOGLE_ANALYTICS_ID,
-	PUBLIC_ORIGIN,
-	PUBLIC_APP_DISCLAIMER,
-} from "$env/static/public";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
@@ -24,13 +12,13 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 
 if (!building) {
 	await checkAndRunMigrations();
-	if (ENABLE_ASSISTANTS) {
+	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (event.url.pathname.startsWith(`${base}/api/`) && EXPOSE_API !== "true") {
+	if (event.url.pathname.startsWith(`${base}/api/`) && env.EXPOSE_API !== "true") {
 		return new Response("API is disabled", { status: 403 });
 	}
 
@@ -47,7 +35,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
-		const ADMIN_SECRET = ADMIN_API_SECRET || PARQUET_EXPORT_SECRET;
+		const ADMIN_SECRET = env.ADMIN_API_SECRET || env.PARQUET_EXPORT_SECRET;
 
 		if (!ADMIN_SECRET) {
 			return errorResponse(500, "Admin API is not configured");
@@ -58,7 +46,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const token = event.cookies.get(COOKIE_NAME);
+	const token = event.cookies.get(env.COOKIE_NAME);
 
 	let secretSessionId: string;
 	let sessionId: string;
@@ -105,7 +93,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 			const validOrigins = [
 				new URL(event.request.url).origin,
-				...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
+				...(env.PUBLIC_ORIGIN ? [new URL(env.PUBLIC_ORIGIN).origin] : []),
 			];
 
 			if (!validOrigins.includes(new URL(referer).origin)) {
@@ -132,7 +120,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!event.locals.user &&
 			requiresUser &&
-			!((MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0)
+			!((env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
@@ -143,7 +131,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!requiresUser &&
 			!event.url.pathname.startsWith(`${base}/settings`) &&
-			!!PUBLIC_APP_DISCLAIMER
+			!!env.PUBLIC_APP_DISCLAIMER
 		) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
@@ -166,7 +154,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 			replaced = true;
 
-			return chunk.html.replace("%gaId%", PUBLIC_GOOGLE_ANALYTICS_ID);
+			return chunk.html.replace("%gaId%", env.PUBLIC_GOOGLE_ANALYTICS_ID || "");
 		},
 	});
 

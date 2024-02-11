@@ -1,4 +1,4 @@
-import { MONGODB_URL, MONGODB_DB_NAME, MONGODB_DIRECT_CONNECTION } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
@@ -14,21 +14,21 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 
-if (!MONGODB_URL) {
+if (!env.MONGODB_URL) {
 	throw new Error(
 		"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
 	);
 }
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
-const client = new MongoClient(MONGODB_URL, {
-	directConnection: MONGODB_DIRECT_CONNECTION === "true",
+const client = new MongoClient(env.MONGODB_URL, {
+	directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
 });
 
 export const connectPromise = client.connect().catch(console.error);
 
 export function getCollections(mongoClient: MongoClient) {
-	const db = mongoClient.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+	const db = mongoClient.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
 	const conversations = db.collection<Conversation>("conversations");
 	const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
@@ -62,7 +62,7 @@ export function getCollections(mongoClient: MongoClient) {
 		semaphores,
 	};
 }
-const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+const db = client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
 const collections = getCollections(client);
 

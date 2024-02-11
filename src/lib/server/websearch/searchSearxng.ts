@@ -1,11 +1,11 @@
-import { SEARXNG_QUERY_URL } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 export async function searchSearxng(query: string) {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
 
 	// Insert the query into the URL template
-	let url = SEARXNG_QUERY_URL.replace("<query>", query);
+	let url = env.SEARXNG_QUERY_URL.replace("<query>", query);
 
 	// Check if "&format=json" already exists in the URL
 	if (!url.includes("&format=json")) {

@@ -1,9 +1,9 @@
-import { LLM_SUMMERIZATION } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import type { Message } from "$lib/types/Message";
 
 export async function summarize(prompt: string) {
-	if (!LLM_SUMMERIZATION) {
+	if (!env.LLM_SUMMERIZATION) {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
