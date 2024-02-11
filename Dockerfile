@@ -18,15 +18,16 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local \
-    npm run build
+RUN npm run build
 
 FROM node:20-slim
 
-RUN npm install -g pm2
+WORKDIR /app
+
+RUN npm install -g pm2 dotenv-cli
 
 COPY --from=builder-production /app/node_modules /app/node_modules
 COPY --link --chown=1000 package.json /app/package.json
 COPY --from=builder /app/build /app/build
 
-CMD pm2 start /app/build/index.js -i $CPU_CORES --no-daemon
+CMD dotenv -e .env -c -- pm2 start /app/build/index.js -i $CPU_CORES --no-daemon

@@ -1,11 +1,4 @@
-import {
-	HF_TOKEN,
-	HF_API_ROOT,
-	MODELS,
-	OLD_MODELS,
-	TASK_MODEL,
-	HF_ACCESS_TOKEN,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
@@ -73,7 +66,7 @@ const modelConfig = z.object({
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(MODELS));
+const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
@@ -92,8 +85,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		if (!m.endpoints) {
 			return endpointTgi({
 				type: "tgi",
-				url: `${HF_API_ROOT}/${m.name}`,
-				accessToken: HF_TOKEN ?? HF_ACCESS_TOKEN,
+				url: `${env.HF_API_ROOT}/${m.name}`,
+				accessToken: env.HF_TOKEN ?? env.HF_ACCESS_TOKEN,
 				weight: 1,
 				model: m,
 			});
@@ -136,7 +129,7 @@ export const models = await Promise.all(modelsRaw.map((e) => processModel(e).the
 export const defaultModel = models[0];
 
 // Models that have been deprecated
-export const oldModels = OLD_MODELS
+export const oldModels = env.OLD_MODELS
 	? z
 			.array(
 				z.object({
@@ -145,7 +138,7 @@ export const oldModels = OLD_MODELS
 					displayName: z.string().min(1).optional(),
 				})
 			)
-			.parse(JSON5.parse(OLD_MODELS))
+			.parse(JSON5.parse(env.OLD_MODELS))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
@@ -156,9 +149,9 @@ export const validateModel = (_models: BackendModel[]) => {
 
 // if `TASK_MODEL` is string & name of a model in `MODELS`, then we use `MODELS[TASK_MODEL]`, else we try to parse `TASK_MODEL` as a model config itself
 
-export const smallModel = TASK_MODEL
-	? (models.find((m) => m.name === TASK_MODEL) ||
-			(await processModel(modelConfig.parse(JSON5.parse(TASK_MODEL))).then((m) =>
+export const smallModel = env.TASK_MODEL
+	? (models.find((m) => m.name === env.TASK_MODEL) ||
+			(await processModel(modelConfig.parse(JSON5.parse(env.TASK_MODEL))).then((m) =>
 				addEndpoint(m)
 			))) ??
 	  defaultModel

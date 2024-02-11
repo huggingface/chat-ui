@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import { getOIDCAuthorizationUrl } from "$lib/server/auth";
 import { base } from "$app/paths";
-import { ALTERNATIVE_REDIRECT_URLS } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 export const actions = {
 	async default({ url, locals, request }) {
@@ -12,7 +12,7 @@ export const actions = {
 
 		if (url.searchParams.has("callback")) {
 			const callback = url.searchParams.get("callback") || redirectURI;
-			if (ALTERNATIVE_REDIRECT_URLS.includes(callback)) {
+			if (env.ALTERNATIVE_REDIRECT_URLS.includes(callback)) {
 				redirectURI = callback;
 			}
 		}

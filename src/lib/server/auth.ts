@@ -1,15 +1,6 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
 import { addHours, addWeeks } from "date-fns";
-import {
-	COOKIE_NAME,
-	OPENID_CLIENT_ID,
-	OPENID_CLIENT_SECRET,
-	OPENID_PROVIDER_URL,
-	OPENID_SCOPES,
-	OPENID_TOLERANCE,
-	OPENID_RESOURCE,
-	OPENID_CONFIG,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
@@ -34,19 +25,19 @@ const stringWithDefault = (value: string) =>
 
 const OIDConfig = z
 	.object({
-		CLIENT_ID: stringWithDefault(OPENID_CLIENT_ID),
-		CLIENT_SECRET: stringWithDefault(OPENID_CLIENT_SECRET),
-		PROVIDER_URL: stringWithDefault(OPENID_PROVIDER_URL),
-		SCOPES: stringWithDefault(OPENID_SCOPES),
-		TOLERANCE: stringWithDefault(OPENID_TOLERANCE),
-		RESOURCE: stringWithDefault(OPENID_RESOURCE),
+		CLIENT_ID: stringWithDefault(env.OPENID_CLIENT_ID),
+		CLIENT_SECRET: stringWithDefault(env.OPENID_CLIENT_SECRET),
+		PROVIDER_URL: stringWithDefault(env.OPENID_PROVIDER_URL),
+		SCOPES: stringWithDefault(env.OPENID_SCOPES),
+		TOLERANCE: stringWithDefault(env.OPENID_TOLERANCE),
+		RESOURCE: stringWithDefault(env.OPENID_RESOURCE),
 	})
-	.parse(JSON5.parse(OPENID_CONFIG));
+	.parse(JSON5.parse(env.OPENID_CONFIG));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
-	cookies.set(COOKIE_NAME, sessionId, {
+	cookies.set(env.COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
 		sameSite: dev ? "lax" : "none",
