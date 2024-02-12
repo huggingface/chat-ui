@@ -274,6 +274,7 @@
 								messages = [...messages];
 							} else if (update.type === "webSearch") {
 								messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+								messages = [...messages];
 							} else if (update.type === "status") {
 								if (update.status === "title" && update.message) {
 									const convInData = data.conversations.find(({ id }) => id === $page.params.id);
