@@ -262,13 +262,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
-			const updates: MessageUpdate[] = isContinue
-				? conv.messages.find((msg) => messageId == msg.id)?.updates ?? []
-				: [];
-
+			messageToWriteTo.updates ??= [];
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
-					updates.push(newUpdate);
+					messageToWriteTo?.updates?.push(newUpdate);
 				}
 
 				if (newUpdate.type === "stream" && newUpdate.token === "") {
@@ -363,7 +360,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 						messageToWriteTo.content = previousText + text;
 						messageToWriteTo.updatedAt = new Date();
-						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), ...updates];
 					}
 				}
 			} catch (e) {

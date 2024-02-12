@@ -12,7 +12,7 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { createLeafConversationTree } from "$lib/stores/leafConversationTree.js";
@@ -23,8 +23,6 @@
 
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
-
-	let webSearchMessages: WebSearchUpdate[] = [];
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -271,7 +269,7 @@
 								messageToWriteTo.content += update.token;
 								messages = [...messages];
 							} else if (update.type === "webSearch") {
-								webSearchMessages = [...webSearchMessages, update];
+								messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 							} else if (update.type === "status") {
 								if (update.status === "title" && update.message) {
 									const convInData = data.conversations.find(({ id }) => id === $page.params.id);
@@ -302,7 +300,6 @@
 				});
 			}
 
-			webSearchMessages = [];
 			messageToWriteTo.updates = messageUpdates;
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
@@ -435,7 +432,6 @@
 	{messages}
 	shared={data.shared}
 	preprompt={data.preprompt}
-	bind:webSearchMessages
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}

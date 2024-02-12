@@ -54,7 +54,7 @@
 	export let readOnly = false;
 	export let isTapped = false;
 
-	export let webSearchMessages: WebSearchUpdate[];
+	$: message = messages.find((m) => m.id === id) ?? ({} as Message);
 
 	const dispatch = createEventDispatcher<{
 		retry: { content?: string; id: Message["id"] };
@@ -111,11 +111,8 @@
 		}
 	});
 
-	let searchUpdates: WebSearchUpdate[] = [];
-
-	$: searchUpdates = ((webSearchMessages.length > 0
-		? webSearchMessages
-		: message.updates?.filter(({ type }) => type === "webSearch")) ?? []) as WebSearchUpdate[];
+	$: searchUpdates = (message.updates?.filter(({ type }) => type === "webSearch") ??
+		[]) as WebSearchUpdate[];
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
@@ -145,8 +142,6 @@
 			editContentEl?.focus();
 		}
 	}
-
-	$: message = messages.find((m) => m.id === id) ?? ({} as Message);
 
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
@@ -182,13 +177,13 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if isLast && searchUpdates && searchUpdates.length > 0}
+			{#if searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
 					webSearchMessages={searchUpdates}
 				/>
 			{/if}
-			{#if !message.content && (webSearchIsDone || (webSearchMessages && webSearchMessages.length === 0))}
+			{#if !message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0))}
 				<IconLoading />
 			{/if}
 
@@ -388,7 +383,6 @@
 
 	<svelte:self
 		{loading}
-		{webSearchMessages}
 		{messages}
 		{isAuthor}
 		{readOnly}

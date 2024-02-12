@@ -16,7 +16,6 @@
 	import type { Model } from "$lib/types/Model";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { page } from "$app/stores";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
@@ -42,7 +41,6 @@
 	export let currentModel: Model;
 	export let models: Model[];
 	export let assistant: Assistant | undefined = undefined;
-	export let webSearchMessages: WebSearchUpdate[] = [];
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
 
@@ -132,7 +130,7 @@
 	{/if}
 	<div
 		class="scrollbar-custom mr-1 h-full overflow-y-auto"
-		use:snapScrollToBottom={messages.length ? [...messages, ...webSearchMessages] : false}
+		use:snapScrollToBottom={messages.length ? [...messages] : false}
 		bind:this={chatContainer}
 	>
 		<div class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl">
@@ -166,7 +164,6 @@
 				<div class="flex h-max flex-col gap-6 pb-44">
 					<ChatMessage
 						{loading}
-						{webSearchMessages}
 						{messages}
 						id={messages[0].id}
 						isAuthor={!shared}
@@ -189,7 +186,6 @@
 						},
 					]}
 					id={"0-0-0-0-0"}
-					{webSearchMessages}
 					isAuthor={!shared}
 					readOnly={isReadOnly}
 					model={currentModel}
