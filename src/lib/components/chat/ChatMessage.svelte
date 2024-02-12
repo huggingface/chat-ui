@@ -66,6 +66,8 @@
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 	let isCopied = false;
 
+	let initialized = false;
+
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
@@ -149,9 +151,16 @@
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
 	$: childrenToRender = 0;
+	$: nChildren = message?.children?.length ?? 0;
 
-	$: id, (childrenToRender = 0);
-
+	$: {
+		if (initialized) {
+			childrenToRender = Math.max(0, nChildren - 1);
+		} else {
+			childrenToRender = 0;
+			initialized = true;
+		}
+	}
 	const leafId = useLeafConversationTree();
 
 	$: if (message.children?.length === 0) $leafId = message.id;
@@ -375,7 +384,7 @@
 {/if}
 <slot name="childrenNav" />
 
-{#if message?.children?.length ?? 0 > 0}
+{#if nChildren > 0}
 	<svelte:self
 		{loading}
 		{messages}
@@ -388,7 +397,7 @@
 		on:continue
 	>
 		<svelte:fragment slot="childrenNav">
-			{#if message.children && message.children.length > 1}
+			{#if nChildren > 1}
 				<div class="font-white z-10 -mt-5 ml-8 mr-auto flex flex-row justify-center gap-1 text-sm">
 					<button
 						class="inline text-lg font-thin text-gray-400 dark:text-gray-300"
@@ -398,7 +407,7 @@
 						{"<"}
 					</button>
 					<span class="my-auto inline text-gray-400 dark:text-gray-300">
-						{childrenToRender + 1} / {message.children.length}
+						{childrenToRender + 1} / {nChildren}
 					</span>
 					<button
 						class="inline text-lg font-thin text-gray-400 dark:text-gray-300"
@@ -407,7 +416,7 @@
 								message?.children?.length ?? 1 - 1,
 								childrenToRender + 1
 							))}
-						disabled={childrenToRender === message.children.length - 1}
+						disabled={childrenToRender === nChildren - 1}
 					>
 						{">"}
 					</button>
