@@ -94,12 +94,15 @@
 
 	$: tokens = marked.lexer(sanitizeMd(message.content));
 
+	$: emptyLoad =
+		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
+
 	afterUpdate(() => {
 		loadingEl?.$destroy();
 		clearTimeout(pendingTimeout);
 
 		// Add loading animation to the last message if update takes more than 600ms
-		if (loading && isLast) {
+		if ((loading && isLast) || emptyLoad) {
 			pendingTimeout = setTimeout(() => {
 				if (contentEl) {
 					loadingEl = new IconLoading({
@@ -182,9 +185,6 @@
 					classNames={tokens.length ? "mb-3.5" : ""}
 					webSearchMessages={searchUpdates}
 				/>
-			{/if}
-			{#if !message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0))}
-				<IconLoading />
 			{/if}
 
 			<div
