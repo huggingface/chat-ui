@@ -167,6 +167,10 @@
 					messageId
 				);
 
+				if (!data.rootMessageId) {
+					data.rootMessageId = newUserMessageId;
+				}
+
 				messageToWriteToId = addChildren(
 					{
 						messages,
