@@ -1,25 +1,16 @@
-import {
-	USE_LOCAL_SEARXNG_URL,
-    SEARXNG_CATEGORIES,
-	SEARXNG_ENGINES,
-} from "$env/static/private";
+import { SEARXNG_QUERY_URL } from "$env/static/private";
 
 export async function searchSearxng(query: string) {
     const abortController = new AbortController();
     setTimeout(() => abortController.abort(), 10000);
 
-//Build query URL
-let url = `${USE_LOCAL_SEARXNG_URL}/search?q=` +  query;
+    // Insert the query into the URL template
+    let url = SEARXNG_QUERY_URL.replace("<query>", query);
 
-if (SEARXNG_CATEGORIES) {
-    url += `&categories=${SEARXNG_CATEGORIES}`;
-}
-
-if (SEARXNG_ENGINES) {
-    url += `&engines=${SEARXNG_ENGINES}`;
-}
-
-url += "&format=json";
+    // Check if "&format=json" already exists in the URL
+    if (!url.includes("&format=json")) {
+        url += "&format=json";
+    }
 
     // Call the URL to return JSON data
     const jsonResponse = await fetch(url, {
@@ -31,13 +22,13 @@ url += "&format=json";
         throw new Error("Failed to fetch or parse JSON");
     });
 
-    // Extract 'url' elements from the JSON response
-    const urls = jsonResponse.results.map(item => item.url);
+    // Extract 'url' elements from the JSON response and trim to the top 5 URLs
+    const urls = jsonResponse.results.slice(0, 5).map(item => item.url);
 
     if (!urls.length) {
         throw new Error(`Response doesn't contain any "url" elements`);
     }
 
-    // Map URLs to the correct object shape if needed
+    // Map URLs to the correct object shape
     return { organic_results: urls.map(link => ({ link })) };
 }

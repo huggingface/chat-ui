@@ -5,7 +5,7 @@ import {
 	SERPER_API_KEY,
 	SERPSTACK_API_KEY,
 	USE_LOCAL_WEBSEARCH,
-	USE_LOCAL_SEARXNG_URL,
+	SEARXNG_QUERY_URL,
 	YDC_API_KEY,
 } from "$env/static/private";
 import { getJson } from "serpapi";
@@ -23,7 +23,7 @@ export async function searchWeb(query: string) {
 	if (USE_LOCAL_WEBSEARCH) {
 		return await searchWebLocal(query);
 	}
-	if (USE_LOCAL_SEARXNG_URL) {
+	if (SEARXNG_QUERY_URL) {
 		return await searchSearxng(query);
 	}
 	if (SERPER_API_KEY) {

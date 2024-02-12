@@ -12,7 +12,7 @@ import {
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
-	USE_LOCAL_SEARXNG_URL,
+	SEARXNG_QUERY_URL,
 	ENABLE_ASSISTANTS,
 } from "$env/static/private";
 import { ObjectId } from "mongodb";
@@ -128,7 +128,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				SERPSTACK_API_KEY ||
 				YDC_API_KEY ||
 				USE_LOCAL_WEBSEARCH ||
-				USE_LOCAL_SEARXNG_URL
+				SEARXNG_QUERY_URL
 			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
