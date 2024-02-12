@@ -15,7 +15,13 @@ import { searchSearxng } from "./searchSearxng";
 
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
-	return YDC_API_KEY ? WebSearchProvider.YOU : WebSearchProvider.GOOGLE;
+    if (YDC_API_KEY) {
+        return WebSearchProvider.YOU;
+    } else if (SEARXNG_QUERY_URL) {
+        return WebSearchProvider.SEARXNG;
+    } else {
+        return WebSearchProvider.GOOGLE;
+    }
 }
 
 // Show result as JSON
