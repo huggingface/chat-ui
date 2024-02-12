@@ -151,7 +151,8 @@
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
 	$: childrenToRender = 0;
-	$: message.id, (childrenToRender = 0);
+
+	$: id, (childrenToRender = 0);
 
 	const leafId = useLeafConversationTree();
 
