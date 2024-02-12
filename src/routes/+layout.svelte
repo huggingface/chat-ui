@@ -157,7 +157,7 @@
 		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/manifest.json"
 	/>
 
-	{#if PUBLIC_PLAUSIBLE_SCRIPT_URL}
+	{#if PUBLIC_PLAUSIBLE_SCRIPT_URL && PUBLIC_ORIGIN}
 		<script
 			defer
 			data-domain={new URL(PUBLIC_ORIGIN).hostname}
