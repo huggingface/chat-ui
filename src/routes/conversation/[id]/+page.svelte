@@ -397,6 +397,19 @@
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
 			writeMessage({ messageId: event.detail.id, isContinue: true });
+		} else {
+			await convFromShared()
+				.then(async (convId) => {
+					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+				})
+				.then(
+					async () =>
+						await writeMessage({
+							messageId: event.detail.id,
+							isContinue: true,
+						})
+				)
+				.finally(() => (loading = false));
 		}
 	}
 
