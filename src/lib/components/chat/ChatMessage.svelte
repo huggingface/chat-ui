@@ -271,7 +271,12 @@
 	</div>
 {/if}
 {#if message.from === "user"}
-	<div class="group relative flex w-full items-start justify-start gap-4 max-sm:text-sm">
+	<div
+		class="group relative flex w-full items-start justify-start gap-4 max-sm:text-sm"
+		role="presentation"
+		on:click={() => (isTapped = !isTapped)}
+		on:keydown={() => (isTapped = !isTapped)}
+	>
 		<div class="flex w-full flex-col">
 			{#if message.files && message.files.length > 0}
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
@@ -331,7 +336,14 @@
 					</div>
 				{/if}
 				{#if !loading && !editMode}
-					<div class="absolute right-0 top-3.5 z-10 h-max">
+					<div
+						class="
+						max-md:opacity-0' invisible absolute
+						right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
+						isCopied
+							? 'max-md:visible max-md:translate-y-0 max-md:opacity-100'
+							: ''}"
+					>
 						<div class="mx-auto flex flex-row flex-nowrap gap-2">
 							{#if downloadLink}
 								<a
@@ -361,26 +373,9 @@
 		</div>
 	</div>
 {/if}
+<slot name="childrenNav" />
 
 {#if message?.children?.length ?? 0 > 0}
-	<!-- <div class="mx-5 mt-5 w-full border-b-2 border-b-gray-200 dark:border-b-gray-800" /> -->
-	<!-- show one button for each children that sets childrenToRender-->
-	{#if message.children && message.children.length > 1}
-		<div class="mt-2 flex justify-center gap-2">
-			{#each message.children as _, i}
-				<button
-					class="btn rounded-lg p-2 text-sm transition-none focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
-					 {childrenToRender === i
-						? 'bg-gray-200 text-gray-500 dark:bg-gray-500 dark:text-gray-400'
-						: 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-300'}"
-					on:click={() => (childrenToRender = i)}
-				>
-					{i + 1}
-				</button>
-			{/each}
-		</div>
-	{/if}
-
 	<svelte:self
 		{loading}
 		{messages}
@@ -391,5 +386,33 @@
 		on:retry
 		on:vote
 		on:continue
-	/>
+	>
+		<svelte:fragment slot="childrenNav">
+			{#if message.children && message.children.length > 1}
+				<div class="font-white z-10 -mt-5 ml-8 mr-auto flex flex-row justify-center gap-1 text-sm">
+					<button
+						class="inline text-lg font-thin text-gray-400 dark:text-gray-300"
+						on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
+						disabled={childrenToRender === 0}
+					>
+						{"<"}
+					</button>
+					<span class="my-auto inline text-gray-400 dark:text-gray-300">
+						{childrenToRender + 1} / {message.children.length}
+					</span>
+					<button
+						class="inline text-lg font-thin text-gray-400 dark:text-gray-300"
+						on:click={() =>
+							(childrenToRender = Math.min(
+								message?.children?.length ?? 1 - 1,
+								childrenToRender + 1
+							))}
+						disabled={childrenToRender === message.children.length - 1}
+					>
+						{">"}
+					</button>
+				</div>
+			{/if}
+		</svelte:fragment>
+	</svelte:self>
 {/if}
