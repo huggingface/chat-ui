@@ -168,7 +168,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-8 flex items-start justify-start gap-4 pb-8 leading-relaxed"
+		class="group relative -mb-6 flex items-start justify-start gap-4 pb-4 leading-relaxed"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
@@ -209,6 +209,7 @@
 					{/if}
 				{/each}
 			</div>
+
 			<!-- Web Search sources -->
 			{#if webSearchSources?.length}
 				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
@@ -278,10 +279,11 @@
 			</div>
 		{/if}
 	</div>
+	<slot name="childrenNav" />
 {/if}
 {#if message.from === "user"}
 	<div
-		class="group relative flex w-full items-start justify-start gap-4 max-sm:text-sm"
+		class="group relative w-full items-start justify-start gap-4 max-sm:text-sm"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
@@ -379,10 +381,10 @@
 					</div>
 				{/if}
 			</div>
+			<slot name="childrenNav" />
 		</div>
 	</div>
 {/if}
-<slot name="childrenNav" />
 
 {#if nChildren > 0}
 	<svelte:self
@@ -398,19 +400,21 @@
 	>
 		<svelte:fragment slot="childrenNav">
 			{#if nChildren > 1}
-				<div class="font-white z-10 -mt-5 ml-8 mr-auto flex flex-row justify-center gap-1 text-sm">
+				<div
+					class="font-white z-10 -mt-3 ml-8 mr-auto flex w-fit flex-row justify-center gap-1 text-sm text-gray-400 dark:text-gray-500"
+				>
 					<button
-						class="inline text-lg font-thin text-gray-400 dark:text-gray-300"
+						class="inline text-lg font-thin"
 						on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
 						disabled={childrenToRender === 0}
 					>
 						{"<"}
 					</button>
-					<span class="my-auto inline text-gray-400 dark:text-gray-300">
+					<span class="my-auto inline">
 						{childrenToRender + 1} / {nChildren}
 					</span>
 					<button
-						class="inline text-lg font-thin text-gray-400 dark:text-gray-300"
+						class="inline text-lg font-thin"
 						on:click={() =>
 							(childrenToRender = Math.min(
 								message?.children?.length ?? 1 - 1,
