@@ -28,7 +28,7 @@ export async function updateUser(params: {
 		.object({
 			preferred_username: z.string().optional(),
 			name: z.string(),
-			picture: z.string(),
+			picture: z.string().optional(),
 			sub: z.string(),
 			email: z.string().email().optional(),
 		})
