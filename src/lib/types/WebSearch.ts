@@ -42,5 +42,5 @@ interface YouSearchHit {
 export enum WebSearchProvider {
 	GOOGLE = "Google",
 	YOU = "You.com",
-	SEARXNG = "SearXNG"
+	SEARXNG = "SearXNG",
 }
