@@ -53,7 +53,7 @@ export const actions: Actions = {
 
 		throw redirect(302, `${base}/settings`);
 	},
-	report: async ({ params, locals, url }) => {
+	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
 			assistantId: new ObjectId(params.assistantId),
@@ -64,12 +64,19 @@ export const actions: Actions = {
 			return fail(400, { error: true, message: "Already reported" });
 		}
 
+		const reason = (await request.formData()).get("reportReason"); // get the reportReason and validate it
+
+		if (!reason || typeof reason !== "string" || reason.length > 128 || reason.length < 1) {
+			return fail(400, { error: true, message: "Invalid report reason" });
+		}
+
 		const { acknowledged } = await collections.reports.insertOne({
 			_id: new ObjectId(),
 			assistantId: new ObjectId(params.assistantId),
 			createdBy: locals.user?._id ?? locals.sessionId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
+			reason,
 		});
 
 		if (!acknowledged) {
@@ -91,7 +98,7 @@ export const actions: Actions = {
 					"Content-type": "application/json",
 				},
 				body: JSON.stringify({
-					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>`,
+					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>. The following reason was given \n\n> ${reason}`,
 				}),
 			});
 
