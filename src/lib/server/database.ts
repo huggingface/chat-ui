@@ -67,8 +67,11 @@ client.on("open", () => {
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
 	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	settings.createIndex({ assistants: 1 }).catch(console.error);
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
+	users.createIndex({ username: 1 }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
 	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
