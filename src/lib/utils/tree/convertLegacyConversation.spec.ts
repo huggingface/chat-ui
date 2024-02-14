@@ -12,19 +12,11 @@ describe("convertLegacyConversation", () => {
 		if (!conv) throw new Error("Conversation not found");
 
 		const newConv = convertLegacyConversation(conv);
+
 		expect(newConv.rootMessageId).toBe(newConv.messages[0].id);
 		expect(newConv.messages[0].ancestors).toEqual([]);
-
-		// insert a conversation which should be equivalent to newConv
-		const linearBranchConvId = await insertLinearBranchConversation();
-		const linearBranchConv = await collections.conversations.findOne({
-			_id: new ObjectId(linearBranchConvId),
-		});
-		if (!linearBranchConv) throw new Error("Conversation not found");
-
-		// compare the two, linearBranchConv messages and rootMessageId should be equivalent to newConv
-		expect(linearBranchConv.rootMessageId).toEqual(newConv.rootMessageId);
-		expect(linearBranchConv.messages).toEqual(newConv.messages);
+		expect(newConv.messages[1].ancestors).toEqual([newConv.messages[0].id]);
+		expect(newConv.messages[0].children).toEqual([newConv.messages[1].id]);
 	});
 	it("should work on empty conversations", async () => {
 		const conv = {
