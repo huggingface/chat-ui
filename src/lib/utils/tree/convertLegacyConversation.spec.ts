@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
 
 import { convertLegacyConversation } from "./convertLegacyConversation";
-import { insertLegacyConversation, insertLinearBranchConversation } from "./treeHelpers.spec";
+import { insertLegacyConversation } from "./treeHelpers.spec";
 
 describe("convertLegacyConversation", () => {
 	it("should convert a legacy conversation", async () => {
