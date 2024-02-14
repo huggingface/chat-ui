@@ -59,17 +59,19 @@ export async function endpointOai(
 		};
 	} else if (completion === "chat_completions") {
 		return async ({ messages, preprompt }) => {
-			const messagesOpenAI = messages.map((message) => ({
+			let messagesOpenAI = messages.map((message) => ({
 				role: message.from,
 				content: message.content,
 			}));
 
+			if (messagesOpenAI?.[0]?.role !== "system") {
+				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
+			}
+
 			return openAIChatToTextGenerationStream(
 				await openai.chat.completions.create({
 					model: model.id ?? model.name,
-					messages: preprompt
-						? [{ role: "system", content: preprompt }, ...messagesOpenAI]
-						: messagesOpenAI,
+					messages: messagesOpenAI,
 					stream: true,
 					max_tokens: model.parameters?.max_new_tokens,
 					stop: model.parameters?.stop,

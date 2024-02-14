@@ -282,10 +282,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			update({ type: "status", status: "started" });
 
 			const summarizeIfNeeded = (async () => {
-				if (conv.title === "New Chat" && conv.messages.length === 2) {
+				if (conv.title === "New Chat" && conv.messages.length === 3) {
 					try {
-						conv.title = (await summarize(conv.messages[0].content)) ?? conv.title;
+						conv.title = (await summarize(conv.messages[1].content)) ?? conv.title;
 						update({ type: "status", status: "title", message: conv.title });
+						await collections.conversations.updateOne(
+							{
+								_id: convId,
+							},
+							{
+								$set: {
+									title: conv?.title,
+									updatedAt: new Date(),
+								},
+							}
+						);
 					} catch (e) {
 						console.error(e);
 					}

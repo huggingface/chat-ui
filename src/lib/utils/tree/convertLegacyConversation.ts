@@ -1,11 +1,21 @@
 import type { Conversation } from "$lib/types/Conversation";
+import type { Message } from "$lib/types/Message";
 
 export function convertLegacyConversation(
-	conv: Pick<Conversation, "messages" | "rootMessageId">
-): Pick<Conversation, "messages" | "rootMessageId"> {
+	conv: Pick<Conversation, "messages" | "rootMessageId" | "preprompt">
+): Pick<Conversation, "messages" | "rootMessageId" | "preprompt"> {
 	if (conv.rootMessageId) return conv; // not a legacy conversation
 	if (conv.messages.length === 0) return conv; // empty conversation
-	const messages = conv.messages;
+	const messages = [
+		{
+			from: "system",
+			content: conv.preprompt ?? "",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			id: crypto.randomUUID(),
+		} satisfies Message,
+		...conv.messages,
+	];
 
 	const rootMessageId = messages[0].id;
 
