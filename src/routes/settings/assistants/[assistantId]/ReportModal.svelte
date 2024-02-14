@@ -36,7 +36,7 @@
 			bind:value={reason}
 		/>
 
-		<div class="flex w-full flex-row justify-between pt-4">
+		<div class="flex w-full flex-row justify-between px-2 pt-4">
 			<button
 				type="button"
 				class="text-sm text-gray-700 hover:underline"
@@ -45,10 +45,10 @@
 
 			<button
 				type="submit"
-				class="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white md:px-20"
+				class="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white md:px-8"
 				disabled={!reason}
-				class:bg-gray-400={!reason}
-				class:!text-gray-200={!reason}
+				class:bg-gray-200={!reason}
+				class:!text-gray-400={!reason}
 			>
 				Submit report
 			</button>
