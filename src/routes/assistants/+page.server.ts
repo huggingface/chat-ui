@@ -26,7 +26,7 @@ export const load = async ({ url, locals }) => {
 
 	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
 	const filter: Filter<Assistant> = {
-		modelId: modelId ?? { $exists: true },
+		...(modelId && { modelId }),
 		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
 		...(createdByName ? { createdByName } : { featured: true }),
 	};
