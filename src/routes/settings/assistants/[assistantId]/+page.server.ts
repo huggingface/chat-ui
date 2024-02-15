@@ -5,7 +5,7 @@ import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
 import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
-
+import { z } from "zod";
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
@@ -64,9 +64,10 @@ export const actions: Actions = {
 			return fail(400, { error: true, message: "Already reported" });
 		}
 
-		const reason = (await request.formData()).get("reportReason"); // get the reportReason and validate it
+		const formData = await request.formData();
+		const result = z.string().min(1).max(128).safeParse(formData?.get("reportReason"));
 
-		if (!reason || typeof reason !== "string" || reason.length > 128 || reason.length < 1) {
+		if (!result.success) {
 			return fail(400, { error: true, message: "Invalid report reason" });
 		}
 
@@ -76,7 +77,7 @@ export const actions: Actions = {
 			createdBy: locals.user?._id ?? locals.sessionId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			reason,
+			reason: result.data,
 		});
 
 		if (!acknowledged) {
@@ -98,7 +99,7 @@ export const actions: Actions = {
 					"Content-type": "application/json",
 				},
 				body: JSON.stringify({
-					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>. The following reason was given \n\n> ${reason}`,
+					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>. The following reason was given \n\n> ${result.data}`,
 				}),
 			});
 
