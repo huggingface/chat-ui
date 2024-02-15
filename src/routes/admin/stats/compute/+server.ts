@@ -90,7 +90,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 								$group: {
 									_id: {
 										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
-										sessionId: "$userId",
+										sessionId: "$sessionId",
 									},
 								},
 							},
