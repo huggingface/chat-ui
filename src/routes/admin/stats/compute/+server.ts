@@ -24,6 +24,8 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 
 	const minDay = lastComputed ? lastComputed.date.day : new Date(0);
 
+	console.log("Computing stats for", params.dateField, "from", minDay);
+
 	await collections.conversationStats
 		.aggregate([
 			{
@@ -168,4 +170,6 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 			},
 		])
 		.next();
+
+	console.log("Computed stats for", params.dateField);
 }
