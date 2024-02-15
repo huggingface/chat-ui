@@ -18,9 +18,12 @@ export const load = async ({ url, locals }) => {
 	const username = url.searchParams.get("user");
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
-	let user: User | null = null;
+	let user: Pick<User, "_id"> | null = null;
 	if (username) {
-		user = await collections.users.findOne({ username }, { projection: { _id: 1 } });
+		user = await collections.users.findOne<Pick<User, "_id">>(
+			{ username },
+			{ projection: { _id: 1 } }
+		);
 		if (!user) {
 			throw error(404, `User "${username}" doesn't exist`);
 		}
