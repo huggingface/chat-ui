@@ -116,6 +116,12 @@
 		}
 	});
 
+	function handleKeyDown(e: KeyboardEvent) {
+		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+			editFormEl.requestSubmit();
+		}
+	}
+
 	$: searchUpdates = (message.updates?.filter(({ type }) => type === "webSearch") ??
 		[]) as WebSearchUpdate[];
 
@@ -139,6 +145,7 @@
 
 	let editMode = false;
 	let editContentEl: HTMLTextAreaElement;
+	let editFormEl: HTMLFormElement;
 
 	$: if (editMode) {
 		tick();
@@ -319,23 +326,29 @@
 						{message.content.trim()}
 					</p>
 				{:else}
-					<div class="flex w-full flex-col">
+					<form
+						class="flex w-full flex-col"
+						bind:this={editFormEl}
+						on:submit={() => {
+							dispatch("retry", { content: editContentEl.value, id: message.id });
+							editMode = false;
+						}}
+					>
 						<textarea
 							class="w-full whitespace-break-spaces break-words rounded-lg bg-gray-800 bg-inherit px-5 py-3.5 text-gray-500 *:h-max dark:text-gray-400"
 							bind:this={editContentEl}
 							value={message.content.trim()}
+							on:keydown={handleKeyDown}
 						/>
 						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
+								type="submit"
 								class="btn rounded-lg bg-gray-200 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
-								on:click={() => {
-									dispatch("retry", { content: editContentEl.value, id: message.id });
-									editMode = false;
-								}}
 							>
 								Submit
 							</button>
 							<button
+								type="button"
 								class="btn rounded-sm p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
 								on:click={() => {
 									editMode = false;
@@ -344,7 +357,7 @@
 								Cancel
 							</button>
 						</div>
-					</div>
+					</form>
 				{/if}
 				{#if !loading && !editMode}
 					<div
