@@ -25,8 +25,10 @@ export const connectPromise = client.connect().catch(console.error);
 
 const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
+export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
+
 const conversations = db.collection<Conversation>("conversations");
-const conversationStats = db.collection<ConversationStats>("conversations.stats");
+const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
 const assistants = db.collection<Assistant>("assistants");
 const reports = db.collection<Report>("reports");
 const sharedConversations = db.collection<SharedConversation>("sharedConversations");

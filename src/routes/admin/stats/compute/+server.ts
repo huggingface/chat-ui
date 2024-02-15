@@ -1,7 +1,7 @@
 import { ADMIN_API_SECRET } from "$env/static/private";
 import { error, json } from "@sveltejs/kit";
 import type { ConversationStats } from "$lib/types/ConversationStats";
-import { collections } from "$lib/server/database.js";
+import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database.js";
 
 export async function POST({ request }) {
 	const authorization = request.headers.get("Authorization");
@@ -161,7 +161,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 			},
 			{
 				$merge: {
-					into: "conversationStats",
+					into: CONVERSATION_STATS_COLLECTION,
 					whenMatched: "replace",
 					whenNotMatched: "insert",
 				},
