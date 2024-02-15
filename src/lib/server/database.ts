@@ -80,8 +80,8 @@ client.on("open", () => {
 	conversationStats
 		.createIndex(
 			{
-				"date.day": 1,
 				"date.field": 1,
+				"date.day": 1,
 				distinct: 1,
 			},
 			{ unique: true }
