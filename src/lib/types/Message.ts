@@ -3,7 +3,7 @@ import type { Timestamps } from "./Timestamps";
 import type { WebSearch } from "./WebSearch";
 
 export type Message = Partial<Timestamps> & {
-	from: "user" | "assistant";
+	from: "user" | "assistant" | "system";
 	id: ReturnType<typeof crypto.randomUUID>;
 	content: string;
 	updates?: MessageUpdate[];
@@ -12,4 +12,10 @@ export type Message = Partial<Timestamps> & {
 	score?: -1 | 0 | 1;
 	files?: string[]; // can contain either the hash of the file or the b64 encoded image data on the client side when uploading
 	interrupted?: boolean;
+
+	// needed for conversation trees
+	ancestors?: Message["id"][];
+
+	// goes one level deep
+	children?: Message["id"][];
 };

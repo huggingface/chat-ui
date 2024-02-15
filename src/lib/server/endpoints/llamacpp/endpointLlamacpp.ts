@@ -19,11 +19,11 @@ export function endpointLlamacpp(
 	input: z.input<typeof endpointLlamacppParametersSchema>
 ): Endpoint {
 	const { url, model } = endpointLlamacppParametersSchema.parse(input);
-	return async ({ conversation }) => {
+	return async ({ messages, preprompt, continueMessage }) => {
 		const prompt = await buildPrompt({
-			messages: conversation.messages,
-			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-			preprompt: conversation.preprompt,
+			messages,
+			continueMessage,
+			preprompt,
 			model,
 		});
 
