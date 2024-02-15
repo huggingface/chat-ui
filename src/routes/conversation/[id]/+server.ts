@@ -177,6 +177,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
 			throw error(400, "Can only continue the last message");
 		}
+		messageToWriteToId = messageId;
+		messagesForPrompt = buildSubtree(conv, messageId);
 	} else if (isRetry && messageId) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message
