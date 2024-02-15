@@ -337,15 +337,16 @@
 						}}
 					>
 						<textarea
-							class="w-full whitespace-break-spaces break-words rounded-lg bg-gray-800 bg-inherit px-5 py-3.5 text-gray-500 *:h-max dark:text-gray-400"
+							class="w-full whitespace-break-spaces break-words rounded-lg bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max dark:bg-gray-800 dark:text-gray-400"
 							bind:this={editContentEl}
 							value={message.content.trim()}
 							on:keydown={handleKeyDown}
+							required
 						/>
 						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
 								type="submit"
-								class="btn rounded-lg bg-gray-200 p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+								class="btn rounded-lg bg-gray-200 px-3 py-1.5 text-sm text-gray-600 focus:ring-0 hover:text-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200"
 							>
 								Submit
 							</button>
@@ -423,9 +424,9 @@
 						on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
 						disabled={childrenToRender === 0}
 					>
-						<CarbonChevronLeft />
+						<CarbonChevronLeft class="text-sm" />
 					</button>
-					<span class="my-auto inline text-gray-400 dark:text-gray-500">
+					<span class=" text-gray-400 dark:text-gray-500">
 						{childrenToRender + 1} / {nChildren}
 					</span>
 					<button
@@ -437,7 +438,7 @@
 							))}
 						disabled={childrenToRender === nChildren - 1}
 					>
-						<CarbonChevronRight />
+						<CarbonChevronRight class="text-sm" />
 					</button>
 				</div>
 			{/if}
