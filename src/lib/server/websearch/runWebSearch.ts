@@ -1,22 +1,23 @@
 import { searchWeb } from "$lib/server/websearch/searchWeb";
-import type { Message } from "$lib/types/Message";
-import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
-import type { Conversation } from "$lib/types/Conversation";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
+import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
+
+import type { Conversation } from "$lib/types/Conversation";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import type { Message } from "$lib/types/Message";
+import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import type { Assistant } from "$lib/types/Assistant";
+
+import { z } from "zod";
+import JSON5 from "json5";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
-
-import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
-import { z } from "zod";
-import JSON5 from "json5";
-import type { Assistant } from "$lib/types/Assistant";
 
 const listSchema = z.array(z.string()).default([]);
 
