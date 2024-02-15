@@ -31,7 +31,7 @@
 		<input
 			name="reportReason"
 			class="mt-6 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-smd"
-			placeholder="This assistant should be reported because..."
+			placeholder="Reason(s) for the report"
 			maxlength="128"
 			bind:value={reason}
 		/>
