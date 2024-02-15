@@ -9,6 +9,7 @@ import type { MessageEvent } from "$lib/types/MessageEvent";
 import type { Session } from "$lib/types/Session";
 import type { Assistant } from "$lib/types/Assistant";
 import type { Report } from "$lib/types/Report";
+import type { ConversationStats } from "$lib/types/ConversationStats";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -25,6 +26,7 @@ export const connectPromise = client.connect().catch(console.error);
 const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
 const conversations = db.collection<Conversation>("conversations");
+const conversationStats = db.collection<ConversationStats>("conversations.stats");
 const assistants = db.collection<Assistant>("assistants");
 const reports = db.collection<Report>("reports");
 const sharedConversations = db.collection<SharedConversation>("sharedConversations");
@@ -38,6 +40,7 @@ const bucket = new GridFSBucket(db, { bucketName: "files" });
 export { client, db };
 export const collections = {
 	conversations,
+	conversationStats,
 	assistants,
 	reports,
 	sharedConversations,
@@ -66,6 +69,20 @@ client.on("open", () => {
 		.createIndex(
 			{ "message.id": 1, "message.ancestors": 1 },
 			{ partialFilterExpression: { userId: { $exists: true } } }
+		)
+		.catch(console.error);
+	// To do stats on conversations
+	conversations.createIndex({ updatedAt: 1 }).catch(console.error);
+	// Not strictly necessary, could use _id, but more convenient. Also for stats
+	conversations.createIndex({ createdAt: 1 }).catch(console.error);
+	conversationStats
+		.createIndex(
+			{
+				"date.day": 1,
+				"date.field": 1,
+				distinct: 1,
+			},
+			{ unique: true }
 		)
 		.catch(console.error);
 	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);

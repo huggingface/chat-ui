@@ -21,7 +21,7 @@ export async function POST({ request }) {
 	}
 
 	if (request.headers.get("Authorization") !== `Bearer ${PARQUET_EXPORT_SECRET}`) {
-		throw error(403);
+		throw error(401, "Unauthorized");
 	}
 
 	const { model } = z
