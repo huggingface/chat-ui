@@ -2,6 +2,7 @@ import { base } from "$app/paths";
 import { ENABLE_ASSISTANTS } from "$env/static/private";
 import { collections } from "$lib/server/database.js";
 import type { Assistant } from "$lib/types/Assistant";
+import type { User } from "$lib/types/User";
 import { error, redirect } from "@sveltejs/kit";
 import type { Filter } from "mongodb";
 
@@ -14,13 +15,17 @@ export const load = async ({ url, locals }) => {
 
 	const modelId = url.searchParams.get("modelId");
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
-	const createdByName = url.searchParams.get("user");
-	const createdByCurrentUser = locals.user?.username && locals.user.username === createdByName;
+	const username = url.searchParams.get("user");
+	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
-	if (createdByName) {
-		const existingUser = await collections.users.findOne({ username: createdByName });
-		if (!existingUser) {
-			throw error(404, `User "${createdByName}" doesn't exist`);
+	let user: Pick<User, "_id"> | null = null;
+	if (username) {
+		user = await collections.users.findOne<Pick<User, "_id">>(
+			{ username },
+			{ projection: { _id: 1 } }
+		);
+		if (!user) {
+			throw error(404, `User "${username}" doesn't exist`);
 		}
 	}
 
@@ -28,7 +33,7 @@ export const load = async ({ url, locals }) => {
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
 		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
-		...(createdByName ? { createdByName } : { featured: true }),
+		...(user ? { createdById: user._id } : { featured: true }),
 	};
 	const assistants = await collections.assistants
 		.find(filter)
