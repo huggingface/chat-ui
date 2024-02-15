@@ -14,6 +14,8 @@
 	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
 	import CarbonPen from "~icons/carbon/pen";
+	import CarbonChevronLeft from "~icons/carbon/chevron-left";
+	import CarbonChevronRight from "~icons/carbon/chevron-right";
 
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
@@ -414,20 +416,20 @@
 		<svelte:fragment slot="childrenNav">
 			{#if nChildren > 1}
 				<div
-					class="font-white z-10 -mt-3 ml-8 mr-auto flex w-fit flex-row justify-center gap-1 text-sm text-gray-400 dark:text-gray-500"
+					class="font-white z-10 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
 				>
 					<button
-						class="inline text-lg font-thin"
+						class="inline text-lg font-thin text-gray-400 disabled:pointer-events-none disabled:opacity-25 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
 						on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
 						disabled={childrenToRender === 0}
 					>
-						{"<"}
+						<CarbonChevronLeft />
 					</button>
-					<span class="my-auto inline">
+					<span class="my-auto inline text-gray-400 dark:text-gray-500">
 						{childrenToRender + 1} / {nChildren}
 					</span>
 					<button
-						class="inline text-lg font-thin"
+						class="inline text-lg font-thin text-gray-400 disabled:pointer-events-none disabled:opacity-25 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
 						on:click={() =>
 							(childrenToRender = Math.min(
 								message?.children?.length ?? 1 - 1,
@@ -435,7 +437,7 @@
 							))}
 						disabled={childrenToRender === nChildren - 1}
 					>
-						{">"}
+						<CarbonChevronRight />
 					</button>
 				</div>
 			{/if}
