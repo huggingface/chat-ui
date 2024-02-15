@@ -333,7 +333,7 @@
 						bind:this={editFormEl}
 						on:submit|preventDefault={() => {
 							dispatch("retry", { content: editContentEl.value, id: message.id });
-							editMode = false;
+							$convTreeStore.editing = null;
 						}}
 					>
 						<textarea
