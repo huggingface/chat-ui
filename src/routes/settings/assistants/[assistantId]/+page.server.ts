@@ -5,7 +5,8 @@ import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
 import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
-
+import { z } from "zod";
+import type { Assistant } from "$lib/types/Assistant";
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
@@ -53,7 +54,7 @@ export const actions: Actions = {
 
 		throw redirect(302, `${base}/settings`);
 	},
-	report: async ({ params, locals, url }) => {
+	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
 			assistantId: new ObjectId(params.assistantId),
@@ -64,12 +65,20 @@ export const actions: Actions = {
 			return fail(400, { error: true, message: "Already reported" });
 		}
 
+		const formData = await request.formData();
+		const result = z.string().min(1).max(128).safeParse(formData?.get("reportReason"));
+
+		if (!result.success) {
+			return fail(400, { error: true, message: "Invalid report reason" });
+		}
+
 		const { acknowledged } = await collections.reports.insertOne({
 			_id: new ObjectId(),
 			assistantId: new ObjectId(params.assistantId),
 			createdBy: locals.user?._id ?? locals.sessionId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
+			reason: result.data,
 		});
 
 		if (!acknowledged) {
@@ -80,10 +89,12 @@ export const actions: Actions = {
 			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
-			const assistant = await collections.assistants.findOne(
+			const assistant = await collections.assistants.findOne<Pick<Assistant, "name">>(
 				{ _id: new ObjectId(params.assistantId) },
 				{ projection: { name: 1 } }
 			);
+
+			const username = locals.user?.username;
 
 			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
 				method: "POST",
@@ -91,7 +102,9 @@ export const actions: Actions = {
 					"Content-type": "application/json",
 				},
 				body: JSON.stringify({
-					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>`,
+					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by ${
+						username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
+					}.\n\n> ${result.data}`,
 				}),
 			});
 

@@ -76,11 +76,14 @@ client.on("open", () => {
 	settings.createIndex({ assistants: 1 }).catch(console.error);
 	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
 	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
+	users.createIndex({ username: 1 }).catch(console.error);
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
 	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
-	assistants.createIndex({ createdBy: 1 }).catch(console.error);
+	assistants.createIndex({ createdById: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ userCount: 1 }).catch(console.error);
-	assistants.createIndex({ featured: 1 }).catch(console.error);
+	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
+	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
 	reports.createIndex({ assistantId: 1 }).catch(console.error);
 });
