@@ -9,19 +9,20 @@
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
-	import { randomUUID } from "$lib/utils/randomUuid";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import type { MessageUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
+	import { addChildren } from "$lib/utils/tree/addChildren";
+	import { addSibling } from "$lib/utils/tree/addSibling";
+	import { createConvTreeStore } from "$lib/stores/convTree";
+
 	export let data;
 
 	let messages = data.messages;
 	let lastLoadedMessages = data.messages;
-
-	let webSearchMessages: WebSearchUpdate[] = [];
 
 	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
 	$: if (data.messages !== lastLoadedMessages) {
@@ -66,12 +67,12 @@
 	// this function is used to send new message to the backends
 	async function writeMessage({
 		prompt,
-		messageId = randomUUID(),
+		messageId = $convTreeStore.leaf ?? undefined,
 		isRetry = false,
 		isContinue = false,
 	}: {
 		prompt?: string;
-		messageId?: ReturnType<typeof randomUUID>;
+		messageId?: ReturnType<typeof crypto.randomUUID>;
 		isRetry?: boolean;
 		isContinue?: boolean;
 	}): Promise<void> {
@@ -80,25 +81,7 @@
 			loading = true;
 			pending = true;
 
-			// first we check if the messageId already exists, indicating a retry
-
-			let msgIndex = messages.findIndex((msg) => msg.id === messageId);
-
-			if (msgIndex === -1) {
-				msgIndex = messages.length - 1;
-			}
-			if (isRetry && messages[msgIndex].from === "assistant") {
-				throw new Error("Trying to retry a message that is not from user");
-			}
-
-			if (isContinue && messages[msgIndex].from === "user") {
-				throw new Error("Trying to continue a message that is not from assistant");
-			}
-
-			// const isNewMessage = !isRetry && !isContinue;
-
 			const module = await import("browser-image-resizer");
-
 			// currently, only IDEFICS is supported by TGI
 			// the size of images is hardcoded to 224x224 in TGI
 			// this will need to be configurable when support for more models is added
@@ -114,35 +97,101 @@
 				})
 			);
 
-			// slice up to the point of the retry
-			if (isRetry) {
-				messages = [
-					...messages.slice(0, msgIndex),
-					{
-						from: "user",
-						content: messages[msgIndex].content,
-						id: messageId,
-						files: messages[msgIndex].files,
-					},
-				];
-			} else if (!isContinue) {
-				// or add a new message if its not a continue request
-				if (!prompt) {
-					throw new Error("Prompt is undefined");
+			let messageToWriteToId: Message["id"] | undefined = undefined;
+			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
+
+			if (isContinue && messageId) {
+				if ((messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
+					$error = "Can only continue the last message";
+				} else {
+					messageToWriteToId = messageId;
 				}
-				messages = [
-					...messages,
+			} else if (isRetry && messageId) {
+				// two cases, if we're retrying a user message with a newPrompt set,
+				// it means we're editing a user message
+				// if we're retrying on an assistant message, newPrompt cannot be set
+				// it means we're retrying the last assistant message for a new answer
+
+				const messageToRetry = messages.find((message) => message.id === messageId);
+
+				if (!messageToRetry) {
+					$error = "Message not found";
+				}
+
+				if (messageToRetry?.from === "user" && prompt) {
+					// add a sibling to this message from the user, with the alternative prompt
+					// add a children to that sibling, where we can write to
+					const newUserMessageId = addSibling(
+						{
+							messages,
+							rootMessageId: data.rootMessageId,
+						},
+						{ from: "user", content: prompt },
+						messageId
+					);
+					messageToWriteToId = addChildren(
+						{
+							messages,
+							rootMessageId: data.rootMessageId,
+						},
+						{ from: "assistant", content: "", files: resizedImages },
+						newUserMessageId
+					);
+				} else if (messageToRetry?.from === "assistant") {
+					// we're retrying an assistant message, to generate a new answer
+					// just add a sibling to the assistant answer where we can write to
+					messageToWriteToId = addSibling(
+						{
+							messages,
+							rootMessageId: data.rootMessageId,
+						},
+						{ from: "assistant", content: "" },
+						messageId
+					);
+				}
+			} else {
+				// just a normal linear conversation, so we add the user message
+				// and the blank assistant message back to back
+				const newUserMessageId = addChildren(
+					{
+						messages,
+						rootMessageId: data.rootMessageId,
+					},
 					{
 						from: "user",
 						content: prompt ?? "",
-						id: messageId,
 						files: resizedImages,
+						createdAt: new Date(),
+						updatedAt: new Date(),
 					},
-				];
+					messageId
+				);
+
+				if (!data.rootMessageId) {
+					data.rootMessageId = newUserMessageId;
+				}
+
+				messageToWriteToId = addChildren(
+					{
+						messages,
+						rootMessageId: data.rootMessageId,
+					},
+					{
+						from: "assistant",
+						content: "",
+						createdAt: new Date(),
+						updatedAt: new Date(),
+					},
+					newUserMessageId
+				);
 			}
 
-			files = [];
+			messages = [...messages];
+			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 
+			if (!messageToWriteTo) {
+				throw new Error("Message to write to not found");
+			}
 			// disable websearch if assistant is present
 			const hasAssistant = !!$page.data.assistant;
 
@@ -221,25 +270,16 @@
 								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
 								pending = false;
-
-								let lastMessage = messages[messages.length - 1];
-
-								if (lastMessage.from !== "assistant") {
-									messages = [
-										...messages,
-										{ from: "assistant", id: randomUUID(), content: update.token },
-									];
-								} else {
-									lastMessage.content += update.token;
-									messages = [...messages];
-								}
+								messageToWriteTo.content += update.token;
+								messages = [...messages];
 							} else if (update.type === "webSearch") {
-								webSearchMessages = [...webSearchMessages, update];
+								messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+								messages = [...messages];
 							} else if (update.type === "status") {
 								if (update.status === "title" && update.message) {
-									const conv = data.conversations.find(({ id }) => id === $page.params.id);
-									if (conv) {
-										conv.title = update.message;
+									const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+									if (convInData) {
+										convInData.title = update.message;
 
 										$titleUpdate = {
 											title: update.message,
@@ -265,11 +305,7 @@
 				});
 			}
 
-			webSearchMessages = [];
-
-			const lastMessage = messages[messages.length - 1];
-			lastMessage.updates = messageUpdates;
-
+			messageToWriteTo.updates = messageUpdates;
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
@@ -285,6 +321,7 @@
 		} finally {
 			loading = false;
 			pending = false;
+			await invalidate(UrlDependency.Conversation);
 		}
 	}
 
@@ -336,7 +373,7 @@
 		}
 	}
 
-	async function onRetry(event: CustomEvent<{ id: Message["id"]; content: string }>) {
+	async function onRetry(event: CustomEvent<{ id: Message["id"]; content?: string }>) {
 		if (!data.shared) {
 			await writeMessage({
 				prompt: event.detail.content,
@@ -363,11 +400,26 @@
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
 			writeMessage({ messageId: event.detail.id, isContinue: true });
+		} else {
+			await convFromShared()
+				.then(async (convId) => {
+					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
+				})
+				.then(
+					async () =>
+						await writeMessage({
+							messageId: event.detail.id,
+							isContinue: true,
+						})
+				)
+				.finally(() => (loading = false));
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false));
+	$: $page.params.id, (($isAborted = true), (loading = false), ($convTreeStore.editing = null));
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+
+	const convTreeStore = createConvTreeStore();
 </script>
 
 <svelte:head>
@@ -386,7 +438,6 @@
 	{messages}
 	shared={data.shared}
 	preprompt={data.preprompt}
-	bind:webSearchMessages
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}

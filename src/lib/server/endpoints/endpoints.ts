@@ -8,13 +8,10 @@ import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/e
 import endpointOllama, { endpointOllamaParametersSchema } from "./ollama/endpointOllama";
 
 // parameters passed when generating text
-interface EndpointParameters {
-	conversation: {
-		messages: Omit<Conversation["messages"][0], "id">[];
-		preprompt?: Conversation["preprompt"];
-		_id?: Conversation["_id"];
-	};
-	continue?: boolean;
+export interface EndpointParameters {
+	messages: Omit<Conversation["messages"][0], "id">[];
+	preprompt?: Conversation["preprompt"];
+	continueMessage?: boolean; // used to signal that the last message will be extended
 }
 
 interface CommonEndpoint {
