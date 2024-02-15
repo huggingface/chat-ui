@@ -321,6 +321,7 @@
 		} finally {
 			loading = false;
 			pending = false;
+			await invalidate(UrlDependency.Conversation);
 		}
 	}
 
