@@ -62,6 +62,12 @@ client.on("open", () => {
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
 		.catch(console.error);
+	conversations
+		.createIndex(
+			{ "message.id": 1, "message.ancestors": 1 },
+			{ partialFilterExpression: { userId: { $exists: true } } }
+		)
+		.catch(console.error);
 	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
 	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
 	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
@@ -75,8 +81,9 @@ client.on("open", () => {
 	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
 	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
-	assistants.createIndex({ createdBy: 1 }).catch(console.error);
+	assistants.createIndex({ createdById: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ userCount: 1 }).catch(console.error);
-	assistants.createIndex({ featured: 1 }).catch(console.error);
+	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
+	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
 	reports.createIndex({ assistantId: 1 }).catch(console.error);
 });

@@ -7,4 +7,5 @@ export interface Report extends Timestamps {
 	_id: ObjectId;
 	createdBy: User["_id"] | string;
 	assistantId: Assistant["_id"];
+	reason?: string;
 }

@@ -9,11 +9,16 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
+import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
+import { isMessageId } from "$lib/utils/tree/isMessageId";
+import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
+import { addChildren } from "$lib/utils/tree/addChildren.js";
+import { addSibling } from "$lib/utils/tree/addSibling.js";
+import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -28,6 +33,29 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// check if the user has access to the conversation
+	const convBeforeCheck = await collections.conversations.findOne({
+		_id: convId,
+		...authCondition(locals),
+	});
+
+	if (convBeforeCheck && !convBeforeCheck.rootMessageId) {
+		const res = await collections.conversations.updateOne(
+			{
+				_id: convId,
+			},
+			{
+				$set: {
+					...convBeforeCheck,
+					...convertLegacyConversation(convBeforeCheck),
+				},
+			}
+		);
+
+		if (!res.acknowledged) {
+			throw error(500, "Failed to convert conversation");
+		}
+	}
+
 	const conv = await collections.conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
@@ -97,8 +125,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		files: b64files,
 	} = z
 		.object({
+			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
 			inputs: z.optional(z.string().trim().min(1)),
-			id: z.optional(z.string().uuid()),
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
@@ -138,59 +166,93 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
 	}
 
-	// can only call isContinue on the last message id
-	if (isContinue && conv.messages[conv.messages.length - 1].id !== messageId) {
-		throw error(400, "Can only continue the last message");
+	// we will append tokens to the content of this message
+	let messageToWriteToId: Message["id"] | undefined = undefined;
+	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
+	let messagesForPrompt: Message[] = [];
+
+	if (isContinue && messageId) {
+		// if it's the last message and we continue then we build the prompt up to the last message
+		// we will strip the end tokens afterwards when the prompt is built
+		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
+			throw error(400, "Can only continue the last message");
+		}
+		messageToWriteToId = messageId;
+		messagesForPrompt = buildSubtree(conv, messageId);
+	} else if (isRetry && messageId) {
+		// two cases, if we're retrying a user message with a newPrompt set,
+		// it means we're editing a user message
+		// if we're retrying on an assistant message, newPrompt cannot be set
+		// it means we're retrying the last assistant message for a new answer
+
+		const messageToRetry = conv.messages.find((message) => message.id === messageId);
+
+		if (!messageToRetry) {
+			throw error(404, "Message not found");
+		}
+
+		if (messageToRetry.from === "user" && newPrompt) {
+			// add a sibling to this message from the user, with the alternative prompt
+			// add a children to that sibling, where we can write to
+			const newUserMessageId = addSibling(conv, { from: "user", content: newPrompt }, messageId);
+			messageToWriteToId = addChildren(
+				conv,
+				{ from: "assistant", content: "", files: hashes },
+				newUserMessageId
+			);
+			messagesForPrompt = buildSubtree(conv, newUserMessageId);
+		} else if (messageToRetry.from === "assistant") {
+			// we're retrying an assistant message, to generate a new answer
+			// just add a sibling to the assistant answer where we can write to
+			messageToWriteToId = addSibling(conv, { from: "assistant", content: "" }, messageId);
+			messagesForPrompt = buildSubtree(conv, messageId);
+			messagesForPrompt.pop(); // don't need the latest assistant message in the prompt since we're retrying it
+		}
+	} else {
+		// just a normal linear conversation, so we add the user message
+		// and the blank assistant message back to back
+		const newUserMessageId = addChildren(
+			conv,
+			{
+				from: "user",
+				content: newPrompt ?? "",
+				files: hashes,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+			messageId
+		);
+
+		messageToWriteToId = addChildren(
+			conv,
+			{
+				from: "assistant",
+				content: "",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+			newUserMessageId
+		);
+		// build the prompt from the user message
+		messagesForPrompt = buildSubtree(conv, newUserMessageId);
 	}
 
-	// get the list of messages
-	// while checking for retries
-	let messages = (() => {
-		// for retries we slice and rewrite the last user message
-		if (isRetry && messageId) {
-			// if the message is a retry, replace the message and remove the messages after it
-			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
+	const messageToWriteTo = conv.messages.find((message) => message.id === messageToWriteToId);
+	if (!messageToWriteTo) {
+		throw error(500, "Failed to create message");
+	}
+	if (messagesForPrompt.length === 0) {
+		throw error(500, "Failed to create prompt");
+	}
 
-			if (retryMessageIdx === -1) {
-				retryMessageIdx = conv.messages.length;
-			}
-
-			return [
-				...conv.messages.slice(0, retryMessageIdx),
-				{
-					content: conv.messages[retryMessageIdx]?.content,
-					from: "user",
-					id: messageId as Message["id"],
-					updatedAt: new Date(),
-					files: conv.messages[retryMessageIdx]?.files,
-				},
-			];
-		} else if (isContinue && messageId) {
-			// for continue we do nothing and expand the last assistant message
-			return conv.messages;
-		} else {
-			// in normal conversation we add an extra user message
-			return [
-				...conv.messages,
-				{
-					content: newPrompt ?? "",
-					from: "user",
-					id: (messageId as Message["id"]) || crypto.randomUUID(),
-					createdAt: new Date(),
-					updatedAt: new Date(),
-					files: hashes,
-				},
-			];
-		} // else append the message at the bottom
-	})() satisfies Message[];
-
+	// update the conversation with the new messages
 	await collections.conversations.updateOne(
 		{
 			_id: convId,
 		},
 		{
 			$set: {
-				messages,
+				messages: conv.messages,
 				title: conv.title,
 				updatedAt: new Date(),
 			},
@@ -202,13 +264,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
-			const updates: MessageUpdate[] = isContinue
-				? conv.messages[conv.messages.length - 1].updates ?? []
-				: [];
-
+			messageToWriteTo.updates ??= [];
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
-					updates.push(newUpdate);
+					messageToWriteTo?.updates?.push(newUpdate);
 				}
 
 				if (newUpdate.type === "stream" && newUpdate.token === "") {
@@ -225,10 +284,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			update({ type: "status", status: "started" });
 
 			const summarizeIfNeeded = (async () => {
-				if (conv.title === "New Chat" && messages.length === 1) {
+				if (conv.title === "New Chat" && conv.messages.length === 3) {
 					try {
-						conv.title = (await summarize(messages[0].content)) ?? conv.title;
+						conv.title = (await summarize(conv.messages[1].content)) ?? conv.title;
 						update({ type: "status", status: "title", message: conv.title });
+						await collections.conversations.updateOne(
+							{
+								_id: convId,
+							},
+							{
+								$set: {
+									title: conv?.title,
+									updatedAt: new Date(),
+								},
+							}
+						);
 					} catch (e) {
 						console.error(e);
 					}
@@ -241,31 +311,33 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				},
 				{
 					$set: {
-						messages,
 						title: conv.title,
 						updatedAt: new Date(),
 					},
 				}
 			);
 
-			let webSearchResults: WebSearch | undefined;
-
+			// perform websearch if needed
 			if (webSearch && !isContinue && !conv.assistantId) {
-				webSearchResults = await runWebSearch(conv, messages[messages.length - 1].content, update);
-				messages[messages.length - 1].webSearch = webSearchResults;
-			} else if (isContinue) {
-				webSearchResults = messages[messages.length - 1].webSearch;
+				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update);
 			}
 
-			conv.messages = messages;
+			// inject websearch result & optionally images into the messages
+			const processedMessages = await preprocessMessages(
+				messagesForPrompt,
+				model.multimodal,
+				convId
+			);
 
-			const previousContent = isContinue
-				? conv.messages.find((message) => message.id === messageId)?.content ?? ""
-				: "";
+			const previousText = messageToWriteTo.content;
 
 			try {
 				const endpoint = await model.getEndpoint();
-				for await (const output of await endpoint({ conversation: conv, continue: isContinue })) {
+				for await (const output of await endpoint({
+					messages: processedMessages,
+					preprompt: conv.preprompt,
+					continueMessage: isContinue,
+				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
 						// else we get the next token
@@ -274,63 +346,33 @@ export async function POST({ request, locals, params, getClientAddress }) {
 								type: "stream",
 								token: output.token.text,
 							});
-
-							// if the last message is not from assistant, it means this is the first token
-							const lastMessage = messages[messages.length - 1];
-
-							if (lastMessage?.from !== "assistant") {
-								// so we create a new message
-								messages = [
-									...messages,
-									// id doesn't match the backend id but it's not important for assistant messages
-									// First token has a space at the beginning, trim it
-									{
-										from: "assistant",
-										content: output.token.text.trimStart(),
-										webSearch: webSearchResults,
-										updates,
-										id: crypto.randomUUID(),
-										createdAt: new Date(),
-										updatedAt: new Date(),
-									},
-								];
-							} else {
-								// abort check
-								const date = abortedGenerations.get(convId.toString());
-								if (date && date > promptedAt) {
-									break;
-								}
-
-								if (!output) {
-									break;
-								}
-
-								// otherwise we just concatenate tokens
-								lastMessage.content += output.token.text;
+							// abort check
+							const date = abortedGenerations.get(convId.toString());
+							if (date && date > promptedAt) {
+								break;
 							}
+							// no output check
+							if (!output) {
+								break;
+							}
+
+							// otherwise we just concatenate tokens
+							messageToWriteTo.content += output.token.text;
 						}
 					} else {
-						let interrupted = !output.token.special;
+						messageToWriteTo.interrupted = !output.token.special;
 						// add output.generated text to the last message
 						// strip end tokens from the output.generated_text
 						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
 							if (acc.endsWith(curr)) {
-								interrupted = false;
+								messageToWriteTo.interrupted = false;
 								return acc.slice(0, acc.length - curr.length);
 							}
 							return acc;
 						}, output.generated_text.trimEnd());
 
-						messages = [
-							...messages.slice(0, -1),
-							{
-								...messages[messages.length - 1],
-								content: previousContent + text,
-								interrupted, // if its a special token it finished on its own, else it was interrupted
-								updates,
-								updatedAt: new Date(),
-							},
-						];
+						messageToWriteTo.content = previousText + text;
+						messageToWriteTo.updatedAt = new Date();
 					}
 				}
 			} catch (e) {
@@ -343,7 +385,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				},
 				{
 					$set: {
-						messages,
+						messages: conv.messages,
 						title: conv?.title,
 						updatedAt: new Date(),
 					},
@@ -355,7 +397,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			update({
 				type: "finalAnswer",
-				text: messages[messages.length - 1].content,
+				text: messageToWriteTo.content,
 			});
 
 			await summarizeIfNeeded;
@@ -370,7 +412,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					},
 					{
 						$set: {
-							messages,
+							messages: conv.messages,
 							title: conv.title,
 							updatedAt: new Date(),
 						},
