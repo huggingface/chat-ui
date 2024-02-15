@@ -60,6 +60,11 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
 										userId: "$userId",
 									},
+								},
+							},
+							{
+								$group: {
+									_id: "$_id.day",
 									count: { $sum: 1 },
 								},
 							},
@@ -67,7 +72,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 								$project: {
 									_id: 0,
 									date: {
-										day: "$_id.day",
+										day: "$_id",
 										field: params.dateField,
 									},
 									distinct: "userId",
@@ -87,6 +92,11 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
 										sessionId: "$userId",
 									},
+								},
+							},
+							{
+								$group: {
+									_id: "$_id.day",
 									count: { $sum: 1 },
 								},
 							},
@@ -94,7 +104,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 								$project: {
 									_id: 0,
 									date: {
-										day: "$_id.day",
+										day: "$_id",
 										field: params.dateField,
 									},
 									distinct: "sessionId",
@@ -109,6 +119,11 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
 										userOrSessionId: { $ifNull: ["$userId", "$sessionId"] },
 									},
+								},
+							},
+							{
+								$group: {
+									_id: "$_id.day",
 									count: { $sum: 1 },
 								},
 							},
@@ -116,7 +131,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 								$project: {
 									_id: 0,
 									date: {
-										day: "$_id.day",
+										day: "$_id",
 										field: params.dateField,
 									},
 									distinct: "userOrSessionId",
@@ -127,9 +142,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 						_id: [
 							{
 								$group: {
-									_id: {
-										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
-									},
+									_id: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
 									count: { $sum: 1 },
 								},
 							},
@@ -137,7 +150,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 								$project: {
 									_id: 0,
 									date: {
-										day: "$_id.day",
+										day: "$_id",
 										field: params.dateField,
 									},
 									distinct: "_id",
