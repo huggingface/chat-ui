@@ -104,7 +104,7 @@ export const actions: Actions = {
 				body: JSON.stringify({
 					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by ${
 						username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
-					}. The following reason was given \n\n> ${result.data}`,
+					}.\n\n> ${result.data}`,
 				}),
 			});
 
