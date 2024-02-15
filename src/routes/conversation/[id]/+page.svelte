@@ -416,7 +416,7 @@
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false));
+	$: $page.params.id, (($isAborted = true), (loading = false), ($convTreeStore.editing = null));
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
 	const convTreeStore = createConvTreeStore();
