@@ -178,6 +178,7 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 				{
 					$merge: {
 						into: CONVERSATION_STATS_COLLECTION,
+						on: ["date.day", "date.field", "distinct"],
 						whenMatched: "replace",
 						whenNotMatched: "insert",
 					},
