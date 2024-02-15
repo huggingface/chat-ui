@@ -15,9 +15,9 @@
 	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
-	import { createLeafConversationTree } from "$lib/stores/leafConversationTree.js";
-	import { addChildren } from "$lib/utils/tree/addChildren.js";
-	import { addSibling } from "$lib/utils/tree/addSibling.js";
+	import { addChildren } from "$lib/utils/tree/addChildren";
+	import { addSibling } from "$lib/utils/tree/addSibling";
+	import { createConvTreeStore } from "$lib/stores/convTree";
 
 	export let data;
 
@@ -67,7 +67,7 @@
 	// this function is used to send new message to the backends
 	async function writeMessage({
 		prompt,
-		messageId = $leafId ?? undefined,
+		messageId = $convTreeStore.leaf ?? undefined,
 		isRetry = false,
 		isContinue = false,
 	}: {
@@ -419,7 +419,7 @@
 	$: $page.params.id, (($isAborted = true), (loading = false));
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
-	const leafId = createLeafConversationTree();
+	const convTreeStore = createConvTreeStore();
 </script>
 
 <svelte:head>

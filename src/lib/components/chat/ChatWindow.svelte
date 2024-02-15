@@ -31,7 +31,7 @@
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
-	import { useLeafConversationTree } from "$lib/stores/leafConversationTree";
+	import { useConvTreeStore } from "$lib/stores/convTree";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -83,9 +83,9 @@
 		e.preventDefault();
 	};
 
-	const leafId = useLeafConversationTree();
+	const convTreeStore = useConvTreeStore();
 
-	$: lastMessage = browser && (messages.find((m) => m.id == $leafId) as Message);
+	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
 	$: lastIsError = lastMessage && lastMessage.from === "user" && !loading;
 
 	$: sources = files.map((file) => file2base64(file));

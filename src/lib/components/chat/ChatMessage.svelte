@@ -23,7 +23,7 @@
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
-	import { useLeafConversationTree } from "$lib/stores/leafConversationTree";
+	import { useConvTreeStore } from "$lib/stores/convTree";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -145,7 +145,7 @@
 		}, 1000);
 	}
 
-	let editMode = false;
+	$: editMode = $convTreeStore.editing === message.id;
 	let editContentEl: HTMLTextAreaElement;
 	let editFormEl: HTMLFormElement;
 
@@ -170,9 +170,9 @@
 			initialized = true;
 		}
 	}
-	const leafId = useLeafConversationTree();
+	const convTreeStore = useConvTreeStore();
 
-	$: if (message.children?.length === 0) $leafId = message.id;
+	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 </script>
 
 {#if message.from === "assistant"}
@@ -359,7 +359,7 @@
 								type="button"
 								class="btn rounded-sm p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
 								on:click={() => {
-									editMode = false;
+									$convTreeStore.editing = null;
 								}}
 							>
 								Cancel
@@ -393,7 +393,7 @@
 									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
 									title="Branch"
 									type="button"
-									on:click={() => (editMode = !editMode)}
+									on:click={() => ($convTreeStore.editing = message.id)}
 								>
 									<CarbonPen />
 								</button>
@@ -420,7 +420,7 @@
 		on:continue
 	>
 		<svelte:fragment slot="childrenNav">
-			{#if nChildren > 1}
+			{#if nChildren > 1 && $convTreeStore.editing === null}
 				<div
 					class="font-white z-10 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
 				>
