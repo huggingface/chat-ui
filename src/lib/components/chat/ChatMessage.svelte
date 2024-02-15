@@ -346,7 +346,12 @@
 						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
 								type="submit"
-								class="btn rounded-lg bg-gray-200 px-3 py-1.5 text-sm text-gray-600 focus:ring-0 hover:text-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200"
+								class="btn rounded-lg px-3 py-1.5 text-sm
+								{loading
+									? 'bg-gray-300 text-gray-400 dark:bg-gray-700 dark:text-gray-600'
+									: 'bg-gray-200 text-gray-600 focus:ring-0   hover:text-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
+								"
+								disabled={loading}
 							>
 								Submit
 							</button>
@@ -422,7 +427,7 @@
 					<button
 						class="inline text-lg font-thin text-gray-400 disabled:pointer-events-none disabled:opacity-25 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
 						on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
-						disabled={childrenToRender === 0}
+						disabled={childrenToRender === 0 || loading}
 					>
 						<CarbonChevronLeft class="text-sm" />
 					</button>
@@ -436,7 +441,7 @@
 								message?.children?.length ?? 1 - 1,
 								childrenToRender + 1
 							))}
-						disabled={childrenToRender === nChildren - 1}
+						disabled={childrenToRender === nChildren - 1 || loading}
 					>
 						<CarbonChevronRight class="text-sm" />
 					</button>
