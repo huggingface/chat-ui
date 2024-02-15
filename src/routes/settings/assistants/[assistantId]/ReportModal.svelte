@@ -28,9 +28,9 @@
 			Please provide a brief description of why you are reporting this assistant.
 		</p>
 
-		<input
+		<textarea
 			name="reportReason"
-			class="mt-6 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-smd"
+			class="mt-6 max-h-48 w-full resize-y rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-smd"
 			placeholder="Reason(s) for the report"
 			maxlength="128"
 			bind:value={reason}
