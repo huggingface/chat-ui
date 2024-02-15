@@ -6,6 +6,7 @@ import { base } from "$app/paths";
 import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
 import { z } from "zod";
+import type { Assistant } from "$lib/types/Assistant";
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
@@ -88,10 +89,12 @@ export const actions: Actions = {
 			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
-			const assistant = await collections.assistants.findOne(
+			const assistant = await collections.assistants.findOne<Pick<Assistant, "name">>(
 				{ _id: new ObjectId(params.assistantId) },
 				{ projection: { name: 1 } }
 			);
+
+			const username = locals.user?.username;
 
 			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
 				method: "POST",
@@ -99,7 +102,9 @@ export const actions: Actions = {
 					"Content-type": "application/json",
 				},
 				body: JSON.stringify({
-					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by <http://hf.co/${locals.user?.username}|${locals.user?.username}>. The following reason was given \n\n> ${result.data}`,
+					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by ${
+						username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
+					}.\n\n> ${result.data}`,
 				}),
 			});
 
