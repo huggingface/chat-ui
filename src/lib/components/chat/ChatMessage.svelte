@@ -331,7 +331,7 @@
 					<form
 						class="flex w-full flex-col"
 						bind:this={editFormEl}
-						on:submit={() => {
+						on:submit|preventDefault={() => {
 							dispatch("retry", { content: editContentEl.value, id: message.id });
 							editMode = false;
 						}}
