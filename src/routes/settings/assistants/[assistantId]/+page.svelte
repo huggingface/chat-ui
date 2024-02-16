@@ -16,7 +16,7 @@
 
 	export let data: PageData;
 
-	$: assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
+	$: assistant = data.assistant;
 
 	const settings = useSettingsStore();
 
