@@ -7,7 +7,7 @@ export interface ConversationStats extends Timestamps {
 		field: "updatedAt" | "createdAt";
 	};
 	type: "conversation" | "message";
-	/**  _id => conversationId, eg for type="message" messages will be grouped by conversation */
+	/**  _id => number of conversations/messages in the month */
 	distinct: "sessionId" | "userId" | "userOrSessionId" | "_id";
 	count: number;
 }
