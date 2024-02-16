@@ -1,6 +1,7 @@
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import type { LayoutServerLoad } from "./$types";
+import type { Report } from "$lib/types/Report";
 
 export const load = (async ({ locals, parent }) => {
 	const { settings } = await parent();
@@ -12,6 +13,15 @@ export const load = (async ({ locals, parent }) => {
 		})
 		.toArray();
 
+	let reportsByUser: ObjectId[] = [];
+	const createdBy = locals.user?._id ?? locals.sessionId;
+	if (createdBy) {
+		const reports = await collections.reports
+			.find<Pick<Report, "assistantId">>({ createdBy }, { projection: { _id: 0, assistantId: 1 } })
+			.toArray();
+		reportsByUser = reports.map((r) => r.assistantId);
+	}
+
 	return {
 		assistants: await Promise.all(
 			assistants.map(async (el) => ({
@@ -20,11 +30,7 @@ export const load = (async ({ locals, parent }) => {
 				createdById: undefined,
 				createdByMe:
 					el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-				reported:
-					(await collections.reports.findOne({
-						assistantId: el._id,
-						createdBy: locals.user?._id ?? locals.sessionId,
-					})) !== null,
+				reported: reportsByUser.includes(el._id),
 			}))
 		),
 	};

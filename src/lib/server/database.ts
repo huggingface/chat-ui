@@ -85,5 +85,5 @@ client.on("open", () => {
 	assistants.createIndex({ userCount: 1 }).catch(console.error);
 	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
-	reports.createIndex({ assistantId: 1, createdBy: 1 }).catch(console.error);
+	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
 });
