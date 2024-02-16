@@ -23,15 +23,12 @@ export const load = (async ({ locals, parent }) => {
 	}
 
 	return {
-		assistants: await Promise.all(
-			assistants.map(async (el) => ({
-				...el,
-				_id: el._id.toString(),
-				createdById: undefined,
-				createdByMe:
-					el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-				reported: reportsByUser.includes(el._id),
-			}))
-		),
+		assistants: assistants.map((el) => ({
+			...el,
+			_id: el._id.toString(),
+			createdById: undefined,
+			createdByMe: el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+			reported: reportsByUser.includes(el._id),
+		})),
 	};
 }) satisfies LayoutServerLoad;
