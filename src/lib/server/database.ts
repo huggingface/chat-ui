@@ -77,15 +77,28 @@ client.on("open", () => {
 	conversations.createIndex({ updatedAt: 1 }).catch(console.error);
 	// Not strictly necessary, could use _id, but more convenient. Also for stats
 	conversations.createIndex({ createdAt: 1 }).catch(console.error);
+	// To do stats on conversation messages
+	conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(console.error);
+	// Unique index for stats
 	conversationStats
 		.createIndex(
 			{
+				type: 1,
 				"date.field": 1,
-				"date.day": 1,
+				"date.span": 1,
+				"date.at": 1,
 				distinct: 1,
 			},
 			{ unique: true }
 		)
+		.catch(console.error);
+	// Allow easy check of last computed stat for given type/dateField
+	conversationStats
+		.createIndex({
+			type: 1,
+			"date.field": 1,
+			"date.at": 1,
+		})
 		.catch(console.error);
 	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
 	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);

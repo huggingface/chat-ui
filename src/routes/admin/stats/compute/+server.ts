@@ -10,160 +10,198 @@ export async function POST({ request }) {
 		throw error(401, "Unauthorized");
 	}
 
-	computeStats({ dateField: "updatedAt" }).catch(console.error);
-	computeStats({ dateField: "createdAt" }).catch(console.error);
+	computeStats({ dateField: "updatedAt", type: "conversation" }).catch(console.error);
+	computeStats({ dateField: "createdAt", type: "conversation" }).catch(console.error);
+	computeStats({ dateField: "createdAt", type: "message" }).catch(console.error);
 
 	return json({}, { status: 202 });
 }
 
-async function computeStats(params: { dateField: ConversationStats["date"]["field"] }) {
+async function computeStats(params: {
+	dateField: ConversationStats["date"]["field"];
+	type: ConversationStats["type"];
+}) {
+	// Recompute 1~2 months of stats
 	const lastComputed = await collections.conversationStats.findOne(
-		{ "date.field": params.dateField },
-		{ sort: { "date.day": -1 } }
+		{ "date.field": params.dateField, "date.span": "month", type: params.type },
+		{ sort: { "date.at": -1 } }
 	);
 
-	const minDay = lastComputed ? lastComputed.date.day : new Date(0);
+	const minDay = lastComputed ? lastComputed.date.at : new Date(0);
 
-	console.log("Computing stats for", params.dateField, "from", minDay);
+	console.log("Computing stats for", params.type, params.dateField, "from", minDay);
+
+	const dateField = params.type === "message" ? "messages." + params.dateField : params.dateField;
 
 	await collections.conversations
 		.aggregate(
 			[
 				{
 					$match: {
-						[params.dateField]: { $gte: minDay },
+						[dateField]: { $gte: minDay, $lte: new Date("2023-05-02") },
 					},
 				},
 				{
 					$project: {
-						[params.dateField]: 1,
+						[dateField]: 1,
 						sessionId: 1,
 						userId: 1,
 					},
 				},
 				{
 					$sort: {
-						[params.dateField]: 1,
+						[dateField]: 1,
 					},
 				},
 				{
-					$facet: {
-						userId: [
-							{
-								$match: {
-									userId: { $exists: true },
-								},
-							},
-							{
-								$group: {
-									_id: {
-										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
-										userId: "$userId",
+					$facet: Object.fromEntries(
+						["day", "week", "month"].flatMap((span) => [
+							[
+								`${span}_userId`,
+								[
+									{
+										$match: {
+											userId: { $exists: true },
+										},
 									},
-								},
-							},
-							{
-								$group: {
-									_id: "$_id.day",
-									count: { $sum: 1 },
-								},
-							},
-							{
-								$project: {
-									_id: 0,
-									date: {
-										day: "$_id",
-										field: params.dateField,
+									{
+										$group: {
+											_id: {
+												at: { $dateTrunc: { date: `$${dateField}`, unit: span } },
+												userId: "$userId",
+											},
+										},
 									},
-									distinct: "userId",
-									count: 1,
-								},
-							},
-						],
-						sessionId: [
-							{
-								$match: {
-									sessionId: { $exists: true },
-								},
-							},
-							{
-								$group: {
-									_id: {
-										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
-										sessionId: "$sessionId",
+									{
+										$group: {
+											_id: "$_id.at",
+											count: { $sum: 1 },
+										},
 									},
-								},
-							},
-							{
-								$group: {
-									_id: "$_id.day",
-									count: { $sum: 1 },
-								},
-							},
-							{
-								$project: {
-									_id: 0,
-									date: {
-										day: "$_id",
-										field: params.dateField,
+									{
+										$project: {
+											_id: 0,
+											date: {
+												at: "$_id",
+												field: dateField,
+												span,
+											},
+											distinct: "userId",
+											count: 1,
+										},
 									},
-									distinct: "sessionId",
-									count: 1,
-								},
-							},
-						],
-						userOrSessionId: [
-							{
-								$group: {
-									_id: {
-										day: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
-										userOrSessionId: { $ifNull: ["$userId", "$sessionId"] },
+								],
+							],
+							[
+								`${span}_sessionId`,
+								[
+									{
+										$match: {
+											sessionId: { $exists: true },
+										},
 									},
-								},
-							},
-							{
-								$group: {
-									_id: "$_id.day",
-									count: { $sum: 1 },
-								},
-							},
-							{
-								$project: {
-									_id: 0,
-									date: {
-										day: "$_id",
-										field: params.dateField,
+									{
+										$group: {
+											_id: {
+												at: { $dateTrunc: { date: `$${dateField}`, unit: span } },
+												sessionId: "$sessionId",
+											},
+										},
 									},
-									distinct: "userOrSessionId",
-									count: 1,
-								},
-							},
-						],
-						_id: [
-							{
-								$group: {
-									_id: { $dateTrunc: { date: `$${params.dateField}`, unit: "day" } },
-									count: { $sum: 1 },
-								},
-							},
-							{
-								$project: {
-									_id: 0,
-									date: {
-										day: "$_id",
-										field: params.dateField,
+									{
+										$group: {
+											_id: "$_id.at",
+											count: { $sum: 1 },
+										},
 									},
-									distinct: "_id",
-									count: 1,
-								},
-							},
-						],
-					},
+									{
+										$project: {
+											_id: 0,
+											date: {
+												at: "$_id",
+												field: dateField,
+												span,
+											},
+											distinct: "sessionId",
+											count: 1,
+										},
+									},
+								],
+							],
+							[
+								`${span}_userOrSessionId`,
+								[
+									{
+										$group: {
+											_id: {
+												at: { $dateTrunc: { date: `$${dateField}`, unit: span } },
+												userOrSessionId: { $ifNull: ["$userId", "$sessionId"] },
+											},
+										},
+									},
+									{
+										$group: {
+											_id: "$_id.at",
+											count: { $sum: 1 },
+										},
+									},
+									{
+										$project: {
+											_id: 0,
+											date: {
+												at: "$_id",
+												field: dateField,
+												span,
+											},
+											distinct: "userOrSessionId",
+											count: 1,
+										},
+									},
+								],
+							],
+							[
+								`${span}_id`,
+								[
+									{
+										$group: {
+											_id: { $dateTrunc: { date: `$${dateField}`, unit: span } },
+											count: { $sum: 1 },
+										},
+									},
+									{
+										$project: {
+											_id: 0,
+											date: {
+												at: "$_id",
+												field: dateField,
+												span,
+											},
+											distinct: "_id",
+											count: 1,
+										},
+									},
+								],
+							],
+						])
+					),
 				},
 				{
 					$project: {
 						stats: {
-							$concatArrays: ["$userId", "$sessionId", "$userOrSessionId", "$_id"],
+							$concatArrays: [
+								"$day_userId",
+								"$day_sessionId",
+								"$day_userOrSessionId",
+								"$day_id",
+								"$week_userId",
+								"$week_sessionId",
+								"$week_userOrSessionId",
+								"$week_id",
+								"$month_userId",
+								"$month_sessionId",
+								"$month_userOrSessionId",
+								"$month_id",
+							],
 						},
 					},
 				},
@@ -176,9 +214,14 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 					},
 				},
 				{
+					$set: {
+						type: params.type,
+					},
+				},
+				{
 					$merge: {
 						into: CONVERSATION_STATS_COLLECTION,
-						on: ["date.day", "date.field", "distinct"],
+						on: ["date.at", "type", "date.span", "date.field", "distinct"],
 						whenMatched: "replace",
 						whenNotMatched: "insert",
 					},
@@ -188,5 +231,5 @@ async function computeStats(params: { dateField: ConversationStats["date"]["fiel
 		)
 		.next();
 
-	console.log("Computed stats for", params.dateField);
+	console.log("Computed stats for", params.type, params.dateField);
 }
