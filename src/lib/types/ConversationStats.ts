@@ -3,7 +3,7 @@ import type { Timestamps } from "./Timestamps";
 export interface ConversationStats extends Timestamps {
 	date: {
 		at: Date;
-		span: "day" | "weak" | "month";
+		span: "day" | "week" | "month";
 		field: "updatedAt" | "createdAt";
 	};
 	type: "conversation" | "message";
