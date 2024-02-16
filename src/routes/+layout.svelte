@@ -166,7 +166,7 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== "/privacy"}
+{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy`}
 	<DisclaimerModal />
 {/if}
 
