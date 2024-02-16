@@ -85,5 +85,5 @@
 				{/each}
 			</div>
 		</div>{/if}
-	<div class="h-36" />
+	<div class="h-40 sm:h-24" />
 </div>
