@@ -13,13 +13,13 @@ export const load = (async ({ locals, parent }) => {
 		})
 		.toArray();
 
-	let reportsByUser: ObjectId[] = [];
+	let reportsByUser: string[] = [];
 	const createdBy = locals.user?._id ?? locals.sessionId;
 	if (createdBy) {
 		const reports = await collections.reports
 			.find<Pick<Report, "assistantId">>({ createdBy }, { projection: { _id: 0, assistantId: 1 } })
 			.toArray();
-		reportsByUser = reports.map((r) => r.assistantId);
+		reportsByUser = reports.map((r) => r.assistantId.toString());
 	}
 
 	return {
@@ -28,7 +28,7 @@ export const load = (async ({ locals, parent }) => {
 			_id: el._id.toString(),
 			createdById: undefined,
 			createdByMe: el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-			reported: reportsByUser.includes(el._id),
+			reported: reportsByUser.includes(el._id.toString()),
 		})),
 	};
 }) satisfies LayoutServerLoad;
