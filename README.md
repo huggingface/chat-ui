@@ -353,9 +353,12 @@ MODELS=`[{
   "endpoints": [
       {
           "type": "openai",
-          "baseURL": "https://gateway.example.com/v1",
+          "baseURL": "https://{resource-name}.openai.azure.com/openai/deployments/{deployment-id}",
           "defaultHeaders": {
-              "x-portkey-config": '{"provider":"azure-openai","resource_name":"abc-fr","deployment_id":"gpt-4-1106-preview","api_version":"2023-03-15-preview","api_key":"abc...xyz"}'
+              "api-key": "{api-key}"
+          },
+          "defaultQuery": {
+              "api-version": "2023-05-15"
           }
       }
   ]
