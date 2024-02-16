@@ -57,8 +57,8 @@ export const actions: Actions = {
 	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
-			createdBy: locals.user?._id ?? locals.sessionId,
 			assistantId: new ObjectId(params.assistantId),
+			createdBy: locals.user?._id ?? locals.sessionId,
 		});
 
 		if (report) {
