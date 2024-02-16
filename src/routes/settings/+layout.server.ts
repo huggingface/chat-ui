@@ -21,10 +21,10 @@ export const load = (async ({ locals, parent }) => {
 				createdByMe:
 					el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
 				reported:
-					(await collections.reports.countDocuments({
+					(await collections.reports.findOne({
 						assistantId: el._id,
 						createdBy: locals.user?._id ?? locals.sessionId,
-					})) > 0,
+					})) !== null,
 			}))
 		),
 	};
