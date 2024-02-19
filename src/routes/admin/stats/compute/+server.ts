@@ -1,15 +1,11 @@
-import { ADMIN_API_SECRET } from "$env/static/private";
-import { error, json } from "@sveltejs/kit";
+import { json } from "@sveltejs/kit";
 import type { ConversationStats } from "$lib/types/ConversationStats";
 import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database.js";
 
-export async function POST({ request }) {
-	const authorization = request.headers.get("Authorization");
+// Triger like this:
+// curl -X POST "http://localhost:5173/chat/admin/stats/compute" -H "Authorization: Bearer <ADMIN_API_SECRET>"
 
-	if (authorization !== `Bearer ${ADMIN_API_SECRET}`) {
-		throw error(401, "Unauthorized");
-	}
-
+export async function POST() {
 	for (const span of ["day", "week", "month"] as const) {
 		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch(console.error);
 		computeStats({ dateField: "createdAt", type: "conversation", span }).catch(console.error);
