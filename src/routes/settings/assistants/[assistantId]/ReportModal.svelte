@@ -45,7 +45,7 @@
 
 			<button
 				type="submit"
-				class="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white md:px-8 dark:text-gray-900 dark:bg-gray-300"
+				class="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white md:px-8 dark:bg-gray-300 dark:text-gray-900"
 				disabled={!reason}
 				class:bg-gray-200={!reason}
 				class:dark:bg-gray-600={!reason}
