@@ -177,7 +177,7 @@
 					<div class="mb-1 flex w-max flex-row gap-4">
 						<label
 							for="avatar"
-							class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+							class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-700"
 						>
 							<CarbonUpload class="mr-2 text-xs " /> Upload
 						</label>
