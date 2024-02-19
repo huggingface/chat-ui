@@ -43,7 +43,7 @@
 			/>
 		{:else}
 			<div
-				class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24"
+				class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24 dark:bg-gray-800"
 			>
 				{assistant?.name[0]}
 			</div>

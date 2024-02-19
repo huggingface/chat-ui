@@ -116,7 +116,7 @@
 							/>
 						{:else}
 							<div
-								class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
+								class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500 dark:bg-gray-700"
 							>
 								{assistant.name[0]}
 							</div>
