@@ -10,6 +10,7 @@
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonAdd from "~icons/carbon/add";
 
+	import LicenseIcon from '~icons/carbon/license'
 	import UserIcon from "~icons/carbon/user";
 	import { fade, fly } from "svelte/transition";
 	export let data;
@@ -76,6 +77,14 @@
 					{/if}
 				</a>
 			{/each}
+			<a
+				href="{base}/settings/custom"
+				class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
+			{$page.url.pathname === `${base}/settings/custom` ? '!bg-gray-100 !text-gray-800' : ''}"
+			>
+				<LicenseIcon />
+				<div class="truncate">Custom Instructions</div>
+			</a>
 			<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
 			{#if data.enableAssistants}
 				<h3 bind:this={assistantsSection} class="pb-3 pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
