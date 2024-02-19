@@ -11,8 +11,10 @@ export async function buildPrompt({
 	preprompt,
 	continueMessage,
 }: buildPromptOptions): Promise<string> {
+	const filteredMessages = messages.filter((m) => m.from !== "system");
+
 	let prompt = model
-		.chatPromptRender({ messages, preprompt })
+		.chatPromptRender({ messages: filteredMessages, preprompt })
 		// Not super precise, but it's truncated in the model's backend anyway
 		.split(" ")
 		.slice(-(model.parameters?.truncate ?? 0))
