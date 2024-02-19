@@ -135,9 +135,9 @@ export const actions: Actions = {
 					avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
 					updatedAt: new Date(),
 					rag: {
-						links: parse.data.ragLinkList,
-						allowList: parse.data.ragDomainList,
-						allowAll: parse.data.ragAllowAll,
+						allowedLinks: parse.data.ragLinkList,
+						allowedDomains: parse.data.ragDomainList,
+						allowAllDomains: parse.data.ragAllowAll,
 					},
 				},
 			}

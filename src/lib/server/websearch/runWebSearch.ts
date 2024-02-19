@@ -50,9 +50,9 @@ export async function runWebSearch(
 
 	try {
 		// if the assistant specified direct links, skip the websearch
-		if (ragSettings && ragSettings?.links.length > 0) {
+		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
 			appendUpdate("Using links specified in assistant directly. Skipping websearch");
-			webSearch.results = ragSettings.links.map((link) => {
+			webSearch.results = ragSettings.allowedLinks.map((link) => {
 				return { link, hostname: new URL(link).hostname, title: "", text: "" };
 			});
 		} else {
@@ -60,10 +60,10 @@ export async function runWebSearch(
 			const searchProvider = getWebSearchProvider();
 			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 
-			if (ragSettings && ragSettings?.allowList.length > 0) {
+			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
 				appendUpdate("Filtering results to only domains specified in assistant");
 				webSearch.searchQuery +=
-					" " + ragSettings.allowList.map((item) => "site:" + item).join(" ");
+					" " + ragSettings.allowedDomains.map((item) => "site:" + item).join(" ");
 			}
 
 			// handle the global lists

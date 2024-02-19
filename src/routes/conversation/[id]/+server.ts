@@ -259,9 +259,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			const assistantHasRAG =
 				assistantRAG &&
-				(assistantRAG.links.length > 0 ||
-					assistantRAG.allowList.length > 0 ||
-					assistantRAG.allowAll);
+				(assistantRAG.allowedLinks.length > 0 ||
+					assistantRAG.allowedDomains.length > 0 ||
+					assistantRAG.allowAllDomains);
 
 			// if websearch is enabled and the assistant is not specified or it is and has a rag
 			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {

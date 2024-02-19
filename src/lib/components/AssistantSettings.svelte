@@ -72,11 +72,11 @@
 
 	let loading = false;
 
-	let ragMode: false | "links" | "domains" | "all" = assistant?.rag?.allowAll
+	let ragMode: false | "links" | "domains" | "all" = assistant?.rag?.allowAllDomains
 		? "all"
-		: assistant?.rag?.links?.length ?? 0 > 0
+		: assistant?.rag?.allowedLinks?.length ?? 0 > 0
 		? "links"
-		: (assistant?.rag?.allowList?.length ?? 0) > 0
+		: (assistant?.rag?.allowedDomains?.length ?? 0) > 0
 		? "domains"
 		: false;
 </script>
@@ -343,7 +343,7 @@
 						name="ragLinkList"
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
-						value={assistant?.rag?.links.join(";") ?? ""}
+						value={assistant?.rag?.allowedLinks.join(";") ?? ""}
 					/>
 					<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
 				{/if}
@@ -367,7 +367,7 @@
 						name="ragDomainList"
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						placeholder="wikipedia.org;bbc.com"
-						value={assistant?.rag?.allowList?.join(";") ?? ""}
+						value={assistant?.rag?.allowedDomains?.join(";") ?? ""}
 					/>
 					<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
 				{/if}

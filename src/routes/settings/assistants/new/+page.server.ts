@@ -104,9 +104,9 @@ export const actions: Actions = {
 			userCount: 1,
 			featured: false,
 			rag: {
-				links: parse.data.ragLinkList,
-				allowList: parse.data.ragDomainList,
-				allowAll: parse.data.ragAllowAll,
+				allowedLinks: parse.data.ragLinkList,
+				allowedDomains: parse.data.ragDomainList,
+				allowAllDomains: parse.data.ragAllowAll,
 			},
 		});
 

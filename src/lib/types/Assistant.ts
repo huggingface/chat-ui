@@ -15,8 +15,8 @@ export interface Assistant extends Timestamps {
 	userCount?: number;
 	featured?: boolean;
 	rag?: {
-		allowAll: boolean;
-		allowList: string[];
-		links: string[];
+		allowAllDomains: boolean;
+		allowedDomains: string[];
+		allowedLinks: string[];
 	};
 }
