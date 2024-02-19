@@ -55,7 +55,7 @@
 					{assistant?.name}
 				</h1>
 				<span
-					class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500 dark:text-gray-400"
+					class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500 dark:border-gray-600 dark:text-gray-400"
 					>public</span
 				>
 			</div>

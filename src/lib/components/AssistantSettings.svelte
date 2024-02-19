@@ -120,7 +120,7 @@
 		<h2 class="text-xl font-semibold dark:text-gray-300">Create new assistant</h2>
 		<p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
 			Create and share your own AI Assistant. All assistants are <span
-				class="rounded-full border px-2 py-0.5 leading-none">public</span
+				class="rounded-full border px-2 py-0.5 leading-none dark:border-gray-600">public</span
 			>
 		</p>
 	{/if}
