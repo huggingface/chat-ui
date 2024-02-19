@@ -16,6 +16,7 @@ export const load = async ({ url, locals }) => {
 	const modelId = url.searchParams.get("modelId");
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const username = url.searchParams.get("user");
+	const query = url.searchParams.get("q");
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
 	let user: Pick<User, "_id"> | null = null;
@@ -34,6 +35,7 @@ export const load = async ({ url, locals }) => {
 		...(modelId && { modelId }),
 		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
 		...(user ? { createdById: user._id } : { featured: true }),
+		...(query && { name: { $regex: query, $options: "i" } }),
 	};
 	const assistants = await collections.assistants
 		.find(filter)
@@ -49,5 +51,6 @@ export const load = async ({ url, locals }) => {
 		selectedModel: modelId ?? "",
 		numTotalItems,
 		numItemsPerPage: NUM_PER_PAGE,
+		query,
 	};
 };

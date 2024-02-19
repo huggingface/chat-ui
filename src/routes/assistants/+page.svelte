@@ -14,14 +14,19 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
+	import CarbonSearch from "~icons/carbon/search";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
+	import { debounce } from "$lib/utils/debounce";
 
 	export let data: PageData;
 
 	$: assistantsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
+
+	const DEBOUNCE_DELAY = 400;
+	let filterInputEl: HTMLInputElement;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
@@ -30,6 +35,15 @@
 		});
 		goto(newUrl);
 	};
+
+	const filterOnName = debounce(async (e: Event) => {
+		const value = (e.target as HTMLInputElement).value;
+		const newUrl = getHref($page.url, { newKeys: { q: value } });
+		await goto(newUrl);
+		setTimeout(() => {
+			filterInputEl.focus();
+		}, 0);
+	}, DEBOUNCE_DELAY);
 </script>
 
 <svelte:head>
@@ -96,7 +110,7 @@
 					{assistantsCreator}'s Assistants
 					<a
 						href={getHref($page.url, {
-							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
 						class="group"
 						><CarbonClose
@@ -116,7 +130,7 @@
 			{:else}
 				<a
 					href={getHref($page.url, {
-						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 					})}
 					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
 						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
@@ -129,9 +143,9 @@
 					<a
 						href={getHref($page.url, {
 							newKeys: { user: data.user.username },
-							existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q"] },
 						})}
-						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+						class="flex items-center gap-1.5 truncate rounded-full border px-3 py-1 {assistantsCreator &&
 						createdByMe
 							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 							: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
@@ -139,6 +153,20 @@
 					</a>
 				{/if}
 			{/if}
+			<div
+				class="ml-auto mr-2 flex h-9 w-9 items-center gap-x-2 rounded-full border border-gray-300 px-2 transition-all duration-300 ease-out hover:w-64 md:w-64 dark:border-gray-500"
+			>
+				<button class="flex-shrink-0 cursor-default" on:click={() => filterInputEl.focus()}
+					><CarbonSearch class="text-gray-400" /></button
+				>
+				<input
+					class="h-9 w-full rounded-full bg-transparent focus:outline-none"
+					placeholder="Filter by name"
+					value={data.query}
+					on:input={filterOnName}
+					bind:this={filterInputEl}
+				/>
+			</div>
 		</div>
 
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
