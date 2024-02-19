@@ -55,7 +55,7 @@
 					{assistant?.name}
 				</h1>
 				<span
-					class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500 dark:text-gray-400"
+					class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500 dark:border-gray-600 dark:text-gray-400"
 					>public</span
 				>
 			</div>
@@ -76,8 +76,8 @@
 			<div class="flex items-center gap-4 whitespace-nowrap text-sm">
 				<button
 					class="{isActive
-						? 'bg-gray-100 text-gray-800 dark:bg-gray-300 dark:text-gray-900'
-						: 'bg-black text-white dark:bg-gray-800 dark:text-gray-300'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
+						? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+						: 'bg-black text-white dark:bg-gray-300 dark:text-gray-900'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
 					disabled={isActive}
 					name="Activate model"
 					on:click|stopPropagation={() => {
