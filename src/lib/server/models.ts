@@ -25,6 +25,7 @@ const modelConfig = z.object({
 	name: z.string().default(""),
 	displayName: z.string().min(1).optional(),
 	description: z.string().min(1).optional(),
+	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
 	datasetName: z.string().min(1).optional(),
