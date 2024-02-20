@@ -35,7 +35,7 @@ export const load = async ({ url, locals }) => {
 		...(modelId && { modelId }),
 		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
 		...(user ? { createdById: user._id } : { featured: true }),
-		...(query && { name: { $regex: query, $options: "i" } }),
+		...(query && { $text: { $search: query } }),
 	};
 	const assistants = await collections.assistants
 		.find(filter)
