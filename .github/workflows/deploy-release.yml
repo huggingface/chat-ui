@@ -26,6 +26,7 @@ jobs:
           MONGODB_URL: ${{ secrets.MONGODB_URL }}
           HF_DEPLOYMENT_TOKEN: ${{ secrets.HF_DEPLOYMENT_TOKEN }}
           WEBHOOK_URL_REPORT_ASSISTANT: ${{ secrets.WEBHOOK_URL_REPORT_ASSISTANT }}
+          ADMIN_API_SECRET: ${{ secrets.ADMIN_API_SECRET }}
         run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest

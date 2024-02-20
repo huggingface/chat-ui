@@ -1,8 +1,4 @@
-import {
-	PARQUET_EXPORT_DATASET,
-	PARQUET_EXPORT_HF_TOKEN,
-	PARQUET_EXPORT_SECRET,
-} from "$env/static/private";
+import { PARQUET_EXPORT_DATASET, PARQUET_EXPORT_HF_TOKEN } from "$env/static/private";
 import { collections } from "$lib/server/database";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
@@ -13,15 +9,11 @@ import parquet from "parquetjs";
 import { z } from "zod";
 
 // Triger like this:
-// curl -X POST "http://localhost:5173/chat/admin/export" -H "Authorization: Bearer <PARQUET_EXPORT_SECRET>" -H "Content-Type: application/json" -d '{"model": "OpenAssistant/oasst-sft-6-llama-30b-xor"}'
+// curl -X POST "http://localhost:5173/chat/admin/export" -H "Authorization: Bearer <ADMIN_API_SECRET>" -H "Content-Type: application/json" -d '{"model": "OpenAssistant/oasst-sft-6-llama-30b-xor"}'
 
 export async function POST({ request }) {
-	if (!PARQUET_EXPORT_SECRET || !PARQUET_EXPORT_DATASET || !PARQUET_EXPORT_HF_TOKEN) {
+	if (!PARQUET_EXPORT_DATASET || !PARQUET_EXPORT_HF_TOKEN) {
 		throw error(500, "Parquet export is not configured.");
-	}
-
-	if (request.headers.get("Authorization") !== `Bearer ${PARQUET_EXPORT_SECRET}`) {
-		throw error(403);
 	}
 
 	const { model } = z
