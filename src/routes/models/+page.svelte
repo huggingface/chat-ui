@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN, PUBLIC_APP_NAME } from "$env/static/public";
+	import { PUBLIC_APP_NAME } from "$env/static/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { base } from "$app/paths";
@@ -18,10 +18,6 @@
 		<meta property="og:title" content="HuggingChat - Models" />
 		<meta property="og:type" content="link" />
 		<meta property="og:description" content="Browse HuggingChat available models" />
-		<meta
-			property="og:image"
-			content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/models-thumbnail.png"
-		/>
 		<meta property="og:url" content={$page.url.href} />
 	{/if}
 </svelte:head>
@@ -68,7 +64,7 @@
 					<dt class="flex items-center gap-2 font-semibold">
 						{model.displayName}
 					</dt>
-					<dd class="text-sm text-gray-500 dark:text-gray-400">{model.description}</dd>
+					<dd class="text-sm text-gray-500 dark:text-gray-400">{model.description || "-"}</dd>
 				</a>
 			{/each}
 		</dl>
