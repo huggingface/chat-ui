@@ -16,7 +16,7 @@ export const load = async ({ url, locals }) => {
 	const modelId = url.searchParams.get("modelId");
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const username = url.searchParams.get("user");
-	const query = url.searchParams.get("q");
+	const query = url.searchParams.get("q")?.trim();
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
 	let user: Pick<User, "_id"> | null = null;
