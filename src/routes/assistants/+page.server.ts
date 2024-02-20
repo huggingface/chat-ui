@@ -3,6 +3,7 @@ import { ENABLE_ASSISTANTS } from "$env/static/private";
 import { collections } from "$lib/server/database.js";
 import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
+import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import { error, redirect } from "@sveltejs/kit";
 import type { Filter } from "mongodb";
 
@@ -35,12 +36,12 @@ export const load = async ({ url, locals }) => {
 		...(modelId && { modelId }),
 		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
 		...(user ? { createdById: user._id } : { featured: true }),
-		...(query && { $text: { $search: query } }),
+		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 	};
 	const assistants = await collections.assistants
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
-		.sort({ ...(query && { score: { $meta: "textScore" } }), userCount: -1 })
+		.sort({ userCount: -1 })
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
