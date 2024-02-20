@@ -42,17 +42,26 @@
 		</div>
 		<h3 class="text-gray-500">All models available on {PUBLIC_APP_NAME}</h3>
 		<dl class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
-			{#each data.models.filter((el) => !el.unlisted) as model (model.id)}
+			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
 				<a
 					href="{base}/settings/{model.id}"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
 					{#if model.logoUrl}
-						<img
-							class=" overflown aspect-square size-6 rounded border dark:border-gray-700"
-							src={model.logoUrl}
-							alt=""
-						/>
+						<div class="flex items-center justify-between">
+							<img
+								class=" overflown aspect-square size-6 rounded border dark:border-gray-700"
+								src={model.logoUrl}
+								alt=""
+							/>
+							{#if index === 0}
+								<div
+									class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
+								>
+									Default
+								</div>
+							{/if}
+						</div>
 					{:else}
 						<div class="size-6 rounded border border-transparent bg-gray-300 dark:bg-gray-800" />
 					{/if}
