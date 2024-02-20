@@ -12,6 +12,7 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import TokensCounter from "./TokensCounter.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -28,6 +29,10 @@
 	export let models: Model[] = [];
 
 	let files: FileList | null = null;
+	let selectedModel: Model | undefined = models.find(
+		(model) => assistant?.modelId && assistant.modelId === model.id
+	);
+	let enteredSystemPrompt = "";
 
 	const settings = useSettingsStore();
 
@@ -68,6 +73,15 @@
 
 	function getError(field: string, returnForm: ActionData) {
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
+	}
+
+	function onModelChange(e: Event) {
+		const modelId = (e.target as HTMLSelectElement).value;
+		selectedModel = models.find((model) => model.id === modelId);
+	}
+
+	function onPromptChange(e: Event) {
+		enteredSystemPrompt = (e.target as HTMLSelectElement).value;
 	}
 
 	let deleteExistingAvatar = false;
@@ -238,7 +252,11 @@
 
 			<label>
 				<div class="mb-1 font-semibold">Model</div>
-				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
+				<select
+					name="modelId"
+					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					on:change={onModelChange}
+				>
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
@@ -395,6 +413,12 @@
 				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
+				on:input={onPromptChange}
+			/>
+			<TokensCounter
+				classNames="absolute bottom-2 right-2"
+				prompt={enteredSystemPrompt}
+				model={selectedModel}
 			/>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</div>
