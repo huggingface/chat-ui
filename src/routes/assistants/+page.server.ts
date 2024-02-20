@@ -40,7 +40,7 @@ export const load = async ({ url, locals }) => {
 	const assistants = await collections.assistants
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
-		.sort({ userCount: -1 })
+		.sort({ ...(query && { score: { $meta: "textScore" } }), userCount: -1 })
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
