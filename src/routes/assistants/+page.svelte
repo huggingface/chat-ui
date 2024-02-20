@@ -4,6 +4,7 @@
 	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
+	import { tick } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -25,8 +26,9 @@
 	$: assistantsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
 
-	const DEBOUNCE_DELAY = 400;
+	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement;
+	let searchDisabled = false;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
@@ -37,13 +39,16 @@
 	};
 
 	const filterOnName = debounce(async (e: Event) => {
+		searchDisabled = true;
 		const value = (e.target as HTMLInputElement).value;
 		const newUrl = getHref($page.url, { newKeys: { q: value } });
 		await goto(newUrl);
-		setTimeout(() => {
+		setTimeout(async () => {
+			searchDisabled = false;
+			await tick();
 			filterInputEl.focus();
 		}, 0);
-	}, DEBOUNCE_DELAY);
+	}, SEARCH_DEBOUNCE_DELAY);
 </script>
 
 <svelte:head>
@@ -166,6 +171,7 @@
 					on:input={filterOnName}
 					bind:this={filterInputEl}
 					maxlength="150"
+					disabled={searchDisabled}
 				/>
 			</div>
 		</div>
