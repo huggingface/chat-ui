@@ -165,6 +165,7 @@
 					value={data.query}
 					on:input={filterOnName}
 					bind:this={filterInputEl}
+					maxlength="150"
 				/>
 			</div>
 		</div>
