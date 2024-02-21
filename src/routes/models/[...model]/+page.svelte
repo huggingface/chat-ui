@@ -22,7 +22,7 @@
 	<meta property="og:description" content={`Use ${modelId} inside of ${PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/model/{modelId}/thumbnail.png"
+		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
 	<meta property="og:url" content={$page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
