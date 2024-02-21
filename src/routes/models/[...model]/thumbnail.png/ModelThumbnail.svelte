@@ -27,7 +27,7 @@
 	</p>
 
 	<div
-		class="flex h-[200px] w-[1200px] flex-col items-center self-end self-center rounded-b-none pb-10 bg-{PUBLIC_APP_COLOR}-100 pt-10 text-4xl text-{PUBLIC_APP_COLOR}-800"
+		class="flex h-[200px] w-[1200px] flex-col items-center self-center rounded-b-none pb-10 bg-{PUBLIC_APP_COLOR}-100 pt-10 text-4xl text-{PUBLIC_APP_COLOR}-800"
 		style="border-radius: 100% 100% 0 0 / 30%;"
 	>
 		Try it now
