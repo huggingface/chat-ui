@@ -27,7 +27,5 @@ export async function load({ params, locals }) {
 				upsert: true,
 			}
 		);
-
-		throw redirect(302, `${base}/`);
 	}
 }

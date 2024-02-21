@@ -8,21 +8,21 @@
 
 	const settings = useSettingsStore();
 
-	const model = $page.params.model;
+	const modelId = $page.params.model;
 
 	onMount(async () => {
-		$settings.activeModel = model;
+		$settings.activeModel = modelId;
 		await goto(`${base}/`, { invalidateAll: true });
 	});
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={model + " - " + PUBLIC_APP_NAME} />
+	<meta property="og:title" content={modelId + " - " + PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${model} inside of ${PUBLIC_APP_NAME}`} />
+	<meta property="og:description" content={`Use ${modelId} inside of ${PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/model/{model}/thumbnail.png"
+		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/model/{modelId}/thumbnail.png"
 	/>
 	<meta property="og:url" content={$page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
