@@ -95,9 +95,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		})
 		.toArray();
 
-	const assistantIds = conversations
-		.map((conv) => conv.assistantId)
-		.filter((el) => !!el) as ObjectId[];
+	const assistantIds = settings?.assistants?.map((assistantId) => assistantId) ?? [];
 
 	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
@@ -157,6 +155,12 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
+		assistants: assistants.map((el) => ({
+			...el,
+			_id: el._id.toString(),
+			createdById: undefined,
+			createdByMe: el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+		})),
 		user: locals.user && {
 			id: locals.user._id.toString(),
 			username: locals.user.username,
