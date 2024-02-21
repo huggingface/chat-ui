@@ -233,7 +233,7 @@
 			// we read the stream until we get the final answer
 			while (finalAnswer === "") {
 				// check for abort
-				if ($isAborted) {
+				if ($isAborted || $error) {
 					reader?.cancel();
 					break;
 				}
