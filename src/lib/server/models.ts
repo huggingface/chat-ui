@@ -58,9 +58,9 @@ const modelConfig = z.object({
 	endpoints: z.array(endpointSchema).optional(),
 	parameters: z
 		.object({
-			temperature: z.number().min(0).max(1),
+			temperature: z.number().min(0).max(1).optional(),
 			truncate: z.number().int().positive().optional(),
-			max_new_tokens: z.number().int().positive(),
+			max_new_tokens: z.number().int().positive().optional(),
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),
