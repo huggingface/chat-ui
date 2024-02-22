@@ -93,6 +93,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			createdAt: 1,
 			assistantId: 1,
 		})
+		.limit(100)
 		.toArray();
 
 	const assistantIds = settings?.assistants?.map((assistantId) => assistantId) ?? [];
