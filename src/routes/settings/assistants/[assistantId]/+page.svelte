@@ -107,7 +107,7 @@
 							<CarbonCopy class="mr-1.5 inline text-xs" />Duplicate</button
 						>
 					</form>
-					{#if !assistant?.reported}
+					{#if !data.isReported}
 						<button
 							type="button"
 							on:click={() => {
