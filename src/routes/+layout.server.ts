@@ -91,8 +91,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			(
 				await collections.conversations
 					.aggregate([
-						{ $match: authCondition(locals) },
+						{ $match: authCondition(locals), "messages.from": "assistant" },
 						{ $project: { messages: 1 } },
+						{ $limit:  messagesBeforeLogin + 1 },
 						{ $unwind: "$messages" },
 						{ $match: { "messages.from": "assistant" } },
 						{ $count: "messages" },
