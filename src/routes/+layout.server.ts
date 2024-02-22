@@ -93,7 +93,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			createdAt: 1,
 			assistantId: 1,
 		})
-		.limit(100)
+		.limit(300)
 		.toArray();
 
 	const assistantIds = [
