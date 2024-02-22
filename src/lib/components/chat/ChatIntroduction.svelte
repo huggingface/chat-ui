@@ -59,7 +59,18 @@
 			<div class="flex p-3">
 				<div>
 					<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
-					<div class="font-semibold">{currentModel.displayName}</div>
+					<div class="flex items-center gap-1.5 font-semibold max-sm:text-smd">
+						{#if currentModel.logoUrl}
+							<img
+								class=" overflown aspect-square size-4 rounded border dark:border-gray-700"
+								src={currentModel.logoUrl}
+								alt=""
+							/>
+						{:else}
+							<div class="size-4 rounded border border-transparent bg-gray-300 dark:bg-gray-800" />
+						{/if}
+						{currentModel.displayName}
+					</div>
 				</div>
 				<a
 					href="{base}/settings/{currentModel.id}"
