@@ -150,7 +150,7 @@
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 					on:click={() => {
 						if (data.settings.assistants.includes(assistant._id.toString())) {
-							$settings.activeModel = assistant._id.toString();
+							settings.instantSet({ activeModel: assistant._id.toString() });
 							goto(`${base}` || "/");
 						} else {
 							goto(`${base}/assistant/${assistant._id}`);
