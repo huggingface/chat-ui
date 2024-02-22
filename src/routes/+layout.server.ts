@@ -46,6 +46,26 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		});
 	}
 
+	// get the number of messages where `from === "assistant"` across all conversations.
+	const totalMessages =
+		(
+			await collections.conversations
+				.aggregate([
+					{ $match: authCondition(locals) },
+					{ $project: { messages: 1 } },
+					{ $unwind: "$messages" },
+					{ $match: { "messages.from": "assistant" } },
+					{ $count: "messages" },
+				])
+				.toArray()
+		)[0]?.messages ?? 0;
+
+	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+
+	const userHasExceededMessages = messagesBeforeLogin > 0 && totalMessages > messagesBeforeLogin;
+
+	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
+
 	const enableAssistants = ENABLE_ASSISTANTS === "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
@@ -82,29 +102,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	];
 
 	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
-
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
-
-	let loginRequired = conversations.length > messagesBeforeLogin;
-
-	if (!loginRequired && messagesBeforeLogin && requiresUser && !locals.user) {
-		// get the number of messages where `from === "assistant"` across all conversations.
-		const totalMessages =
-			(
-				await collections.conversations
-					.aggregate([
-						{ $match: authCondition(locals), "messages.from": "assistant" },
-						{ $project: { messages: 1 } },
-						{ $limit: messagesBeforeLogin + 1 },
-						{ $unwind: "$messages" },
-						{ $match: { "messages.from": "assistant" } },
-						{ $count: "messages" },
-					])
-					.toArray()
-			)[0]?.messages ?? 0;
-
-		loginRequired = totalMessages > messagesBeforeLogin;
-	}
 
 	return {
 		conversations: conversations.map((conv) => {
