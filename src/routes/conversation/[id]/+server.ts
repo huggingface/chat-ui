@@ -72,18 +72,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
+	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+
 	// guest mode check
-	if (
-		!locals.user?._id &&
-		requiresUser &&
-		(MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0
-	) {
+	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
 		const totalMessages =
 			(
 				await collections.conversations
 					.aggregate([
-						{ $match: authCondition(locals) },
+						{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
 						{ $project: { messages: 1 } },
+						{ $limit: messagesBeforeLogin + 1 },
 						{ $unwind: "$messages" },
 						{ $match: { "messages.from": "assistant" } },
 						{ $count: "messages" },
@@ -91,7 +90,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.toArray()
 			)[0]?.messages ?? 0;
 
-		if (totalMessages > parseInt(MESSAGES_BEFORE_LOGIN)) {
+		if (totalMessages > messagesBeforeLogin) {
 			throw error(429, "Exceeded number of messages before login");
 		}
 	}
