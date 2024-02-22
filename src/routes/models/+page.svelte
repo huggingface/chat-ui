@@ -22,7 +22,7 @@
 	{/if}
 </svelte:head>
 
-<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
+<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Models</h1>
@@ -40,7 +40,7 @@
 		<dl class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
 			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
 				<a
-					href="{base}/settings/{model.id}"
+					href="{base}/?model={model.id}"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
 					<div class="flex items-center justify-between">
