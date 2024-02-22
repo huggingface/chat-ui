@@ -96,7 +96,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		.limit(100)
 		.toArray();
 
-	const assistantIds = settings?.assistants?.map((assistantId) => assistantId) ?? [];
+	const assistantIds = [
+		...(settings?.assistants?.map((assistantId) => assistantId) ?? []),
+		...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
+	];
 
 	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
