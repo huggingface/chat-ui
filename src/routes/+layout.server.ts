@@ -76,8 +76,11 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		.limit(300)
 		.toArray();
 
+	const userAssistants = settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
+	const userAssistantsSet = new Set(userAssistants);
+
 	const assistantIds = [
-		...(settings?.assistants?.map((assistantId) => assistantId) ?? []),
+		...userAssistants.map((el) => new ObjectId(el)),
 		...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
 	];
 
@@ -147,7 +150,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				settings?.shareConversationsWithModelAuthors ??
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
-			assistants: settings?.assistants?.map((el) => el.toString()) ?? [],
+			assistants: userAssistants,
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -166,12 +169,15 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
-		assistants: assistants.map((el) => ({
-			...el,
-			_id: el._id.toString(),
-			createdById: undefined,
-			createdByMe: el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-		})),
+		assistants: assistants
+			.filter((el) => userAssistantsSet.has(el._id.toString()))
+			.map((el) => ({
+				...el,
+				_id: el._id.toString(),
+				createdById: undefined,
+				createdByMe:
+					el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+			})),
 		user: locals.user && {
 			id: locals.user._id.toString(),
 			username: locals.user.username,
