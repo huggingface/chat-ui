@@ -50,7 +50,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	let loginRequired = false;
 
-	if (requiresUser && !locals.user) {
+	if (requiresUser && !locals.user && messagesBeforeLogin) {
 		// get the number of messages where `from === "assistant"` across all conversations.
 		const totalMessages =
 			(
@@ -65,7 +65,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 					.toArray()
 			)[0]?.messages ?? 0;
 
-		loginRequired = messagesBeforeLogin > 0 && totalMessages > messagesBeforeLogin;
+		loginRequired = totalMessages > messagesBeforeLogin;
 	}
 
 	const enableAssistants = ENABLE_ASSISTANTS === "true";
