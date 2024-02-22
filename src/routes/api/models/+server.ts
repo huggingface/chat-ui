@@ -10,6 +10,7 @@ export async function GET() {
 		datasetUrl: model.datasetUrl,
 		displayName: model.displayName,
 		description: model.description,
+		logoUrl: model.logoUrl,
 		promptExamples: model.promptExamples,
 		preprompt: model.preprompt,
 		multimodal: model.multimodal,

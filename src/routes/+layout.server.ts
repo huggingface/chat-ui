@@ -149,6 +149,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			datasetUrl: model.datasetUrl,
 			displayName: model.displayName,
 			description: model.description,
+			logoUrl: model.logoUrl,
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
 			preprompt: model.preprompt,
