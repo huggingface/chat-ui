@@ -111,7 +111,6 @@ export function endpointLlamacpp(
 								stop = true;
 								reader?.cancel();
 							}
-							console.log(output);
 							yield output;
 						}
 					}
