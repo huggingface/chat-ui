@@ -68,11 +68,11 @@
 				}}
 			>
 				<button
-					class="flex items-center rounded-full border border-gray-300 px-3 py-1 text-gray-900 hover:bg-gray-100"
+					class="flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm text-gray-900 hover:bg-gray-100"
 					name="Settings"
 					type="submit"
 				>
-					<IconGear class="mr-1.5 text-xs" />
+					<IconGear class="mr-1.5 text-xxs" />
 					Settings
 				</button>
 			</form>
