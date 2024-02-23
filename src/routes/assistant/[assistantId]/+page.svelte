@@ -8,6 +8,7 @@
 	import { applyAction, enhance } from "$app/forms";
 	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import { page } from "$app/stores";
+	import IconGear from "~icons/bi/gear-fill";
 
 	export let data: PageData;
 
@@ -47,6 +48,35 @@
 		}}
 		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-3 overflow-hidden rounded-2xl bg-white p-4 pt-6 text-center shadow-2xl outline-none max-sm:w-[85dvw] max-sm:px-6 md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 	>
+		<div class="absolute right-0 top-0 m-6">
+			<form
+				method="POST"
+				action="{base}/settings/assistants/{data.assistant._id}?/subscribe"
+				class="w-full"
+				use:enhance={() => {
+					return async ({ result }) => {
+						// `result` is an `ActionResult` object
+						if (result.type === "success") {
+							$settings.activeModel = data.assistant._id;
+							await goto(`${base}/settings/assistants/${data.assistant._id}`, {
+								invalidateAll: true,
+							});
+						} else {
+							await applyAction(result);
+						}
+					};
+				}}
+			>
+				<button
+					class="flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm text-gray-900 hover:bg-gray-100"
+					name="Settings"
+					type="submit"
+				>
+					<IconGear class="mr-1.5 text-xxs" />
+					Settings
+				</button>
+			</form>
+		</div>
 		{#if data.assistant.avatar}
 			<img
 				class="size-16 flex-none rounded-full object-cover sm:size-24"

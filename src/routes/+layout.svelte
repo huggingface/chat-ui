@@ -116,7 +116,9 @@
 		if ($settings.activeModel === $page.url.searchParams.get("model")) {
 			goto(`${base}/?`);
 		}
-		$settings.activeModel = $page.url.searchParams.get("model") ?? $settings.activeModel;
+		settings.instantSet({
+			activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
+		});
 	}
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
