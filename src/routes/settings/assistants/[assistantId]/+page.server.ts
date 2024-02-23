@@ -22,16 +22,8 @@ async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	return assistant;
 }
 
-export async function load({ parent, params, locals }) {
-	const data = await parent();
-
+export async function load({ params, locals }) {
 	const assistantId = params.assistantId;
-
-	const assistant = data.settings.assistants.find((id) => id === assistantId);
-	if (!assistant) {
-		throw redirect(302, `${base}/assistant/${params.assistantId}`);
-	}
-
 	let isReported = false;
 
 	const createdBy = locals.user?._id ?? locals.sessionId;
