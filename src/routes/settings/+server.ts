@@ -15,6 +15,7 @@ export async function POST({ request, locals }) {
 			ethicsModalAccepted: z.boolean().optional(),
 			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 			customPrompts: z.record(z.string()).default({}),
+			customInstruction: z.string().default(""),
 		})
 		.parse(body);
 

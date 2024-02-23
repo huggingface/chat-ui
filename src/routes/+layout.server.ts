@@ -139,6 +139,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: settings?.assistants?.map((el) => el.toString()) ?? [],
+			customInstruction: settings?.customInstruction ?? "",
 		},
 		models: models.map((model) => ({
 			id: model.id,

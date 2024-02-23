@@ -15,6 +15,7 @@ type SettingsStore = {
 	customPrompts: Record<string, string>;
 	recentlySaved: boolean;
 	assistants: Array<ObjectId | string>;
+	customInstruction: string;
 };
 
 export function useSettingsStore() {
