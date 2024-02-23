@@ -56,36 +56,37 @@ export function endpointLlamacpp(
 			let generatedText = "";
 			let tokenId = 0;
 			let accumulatedData = ""; // Buffer to accumulate data chunks
-		
+
 			while (!stop) {
 				// Read the stream and log the outputs to console
 				const out = (await reader?.read()) ?? { done: false, value: undefined };
-		
+
 				// If it's done, we cancel
 				if (out.done) {
 					reader?.cancel();
 					return;
 				}
-		
+
 				if (!out.value) {
 					return;
 				}
-		
+
 				// Accumulate the data chunk
 				accumulatedData += out.value;
-		
+
 				// Process each complete JSON object in the accumulated data
-				while (accumulatedData.includes("\n")) { // Assuming each JSON object ends with a newline
+				while (accumulatedData.includes("\n")) {
+					// Assuming each JSON object ends with a newline
 					const endIndex = accumulatedData.indexOf("\n");
 					let jsonString = accumulatedData.substring(0, endIndex).trim();
-		
+
 					// Remove the processed part from the buffer
 					accumulatedData = accumulatedData.substring(endIndex + 1);
-		
+
 					if (jsonString.startsWith("data: ")) {
 						jsonString = jsonString.slice(6);
 						let data = null;
-		
+
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
@@ -93,7 +94,7 @@ export function endpointLlamacpp(
 							console.error("Problematic JSON string:", jsonString);
 							continue; // Skip this iteration and try the next chunk
 						}
-		
+
 						// Handle the parsed data
 						if (data.content || data.stop) {
 							generatedText += data.content;
