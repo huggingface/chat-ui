@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -261,6 +261,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				)?.rag ?? undefined;
 
 			const assistantHasRAG =
+				ENABLE_ASSISTANTS_RAG === "true" &&
 				rag &&
 				(rag.allowedLinks.length > 0 || rag.allowedDomains.length > 0 || rag.allowAllDomains);
 
