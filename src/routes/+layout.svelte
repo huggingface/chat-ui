@@ -116,8 +116,14 @@
 		if ($settings.activeModel === $page.url.searchParams.get("model")) {
 			goto(`${base}/?`);
 		}
-		$settings.activeModel = $page.url.searchParams.get("model") ?? $settings.activeModel;
+		settings.instantSet({
+			activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
+		});
 	}
+
+	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
+		? ""
+		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
 </script>
 
 <svelte:head>
@@ -166,18 +172,14 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== "/privacy"}
+{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy`}
 	<DisclaimerModal />
 {/if}
 
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd md:grid-cols-[280px,1fr] md:grid-rows-[1fr] dark:text-gray-300"
 >
-	<MobileNav
-		isOpen={isNavOpen}
-		on:toggle={(ev) => (isNavOpen = ev.detail)}
-		title={data.conversations.find((conv) => conv.id === $page.params.id)?.title}
-	>
+	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}

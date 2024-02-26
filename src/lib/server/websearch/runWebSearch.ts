@@ -26,14 +26,11 @@ const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
 
 export async function runWebSearch(
 	conv: Conversation,
-	prompt: string,
+	messages: Message[],
 	updatePad: (upd: MessageUpdate) => void,
 	ragSettings?: Assistant["rag"]
 ) {
-	const messages = (() => {
-		return [...conv.messages, { content: prompt, from: "user", id: crypto.randomUUID() }];
-	})() satisfies Message[];
-
+	const prompt = messages[messages.length - 1].content;
 	const webSearch: WebSearch = {
 		prompt,
 		searchQuery: "",

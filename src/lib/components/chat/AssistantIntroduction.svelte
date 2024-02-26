@@ -12,7 +12,7 @@
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
-<div class="flex h-full w-full flex-col content-center items-center justify-center">
+<div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
 	<div
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>

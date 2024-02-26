@@ -10,7 +10,7 @@ export async function generateFromDefaultEndpoint({
 }): Promise<string> {
 	const endpoint = await smallModel.getEndpoint();
 
-	const tokenStream = await endpoint({ conversation: { messages, preprompt } });
+	const tokenStream = await endpoint({ messages, preprompt });
 
 	for await (const output of tokenStream) {
 		// if not generated_text is here it means the generation is not done

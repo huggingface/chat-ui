@@ -12,6 +12,7 @@
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
+	import ReportModal from "./ReportModal.svelte";
 
 	export let data: PageData;
 
@@ -24,8 +25,13 @@
 	const prefix = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
+
+	let displayReportModal = false;
 </script>
 
+{#if displayReportModal}
+	<ReportModal on:close={() => (displayReportModal = false)} />
+{/if}
 <div class="flex h-full flex-col gap-2">
 	<div class="flex gap-6">
 		{#if assistant?.avatar}
@@ -102,11 +108,15 @@
 						>
 					</form>
 					{#if !assistant?.reported}
-						<form method="POST" action="?/report" use:enhance>
-							<button type="submit" class="underline">
-								<CarbonFlag class="mr-1.5 inline text-xs" />Report</button
-							>
-						</form>
+						<button
+							type="button"
+							on:click={() => {
+								displayReportModal = true;
+							}}
+							class="underline"
+						>
+							<CarbonFlag class="mr-1.5 inline text-xs" />Report
+						</button>
 					{:else}
 						<button type="button" disabled class="text-gray-700">
 							<CarbonFlag class="mr-1.5 inline text-xs" />Reported</button

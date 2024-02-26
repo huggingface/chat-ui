@@ -36,11 +36,11 @@ export async function endpointAws(
 		region,
 	});
 
-	return async ({ conversation }) => {
+	return async ({ messages, preprompt, continueMessage }) => {
 		const prompt = await buildPrompt({
-			messages: conversation.messages,
-			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-			preprompt: conversation.preprompt,
+			messages,
+			continueMessage,
+			preprompt,
 			model,
 		});
 

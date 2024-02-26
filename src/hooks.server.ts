@@ -1,4 +1,10 @@
-import { COOKIE_NAME, EXPOSE_API, MESSAGES_BEFORE_LOGIN } from "$env/static/private";
+import {
+	ADMIN_API_SECRET,
+	COOKIE_NAME,
+	EXPOSE_API,
+	MESSAGES_BEFORE_LOGIN,
+	PARQUET_EXPORT_SECRET,
+} from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
@@ -27,6 +33,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 				"content-type": sendJson ? "application/json" : "text/plain",
 			},
 		});
+	}
+
+	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
+		const ADMIN_SECRET = ADMIN_API_SECRET || PARQUET_EXPORT_SECRET;
+
+		if (!ADMIN_SECRET) {
+			return errorResponse(500, "Admin API is not configured");
+		}
+
+		if (event.request.headers.get("Authorization") !== `Bearer ${ADMIN_SECRET}`) {
+			return errorResponse(401, "Unauthorized");
+		}
 	}
 
 	const token = event.cookies.get(COOKIE_NAME);

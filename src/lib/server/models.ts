@@ -25,6 +25,7 @@ const modelConfig = z.object({
 	name: z.string().default(""),
 	displayName: z.string().min(1).optional(),
 	description: z.string().min(1).optional(),
+	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
 	datasetName: z.string().min(1).optional(),
@@ -57,9 +58,9 @@ const modelConfig = z.object({
 	endpoints: z.array(endpointSchema).optional(),
 	parameters: z
 		.object({
-			temperature: z.number().min(0).max(1),
+			temperature: z.number().min(0).max(1).optional(),
 			truncate: z.number().int().positive().optional(),
-			max_new_tokens: z.number().int().positive(),
+			max_new_tokens: z.number().int().positive().optional(),
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),

@@ -17,8 +17,12 @@ type SettingsStore = {
 	assistants: Array<ObjectId | string>;
 };
 
+type SettingsStoreWritable = Writable<SettingsStore> & {
+	instantSet: (settings: Partial<SettingsStore>) => Promise<void>;
+};
+
 export function useSettingsStore() {
-	return getContext<Writable<SettingsStore>>("settings");
+	return getContext<SettingsStoreWritable>("settings");
 }
 
 export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlySaved">) {
@@ -64,14 +68,35 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			// debounce server calls by 300ms
 		}
 	}
+	async function instantSet(settings: Partial<SettingsStore>) {
+		baseStore.update((s) => ({
+			...s,
+			...settings,
+		}));
+
+		if (browser) {
+			await fetch(`${base}/settings`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					...get(baseStore),
+					...settings,
+				}),
+			});
+			invalidate(UrlDependency.ConversationList);
+		}
+	}
 
 	const newStore = {
 		subscribe: baseStore.subscribe,
 		set: setSettings,
+		instantSet,
 		update: (fn: (s: SettingsStore) => SettingsStore) => {
 			setSettings(fn(get(baseStore)));
 		},
-	} satisfies Writable<SettingsStore>;
+	} satisfies SettingsStoreWritable;
 
 	setContext("settings", newStore);
 
