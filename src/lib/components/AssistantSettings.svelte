@@ -291,8 +291,8 @@
 				value={assistant?.preprompt ?? ""}
 			/>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
-			<div class="flex min-h-44 flex-col flex-nowrap">
-				{#if $page.data.enableAssistantsRAG}
+			{#if $page.data.enableAssistantsRAG}
+				<div class="flex min-h-44 flex-col flex-nowrap">
 					<span class="my-2 text-smd font-semibold"> RAG Settings</span>
 
 					<label>
@@ -373,8 +373,8 @@
 						/>
 						<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
 					{/if}
-				{/if}
-			</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 
