@@ -324,6 +324,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			// inject websearch result & optionally images into the messages
 			const processedMessages = await preprocessMessages(
 				messagesForPrompt,
+				messageToWriteTo.webSearch,
 				model.multimodal,
 				convId
 			);
