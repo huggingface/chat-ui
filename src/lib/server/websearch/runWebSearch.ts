@@ -5,7 +5,7 @@ import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import { getWebSearchProvider } from "./searchWeb";
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
-import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
+import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST, ENABLE_LOCAL_FETCH } from "$env/static/private";
 
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
@@ -15,6 +15,7 @@ import type { Assistant } from "$lib/types/Assistant";
 
 import { z } from "zod";
 import JSON5 from "json5";
+import { Address6, Address4 } from "ip-address";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -49,7 +50,46 @@ export async function runWebSearch(
 		// if the assistant specified direct links, skip the websearch
 		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
 			appendUpdate("Using links specified in assistant directly. Skipping websearch");
-			webSearch.results = ragSettings.allowedLinks.map((link) => {
+
+			let linksToUse = [...ragSettings.allowedLinks];
+
+			if (ENABLE_LOCAL_FETCH !== "true") {
+				linksToUse = linksToUse.filter((link) => {
+					const url = new URL(link);
+
+					// check if the hostname is a valid ipv6 address
+					// make sure it's not loopback address or link-local
+					try {
+						const addr = new Address6(url.hostname);
+						return !(
+							addr.isLoopback() ||
+							addr.isInSubnet(new Address6("::1/128")) ||
+							addr.isLinkLocal()
+						);
+					} catch (e) {
+						// not an ipv6 address
+					}
+
+					// check if the hostname is a valid ipv4 address
+					// make sure it's not in the loopback range
+					try {
+						const addr = new Address4(url.hostname);
+						return !addr.isInSubnet(new Address4("127.0.0.0/8"));
+					} catch (e) {
+						// not an ipv4 address
+					}
+
+					// check if the link hostname is localhost
+					if (url.hostname === "localhost") {
+						return false;
+					}
+
+					// else we're good
+					return true;
+				});
+			}
+
+			webSearch.results = linksToUse.map((link) => {
 				return { link, hostname: new URL(link).hostname, title: "", text: "" };
 			});
 		} else {
