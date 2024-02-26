@@ -333,7 +333,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			// perform websearch if needed
 			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
-				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update);
+				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, rag);
 			}
 
 			// inject websearch result & optionally images into the messages
