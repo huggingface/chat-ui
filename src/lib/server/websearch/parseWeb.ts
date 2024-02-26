@@ -3,7 +3,7 @@ import { JSDOM, VirtualConsole } from "jsdom";
 export async function parseWeb(url: string) {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
-	const r = await fetch(url, { signal: abortController.signal }).catch();
+	const r = await fetch(url, { signal: abortController.signal, credentials: "omit" }).catch();
 
 	if (r.headers.get("content-type")?.includes("text/html")) {
 		const virtualConsole = new VirtualConsole();
