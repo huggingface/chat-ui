@@ -14,6 +14,7 @@ import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
+import type { Assistant } from "$lib/types/Assistant";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -251,17 +252,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			let webSearchResults: WebSearch | undefined;
 
 			// check if assistant has a rag
-			const assistantRAG = await collections.assistants
-				.findOne({ _id: conv.assistantId })
-				.then((a) => {
-					return a?.rag;
-				});
+			const rag =
+				(
+					await collections.assistants.findOne<Pick<Assistant, "rag">>(
+						{ _id: conv.assistantId },
+						{ projection: { rag: 1 } }
+					)
+				)?.rag ?? undefined;
 
 			const assistantHasRAG =
-				assistantRAG &&
-				(assistantRAG.allowedLinks.length > 0 ||
-					assistantRAG.allowedDomains.length > 0 ||
-					assistantRAG.allowAllDomains);
+				rag &&
+				(rag.allowedLinks.length > 0 || rag.allowedDomains.length > 0 || rag.allowAllDomains);
 
 			// if websearch is enabled and the assistant is not specified or it is and has a rag
 			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
@@ -269,7 +270,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					conv,
 					messages[messages.length - 1].content,
 					update,
-					assistantRAG
+					rag
 				);
 				messages[messages.length - 1].webSearch = webSearchResults;
 			} else if (isContinue) {
