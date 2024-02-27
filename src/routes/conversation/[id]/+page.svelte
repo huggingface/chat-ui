@@ -18,6 +18,7 @@
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { createConvTreeStore } from "$lib/stores/convTree";
+	import type { v4 } from "uuid";
 
 	export let data;
 
@@ -72,7 +73,7 @@
 		isContinue = false,
 	}: {
 		prompt?: string;
-		messageId?: ReturnType<typeof crypto.randomUUID>;
+		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
 		isContinue?: boolean;
 	}): Promise<void> {
