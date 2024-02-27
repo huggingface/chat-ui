@@ -11,7 +11,7 @@
 	const modelId = $page.params.model;
 
 	onMount(async () => {
-		$settings.activeModel = modelId;
+		settings.instantSet({ activeModel: modelId });
 		await goto(`${base}/`, { invalidateAll: true });
 	});
 </script>
