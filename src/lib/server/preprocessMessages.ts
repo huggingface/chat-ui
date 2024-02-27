@@ -5,29 +5,28 @@ import { downloadFile } from "./files/downloadFile";
 
 export async function preprocessMessages(
 	messages: Message[],
+	webSearch: Message["webSearch"],
 	multimodal: boolean,
 	id: Conversation["_id"]
 ): Promise<Message[]> {
 	return await Promise.all(
-		messages.map(async (message, idx) => {
+		structuredClone(messages).map(async (message, idx) => {
 			// start by adding websearch to the last message
-			if (idx === messages.length - 1 && message.webSearch && message.webSearch.context) {
-				const lastUsrMsgIndex = messages.map((el) => el.from).lastIndexOf("user");
-				const previousUserMessages = messages.filter((el) => el.from === "user").slice(0, -1);
-				const previousQuestions =
-					previousUserMessages.length > 0
-						? `Previous questions: \n${previousUserMessages
-								.map(({ content }) => `- ${content}`)
-								.join("\n")}`
-						: "";
+			if (idx === messages.length - 1 && webSearch && webSearch.context) {
+				const lastQuestion = messages.findLast((el) => el.from === "user")?.content ?? "";
+				const previousQuestions = messages
+					.filter((el) => el.from === "user")
+					.slice(0, -1)
+					.map((el) => el.content);
 				const currentDate = format(new Date(), "MMMM d, yyyy");
 
-				message.content = `I searched the web using the query: ${message.webSearch.searchQuery}. Today is ${currentDate} and here are the results:
+				message.content = `I searched the web using the query: ${webSearch.searchQuery}. 
+Today is ${currentDate} and here are the results:
 =====================
-${message.webSearch.context}
+${webSearch.context}
 =====================
-${previousQuestions}
-Answer the question: ${messages[lastUsrMsgIndex].content}`;
+${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
+Answer the question: ${lastQuestion}`;
 			}
 			// handle files if model is multimodal
 			if (multimodal) {
