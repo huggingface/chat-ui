@@ -17,6 +17,7 @@
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
@@ -30,6 +31,8 @@
 		});
 		goto(newUrl);
 	};
+
+	const settings = useSettingsStore();
 </script>
 
 <svelte:head>
@@ -50,7 +53,7 @@
 	{/if}
 </svelte:head>
 
-<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
+<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Assistants</h1>
@@ -143,9 +146,16 @@
 
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant (assistant._id)}
-				<a
-					href="{base}/assistant/{assistant._id}"
+				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					on:click={() => {
+						if (data.settings.assistants.includes(assistant._id.toString())) {
+							settings.instantSet({ activeModel: assistant._id.toString() });
+							goto(`${base}` || "/");
+						} else {
+							goto(`${base}/assistant/${assistant._id}`);
+						}
+					}}
 				>
 					{#if assistant.userCount && assistant.userCount > 1}
 						<div
@@ -186,7 +196,7 @@
 							</a>
 						</p>
 					{/if}
-				</a>
+				</button>
 			{:else}
 				No assistants found
 			{/each}
