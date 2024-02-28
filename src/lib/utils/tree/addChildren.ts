@@ -1,5 +1,6 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
+import { v4 } from "uuid";
 
 export function addChildren(
 	conv: Pick<Conversation, "messages" | "rootMessageId">,
@@ -8,7 +9,7 @@ export function addChildren(
 ): Message["id"] {
 	// if this is the first message we just push it
 	if (conv.messages.length === 0) {
-		const messageId = crypto.randomUUID();
+		const messageId = v4();
 		conv.rootMessageId = messageId;
 		conv.messages.push({
 			...message,
@@ -22,7 +23,7 @@ export function addChildren(
 		throw new Error("You need to specify a parentId if this is not the first message");
 	}
 
-	const messageId = crypto.randomUUID();
+	const messageId = v4();
 	if (!conv.rootMessageId) {
 		// if there is no parentId we just push the message
 		if (!!parentId && parentId !== conv.messages[conv.messages.length - 1].id) {
