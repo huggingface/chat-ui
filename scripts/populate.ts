@@ -106,6 +106,7 @@ async function seed() {
 	const modelIds = models.map((model) => model.id);
 
 	if (flags.includes("reset")) {
+		console.log("Starting reset of DB");
 		await collections.users.deleteMany({});
 		await collections.settings.deleteMany({});
 		await collections.assistants.deleteMany({});
@@ -114,6 +115,7 @@ async function seed() {
 	}
 
 	if (flags.includes("users") || flags.includes("all")) {
+		console.log("Creating 100 new users");
 		const newUsers: User[] = Array.from({ length: 100 }, () => ({
 			_id: new ObjectId(),
 			createdAt: faker.date.recent({ days: 30 }),
@@ -125,9 +127,12 @@ async function seed() {
 		}));
 
 		await collections.users.insertMany(newUsers);
+		console.log("Done creating users.");
 	}
+
 	const users = await collections.users.find().toArray();
 	if (flags.includes("settings") || flags.includes("all")) {
+		console.log("Updating settings for all users");
 		users.forEach(async (user) => {
 			const settings: Settings = {
 				userId: user._id,
@@ -146,9 +151,11 @@ async function seed() {
 				{ upsert: true }
 			);
 		});
+		console.log("Done updating settings.");
 	}
 
 	if (flags.includes("assistants") || flags.includes("all")) {
+		console.log("Creating assistants for all users");
 		await Promise.all(
 			users.map(async (user) => {
 				const assistants = faker.helpers.multiple<Assistant>(
@@ -178,9 +185,11 @@ async function seed() {
 				);
 			})
 		);
+		console.log("Done creating assistants.");
 	}
 
 	if (flags.includes("conversations") || flags.includes("all")) {
+		console.log("Creating conversations for all users");
 		await Promise.all(
 			users.map(async (user) => {
 				const conversations = faker.helpers.multiple(
@@ -223,6 +232,7 @@ async function seed() {
 				await collections.conversations.insertMany(await Promise.all(conversations));
 			})
 		);
+		console.log("Done creating conversations.");
 	}
 }
 
@@ -243,6 +253,7 @@ async function seed() {
 				}
 				console.log("Starting seeding...");
 				await seed();
+				console.log("Seeding done.");
 				rl.close();
 			}
 		);
