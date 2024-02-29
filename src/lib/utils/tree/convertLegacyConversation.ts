@@ -1,5 +1,6 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
+import { v4 } from "uuid";
 
 export function convertLegacyConversation(
 	conv: Pick<Conversation, "messages" | "rootMessageId" | "preprompt">
@@ -12,7 +13,7 @@ export function convertLegacyConversation(
 			content: conv.preprompt ?? "",
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			id: crypto.randomUUID(),
+			id: v4(),
 		} satisfies Message,
 		...conv.messages,
 	];
