@@ -141,6 +141,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		})
 		.parse(json);
 
+	if (RateLimits?.messageLength && (newPrompt?.length ?? 0) > RateLimits.messageLength) {
+		throw error(400, "Message too long.");
+	}
 	// files is an array of base64 strings encoding Blob objects
 	// we need to convert this array to an array of File objects
 

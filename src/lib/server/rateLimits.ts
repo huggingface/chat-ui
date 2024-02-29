@@ -8,6 +8,7 @@ export const rateLimitsSchema = z
 		conversations: z.coerce.number().optional(), // how many conversations
 		messages: z.coerce.number().optional(), // how many messages in a conversation
 		assistants: z.coerce.number().optional(), // how many assistants
+		messageLength: z.coerce.number().optional(), // how long can a message be before we cut it off
 		messagesPerMinute: z
 			.preprocess((val) => {
 				if (val === undefined) {
