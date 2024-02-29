@@ -619,6 +619,9 @@ This will replace your `.env.local` file with the one that will be used in prod 
 
 ### Populate database
 
+> [!WARNING]  
+> The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
+
 You can populate the database using faker data using the `populate` script:
 
 ```bash
@@ -628,13 +631,11 @@ npm run populate <flags here>
 At least one flag must be specified, the following flags are available:
 
 - `reset` - resets the database
+- `all` - populates all tables
 - `users` - populates the users table
 - `settings` - populates the settings table for existing users
 - `assistants` - populates the assistants table for existing users
 - `conversations` - populates the conversations table for existing users
-
-> [!WARNING]  
-> The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
 
 For example, you could use it like so:
 
