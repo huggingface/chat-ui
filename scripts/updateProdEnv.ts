@@ -9,8 +9,8 @@ const HF_TOKEN = process.env.HF_TOKEN ?? process.env.HF_ACCESS_TOKEN; // token u
 const WEBHOOK_URL_REPORT_ASSISTANT = process.env.WEBHOOK_URL_REPORT_ASSISTANT; // slack webhook url used to get "report assistant" events
 const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET;
 
-// Read the content of the file .env.template
-const PUBLIC_CONFIG = fs.readFileSync(".env.template", "utf8");
+// Read the content of the file .env.huggingchat
+const PUBLIC_CONFIG = fs.readFileSync(".env.huggingchat", "utf8");
 
 // Prepend the content of the env variable SECRET_CONFIG
 const full_config = `${PUBLIC_CONFIG}

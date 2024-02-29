@@ -10,8 +10,8 @@ if (!SECRET_CONFIG) {
 	);
 }
 
-// Read the content of the file .env.template
-const PUBLIC_CONFIG = fs.readFileSync(".env.template", "utf8");
+// Read the content of the file .env.huggingchat
+const PUBLIC_CONFIG = fs.readFileSync(".env.huggingchat", "utf8");
 
 // Prepend the content of the env variable SECRET_CONFIG
 const full_config = `${PUBLIC_CONFIG}\n${SECRET_CONFIG}`;
