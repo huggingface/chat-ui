@@ -43,7 +43,7 @@
 			});
 
 			if (!res.ok) {
-				error.set("Error while creating conversation, try again.");
+				error.set(await res.text());
 				console.error("Error while creating conversation: " + (await res.text()));
 				return;
 			}

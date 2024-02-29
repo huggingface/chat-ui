@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN } from "$env/static/private";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -19,6 +19,7 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
+import { RateLimits } from "$lib/server/rateLimits.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -101,8 +102,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
 	);
 
-	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
+	if (RateLimits?.messagesPerMinute && nEvents > RateLimits.messagesPerMinute) {
 		throw error(429, ERROR_MESSAGES.rateLimited);
+	}
+
+	if (RateLimits?.messages && conv.messages.length > RateLimits.messages) {
+		throw error(
+			429,
+			`This conversation has more than ${RateLimits.messages} messages. Start a new one to continue`
+		);
 	}
 
 	// fetch the model
