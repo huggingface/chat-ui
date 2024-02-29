@@ -8,6 +8,7 @@ import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 
 import sharp from "sharp";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -130,6 +131,7 @@ export const actions: Actions = {
 					exampleInputs,
 					avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
 					updatedAt: new Date(),
+					searchTokens: generateSearchTokens(parse.data.name),
 				},
 			}
 		);
