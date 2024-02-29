@@ -27,7 +27,7 @@ rl.on("close", function () {
 	process.exit(0);
 });
 
-const possibleFlags = ["reset", "users", "settings", "assistants", "conversations"];
+const possibleFlags = ["reset", "all", "users", "settings", "assistants", "conversations"];
 const argv = minimist(process.argv.slice(2));
 const flags = argv["_"].filter((flag) => possibleFlags.includes(flag));
 
@@ -113,7 +113,7 @@ async function seed() {
 		console.log("Reset done");
 	}
 
-	if (flags.includes("users")) {
+	if (flags.includes("users") || flags.includes("all")) {
 		const newUsers: User[] = Array.from({ length: 100 }, () => ({
 			_id: new ObjectId(),
 			createdAt: faker.date.recent({ days: 30 }),
@@ -127,7 +127,7 @@ async function seed() {
 		await collections.users.insertMany(newUsers);
 	}
 	const users = await collections.users.find().toArray();
-	if (flags.includes("settings")) {
+	if (flags.includes("settings") || flags.includes("all")) {
 		users.forEach(async (user) => {
 			const settings: Settings = {
 				userId: user._id,
@@ -148,7 +148,7 @@ async function seed() {
 		});
 	}
 
-	if (flags.includes("assistants")) {
+	if (flags.includes("assistants") || flags.includes("all")) {
 		await Promise.all(
 			users.map(async (user) => {
 				const assistants = faker.helpers.multiple<Assistant>(
@@ -180,7 +180,7 @@ async function seed() {
 		);
 	}
 
-	if (flags.includes("conversations")) {
+	if (flags.includes("conversations") || flags.includes("all")) {
 		await Promise.all(
 			users.map(async (user) => {
 				const conversations = faker.helpers.multiple(
