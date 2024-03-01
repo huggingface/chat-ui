@@ -224,9 +224,16 @@
 
 			// this is a bit ugly
 			// we read the stream until we get the final answer
+
+			let readerClosed = false;
+
+			reader.closed.then(() => {
+				readerClosed = true;
+			});
+
 			while (finalAnswer === "") {
 				// check for abort
-				if ($isAborted || $error) {
+				if ($isAborted || $error || readerClosed) {
 					reader?.cancel();
 					break;
 				}
@@ -236,7 +243,6 @@
 					// we read, if it's done we cancel
 					if (done) {
 						reader.cancel();
-						return;
 					}
 
 					if (!value) {

@@ -13,9 +13,11 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest",
 		"updateLocalEnv": "node --loader ts-node/esm scripts/updateLocalEnv.ts",
-		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts"
+		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts",
+		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts"
 	},
 	"devDependencies": {
+		"@faker-js/faker": "^8.4.1",
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^1.3.1",
@@ -23,6 +25,7 @@
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/jsdom": "^21.1.1",
 		"@types/marked": "^4.0.8",
+		"@types/minimist": "^1.2.5",
 		"@types/parquetjs": "^0.10.3",
 		"@types/uuid": "^9.0.8",
 		"@typescript-eslint/eslint-plugin": "^6.x",
@@ -31,6 +34,7 @@
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.30.0",
 		"marked-katex-extension": "^3.0.6",
+		"minimist": "^1.2.8",
 		"prettier": "^2.8.0",
 		"prettier-plugin-svelte": "^2.10.1",
 		"prettier-plugin-tailwindcss": "^0.2.7",
@@ -41,6 +45,7 @@
 		"typescript": "^5.0.0",
 		"unplugin-icons": "^0.16.1",
 		"vite": "^4.5.2",
+		"vite-node": "^1.3.1",
 		"vitest": "^0.31.0"
 	},
 	"type": "module",
