@@ -106,7 +106,7 @@
 		clearTimeout(pendingTimeout);
 
 		// Add loading animation to the last message if update takes more than 600ms
-		if ((loading && isLast) || emptyLoad) {
+		if (isLast && loading && emptyLoad) {
 			pendingTimeout = setTimeout(() => {
 				if (contentEl) {
 					loadingEl = new IconLoading({

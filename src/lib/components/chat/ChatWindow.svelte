@@ -86,7 +86,10 @@
 	const convTreeStore = useConvTreeStore();
 
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
-	$: lastIsError = lastMessage && lastMessage.from === "user" && !loading;
+	$: lastIsError =
+		lastMessage &&
+		((lastMessage.from === "user" && !loading) ||
+			lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1);
 
 	$: sources = files.map((file) => file2base64(file));
 
@@ -242,7 +245,7 @@
 						on:click={() => {
 							if (lastMessage && lastMessage.ancestors) {
 								dispatch("retry", {
-									id: lastMessage.ancestors[lastMessage.ancestors.length - 1],
+									id: lastMessage.id,
 								});
 							}
 						}}
