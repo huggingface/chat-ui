@@ -88,7 +88,8 @@
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
 	$: lastIsError =
 		lastMessage &&
-		((lastMessage.from === "user" && !loading) ||
+		!loading &&
+		(lastMessage.from === "user" ||
 			lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1);
 
 	$: sources = files.map((file) => file2base64(file));
