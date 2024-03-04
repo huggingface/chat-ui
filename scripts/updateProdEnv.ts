@@ -9,6 +9,7 @@ const HF_TOKEN = process.env.HF_TOKEN ?? process.env.HF_ACCESS_TOKEN; // token u
 const WEBHOOK_URL_REPORT_ASSISTANT = process.env.WEBHOOK_URL_REPORT_ASSISTANT; // slack webhook url used to get "report assistant" events
 const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET;
 const RATE_LIMITS = process.env.RATE_LIMITS;
+const MESSAGES_BEFORE_LOGIN = process.env.MESSAGES_BEFORE_LOGIN;
 
 // Read the content of the file .env.template
 const PUBLIC_CONFIG = fs.readFileSync(".env.template", "utf8");
@@ -22,6 +23,7 @@ HF_TOKEN=${HF_TOKEN}
 WEBHOOK_URL_REPORT_ASSISTANT=${WEBHOOK_URL_REPORT_ASSISTANT}
 ADMIN_API_SECRET=${ADMIN_API_SECRET}
 RATE_LIMITS=${RATE_LIMITS}
+MESSAGES_BEFORE_LOGIN=${MESSAGES_BEFORE_LOGIN}
 `;
 
 // Make an HTTP POST request to add the space secrets

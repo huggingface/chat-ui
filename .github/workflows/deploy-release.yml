@@ -28,6 +28,7 @@ jobs:
           WEBHOOK_URL_REPORT_ASSISTANT: ${{ secrets.WEBHOOK_URL_REPORT_ASSISTANT }}
           ADMIN_API_SECRET: ${{ secrets.ADMIN_API_SECRET }}
           RATE_LIMITS: ${{ secrets.RATE_LIMITS }}
+          MESSAGES_BEFORE_LOGIN: ${{ secrets.MESSAGES_BEFORE_LOGIN }}
         run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
