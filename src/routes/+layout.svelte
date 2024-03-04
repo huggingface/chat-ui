@@ -1,31 +1,37 @@
 <script lang="ts">
+	import "../styles/main.css";
+
 	import { onDestroy } from "svelte";
 	import { goto, invalidate } from "$app/navigation";
-	import { page } from "$app/stores";
-	import "../styles/main.css";
 	import { base } from "$app/paths";
+	import { page } from "$app/stores";
+	import { browser } from "$app/environment";
+
 	import {
 		PUBLIC_APP_DESCRIPTION,
 		PUBLIC_ORIGIN,
 		PUBLIC_PLAUSIBLE_SCRIPT_URL,
 	} from "$env/static/public";
+	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
+
+	import { error } from "$lib/stores/errors";
+	import { createSettingsStore } from "$lib/stores/settings";
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { error } from "$lib/stores/errors";
 
-	import MobileNav from "$lib/components/MobileNav.svelte";
-	import NavMenu from "$lib/components/NavMenu.svelte";
 	import Toast from "$lib/components/Toast.svelte";
-	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
+	import NavMenu from "$lib/components/NavMenu.svelte";
+	import MobileNav from "$lib/components/MobileNav.svelte";
 	import titleUpdate from "$lib/stores/titleUpdate";
-	import { createSettingsStore } from "$lib/stores/settings";
-	import { browser } from "$app/environment";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
+	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 
 	export let data;
 
 	let isNavOpen = false;
+	let isNavCollapsed = false;
+
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
 
@@ -176,8 +182,18 @@
 	<DisclaimerModal />
 {/if}
 
+<ExpandNavigation
+	isCollapsed={isNavCollapsed}
+	on:click={() => (isNavCollapsed = !isNavCollapsed)}
+	classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
+		? 'left-[280px]'
+		: 'left-0'} *:transition-transform"
+/>
+
 <div
-	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd md:grid-cols-[280px,1fr] md:grid-rows-[1fr] dark:text-gray-300"
+	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
+		? 'md:grid-cols-[280px,1fr]'
+		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] md:grid-rows-[1fr] dark:text-gray-300"
 >
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
 		<NavMenu
@@ -189,7 +205,9 @@
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</MobileNav>
-	<nav class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] max-md:hidden">
+	<nav
+		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+	>
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
