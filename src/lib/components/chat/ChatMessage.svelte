@@ -111,7 +111,7 @@
 				if (contentEl) {
 					loadingEl = new IconLoading({
 						target: deepestChild(contentEl),
-						props: { classNames: "loading inline ml-2" },
+						props: { classNames: "loading inline ml-2 first:ml-0" },
 					});
 				}
 			}, 600);
