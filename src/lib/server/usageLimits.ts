@@ -3,7 +3,7 @@ import { USAGE_LIMITS, RATE_LIMIT } from "$env/static/private";
 import JSON5 from "json5";
 
 // RATE_LIMIT is the legacy way to define messages per minute limit
-export const rateLimitsSchema = z
+export const usageLimitsSchema = z
 	.object({
 		conversations: z.coerce.number().optional(), // how many conversations
 		messages: z.coerce.number().optional(), // how many messages in a conversation
@@ -20,4 +20,4 @@ export const rateLimitsSchema = z
 	})
 	.optional();
 
-export const usageLimits = rateLimitsSchema.parse(JSON5.parse(USAGE_LIMITS));
+export const usageLimits = usageLimitsSchema.parse(JSON5.parse(USAGE_LIMITS));
