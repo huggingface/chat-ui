@@ -377,6 +377,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			} catch (e) {
 				update({ type: "status", status: "error", message: (e as Error).message });
+			} finally {
+				// check if no output was generated
+				if (messageToWriteTo.content === previousText) {
+					update({
+						type: "status",
+						status: "error",
+						message: "No output was generated. Something went wrong.",
+					});
+				}
 			}
 
 			await collections.conversations.updateOne(
