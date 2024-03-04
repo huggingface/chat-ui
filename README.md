@@ -616,3 +616,37 @@ npm run updateLocalEnv
 ```
 
 This will replace your `.env.local` file with the one that will be used in prod (simply taking `.env.template + .env.SECRET_CONFIG`).
+
+### Populate database
+
+> [!WARNING]  
+> The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
+
+You can populate the database using faker data using the `populate` script:
+
+```bash
+npm run populate <flags here>
+```
+
+At least one flag must be specified, the following flags are available:
+
+- `reset` - resets the database
+- `all` - populates all tables
+- `users` - populates the users table
+- `settings` - populates the settings table for existing users
+- `assistants` - populates the assistants table for existing users
+- `conversations` - populates the conversations table for existing users
+
+For example, you could use it like so:
+
+```bash
+npm run populate reset
+```
+
+to clear out the database. Then login in the app to create your user and run the following command:
+
+```bash
+npm run populate users settings assistants conversations
+```
+
+to populate the database with fake data, including fake conversations and assistants for your user.
