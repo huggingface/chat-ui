@@ -19,7 +19,7 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
-import { RateLimits } from "$lib/server/rateLimits.js";
+import { usageLimits } from "$lib/server/usageLimits";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -96,20 +96,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		}
 	}
 
-	// check if the user is rate limited
-	const nEvents = Math.max(
-		await collections.messageEvents.countDocuments({ userId }),
-		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
-	);
-
-	if (RateLimits?.messagesPerMinute && nEvents > RateLimits.messagesPerMinute) {
-		throw error(429, ERROR_MESSAGES.rateLimited);
+	if (usageLimits?.messagesPerMinute) {
+		// check if the user is rate limited
+		const nEvents = Math.max(
+			await collections.messageEvents.countDocuments({ userId }),
+			await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+		);
+		if (nEvents > usageLimits.messagesPerMinute) {
+			throw error(429, ERROR_MESSAGES.rateLimited);
+		}
 	}
 
-	if (RateLimits?.messages && conv.messages.length > RateLimits.messages) {
+	if (usageLimits?.messages && conv.messages.length > usageLimits.messages) {
 		throw error(
 			429,
-			`This conversation has more than ${RateLimits.messages} messages. Start a new one to continue`
+			`This conversation has more than ${usageLimits.messages} messages. Start a new one to continue`
 		);
 	}
 
@@ -141,7 +142,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		})
 		.parse(json);
 
-	if (RateLimits?.messageLength && (newPrompt?.length ?? 0) > RateLimits.messageLength) {
+	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		throw error(400, "Message too long.");
 	}
 	// files is an array of base64 strings encoding Blob objects

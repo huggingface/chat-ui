@@ -20,4 +20,4 @@ export const rateLimitsSchema = z
 	})
 	.optional();
 
-export const RateLimits = rateLimitsSchema.parse(JSON5.parse(USAGE_LIMITS));
+export const usageLimits = rateLimitsSchema.parse(JSON5.parse(USAGE_LIMITS));

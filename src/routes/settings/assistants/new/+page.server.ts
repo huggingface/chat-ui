@@ -7,7 +7,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
-import { RateLimits } from "$lib/server/rateLimits";
+import { usageLimits } from "$lib/server/usageLimits";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -64,7 +64,7 @@ export const actions: Actions = {
 
 		const assistantsCount = await collections.assistants.countDocuments(authCondition(locals));
 
-		if (RateLimits?.assistants && assistantsCount > RateLimits.assistants) {
+		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
 			const errors = [
 				{
 					field: "preprompt",
