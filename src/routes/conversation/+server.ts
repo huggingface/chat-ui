@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
 import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
+import { v4 } from "uuid";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -24,7 +25,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	let messages: Message[] = [
 		{
-			id: crypto.randomUUID(),
+			id: v4(),
 			from: "system",
 			content: values.preprompt ?? "",
 			createdAt: new Date(),

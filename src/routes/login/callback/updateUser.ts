@@ -18,6 +18,12 @@ export async function updateUser(params: {
 }) {
 	const { userData, locals, cookies, userAgent, ip } = params;
 
+	// Microsoft Entra v1 tokens do not provide preferred_username, instead the username is provided in the upn
+	// claim. See https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference
+	if (!userData.preferred_username && userData.upn) {
+		userData.preferred_username = userData.upn as string;
+	}
+
 	const {
 		preferred_username: username,
 		name,
@@ -28,7 +34,7 @@ export async function updateUser(params: {
 		.object({
 			preferred_username: z.string().optional(),
 			name: z.string(),
-			picture: z.string(),
+			picture: z.string().optional(),
 			sub: z.string(),
 			email: z.string().email().optional(),
 		})

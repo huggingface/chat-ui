@@ -4,10 +4,9 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
@@ -18,17 +17,11 @@
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { createConvTreeStore } from "$lib/stores/convTree";
+	import type { v4 } from "uuid";
 
 	export let data;
 
-	let messages = data.messages;
-	let lastLoadedMessages = data.messages;
-
-	// Since we modify the messages array locally, we don't want to reset it if an old version is passed
-	$: if (data.messages !== lastLoadedMessages) {
-		messages = data.messages;
-		lastLoadedMessages = data.messages;
-	}
+	$: ({ messages } = data);
 
 	let loading = false;
 	let pending = false;
@@ -72,7 +65,7 @@
 		isContinue = false,
 	}: {
 		prompt?: string;
-		messageId?: ReturnType<typeof crypto.randomUUID>;
+		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
 		isContinue?: boolean;
 	}): Promise<void> {
@@ -231,9 +224,16 @@
 
 			// this is a bit ugly
 			// we read the stream until we get the final answer
+
+			let readerClosed = false;
+
+			reader.closed.then(() => {
+				readerClosed = true;
+			});
+
 			while (finalAnswer === "") {
 				// check for abort
-				if ($isAborted) {
+				if ($isAborted || $error || readerClosed) {
 					reader?.cancel();
 					break;
 				}
@@ -243,7 +243,6 @@
 					// we read, if it's done we cancel
 					if (done) {
 						reader.cancel();
-						return;
 					}
 
 					if (!value) {
@@ -264,10 +263,8 @@
 
 							if (update.type === "finalAnswer") {
 								finalAnswer = update.text;
-								reader.cancel();
 								loading = false;
 								pending = false;
-								invalidate(UrlDependency.Conversation);
 							} else if (update.type === "stream") {
 								pending = false;
 								messageToWriteTo.content += update.token;
@@ -306,7 +303,6 @@
 			}
 
 			messageToWriteTo.updates = messageUpdates;
-			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
@@ -321,7 +317,7 @@
 		} finally {
 			loading = false;
 			pending = false;
-			await invalidate(UrlDependency.Conversation);
+			await invalidateAll();
 		}
 	}
 

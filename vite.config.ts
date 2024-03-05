@@ -26,6 +26,6 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 	],
 	optimizeDeps: {
-		include: ["browser-image-resizer"],
+		include: ["browser-image-resizer", "uuid"],
 	},
 });

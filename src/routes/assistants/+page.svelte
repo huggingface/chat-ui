@@ -4,6 +4,7 @@
 	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
+	import { tick } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -14,14 +15,21 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
+	import CarbonSearch from "~icons/carbon/search";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
+	import { debounce } from "$lib/utils/debounce";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
 	$: assistantsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
+
+	const SEARCH_DEBOUNCE_DELAY = 400;
+	let filterInputEl: HTMLInputElement;
+	let searchDisabled = false;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
@@ -30,6 +38,23 @@
 		});
 		goto(newUrl);
 	};
+
+	const filterOnName = debounce(async (e: Event) => {
+		searchDisabled = true;
+		const value = (e.target as HTMLInputElement).value;
+		const newUrl = getHref($page.url, {
+			newKeys: { q: value },
+			existingKeys: { behaviour: "delete", keys: ["p"] },
+		});
+		await goto(newUrl);
+		setTimeout(async () => {
+			searchDisabled = false;
+			await tick();
+			filterInputEl.focus();
+		}, 0);
+	}, SEARCH_DEBOUNCE_DELAY);
+
+	const settings = useSettingsStore();
 </script>
 
 <svelte:head>
@@ -50,7 +75,7 @@
 	{/if}
 </svelte:head>
 
-<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 md:py-24">
+<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Assistants</h1>
@@ -96,7 +121,7 @@
 					{assistantsCreator}'s Assistants
 					<a
 						href={getHref($page.url, {
-							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
 						class="group"
 						><CarbonClose
@@ -116,7 +141,7 @@
 			{:else}
 				<a
 					href={getHref($page.url, {
-						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 					})}
 					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
 						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
@@ -129,9 +154,9 @@
 					<a
 						href={getHref($page.url, {
 							newKeys: { user: data.user.username },
-							existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q"] },
 						})}
-						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+						class="flex items-center gap-1.5 truncate rounded-full border px-3 py-1 {assistantsCreator &&
 						createdByMe
 							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 							: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
@@ -139,13 +164,35 @@
 					</a>
 				{/if}
 			{/if}
+			<div
+				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 sm:w-64 dark:border-gray-600"
+			>
+				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400" />
+				<input
+					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
+					placeholder="Filter by name"
+					value={data.query}
+					on:input={filterOnName}
+					bind:this={filterInputEl}
+					maxlength="150"
+					type="search"
+					disabled={searchDisabled}
+				/>
+			</div>
 		</div>
 
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant (assistant._id)}
-				<a
-					href="{base}/assistant/{assistant._id}"
+				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					on:click={() => {
+						if (data.settings.assistants.includes(assistant._id.toString())) {
+							settings.instantSet({ activeModel: assistant._id.toString() });
+							goto(`${base}` || "/");
+						} else {
+							goto(`${base}/assistant/${assistant._id}`);
+						}
+					}}
 				>
 					{#if assistant.userCount && assistant.userCount > 1}
 						<div
@@ -186,7 +233,7 @@
 							</a>
 						</p>
 					{/if}
-				</a>
+				</button>
 			{:else}
 				No assistants found
 			{/each}
