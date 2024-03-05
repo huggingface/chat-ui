@@ -2,6 +2,7 @@ import type { Migration } from ".";
 import { getCollections } from "$lib/server/database";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import type { Assistant } from "$lib/types/Assistant";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const migration: Migration = {
 	_id: new ObjectId("5f9f3e3e3e3e3e3e3e3e3e3e"),
@@ -20,7 +21,7 @@ const migration: Migration = {
 					},
 					update: {
 						$set: {
-							searchTokens: assistant.name.split(" ").map((el) => el.toLowerCase()),
+							searchTokens: generateSearchTokens(assistant.name),
 						},
 					},
 				},
