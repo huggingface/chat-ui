@@ -10,7 +10,7 @@
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonAdd from "~icons/carbon/add";
 
-	import LicenseIcon from '~icons/carbon/license'
+	import LicenseIcon from "~icons/carbon/license";
 	import UserIcon from "~icons/carbon/user";
 	import { fade, fly } from "svelte/transition";
 	export let data;

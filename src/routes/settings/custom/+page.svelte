@@ -7,8 +7,7 @@
 		$settings.customInstruction = "";
 	}
 
-	$: hasCustomInstruction =
-		$settings.customInstruction !== "";
+	$: hasCustomInstruction = $settings.customInstruction !== "";
 </script>
 
 <div class="flex flex-col items-start">
@@ -18,8 +17,7 @@
 			{#if hasCustomInstruction}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
-					on:click|stopPropagation={() =>
-						($settings.customInstruction = "")}
+					on:click|stopPropagation={() => ($settings.customInstruction = "")}
 				>
 					Reset
 				</button>

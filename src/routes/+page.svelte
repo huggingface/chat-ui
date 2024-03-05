@@ -34,6 +34,9 @@
 					model = data.models[0].id;
 				}
 			}
+			let customPreprompt = $settings.customPrompts[$settings.activeModel]
+				? $settings.customInstruction + "\n" + $settings.customPrompts[$settings.activeModel]
+				: undefined;
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
@@ -41,7 +44,7 @@
 				},
 				body: JSON.stringify({
 					model,
-					preprompt: $settings.customPrompts[$settings.activeModel],
+					preprompt: customPreprompt,
 					assistantId: data.assistant?._id,
 				}),
 			});
