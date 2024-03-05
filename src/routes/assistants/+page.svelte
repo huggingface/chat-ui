@@ -164,7 +164,7 @@
 			<div
 				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 sm:w-64 dark:border-gray-600"
 			>
-				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400 " />
+				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400" />
 				<input
 					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
 					placeholder="Filter by name"
