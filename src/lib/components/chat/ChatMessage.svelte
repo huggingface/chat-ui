@@ -106,12 +106,12 @@
 		clearTimeout(pendingTimeout);
 
 		// Add loading animation to the last message if update takes more than 600ms
-		if ((loading && isLast) || emptyLoad) {
+		if (isLast && loading && emptyLoad) {
 			pendingTimeout = setTimeout(() => {
 				if (contentEl) {
 					loadingEl = new IconLoading({
 						target: deepestChild(contentEl),
-						props: { classNames: "loading inline ml-2" },
+						props: { classNames: "loading inline ml-2 first:ml-0" },
 					});
 				}
 			}, 600);

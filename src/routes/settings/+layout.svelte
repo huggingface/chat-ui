@@ -33,7 +33,7 @@
 </script>
 
 <div
-	class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
+	class="fixed inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
 	in:fade
 >
 	<dialog
@@ -42,7 +42,7 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="xl: z-10 grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-8 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
+		class="grid h-[95dvh] w-[90dvw] grid-cols-1 content-start gap-x-8 overflow-hidden rounded-2xl bg-white p-4 shadow-2xl outline-none sm:h-[80dvh] md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8 xl:w-[1200px] 2xl:h-[70dvh]"
 	>
 		<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
 			<h2 class="text-xl font-bold">Settings</h2>

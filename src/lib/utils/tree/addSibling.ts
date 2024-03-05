@@ -1,5 +1,6 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
+import { v4 } from "uuid";
 
 export function addSibling(
 	conv: Pick<Conversation, "messages" | "rootMessageId">,
@@ -23,7 +24,7 @@ export function addSibling(
 		throw new Error("The sibling message is the root message, therefore we can't add a sibling");
 	}
 
-	const messageId = crypto.randomUUID();
+	const messageId = v4();
 
 	conv.messages.push({
 		...message,
