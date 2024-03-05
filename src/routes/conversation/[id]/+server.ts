@@ -134,7 +134,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
-			inputs: z.optional(z.string().trim().min(1)),
+			inputs: z.optional(
+				z
+					.string()
+					.trim()
+					.min(1)
+					.transform((s) => s.replace(/\r\n/g, "\n"))
+			),
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
