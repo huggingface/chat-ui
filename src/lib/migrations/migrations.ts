@@ -1,4 +1,4 @@
-import { client, collections, getCollections } from "$lib/server/database";
+import { client, collections } from "$lib/server/database";
 import { migrations } from "./routines";
 import {
 	acquireLock,
@@ -90,7 +90,7 @@ export async function checkAndRunMigrations() {
 			// otherwise all is good and we cna run the migration
 			console.log(`[MIGRATIONS] "${migration.name}" not applied yet. Applying...`);
 
-			await getCollections(connectedClient).migrationResults.updateOne(
+			await collections.migrationResults.updateOne(
 				{ guid: migration.guid },
 				{
 					$set: {
@@ -116,7 +116,7 @@ export async function checkAndRunMigrations() {
 				await session.endSession();
 			}
 
-			await getCollections(connectedClient).migrationResults.updateOne(
+			await collections.migrationResults.updateOne(
 				{ guid: migration.guid },
 				{
 					$set: {

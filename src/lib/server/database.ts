@@ -20,6 +20,12 @@ if (!MONGODB_URL) {
 }
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
+const client = new MongoClient(MONGODB_URL, {
+	directConnection: MONGODB_DIRECT_CONNECTION === "true",
+});
+
+export const connectPromise = client.connect().catch(console.error);
+
 export function getCollections(mongoClient: MongoClient) {
 	const db = mongoClient.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
@@ -53,47 +59,54 @@ export function getCollections(mongoClient: MongoClient) {
 		semaphores,
 	};
 }
-
-const client = new MongoClient(MONGODB_URL, {
-	directConnection: MONGODB_DIRECT_CONNECTION === "true",
-});
-
-export const connectPromise = client.connect().catch(console.error);
-
 const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+
 const collections = getCollections(client);
+
+const {
+	conversations,
+	conversationStats,
+	assistants,
+	reports,
+	sharedConversations,
+	abortedGenerations,
+	settings,
+	users,
+	sessions,
+	messageEvents,
+	migrationResults,
+	semaphores,
+} = collections;
 
 export { client, db, collections };
 
 client.on("open", () => {
-	collections.conversations
+	conversations
 		.createIndex(
 			{ sessionId: 1, updatedAt: -1 },
 			{ partialFilterExpression: { sessionId: { $exists: true } } }
 		)
 		.catch(console.error);
-	collections.conversations
+	conversations
 		.createIndex(
 			{ userId: 1, updatedAt: -1 },
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
 		.catch(console.error);
-	collections.conversations
+	conversations
 		.createIndex(
 			{ "message.id": 1, "message.ancestors": 1 },
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
 		.catch(console.error);
 	// To do stats on conversations
-	collections.conversations.createIndex({ updatedAt: 1 }).catch(console.error);
+	conversations.createIndex({ updatedAt: 1 }).catch(console.error);
 	// Not strictly necessary, could use _id, but more convenient. Also for stats
-	collections.conversations.createIndex({ createdAt: 1 }).catch(console.error);
+	conversations.createIndex({ createdAt: 1 }).catch(console.error);
 	// To do stats on conversation messages
-	collections.conversations
-		.createIndex({ "messages.createdAt": 1 }, { sparse: true })
-		.catch(console.error);
+	conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(console.error);
 	// Unique index for stats
-	collections.conversationStats
+	conversationStats
 		.createIndex(
 			{
 				type: 1,
@@ -106,48 +119,34 @@ client.on("open", () => {
 		)
 		.catch(console.error);
 	// Allow easy check of last computed stat for given type/dateField
-	collections.conversationStats
+	conversationStats
 		.createIndex({
 			type: 1,
 			"date.field": 1,
 			"date.at": 1,
 		})
 		.catch(console.error);
-	collections.abortedGenerations
-		.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 })
-		.catch(console.error);
-	collections.abortedGenerations
-		.createIndex({ conversationId: 1 }, { unique: true })
-		.catch(console.error);
-	collections.sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
-	collections.settings
-		.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
-		.catch(console.error);
-	collections.settings
-		.createIndex({ userId: 1 }, { unique: true, sparse: true })
-		.catch(console.error);
-	collections.settings.createIndex({ assistants: 1 }).catch(console.error);
-	collections.users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
-	collections.users
-		.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
-		.catch(console.error);
+	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
+	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
+	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
+	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
+	settings.createIndex({ assistants: 1 }).catch(console.error);
+	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
+	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
 	// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
-	collections.users.createIndex({ username: 1 }).catch(console.error);
-	collections.messageEvents
-		.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
-		.catch(console.error);
-	collections.sessions
-		.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
-		.catch(console.error);
-	collections.sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
-	collections.assistants.createIndex({ createdById: 1, userCount: -1 }).catch(console.error);
-	collections.assistants.createIndex({ userCount: 1 }).catch(console.error);
-	collections.assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
-	collections.assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
-	collections.reports.createIndex({ assistantId: 1 }).catch(console.error);
-	collections.reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
+	users.createIndex({ username: 1 }).catch(console.error);
+	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
+	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
+	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
+	assistants.createIndex({ createdById: 1, userCount: -1 }).catch(console.error);
+	assistants.createIndex({ userCount: 1 }).catch(console.error);
+	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
+	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
+	reports.createIndex({ assistantId: 1 }).catch(console.error);
+	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
 
 	// Unique index for semaphore and migration results
-	collections.migrationResults.createIndex({ guid: 1 }, { unique: true }).catch(console.error);
-	collections.semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
+	migrationResults.createIndex({ guid: 1 }, { unique: true }).catch(console.error);
+	semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
 });
