@@ -148,7 +148,7 @@
 		<div
 			class="col-span-1 w-full overflow-y-auto px-1 max-md:px-2 max-md:pt-4 {!isFullFrame
 				? 'md:col-span-2'
-				: 'md:col-span-3'}"
+				: 'md:col-span-3 md:row-span-2'}"
 		>
 			<slot />
 		</div>

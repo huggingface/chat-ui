@@ -8,11 +8,8 @@
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
-	import CarbonClose from "~icons/carbon/close";
-	import CarbonSave from "~icons/carbon/save";
 
 	import { useSettingsStore } from "$lib/stores/settings";
-	import IconLoading from "./icons/IconLoading.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -128,10 +125,10 @@
 		</p>
 	{/if}
 
-	<div class="mx-1 grid h-full w-full flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
+	<div class="grid h-full w-full flex-1 grid-cols-2 gap-6 text-sm max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4">
 			<div>
-				<span class="mb-1 block pb-2 text-sm font-semibold">Avatar</span>
+				<div class="mb-1 block pb-2 text-sm font-semibold">Avatar</div>
 				<input
 					type="file"
 					accept="image/*"
@@ -190,7 +187,7 @@
 			</div>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Name</span>
+				<div class="mb-1 font-semibold">Name</div>
 				<input
 					name="name"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
@@ -201,10 +198,10 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Description</span>
+				<div class="mb-1 font-semibold">Description</div>
 				<textarea
 					name="description"
-					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					class="h-15 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="He knows everything about python"
 					value={assistant?.description ?? ""}
 				/>
@@ -212,7 +209,7 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">Model</span>
+				<div class="mb-1 font-semibold">Model</div>
 				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
@@ -227,7 +224,7 @@
 			</label>
 
 			<label>
-				<span class="mb-1 text-sm font-semibold">User start messages</span>
+				<div class="mb-1 font-semibold">User start messages</div>
 				<div class="flex flex-col gap-2">
 					<input
 						name="exampleInput1"
@@ -261,7 +258,7 @@
 		</div>
 
 		<label class="flex flex-col max-md:pb-12">
-			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
+			<div class="mb-1 text-sm font-semibold">Instructions (system prompt)</div>
 			<textarea
 				name="preprompt"
 				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
@@ -272,31 +269,23 @@
 		</label>
 	</div>
 
-	<div class="absolute bottom-0 right-0 mx-8 my-4 flex justify-end gap-2">
-		<div class="mt-auto flex justify-end gap-2 pt-5">
-			<a
-				href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
-				class="flex items-center justify-center gap-1 rounded-full bg-gray-200 p-2 px-3 font-semibold text-gray-600"
-			>
-				<CarbonClose class="text-xl" />
-				Cancel
-			</a>
-			<button
-				type="submit"
-				disabled={loading}
-				aria-disabled={loading}
-				class="flex items-center justify-center gap-1 rounded-full bg-black p-2 px-3 font-semibold"
-				class:bg-gray-200={loading}
-				class:text-gray-600={loading}
-				class:text-white={!loading}
-			>
-				{#if loading}
-					<IconLoading classNames="ml-2 h-min" />
-				{:else}
-					<CarbonSave class="text-xl" />
-				{/if}
-				{assistant ? "Save" : "Create"}
-			</button>
-		</div>
+	<div class="mt-4 flex justify-end gap-2">
+		<a
+			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
+			class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
+		>
+			Cancel
+		</a>
+		<button
+			type="submit"
+			disabled={loading}
+			aria-disabled={loading}
+			class="flex items-center justify-center rounded-full bg-black px-8 py-2 font-semibold"
+			class:bg-gray-200={loading}
+			class:text-gray-600={loading}
+			class:text-white={!loading}
+		>
+			{assistant ? "Save" : "Create"}
+		</button>
 	</div>
 </form>
