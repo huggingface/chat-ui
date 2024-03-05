@@ -21,6 +21,7 @@ export async function createAndAcquireLock(): Promise<boolean> {
 		);
 		return !!upsert.upsertedCount; // true if the document was inserted
 	} catch (e) {
+		// unique index violation, so there must already be a lock
 		return false;
 	}
 }

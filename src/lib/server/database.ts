@@ -147,6 +147,7 @@ client.on("open", () => {
 	collections.reports.createIndex({ assistantId: 1 }).catch(console.error);
 	collections.reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
 
-	// Unique index for semaphore
+	// Unique index for semaphore and migration results
+	collections.migrationResults.createIndex({ guid: 1 }, { unique: true }).catch(console.error);
 	collections.semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
 });
