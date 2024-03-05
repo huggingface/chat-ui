@@ -42,7 +42,10 @@
 	const filterOnName = debounce(async (e: Event) => {
 		searchDisabled = true;
 		const value = (e.target as HTMLInputElement).value;
-		const newUrl = getHref($page.url, { newKeys: { q: value } });
+		const newUrl = getHref($page.url, {
+			newKeys: { q: value },
+			existingKeys: { behaviour: "delete", keys: ["p"] },
+		});
 		await goto(newUrl);
 		setTimeout(async () => {
 			searchDisabled = false;
