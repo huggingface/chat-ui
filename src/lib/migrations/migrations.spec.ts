@@ -25,6 +25,7 @@ describe("migrations", () => {
 	it("should read the lock correctly", async () => {
 		expect(await acquireLock()).toBe(true);
 		expect(await isDBLocked()).toBe(true);
+		expect(await acquireLock()).toBe(false);
 		await releaseLock();
 		expect(await isDBLocked()).toBe(false);
 	});
