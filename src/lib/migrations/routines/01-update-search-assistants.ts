@@ -1,10 +1,10 @@
 import type { Migration } from ".";
 import { getCollections } from "$lib/server/database";
-import type { AnyBulkWriteOperation } from "mongodb";
+import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import type { Assistant } from "$lib/types/Assistant";
 
 const migration: Migration = {
-	guid: "78c019ad-6bac-4958-a8ad-57a880e79bbf",
+	_id: new ObjectId("5f9f3e3e3e3e3e3e3e3e3e3e"),
 	name: "Update search assistants",
 	up: async (client) => {
 		const { assistants } = getCollections(client);

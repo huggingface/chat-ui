@@ -1,5 +1,7 @@
+import type { ObjectId } from "mongodb";
+
 export interface MigrationResult {
-	guid: ReturnType<typeof crypto.randomUUID>; // must be hardcoded randomUUID. Do not change it once pushed!
+	_id: ObjectId;
 	name: string;
 	status: "success" | "failure" | "ongoing";
 }

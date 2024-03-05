@@ -74,7 +74,6 @@ const {
 	users,
 	sessions,
 	messageEvents,
-	migrationResults,
 	semaphores,
 } = collections;
 
@@ -147,6 +146,6 @@ client.on("open", () => {
 	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
 
 	// Unique index for semaphore and migration results
-	migrationResults.createIndex({ guid: 1 }, { unique: true }).catch(console.error);
 	semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
+	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 300 }).catch(console.error);
 });

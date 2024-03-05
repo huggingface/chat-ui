@@ -1,9 +1,9 @@
-import type { MongoClient } from "mongodb";
+import type { MongoClient, ObjectId } from "mongodb";
 
 import updateSearchAssistant from "./01-update-search-assistants";
 
 export interface Migration {
-	guid: ReturnType<typeof crypto.randomUUID>; // must be hardcoded randomUUID. Do not change it once pushed!
+	_id: ObjectId;
 	name: string;
 	up: (client: MongoClient) => Promise<boolean>;
 	down?: (client: MongoClient) => Promise<boolean>;

@@ -1,18 +1,11 @@
 import { client, collections } from "$lib/server/database";
 import { migrations } from "./routines";
-import {
-	acquireLock,
-	createAndAcquireLock,
-	releaseLock,
-	isDBLocked,
-	discardExpiredLock,
-	refreshLock,
-} from "./lock";
+import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 export async function checkAndRunMigrations() {
 	// make sure all GUIDs are unique
-	if (new Set(migrations.map((m) => m.guid)).size !== migrations.length) {
+	if (new Set(migrations.map((m) => m._id.toString())).size !== migrations.length) {
 		throw new Error("Duplicate migration GUIDs found.");
 	}
 
@@ -21,22 +14,7 @@ export async function checkAndRunMigrations() {
 	// connect to the database
 	const connectedClient = await client.connect();
 
-	// see if semaphore needs to be created
-	let hasLock = false;
-	let isFresh = false;
-
-	const createdLock = await createAndAcquireLock();
-
-	if (createdLock) {
-		console.log("[MIGRATIONS] Created lock. Fresh install detected.");
-		// if the semaphore was created, we have the lock
-		hasLock = true;
-		isFresh = true;
-	} else {
-		// else we have to check if we can get a lock
-		hasLock = await acquireLock();
-		isFresh = false;
-	}
+	const hasLock = await acquireLock();
 
 	if (!hasLock) {
 		// another instance already has the lock, so we exit early
@@ -46,11 +24,6 @@ export async function checkAndRunMigrations() {
 
 		// block until the lock is released
 		while (await isDBLocked()) {
-			const discarded = await discardExpiredLock();
-			if (discarded) {
-				console.log("[MIGRATIONS] Discarded expired lock. Erroring out");
-				throw new Error("Lock timed out while waiting for it to be released.");
-			}
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 		return;
@@ -60,7 +33,7 @@ export async function checkAndRunMigrations() {
 	// make sure to refresh it regularly while it's running
 	const refreshInterval = setInterval(async () => {
 		await refreshLock();
-	}, 60 * 1000);
+	}, 1000 * 30);
 
 	// get all migration results that have already been applied
 	const migrationResults = await collections.migrationResults.find().toArray();
@@ -68,7 +41,9 @@ export async function checkAndRunMigrations() {
 	// iterate over all migrations
 	for (const migration of migrations) {
 		// check if the migration has already been applied
-		const existingMigrationResult = migrationResults.find((m) => m.guid === migration.guid);
+		const existingMigrationResult = migrationResults.find(
+			(m) => m._id.toString() === migration._id.toString()
+		);
 
 		// check if the migration has already been applied
 		if (existingMigrationResult) {
@@ -76,9 +51,7 @@ export async function checkAndRunMigrations() {
 		} else {
 			// check the modifiers to see if some cases match
 			if (
-				(migration.runForFreshInstall === "only" && !isFresh) ||
 				(migration.runForHuggingChat === "only" && !isHuggingChat) ||
-				(migration.runForFreshInstall === "never" && isFresh) ||
 				(migration.runForHuggingChat === "never" && isHuggingChat)
 			) {
 				console.log(
@@ -91,10 +64,9 @@ export async function checkAndRunMigrations() {
 			console.log(`[MIGRATIONS] "${migration.name}" not applied yet. Applying...`);
 
 			await collections.migrationResults.updateOne(
-				{ guid: migration.guid },
+				{ _id: migration._id },
 				{
 					$set: {
-						guid: migration.guid,
 						name: migration.name,
 						status: "ongoing",
 					},
@@ -117,10 +89,9 @@ export async function checkAndRunMigrations() {
 			}
 
 			await collections.migrationResults.updateOne(
-				{ guid: migration.guid },
+				{ _id: migration._id },
 				{
 					$set: {
-						guid: migration.guid,
 						name: migration.name,
 						status: result ? "success" : "failure",
 					},
@@ -133,5 +104,5 @@ export async function checkAndRunMigrations() {
 	console.log("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
-	releaseLock();
+	await releaseLock();
 }
