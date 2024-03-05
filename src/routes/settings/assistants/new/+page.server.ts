@@ -8,6 +8,7 @@ import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
 import { usageLimits } from "$lib/server/usageLimits";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -112,6 +113,7 @@ export const actions: Actions = {
 			updatedAt: new Date(),
 			userCount: 1,
 			featured: false,
+			searchTokens: generateSearchTokens(parse.data.name),
 		});
 
 		// add insertedId to user settings
