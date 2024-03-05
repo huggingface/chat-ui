@@ -55,10 +55,13 @@ export function endpointLlamacpp(
 			let stop = false;
 			let generatedText = "";
 			let tokenId = 0;
+			let accumulatedData = ""; // Buffer to accumulate data chunks
+
 			while (!stop) {
-				// read the stream and log the outputs to console
+				// Read the stream and log the outputs to console
 				const out = (await reader?.read()) ?? { done: false, value: undefined };
-				// we read, if it's done we cancel
+
+				// If it's done, we cancel
 				if (out.done) {
 					reader?.cancel();
 					return;
@@ -68,31 +71,49 @@ export function endpointLlamacpp(
 					return;
 				}
 
-				if (out.value.startsWith("data: ")) {
-					let data = null;
-					try {
-						data = JSON.parse(out.value.slice(6));
-					} catch (e) {
-						return;
-					}
-					if (data.content || data.stop) {
-						generatedText += data.content;
-						const output: TextGenerationStreamOutput = {
-							token: {
-								id: tokenId++,
-								text: data.content ?? "",
-								logprob: 0,
-								special: false,
-							},
-							generated_text: data.stop ? generatedText : null,
-							details: null,
-						};
-						if (data.stop) {
-							stop = true;
-							reader?.cancel();
+				// Accumulate the data chunk
+				accumulatedData += out.value;
+
+				// Process each complete JSON object in the accumulated data
+				while (accumulatedData.includes("\n")) {
+					// Assuming each JSON object ends with a newline
+					const endIndex = accumulatedData.indexOf("\n");
+					let jsonString = accumulatedData.substring(0, endIndex).trim();
+
+					// Remove the processed part from the buffer
+					accumulatedData = accumulatedData.substring(endIndex + 1);
+
+					if (jsonString.startsWith("data: ")) {
+						jsonString = jsonString.slice(6);
+						let data = null;
+
+						try {
+							data = JSON.parse(jsonString);
+						} catch (e) {
+							console.error("Failed to parse JSON", e);
+							console.error("Problematic JSON string:", jsonString);
+							continue; // Skip this iteration and try the next chunk
 						}
-						yield output;
-						// take the data.content value and yield it
+
+						// Handle the parsed data
+						if (data.content || data.stop) {
+							generatedText += data.content;
+							const output: TextGenerationStreamOutput = {
+								token: {
+									id: tokenId++,
+									text: data.content ?? "",
+									logprob: 0,
+									special: false,
+								},
+								generated_text: data.stop ? generatedText : null,
+								details: null,
+							};
+							if (data.stop) {
+								stop = true;
+								reader?.cancel();
+							}
+							yield output;
+						}
 					}
 				}
 			}
