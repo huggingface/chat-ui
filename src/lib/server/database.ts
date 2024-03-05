@@ -10,12 +10,15 @@ import type { Session } from "$lib/types/Session";
 import type { Assistant } from "$lib/types/Assistant";
 import type { Report } from "$lib/types/Report";
 import type { ConversationStats } from "$lib/types/ConversationStats";
+import type { MigrationResult } from "$lib/types/MigrationResult";
+import type { Semaphore } from "$lib/types/Semaphore";
 
 if (!MONGODB_URL) {
 	throw new Error(
 		"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
 	);
 }
+export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
 const client = new MongoClient(MONGODB_URL, {
 	directConnection: MONGODB_DIRECT_CONNECTION === "true",
@@ -23,24 +26,44 @@ const client = new MongoClient(MONGODB_URL, {
 
 export const connectPromise = client.connect().catch(console.error);
 
+export function getCollections(mongoClient: MongoClient) {
+	const db = mongoClient.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+
+	const conversations = db.collection<Conversation>("conversations");
+	const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
+	const assistants = db.collection<Assistant>("assistants");
+	const reports = db.collection<Report>("reports");
+	const sharedConversations = db.collection<SharedConversation>("sharedConversations");
+	const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
+	const settings = db.collection<Settings>("settings");
+	const users = db.collection<User>("users");
+	const sessions = db.collection<Session>("sessions");
+	const messageEvents = db.collection<MessageEvent>("messageEvents");
+	const bucket = new GridFSBucket(db, { bucketName: "files" });
+	const migrationResults = db.collection<MigrationResult>("migrationResults");
+	const semaphores = db.collection<Semaphore>("semaphores");
+
+	return {
+		conversations,
+		conversationStats,
+		assistants,
+		reports,
+		sharedConversations,
+		abortedGenerations,
+		settings,
+		users,
+		sessions,
+		messageEvents,
+		bucket,
+		migrationResults,
+		semaphores,
+	};
+}
 const db = client.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
-export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
+const collections = getCollections(client);
 
-const conversations = db.collection<Conversation>("conversations");
-const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
-const assistants = db.collection<Assistant>("assistants");
-const reports = db.collection<Report>("reports");
-const sharedConversations = db.collection<SharedConversation>("sharedConversations");
-const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
-const settings = db.collection<Settings>("settings");
-const users = db.collection<User>("users");
-const sessions = db.collection<Session>("sessions");
-const messageEvents = db.collection<MessageEvent>("messageEvents");
-const bucket = new GridFSBucket(db, { bucketName: "files" });
-
-export { client, db };
-export const collections = {
+const {
 	conversations,
 	conversationStats,
 	assistants,
@@ -51,8 +74,10 @@ export const collections = {
 	users,
 	sessions,
 	messageEvents,
-	bucket,
-};
+	semaphores,
+} = collections;
+
+export { client, db, collections };
 
 client.on("open", () => {
 	conversations
@@ -120,4 +145,8 @@ client.on("open", () => {
 	assistants.createIndex({ searchTokens: 1 }).catch(console.error);
 	reports.createIndex({ assistantId: 1 }).catch(console.error);
 	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
+
+	// Unique index for semaphore and migration results
+	semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
+	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 });
