@@ -9,6 +9,17 @@ export async function checkAndRunMigrations() {
 		throw new Error("Duplicate migration GUIDs found.");
 	}
 
+	// check if all migrations have already been run
+	const migrationResults = await collections.migrationResults.find().toArray();
+
+	// if all the migrations._id are in the migrationResults, we can exit early
+	if (
+		migrations.every((m) => migrationResults.some((m2) => m2._id.toString() === m._id.toString()))
+	) {
+		console.log("[MIGRATIONS] All migrations already applied.");
+		return;
+	}
+
 	console.log("[MIGRATIONS] Begin check...");
 
 	// connect to the database
@@ -33,10 +44,7 @@ export async function checkAndRunMigrations() {
 	// make sure to refresh it regularly while it's running
 	const refreshInterval = setInterval(async () => {
 		await refreshLock();
-	}, 1000 * 30);
-
-	// get all migration results that have already been applied
-	const migrationResults = await collections.migrationResults.find().toArray();
+	}, 1000 * 10);
 
 	// iterate over all migrations
 	for (const migration of migrations) {

@@ -147,5 +147,5 @@ client.on("open", () => {
 
 	// Unique index for semaphore and migration results
 	semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
-	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 300 }).catch(console.error);
+	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
 });
