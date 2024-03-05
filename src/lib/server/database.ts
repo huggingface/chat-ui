@@ -10,7 +10,6 @@ import type { Session } from "$lib/types/Session";
 import type { Assistant } from "$lib/types/Assistant";
 import type { Report } from "$lib/types/Report";
 import type { ConversationStats } from "$lib/types/ConversationStats";
-import migrationFunctions from "./database-migrations";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -55,33 +54,7 @@ export const collections = {
 	bucket,
 };
 
-/**
- * Migrations to run. Get the names of the migrations from env var 'migrations'.
- * Example: migrations=refreshSearchTokens npm run dev
- * In this case, we expect 'refreshSearchTokens' to be defined in './database-migrations.ts'
- */
-const migrationsToRun: string[] | undefined = process.env.migrations
-	?.split(",")
-	.map((el) => el.trim());
-
 client.on("open", () => {
-	// run migrations
-	if (migrationsToRun) {
-		for (const migrationName of migrationsToRun) {
-			const migrationFunction = migrationFunctions[migrationName];
-
-			if (!migrationFunction) {
-				console.warn(
-					`Migration '${migrationName}' does NOT exist in 'server/database-migrations.ts'`
-				);
-				continue;
-			}
-
-			migrationFunction().catch(console.error);
-		}
-	}
-
-	// create indices
 	conversations
 		.createIndex(
 			{ sessionId: 1, updatedAt: -1 },
