@@ -17,6 +17,12 @@ import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
+import { checkAndRunMigrations } from "$lib/migrations/migrations";
+import { building } from "$app/environment";
+
+if (!building) {
+	await checkAndRunMigrations();
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (event.url.pathname.startsWith(`${base}/api/`) && EXPOSE_API !== "true") {
