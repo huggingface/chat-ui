@@ -6,6 +6,7 @@ import {
 	releaseLock,
 	isDBLocked,
 	discardExpiredLock,
+	refreshLock,
 } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
@@ -54,6 +55,12 @@ export async function checkAndRunMigrations() {
 		}
 		return;
 	}
+
+	// once here, we have the lock
+	// make sure to refresh it regularly while it's running
+	const refreshInterval = setInterval(async () => {
+		await refreshLock();
+	}, 60 * 1000);
 
 	// get all migration results that have already been applied
 	const migrationResults = await collections.migrationResults.find().toArray();
@@ -124,5 +131,7 @@ export async function checkAndRunMigrations() {
 	}
 
 	console.log("[MIGRATIONS] All migrations applied. Releasing lock");
+
+	clearInterval(refreshInterval);
 	releaseLock();
 }
