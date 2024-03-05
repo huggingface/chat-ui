@@ -8,6 +8,9 @@
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
+	import CarbonClose from "~icons/carbon/close";
+	import CarbonSave from "~icons/carbon/save";
+
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconLoading from "./icons/IconLoading.svelte";
 
@@ -75,7 +78,7 @@
 
 <form
 	method="POST"
-	class="flex h-full flex-col"
+	class="flex h-full flex-col max-md:-mt-4"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
@@ -110,7 +113,9 @@
 	}}
 >
 	{#if assistant}
-		<h2 class="text-xl font-semibold">Edit assistant ({assistant?.name ?? ""})</h2>
+		<h2 class="text-xl font-semibold">
+			Edit {assistant?.name ?? "assistant"}
+		</h2>
 		<p class="mb-6 text-sm text-gray-500">
 			Modifying an existing assistant will propagate those changes to all users.
 		</p>
@@ -123,7 +128,7 @@
 		</p>
 	{/if}
 
-	<div class="mx-1 grid flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
+	<div class="mx-1 grid h-full w-full flex-1 grid-cols-2 gap-4 max-sm:grid-cols-1">
 		<div class="flex flex-col gap-4">
 			<div>
 				<span class="mb-1 block pb-2 text-sm font-semibold">Avatar</span>
@@ -223,7 +228,7 @@
 
 			<label>
 				<span class="mb-1 text-sm font-semibold">User start messages</span>
-				<div class="flex flex-col gap-2 md:max-h-32">
+				<div class="flex flex-col gap-2">
 					<input
 						name="exampleInput1"
 						bind:value={inputMessage1}
@@ -255,7 +260,7 @@
 			</label>
 		</div>
 
-		<label class="flex flex-col">
+		<label class="flex flex-col max-md:pb-12">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 			<textarea
 				name="preprompt"
@@ -267,24 +272,31 @@
 		</label>
 	</div>
 
-	<div class="mt-5 flex justify-end gap-2">
-		<a
-			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
-			class="rounded-full bg-gray-200 px-8 py-2 font-semibold text-gray-600">Cancel</a
-		>
-		<button
-			type="submit"
-			disabled={loading}
-			aria-disabled={loading}
-			class="rounded-full bg-black px-8 py-2 font-semibold md:px-20"
-			class:bg-gray-200={loading}
-			class:text-gray-600={loading}
-			class:text-white={!loading}
-		>
-			{assistant ? "Save" : "Create"}
-			{#if loading}
-				<IconLoading classNames="ml-2 h-min" />
-			{/if}
-		</button>
+	<div class="absolute bottom-0 right-0 mx-8 my-4 flex justify-end gap-2">
+		<div class="mt-auto flex justify-end gap-2 pt-5">
+			<a
+				href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
+				class="flex items-center justify-center gap-1 rounded-full bg-gray-200 p-2 px-3 font-semibold text-gray-600"
+			>
+				<CarbonClose class="text-xl" />
+				Cancel
+			</a>
+			<button
+				type="submit"
+				disabled={loading}
+				aria-disabled={loading}
+				class="flex items-center justify-center gap-1 rounded-full bg-black p-2 px-3 font-semibold"
+				class:bg-gray-200={loading}
+				class:text-gray-600={loading}
+				class:text-white={!loading}
+			>
+				{#if loading}
+					<IconLoading classNames="ml-2 h-min" />
+				{:else}
+					<CarbonSave class="text-xl" />
+				{/if}
+				{assistant ? "Save" : "Create"}
+			</button>
+		</div>
 	</div>
 </form>
