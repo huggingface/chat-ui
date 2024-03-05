@@ -110,6 +110,7 @@ export function endpointLlamacpp(
 							};
 							if (data.stop) {
 								stop = true;
+								output.token.special = true;
 								reader?.cancel();
 							}
 							yield output;
