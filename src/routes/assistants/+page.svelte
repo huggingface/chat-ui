@@ -162,18 +162,17 @@
 				{/if}
 			{/if}
 			<div
-				class="ml-auto mr-2 flex h-9 w-9 items-center gap-x-2 rounded-full border border-gray-300 px-2 transition-all duration-300 ease-out hover:w-64 md:w-64 dark:border-gray-500"
+				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 sm:w-64 dark:border-gray-600"
 			>
-				<button class="flex-shrink-0 cursor-default" on:click={() => filterInputEl.focus()}
-					><CarbonSearch class="text-gray-400" /></button
-				>
+				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400 " />
 				<input
-					class="h-9 w-full rounded-full bg-transparent focus:outline-none"
+					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
 					placeholder="Filter by name"
 					value={data.query}
 					on:input={filterOnName}
 					bind:this={filterInputEl}
 					maxlength="150"
+					type="search"
 					disabled={searchDisabled}
 				/>
 			</div>
