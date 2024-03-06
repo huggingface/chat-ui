@@ -8,6 +8,8 @@ import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
 import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 import { v4 } from "uuid";
+import { authCondition } from "$lib/server/auth";
+import { usageLimits } from "$lib/server/usageLimits";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -22,6 +24,15 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			preprompt: z.string().optional(),
 		})
 		.parse(JSON.parse(body));
+
+	const convCount = await collections.conversations.countDocuments(authCondition(locals));
+
+	if (usageLimits?.conversations && convCount > usageLimits?.conversations) {
+		throw error(
+			429,
+			"You have reached the maximum number of conversations. Delete some to continue."
+		);
+	}
 
 	let messages: Message[] = [
 		{

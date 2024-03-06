@@ -27,6 +27,8 @@ jobs:
           HF_DEPLOYMENT_TOKEN: ${{ secrets.HF_DEPLOYMENT_TOKEN }}
           WEBHOOK_URL_REPORT_ASSISTANT: ${{ secrets.WEBHOOK_URL_REPORT_ASSISTANT }}
           ADMIN_API_SECRET: ${{ secrets.ADMIN_API_SECRET }}
+          USAGE_LIMITS: ${{ secrets.USAGE_LIMITS }}
+          MESSAGES_BEFORE_LOGIN: ${{ secrets.MESSAGES_BEFORE_LOGIN }}
         run: npm run updateProdEnv
   sync-to-hub:
     runs-on: ubuntu-latest
