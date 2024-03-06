@@ -47,8 +47,9 @@
 			});
 
 			if (!res.ok) {
-				error.set("Error while creating conversation, try again.");
-				console.error("Error while creating conversation: " + (await res.text()));
+				const errorMessage = (await res.json()).message || ERROR_MESSAGES.default;
+				error.set(errorMessage);
+				console.error("Error while creating conversation: ", errorMessage);
 				return;
 			}
 
@@ -63,7 +64,7 @@
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });
 		} catch (err) {
-			error.set(ERROR_MESSAGES.default);
+			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
 		} finally {
 			loading = false;

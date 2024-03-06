@@ -4,7 +4,6 @@
 	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
-	import { tick } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -29,7 +28,8 @@
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement;
-	let searchDisabled = false;
+	let filterValue = data.query;
+	let isFilterInPorgress = false;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
@@ -39,19 +39,26 @@
 		goto(newUrl);
 	};
 
-	const filterOnName = debounce(async (e: Event) => {
-		searchDisabled = true;
-		const value = (e.target as HTMLInputElement).value;
+	const filterOnName = debounce(async (value: string) => {
+		filterValue = value;
+
+		if (isFilterInPorgress) {
+			return;
+		}
+
+		isFilterInPorgress = true;
 		const newUrl = getHref($page.url, {
 			newKeys: { q: value },
 			existingKeys: { behaviour: "delete", keys: ["p"] },
 		});
 		await goto(newUrl);
-		setTimeout(async () => {
-			searchDisabled = false;
-			await tick();
-			filterInputEl.focus();
-		}, 0);
+		setTimeout(() => filterInputEl.focus(), 0);
+		isFilterInPorgress = false;
+
+		// there was a new filter query before server returned response
+		if (filterValue !== value) {
+			filterOnName(filterValue);
+		}
 	}, SEARCH_DEBOUNCE_DELAY);
 
 	const settings = useSettingsStore();
@@ -171,12 +178,11 @@
 				<input
 					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
 					placeholder="Filter by name"
-					value={data.query}
-					on:input={filterOnName}
+					value={filterValue}
+					on:input={(e) => filterOnName(e.currentTarget.value)}
 					bind:this={filterInputEl}
 					maxlength="150"
 					type="search"
-					disabled={searchDisabled}
 				/>
 			</div>
 		</div>
