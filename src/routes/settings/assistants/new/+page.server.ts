@@ -7,6 +7,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
+import { usageLimits } from "$lib/server/usageLimits";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const newAsssistantSchema = z.object({
@@ -59,6 +60,18 @@ export const actions: Actions = {
 		// can only create assistants when logged in, IF login is setup
 		if (!locals.user && requiresUser) {
 			const errors = [{ field: "preprompt", message: "Must be logged in. Unauthorized" }];
+			return fail(400, { error: true, errors });
+		}
+
+		const assistantsCount = await collections.assistants.countDocuments(authCondition(locals));
+
+		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
+			const errors = [
+				{
+					field: "preprompt",
+					message: "You have reached the maximum number of assistants. Delete some to continue.",
+				},
+			];
 			return fail(400, { error: true, errors });
 		}
 
