@@ -128,7 +128,7 @@
 		</a>
 	</div>
 	<div
-		class="col-span-1 w-full overflow-y-auto px-1 max-md:px-2 max-md:pt-4 md:col-span-2 md:row-span-2"
+		class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 max-md:pt-4 md:col-span-2 md:row-span-2"
 	>
 		<slot />
 	</div>

@@ -1,22 +1,13 @@
 <script lang="ts">
-	import { onMount } from "svelte";
 	import { base } from "$app/paths";
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { afterNavigate, goto } from "$app/navigation";
-	import { page } from "$app/stores";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import { fade, fly } from "svelte/transition";
 
 	let previousPage: string = base;
-	let assistantsSection: HTMLHeadingElement;
-
-	onMount(() => {
-		if ($page.params?.assistantId) {
-			assistantsSection.scrollIntoView();
-		}
-	});
 
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("settings")) {
