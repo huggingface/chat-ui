@@ -20,6 +20,7 @@
 	import { getHref } from "$lib/utils/getHref";
 	import { debounce } from "$lib/utils/debounce";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { isDesktop } from "$lib/utils/isDesktop";
 
 	export let data: PageData;
 
@@ -36,7 +37,13 @@
 			newKeys: { modelId: (e.target as HTMLSelectElement).value },
 			existingKeys: { behaviour: "delete_except", keys: ["user"] },
 		});
+		resetFilter();
 		goto(newUrl);
+	};
+
+	const resetFilter = () => {
+		filterValue = "";
+		isFilterInPorgress = false;
 	};
 
 	const filterOnName = debounce(async (value: string) => {
@@ -52,7 +59,9 @@
 			existingKeys: { behaviour: "delete", keys: ["p"] },
 		});
 		await goto(newUrl);
-		setTimeout(() => filterInputEl.focus(), 0);
+		if (isDesktop(window)) {
+			setTimeout(() => filterInputEl.focus(), 0);
+		}
 		isFilterInPorgress = false;
 
 		// there was a new filter query before server returned response
@@ -130,6 +139,7 @@
 						href={getHref($page.url, {
 							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
+						on:click={resetFilter}
 						class="group"
 						><CarbonClose
 							class="text-xs group-hover:text-gray-800 dark:group-hover:text-gray-300"
@@ -150,6 +160,7 @@
 					href={getHref($page.url, {
 						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 					})}
+					on:click={resetFilter}
 					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
 						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
@@ -163,6 +174,7 @@
 							newKeys: { user: data.user.username },
 							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q"] },
 						})}
+						on:click={resetFilter}
 						class="flex items-center gap-1.5 truncate rounded-full border px-3 py-1 {assistantsCreator &&
 						createdByMe
 							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
