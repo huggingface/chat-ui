@@ -75,7 +75,7 @@
 
 <form
 	method="POST"
-	class="flex h-full flex-col max-md:-mt-4"
+	class="flex h-full flex-col overflow-y-scroll p-4 md:p-8"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
@@ -269,7 +269,7 @@
 		</label>
 	</div>
 
-	<div class="mt-4 flex justify-end gap-2">
+	<div class="mt-4 flex justify-end gap-2 max-md:mt-16">
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 			class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
