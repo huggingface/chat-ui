@@ -28,7 +28,6 @@
 	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
-	let innerWidth = 0;
 	let filterInputEl: HTMLInputElement;
 	let filterValue = data.query;
 	let isFilterInPorgress = false;
@@ -73,8 +72,6 @@
 
 	const settings = useSettingsStore();
 </script>
-
-<svelte:window bind:innerWidth />
 
 <svelte:head>
 	{#if isHuggingChat}
