@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -20,6 +20,7 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
+import { usageLimits } from "$lib/server/usageLimits";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -96,14 +97,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		}
 	}
 
-	// check if the user is rate limited
-	const nEvents = Math.max(
-		await collections.messageEvents.countDocuments({ userId }),
-		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
-	);
+	if (usageLimits?.messagesPerMinute) {
+		// check if the user is rate limited
+		const nEvents = Math.max(
+			await collections.messageEvents.countDocuments({ userId }),
+			await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+		);
+		if (nEvents > usageLimits.messagesPerMinute) {
+			throw error(429, ERROR_MESSAGES.rateLimited);
+		}
+	}
 
-	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
-		throw error(429, ERROR_MESSAGES.rateLimited);
+	if (usageLimits?.messages && conv.messages.length > usageLimits.messages) {
+		throw error(
+			429,
+			`This conversation has more than ${usageLimits.messages} messages. Start a new one to continue`
+		);
 	}
 
 	// fetch the model
@@ -126,7 +135,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
-			inputs: z.optional(z.string().trim().min(1)),
+			inputs: z.optional(
+				z
+					.string()
+					.trim()
+					.min(1)
+					.transform((s) => s.replace(/\r\n/g, "\n"))
+			),
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
@@ -134,6 +149,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		})
 		.parse(json);
 
+	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
+		throw error(400, "Message too long.");
+	}
 	// files is an array of base64 strings encoding Blob objects
 	// we need to convert this array to an array of File objects
 

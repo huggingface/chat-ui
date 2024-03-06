@@ -19,4 +19,5 @@ export interface Assistant extends Timestamps {
 		allowedDomains: string[];
 		allowedLinks: string[];
 	};
+	searchTokens: string[];
 }

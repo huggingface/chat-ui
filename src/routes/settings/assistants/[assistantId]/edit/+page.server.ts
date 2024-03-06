@@ -9,6 +9,7 @@ import { sha256 } from "$lib/utils/sha256";
 
 import sharp from "sharp";
 import { parseStringToList } from "$lib/utils/parseStringToList";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -139,6 +140,7 @@ export const actions: Actions = {
 						allowedDomains: parse.data.ragDomainList,
 						allowAllDomains: parse.data.ragAllowAll,
 					},
+					searchTokens: generateSearchTokens(parse.data.name),
 				},
 			}
 		);
