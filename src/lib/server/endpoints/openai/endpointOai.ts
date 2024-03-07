@@ -67,7 +67,11 @@ export async function endpointOai(
 			}));
 
 			if (messagesOpenAI?.[0]?.role !== "system") {
-				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
+				messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
+			}
+
+			if (messagesOpenAI?.[0]) {
+				messagesOpenAI[0].content = preprompt ?? "";
 			}
 
 			return openAIChatToTextGenerationStream(
