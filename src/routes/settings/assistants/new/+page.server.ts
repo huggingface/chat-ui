@@ -7,6 +7,8 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
+import { usageLimits } from "$lib/server/usageLimits";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -61,6 +63,18 @@ export const actions: Actions = {
 			return fail(400, { error: true, errors });
 		}
 
+		const assistantsCount = await collections.assistants.countDocuments(authCondition(locals));
+
+		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
+			const errors = [
+				{
+					field: "preprompt",
+					message: "You have reached the maximum number of assistants. Delete some to continue.",
+				},
+			];
+			return fail(400, { error: true, errors });
+		}
+
 		const createdById = locals.user?._id ?? locals.sessionId;
 
 		const newAssistantId = new ObjectId();
@@ -99,6 +113,7 @@ export const actions: Actions = {
 			updatedAt: new Date(),
 			userCount: 1,
 			featured: false,
+			searchTokens: generateSearchTokens(parse.data.name),
 		});
 
 		// add insertedId to user settings

@@ -14,23 +14,61 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
+	import CarbonSearch from "~icons/carbon/search";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
+	import { debounce } from "$lib/utils/debounce";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { isDesktop } from "$lib/utils/isDesktop";
 
 	export let data: PageData;
 
 	$: assistantsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === assistantsCreator;
 
+	const SEARCH_DEBOUNCE_DELAY = 400;
+	let filterInputEl: HTMLInputElement;
+	let filterValue = data.query;
+	let isFilterInPorgress = false;
+
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
 			newKeys: { modelId: (e.target as HTMLSelectElement).value },
 			existingKeys: { behaviour: "delete_except", keys: ["user"] },
 		});
+		resetFilter();
 		goto(newUrl);
 	};
+
+	const resetFilter = () => {
+		filterValue = "";
+		isFilterInPorgress = false;
+	};
+
+	const filterOnName = debounce(async (value: string) => {
+		filterValue = value;
+
+		if (isFilterInPorgress) {
+			return;
+		}
+
+		isFilterInPorgress = true;
+		const newUrl = getHref($page.url, {
+			newKeys: { q: value },
+			existingKeys: { behaviour: "delete", keys: ["p"] },
+		});
+		await goto(newUrl);
+		if (isDesktop(window)) {
+			setTimeout(() => filterInputEl.focus(), 0);
+		}
+		isFilterInPorgress = false;
+
+		// there was a new filter query before server returned response
+		if (filterValue !== value) {
+			filterOnName(filterValue);
+		}
+	}, SEARCH_DEBOUNCE_DELAY);
 
 	const settings = useSettingsStore();
 </script>
@@ -99,8 +137,9 @@
 					{assistantsCreator}'s Assistants
 					<a
 						href={getHref($page.url, {
-							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
+						on:click={resetFilter}
 						class="group"
 						><CarbonClose
 							class="text-xs group-hover:text-gray-800 dark:group-hover:text-gray-300"
@@ -119,8 +158,9 @@
 			{:else}
 				<a
 					href={getHref($page.url, {
-						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p"] },
+						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 					})}
+					on:click={resetFilter}
 					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!assistantsCreator
 						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
@@ -132,9 +172,10 @@
 					<a
 						href={getHref($page.url, {
 							newKeys: { user: data.user.username },
-							existingKeys: { behaviour: "delete", keys: ["modelId", "p"] },
+							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q"] },
 						})}
-						class="flex items-center gap-1.5 rounded-full border px-3 py-1 {assistantsCreator &&
+						on:click={resetFilter}
+						class="flex items-center gap-1.5 truncate rounded-full border px-3 py-1 {assistantsCreator &&
 						createdByMe
 							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 							: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
@@ -142,6 +183,20 @@
 					</a>
 				{/if}
 			{/if}
+			<div
+				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 sm:w-64 dark:border-gray-600"
+			>
+				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400" />
+				<input
+					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
+					placeholder="Filter by name"
+					value={filterValue}
+					on:input={(e) => filterOnName(e.currentTarget.value)}
+					bind:this={filterInputEl}
+					maxlength="150"
+					type="search"
+				/>
+			</div>
 		</div>
 
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
