@@ -4,8 +4,9 @@ import { collections } from "$lib/server/database.js";
 import { models } from "$lib/server/models";
 import { redirect } from "@sveltejs/kit";
 
-export async function load({ params, locals }) {
+export async function load({ params, locals, parent }) {
 	const model = models.find(({ id }) => id === params.model);
+	const data = await parent();
 
 	if (!model || model.unlisted) {
 		throw redirect(302, `${base}/`);
@@ -28,4 +29,11 @@ export async function load({ params, locals }) {
 			}
 		);
 	}
+
+	return {
+		settings: {
+			...data.settings,
+			activeModel: model.id,
+		},
+	};
 }
