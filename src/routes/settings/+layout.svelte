@@ -28,7 +28,7 @@
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="h-[95dvh] w-[90dvw] rounded-2xl bg-white shadow-2xl outline-none sm:h-[80dvh] xl:w-[1200px] 2xl:h-[70dvh]"
+		class="h-[95dvh] w-[90dvw] overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[80dvh] xl:w-[1200px] 2xl:h-[70dvh]"
 	>
 		<slot />
 		{#if $settings.recentlySaved}

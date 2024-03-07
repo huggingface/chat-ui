@@ -75,7 +75,7 @@
 
 <form
 	method="POST"
-	class="flex h-full flex-col overflow-y-scroll p-4 md:p-8"
+	class="flex h-full flex-col overflow-y-auto p-4 md:p-8"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
@@ -257,7 +257,7 @@
 			</label>
 		</div>
 
-		<label class="flex flex-col max-md:pb-12">
+		<label class="flex flex-col">
 			<div class="mb-1 text-sm font-semibold">Instructions (system prompt)</div>
 			<textarea
 				name="preprompt"
@@ -269,7 +269,7 @@
 		</label>
 	</div>
 
-	<div class="mt-4 flex justify-end gap-2 max-md:mt-16">
+	<div class="mt-6 flex justify-end gap-2">
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 			class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
