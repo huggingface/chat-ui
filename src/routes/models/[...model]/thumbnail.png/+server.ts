@@ -19,7 +19,6 @@ export const GET: RequestHandler = (async ({ params }) => {
 	}
 	const renderedComponent = (ModelThumbnail as unknown as SvelteComponent).render({
 		name: model.name,
-		description: model.description,
 		logoUrl: model.logoUrl,
 	});
 
