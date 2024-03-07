@@ -19,7 +19,7 @@
 	</div>
 
 	<div
-		class="flex h-[200px] w-full flex-col items-center justify-center rounded-b-none bg-yellow-500/10 pb-10 pt-10 text-4xl text-gray-500"
+		class="flex h-[200px] w-full flex-col items-center justify-center rounded-b-none bg-{PUBLIC_APP_COLOR}-500/10 pb-10 pt-10 text-4xl text-gray-500"
 		style="border-radius: 100% 100% 0 0;"
 	>
 		Try it now
