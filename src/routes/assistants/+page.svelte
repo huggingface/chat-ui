@@ -20,6 +20,7 @@
 	import { getHref } from "$lib/utils/getHref";
 	import { debounce } from "$lib/utils/debounce";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 
 	export let data: PageData;
 
@@ -208,6 +209,13 @@
 							<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)}
 						</div>
 					{/if}
+
+					{#if !!assistant?.rag}
+						<div class="absolute left-3 top-3" title="This assistant uses the websearch.">
+							<IconInternet classNames="h-5 w-5 fill-blue-400 dark:fill-blue-600" />
+						</div>
+					{/if}
+
 					{#if assistant.avatar}
 						<img
 							src="{base}/settings/assistants/{assistant._id}/avatar.jpg"
