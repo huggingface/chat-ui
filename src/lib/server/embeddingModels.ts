@@ -22,6 +22,7 @@ const modelConfig = z.object({
 	modelUrl: z.string().url().optional(),
 	endpoints: z.array(embeddingEndpointSchema).nonempty(),
 	chunkCharLength: z.number().positive(),
+	maxBatchSize: z.number().positive().optional(),
 	preQuery: z.string().default(""),
 	prePassage: z.string().default(""),
 });
@@ -70,6 +71,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processEmbeddingModel>>) => ({
 						return embeddingEndpoints.tei(args);
 					case "transformersjs":
 						return embeddingEndpoints.transformersjs(args);
+					case "openai":
+						return embeddingEndpoints.openai(args);
 				}
 			}
 
