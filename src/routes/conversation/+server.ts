@@ -16,14 +16,19 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	let title = "";
 
-	const values = z
+	const parsedBody = z
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
 			assistantId: z.string().optional(),
 			preprompt: z.string().optional(),
 		})
-		.parse(JSON.parse(body));
+		.safeParse(JSON.parse(body));
+
+	if (!parsedBody.success) {
+		throw error(400, "Invalid request");
+	}
+	const values = parsedBody.data;
 
 	const convCount = await collections.conversations.countDocuments(authCondition(locals));
 
@@ -34,14 +39,13 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		);
 	}
 
-	// get preprompt from assistant if it exists
-
 	const model = models.find((m) => m.name === values.model);
 
 	if (!model) {
 		throw error(400, "Invalid model");
 	}
 
+	// get preprompt from assistant if it exists
 	const assistant = await collections.assistants.findOne({
 		_id: new ObjectId(values.assistantId),
 	});
