@@ -19,33 +19,33 @@ export async function embeddingEndpointOpenAI(
 	const maxBatchSize = model.maxBatchSize || 100;
 
 	return async ({ inputs }) => {
-        const requestURL = new URL(url);
+		const requestURL = new URL(url);
 
-        const batchesInputs = chunk(inputs, maxBatchSize);
+		const batchesInputs = chunk(inputs, maxBatchSize);
 
-        const batchesResults = await Promise.all(
-            batchesInputs.map(async (batchInputs) => {
-                const response = await fetch(requestURL, {
-                    method: "POST",
-                    headers: {
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                        ...(authorization ? { Authorization: authorization } : {}),
-                    },
-                    body: JSON.stringify({ input: batchInputs, model: model.name }),
-                });
+		const batchesResults = await Promise.all(
+			batchesInputs.map(async (batchInputs) => {
+				const response = await fetch(requestURL, {
+					method: "POST",
+					headers: {
+						Accept: "application/json",
+						"Content-Type": "application/json",
+						...(authorization ? { Authorization: authorization } : {}),
+					},
+					body: JSON.stringify({ input: batchInputs, model: model.name }),
+				});
 
-                let embeddings: Embedding[] = [];
-                const responseObject = await response.json();
-                for (const embeddingObject of responseObject.data) {
-                    embeddings.push(embeddingObject.embedding);
-                }
-                return embeddings;
-            })
-        );
+				const embeddings: Embedding[] = [];
+				const responseObject = await response.json();
+				for (const embeddingObject of responseObject.data) {
+					embeddings.push(embeddingObject.embedding);
+				}
+				return embeddings;
+			})
+		);
 
-        const flatAllEmbeddings = batchesResults.flat();
+		const flatAllEmbeddings = batchesResults.flat();
 
-        return flatAllEmbeddings;
+		return flatAllEmbeddings;
 	};
 }
