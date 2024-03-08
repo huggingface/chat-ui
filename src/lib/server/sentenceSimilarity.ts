@@ -22,7 +22,7 @@ export async function findSimilarSentences(
 	const output = await embeddingEndpoint({ inputs });
 
 	const queryEmbedding: Embedding = output[0];
-	const sentencesEmbeddings: Embedding[] = output.slice(1, inputs.length - 1);
+	const sentencesEmbeddings: Embedding[] = output.slice(1);
 
 	const distancesFromQuery: { distance: number; index: number }[] = [...sentencesEmbeddings].map(
 		(sentenceEmbedding: Embedding, index: number) => {
