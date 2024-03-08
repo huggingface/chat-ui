@@ -9,7 +9,7 @@
 </script>
 
 <div class=" flex h-[648px] w-full flex-col items-center bg-white">
-	<div class="flex flex-1 flex-col items-center justify-center gap-2">
+	<div class="flex flex-1 flex-col items-center justify-center">
 		{#if logoUrl}
 			<img class="h-48 w-48" src={logoUrl} alt="avatar" />
 		{/if}
