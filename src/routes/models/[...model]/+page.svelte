@@ -82,7 +82,7 @@
 <svelte:head>
 	<meta property="og:title" content={modelId + " - " + PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${modelId} inside of ${PUBLIC_APP_NAME}`} />
+	<meta property="og:description" content={`Use ${modelId} with ${PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
 		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
