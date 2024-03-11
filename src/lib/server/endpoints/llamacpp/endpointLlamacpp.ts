@@ -41,6 +41,7 @@ export function endpointLlamacpp(
 				stop: model.parameters.stop,
 				repeat_penalty: model.parameters.repetition_penalty,
 				n_predict: model.parameters.max_new_tokens,
+				cache_prompt: true,
 			}),
 		});
 
