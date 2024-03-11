@@ -195,9 +195,30 @@
 					model={currentModel}
 				/>
 			{:else if !assistant}
-				<ChatIntroduction {models} {currentModel} on:message />
+				<ChatIntroduction
+					{models}
+					{currentModel}
+					on:message={(ev) => {
+						if ($page.data.loginRequired) {
+							ev.preventDefault();
+							loginModalOpen = true;
+						} else {
+							dispatch("message", ev.detail);
+						}
+					}}
+				/>
 			{:else}
-				<AssistantIntroduction {assistant} on:message />
+				<AssistantIntroduction
+					{assistant}
+					on:message={(ev) => {
+						if ($page.data.loginRequired) {
+							ev.preventDefault();
+							loginModalOpen = true;
+						} else {
+							dispatch("message", ev.detail);
+						}
+					}}
+				/>
 			{/if}
 		</div>
 		<ScrollToBottomBtn
