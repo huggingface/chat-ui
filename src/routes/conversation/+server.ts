@@ -16,14 +16,19 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	let title = "";
 
-	const values = z
+	const parsedBody = z
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
 			assistantId: z.string().optional(),
 			preprompt: z.string().optional(),
 		})
-		.parse(JSON.parse(body));
+		.safeParse(JSON.parse(body));
+
+	if (!parsedBody.success) {
+		throw error(400, "Invalid request");
+	}
+	const values = parsedBody.data;
 
 	const convCount = await collections.conversations.countDocuments(authCondition(locals));
 
@@ -34,11 +39,28 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		);
 	}
 
+	const model = models.find((m) => m.name === values.model);
+
+	if (!model) {
+		throw error(400, "Invalid model");
+	}
+
+	// get preprompt from assistant if it exists
+	const assistant = await collections.assistants.findOne({
+		_id: new ObjectId(values.assistantId),
+	});
+
+	if (assistant) {
+		values.preprompt = assistant.preprompt;
+	} else {
+		values.preprompt ??= model?.preprompt ?? "";
+	}
+
 	let messages: Message[] = [
 		{
 			id: v4(),
 			from: "system",
-			content: values.preprompt ?? "",
+			content: values.preprompt,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			children: [],
@@ -67,29 +89,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		embeddingModel = conversation.embeddingModel;
 	}
 
-	const model = models.find((m) => m.name === values.model);
-
-	if (!model) {
-		throw error(400, "Invalid model");
-	}
-
 	embeddingModel ??= model.embeddingModel ?? defaultEmbeddingModel.name;
 
 	if (model.unlisted) {
 		throw error(400, "Can't start a conversation with an unlisted model");
 	}
-
-	// Use the model preprompt if there is no conversation/preprompt in the request body
-	const preprompt = await (async () => {
-		if (values.assistantId) {
-			const assistant = await collections.assistants.findOne({
-				_id: new ObjectId(values.assistantId),
-			});
-			return assistant?.preprompt;
-		} else {
-			return values?.preprompt ?? model?.preprompt;
-		}
-	})();
 
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
@@ -97,7 +101,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		rootMessageId,
 		messages,
 		model: values.model,
-		preprompt: preprompt === model?.preprompt ? model?.preprompt : preprompt,
+		preprompt: values.preprompt,
 		assistantId: values.assistantId ? new ObjectId(values.assistantId) : undefined,
 		createdAt: new Date(),
 		updatedAt: new Date(),
