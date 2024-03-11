@@ -7,6 +7,10 @@ import {
 	embeddingEndpointTransformersJS,
 	embeddingEndpointTransformersJSParametersSchema,
 } from "./transformersjs/embeddingEndpoints";
+import {
+	embeddingEndpointOpenAI,
+	embeddingEndpointOpenAIParametersSchema,
+} from "./openai/embeddingEndpoints";
 
 // parameters passed when generating text
 interface EmbeddingEndpointParameters {
@@ -21,6 +25,7 @@ export type EmbeddingEndpoint = (params: EmbeddingEndpointParameters) => Promise
 export const embeddingEndpointSchema = z.discriminatedUnion("type", [
 	embeddingEndpointTeiParametersSchema,
 	embeddingEndpointTransformersJSParametersSchema,
+	embeddingEndpointOpenAIParametersSchema,
 ]);
 
 type EmbeddingEndpointTypeOptions = z.infer<typeof embeddingEndpointSchema>["type"];
@@ -36,6 +41,7 @@ export const embeddingEndpoints: {
 } = {
 	tei: embeddingEndpointTei,
 	transformersjs: embeddingEndpointTransformersJS,
+	openai: embeddingEndpointOpenAI,
 };
 
 export default embeddingEndpoints;

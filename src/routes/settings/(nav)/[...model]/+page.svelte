@@ -77,7 +77,7 @@
 			</a>
 		{/if}
 		<CopyToClipBoardBtn
-			value="{PUBLIC_ORIGIN || $page.url.origin}{base}?model={model.id}"
+			value="{PUBLIC_ORIGIN || $page.url.origin}{base}/models/{model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
 			<div class="flex items-center gap-1.5 hover:underline">
