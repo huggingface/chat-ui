@@ -17,10 +17,12 @@ export async function parseWeb(url: string) {
 		});
 
 		const { document } = dom.window;
-		const textElTags = "p";
-		const paragraphs = document.querySelectorAll(textElTags);
+		const paragraphs = document.querySelectorAll(
+			"p, span, article, section, main, aside, header, footer, code, pre, th, td, li, ol, ul"
+		);
+
 		if (!paragraphs.length) {
-			throw new Error(`webpage doesn't have any "${textElTags}" element`);
+			throw new Error(`webpage doesn't have any parseable element`);
 		}
 		const paragraphTexts = Array.from(paragraphs).map((p) => p.textContent);
 
