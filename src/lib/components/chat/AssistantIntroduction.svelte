@@ -3,13 +3,26 @@
 	import IconGear from "~icons/bi/gear-fill";
 	import { base } from "$app/paths";
 	import type { Assistant } from "$lib/types/Assistant";
+	import IconInternet from "../icons/IconInternet.svelte";
 
 	export let assistant: Pick<
 		Assistant,
-		"avatar" | "name" | "modelId" | "createdByName" | "exampleInputs" | "_id" | "description"
+		| "avatar"
+		| "name"
+		| "rag"
+		| "modelId"
+		| "createdByName"
+		| "exampleInputs"
+		| "_id"
+		| "description"
 	>;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
+
+	$: hasRag =
+		assistant?.rag?.allowAllDomains ||
+		(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
+		(assistant?.rag?.allowedLinks?.length ?? 0) > 0;
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
@@ -55,6 +68,14 @@
 				{/if}
 			</div>
 		</div>
+		{#if hasRag}
+			<div
+				class="absolute left-3 top-3 md:left-4 md:top-4"
+				title="This assistant uses the websearch."
+			>
+				<IconInternet classNames="size-5 fill-blue-400 dark:fill-blue-600" />
+			</div>
+		{/if}
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"
