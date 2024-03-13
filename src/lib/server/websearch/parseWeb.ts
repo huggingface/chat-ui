@@ -1,4 +1,5 @@
 import { JSDOM, VirtualConsole } from "jsdom";
+import { Readability } from "@mozilla/readability";
 
 export async function parseWeb(url: string) {
 	const abortController = new AbortController();
@@ -17,19 +18,12 @@ export async function parseWeb(url: string) {
 		});
 
 		const { document } = dom.window;
-		const paragraphs = document.querySelectorAll(
-			"p, span, article, section, main, aside, header, footer, code, pre, th, td, li, ol, ul"
-		);
 
-		if (!paragraphs.length) {
-			throw new Error(`webpage doesn't have any parseable element`);
-		}
-		const paragraphTexts = Array.from(paragraphs).map((p) => p.textContent);
+		const article = new Readability(document).parse();
 
-		// combine text contents from paragraphs and then remove newlines and multiple spaces
-		const text = paragraphTexts.join(" ").replace(/ {2}|\r\n|\n|\r/gm, "");
+		console.log({ article });
 
-		return text;
+		return article?.textContent;
 	} else if (
 		r.headers.get("content-type")?.includes("text/plain") ||
 		r.headers.get("content-type")?.includes("text/markdown")
