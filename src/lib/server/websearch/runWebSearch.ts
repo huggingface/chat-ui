@@ -49,7 +49,7 @@ export async function runWebSearch(
 	try {
 		// if the assistant specified direct links, skip the websearch
 		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
-			appendUpdate("Using links specified in assistant directly.");
+			appendUpdate("Using links specified in Assistant");
 
 			let linksToUse = [...ragSettings.allowedLinks];
 
@@ -77,7 +77,7 @@ export async function runWebSearch(
 			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 
 			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
-				appendUpdate("Filtering results to only domains specified in assistant");
+				appendUpdate("Filtering on specified domains");
 				webSearch.searchQuery +=
 					" " + ragSettings.allowedDomains.map((item) => "site:" + item).join(" ");
 			}

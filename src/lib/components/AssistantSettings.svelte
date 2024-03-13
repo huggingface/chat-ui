@@ -283,8 +283,8 @@
 				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 			</label>
 			{#if $page.data.enableAssistantsRAG}
-				<div class="flex min-h-44 flex-col flex-nowrap">
-					<span class="my-2 text-smd font-semibold"> RAG Settings</span>
+				<div class="mb-4 flex flex-col flex-nowrap">
+					<span class="my-2 text-smd font-semibold">Internet access</span>
 
 					<label>
 						<input
@@ -313,7 +313,7 @@
 						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Enabled </span>
 						{#if ragMode === "all"}
 							<span class="block text-xs text-gray-500">
-								Assistant can access any content on the web.
+								Assistant will do a web search to find information.
 							</span>
 						{/if}
 					</label>
@@ -325,12 +325,14 @@
 							name="ragMode"
 							value={false}
 						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "links"}> Links </span>
+						<span class="my-2 text-sm" class:font-semibold={ragMode === "links"}>
+							Specific Links
+						</span>
 					</label>
 					{#if ragMode === "links"}
 						<span class="mb-2 text-xs text-gray-500">
 							Specify a maximum of 3 direct URLs that the Assistant will access. HTML & plain text
-							only. Separate list items with a comma.
+							only, separated by commas.
 						</span>
 						<input
 							name="ragLinkList"
@@ -353,7 +355,7 @@
 					</label>
 					{#if ragMode === "domains"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify allowed domains for web search, separated with a comma.
+							Specify allowed web search domains for the Assistant to search, separated by commas.
 						</span>
 
 						<input

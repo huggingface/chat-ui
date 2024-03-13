@@ -52,9 +52,21 @@
 				<p class="-mb-1">Assistant</p>
 
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
-				<p class="line-clamp-6 text-sm text-gray-500 dark:text-gray-400">
-					{assistant.description}
-				</p>
+				{#if assistant.description}
+					<p class="line-clamp-6 text-sm text-gray-500 dark:text-gray-400">
+						{assistant.description}
+					</p>
+				{/if}
+
+				{#if hasRag}
+					<div
+						class="flex h-5 w-fit items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs"
+						title="This assistant uses the websearch."
+					>
+						<IconInternet classNames="text-sm text-blue-600" />
+						Has internet access
+					</div>
+				{/if}
 
 				{#if assistant.createdByName}
 					<p class="pt-2 text-sm text-gray-400 dark:text-gray-500">
@@ -68,15 +80,7 @@
 				{/if}
 			</div>
 		</div>
-		{#if hasRag}
-			<div
-				class="absolute left-3 top-3 flex h-5 items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs md:left-4 md:top-4"
-				title="This assistant uses the websearch."
-			>
-				<IconInternet classNames="text-sm text-blue-600" />
-				Has internet access
-			</div>
-		{/if}
+
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"

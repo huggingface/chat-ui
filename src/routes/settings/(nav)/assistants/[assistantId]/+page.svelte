@@ -173,7 +173,7 @@
 
 		{#if hasRag}
 			<div class="mt-4">
-				<h2 class=" font-semibold">Web Search</h2>
+				<h2 class=" font-semibold">Internet Access</h2>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
 						This Assistant uses web search to find relevant websites.
