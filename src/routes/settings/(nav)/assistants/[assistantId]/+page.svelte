@@ -63,10 +63,10 @@
 
 				{#if hasRag}
 					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
 						title="This assistant uses the websearch."
-						class="mx-1 inline-flex h-full items-center justify-center"
 					>
-						<IconInternet classNames="fill-blue-400" />
+						<IconInternet classNames="text-sm text-blue-600" />
 					</span>
 				{/if}
 				<span class="ml-1 rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
@@ -163,36 +163,32 @@
 	</div>
 
 	<!-- two columns for big screen, single column for small screen -->
-	<div class="mb-12 grid h-full grid-cols-1 gap-x-8 gap-y-12" class:md:grid-cols-2={hasRag}>
-		<div class="mt-4 h-full">
-			<h2 class="text-lg font-semibold">System Instructions</h2>
-			<textarea
-				disabled
-				class="box-border h-full min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
-				>{assistant?.preprompt}</textarea
-			>
-		</div>
+	<div class="mb-12 mt-3">
+		<h2 class="mb-2 font-semibold">System Instructions</h2>
+		<textarea
+			disabled
+			class="box-border h-full min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
+			>{assistant?.preprompt}</textarea
+		>
 
 		{#if hasRag}
 			<div class="mt-4">
-				<h2 class=" text-lg font-semibold">Websearch</h2>
+				<h2 class=" font-semibold">Web Search</h2>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
-						This assistant uses the web search to find relevant websites.
+						This Assistant uses web search to find relevant websites.
 					</p>
 				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length > 0}
-					<p class="pb-2 text-sm text-gray-500">
-						This assistant is limited to the following domains:
-					</p>
-					<ul class="mr-2 list-inside list-disc gap-y-3 text-sm text-gray-500">
+					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following domains:</p>
+					<ul class="mr-2 flex flex-wrap gap-2 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedDomains as domain}
-							<li>{domain}</li>
+							<li class="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-0.5">
+								{domain}
+							</li>
 						{/each}
 					</ul>
 				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length > 0}
-					<p class="pb-2 text-sm text-gray-500">
-						This assistant is limited to the following links:
-					</p>
+					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following links:</p>
 					<ul class="mr-2 list-inside list-disc gap-y-3 text-sm text-gray-500">
 						{#each assistant?.rag?.allowedLinks as link}
 							<li>

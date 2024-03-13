@@ -70,10 +70,11 @@
 		</div>
 		{#if hasRag}
 			<div
-				class="absolute left-3 top-3 md:left-4 md:top-4"
+				class="absolute left-3 top-3 flex h-5 items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs md:left-4 md:top-4"
 				title="This assistant uses the websearch."
 			>
-				<IconInternet classNames="size-5 fill-blue-400 dark:fill-blue-600" />
+				<IconInternet classNames="text-sm text-blue-600" />
+				Has internet access
 			</div>
 		{/if}
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">

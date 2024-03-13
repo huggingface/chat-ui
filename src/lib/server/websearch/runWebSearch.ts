@@ -49,7 +49,7 @@ export async function runWebSearch(
 	try {
 		// if the assistant specified direct links, skip the websearch
 		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
-			appendUpdate("Using links specified in assistant directly. Skipping websearch");
+			appendUpdate("Using links specified in assistant directly.");
 
 			let linksToUse = [...ragSettings.allowedLinks];
 

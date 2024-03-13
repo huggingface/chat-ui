@@ -282,17 +282,6 @@
 				</div>
 				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 			</label>
-		</div>
-
-		<div class="flex flex-col">
-			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
-			<textarea
-				name="preprompt"
-				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-				placeholder="You'll act as..."
-				value={assistant?.preprompt ?? ""}
-			/>
-			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 			{#if $page.data.enableAssistantsRAG}
 				<div class="flex min-h-44 flex-col flex-nowrap">
 					<span class="my-2 text-smd font-semibold"> RAG Settings</span>
@@ -340,14 +329,14 @@
 					</label>
 					{#if ragMode === "links"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify max 3 direct URLs the assistant will access. HTML & plaintext only. Separate
-							the list elements with a semicolon.
+							Specify a maximum of 3 direct URLs that the Assistant will access. HTML & plain text
+							only. Separate list items with a comma.
 						</span>
 						<input
 							name="ragLinkList"
 							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 							placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
-							value={assistant?.rag?.allowedLinks.join(";") ?? ""}
+							value={assistant?.rag?.allowedLinks.join(",") ?? ""}
 						/>
 						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
 					{/if}
@@ -364,19 +353,30 @@
 					</label>
 					{#if ragMode === "domains"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify allowed domains for web search, separe the list elements with a semicolon.
+							Specify allowed domains for web search, separated with a comma.
 						</span>
 
 						<input
 							name="ragDomainList"
 							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-							placeholder="wikipedia.org;bbc.com"
-							value={assistant?.rag?.allowedDomains?.join(";") ?? ""}
+							placeholder="wikipedia.org,bbc.com"
+							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
 						/>
 						<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
 					{/if}
 				</div>
 			{/if}
+		</div>
+
+		<div class="flex flex-col">
+			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
+			<textarea
+				name="preprompt"
+				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+				placeholder="You'll act as..."
+				value={assistant?.preprompt ?? ""}
+			/>
+			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</div>
 	</div>
 

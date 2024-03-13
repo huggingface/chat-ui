@@ -223,8 +223,11 @@
 					{/if}
 
 					{#if !!assistant?.rag}
-						<div class="absolute left-3 top-3" title="This assistant uses the websearch.">
-							<IconInternet classNames="h-5 w-5 fill-blue-400 dark:fill-blue-600" />
+						<div
+							class="absolute left-3 top-3 grid size-5 place-items-center rounded-full bg-blue-500/10"
+							title="This assistant uses the websearch."
+						>
+							<IconInternet classNames="text-sm text-blue-600" />
 						</div>
 					{/if}
 
