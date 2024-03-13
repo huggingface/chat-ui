@@ -21,9 +21,7 @@ export async function parseWeb(url: string) {
 
 		const article = new Readability(document).parse();
 
-		console.log({ article });
-
-		return article?.textContent;
+		return article?.textContent ?? "";
 	} else if (
 		r.headers.get("content-type")?.includes("text/plain") ||
 		r.headers.get("content-type")?.includes("text/markdown")
