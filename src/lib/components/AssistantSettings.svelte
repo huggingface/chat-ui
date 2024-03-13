@@ -153,7 +153,7 @@
 	{/if}
 
 	<div class="grid h-full w-full flex-1 grid-cols-2 gap-6 text-sm max-sm:grid-cols-1">
-		<div class="flex flex-col gap-4">
+		<div class="col-span-1 flex flex-col gap-4">
 			<div>
 				<div class="mb-1 block pb-2 text-sm font-semibold">Avatar</div>
 				<input
@@ -368,11 +368,11 @@
 			{/if}
 		</div>
 
-		<div class="flex flex-col">
+		<div class="col-span-1 flex h-full flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 			<textarea
 				name="preprompt"
-				class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
 			/>
@@ -380,7 +380,9 @@
 		</div>
 	</div>
 
-	<div class="mt-6 flex justify-end gap-2">
+	<div
+		class="ml-auto mt-6 flex w-fit justify-end gap-2 max-sm:fixed max-sm:bottom-6 max-sm:right-6"
+	>
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 			class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
