@@ -30,7 +30,7 @@
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
 		<div
-			class="flex min-w-[80dvw] items-center gap-4 p-4 pr-1 sm:min-w-[440px] md:p-8 md:pt-10 xl:gap-8"
+			class="mt-3 flex min-w-[80dvw] items-center gap-4 p-4 pr-1 sm:min-w-[440px] md:p-8 md:pt-10 xl:gap-8"
 		>
 			{#if assistant.avatar}
 				<img
