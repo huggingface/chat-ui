@@ -331,7 +331,7 @@
 					</label>
 					{#if ragMode === "links"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify a maximum of 3 direct URLs that the Assistant will access. HTML & plain text
+							Specify a maximum of 10 direct URLs that the Assistant will access. HTML & plain text
 							only, separated by commas.
 						</span>
 						<input

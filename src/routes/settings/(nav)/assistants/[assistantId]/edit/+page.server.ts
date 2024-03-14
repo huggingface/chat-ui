@@ -21,7 +21,7 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.union([z.instanceof(File), z.literal("null")]).optional(),
-	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(3)),
+	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(10)),
 	ragDomainList: z.preprocess(parseStringToList, z.string().array()),
 	ragAllowAll: z.preprocess((v) => v === "true", z.boolean()),
 });
