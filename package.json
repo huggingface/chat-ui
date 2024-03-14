@@ -53,7 +53,6 @@
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
-		"@mozilla/readability": "^0.5.0",
 		"@resvg/resvg-js": "^2.6.0",
 		"@xenova/transformers": "^2.6.0",
 		"autoprefixer": "^10.4.14",
