@@ -178,7 +178,7 @@
 					<p class="text-sm text-gray-500">
 						This Assistant uses Web Search to find information on Internet.
 					</p>
-				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length > 0}
+				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length}
 					<p class="pb-4 text-sm text-gray-500">
 						This Assistant can use Web Search on the following domains:
 					</p>
