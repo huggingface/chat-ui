@@ -180,19 +180,23 @@
 					</p>
 				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length > 0}
 					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following domains:</p>
-					<ul class="mr-2 flex flex-wrap gap-2 text-sm text-gray-800">
+					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedDomains as domain}
-							<li class="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-0.5">
-								{domain}
+							<li
+								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight"
+							>
+								<a target="_blank" class="underline" href={domain}>{domain}</a>
 							</li>
 						{/each}
 					</ul>
 				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length > 0}
 					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following links:</p>
-					<ul class="mr-2 list-inside list-disc gap-y-3 text-sm text-gray-500">
+					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedLinks as link}
-							<li>
-								<a class="underline" href={link}>{link}</a>
+							<li
+								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight"
+							>
+								<a target="_blank" class="underline" href={link}>{link}</a>
 							</li>
 						{/each}
 					</ul>
