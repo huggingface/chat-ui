@@ -189,7 +189,7 @@
 							</li>
 						{/each}
 					</ul>
-				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length > 0}
+				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length}
 					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following links:</p>
 					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedLinks as link}
