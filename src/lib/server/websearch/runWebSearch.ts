@@ -1,24 +1,35 @@
 import { searchWeb } from "$lib/server/websearch/searchWeb";
-import type { Message } from "$lib/types/Message";
-import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
 import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
-import type { Conversation } from "$lib/types/Conversation";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { getWebSearchProvider } from "./searchWeb";
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
+import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST, ENABLE_LOCAL_FETCH } from "$env/static/private";
+
+import type { Conversation } from "$lib/types/Conversation";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import type { Message } from "$lib/types/Message";
+import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import type { Assistant } from "$lib/types/Assistant";
+
+import { z } from "zod";
+import JSON5 from "json5";
+import { isURLLocal } from "../isURLLocal";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
 
-const DOMAIN_BLOCKLIST = ["youtube.com", "twitter.com"];
+const listSchema = z.array(z.string()).default([]);
+
+const allowList = listSchema.parse(JSON5.parse(WEBSEARCH_ALLOWLIST));
+const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
 
 export async function runWebSearch(
 	conv: Conversation,
 	messages: Message[],
-	updatePad: (upd: MessageUpdate) => void
+	updatePad: (upd: MessageUpdate) => void,
+	ragSettings?: Assistant["rag"]
 ) {
 	const prompt = messages[messages.length - 1].content;
 	const webSearch: WebSearch = {
@@ -36,26 +47,66 @@ export async function runWebSearch(
 	}
 
 	try {
-		webSearch.searchQuery = await generateQuery(messages);
-		const searchProvider = getWebSearchProvider();
-		appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
-		const results = await searchWeb(webSearch.searchQuery);
-		webSearch.results =
-			(results.organic_results &&
-				results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
-					try {
-						const { title, link, text } = el;
-						const { hostname } = new URL(link);
-						return { title, link, hostname, text };
-					} catch (e) {
-						// Ignore Errors
-						return null;
-					}
-				})) ??
-			[];
+		// if the assistant specified direct links, skip the websearch
+		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
+			appendUpdate("Using links specified in Assistant");
+
+			let linksToUse = [...ragSettings.allowedLinks];
+
+			if (ENABLE_LOCAL_FETCH !== "true") {
+				const localLinks = await Promise.all(
+					linksToUse.map(async (link) => {
+						try {
+							const url = new URL(link);
+							return await isURLLocal(url);
+						} catch (e) {
+							return true;
+						}
+					})
+				);
+
+				linksToUse = linksToUse.filter((_, index) => !localLinks[index]);
+			}
+
+			webSearch.results = linksToUse.map((link) => {
+				return { link, hostname: new URL(link).hostname, title: "", text: "" };
+			});
+		} else {
+			webSearch.searchQuery = await generateQuery(messages);
+			const searchProvider = getWebSearchProvider();
+			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
+
+			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
+				appendUpdate("Filtering on specified domains");
+				webSearch.searchQuery +=
+					" " + ragSettings.allowedDomains.map((item) => "site:" + item).join(" ");
+			}
+
+			// handle the global lists
+			webSearch.searchQuery +=
+				allowList.map((item) => "site:" + item).join(" ") +
+				" " +
+				blockList.map((item) => "-site:" + item).join(" ");
+
+			const results = await searchWeb(webSearch.searchQuery);
+			webSearch.results =
+				(results.organic_results &&
+					results.organic_results.map((el: { title?: string; link: string; text?: string }) => {
+						try {
+							const { title, link, text } = el;
+							const { hostname } = new URL(link);
+							return { title, link, hostname, text };
+						} catch (e) {
+							// Ignore Errors
+							return null;
+						}
+					})) ??
+				[];
+		}
+
 		webSearch.results = webSearch.results.filter((value) => value !== null);
 		webSearch.results = webSearch.results
-			.filter(({ link }) => !DOMAIN_BLOCKLIST.some((el) => link.includes(el))) // filter out blocklist links
+			.filter(({ link }) => !blockList.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
 		// fetch the model

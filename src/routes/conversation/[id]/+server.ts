@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -13,6 +13,7 @@ import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
+import type { Assistant } from "$lib/types/Assistant";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
@@ -334,9 +335,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			);
 
+			// check if assistant has a rag
+			const rag = (
+				await collections.assistants.findOne<Pick<Assistant, "rag">>(
+					{ _id: conv.assistantId },
+					{ projection: { rag: 1 } }
+				)
+			)?.rag;
+
+			const assistantHasRAG =
+				ENABLE_ASSISTANTS_RAG === "true" &&
+				rag &&
+				(rag.allowedLinks.length > 0 || rag.allowedDomains.length > 0 || rag.allowAllDomains);
+
 			// perform websearch if needed
-			if (webSearch && !isContinue && !conv.assistantId) {
-				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update);
+			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
+				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, rag);
 			}
 
 			// inject websearch result & optionally images into the messages

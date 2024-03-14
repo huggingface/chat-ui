@@ -14,5 +14,10 @@ export interface Assistant extends Timestamps {
 	preprompt: string;
 	userCount?: number;
 	featured?: boolean;
+	rag?: {
+		allowAllDomains: boolean;
+		allowedDomains: string[];
+		allowedLinks: string[];
+	};
 	searchTokens: string[];
 }

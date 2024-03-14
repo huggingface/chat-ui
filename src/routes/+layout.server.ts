@@ -14,6 +14,7 @@ import {
 	USE_LOCAL_WEBSEARCH,
 	SEARXNG_QUERY_URL,
 	ENABLE_ASSISTANTS,
+	ENABLE_ASSISTANTS_RAG,
 } from "$env/static/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
@@ -186,6 +187,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		},
 		assistant,
 		enableAssistants,
+		enableAssistantsRAG: ENABLE_ASSISTANTS_RAG === "true",
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
