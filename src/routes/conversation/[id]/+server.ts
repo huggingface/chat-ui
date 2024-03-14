@@ -336,13 +336,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			// check if assistant has a rag
-			const rag =
-				(
-					await collections.assistants.findOne<Pick<Assistant, "rag">>(
-						{ _id: conv.assistantId },
-						{ projection: { rag: 1 } }
-					)
-				)?.rag ?? undefined;
+			const rag = (
+				await collections.assistants.findOne<Pick<Assistant, "rag">>(
+					{ _id: conv.assistantId },
+					{ projection: { rag: 1 } }
+				)
+			)?.rag;
 
 			const assistantHasRAG =
 				ENABLE_ASSISTANTS_RAG === "true" &&
