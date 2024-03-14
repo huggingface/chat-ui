@@ -176,7 +176,7 @@
 				<h2 class=" font-semibold">Internet Access</h2>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
-						This Assistant uses the Web Search to find information on Internet.
+						This Assistant uses Web Search to find information on Internet.
 					</p>
 				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length > 0}
 					<p class="pb-4 text-sm text-gray-500">
