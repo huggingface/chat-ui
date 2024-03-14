@@ -30,7 +30,9 @@
 	let displayReportModal = false;
 
 	$: hasRag =
-		assistant?.rag?.allowAllDomains || !!assistant?.rag?.allowedDomains?.length || !!assistant?.rag?.allowedLinks?.length;
+		assistant?.rag?.allowAllDomains ||
+		!!assistant?.rag?.allowedDomains?.length ||
+		!!assistant?.rag?.allowedLinks?.length;
 </script>
 
 {#if displayReportModal}

@@ -203,7 +203,9 @@
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant (assistant._id)}
 				{@const hasRag =
-					assistant?.rag?.allowAllDomains || !!assistant?.rag?.allowedDomains?.length || !!assistant?.rag?.allowedLinks?.length}
+					assistant?.rag?.allowAllDomains ||
+					!!assistant?.rag?.allowedDomains?.length ||
+					!!assistant?.rag?.allowedLinks?.length}
 
 				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
