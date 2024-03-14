@@ -284,9 +284,13 @@
 			</label>
 			{#if $page.data.enableAssistantsRAG}
 				<div class="mb-4 flex flex-col flex-nowrap">
-					<span class="my-2 text-smd font-semibold">Internet access</span>
-
-					<label>
+					<span class="mt-2 text-smd font-semibold"
+						>Internet access <span
+							class="rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
+							>Experimental</span
+						></span
+					>
+					<label class="mt-1">
 						<input
 							checked={!ragMode}
 							on:change={() => (ragMode = false)}
@@ -302,7 +306,7 @@
 						{/if}
 					</label>
 
-					<label>
+					<label class="mt-1">
 						<input
 							checked={ragMode === "all"}
 							on:change={() => (ragMode = "all")}
@@ -313,11 +317,38 @@
 						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Enabled </span>
 						{#if ragMode === "all"}
 							<span class="block text-xs text-gray-500">
-								Assistant will do a web search to find information.
+								Assistant will do a web search on each user request to find information.
 							</span>
 						{/if}
 					</label>
-					<label>
+
+					<label class="mt-1">
+						<input
+							checked={ragMode === "domains"}
+							on:change={() => (ragMode = "domains")}
+							type="radio"
+							name="ragMode"
+							value={false}
+						/>
+						<span class="my-2 text-sm" class:font-semibold={ragMode === "domains"}>
+							Domains search
+						</span>
+					</label>
+					{#if ragMode === "domains"}
+						<span class="mb-2 text-xs text-gray-500">
+							Specify domains and urls that can be searched by the Assistant, separated by commas.
+						</span>
+
+						<input
+							name="ragDomainList"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							placeholder="wikipedia.org,bbc.com"
+							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
+						/>
+						<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
+					{/if}
+
+					<label class="mt-1">
 						<input
 							checked={ragMode === "links"}
 							on:change={() => (ragMode = "links")}
@@ -332,7 +363,7 @@
 					{#if ragMode === "links"}
 						<span class="mb-2 text-xs text-gray-500">
 							Specify a maximum of 10 direct URLs that the Assistant will access. HTML & plain text
-							only, separated by commas.
+							only, separated by commas
 						</span>
 						<input
 							name="ragLinkList"
@@ -341,30 +372,6 @@
 							value={assistant?.rag?.allowedLinks.join(",") ?? ""}
 						/>
 						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
-					{/if}
-
-					<label>
-						<input
-							checked={ragMode === "domains"}
-							on:change={() => (ragMode = "domains")}
-							type="radio"
-							name="ragMode"
-							value={false}
-						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "domains"}> Domains </span>
-					</label>
-					{#if ragMode === "domains"}
-						<span class="mb-2 text-xs text-gray-500">
-							Specify allowed web search domains for the Assistant to search, separated by commas.
-						</span>
-
-						<input
-							name="ragDomainList"
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-							placeholder="wikipedia.org,bbc.com"
-							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
-						/>
-						<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
 					{/if}
 				</div>
 			{/if}

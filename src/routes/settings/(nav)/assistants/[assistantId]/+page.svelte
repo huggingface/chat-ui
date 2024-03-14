@@ -176,14 +176,16 @@
 				<h2 class=" font-semibold">Internet Access</h2>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
-						This Assistant uses web search to find relevant websites.
+						This Assistant uses the Web Search to find information on Internet.
 					</p>
 				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length > 0}
-					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following domains:</p>
+					<p class="pb-4 text-sm text-gray-500">
+						This Assistant can use Web Search on the following domains:
+					</p>
 					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedDomains as domain}
 							<li
-								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight"
+								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight decoration-gray-400"
 							>
 								<a target="_blank" class="underline" href={domain}>{domain}</a>
 							</li>
@@ -194,7 +196,7 @@
 					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedLinks as link}
 							<li
-								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight"
+								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight decoration-gray-400"
 							>
 								<a target="_blank" class="underline" href={link}>{link}</a>
 							</li>
