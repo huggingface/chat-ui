@@ -3,13 +3,26 @@
 	import IconGear from "~icons/bi/gear-fill";
 	import { base } from "$app/paths";
 	import type { Assistant } from "$lib/types/Assistant";
+	import IconInternet from "../icons/IconInternet.svelte";
 
 	export let assistant: Pick<
 		Assistant,
-		"avatar" | "name" | "modelId" | "createdByName" | "exampleInputs" | "_id" | "description"
+		| "avatar"
+		| "name"
+		| "rag"
+		| "modelId"
+		| "createdByName"
+		| "exampleInputs"
+		| "_id"
+		| "description"
 	>;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
+
+	$: hasRag =
+		assistant?.rag?.allowAllDomains ||
+		(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
+		(assistant?.rag?.allowedLinks?.length ?? 0) > 0;
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
@@ -17,7 +30,7 @@
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
 		<div
-			class="flex min-w-[80dvw] items-center gap-4 p-4 pr-1 sm:min-w-[440px] md:p-8 md:pt-10 xl:gap-8"
+			class="mt-3 flex min-w-[80dvw] items-center gap-4 p-4 pr-1 sm:min-w-[440px] md:p-8 md:pt-10 xl:gap-8"
 		>
 			{#if assistant.avatar}
 				<img
@@ -39,9 +52,21 @@
 				<p class="-mb-1">Assistant</p>
 
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
-				<p class="line-clamp-6 text-sm text-gray-500 dark:text-gray-400">
-					{assistant.description}
-				</p>
+				{#if assistant.description}
+					<p class="line-clamp-6 text-sm text-gray-500 dark:text-gray-400">
+						{assistant.description}
+					</p>
+				{/if}
+
+				{#if hasRag}
+					<div
+						class="flex h-5 w-fit items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs"
+						title="This assistant uses the websearch."
+					>
+						<IconInternet classNames="text-sm text-blue-600" />
+						Has internet access
+					</div>
+				{/if}
 
 				{#if assistant.createdByName}
 					<p class="pt-2 text-sm text-gray-400 dark:text-gray-500">
@@ -55,6 +80,7 @@
 				{/if}
 			</div>
 		</div>
+
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<a
 				href="{base}/settings/assistants/{assistant._id.toString()}"
