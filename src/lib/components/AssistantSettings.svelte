@@ -312,7 +312,7 @@
 						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Disabled </span>
 						{#if !ragMode}
 							<span class="block text-xs text-gray-500">
-								Assistant won't look for information on the web and will be faster to answer.
+								Assistant won't look for information from Internet and will be faster to answer.
 							</span>
 						{/if}
 					</label>
