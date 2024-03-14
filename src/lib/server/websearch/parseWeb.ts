@@ -17,7 +17,7 @@ export async function parseWeb(url: string) {
 		});
 
 		const { document } = dom.window;
-		const paragraphs = document.querySelectorAll("p, table, pre");
+		const paragraphs = document.querySelectorAll("p, table, pre, ul, ol");
 
 		if (!paragraphs.length) {
 			throw new Error(`webpage doesn't have any parseable element`);
