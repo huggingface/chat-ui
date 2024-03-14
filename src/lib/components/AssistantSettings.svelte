@@ -11,6 +11,7 @@
 	import CarbonUpload from "~icons/carbon/upload";
 
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	type ActionData = {
 		error: boolean;
@@ -286,10 +287,20 @@
 				<div class="mb-4 flex flex-col flex-nowrap">
 					<span class="mt-2 text-smd font-semibold"
 						>Internet access <span
-							class="rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
+							class="ml-1 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
 							>Experimental</span
-						></span
-					>
+						>
+
+						{#if isHuggingChat}
+							<a
+								href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/385"
+								target="_blank"
+								class="ml-0.5 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-700 underline decoration-gray-400"
+								>Give feedback</a
+							>
+						{/if}
+					</span>
+
 					<label class="mt-1">
 						<input
 							checked={!ragMode}
@@ -301,7 +312,7 @@
 						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Disabled </span>
 						{#if !ragMode}
 							<span class="block text-xs text-gray-500">
-								Assistant won't look for information on the web.
+								Assistant won't look for information on the web and will be faster to answer.
 							</span>
 						{/if}
 					</label>
@@ -336,7 +347,7 @@
 					</label>
 					{#if ragMode === "domains"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify domains and urls that can be searched by the Assistant, separated by commas.
+							Specify domains and URLs that the application can search, separated by commas.
 						</span>
 
 						<input
@@ -362,7 +373,7 @@
 					</label>
 					{#if ragMode === "links"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify a maximum of 10 direct URLs that the Assistant will access. HTML & plain text
+							Specify a maximum of 10 direct URLs that the Assistant will access. HTML & Plain Text
 							only, separated by commas
 						</span>
 						<input
