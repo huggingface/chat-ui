@@ -1,6 +1,6 @@
 export function parseStringToList(links: unknown): string[] {
 	if (typeof links !== "string") {
-		return [];
+		throw new Error("Expected a string");
 	}
 
 	return links
