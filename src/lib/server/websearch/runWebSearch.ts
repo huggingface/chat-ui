@@ -79,12 +79,12 @@ export async function runWebSearch(
 			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
 				appendUpdate("Filtering on specified domains");
 				webSearch.searchQuery +=
-					" " + ragSettings.allowedDomains.map((item) => "site:" + item).join(" ");
+					" " + ragSettings.allowedDomains.map((item) => "site:" + item).join(" OR ");
 			}
 
 			// handle the global lists
 			webSearch.searchQuery +=
-				allowList.map((item) => "site:" + item).join(" ") +
+				allowList.map((item) => "site:" + item).join(" OR ") +
 				" " +
 				blockList.map((item) => "-site:" + item).join(" ");
 
