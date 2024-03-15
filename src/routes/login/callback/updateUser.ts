@@ -25,36 +25,38 @@ export async function updateUser(params: {
 		userData.preferred_username = userData.upn as string;
 	}
 
-	const nameClaim: Exclude<string, "preferred_username" | "email" | "picture" | "sub"> =
-		OIDConfig.NAME_CLAIM;
-
-	if (["preferred_username", "email", "picture", "sub"].includes(nameClaim)) {
-		throw new Error(`nameClaim cannot be one of the restricted keys.`);
-	}
-
-	const parsedUserData = z
+	const {
+		preferred_username: username,
+		name,
+		email,
+		picture: avatarUrl,
+		sub: hfUserId,
+	} = z
 		.object({
 			preferred_username: z.string().optional(),
-			[nameClaim]: z.string(), // Dynamically set based on NAME_CLAIM
+			name: z.string(),
 			picture: z.string().optional(),
 			sub: z.string(),
 			email: z.string().email().optional(),
 		})
+		.setKey(OIDConfig.NAME_CLAIM, z.string())
 		.refine((data) => data.preferred_username || data.email, {
 			message: "Either preferred_username or email must be provided by the provider.",
 		})
+		.transform((data) => ({
+			...data,
+			name: data[OIDConfig.NAME_CLAIM],
+		}))
 		.parse(userData) as {
 		preferred_username?: string;
 		email?: string;
 		picture?: string;
 		sub: string;
+		name: string;
 	} & Record<string, string>;
-
-	const { preferred_username: username, email, picture: avatarUrl, sub: hfUserId } = parsedUserData;
 
 	// Dynamically access user data based on NAME_CLAIM from environment
 	// This approach allows us to adapt to different OIDC providers flexibly.
-	const name = parsedUserData[nameClaim];
 
 	// check if user already exists
 	const existingUser = await collections.users.findOne({ hfUserId });
