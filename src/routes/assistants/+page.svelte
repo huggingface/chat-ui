@@ -20,6 +20,7 @@
 	import { getHref } from "$lib/utils/getHref";
 	import { debounce } from "$lib/utils/debounce";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import { isDesktop } from "$lib/utils/isDesktop";
 
 	export let data: PageData;
@@ -201,6 +202,11 @@
 
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
 			{#each data.assistants as assistant (assistant._id)}
+				{@const hasRag =
+					assistant?.rag?.allowAllDomains ||
+					!!assistant?.rag?.allowedDomains?.length ||
+					!!assistant?.rag?.allowedLinks?.length}
+
 				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 					on:click={() => {
@@ -220,6 +226,16 @@
 							<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)}
 						</div>
 					{/if}
+
+					{#if hasRag}
+						<div
+							class="absolute left-3 top-3 grid size-5 place-items-center rounded-full bg-blue-500/10"
+							title="This assistant uses the websearch."
+						>
+							<IconInternet classNames="text-sm text-blue-600" />
+						</div>
+					{/if}
+
 					{#if assistant.avatar}
 						<img
 							src="{base}/settings/assistants/{assistant._id}/avatar.jpg"

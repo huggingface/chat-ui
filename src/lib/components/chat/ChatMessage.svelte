@@ -77,6 +77,10 @@
 		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
 	};
 
+	renderer.link = (href, title, text) => {
+		return `<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`;
+	};
+
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const { extensions, ...defaults } = marked.getDefaults() as marked.MarkedOptions & {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any

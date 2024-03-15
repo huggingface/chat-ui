@@ -9,8 +9,8 @@
 	export let webSearchMessages: WebSearchUpdate[] = [];
 
 	$: sources = webSearchMessages.find((m) => m.sources)?.sources;
-	$: error = webSearchMessages.find((m) => m.messageType === "error");
-	$: loading = !sources && !error;
+	$: lastMessage = webSearchMessages.filter((m) => m.messageType !== "sources").slice(-1)[0];
+	$: loading = !sources && lastMessage.messageType !== "error";
 </script>
 
 <details
@@ -44,12 +44,10 @@
 		<dl class="leading-4">
 			<dd class="text-sm">Web Search</dd>
 			<dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">
-				{#if error}
-					{error.message}
-				{:else if sources}
+				{#if sources}
 					Completed
 				{:else}
-					{webSearchMessages[webSearchMessages.length - 1].message}
+					{lastMessage.message}
 				{/if}
 			</dt>
 		</dl>

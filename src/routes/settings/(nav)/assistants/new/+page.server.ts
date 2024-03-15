@@ -7,6 +7,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
+import { parseStringToList } from "$lib/utils/parseStringToList";
 import { usageLimits } from "$lib/server/usageLimits";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
 
@@ -20,6 +21,9 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
+	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(10)),
+	ragDomainList: z.preprocess(parseStringToList, z.string().array()),
+	ragAllowAll: z.preprocess((v) => v === "true", z.boolean()),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -113,6 +117,11 @@ export const actions: Actions = {
 			updatedAt: new Date(),
 			userCount: 1,
 			featured: false,
+			rag: {
+				allowedLinks: parse.data.ragLinkList,
+				allowedDomains: parse.data.ragDomainList,
+				allowAllDomains: parse.data.ragAllowAll,
+			},
 			searchTokens: generateSearchTokens(parse.data.name),
 		});
 

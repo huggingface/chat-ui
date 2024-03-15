@@ -459,6 +459,51 @@ MODELS=`[
 ]`
 ```
 
+#### Anthropic
+
+We also support Anthropic models through the official SDK. You may provide your API key via the `ANTHROPIC_API_KEY` env variable, or alternatively, through the `endpoints.apiKey` as per the following example.
+
+```
+MODELS=`[
+  {
+      "name": "claude-3-sonnet-20240229",
+      "displayName": "Claude 3 Sonnet",
+      "description": "Ideal balance of intelligence and speed",
+      "parameters": {
+        "max_new_tokens": 4096,
+      },
+      "endpoints": [
+        {
+          "type": "anthropic",
+          // optionals
+          "apiKey": "sk-ant-...",
+          "baseURL": "https://api.anthropic.com",
+          defaultHeaders: {},
+          defaultQuery: {}
+        }
+      ]
+  },
+  {
+      "name": "claude-3-opus-20240229",
+      "displayName": "Claude 3 Opus",
+      "description": "Most powerful model for highly complex tasks",
+      "parameters": {
+         "max_new_tokens": 4096
+      },
+      "endpoints": [
+        {
+          "type": "anthropic",
+          // optionals
+          "apiKey": "sk-ant-...",
+          "baseURL": "https://api.anthropic.com",
+          defaultHeaders: {},
+          defaultQuery: {}
+        }
+      ]
+  }
+]`
+```
+
 #### Amazon
 
 You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. The config goes like this:
