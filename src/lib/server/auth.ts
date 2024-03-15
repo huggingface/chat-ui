@@ -39,7 +39,10 @@ export const OIDConfig = z
 		CLIENT_SECRET: stringWithDefault(OPENID_CLIENT_SECRET),
 		PROVIDER_URL: stringWithDefault(OPENID_PROVIDER_URL),
 		SCOPES: stringWithDefault(OPENID_SCOPES),
-		NAME_CLAIM: stringWithDefault(OPENID_NAME_CLAIM),
+		NAME_CLAIM: stringWithDefault(OPENID_NAME_CLAIM).refine(
+			(el) => !["preferred_username", "email", "picture", "sub"].includes(el),
+			{ message: "nameClaim cannot be one of the restricted keys." }
+		),
 		TOLERANCE: stringWithDefault(OPENID_TOLERANCE),
 		RESOURCE: stringWithDefault(OPENID_RESOURCE),
 	})
