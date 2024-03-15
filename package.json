@@ -82,6 +82,7 @@
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
+		"@anthropic-ai/sdk": "^0.17.1",
 		"aws4fetch": "^1.0.17",
 		"openai": "^4.14.2"
 	}
