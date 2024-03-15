@@ -109,6 +109,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				switch (args.type) {
 					case "tgi":
 						return endpoints.tgi(args);
+					case "anthropic":
+						return endpoints.anthropic(args);
 					case "aws":
 						return await endpoints.aws(args);
 					case "openai":

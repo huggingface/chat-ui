@@ -32,7 +32,7 @@
 </script>
 
 <div
-	class="grid h-full w-full grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-8 overflow-hidden p-4 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
+	class="grid h-full w-full grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-4 overflow-hidden p-4 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 >
 	<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
 		<h2 class="text-xl font-bold">Settings</h2>
