@@ -7,6 +7,9 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
+import { parseStringToList } from "$lib/utils/parseStringToList";
+import { usageLimits } from "$lib/server/usageLimits";
+import { generateSearchTokens } from "$lib/utils/searchTokens";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -18,6 +21,9 @@ const newAsssistantSchema = z.object({
 	exampleInput3: z.string().optional(),
 	exampleInput4: z.string().optional(),
 	avatar: z.instanceof(File).optional(),
+	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(10)),
+	ragDomainList: z.preprocess(parseStringToList, z.string().array()),
+	ragAllowAll: z.preprocess((v) => v === "true", z.boolean()),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -61,6 +67,18 @@ export const actions: Actions = {
 			return fail(400, { error: true, errors });
 		}
 
+		const assistantsCount = await collections.assistants.countDocuments(authCondition(locals));
+
+		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
+			const errors = [
+				{
+					field: "preprompt",
+					message: "You have reached the maximum number of assistants. Delete some to continue.",
+				},
+			];
+			return fail(400, { error: true, errors });
+		}
+
 		const createdById = locals.user?._id ?? locals.sessionId;
 
 		const newAssistantId = new ObjectId();
@@ -99,6 +117,12 @@ export const actions: Actions = {
 			updatedAt: new Date(),
 			userCount: 1,
 			featured: false,
+			rag: {
+				allowedLinks: parse.data.ragLinkList,
+				allowedDomains: parse.data.ragDomainList,
+				allowAllDomains: parse.data.ragAllowAll,
+			},
+			searchTokens: generateSearchTokens(parse.data.name),
 		});
 
 		// add insertedId to user settings

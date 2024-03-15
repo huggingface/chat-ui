@@ -12,7 +12,7 @@
 	export let isOpen = false;
 	export let title: string | undefined;
 
-	$: title = title || "New Chat";
+	$: title = title ?? "New Chat";
 
 	let closeEl: HTMLButtonElement;
 	let openEl: HTMLButtonElement;

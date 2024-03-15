@@ -12,6 +12,8 @@
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
+	import ReportModal from "./ReportModal.svelte";
+	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 
 	export let data: PageData;
 
@@ -24,8 +26,18 @@
 	const prefix = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
+
+	let displayReportModal = false;
+
+	$: hasRag =
+		assistant?.rag?.allowAllDomains ||
+		!!assistant?.rag?.allowedDomains?.length ||
+		!!assistant?.rag?.allowedLinks?.length;
 </script>
 
+{#if displayReportModal}
+	<ReportModal on:close={() => (displayReportModal = false)} />
+{/if}
 <div class="flex h-full flex-col gap-2">
 	<div class="flex gap-6">
 		{#if assistant?.avatar}
@@ -45,10 +57,19 @@
 
 		<div class="flex-1">
 			<div class="mb-1.5">
-				<h1 class="mr-2 inline text-xl font-semibold">
+				<h1 class="mr-1 inline text-xl font-semibold">
 					{assistant?.name}
 				</h1>
-				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+
+				{#if hasRag}
+					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
+						title="This assistant uses the websearch."
+					>
+						<IconInternet classNames="text-sm text-blue-600" />
+					</span>
+				{/if}
+				<span class="ml-1 rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
 					>public</span
 				>
 			</div>
@@ -102,11 +123,15 @@
 						>
 					</form>
 					{#if !assistant?.reported}
-						<form method="POST" action="?/report" use:enhance>
-							<button type="submit" class="underline">
-								<CarbonFlag class="mr-1.5 inline text-xs" />Report</button
-							>
-						</form>
+						<button
+							type="button"
+							on:click={() => {
+								displayReportModal = true;
+							}}
+							class="underline"
+						>
+							<CarbonFlag class="mr-1.5 inline text-xs" />Report
+						</button>
 					{:else}
 						<button type="button" disabled class="text-gray-700">
 							<CarbonFlag class="mr-1.5 inline text-xs" />Reported</button
@@ -137,11 +162,48 @@
 		</div>
 	</div>
 
-	<h2 class="mt-4 text-lg font-semibold">System Instructions</h2>
+	<!-- two columns for big screen, single column for small screen -->
+	<div class="mb-12 mt-3">
+		<h2 class="mb-2 font-semibold">System Instructions</h2>
+		<textarea
+			disabled
+			class="box-border h-full min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
+			>{assistant?.preprompt}</textarea
+		>
 
-	<textarea
-		disabled
-		class="min-h-[8lh] w-full flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:min-h-[12lh]"
-		>{assistant?.preprompt}</textarea
-	>
+		{#if hasRag}
+			<div class="mt-4">
+				<h2 class=" font-semibold">Internet Access</h2>
+				{#if assistant?.rag?.allowAllDomains}
+					<p class="text-sm text-gray-500">
+						This Assistant uses Web Search to find information on Internet.
+					</p>
+				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length}
+					<p class="pb-4 text-sm text-gray-500">
+						This Assistant can use Web Search on the following domains:
+					</p>
+					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
+						{#each assistant?.rag?.allowedDomains as domain}
+							<li
+								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight decoration-gray-400"
+							>
+								<a target="_blank" class="underline" href={domain}>{domain}</a>
+							</li>
+						{/each}
+					</ul>
+				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length}
+					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following links:</p>
+					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
+						{#each assistant?.rag?.allowedLinks as link}
+							<li
+								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight decoration-gray-400"
+							>
+								<a target="_blank" class="underline" href={link}>{link}</a>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		{/if}
+	</div>
 </div>

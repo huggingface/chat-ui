@@ -120,7 +120,7 @@ TEXT_EMBEDDING_MODELS = `[
 ```
 
 The required fields are `name`, `chunkCharLength` and `endpoints`.
-Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js) and [`TEI`](https://github.com/huggingface/text-embeddings-inference). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint.
+Supported text embedding backends are: [`transformers.js`](https://huggingface.co/docs/transformers.js), [`TEI`](https://github.com/huggingface/text-embeddings-inference) and [`OpenAI`](https://platform.openai.com/docs/guides/embeddings). `transformers.js` models run locally as part of `chat-ui`, whereas `TEI` models run in a different environment & accessed through an API endpoint. `openai` models are accessed through the [OpenAI API](https://platform.openai.com/docs/guides/embeddings).
 
 When more than one embedding models are supplied in `.env.local` file, the first will be used by default, and the others will only be used on LLM's which configured `embeddingModel` to the name of the model.
 
@@ -166,7 +166,7 @@ PUBLIC_APP_DISCLAIMER=
 
 You can enable the web search through an API by adding `YDC_API_KEY` ([docs.you.com](https://docs.you.com)) or `SERPER_API_KEY` ([serper.dev](https://serper.dev/)) or `SERPAPI_KEY` ([serpapi.com](https://serpapi.com/)) or `SERPSTACK_API_KEY` ([serpstack.com](https://serpstack.com/)) to your `.env.local`.
 
-You can also simply enable the local websearch by setting `USE_LOCAL_WEBSEARCH=true` in your `.env.local`.
+You can also simply enable the local google websearch by setting `USE_LOCAL_WEBSEARCH=true` in your `.env.local` or specify a SearXNG instance by adding the query URL to `SEARXNG_QUERY_URL`.
 
 ### Custom models
 
@@ -353,9 +353,12 @@ MODELS=`[{
   "endpoints": [
       {
           "type": "openai",
-          "baseURL": "https://gateway.example.com/v1",
+          "baseURL": "https://{resource-name}.openai.azure.com/openai/deployments/{deployment-id}",
           "defaultHeaders": {
-              "x-portkey-config": '{"provider":"azure-openai","resource_name":"abc-fr","deployment_id":"gpt-4-1106-preview","api_version":"2023-03-15-preview","api_key":"abc...xyz"}'
+              "api-key": "{api-key}"
+          },
+          "defaultQuery": {
+              "api-version": "2023-05-15"
           }
       }
   ]
@@ -450,6 +453,51 @@ MODELS=`[
          "type": "ollama",
          "url" : "http://127.0.0.1:11434",
          "ollamaName" : "mistral"
+        }
+      ]
+  }
+]`
+```
+
+#### Anthropic
+
+We also support Anthropic models through the official SDK. You may provide your API key via the `ANTHROPIC_API_KEY` env variable, or alternatively, through the `endpoints.apiKey` as per the following example.
+
+```
+MODELS=`[
+  {
+      "name": "claude-3-sonnet-20240229",
+      "displayName": "Claude 3 Sonnet",
+      "description": "Ideal balance of intelligence and speed",
+      "parameters": {
+        "max_new_tokens": 4096,
+      },
+      "endpoints": [
+        {
+          "type": "anthropic",
+          // optionals
+          "apiKey": "sk-ant-...",
+          "baseURL": "https://api.anthropic.com",
+          defaultHeaders: {},
+          defaultQuery: {}
+        }
+      ]
+  },
+  {
+      "name": "claude-3-opus-20240229",
+      "displayName": "Claude 3 Opus",
+      "description": "Most powerful model for highly complex tasks",
+      "parameters": {
+         "max_new_tokens": 4096
+      },
+      "endpoints": [
+        {
+          "type": "anthropic",
+          // optionals
+          "apiKey": "sk-ant-...",
+          "baseURL": "https://api.anthropic.com",
+          defaultHeaders: {},
+          defaultQuery: {}
         }
       ]
   }
@@ -613,3 +661,37 @@ npm run updateLocalEnv
 ```
 
 This will replace your `.env.local` file with the one that will be used in prod (simply taking `.env.template + .env.SECRET_CONFIG`).
+
+### Populate database
+
+> [!WARNING]  
+> The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
+
+You can populate the database using faker data using the `populate` script:
+
+```bash
+npm run populate <flags here>
+```
+
+At least one flag must be specified, the following flags are available:
+
+- `reset` - resets the database
+- `all` - populates all tables
+- `users` - populates the users table
+- `settings` - populates the settings table for existing users
+- `assistants` - populates the assistants table for existing users
+- `conversations` - populates the conversations table for existing users
+
+For example, you could use it like so:
+
+```bash
+npm run populate reset
+```
+
+to clear out the database. Then login in the app to create your user and run the following command:
+
+```bash
+npm run populate users settings assistants conversations
+```
+
+to populate the database with fake data, including fake conversations and assistants for your user.
