@@ -128,6 +128,7 @@ export async function runWebSearch(
 						text = await parseWeb(link);
 						appendUpdate("Browsing webpage", [link]);
 					} catch (e) {
+						appendUpdate("Failed to parse webpage", [(e as Error).message, link], "error");
 						// ignore errors
 					}
 				}
