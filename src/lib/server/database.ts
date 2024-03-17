@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { GridFSBucket, MongoClient } from "mongodb";
+import { Collection, GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
@@ -13,19 +13,46 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
+import { building } from "$app/environment";
 
-if (!env.MONGODB_URL) {
-	throw new Error(
-		"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
-	);
-}
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
-const client = new MongoClient(env.MONGODB_URL, {
-	directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
-});
+let client: MongoClient;
+let collections: {
+	sessions: Collection<Session>;
+	users: Collection<User>;
+	settings: Collection<Settings>;
+	assistants: Collection<Assistant>;
+	conversations: Collection<Conversation>;
+	semaphores: Collection<Semaphore>;
+	migrationResults?: Collection<MigrationResult>;
+	abortedGenerations: Collection<AbortedGeneration>;
+	bucket?: GridFSBucket;
+	sharedConversations: Collection<SharedConversation>;
+	reports: Collection<Report>;
+	conversationStats: Collection<ConversationStats>;
+	messageEvents: Collection<MessageEvent>;
+};
 
-export const connectPromise = client.connect().catch(console.error);
+if (!building) {
+	if (!env.MONGODB_URL) {
+		throw new Error(
+			"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
+		);
+	}
+
+	client = new MongoClient(env.MONGODB_URL, {
+		directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
+	});
+
+	client.connect().catch(console.error);
+
+	collections = getCollections(client);
+
+	client.on("open", () => createIndexes(collections));
+}
+
+export { client, collections };
 
 export function getCollections(mongoClient: MongoClient) {
 	const db = mongoClient.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
@@ -62,11 +89,8 @@ export function getCollections(mongoClient: MongoClient) {
 		semaphores,
 	};
 }
-const db = client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 
-const collections = getCollections(client);
-
-const {
+function createIndexes({
 	conversations,
 	conversationStats,
 	assistants,
@@ -79,11 +103,7 @@ const {
 	sessions,
 	messageEvents,
 	semaphores,
-} = collections;
-
-export { client, db, collections };
-
-client.on("open", () => {
+}: typeof collections) {
 	conversations
 		.createIndex(
 			{ sessionId: 1, updatedAt: -1 },
@@ -158,4 +178,4 @@ client.on("open", () => {
 	// Unique index for semaphore and migration results
 	semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
 	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
-});
+}
