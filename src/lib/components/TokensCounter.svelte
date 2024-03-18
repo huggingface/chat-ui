@@ -11,7 +11,12 @@
 	let modelId = model?.id;
 
 	async function tokenizeText() {
-		if (isDisabled || !model || !prompt) {
+		if (isDisabled || !model) {
+			return;
+		}
+
+		if (!prompt) {
+			nTokens = 0;
 			return;
 		}
 
@@ -27,20 +32,22 @@
 	}
 
 	$: {
-		if (typeof window !== "undefined" && model && prompt) {
+		if (typeof window !== "undefined" && model) {
 			tokenizeText();
 		}
 	}
 
 	$: {
 		if (model?.id !== modelId) {
+			// reset
 			modelId = model?.id;
+			nTokens = 0;
 			isDisabled = false;
 		}
 	}
 </script>
 
-{#if !isDisabled && prompt && model?.parameters?.max_new_tokens}
+{#if !isDisabled && model?.parameters?.max_new_tokens && nTokens}
 	<p class="text-sm opacity-60 hover:opacity-80 {classNames}">
 		{nTokens}/{model.parameters.max_new_tokens}
 	</p>
