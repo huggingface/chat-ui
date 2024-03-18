@@ -42,9 +42,10 @@ export const load = async ({ url, locals }) => {
 	const assistants = await collections.assistants
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
-		.sort(
-			sort === SortKey.POPULAR ? { userCount: -1 } : { "last24HoursCount.count": -1, userCount: -1 }
-		)
+		.sort({
+			...(sort === SortKey.TRENDING && { "last24HoursCount.count": -1 }),
+			userCount: -1,
+		})
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
