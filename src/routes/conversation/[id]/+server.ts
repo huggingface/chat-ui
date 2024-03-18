@@ -503,6 +503,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		},
 	});
 
+	if (conv.assistantId) {
+		const hour = new Date().getUTCHours();
+		await collections.assistants.updateOne(
+			{ _id: conv.assistantId },
+			{ $inc: { "last24HoursCount.count": 1, [`last24HoursCount.byHour.${hour}`]: 1 } }
+		);
+	}
+
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
 		headers: {

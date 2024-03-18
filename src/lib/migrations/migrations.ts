@@ -2,6 +2,8 @@ import { client, collections } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import assistantsCountMigration from "./routines/refresh-assistants-counts";
+import type { MigrationResult } from "$lib/types/MigrationResult";
 
 export async function checkAndRunMigrations() {
 	// make sure all GUIDs are unique
@@ -113,4 +115,82 @@ export async function checkAndRunMigrations() {
 
 	clearInterval(refreshInterval);
 	await releaseLock();
+}
+
+export async function refreshAssistantsCountHelper() {
+	const hourExpired = new Date().getUTCHours() + 1;
+
+	const migrationResult = await collections.migrationResults.findOne<MigrationResult<number>>({
+		_id: assistantsCountMigration._id,
+	});
+	if (migrationResult?.data === hourExpired) {
+		// another instance already run the migration, so we exit early
+		return;
+	}
+
+	// connect to the database
+	const connectedClient = await client.connect();
+	const lockKey = "assistants-count";
+
+	const hasLock = await acquireLock(lockKey);
+
+	if (!hasLock) {
+		// block until the lock is released
+		while (await isDBLocked(lockKey)) {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		}
+		// another instance already has the lock, so we exit early
+		return;
+	}
+
+	// once here, we have the lock
+	// make sure to refresh it regularly while it's running
+	const refreshInterval = setInterval(async () => {
+		await refreshLock(lockKey);
+	}, 1000 * 10);
+
+	await collections.migrationResults.updateOne(
+		{ _id: assistantsCountMigration._id },
+		{
+			$set: {
+				name: assistantsCountMigration.name,
+				status: "ongoing",
+			},
+		},
+		{ upsert: true }
+	);
+
+	const session = connectedClient.startSession();
+	let result = false;
+
+	try {
+		await session.withTransaction(async () => {
+			result = await assistantsCountMigration.up(connectedClient);
+		});
+	} catch (e) {
+		console.log(`"${assistantsCountMigration.name}" failed!`);
+		console.error(e);
+	} finally {
+		await session.endSession();
+	}
+
+	await collections.migrationResults.updateOne(
+		{ _id: assistantsCountMigration._id },
+		{
+			$set: {
+				name: assistantsCountMigration.name,
+				status: result ? "success" : "failure",
+				data: hourExpired,
+			},
+		},
+		{ upsert: true }
+	);
+
+	clearInterval(refreshInterval);
+	await releaseLock(lockKey);
+}
+
+export function refreshAssistantsCount() {
+	const ONE_HOUR_MS = 3_600_000;
+	setInterval(refreshAssistantsCountHelper, ONE_HOUR_MS);
 }

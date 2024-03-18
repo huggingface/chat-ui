@@ -22,6 +22,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import { isDesktop } from "$lib/utils/isDesktop";
+	import { SortKey } from "$lib/types/Assistant";
 
 	export let data: PageData;
 
@@ -32,6 +33,7 @@
 	let filterInputEl: HTMLInputElement;
 	let filterValue = data.query;
 	let isFilterInPorgress = false;
+	let sortValue = data.sort as SortKey;
 
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
@@ -70,6 +72,14 @@
 			filterOnName(filterValue);
 		}
 	}, SEARCH_DEBOUNCE_DELAY);
+
+	const sortAssistants = () => {
+		const newUrl = getHref($page.url, {
+			newKeys: { sort: sortValue },
+			existingKeys: { behaviour: "delete", keys: ["p"] },
+		});
+		goto(newUrl);
+	};
 
 	const settings = useSettingsStore();
 </script>
@@ -130,7 +140,7 @@
 			</a>
 		</div>
 
-		<div class="mt-7 flex items-center gap-x-2 text-sm">
+		<div class="mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
 			{#if assistantsCreator && !createdByMe}
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -198,6 +208,14 @@
 					type="search"
 				/>
 			</div>
+			<select
+				bind:value={sortValue}
+				on:change={sortAssistants}
+				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+			>
+				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
+				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
+			</select>
 		</div>
 
 		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
