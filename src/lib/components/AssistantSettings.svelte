@@ -325,7 +325,7 @@
 							name="ragMode"
 							value={"all"}
 						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Enabled </span>
+						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Web search </span>
 						{#if ragMode === "all"}
 							<span class="block text-xs text-gray-500">
 								Assistant will do a web search on each user request to find information.
@@ -400,9 +400,7 @@
 		</div>
 	</div>
 
-	<div
-		class="ml-auto mt-6 flex w-fit justify-end gap-2 max-sm:fixed max-sm:bottom-6 max-sm:right-6"
-	>
+	<div class="fixed bottom-6 right-6 ml-auto mt-6 flex w-fit justify-end gap-2 sm:absolute">
 		<a
 			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 			class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
