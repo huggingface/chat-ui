@@ -75,15 +75,6 @@
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
 
-	function onModelChange(e: Event) {
-		const modelId = (e.target as HTMLSelectElement).value;
-		selectedModel = models.find((model) => model.id === modelId);
-	}
-
-	function onPromptChange(e: Event) {
-		enteredSystemPrompt = (e.target as HTMLSelectElement).value;
-	}
-
 	let deleteExistingAvatar = false;
 
 	let loading = false;
@@ -255,7 +246,8 @@
 				<select
 					name="modelId"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					on:change={onModelChange}
+					on:change={(e) =>
+						(selectedModel = models.find((model) => model.id === e.currentTarget.value))}
 				>
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
@@ -414,7 +406,7 @@
 					class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
 					value={assistant?.preprompt ?? ""}
-					on:input={onPromptChange}
+					on:input={(e) => (enteredSystemPrompt = e.currentTarget.value)}
 				/>
 				<TokensCounter
 					classNames="absolute bottom-2 right-2"
