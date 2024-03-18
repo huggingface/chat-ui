@@ -76,17 +76,19 @@ export async function runWebSearch(
 			const searchProvider = getWebSearchProvider();
 			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 
+			let filters = "";
 			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
 				appendUpdate("Filtering on specified domains");
-				webSearch.searchQuery +=
-					" " + ragSettings.allowedDomains.map((item) => "site:" + item).join(" OR ");
+				filters += ragSettings.allowedDomains.map((item) => "site:" + item).join(" OR ");
 			}
 
 			// handle the global lists
-			webSearch.searchQuery +=
+			filters +=
 				allowList.map((item) => "site:" + item).join(" OR ") +
 				" " +
 				blockList.map((item) => "-site:" + item).join(" ");
+
+			webSearch.searchQuery = filters + " " + webSearch.searchQuery;
 
 			const results = await searchWeb(webSearch.searchQuery);
 			webSearch.results =
