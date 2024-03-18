@@ -408,18 +408,20 @@
 
 		<div class="col-span-1 flex h-full flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
-			<textarea
-				name="preprompt"
-				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-				placeholder="You'll act as..."
-				value={assistant?.preprompt ?? ""}
-				on:input={onPromptChange}
-			/>
-			<TokensCounter
-				classNames="absolute bottom-2 right-2"
-				prompt={enteredSystemPrompt}
-				model={selectedModel}
-			/>
+			<div class="relative mb-20 flex min-h-[8lh] flex-1 grow flex-col">
+				<textarea
+					name="preprompt"
+					class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+					placeholder="You'll act as..."
+					value={assistant?.preprompt ?? ""}
+					on:input={onPromptChange}
+				/>
+				<TokensCounter
+					classNames="absolute bottom-2 right-2"
+					prompt={enteredSystemPrompt}
+					model={selectedModel}
+				/>
+			</div>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</div>
 	</div>
