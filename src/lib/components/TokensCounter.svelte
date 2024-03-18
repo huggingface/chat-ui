@@ -8,6 +8,7 @@
 
 	let nTokens = 0;
 	let isDisabled = false;
+	let modelId = model?.id;
 
 	async function tokenizeText() {
 		if (isDisabled || !model || !prompt) {
@@ -28,6 +29,13 @@
 	$: {
 		if (typeof window !== "undefined" && model && prompt) {
 			tokenizeText();
+		}
+	}
+
+	$: {
+		if (model?.id !== modelId) {
+			modelId = model?.id;
+			isDisabled = false;
 		}
 	}
 </script>
