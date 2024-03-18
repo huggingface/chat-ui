@@ -10,7 +10,7 @@
 	let isDisabled = false;
 
 	async function tokenizeText() {
-		if (!model || !prompt) {
+		if (isDisabled || !model || !prompt) {
 			return;
 		}
 
