@@ -10,8 +10,7 @@ export interface WebSearch extends Timestamps {
 
 	searchQuery: string;
 	results: WebSearchSource[];
-	context: string;
-	contextSources: WebSearchSource[];
+	contextSources: WebSearchUsedSource[];
 }
 
 export interface WebSearchSource {
@@ -19,6 +18,10 @@ export interface WebSearchSource {
 	link: string;
 	hostname: string;
 	text?: string; // You.com provides text of webpage right away
+}
+
+export interface WebSearchUsedSource extends WebSearchSource {
+	context: { idx: number; text: string }[];
 }
 
 export type WebSearchMessageSources = {
