@@ -53,7 +53,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	});
 
 	if (assistant) {
-		console.log(assistant?.rag?.prepromptUrl);
 		// if the assistant has a preprompt Url and it's not local, try to fetch it
 		if (assistant.rag?.prepromptUrl && !(await isURLLocal(new URL(assistant.rag.prepromptUrl)))) {
 			try {
