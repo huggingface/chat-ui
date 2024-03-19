@@ -26,6 +26,9 @@
 		in:fly={{ y: 100 }}
 		open
 		use:clickOutside={() => {
+			if (window?.getSelection()?.toString()) {
+				return;
+			}
 			goto(previousPage);
 		}}
 		class="h-[95dvh] w-[90dvw] overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[80dvh] xl:w-[1200px] 2xl:h-[70dvh]"
