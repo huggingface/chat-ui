@@ -176,7 +176,7 @@
 		</h2>
 		{#if assistant?.rag?.prepromptUrl}
 			<p class="pb-3 text-sm text-gray-500">
-				This Assistant gets its instructions from the following URL:
+				This assistant loads system instructions from the following URL:
 			</p>
 			<a
 				target="_blank"
