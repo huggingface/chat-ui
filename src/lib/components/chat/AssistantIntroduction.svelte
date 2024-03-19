@@ -19,10 +19,9 @@
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 
-	$: hasRag =
-		assistant?.rag?.allowAllDomains ||
-		(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
-		(assistant?.rag?.allowedLinks?.length ?? 0) > 0;
+	$: hasRag = Object.values(assistant?.rag ?? {}).some((value) =>
+		Array.isArray(value) ? value.length > 0 : !!value
+	);
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">

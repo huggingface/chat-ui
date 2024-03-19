@@ -24,6 +24,7 @@ const newAsssistantSchema = z.object({
 	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(10)),
 	ragDomainList: z.preprocess(parseStringToList, z.string().array()),
 	ragAllowAll: z.preprocess((v) => v === "true", z.boolean()),
+	ragPrepromptUrl: z.union([z.literal(""), z.string().trim().url()]),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -121,6 +122,7 @@ export const actions: Actions = {
 				allowedLinks: parse.data.ragLinkList,
 				allowedDomains: parse.data.ragDomainList,
 				allowAllDomains: parse.data.ragAllowAll,
+				prepromptUrl: parse.data.ragPrepromptUrl,
 			},
 			searchTokens: generateSearchTokens(parse.data.name),
 		});

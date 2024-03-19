@@ -346,10 +346,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const assistantHasRAG =
 				ENABLE_ASSISTANTS_RAG === "true" &&
 				rag &&
-				(rag.allowedLinks.length > 0 || rag.allowedDomains.length > 0 || rag.allowAllDomains);
+				Object.values(rag).some((value) => (Array.isArray(value) ? value.length > 0 : !!value));
 
 			// perform websearch if needed
-			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
+			if (
+				!isContinue &&
+				((webSearch && !conv.assistantId) || (assistantHasRAG && !rag.prepromptUrl))
+			) {
 				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, rag);
 			}
 

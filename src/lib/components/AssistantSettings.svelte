@@ -74,12 +74,14 @@
 
 	let loading = false;
 
-	let ragMode: false | "links" | "domains" | "all" = assistant?.rag?.allowAllDomains
+	let ragMode: false | "links" | "domains" | "all" | "preprompt" = assistant?.rag?.allowAllDomains
 		? "all"
 		: assistant?.rag?.allowedLinks?.length ?? 0 > 0
 		? "links"
 		: (assistant?.rag?.allowedDomains?.length ?? 0) > 0
 		? "domains"
+		: (assistant?.rag?.prepromptUrl ?? "").length > 0
+		? "preprompt"
 		: false;
 </script>
 
@@ -119,18 +121,29 @@
 			formData.set("ragAllowAll", "false");
 			formData.set("ragLinkList", "");
 			formData.set("ragDomainList", "");
+			formData.set("ragPrepromptUrl", "");
 		} else if (ragMode === "all") {
 			formData.set("ragAllowAll", "true");
 			formData.set("ragLinkList", "");
 			formData.set("ragDomainList", "");
+			formData.set("ragPrepromptUrl", "");
 		} else if (ragMode === "links") {
 			formData.set("ragAllowAll", "false");
 			formData.set("ragDomainList", "");
+			formData.set("ragPrepromptUrl", "");
 		} else if (ragMode === "domains") {
 			formData.set("ragAllowAll", "false");
 			formData.set("ragLinkList", "");
+			formData.set("ragPrepromptUrl", "");
+		} else if (ragMode === "preprompt") {
+			formData.set("ragAllowAll", "false");
+			formData.set("ragLinkList", "");
+			formData.set("ragDomainList", "");
+			formData.set(
+				"preprompt",
+				"The system prompt input is disabled when using a system prompt URL."
+			);
 		}
-
 		return async ({ result }) => {
 			loading = false;
 			await applyAction(result);
@@ -384,6 +397,31 @@
 						/>
 						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
 					{/if}
+					<label class="mt-1">
+						<input
+							checked={ragMode === "preprompt"}
+							on:change={() => (ragMode = "preprompt")}
+							type="radio"
+							name="ragMode"
+							value={false}
+						/>
+						<span class="my-2 text-sm" class:font-semibold={ragMode === "links"}>
+							System Prompt URL
+						</span>
+					</label>
+					{#if ragMode === "preprompt"}
+						<span class="mb-2 text-xs text-gray-500">
+							Specify a single URL which returns a plain-text response that will be passed directly
+							as the system prompt.
+						</span>
+						<input
+							name="ragPrepromptUrl"
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
+							value={assistant?.rag?.prepromptUrl ?? ""}
+						/>
+						<p class="text-xs text-red-500">{getError("ragPrepromptUrl", form)}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -392,9 +430,17 @@
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
 			<textarea
 				name="preprompt"
+				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-200 p-2 text-sm text-gray-600"
+				value="The system prompt input is disabled when using a system prompt URL."
+				disabled
+				class:hidden={ragMode !== "preprompt"}
+			/>
+			<textarea
+				name="preprompt"
 				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 				placeholder="You'll act as..."
 				value={assistant?.preprompt ?? ""}
+				class:hidden={ragMode === "preprompt"}
 			/>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</div>

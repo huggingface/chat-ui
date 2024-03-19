@@ -29,10 +29,9 @@
 
 	let displayReportModal = false;
 
-	$: hasRag =
-		assistant?.rag?.allowAllDomains ||
-		!!assistant?.rag?.allowedDomains?.length ||
-		!!assistant?.rag?.allowedLinks?.length;
+	$: hasRag = Object.values(assistant?.rag ?? {}).some((value) =>
+		Array.isArray(value) ? value.length > 0 : !!value
+	);
 </script>
 
 {#if displayReportModal}
@@ -164,14 +163,35 @@
 
 	<!-- two columns for big screen, single column for small screen -->
 	<div class="mb-12 mt-3">
-		<h2 class="mb-2 font-semibold">System Instructions</h2>
-		<textarea
-			disabled
-			class="box-border h-full min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
-			>{assistant?.preprompt}</textarea
-		>
+		<h2 class="mb-2 font-semibold">
+			System Instructions
+			{#if assistant?.rag?.prepromptUrl}
+				<span
+					class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
+					title="This assistant gets its instructions from the internet.."
+				>
+					<IconInternet classNames="text-sm text-blue-600" />
+				</span>
+			{/if}
+		</h2>
+		{#if assistant?.rag?.prepromptUrl}
+			<p class="pb-3 text-sm text-gray-500">
+				This Assistant gets its instructions from the following URL:
+			</p>
+			<a
+				target="_blank"
+				class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-1.5 leading-tight underline decoration-gray-400"
+				href={assistant?.rag?.prepromptUrl}>{assistant?.rag?.prepromptUrl}</a
+			>
+		{:else}
+			<textarea
+				disabled
+				class="box-border h-full min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
+				>{assistant?.preprompt}</textarea
+			>
+		{/if}
 
-		{#if hasRag}
+		{#if hasRag && !assistant?.rag?.prepromptUrl}
 			<div class="mt-4">
 				<h2 class=" font-semibold">Internet Access</h2>
 				{#if assistant?.rag?.allowAllDomains}

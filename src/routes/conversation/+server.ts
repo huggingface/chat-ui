@@ -10,6 +10,8 @@ import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
+import { isURLLocal } from "$lib/server/isURLLocal";
+import { parseWeb } from "$lib/server/websearch/parseWeb";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -51,10 +53,22 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	});
 
 	if (assistant) {
-		values.preprompt = assistant.preprompt;
-	} else {
-		values.preprompt ??= model?.preprompt ?? "";
+		console.log(assistant?.rag?.prepromptUrl);
+		// if the assistant has a preprompt Url and it's not local, try to fetch it
+		if (assistant.rag?.prepromptUrl && !(await isURLLocal(new URL(assistant.rag.prepromptUrl)))) {
+			try {
+				const content = await parseWeb(assistant.rag.prepromptUrl);
+				values.preprompt = content;
+			} catch (e) {
+				values.preprompt = assistant.preprompt;
+			}
+		} else {
+			values.preprompt = assistant.preprompt;
+		}
 	}
+
+	// if no prompt was set try the model preprompt
+	values.preprompt ??= model?.preprompt ?? "";
 
 	let messages: Message[] = [
 		{
