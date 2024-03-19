@@ -29,12 +29,10 @@
 	export let models: Model[] = [];
 
 	let files: FileList | null = null;
-	let selectedModel: Model | undefined = models.find(
-		(model) => assistant?.modelId && assistant.modelId === model.id
-	);
-	let enteredSystemPrompt = "";
-
 	const settings = useSettingsStore();
+	let modelId =
+		assistant?.modelId ?? models.find((_model) => _model.id === $settings.activeModel)?.name;
+	let systemPrompt = assistant?.preprompt ?? "";
 
 	let compress: typeof readAndCompressImage | null = null;
 
@@ -246,8 +244,7 @@
 				<select
 					name="modelId"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					on:change={(e) =>
-						(selectedModel = models.find((model) => model.id === e.currentTarget.value))}
+					bind:value={modelId}
 				>
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
@@ -405,14 +402,19 @@
 					name="preprompt"
 					class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
-					value={assistant?.preprompt ?? ""}
-					on:input={(e) => (enteredSystemPrompt = e.currentTarget.value)}
+					bind:value={systemPrompt}
 				/>
-				<TokensCounter
-					classNames="absolute bottom-2 right-2"
-					prompt={enteredSystemPrompt}
-					model={selectedModel}
-				/>
+				{#if modelId}
+					{@const model = models.find((_model) => _model.id === modelId)}
+					{#if model?.tokenizer && systemPrompt}
+						<TokensCounter
+							classNames="absolute bottom-2 right-2"
+							prompt={systemPrompt}
+							modelTokenizer={model.tokenizer}
+							max_new_tokens={model?.parameters?.max_new_tokens}
+						/>
+					{/if}
+				{/if}
 			</div>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</div>

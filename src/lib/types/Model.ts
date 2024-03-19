@@ -12,6 +12,7 @@ export type Model = Pick<
 	| "description"
 	| "logoUrl"
 	| "modelUrl"
+	| "tokenizer"
 	| "datasetUrl"
 	| "preprompt"
 	| "multimodal"

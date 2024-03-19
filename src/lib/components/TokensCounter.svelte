@@ -1,54 +1,48 @@
 <script lang="ts">
 	import type { Model } from "$lib/types/Model";
-	import { AutoTokenizer } from "@xenova/transformers";
+	import { AutoTokenizer, PreTrainedTokenizer } from "@xenova/transformers";
 
 	export let classNames = "";
 	export let prompt = "";
-	export let model: Model | undefined = undefined;
+	export let modelTokenizer: Exclude<Model["tokenizer"], undefined>;
+	export let max_new_tokens: number | undefined = undefined;
 
-	let nTokens = 0;
-	let isDisabled = false;
-	let modelId = model?.id;
+	let tokenizer: PreTrainedTokenizer | undefined = undefined;
 
-	async function tokenizeText() {
-		if (isDisabled || !model) {
+	async function getTokenizer(_modelTokenizer: Exclude<Model["tokenizer"], undefined>) {
+		if (typeof _modelTokenizer === "string") {
+			// return auto tokenizer
+			return await AutoTokenizer.from_pretrained(_modelTokenizer);
+		}
+		{
+			// construct & return pretrained tokenizer
+			const { tokenizerUrl, tokenizerConfigUrl } = _modelTokenizer satisfies {
+				tokenizerUrl: string;
+				tokenizerConfigUrl: string;
+			};
+			const tokenizerJSON = await (await fetch(tokenizerUrl)).json();
+			const tokenizerConfig = await (await fetch(tokenizerConfigUrl)).json();
+			return new PreTrainedTokenizer(tokenizerJSON, tokenizerConfig);
+		}
+	}
+
+	async function tokenizeText(_prompt: string) {
+		if (!tokenizer) {
 			return;
 		}
-
-		if (!prompt) {
-			nTokens = 0;
-			return;
-		}
-
-		try {
-			const tokenizer = await AutoTokenizer.from_pretrained(model.id);
-			const { input_ids } = await tokenizer(prompt);
-			nTokens = input_ids.size;
-			isDisabled = false;
-		} catch (err) {
-			isDisabled = true;
-			console.error("Error while counting tokens: ", err);
-		}
+		const { input_ids } = await tokenizer(_prompt);
+		return input_ids.size;
 	}
 
-	$: {
-		if (typeof window !== "undefined" && model) {
-			tokenizeText();
-		}
-	}
-
-	$: {
-		if (model?.id !== modelId) {
-			// reset
-			modelId = model?.id;
-			nTokens = 0;
-			isDisabled = false;
-		}
-	}
+	$: (async () => {
+		tokenizer = await getTokenizer(modelTokenizer);
+	})();
 </script>
 
-{#if !isDisabled && model?.parameters?.max_new_tokens && nTokens}
-	<p class="text-sm opacity-60 hover:opacity-80 {classNames}">
-		{nTokens}/{model.parameters.max_new_tokens}
-	</p>
+{#if tokenizer}
+	{#await tokenizeText(prompt) then nTokens}
+		<p class="text-sm opacity-60 hover:opacity-80 {classNames}">
+			{nTokens}{max_new_tokens ? `/${max_new_tokens}` : ""}
+		</p>
+	{/await}
 {/if}
