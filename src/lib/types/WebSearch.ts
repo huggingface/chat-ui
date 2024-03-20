@@ -71,7 +71,8 @@ function archyveTemplator(
 	lastQuestion: string,
 	previousQuestions: string[]
 ): string {
-	return `Given this context and previous questions, answer the following question: 
+	return `Given this context and previous questions, answer the following question:
+
 ${webSearch.context}
 
 ${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
