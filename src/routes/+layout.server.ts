@@ -13,6 +13,7 @@ import {
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
 	SEARXNG_QUERY_URL,
+	ARCHYVE_QUERY_URL,
 	ENABLE_ASSISTANTS,
 	ENABLE_ASSISTANTS_RAG,
 } from "$env/static/private";
@@ -141,7 +142,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				SERPSTACK_API_KEY ||
 				YDC_API_KEY ||
 				USE_LOCAL_WEBSEARCH ||
-				SEARXNG_QUERY_URL
+				SEARXNG_QUERY_URL ||
+				ARCHYVE_QUERY_URL
 			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,

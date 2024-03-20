@@ -18,15 +18,22 @@ export async function preprocessMessages(
 					.filter((el) => el.from === "user")
 					.slice(0, -1)
 					.map((el) => el.content);
-				const currentDate = format(new Date(), "MMMM d, yyyy");
+				// const currentDate = format(new Date(), "MMMM d, yyyy");
 
-				message.content = `I searched the web using the query: ${webSearch.searchQuery}. 
-Today is ${currentDate} and here are the results:
-=====================
+				message.content = `Given this context and previous questions, answer the following question: 
 ${webSearch.context}
-=====================
+
 ${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
-Answer the question: ${lastQuestion}`;
+
+Question: ${lastQuestion}
+`;
+				// 				message.content = `I searched the web using the query: ${webSearch.searchQuery}.
+				// Today is ${currentDate} and here are the results:
+				// =====================
+				// ${webSearch.context}
+				// =====================
+				// ${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
+				// Answer the question: ${lastQuestion}`;
 			}
 			// handle files if model is multimodal
 			if (multimodal) {

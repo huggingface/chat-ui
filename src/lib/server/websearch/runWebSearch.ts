@@ -72,8 +72,12 @@ export async function runWebSearch(
 				return { link, hostname: new URL(link).hostname, title: "", text: "" };
 			});
 		} else {
-			webSearch.searchQuery = await generateQuery(messages);
 			const searchProvider = getWebSearchProvider();
+			if (searchProvider === "Archyve") {
+				webSearch.searchQuery = prompt;
+			} else {
+				webSearch.searchQuery = await generateQuery(messages);
+			}
 			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 
 			let filters = "";
