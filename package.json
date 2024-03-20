@@ -56,6 +56,7 @@
 		"@resvg/resvg-js": "^2.6.0",
 		"@xenova/transformers": "^2.16.1",
 		"autoprefixer": "^10.4.14",
+		"aws4": "^1.12.0",
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
