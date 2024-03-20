@@ -32,6 +32,7 @@ export async function runWebSearch(
 	ragSettings?: Assistant["rag"]
 ) {
 	const prompt = messages[messages.length - 1].content;
+	const searchProvider = getWebSearchProvider();
 	const webSearch: WebSearch = {
 		prompt,
 		searchQuery: "",
@@ -39,6 +40,7 @@ export async function runWebSearch(
 		contextSources: [],
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		provider: searchProvider,
 	};
 
 	function appendUpdate(message: string, args?: string[], type?: "error" | "update") {
@@ -71,9 +73,12 @@ export async function runWebSearch(
 				return { link, hostname: new URL(link).hostname, title: "", text: "" };
 			});
 		} else {
-			webSearch.searchQuery = await generateQuery(messages);
-			const searchProvider = getWebSearchProvider();
-			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
+			if (webSearch.provider.generateQuery) {
+				webSearch.searchQuery = await generateQuery(messages);
+			} else {
+				webSearch.searchQuery = prompt;
+			}
+			appendUpdate(`Searching ${searchProvider.name}`, [webSearch.searchQuery]);
 
 			let filters = "";
 			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
@@ -110,59 +115,71 @@ export async function runWebSearch(
 			.filter(({ link }) => !blockList.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
-		// fetch the model
-		const embeddingModel =
-			embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
+		const usedSources = new Set<string>();
+		const topKClosestParagraphs = 8;
+		if (webSearch.provider.doSimilaritySearch) {
+			// fetch the model
+			const embeddingModel =
+				embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
 
-		if (!embeddingModel) {
-			throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
-		}
+			if (!embeddingModel) {
+				throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
+			}
 
-		let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
-		if (webSearch.results.length > 0) {
-			appendUpdate("Browsing results");
-			const promises = webSearch.results.map(async (result) => {
-				const { link } = result;
-				let text = result.text ?? "";
-				if (!text) {
-					try {
-						text = await parseWeb(link);
-						appendUpdate("Browsing webpage", [link]);
-					} catch (e) {
-						appendUpdate("Failed to parse webpage", [(e as Error).message, link], "error");
-						// ignore errors
+			let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
+			if (webSearch.results.length > 0) {
+				appendUpdate("Browsing results");
+				const promises = webSearch.results.map(async (result) => {
+					const { link } = result;
+					let text = result.text ?? "";
+					if (!text) {
+						try {
+							text = await parseWeb(link);
+							appendUpdate("Browsing webpage", [link]);
+						} catch (e) {
+							appendUpdate("Failed to parse webpage", [(e as Error).message, link], "error");
+							// ignore errors
+						}
 					}
+					const MAX_N_CHUNKS = 100;
+					const texts = chunk(text, embeddingModel.chunkCharLength).slice(0, MAX_N_CHUNKS);
+					return texts.map((t) => ({ source: result, text: t }));
+				});
+				const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
+				paragraphChunks = nestedParagraphChunks.flat();
+				if (!paragraphChunks.length) {
+					throw new Error("No text found on the first 5 results");
 				}
-				const MAX_N_CHUNKS = 100;
-				const texts = chunk(text, embeddingModel.chunkCharLength).slice(0, MAX_N_CHUNKS);
-				return texts.map((t) => ({ source: result, text: t }));
+			} else {
+				throw new Error("No results found for this search query");
+			}
+
+			appendUpdate("Extracting relevant information");
+			const texts = paragraphChunks.map(({ text }) => text);
+			const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
+				topK: topKClosestParagraphs,
 			});
-			const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
-			paragraphChunks = nestedParagraphChunks.flat();
-			if (!paragraphChunks.length) {
-				throw new Error("No text found on the first 5 results");
+
+			for (const idx of indices) {
+				const { source } = paragraphChunks[idx];
+				const contextWithId = { idx, text: texts[idx] };
+				const usedSource = webSearch.contextSources.find((cSource) => cSource.link === source.link);
+				if (usedSource) {
+					usedSource.context.push(contextWithId);
+				} else {
+					webSearch.contextSources.push({ ...source, context: [contextWithId] });
+				}
 			}
 		} else {
-			throw new Error("No results found for this search query");
-		}
+			const resultsToUse = webSearch.results.slice(0, topKClosestParagraphs);
 
-		appendUpdate("Extracting relevant information");
-		const topKClosestParagraphs = 8;
-		const texts = paragraphChunks.map(({ text }) => text);
-		const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
-			topK: topKClosestParagraphs,
-		});
-
-		for (const idx of indices) {
-			const { source } = paragraphChunks[idx];
-			const contextWithId = { idx, text: texts[idx] };
-			const usedSource = webSearch.contextSources.find((cSource) => cSource.link === source.link);
-			if (usedSource) {
-				usedSource.context.push(contextWithId);
-			} else {
-				webSearch.contextSources.push({ ...source, context: [contextWithId] });
+			webSearch.context = resultsToUse.map((result) => result.text).join("\n");
+			webSearch.contextSources = resultsToUse;
+			for (const { link } of webSearch.results) {
+				usedSources.add(link);
 			}
 		}
+
 		updatePad({
 			type: "webSearch",
 			messageType: "sources",

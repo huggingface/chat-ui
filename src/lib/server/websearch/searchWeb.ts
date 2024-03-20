@@ -1,5 +1,5 @@
 import type { YouWebSearch } from "../../types/WebSearch";
-import { WebSearchProvider } from "../../types/WebSearch";
+import { webSearchProviders } from "../../types/WebSearch";
 import {
 	SERPAPI_KEY,
 	SERPER_API_KEY,
@@ -7,20 +7,24 @@ import {
 	USE_LOCAL_WEBSEARCH,
 	SEARXNG_QUERY_URL,
 	YDC_API_KEY,
+	ARCHYVE_QUERY_URL,
 } from "$env/static/private";
 import { getJson } from "serpapi";
 import type { GoogleParameters } from "serpapi";
 import { searchWebLocal } from "./searchWebLocal";
 import { searchSearxng } from "./searchSearxng";
+import { searchArchyve } from "./searchArchyve";
 
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
 	if (YDC_API_KEY) {
-		return WebSearchProvider.YOU;
+		return webSearchProviders.YOU;
 	} else if (SEARXNG_QUERY_URL) {
-		return WebSearchProvider.SEARXNG;
+		return webSearchProviders.SEARXNG;
+	} else if (ARCHYVE_QUERY_URL) {
+		return webSearchProviders.ARCHYVE;
 	} else {
-		return WebSearchProvider.GOOGLE;
+		return webSearchProviders.GOOGLE;
 	}
 }
 
@@ -44,7 +48,10 @@ export async function searchWeb(query: string) {
 	if (SERPSTACK_API_KEY) {
 		return await searchSerpStack(query);
 	}
-	throw new Error("No You.com or Serper.dev or SerpAPI key found");
+	if (ARCHYVE_QUERY_URL) {
+		return await searchArchyve(query);
+	}
+	throw new Error("No You.com or Serper.dev or SerpAPI or Archyve key found");
 }
 
 export async function searchWebSerper(query: string) {
