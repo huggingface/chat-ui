@@ -210,6 +210,10 @@
 
 			const messageUpdates: MessageUpdate[] = [];
 			for await (const update of messageUpdatesIterator) {
+				if ($isAborted) {
+					messageUpdatesAbortController.abort();
+					return;
+				}
 				if (update.type === "finalAnswer") {
 					loading = false;
 					pending = false;

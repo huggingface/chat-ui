@@ -14,6 +14,9 @@ export async function fetchMessageUpdates(
 	opts: MessageUpdateRequestOptions,
 	abortSignal: AbortSignal
 ): Promise<AsyncGenerator<MessageUpdate>> {
+	const abortController = new AbortController();
+	abortSignal.addEventListener("abort", () => abortController.abort());
+
 	const response = await fetch(`${opts.base}/conversation/${conversationId}`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -25,6 +28,7 @@ export async function fetchMessageUpdates(
 			web_search: opts.webSearch,
 			files: opts.files,
 		}),
+		signal: abortController.signal,
 	});
 
 	if (!response.ok) {
@@ -38,20 +42,18 @@ export async function fetchMessageUpdates(
 		throw Error("Body not defined");
 	}
 	return smoothAsyncIterator(
-		streamMessageUpdatesToFullWords(endpointStreamToIterator(response, abortSignal))
+		streamMessageUpdatesToFullWords(endpointStreamToIterator(response, abortController))
 	);
 }
 
 async function* endpointStreamToIterator(
 	response: Response,
-	abortSignal: AbortSignal
+	abortController: AbortController
 ): AsyncGenerator<MessageUpdate> {
 	const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader();
 	if (!reader) throw Error("Response for endpoint had no body");
 
 	// Handle any cases where we must abort
-	const abortController = new AbortController();
-	abortSignal.addEventListener("abort", () => abortController.abort());
 	reader.closed.then(() => abortController.abort());
 
 	// Handle logic for aborting
