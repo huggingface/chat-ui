@@ -1,3 +1,3 @@
-import { PUBLIC_APP_ASSETS } from "$env/static/public";
+import { env } from "$env/dynamic/public";
 
-export const isHuggingChat = PUBLIC_APP_ASSETS === "huggingchat";
+export const isHuggingChat = env.PUBLIC_APP_ASSETS === "huggingchat";
