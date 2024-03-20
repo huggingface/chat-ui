@@ -21,6 +21,9 @@
 	}
 
 	function handleBackdropClick(event: MouseEvent) {
+		if (window?.getSelection()?.toString()) {
+			return;
+		}
 		if (event.target === backdropEl) {
 			dispatch("close");
 		}
