@@ -32,6 +32,7 @@ export async function runWebSearch(
 	ragSettings?: Assistant["rag"]
 ) {
 	const prompt = messages[messages.length - 1].content;
+	const searchProvider = getWebSearchProvider();
 	const webSearch: WebSearch = {
 		prompt,
 		searchQuery: "",
@@ -40,6 +41,7 @@ export async function runWebSearch(
 		contextSources: [],
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		provider: searchProvider,
 	};
 
 	function appendUpdate(message: string, args?: string[], type?: "error" | "update") {
@@ -72,11 +74,10 @@ export async function runWebSearch(
 				return { link, hostname: new URL(link).hostname, title: "", text: "" };
 			});
 		} else {
-			const searchProvider = getWebSearchProvider();
-			if (searchProvider === "Archyve") {
-				webSearch.searchQuery = prompt;
-			} else {
+			if (webSearch.provider.generateQuery) {
 				webSearch.searchQuery = await generateQuery(messages);
+			} else {
+				webSearch.searchQuery = prompt;
 			}
 			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 

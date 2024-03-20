@@ -1,5 +1,5 @@
 import type { YouWebSearch } from "../../types/WebSearch";
-import { WebSearchProvider } from "../../types/WebSearch";
+import { webSearchProviders } from "../../types/WebSearch";
 import {
 	SERPAPI_KEY,
 	SERPER_API_KEY,
@@ -18,13 +18,13 @@ import { searchArchyve } from "./searchArchyve";
 // get which SERP api is providing web results
 export function getWebSearchProvider() {
 	if (YDC_API_KEY) {
-		return WebSearchProvider.YOU;
+		return webSearchProviders.YOU;
 	} else if (SEARXNG_QUERY_URL) {
-		return WebSearchProvider.SEARXNG;
+		return webSearchProviders.SEARXNG;
 	} else if (ARCHYVE_QUERY_URL) {
-		return WebSearchProvider.ARCHYVE;
+		return webSearchProviders.ARCHYVE;
 	} else {
-		return WebSearchProvider.GOOGLE;
+		return webSearchProviders.GOOGLE;
 	}
 }
 

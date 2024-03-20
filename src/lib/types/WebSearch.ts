@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
+import { format } from "date-fns";
 
 export interface WebSearch extends Timestamps {
 	_id?: ObjectId;
@@ -12,6 +13,7 @@ export interface WebSearch extends Timestamps {
 	results: WebSearchSource[];
 	context: string;
 	contextSources: WebSearchSource[];
+	provider: WebSearchProvider;
 }
 
 export interface WebSearchSource {
@@ -38,10 +40,49 @@ interface YouSearchHit {
 	snippets: string[];
 }
 
-// eslint-disable-next-line no-shadow
-export enum WebSearchProvider {
-	GOOGLE = "Google",
-	YOU = "You.com",
-	SEARXNG = "SearXNG",
-	ARCHYVE = "Archyve",
+export interface WebSearchProvider {
+	name: string;
+	messageTemplator: (
+		webSearch: WebSearch,
+		lastQuestion: string,
+		previousQuestions: string[]
+	) => string;
+	generateQuery: boolean;
 }
+
+export type WebSearchProviders = Record<string, WebSearchProvider>;
+
+function defaultTemplator(
+	webSearch: WebSearch,
+	lastQuestion: string,
+	previousQuestions: string[]
+): string {
+	return `I searched the web using the query: ${webSearch.searchQuery}.
+	Today is ${format(new Date(), "MMMM d, yyyy")} and here are the results:
+	=====================
+	${webSearch.context}
+	=====================
+	${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
+	Answer the question: ${lastQuestion}`;
+}
+
+function archyveTemplator(
+	webSearch: WebSearch,
+	lastQuestion: string,
+	previousQuestions: string[]
+): string {
+	return `Given this context and previous questions, answer the following question: 
+${webSearch.context}
+
+${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
+
+Question: ${previousQuestions}
+`;
+}
+
+export const webSearchProviders: WebSearchProviders = {
+	GOOGLE: { name: "Google", messageTemplator: defaultTemplator, generateQuery: true },
+	YOU: { name: "You.com", messageTemplator: defaultTemplator, generateQuery: true },
+	SEARXNG: { name: "SearXNG", messageTemplator: defaultTemplator, generateQuery: true },
+	ARCHYVE: { name: "Archyve", messageTemplator: archyveTemplator, generateQuery: false },
+};

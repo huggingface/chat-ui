@@ -1,6 +1,5 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
-import { format } from "date-fns";
 import { downloadFile } from "./files/downloadFile";
 
 export async function preprocessMessages(
@@ -18,22 +17,13 @@ export async function preprocessMessages(
 					.filter((el) => el.from === "user")
 					.slice(0, -1)
 					.map((el) => el.content);
-				// const currentDate = format(new Date(), "MMMM d, yyyy");
 
-				message.content = `Given this context and previous questions, answer the following question: 
-${webSearch.context}
-
-${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
-
-Question: ${lastQuestion}
-`;
-				// 				message.content = `I searched the web using the query: ${webSearch.searchQuery}.
-				// Today is ${currentDate} and here are the results:
-				// =====================
-				// ${webSearch.context}
-				// =====================
-				// ${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
-				// Answer the question: ${lastQuestion}`;
+				// use the WebSearch provider's message template
+				message.content = webSearch.provider.messageTemplator(
+					webSearch,
+					lastQuestion,
+					previousQuestions
+				);
 			}
 			// handle files if model is multimodal
 			if (multimodal) {
