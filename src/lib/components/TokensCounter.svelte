@@ -5,7 +5,7 @@
 	export let classNames = "";
 	export let prompt = "";
 	export let modelTokenizer: Exclude<Model["tokenizer"], undefined>;
-	export let max_new_tokens: number | undefined = undefined;
+	export let truncate: number | undefined = undefined;
 
 	let tokenizer: PreTrainedTokenizer | undefined = undefined;
 
@@ -42,7 +42,7 @@
 {#if tokenizer}
 	{#await tokenizeText(prompt) then nTokens}
 		<p class="text-sm opacity-60 hover:opacity-80 {classNames}">
-			{nTokens}{max_new_tokens ? `/${max_new_tokens}` : ""}
+			{nTokens}{truncate ? `/${truncate}` : ""}
 		</p>
 	{/await}
 {/if}

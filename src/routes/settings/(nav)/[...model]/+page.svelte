@@ -123,7 +123,7 @@
 				classNames="absolute bottom-2 right-2"
 				prompt={$settings.customPrompts[$page.params.model]}
 				modelTokenizer={model.tokenizer}
-				max_new_tokens={model?.parameters?.max_new_tokens}
+				truncate={model?.parameters?.truncate}
 			/>
 		{/if}
 	</div>
