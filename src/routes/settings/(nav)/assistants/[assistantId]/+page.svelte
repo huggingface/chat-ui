@@ -185,7 +185,7 @@
 							>
 						{:else if tag.includes("date") || tag.includes("time")}
 							<span
-								class="whitespace-nowrap text-nowrap rounded-lg bg-green-200 px-1 py-0.5 text-green-800"
+								class="whitespace-nowrap text-nowrap rounded-lg bg-green-200 px-1 py-0.5 font-semibold text-green-800"
 								>{tag}</span
 							>
 						{:else}
