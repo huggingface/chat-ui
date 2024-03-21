@@ -172,28 +172,32 @@
 			id="System Instructions"
 			class="mt-2 box-border h-fit w-full whitespace-pre-line rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
 		>
-			{#each prepromptTags as tag}
-				{#if tag.startsWith("{{") && tag.endsWith("}}")}
-					{#if tag.includes("url")}
-						<a
-							target="_blank"
-							href={tag.split("url ")[1].split("}}")[0]}
-							class="whitespace-nowrap text-nowrap rounded-lg bg-blue-200 px-1 py-0.5 font-semibold text-blue-800 hover:underline"
-						>
-							{tag}</a
-						>
-					{:else if tag.includes("date") || tag.includes("time")}
-						<span
-							class="whitespace-nowrap text-nowrap rounded-lg bg-green-200 px-1 py-0.5 text-green-800"
-							>{tag}</span
-						>
+			{#if assistant?.dynamicPrompt}
+				{#each prepromptTags as tag}
+					{#if tag.startsWith("{{") && tag.endsWith("}}")}
+						{#if tag.includes("url")}
+							<a
+								target="_blank"
+								href={tag.split("url ")[1].split("}}")[0]}
+								class="whitespace-nowrap text-nowrap rounded-lg bg-blue-200 px-1 py-0.5 font-semibold text-blue-800 hover:underline"
+							>
+								{tag}</a
+							>
+						{:else if tag.includes("date") || tag.includes("time")}
+							<span
+								class="whitespace-nowrap text-nowrap rounded-lg bg-green-200 px-1 py-0.5 text-green-800"
+								>{tag}</span
+							>
+						{:else}
+							{tag}
+						{/if}
 					{:else}
 						{tag}
 					{/if}
-				{:else}
-					{tag}
-				{/if}
-			{/each}
+				{/each}
+			{:else}
+				{assistant?.preprompt}
+			{/if}
 		</div>
 
 		{#if hasRag}
