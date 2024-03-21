@@ -12,6 +12,7 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import IconInternet from "./icons/IconInternet.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -286,8 +287,10 @@
 			{#if $page.data.enableAssistantsRAG}
 				<div class="mb-4 flex flex-col flex-nowrap">
 					<span class="mt-2 text-smd font-semibold"
-						>Internet access <span
-							class="ml-1 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
+						>Internet access
+						<IconInternet classNames="inline text-sm text-blue-600" />
+
+						<span class="ml-1 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
 							>Experimental</span
 						>
 
@@ -384,39 +387,53 @@
 						/>
 						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
 					{/if}
+
+					<!-- divider -->
+					<div class="my-3 ml-0 mr-6 w-full border border-gray-200" />
+
+					<label class="text-sm has-[:checked]:font-semibold">
+						<input type="checkbox" name="dynamicPrompt" checked={assistant?.dynamicPrompt} />
+						Dynamic Prompt
+						<p class="mb-2 text-xs font-normal text-gray-500">
+							If enabled, you can use special tags like {"{{ date }}"} and {"{{ url https://example.com/path }}"}
+							to insert dynamic information into your prompt.
+						</p>
+					</label>
 				</div>
 			{/if}
 		</div>
 
 		<div class="col-span-1 flex h-full flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
-			<textarea
-				name="preprompt"
-				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-				placeholder="You'll act as..."
-				value={assistant?.preprompt ?? ""}
-			/>
-			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
+			<div class="mb-20 flex h-full flex-col gap-2">
+				<textarea
+					name="preprompt"
+					class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+					placeholder="You'll act as..."
+					value={assistant?.preprompt ?? ""}
+				/>
+				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
+			</div>
 		</div>
-	</div>
 
-	<div class="fixed bottom-6 right-6 ml-auto mt-6 flex w-fit justify-end gap-2 sm:absolute">
-		<a
-			href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
-			class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
-		>
-			Cancel
-		</a>
-		<button
-			type="submit"
-			disabled={loading}
-			aria-disabled={loading}
-			class="flex items-center justify-center rounded-full bg-black px-8 py-2 font-semibold"
-			class:bg-gray-200={loading}
-			class:text-gray-600={loading}
-			class:text-white={!loading}
-		>
-			{assistant ? "Save" : "Create"}
-		</button>
+		<div class="fixed bottom-6 right-6 ml-auto mt-6 flex w-fit justify-end gap-2 sm:absolute">
+			<a
+				href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
+				class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
+			>
+				Cancel
+			</a>
+			<button
+				type="submit"
+				disabled={loading}
+				aria-disabled={loading}
+				class="flex items-center justify-center rounded-full bg-black px-8 py-2 font-semibold"
+				class:bg-gray-200={loading}
+				class:text-gray-600={loading}
+				class:text-white={!loading}
+			>
+				{assistant ? "Save" : "Create"}
+			</button>
+		</div>
 	</div>
 </form>

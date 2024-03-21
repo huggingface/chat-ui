@@ -336,21 +336,30 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			// check if assistant has a rag
-			const rag = (
-				await collections.assistants.findOne<Pick<Assistant, "rag">>(
-					{ _id: conv.assistantId },
-					{ projection: { rag: 1 } }
-				)
-			)?.rag;
+			const assistant = await collections.assistants.findOne<
+				Pick<Assistant, "rag" | "dynamicPrompt">
+			>({ _id: conv.assistantId }, { projection: { rag: 1, dynamicPrompt: 1 } });
 
 			const assistantHasRAG =
 				ENABLE_ASSISTANTS_RAG === "true" &&
-				rag &&
-				(rag.allowedLinks.length > 0 || rag.allowedDomains.length > 0 || rag.allowAllDomains);
+				assistant &&
+				((assistant.rag &&
+					(assistant.rag.allowedLinks.length > 0 ||
+						assistant.rag.allowedDomains.length > 0 ||
+						assistant.rag.allowAllDomains)) ||
+					assistant.dynamicPrompt);
 
 			// perform websearch if needed
-			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
-				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, rag);
+			if (
+				!isContinue &&
+				((webSearch && !conv.assistantId) || (assistantHasRAG && !assistant.dynamicPrompt))
+			) {
+				messageToWriteTo.webSearch = await runWebSearch(
+					conv,
+					messagesForPrompt,
+					update,
+					assistant?.rag
+				);
 			}
 
 			// inject websearch result & optionally images into the messages
