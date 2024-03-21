@@ -48,6 +48,7 @@ export interface WebSearchProvider {
 		previousQuestions: string[]
 	) => string;
 	generateQuery: boolean;
+	doSimilaritySearch: boolean;
 }
 
 export type WebSearchProviders = Record<string, WebSearchProvider>;
@@ -77,13 +78,33 @@ ${webSearch.context}
 
 ${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
 
-Question: ${previousQuestions}
+Question: ${lastQuestion}
 `;
 }
 
 export const webSearchProviders: WebSearchProviders = {
-	GOOGLE: { name: "Google", messageTemplator: defaultTemplator, generateQuery: true },
-	YOU: { name: "You.com", messageTemplator: defaultTemplator, generateQuery: true },
-	SEARXNG: { name: "SearXNG", messageTemplator: defaultTemplator, generateQuery: true },
-	ARCHYVE: { name: "Archyve", messageTemplator: archyveTemplator, generateQuery: false },
+	GOOGLE: {
+		name: "Google",
+		messageTemplator: defaultTemplator,
+		generateQuery: true,
+		doSimilaritySearch: true,
+	},
+	YOU: {
+		name: "You.com",
+		messageTemplator: defaultTemplator,
+		generateQuery: true,
+		doSimilaritySearch: true,
+	},
+	SEARXNG: {
+		name: "SearXNG",
+		messageTemplator: defaultTemplator,
+		generateQuery: true,
+		doSimilaritySearch: true,
+	},
+	ARCHYVE: {
+		name: "Archyve",
+		messageTemplator: archyveTemplator,
+		generateQuery: false,
+		doSimilaritySearch: false,
+	},
 };
