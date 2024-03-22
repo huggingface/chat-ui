@@ -12,6 +12,7 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import TokensCounter from "./TokensCounter.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -28,8 +29,10 @@
 	export let models: Model[] = [];
 
 	let files: FileList | null = null;
-
 	const settings = useSettingsStore();
+	let modelId =
+		assistant?.modelId ?? models.find((_model) => _model.id === $settings.activeModel)?.name;
+	let systemPrompt = assistant?.preprompt ?? "";
 
 	let compress: typeof readAndCompressImage | null = null;
 
@@ -238,7 +241,11 @@
 
 			<label>
 				<div class="mb-1 font-semibold">Model</div>
-				<select name="modelId" class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2">
+				<select
+					name="modelId"
+					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					bind:value={modelId}
+				>
 					{#each models.filter((model) => !model.unlisted) as model}
 						<option
 							value={model.id}
@@ -390,12 +397,25 @@
 
 		<div class="col-span-1 flex h-full flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
-			<textarea
-				name="preprompt"
-				class="mb-20 min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-				placeholder="You'll act as..."
-				value={assistant?.preprompt ?? ""}
-			/>
+			<div class="relative mb-20 flex min-h-[8lh] flex-1 grow flex-col">
+				<textarea
+					name="preprompt"
+					class="flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
+					placeholder="You'll act as..."
+					bind:value={systemPrompt}
+				/>
+				{#if modelId}
+					{@const model = models.find((_model) => _model.id === modelId)}
+					{#if model?.tokenizer && systemPrompt}
+						<TokensCounter
+							classNames="absolute bottom-2 right-2"
+							prompt={systemPrompt}
+							modelTokenizer={model.tokenizer}
+							truncate={model?.parameters?.truncate}
+						/>
+					{/if}
+				{/if}
+			</div>
 			<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 		</div>
 	</div>
