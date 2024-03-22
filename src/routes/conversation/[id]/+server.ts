@@ -373,12 +373,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					try {
 						const url = new URL(match[1]);
 						if (await isURLLocal(url)) {
-							throw new Error("URL couldn't be fetched");
+							throw new Error("URL couldn't be fetched, it resolved to a local address.");
 						}
 
 						const res = await fetch(url.href);
+						console.log({ status: res.status });
+
 						if (!res.ok) {
-							throw new Error("URL couldn't be fetched");
+							throw new Error("URL couldn't be fetched, error " + res.status);
 						}
 						const text = await res.text();
 						preprompt = preprompt.replaceAll(match[0], text);
