@@ -26,13 +26,13 @@ export function endpointVertex(
 
 	const generativeModel = vertex_ai.getGenerativeModel({
 		model: model.id ?? model.name,
-		safetySettings: [
+		safety_settings: [
 			{
 				category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
 				threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
 			},
 		],
-		generationConfig: {},
+		generation_config: {},
 	});
 
 	return async ({ messages, preprompt, continueMessage }) => {
@@ -59,7 +59,7 @@ export function endpointVertex(
 						const output: TextGenerationStreamOutput = {
 							token: {
 								id: tokenId++,
-								text: content,
+								text: content ?? "",
 								logprob: 0,
 								special: false,
 							},

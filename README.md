@@ -563,8 +563,6 @@ MODELS=`[
 
 ```
 
-
-
 ### Custom endpoint authorization
 
 #### Basic and Bearer
