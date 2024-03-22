@@ -10,7 +10,6 @@ import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
-import { isURLLocal } from "$lib/server/isURLLocal";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -92,36 +91,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	if (assistant) {
 		values.preprompt = assistant.preprompt;
-
-		if (assistant.dynamicPrompt) {
-			// process the preprompt
-
-			const date = new Date();
-
-			values.preprompt = values.preprompt.replaceAll(/{{\s?date\s?}}/g, date.toLocaleDateString());
-			values.preprompt = values.preprompt.replaceAll(/{{\s?time\s?}}/g, date.toLocaleTimeString());
-
-			const urlRegex = /{{\s?url (.*?)\s?}}/g;
-			let match;
-			while ((match = urlRegex.exec(values.preprompt)) !== null) {
-				try {
-					const url = new URL(match[1]);
-					if (await isURLLocal(url)) {
-						throw new Error("URL couldn't be fetched");
-					}
-
-					const res = await fetch(url.href);
-					if (!res.ok) {
-						throw new Error("URL couldn't be fetched");
-					}
-					const text = await res.text();
-					values.preprompt = values.preprompt.replaceAll(match[0], text);
-				} catch (e) {
-					values.preprompt = values.preprompt.replaceAll(match[0], (e as Error).message);
-				}
-			}
-		}
-		3;
 	} else {
 		values.preprompt ??= model?.preprompt ?? "";
 	}

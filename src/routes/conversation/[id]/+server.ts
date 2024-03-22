@@ -21,6 +21,7 @@ import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
+import { isURLLocal } from "$lib/server/isURLLocal.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -362,6 +363,35 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				);
 			}
 
+			let preprompt = conv.preprompt;
+
+			if (assistant?.dynamicPrompt && preprompt) {
+				// process the preprompt
+				const urlRegex = /{{\s?url (.*?)\s?}}/g;
+				let match;
+				while ((match = urlRegex.exec(preprompt)) !== null) {
+					try {
+						const url = new URL(match[1]);
+						if (await isURLLocal(url)) {
+							throw new Error("URL couldn't be fetched");
+						}
+
+						const res = await fetch(url.href);
+						if (!res.ok) {
+							throw new Error("URL couldn't be fetched");
+						}
+						const text = await res.text();
+						preprompt = preprompt.replaceAll(match[0], text);
+					} catch (e) {
+						preprompt = preprompt.replaceAll(match[0], (e as Error).message);
+					}
+				}
+
+				if (messagesForPrompt[0].from === "system") {
+					messagesForPrompt[0].content = preprompt;
+				}
+			}
+
 			// inject websearch result & optionally images into the messages
 			const processedMessages = await preprocessMessages(
 				messagesForPrompt,
@@ -376,7 +406,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
 					messages: processedMessages,
-					preprompt: conv.preprompt,
+					preprompt,
 					continueMessage: isContinue,
 				})) {
 					// if not generated_text is here it means the generation is not done
