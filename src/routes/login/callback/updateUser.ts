@@ -92,9 +92,6 @@ export async function updateUser(params: {
 			ip,
 			expiresAt: addWeeks(new Date(), 2),
 		});
-
-		// refresh session cookie
-		refreshSessionCookie(cookies, secretSessionId);
 	} else {
 		// user doesn't exist yet, create a new one
 		const { insertedId } = await collections.users.insertOne({
@@ -141,6 +138,9 @@ export async function updateUser(params: {
 			});
 		}
 	}
+
+	// refresh session cookie
+	refreshSessionCookie(cookies, secretSessionId);
 
 	// migrate pre-existing conversations
 	await collections.conversations.updateMany(
