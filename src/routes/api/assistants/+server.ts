@@ -1,4 +1,3 @@
-import { base } from "$app/paths";
 import { collections } from "$lib/server/database.js";
 import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
@@ -42,7 +41,7 @@ export async function GET({ url, locals }) {
 	const numTotalItems = await collections.assistants.countDocuments(filter);
 
 	return Response.json({
-		assistants: assistants,
+		assistants,
 		selectedModel: modelId ?? "",
 		numTotalItems,
 		numItemsPerPage: NUM_PER_PAGE,
