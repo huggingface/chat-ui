@@ -138,7 +138,7 @@ export async function updateUser(params: {
 			});
 		}
 	}
-	
+
 	// refresh session cookie
 	refreshSessionCookie(cookies, secretSessionId);
 
