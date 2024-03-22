@@ -367,7 +367,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			if (assistant?.dynamicPrompt && preprompt) {
 				// process the preprompt
-				const urlRegex = /{{\s?url (.*?)\s?}}/g;
+				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 				let match;
 				while ((match = urlRegex.exec(preprompt)) !== null) {
 					try {

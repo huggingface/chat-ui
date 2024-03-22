@@ -395,7 +395,7 @@
 						<input type="checkbox" name="dynamicPrompt" checked={assistant?.dynamicPrompt} />
 						Dynamic Prompt
 						<p class="mb-2 text-xs font-normal text-gray-500">
-							If enabled, you can use special tags {"{{ url https://example.com/path }}"} to insert dynamic
+							If enabled, you can use special tags {"{{ url=https://example.com/path }}"} to insert dynamic
 							information into your prompt.
 						</p>
 					</label>
