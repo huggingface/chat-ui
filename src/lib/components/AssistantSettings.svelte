@@ -402,8 +402,9 @@
 						<input type="checkbox" name="dynamicPrompt" checked={assistant?.dynamicPrompt} />
 						Dynamic Prompt
 						<p class="mb-2 text-xs font-normal text-gray-500">
-							If enabled, you can use special tags {"{{ url=https://example.com/path }}"} to insert dynamic
-							information into your prompt.
+							Allow the use of template variables {"{{url=https://example.com/path}}"}
+							to insert dynamic content into your prompt by making GET requests to specified URLs on
+							each inference.
 						</p>
 					</label>
 				</div>
@@ -412,7 +413,7 @@
 
 		<div class="col-span-1 flex h-full flex-col">
 			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
-			<div class="mb-20 flex h-full flex-col gap-2">
+			<div class="relative mb-20 flex h-full flex-col gap-2">
 				<textarea
 					name="preprompt"
 					class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
@@ -423,7 +424,7 @@
 					{@const model = models.find((_model) => _model.id === modelId)}
 					{#if model?.tokenizer && systemPrompt}
 						<TokensCounter
-							classNames="absolute bottom-2 right-2"
+							classNames="absolute bottom-4 right-4"
 							prompt={systemPrompt}
 							modelTokenizer={model.tokenizer}
 							truncate={model?.parameters?.truncate}

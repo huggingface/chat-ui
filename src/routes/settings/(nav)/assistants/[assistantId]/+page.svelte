@@ -178,7 +178,7 @@
 						<a
 							target="_blank"
 							href={tag.split("url=")[1].split("}}")[0]}
-							class="whitespace-nowrap text-nowrap rounded-lg bg-blue-200 px-1 py-0.5 font-semibold text-blue-800 hover:underline"
+							class="break-words rounded-lg bg-blue-100 px-1 py-0.5 text-blue-800 hover:underline"
 						>
 							{tag}</a
 						>
@@ -224,7 +224,7 @@
 					</ul>
 				{/if}
 				{#if assistant?.dynamicPrompt}
-					<p class="pt-4 text-sm text-gray-500">This Assistant has dynamic prompts enabled.</p>
+					<p class="text-sm text-gray-500">This Assistant has dynamic prompts enabled.</p>
 				{/if}
 			</div>
 		{/if}
