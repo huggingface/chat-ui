@@ -41,8 +41,20 @@
 
 {#if tokenizer}
 	{#await tokenizeText(prompt) then nTokens}
-		<p class="text-sm opacity-60 hover:opacity-80 {classNames}">
-			{nTokens}{truncate ? `/${truncate}` : ""}
-		</p>
+		{@const exceedLimit = nTokens > (truncate || Infinity)}
+		<div class={classNames}>
+			<p
+				class="peer text-sm {exceedLimit
+					? 'text-red-500 opacity-100'
+					: 'opacity-60 hover:opacity-90'}"
+			>
+				{nTokens}{truncate ? `/${truncate}` : ""}
+			</p>
+			<div
+				class="invisible absolute -top-6 right-0 whitespace-nowrap rounded bg-black px-1 text-sm text-white peer-hover:visible"
+			>
+				Tokens usage
+			</div>
+		</div>
 	{/await}
 {/if}
