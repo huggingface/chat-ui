@@ -143,10 +143,10 @@
 >
 	{#if assistant}
 		<h2 class="text-xl font-semibold">
-			Edit {assistant?.name ?? "assistant"}
+			Edit Assistant: {assistant?.name ?? "assistant"}
 		</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Modifying an existing assistant will propagate those changes to all users.
+			Modifying an existing assistant will propagate the changes to all users.
 		</p>
 	{:else}
 		<h2 class="text-xl font-semibold">Create new assistant</h2>
@@ -223,7 +223,7 @@
 				<input
 					name="name"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					placeholder="My awesome model"
+					placeholder="Assistant Name"
 					value={assistant?.name ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("name", form)}</p>
@@ -261,33 +261,32 @@
 
 			<label>
 				<div class="mb-1 font-semibold">User start messages</div>
-				<div class="flex flex-col gap-2">
+				<div class="grid gap-1.5 text-sm md:grid-cols-2">
 					<input
 						name="exampleInput1"
+						placeholder="Start Message 1"
 						bind:value={inputMessage1}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
-					{#if !!inputMessage1 || !!inputMessage2}
-						<input
-							name="exampleInput2"
-							bind:value={inputMessage2}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-						/>
-					{/if}
-					{#if !!inputMessage2 || !!inputMessage3}
-						<input
-							name="exampleInput3"
-							bind:value={inputMessage3}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-						/>
-					{/if}
-					{#if !!inputMessage3 || !!inputMessage4}
-						<input
-							name="exampleInput4"
-							bind:value={inputMessage4}
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-						/>
-					{/if}
+					<input
+						name="exampleInput2"
+						placeholder="Start Message 2"
+						bind:value={inputMessage2}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					/>
+
+					<input
+						name="exampleInput3"
+						placeholder="Start Message 3"
+						bind:value={inputMessage3}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					/>
+					<input
+						name="exampleInput4"
+						placeholder="Start Message 4"
+						bind:value={inputMessage4}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+					/>
 				</div>
 				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 			</label>
@@ -323,6 +322,7 @@
 						{#if !ragMode}
 							<span class="block text-xs text-gray-500">
 								Assistant won't look for information from Internet and will be faster to answer.
+								Recommended for most Assistants.
 							</span>
 						{/if}
 					</label>
@@ -412,7 +412,7 @@
 		</div>
 
 		<div class="col-span-1 flex h-full flex-col">
-			<span class="mb-1 text-sm font-semibold"> Instructions (system prompt) </span>
+			<span class="mb-1 text-sm font-semibold"> Instructions (System Prompt) </span>
 			<div class="relative mb-20 flex h-full flex-col gap-2">
 				<textarea
 					name="preprompt"

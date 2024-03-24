@@ -193,7 +193,15 @@
 
 		{#if hasRag}
 			<div class="mt-4">
-				<h2 class=" font-semibold">Internet Access</h2>
+				<div class="mb-1 flex items-center gap-1">
+					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
+						title="This assistant uses the websearch."
+					>
+						<IconInternet classNames="text-sm text-blue-600" />
+					</span>
+					<h2 class=" font-semibold">Internet Access</h2>
+				</div>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
 						This Assistant uses Web Search to find information on Internet.
@@ -224,7 +232,9 @@
 					</ul>
 				{/if}
 				{#if assistant?.dynamicPrompt}
-					<p class="text-sm text-gray-500">This Assistant has dynamic prompts enabled.</p>
+					<p class="text-sm text-gray-500">
+						This Assistant has dynamic prompts enabled and can make requests to external services.
+					</p>
 				{/if}
 			</div>
 		{/if}
