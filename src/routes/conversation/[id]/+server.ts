@@ -377,7 +377,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						}
 
 						const res = await fetch(url.href);
-						console.log({ status: res.status });
 
 						if (!res.ok) {
 							throw new Error("URL couldn't be fetched, error " + res.status);
