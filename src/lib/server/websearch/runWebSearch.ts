@@ -36,7 +36,6 @@ export async function runWebSearch(
 		prompt,
 		searchQuery: "",
 		results: [],
-		context: "",
 		contextSources: [],
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -153,14 +152,15 @@ export async function runWebSearch(
 		const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
 			topK: topKClosestParagraphs,
 		});
-		webSearch.context = indices.map((idx) => texts[idx]).join("");
 
-		const usedSources = new Set<string>();
 		for (const idx of indices) {
 			const { source } = paragraphChunks[idx];
-			if (!usedSources.has(source.link)) {
-				usedSources.add(source.link);
-				webSearch.contextSources.push(source);
+			const contextWithId = { idx, text: texts[idx] };
+			const usedSource = webSearch.contextSources.find((cSource) => cSource.link === source.link);
+			if (usedSource) {
+				usedSource.context.push(contextWithId);
+			} else {
+				webSearch.contextSources.push({ ...source, context: [contextWithId] });
 			}
 		}
 		updatePad({
