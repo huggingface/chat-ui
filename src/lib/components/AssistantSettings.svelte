@@ -314,7 +314,7 @@
 						{/if}
 					</span>
 
-					<label class="mt-1" class:hidden={dynamicPrompt}>
+					<label class="mt-1">
 						<input
 							checked={!ragMode}
 							on:change={() => (ragMode = false)}
@@ -322,11 +322,11 @@
 							name="ragMode"
 							value={false}
 						/>
-						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Disabled </span>
+						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Default </span>
 						{#if !ragMode}
 							<span class="block text-xs text-gray-500">
-								Assistant won't look for information from Internet and will be faster to answer.
-								Recommended for most Assistants.
+								Assistant won't connect to internet to do information retrival and will respond
+								faster. Recommended for most Assistants.
 							</span>
 						{/if}
 					</label>
