@@ -89,7 +89,7 @@
 		? "domains"
 		: false;
 
-	const regex = /\{\{\s*url\s*=\s*(.*?)\s*\}\}/g;
+	const regex = /\{\{\s*url\s*=\s*(.+?)\s*\}\}/g;
 	$: templateVariables = [...systemPrompt.matchAll(regex)].map((match) => match[1]);
 </script>
 
