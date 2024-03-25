@@ -325,8 +325,8 @@
 						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Default </span>
 						{#if !ragMode}
 							<span class="block text-xs text-gray-500">
-								Assistant won't connect to internet to do information retrival and will respond
-								faster. Recommended for most Assistants.
+								Assistant will not use internet to do information retrieval and will respond faster.
+								Recommended for most Assistants.
 							</span>
 						{/if}
 					</label>
