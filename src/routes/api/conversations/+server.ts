@@ -2,6 +2,8 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 
+const NUM_PER_PAGE = 300;
+
 export async function GET({ locals, url }) {
 	const p = parseInt(url.searchParams.get("p") ?? "0");
 
@@ -16,8 +18,8 @@ export async function GET({ locals, url }) {
 				model: 1,
 			})
 			.sort({ updatedAt: -1 })
-			.skip(300 * p)
-			.limit(300)
+			.skip(p * NUM_PER_PAGE)
+			.limit(NUM_PER_PAGE)
 			.toArray();
 
 		const res = convs.map((conv) => ({
