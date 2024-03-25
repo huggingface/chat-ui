@@ -45,22 +45,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		throw error(400, "Invalid model");
 	}
 
-	// get preprompt from assistant if it exists
-	const assistant = await collections.assistants.findOne({
-		_id: new ObjectId(values.assistantId),
-	});
-
-	if (assistant) {
-		values.preprompt = assistant.preprompt;
-	} else {
-		values.preprompt ??= model?.preprompt ?? "";
-	}
-
 	let messages: Message[] = [
 		{
 			id: v4(),
 			from: "system",
-			content: values.preprompt,
+			content: values.preprompt ?? "",
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			children: [],
@@ -93,6 +82,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	if (model.unlisted) {
 		throw error(400, "Can't start a conversation with an unlisted model");
+	}
+
+	// get preprompt from assistant if it exists
+	const assistant = await collections.assistants.findOne({
+		_id: new ObjectId(values.assistantId),
+	});
+
+	if (assistant) {
+		values.preprompt = assistant.preprompt;
+	} else {
+		values.preprompt ??= model?.preprompt ?? "";
 	}
 
 	const res = await collections.conversations.insertOne({

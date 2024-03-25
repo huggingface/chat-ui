@@ -32,7 +32,10 @@
 	$: hasRag =
 		assistant?.rag?.allowAllDomains ||
 		!!assistant?.rag?.allowedDomains?.length ||
-		!!assistant?.rag?.allowedLinks?.length;
+		!!assistant?.rag?.allowedLinks?.length ||
+		!!assistant?.dynamicPrompt;
+
+	$: prepromptTags = assistant?.preprompt?.split(/(\{\{[^{}]*\}\})/) ?? [];
 </script>
 
 {#if displayReportModal}
@@ -164,16 +167,42 @@
 
 	<!-- two columns for big screen, single column for small screen -->
 	<div class="mb-12 mt-3">
-		<h2 class="mb-2 font-semibold">System Instructions</h2>
-		<textarea
-			disabled
-			class="box-border h-full min-h-[8lh] w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
-			>{assistant?.preprompt}</textarea
+		<h2 class="mb-2 inline font-semibold">System Instructions</h2>
+		<div
+			id="System Instructions"
+			class="overlow-y-auto mt-2 box-border h-fit max-h-[240px] w-full overflow-y-auto whitespace-pre-line rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:max-h-[310px]"
 		>
+			{#if assistant?.dynamicPrompt}
+				{#each prepromptTags as tag}
+					{#if tag.startsWith("{{") && tag.endsWith("}}") && tag.includes("url=")}
+						{@const url = tag.split("url=")[1].split("}}")[0]}
+						<a
+							target="_blank"
+							href={url.startsWith("http") ? url : `//${url}`}
+							class="break-words rounded-lg bg-blue-100 px-1 py-0.5 text-blue-800 hover:underline"
+						>
+							{tag}</a
+						>
+					{:else}
+						{tag}
+					{/if}
+				{/each}
+			{:else}
+				{assistant?.preprompt}
+			{/if}
+		</div>
 
 		{#if hasRag}
 			<div class="mt-4">
-				<h2 class=" font-semibold">Internet Access</h2>
+				<div class="mb-1 flex items-center gap-1">
+					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
+						title="This assistant uses the websearch."
+					>
+						<IconInternet classNames="text-sm text-blue-600" />
+					</span>
+					<h2 class=" font-semibold">Internet Access</h2>
+				</div>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
 						This Assistant uses Web Search to find information on Internet.
@@ -202,6 +231,11 @@
 							</li>
 						{/each}
 					</ul>
+				{/if}
+				{#if assistant?.dynamicPrompt}
+					<p class="text-sm text-gray-500">
+						This Assistant has dynamic prompts enabled and can make requests to external services.
+					</p>
 				{/if}
 			</div>
 		{/if}
