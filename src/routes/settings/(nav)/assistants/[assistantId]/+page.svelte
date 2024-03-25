@@ -170,7 +170,7 @@
 		<h2 class="mb-2 inline font-semibold">System Instructions</h2>
 		<div
 			id="System Instructions"
-			class="mt-2 box-border h-fit w-full whitespace-pre-line rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed"
+			class="overlow-y-auto mt-2 box-border h-fit max-h-[240px] w-full overflow-y-auto whitespace-pre-line rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:max-h-[310px]"
 		>
 			{#if assistant?.dynamicPrompt}
 				{#each prepromptTags as tag}
