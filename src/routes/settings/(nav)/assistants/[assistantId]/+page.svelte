@@ -175,9 +175,10 @@
 			{#if assistant?.dynamicPrompt}
 				{#each prepromptTags as tag}
 					{#if tag.startsWith("{{") && tag.endsWith("}}") && tag.includes("url=")}
+						{@const url = tag.split("url=")[1].split("}}")[0]}
 						<a
 							target="_blank"
-							href={tag.split("url=")[1].split("}}")[0]}
+							href={url.startsWith("http") ? url : `//${url}`}
 							class="break-words rounded-lg bg-blue-100 px-1 py-0.5 text-blue-800 hover:underline"
 						>
 							{tag}</a
