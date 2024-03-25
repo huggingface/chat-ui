@@ -14,6 +14,7 @@ export async function GET({ locals }) {
 				model: 1,
 			})
 			.sort({ updatedAt: -1 })
+			.limit(300)
 			.toArray();
 
 		const res = convs.map((conv) => ({
