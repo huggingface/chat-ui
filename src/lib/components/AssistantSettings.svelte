@@ -14,6 +14,8 @@
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
+	import { space } from "postcss/lib/list";
+	import { template } from "handlebars";
 
 	type ActionData = {
 		error: boolean;
@@ -86,6 +88,9 @@
 		: (assistant?.rag?.allowedDomains?.length ?? 0) > 0
 		? "domains"
 		: false;
+
+	const regex = /\{\{\s*url\s*=\s*(.*?)\s*\}\}/g;
+	$: templateVariables = [...systemPrompt.matchAll(regex)].map((match) => match[1]);
 </script>
 
 <form
@@ -413,13 +418,36 @@
 		</div>
 
 		<div class="col-span-1 flex h-full flex-col">
-			<span class="mb-1 text-sm font-semibold"> Instructions (System Prompt) </span>
+			<div class="mb-1 flex justify-between text-sm">
+				<span class="font-semibold"> Instructions (System Prompt) </span>
+				{#if dynamicPrompt && templateVariables.length}
+					<div class="relative">
+						<button
+							type="button"
+							class="peer rounded bg-blue-500/20 px-1 text-xs text-blue-600 focus:bg-blue-500/30 focus:text-blue-800 sm:text-sm"
+						>
+							{templateVariables.length} template variable{templateVariables.length > 1 ? "s" : ""}
+						</button>
+						<div
+							class="invisible absolute right-0 top-6 z-10 rounded-lg border bg-white p-2 text-xs shadow-lg peer-focus:visible hover:visible sm:w-96"
+						>
+							Will performs a GET request and injects the response into the prompt. Works better
+							with plain text, csv or json content.
+							{#each templateVariables as match}
+								<a href={match} target="_blank" class="text-gray-500 underline decoration-gray-300"
+									>{match}</a
+								>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</div>
 			<div class="relative mb-20 flex h-full flex-col gap-2">
 				<textarea
 					name="preprompt"
 					class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
-					value={assistant?.preprompt ?? ""}
+					bind:value={systemPrompt}
 				/>
 				{#if modelId}
 					{@const model = models.find((_model) => _model.id === modelId)}
