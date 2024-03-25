@@ -14,8 +14,6 @@
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
-	import { space } from "postcss/lib/list";
-	import { template } from "handlebars";
 
 	type ActionData = {
 		error: boolean;
