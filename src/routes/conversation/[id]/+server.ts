@@ -21,6 +21,7 @@ import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
+import { isURLLocal } from "$lib/server/isURLLocal.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -336,21 +337,60 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			// check if assistant has a rag
-			const rag = (
-				await collections.assistants.findOne<Pick<Assistant, "rag">>(
-					{ _id: conv.assistantId },
-					{ projection: { rag: 1 } }
-				)
-			)?.rag;
+			const assistant = await collections.assistants.findOne<
+				Pick<Assistant, "rag" | "dynamicPrompt">
+			>({ _id: conv.assistantId }, { projection: { rag: 1, dynamicPrompt: 1 } });
 
 			const assistantHasRAG =
 				ENABLE_ASSISTANTS_RAG === "true" &&
-				rag &&
-				(rag.allowedLinks.length > 0 || rag.allowedDomains.length > 0 || rag.allowAllDomains);
+				assistant &&
+				((assistant.rag &&
+					(assistant.rag.allowedLinks.length > 0 ||
+						assistant.rag.allowedDomains.length > 0 ||
+						assistant.rag.allowAllDomains)) ||
+					assistant.dynamicPrompt);
 
 			// perform websearch if needed
-			if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasRAG)) {
-				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, rag);
+			if (
+				!isContinue &&
+				((webSearch && !conv.assistantId) || (assistantHasRAG && !assistant.dynamicPrompt))
+			) {
+				messageToWriteTo.webSearch = await runWebSearch(
+					conv,
+					messagesForPrompt,
+					update,
+					assistant?.rag
+				);
+			}
+
+			let preprompt = conv.preprompt;
+
+			if (assistant?.dynamicPrompt && preprompt && ENABLE_ASSISTANTS_RAG === "true") {
+				// process the preprompt
+				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
+				let match;
+				while ((match = urlRegex.exec(preprompt)) !== null) {
+					try {
+						const url = new URL(match[1]);
+						if (await isURLLocal(url)) {
+							throw new Error("URL couldn't be fetched, it resolved to a local address.");
+						}
+
+						const res = await fetch(url.href);
+
+						if (!res.ok) {
+							throw new Error("URL couldn't be fetched, error " + res.status);
+						}
+						const text = await res.text();
+						preprompt = preprompt.replaceAll(match[0], text);
+					} catch (e) {
+						preprompt = preprompt.replaceAll(match[0], (e as Error).message);
+					}
+				}
+
+				if (messagesForPrompt[0].from === "system") {
+					messagesForPrompt[0].content = preprompt;
+				}
 			}
 
 			// inject websearch result & optionally images into the messages
@@ -367,7 +407,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
 					messages: processedMessages,
-					preprompt: conv.preprompt,
+					preprompt,
 					continueMessage: isContinue,
 				})) {
 					// if not generated_text is here it means the generation is not done

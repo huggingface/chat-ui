@@ -10,6 +10,7 @@
 		| "avatar"
 		| "name"
 		| "rag"
+		| "dynamicPrompt"
 		| "modelId"
 		| "createdByName"
 		| "exampleInputs"
@@ -22,7 +23,8 @@
 	$: hasRag =
 		assistant?.rag?.allowAllDomains ||
 		(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
-		(assistant?.rag?.allowedLinks?.length ?? 0) > 0;
+		(assistant?.rag?.allowedLinks?.length ?? 0) > 0 ||
+		assistant?.dynamicPrompt;
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
