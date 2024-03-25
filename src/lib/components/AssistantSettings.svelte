@@ -34,6 +34,7 @@
 	let modelId =
 		assistant?.modelId ?? models.find((_model) => _model.id === $settings.activeModel)?.name;
 	let systemPrompt = assistant?.preprompt ?? "";
+	let dynamicPrompt = assistant?.dynamicPrompt ?? false;
 
 	let compress: typeof readAndCompressImage | null = null;
 
@@ -310,7 +311,7 @@
 						{/if}
 					</span>
 
-					<label class="mt-1">
+					<label class="mt-1" class:hidden={dynamicPrompt}>
 						<input
 							checked={!ragMode}
 							on:change={() => (ragMode = false)}
@@ -399,7 +400,7 @@
 					<div class="my-3 ml-0 mr-6 w-full border border-gray-200" />
 
 					<label class="text-sm has-[:checked]:font-semibold">
-						<input type="checkbox" name="dynamicPrompt" checked={assistant?.dynamicPrompt} />
+						<input type="checkbox" name="dynamicPrompt" bind:checked={dynamicPrompt} />
 						Dynamic Prompt
 						<p class="mb-2 text-xs font-normal text-gray-500">
 							Allow the use of template variables {"{{url=https://example.com/path}}"}
