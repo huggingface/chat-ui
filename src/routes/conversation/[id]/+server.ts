@@ -504,10 +504,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	});
 
 	if (conv.assistantId) {
-		const hour = new Date().getUTCHours();
-		await collections.assistants.updateOne(
-			{ _id: conv.assistantId },
-			{ $inc: { "last24HoursCount.count": 1, [`last24HoursCount.byHour.${hour}`]: 1 } }
+		const date = new Date();
+		date.setUTCMinutes(0, 0, 0);
+		await collections.assistantStats.updateOne(
+			{ _id: conv.assistantId, dateWithHour: date },
+			{ $inc: { count: 1 } },
+			{ upsert: true }
 		);
 	}
 

@@ -17,12 +17,13 @@ import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
-import { checkAndRunMigrations, refreshAssistantsCount } from "$lib/migrations/migrations";
+import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
+import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
 
 if (!building) {
 	await checkAndRunMigrations();
-	refreshAssistantsCount();
+	refreshAssistantsCounts();
 }
 
 export const handle: Handle = async ({ event, resolve }) => {

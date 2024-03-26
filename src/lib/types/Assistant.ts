@@ -23,7 +23,7 @@ export interface Assistant extends Timestamps {
 	searchTokens: string[];
 	last24HoursCount?: {
 		count: number; // total number of requests an assistant received over the last 24 hours
-		byHour: Partial<Record<string, number>>; // number of requests an assistant received by hour (ex: `2: n` means from 01:00-02:00 there were n requests)
+		lastUpdated: Date; // last updated date
 	};
 }
 
