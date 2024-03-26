@@ -1,59 +1,8 @@
-import type { Migration } from "../migrations/routines";
-import { client, collections, getCollections } from "$lib/server/database";
-import { ObjectId } from "mongodb";
-import type { MigrationResult } from "$lib/types/MigrationResult";
+import { client, collections } from "$lib/server/database";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "$lib/migrations/lock";
-
-const migration: Migration = {
-	_id: new ObjectId("65f7ff14298f30c5060eb6ac"),
-	name: "Refresh assistants count for last 24 hours",
-	// eslint-disable-next-line no-shadow
-	up: async (client) => {
-		const { assistantStats } = getCollections(client);
-		const currentDate = new Date();
-		const twentyFourHoursAgo = new Date();
-		twentyFourHoursAgo.setDate(twentyFourHoursAgo.getDate() - 1); // subtract 24 hours (i.e. 1 day)
-
-		assistantStats.aggregate([
-			{ $match: { dateDay: { $gte: twentyFourHoursAgo, $lt: currentDate } } },
-			{
-				$group: {
-					_id: { _id: "$_id" },
-					totalCount: { $sum: "$count" },
-				},
-			},
-			{
-				$merge: {
-					into: "assistants",
-					on: "_id",
-					whenMatched: [
-						{
-							$set: {
-								"last24HoursCount.count": "$$ROOT.totalCount",
-								"last24HoursCount.lastUpdated": new Date(),
-							},
-						},
-					],
-					whenNotMatched: "discard",
-				},
-			},
-		]);
-
-		return true;
-	},
-};
+import { addHours, startOfHour } from "date-fns";
 
 async function refreshAssistantsCountsHelper() {
-	const hourExpired = new Date().getUTCHours() + 1;
-
-	const migrationResult = await collections.migrationResults.findOne<MigrationResult<number>>({
-		_id: migration._id,
-	});
-	if (migrationResult?.data === hourExpired) {
-		// another instance already run the migration, so we exit early
-		return;
-	}
-
 	const lockKey = "assistants.count";
 	const hasLock = await acquireLock(lockKey);
 
@@ -72,48 +21,61 @@ async function refreshAssistantsCountsHelper() {
 		await refreshLock(lockKey);
 	}, 1000 * 10);
 
-	await collections.migrationResults.updateOne(
-		{ _id: migration._id },
-		{
-			$set: {
-				name: migration.name,
-				status: "ongoing",
-			},
-		},
-		{ upsert: true }
-	);
-
 	const session = client.startSession();
-	let result = false;
 
 	try {
 		await session.withTransaction(async () => {
-			result = await migration.up(client);
+			const { assistantStats } = collections;
+			const currentDate = new Date();
+			const twentyFourHoursAgo = new Date();
+			twentyFourHoursAgo.setDate(twentyFourHoursAgo.getDate() - 1); // subtract 24 hours (i.e. 1 day)
+
+			assistantStats.aggregate([
+				{ $match: { dateDay: { $gte: twentyFourHoursAgo, $lt: currentDate } } },
+				{
+					$group: {
+						_id: { _id: "$_id" },
+						totalCount: { $sum: "$count" },
+					},
+				},
+				{
+					$merge: {
+						into: "assistants",
+						on: "_id",
+						whenMatched: [
+							{
+								$set: {
+									"last24HoursCount.count": "$$ROOT.totalCount",
+									"last24HoursCount.lastUpdated": new Date(),
+								},
+							},
+						],
+						whenNotMatched: "discard",
+					},
+				},
+			]);
 		});
 	} catch (e) {
-		console.log(`"${migration.name}" failed!`);
+		console.log("Refresh assistants counter failed!");
 		console.error(e);
 	} finally {
 		await session.endSession();
 	}
-
-	await collections.migrationResults.updateOne(
-		{ _id: migration._id },
-		{
-			$set: {
-				name: migration.name,
-				status: result ? "success" : "failure",
-				data: hourExpired,
-			},
-		},
-		{ upsert: true }
-	);
 
 	clearInterval(refreshInterval);
 	await releaseLock(lockKey);
 }
 
 export function refreshAssistantsCounts() {
+	const now = new Date();
+	const nextHour = startOfHour(addHours(now, 1));
+	const delay = nextHour.getTime() - now.getTime();
+
 	const ONE_HOUR_MS = 3_600_000;
-	setInterval(refreshAssistantsCountsHelper, ONE_HOUR_MS);
+
+	// wait until the next hour to start the hourly interval
+	setTimeout(() => {
+		refreshAssistantsCountsHelper();
+		setInterval(refreshAssistantsCountsHelper, ONE_HOUR_MS);
+	}, delay);
 }
