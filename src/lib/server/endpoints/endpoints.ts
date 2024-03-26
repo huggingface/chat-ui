@@ -10,6 +10,10 @@ import {
 	endpointAnthropic,
 	endpointAnthropicParametersSchema,
 } from "./anthropic/endpointAnthropic";
+import {
+	endpointAnthropicVertex,
+	endpointAnthropicVertexParametersSchema,
+} from "./anthropic/endpointAnthropicVertex";
 
 // parameters passed when generating text
 export interface EndpointParameters {
@@ -33,6 +37,7 @@ export type EndpointGenerator<T extends CommonEndpoint> = (parameters: T) => End
 export const endpoints = {
 	tgi: endpointTgi,
 	anthropic: endpointAnthropic,
+	anthropicvertex: endpointAnthropicVertex,
 	aws: endpointAws,
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
@@ -41,6 +46,7 @@ export const endpoints = {
 
 export const endpointSchema = z.discriminatedUnion("type", [
 	endpointAnthropicParametersSchema,
+	endpointAnthropicVertexParametersSchema,
 	endpointAwsParametersSchema,
 	endpointOAIParametersSchema,
 	endpointTgiParametersSchema,

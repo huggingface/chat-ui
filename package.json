@@ -83,6 +83,7 @@
 	},
 	"optionalDependencies": {
 		"@anthropic-ai/sdk": "^0.17.1",
+		"@anthropic-ai/vertex-sdk": "^0.3.0",
 		"aws4fetch": "^1.0.17",
 		"openai": "^4.14.2"
 	}
