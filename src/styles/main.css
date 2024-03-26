@@ -3,7 +3,7 @@
 @font-face {
 	font-family: "Inter";
 	font-weight: 1 999;
-	src: url("/fonts/Inter.ttf");
+	src: url("/fonts/InterVariable.ttf");
 }
 
 @tailwind base;
