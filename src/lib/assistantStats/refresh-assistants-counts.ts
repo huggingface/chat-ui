@@ -18,7 +18,7 @@ const migration: Migration = {
 			{ $match: { dateDay: { $gte: twentyFourHoursAgo, $lt: currentDate } } },
 			{
 				$group: {
-					_id: { _id: "$_id", dateWithHour: "$dateWithHour" },
+					_id: { _id: "$_id" },
 					totalCount: { $sum: "$count" },
 				},
 			},
