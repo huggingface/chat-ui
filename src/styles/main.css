@@ -1,5 +1,11 @@
 @import "./highlight-js.css";
 
+@font-face {
+	font-family: "Inter";
+	font-weight: 1 999;
+	src: url("/fonts/Inter.ttf");
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
