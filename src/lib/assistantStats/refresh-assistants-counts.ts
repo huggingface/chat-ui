@@ -22,7 +22,7 @@ async function refreshAssistantsCountsHelper() {
 						{ $set: { last24HoursCount: 0 } },
 						{
 							$unionWith: {
-								coll: "assistantStats",
+								coll: "assistants.stats",
 								pipeline: [
 									{ $match: { "date.at": { $gte: subDays(new Date(), 1) } }, "date.span": "hour" },
 									{
