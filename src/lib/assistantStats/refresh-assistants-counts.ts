@@ -24,7 +24,7 @@ async function refreshAssistantsCountsHelper() {
 							$unionWith: {
 								coll: "assistants.stats",
 								pipeline: [
-									{ $match: { "date.at": { $gte: subDays(new Date(), 1) } }, "date.span": "hour" },
+									{ $match: { "date.at": { $gte: subDays(new Date(), 1) }, "date.span": "hour" } },
 									{
 										$group: {
 											_id: { _id: "$_assistantId" },
