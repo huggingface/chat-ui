@@ -14,13 +14,15 @@ export const endpointOllamaParametersSchema = z.object({
 export function endpointOllama(input: z.input<typeof endpointOllamaParametersSchema>): Endpoint {
 	const { url, model, ollamaName } = endpointOllamaParametersSchema.parse(input);
 
-	return async ({ messages, preprompt, continueMessage }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 		const prompt = await buildPrompt({
 			messages,
 			continueMessage,
 			preprompt,
 			model,
 		});
+
+		const parameters = { ...model.parameters, ...generateSettings };
 
 		const r = await fetch(`${url}/api/generate`, {
 			method: "POST",
@@ -32,12 +34,12 @@ export function endpointOllama(input: z.input<typeof endpointOllamaParametersSch
 				model: ollamaName ?? model.name,
 				raw: true,
 				options: {
-					top_p: model.parameters.top_p,
-					top_k: model.parameters.top_k,
-					temperature: model.parameters.temperature,
-					repeat_penalty: model.parameters.repetition_penalty,
-					stop: model.parameters.stop,
-					num_predict: model.parameters.max_new_tokens,
+					top_p: parameters.top_p,
+					top_k: parameters.top_k,
+					temperature: parameters.temperature,
+					repeat_penalty: parameters.repetition_penalty,
+					stop: parameters.stop,
+					num_predict: parameters.max_new_tokens,
 				},
 			}),
 		});

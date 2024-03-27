@@ -338,8 +338,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			// check if assistant has a rag
 			const assistant = await collections.assistants.findOne<
-				Pick<Assistant, "rag" | "dynamicPrompt">
-			>({ _id: conv.assistantId }, { projection: { rag: 1, dynamicPrompt: 1 } });
+				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
+			>(
+				{ _id: conv.assistantId },
+				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
+			);
 
 			const assistantHasRAG =
 				ENABLE_ASSISTANTS_RAG === "true" &&
@@ -403,12 +406,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			const previousText = messageToWriteTo.content;
 
+			let hasError = false;
+
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
 					messages: processedMessages,
 					preprompt,
 					continueMessage: isContinue,
+					generateSettings: assistant?.generateSettings,
 				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
@@ -448,10 +454,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 			} catch (e) {
+				hasError = true;
 				update({ type: "status", status: "error", message: (e as Error).message });
 			} finally {
 				// check if no output was generated
-				if (messageToWriteTo.content === previousText) {
+				if (!hasError && messageToWriteTo.content === previousText) {
 					update({
 						type: "status",
 						status: "error",

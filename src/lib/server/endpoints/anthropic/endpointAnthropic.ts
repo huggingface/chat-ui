@@ -32,7 +32,7 @@ export async function endpointAnthropic(
 		defaultQuery,
 	});
 
-	return async ({ messages, preprompt }) => {
+	return async ({ messages, preprompt, generateSettings }) => {
 		let system = preprompt;
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
@@ -49,15 +49,18 @@ export async function endpointAnthropic(
 		}[];
 
 		let tokenId = 0;
+
+		const parameters = { ...model.parameters, ...generateSettings };
+
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
 				messages: messagesFormatted,
-				max_tokens: model.parameters?.max_new_tokens,
-				temperature: model.parameters?.temperature,
-				top_p: model.parameters?.top_p,
-				top_k: model.parameters?.top_k,
-				stop_sequences: model.parameters?.stop,
+				max_tokens: parameters?.max_new_tokens,
+				temperature: parameters?.temperature,
+				top_p: parameters?.top_p,
+				top_k: parameters?.top_k,
+				stop_sequences: parameters?.stop,
 				system,
 			});
 			while (true) {

@@ -14,6 +14,7 @@
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
+	import CarbonHelpFilled from "~icons/carbon/help";
 
 	type ActionData = {
 		error: boolean;
@@ -31,8 +32,7 @@
 
 	let files: FileList | null = null;
 	const settings = useSettingsStore();
-	let modelId =
-		assistant?.modelId ?? models.find((_model) => _model.id === $settings.activeModel)?.name;
+	let modelId = "";
 	let systemPrompt = assistant?.preprompt ?? "";
 	let dynamicPrompt = assistant?.dynamicPrompt ?? false;
 
@@ -41,6 +41,16 @@
 	onMount(async () => {
 		const module = await import("browser-image-resizer");
 		compress = module.readAndCompressImage;
+
+		if (assistant) {
+			modelId = assistant.modelId;
+		} else {
+			if (models.map((model) => model.id).includes($settings.activeModel)) {
+				modelId = $settings.activeModel;
+			} else {
+				modelId = models[0].id;
+			}
+		}
 	});
 
 	let inputMessage1 = assistant?.exampleInputs[0] ?? "";
@@ -89,6 +99,7 @@
 
 	const regex = /{{\s?url=(.+?)\s?}}/g;
 	$: templateVariables = [...systemPrompt.matchAll(regex)].map((match) => match[1]);
+	$: selectedModel = models.find((m) => m.id === modelId);
 </script>
 
 <form
@@ -252,15 +263,95 @@
 					bind:value={modelId}
 				>
 					{#each models.filter((model) => !model.unlisted) as model}
-						<option
-							value={model.id}
-							selected={assistant
-								? assistant?.modelId === model.id
-								: $settings.activeModel === model.id}>{model.displayName}</option
-						>
+						<option value={model.id}>{model.displayName}</option>
 					{/each}
 					<p class="text-xs text-red-500">{getError("modelId", form)}</p>
 				</select>
+				<details
+					class="mt-2"
+					open={Object.values(assistant?.generateSettings ?? {}).some((v) => !!v)}
+				>
+					<summary class="text-xs font-semibold"> Model settings </summary>
+					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
+					<div class="my-2 grid grid-cols-2 grid-rows-2 gap-2">
+						<label
+							class="mr-1 flex-row"
+							for="temperature"
+							title="Temperature affects the distribution of tokens. A high temperature makes less probable tokens more likely to be sampled."
+						>
+							<span class="m-1 ml-0 inline-block text-sm">
+								Temperature <CarbonHelpFilled class="inline" /></span
+							>
+							<input
+								type="number"
+								name="temperature"
+								min="0.1"
+								max="2"
+								step="0.1"
+								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								placeholder={selectedModel?.parameters?.temperature?.toString() ?? "1"}
+								value={assistant?.generateSettings?.temperature ?? ""}
+							/>
+						</label>
+						<label
+							class="mr-1 flex-row"
+							for="top_p"
+							title="When sampling the distribution, only consider the smallest set of most probable tokens with probabilities that add up to Top P."
+						>
+							<span class="m-1 ml-0 inline-block text-sm">
+								Top P <CarbonHelpFilled class="inline" /></span
+							>
+							<input
+								type="number"
+								name="top_p"
+								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								min="0.05"
+								max="1"
+								step="0.05"
+								placeholder={selectedModel?.parameters?.top_p?.toString() ?? "1"}
+								value={assistant?.generateSettings?.top_p ?? ""}
+							/>
+						</label>
+						<label
+							class="mr-1 flex-row"
+							for="repetition_penalty"
+							title="Repetition penalty determines the penalty to a token's score for repeating the same token multiple times."
+						>
+							<span class="m-1 ml-0 inline-block text-sm">
+								Repetition penalty <CarbonHelpFilled class="inline" />
+							</span>
+							<input
+								type="number"
+								name="repetition_penalty"
+								min="0.1"
+								max="2"
+								step="0.1"
+								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								placeholder={selectedModel?.parameters?.repetition_penalty?.toString() ?? "1.0"}
+								value={assistant?.generateSettings?.repetition_penalty ?? ""}
+							/>
+						</label>
+						<label
+							class="mr-1 flex-row"
+							for="top_k"
+							title="The number of highest probability vocabulary tokens to keep for top-k-filtering."
+						>
+							<span class="m-1 ml-0 inline-block text-xs">
+								Top K <CarbonHelpFilled class="inline" /></span
+							>
+							<input
+								type="number"
+								name="top_k"
+								min="5"
+								max="100"
+								step="5"
+								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								placeholder={selectedModel?.parameters?.top_k?.toString() ?? "50"}
+								value={assistant?.generateSettings?.top_k ?? ""}
+							/>
+						</label>
+					</div>
+				</details>
 			</label>
 
 			<label>
