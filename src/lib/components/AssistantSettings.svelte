@@ -272,13 +272,13 @@
 					class="group/details mt-2"
 					open={Object.values(assistant?.generateSettings ?? {}).some((v) => !!v)}
 				>
-					<summary class="ml-1 cursor-pointer text-xs group-open/details:font-semibold">
+					<summary class="cursor-pointer text-xs group-open/details:font-semibold">
 						Model settings
 					</summary>
 					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
-					<div class="mb-2 grid grid-cols-2 grid-rows-2 gap-2">
+					<div class="my-2 grid grid-cols-2 grid-rows-2 gap-2">
 						<label for="temperature">
-							<span class="m-1 ml-0 inline-block text-nowrap text-sm">
+							<span class="m-1 ml-0 inline-block text-sm">
 								Temperature
 
 								<HoverTooltip
@@ -299,7 +299,7 @@
 							/>
 						</label>
 						<label for="top_p">
-							<span class="m-1 ml-0 inline-block text-nowrap text-sm">
+							<span class="m-1 ml-0 inline-block text-sm">
 								Top P
 								<HoverTooltip
 									align="right"
@@ -321,7 +321,7 @@
 							/>
 						</label>
 						<label for="repetition_penalty">
-							<span class="m-1 ml-0 inline-block text-nowrap text-sm">
+							<span class="m-1 ml-0 inline-block text-sm">
 								Repetition penalty
 								<HoverTooltip
 									label="Repetition penalty determines the penalty to a token's score for repeating the same token multiple times."
@@ -341,7 +341,7 @@
 							/>
 						</label>
 						<label for="top_k">
-							<span class="m-1 ml-0 inline-block text-nowrap text-sm">
+							<span class="m-1 ml-0 inline-block text-sm">
 								Top K <HoverTooltip
 									align="right"
 									label="The number of highest probability vocabulary tokens to keep for top-k-filtering."
