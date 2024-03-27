@@ -36,7 +36,7 @@ export async function endpointAws(
 		region,
 	});
 
-	return async ({ messages, preprompt, continueMessage }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 		const prompt = await buildPrompt({
 			messages,
 			continueMessage,
@@ -46,7 +46,7 @@ export async function endpointAws(
 
 		return textGenerationStream(
 			{
-				parameters: { ...model.parameters, return_full_text: false },
+				parameters: { ...model.parameters, ...generateSettings, return_full_text: false },
 				model: url,
 				inputs: prompt,
 			},
