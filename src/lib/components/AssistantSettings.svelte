@@ -9,12 +9,13 @@
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
+	import CarbonHelpFilled from "~icons/carbon/help";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
-	import CarbonHelpFilled from "~icons/carbon/help";
+	import HoverTooltip from "./HoverTooltip.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -268,19 +269,24 @@
 					<p class="text-xs text-red-500">{getError("modelId", form)}</p>
 				</select>
 				<details
-					class="mt-2"
+					class="group/details mt-2"
 					open={Object.values(assistant?.generateSettings ?? {}).some((v) => !!v)}
 				>
-					<summary class="cursor-pointer text-xs font-semibold"> Model settings </summary>
+					<summary class="cursor-pointer text-xs group-open/details:font-semibold">
+						Model settings
+					</summary>
 					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 					<div class="my-2 grid grid-cols-2 grid-rows-2 gap-2">
-						<label
-							for="temperature"
-							title="Temperature affects the distribution of tokens. A high temperature makes less probable tokens more likely to be sampled."
-						>
+						<label for="temperature">
 							<span class="m-1 ml-0 inline-block text-sm">
-								Temperature <CarbonHelpFilled class="inline" /></span
-							>
+								Temperature
+
+								<HoverTooltip
+									label="Temperature affects the distribution of tokens. A high temperature makes less probable tokens more likely to be sampled."
+								>
+									<CarbonHelpFilled class="inline" />
+								</HoverTooltip>
+							</span>
 							<input
 								type="number"
 								name="temperature"
@@ -292,13 +298,17 @@
 								value={assistant?.generateSettings?.temperature ?? ""}
 							/>
 						</label>
-						<label
-							for="top_p"
-							title="When sampling the distribution, only consider the smallest set of most probable tokens with probabilities that add up to Top P."
-						>
+						<label for="top_p">
 							<span class="m-1 ml-0 inline-block text-sm">
-								Top P <CarbonHelpFilled class="inline" /></span
-							>
+								Top P
+								<HoverTooltip
+									align="right"
+									label="When sampling the distribution, only consider the smallest set of most probable tokens with probabilities that add up to Top P."
+								>
+									<CarbonHelpFilled class="inline" />
+								</HoverTooltip>
+							</span>
+
 							<input
 								type="number"
 								name="top_p"
@@ -310,12 +320,14 @@
 								value={assistant?.generateSettings?.top_p ?? ""}
 							/>
 						</label>
-						<label
-							for="repetition_penalty"
-							title="Repetition penalty determines the penalty to a token's score for repeating the same token multiple times."
-						>
+						<label for="repetition_penalty">
 							<span class="m-1 ml-0 inline-block text-sm">
-								Repetition penalty <CarbonHelpFilled class="inline" />
+								Repetition penalty
+								<HoverTooltip
+									label="Repetition penalty determines the penalty to a token's score for repeating the same token multiple times."
+								>
+									<CarbonHelpFilled class="inline" />
+								</HoverTooltip>
 							</span>
 							<input
 								type="number"
@@ -328,13 +340,15 @@
 								value={assistant?.generateSettings?.repetition_penalty ?? ""}
 							/>
 						</label>
-						<label
-							for="top_k"
-							title="The number of highest probability vocabulary tokens to keep for top-k-filtering."
-						>
+						<label for="top_k">
 							<span class="m-1 ml-0 inline-block text-sm">
-								Top K <CarbonHelpFilled class="inline" /></span
-							>
+								Top K <HoverTooltip
+									align="right"
+									label="The number of highest probability vocabulary tokens to keep for top-k-filtering."
+								>
+									<CarbonHelpFilled class="inline" />
+								</HoverTooltip>
+							</span>
 							<input
 								type="number"
 								name="top_k"
