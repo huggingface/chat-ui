@@ -48,11 +48,7 @@
 		if (assistant) {
 			modelId = assistant.modelId;
 		} else {
-			if (models.map((model) => model.id).includes($settings.activeModel)) {
-				modelId = $settings.activeModel;
-			} else {
-				modelId = models[0].id;
-			}
+			modelId = models.find((model) => model.id === $settings.activeModel)?.id ?? models[0].id;
 		}
 	});
 
