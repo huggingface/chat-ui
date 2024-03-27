@@ -271,11 +271,10 @@
 					class="mt-2"
 					open={Object.values(assistant?.generateSettings ?? {}).some((v) => !!v)}
 				>
-					<summary class="text-xs font-semibold"> Model settings </summary>
+					<summary class="cursor-pointer text-xs font-semibold"> Model settings </summary>
 					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 					<div class="my-2 grid grid-cols-2 grid-rows-2 gap-2">
 						<label
-							class="mr-1 flex-row"
 							for="temperature"
 							title="Temperature affects the distribution of tokens. A high temperature makes less probable tokens more likely to be sampled."
 						>
@@ -294,7 +293,6 @@
 							/>
 						</label>
 						<label
-							class="mr-1 flex-row"
 							for="top_p"
 							title="When sampling the distribution, only consider the smallest set of most probable tokens with probabilities that add up to Top P."
 						>
@@ -313,7 +311,6 @@
 							/>
 						</label>
 						<label
-							class="mr-1 flex-row"
 							for="repetition_penalty"
 							title="Repetition penalty determines the penalty to a token's score for repeating the same token multiple times."
 						>
@@ -332,7 +329,6 @@
 							/>
 						</label>
 						<label
-							class="mr-1 flex-row"
 							for="top_k"
 							title="The number of highest probability vocabulary tokens to keep for top-k-filtering."
 						>
