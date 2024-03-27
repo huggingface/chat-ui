@@ -21,10 +21,7 @@ export interface Assistant extends Timestamps {
 	};
 	dynamicPrompt?: boolean;
 	searchTokens: string[];
-	last24HoursCount?: {
-		count: number; // total number of requests an assistant received over the last 24 hours
-		lastUpdated: Date; // last updated date
-	};
+	last24HoursCount: number;
 }
 
 // eslint-disable-next-line no-shadow

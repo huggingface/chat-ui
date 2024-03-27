@@ -43,7 +43,7 @@ export const load = async ({ url, locals }) => {
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
-			...(sort === SortKey.TRENDING && { "last24HoursCount.count": -1 }),
+			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
 			userCount: -1,
 		})
 		.limit(NUM_PER_PAGE)

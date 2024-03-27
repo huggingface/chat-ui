@@ -147,7 +147,7 @@ client.on("open", () => {
 	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ searchTokens: 1 }).catch(console.error);
-	assistants.createIndex({ "last24HoursCount.count": 1 }).catch(console.error);
+	assistants.createIndex({ last24HoursCount: 1 }).catch(console.error);
 	assistantStats
 		// Order of keys is important for the queries
 		.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
