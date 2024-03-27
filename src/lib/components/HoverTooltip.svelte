@@ -7,8 +7,9 @@
 	<slot />
 	<span
 		class="invisible absolute
-		z-10 w-max max-w-md
-		items-center overflow-clip rounded-md bg-black p-1
+		z-10
+		w-max max-w-md items-center
+		overflow-clip text-wrap rounded-md bg-black p-1
 		text-center
 		text-white
 		group-hover:visible
