@@ -1,6 +1,7 @@
 import {
 	ADMIN_API_SECRET,
 	COOKIE_NAME,
+	ENABLE_ASSISTANTS,
 	EXPOSE_API,
 	MESSAGES_BEFORE_LOGIN,
 	PARQUET_EXPORT_SECRET,
@@ -23,7 +24,9 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 
 if (!building) {
 	await checkAndRunMigrations();
-	refreshAssistantsCounts();
+	if (ENABLE_ASSISTANTS) {
+		refreshAssistantsCounts();
+	}
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
