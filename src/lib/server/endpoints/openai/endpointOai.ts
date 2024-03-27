@@ -38,7 +38,7 @@ export async function endpointOai(
 	});
 
 	if (completion === "completions") {
-		return async ({ messages, preprompt, continueMessage }) => {
+		return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 			const prompt = await buildPrompt({
 				messages,
 				continueMessage,
@@ -46,21 +46,23 @@ export async function endpointOai(
 				model,
 			});
 
+			const parameters = { ...model.parameters, ...generateSettings };
+
 			return openAICompletionToTextGenerationStream(
 				await openai.completions.create({
 					model: model.id ?? model.name,
 					prompt,
 					stream: true,
-					max_tokens: model.parameters?.max_new_tokens,
-					stop: model.parameters?.stop,
-					temperature: model.parameters?.temperature,
-					top_p: model.parameters?.top_p,
-					frequency_penalty: model.parameters?.repetition_penalty,
+					max_tokens: parameters?.max_new_tokens,
+					stop: parameters?.stop,
+					temperature: parameters?.temperature,
+					top_p: parameters?.top_p,
+					frequency_penalty: parameters?.repetition_penalty,
 				})
 			);
 		};
 	} else if (completion === "chat_completions") {
-		return async ({ messages, preprompt }) => {
+		return async ({ messages, preprompt, generateSettings }) => {
 			let messagesOpenAI = messages.map((message) => ({
 				role: message.from,
 				content: message.content,
@@ -74,16 +76,18 @@ export async function endpointOai(
 				messagesOpenAI[0].content = preprompt ?? "";
 			}
 
+			const parameters = { ...model.parameters, ...generateSettings };
+
 			return openAIChatToTextGenerationStream(
 				await openai.chat.completions.create({
 					model: model.id ?? model.name,
 					messages: messagesOpenAI,
 					stream: true,
-					max_tokens: model.parameters?.max_new_tokens,
-					stop: model.parameters?.stop,
-					temperature: model.parameters?.temperature,
-					top_p: model.parameters?.top_p,
-					frequency_penalty: model.parameters?.repetition_penalty,
+					max_tokens: parameters?.max_new_tokens,
+					stop: parameters?.stop,
+					temperature: parameters?.temperature,
+					top_p: parameters?.top_p,
+					frequency_penalty: parameters?.repetition_penalty,
 				})
 			);
 		};

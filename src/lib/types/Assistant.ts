@@ -19,6 +19,12 @@ export interface Assistant extends Timestamps {
 		allowedDomains: string[];
 		allowedLinks: string[];
 	};
+	generateSettings?: {
+		temperature?: number;
+		top_p?: number;
+		repetition_penalty?: number;
+		top_k?: number;
+	};
 	dynamicPrompt?: boolean;
 	searchTokens: string[];
 }

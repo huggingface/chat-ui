@@ -19,13 +19,15 @@ export function endpointLlamacpp(
 	input: z.input<typeof endpointLlamacppParametersSchema>
 ): Endpoint {
 	const { url, model } = endpointLlamacppParametersSchema.parse(input);
-	return async ({ messages, preprompt, continueMessage }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 		const prompt = await buildPrompt({
 			messages,
 			continueMessage,
 			preprompt,
 			model,
 		});
+
+		const parameters = { ...model.parameters, ...generateSettings };
 
 		const r = await fetch(`${url}/completion`, {
 			method: "POST",
@@ -35,12 +37,12 @@ export function endpointLlamacpp(
 			body: JSON.stringify({
 				prompt,
 				stream: true,
-				temperature: model.parameters.temperature,
-				top_p: model.parameters.top_p,
-				top_k: model.parameters.top_k,
-				stop: model.parameters.stop,
-				repeat_penalty: model.parameters.repetition_penalty,
-				n_predict: model.parameters.max_new_tokens,
+				temperature: parameters.temperature,
+				top_p: parameters.top_p,
+				top_k: parameters.top_k,
+				stop: parameters.stop,
+				repeat_penalty: parameters.repetition_penalty,
+				n_predict: parameters.max_new_tokens,
 				cache_prompt: true,
 			}),
 		});
