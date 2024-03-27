@@ -336,7 +336,7 @@
 							for="top_k"
 							title="The number of highest probability vocabulary tokens to keep for top-k-filtering."
 						>
-							<span class="m-1 ml-0 inline-block text-xs">
+							<span class="m-1 ml-0 inline-block text-sm">
 								Top K <CarbonHelpFilled class="inline" /></span
 							>
 							<input
