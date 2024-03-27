@@ -107,7 +107,7 @@
 
 <form
 	method="POST"
-	class="flex h-full flex-col overflow-y-auto p-4 md:p-8"
+	class="flex h-full flex-col overflow-y-auto p-4 md:p-8 relative"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
@@ -313,7 +313,6 @@
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
 								Top P
 								<HoverTooltip
-									align="right"
 									label="Top P: Sets word choice boundaries, lower values tighten focus."
 								>
 									<CarbonHelpFilled
@@ -357,7 +356,6 @@
 						<label for="top_k" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
 								Top K <HoverTooltip
-									align="right"
 									label="Top K: Restricts word options, lower values for predictability."
 								>
 									<CarbonHelpFilled
