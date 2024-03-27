@@ -10,6 +10,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
 	import CarbonHelpFilled from "~icons/carbon/help";
+	import CarbonSettingsAdjust from "~icons/carbon/settings-adjust";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
@@ -36,6 +37,7 @@
 	let modelId = "";
 	let systemPrompt = assistant?.preprompt ?? "";
 	let dynamicPrompt = assistant?.dynamicPrompt ?? false;
+	let showModelSettings = Object.values(assistant?.generateSettings ?? {}).some((v) => !!v);
 
 	let compress: typeof readAndCompressImage | null = null;
 
@@ -258,33 +260,42 @@
 
 			<label>
 				<div class="mb-1 font-semibold">Model</div>
-				<select
-					name="modelId"
-					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					bind:value={modelId}
+				<div class="flex gap-2">
+					<select
+						name="modelId"
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						bind:value={modelId}
+					>
+						{#each models.filter((model) => !model.unlisted) as model}
+							<option value={model.id}>{model.displayName}</option>
+						{/each}
+						<p class="text-xs text-red-500">{getError("modelId", form)}</p>
+					</select>
+					<button
+						type="button"
+						class="flex aspect-square items-center gap-2 whitespace-nowrap rounded-lg border px-3 {showModelSettings
+							? 'border-blue-500/20 bg-blue-50 text-blue-600'
+							: ''}"
+						on:click={() => (showModelSettings = !showModelSettings)}
+						><CarbonSettingsAdjust class="text-xs" /></button
+					>
+				</div>
+				<div
+					class="mt-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-2 py-0.5"
+					class:hidden={!showModelSettings}
 				>
-					{#each models.filter((model) => !model.unlisted) as model}
-						<option value={model.id}>{model.displayName}</option>
-					{/each}
-					<p class="text-xs text-red-500">{getError("modelId", form)}</p>
-				</select>
-				<details
-					class="group/details mt-2"
-					open={Object.values(assistant?.generateSettings ?? {}).some((v) => !!v)}
-				>
-					<summary class="cursor-pointer text-xs group-open/details:font-semibold">
-						Model settings
-					</summary>
 					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
-					<div class="my-2 grid grid-cols-2 grid-rows-2 gap-2">
-						<label for="temperature">
-							<span class="m-1 ml-0 inline-block text-sm">
+					<div class="my-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:grid-rows-2">
+						<label for="temperature" class="flex justify-between">
+							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
 								Temperature
 
 								<HoverTooltip
-									label="Temperature affects the distribution of tokens. A high temperature makes less probable tokens more likely to be sampled."
+									label="Temperature: Controls creativity, higher values allow more variety."
 								>
-									<CarbonHelpFilled class="inline" />
+									<CarbonHelpFilled
+										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
+									/>
 								</HoverTooltip>
 							</span>
 							<input
@@ -293,26 +304,28 @@
 								min="0.1"
 								max="2"
 								step="0.1"
-								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								placeholder={selectedModel?.parameters?.temperature?.toString() ?? "1"}
 								value={assistant?.generateSettings?.temperature ?? ""}
 							/>
 						</label>
-						<label for="top_p">
-							<span class="m-1 ml-0 inline-block text-sm">
+						<label for="top_p" class="flex justify-between">
+							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
 								Top P
 								<HoverTooltip
 									align="right"
-									label="When sampling the distribution, only consider the smallest set of most probable tokens with probabilities that add up to Top P."
+									label="Top P: Sets word choice boundaries, lower values tighten focus."
 								>
-									<CarbonHelpFilled class="inline" />
+									<CarbonHelpFilled
+										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
+									/>
 								</HoverTooltip>
 							</span>
 
 							<input
 								type="number"
 								name="top_p"
-								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								min="0.05"
 								max="1"
 								step="0.05"
@@ -320,13 +333,15 @@
 								value={assistant?.generateSettings?.top_p ?? ""}
 							/>
 						</label>
-						<label for="repetition_penalty">
-							<span class="m-1 ml-0 inline-block text-sm">
+						<label for="repetition_penalty" class="flex justify-between">
+							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
 								Repetition penalty
 								<HoverTooltip
-									label="Repetition penalty determines the penalty to a token's score for repeating the same token multiple times."
+									label="Repetition penalty: Prevents reuse, higher values decrease repetition."
 								>
-									<CarbonHelpFilled class="inline" />
+									<CarbonHelpFilled
+										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
+									/>
 								</HoverTooltip>
 							</span>
 							<input
@@ -334,19 +349,20 @@
 								name="repetition_penalty"
 								min="0.1"
 								max="2"
-								step="0.1"
-								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								placeholder={selectedModel?.parameters?.repetition_penalty?.toString() ?? "1.0"}
 								value={assistant?.generateSettings?.repetition_penalty ?? ""}
 							/>
 						</label>
-						<label for="top_k">
-							<span class="m-1 ml-0 inline-block text-sm">
+						<label for="top_k" class="flex justify-between">
+							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
 								Top K <HoverTooltip
 									align="right"
-									label="The number of highest probability vocabulary tokens to keep for top-k-filtering."
+									label="Top K: Restricts word options, lower values for predictability."
 								>
-									<CarbonHelpFilled class="inline" />
+									<CarbonHelpFilled
+										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
+									/>
 								</HoverTooltip>
 							</span>
 							<input
@@ -355,13 +371,13 @@
 								min="5"
 								max="100"
 								step="5"
-								class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								placeholder={selectedModel?.parameters?.top_k?.toString() ?? "50"}
 								value={assistant?.generateSettings?.top_k ?? ""}
 							/>
 						</label>
 					</div>
-				</details>
+				</div>
 			</label>
 
 			<label>
