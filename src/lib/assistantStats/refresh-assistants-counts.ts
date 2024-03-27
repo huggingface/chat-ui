@@ -27,8 +27,8 @@ async function refreshAssistantsCountsHelper() {
 									{ $match: { "date.at": { $gte: subDays(new Date(), 1) }, "date.span": "hour" } },
 									{
 										$group: {
-											_id: { _id: "$_assistantId" },
-											last24HoursCount: { $sum: "$last24HoursCount" },
+											_id: "$assistantId",
+											last24HoursCount: { $sum: "$count" },
 										},
 									},
 								],
