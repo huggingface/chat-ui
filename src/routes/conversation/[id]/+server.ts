@@ -1,4 +1,5 @@
 import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -504,10 +505,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	});
 
 	if (conv.assistantId) {
-		const date = new Date();
-		date.setUTCMinutes(0, 0, 0);
 		await collections.assistantStats.updateOne(
-			{ _id: conv.assistantId, dateWithHour: date },
+			{ assistantId: conv.assistantId, "date.at": startOfHour(new Date()), "date.span": "hour" },
 			{ $inc: { count: 1 } },
 			{ upsert: true }
 		);
