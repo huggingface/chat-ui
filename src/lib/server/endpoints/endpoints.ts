@@ -6,6 +6,8 @@ import endpointAws, { endpointAwsParametersSchema } from "./aws/endpointAws";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/endpointLlamacpp";
 import endpointOllama, { endpointOllamaParametersSchema } from "./ollama/endpointOllama";
+import endpointVertex, { endpointVertexParametersSchema } from "./google/endpointVertex";
+
 import {
 	endpointAnthropic,
 	endpointAnthropicParametersSchema,
@@ -39,6 +41,7 @@ export const endpoints = {
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
+	vertex: endpointVertex,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -48,5 +51,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointTgiParametersSchema,
 	endpointLlamacppParametersSchema,
 	endpointOllamaParametersSchema,
+	endpointVertexParametersSchema,
 ]);
 export default endpoints;

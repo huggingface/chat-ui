@@ -128,6 +128,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.llamacpp(args);
 					case "ollama":
 						return endpoints.ollama(args);
+					case "vertex":
+						return await endpoints.vertex(args);
 					default:
 						// for legacy reason
 						return endpoints.tgi(args);
