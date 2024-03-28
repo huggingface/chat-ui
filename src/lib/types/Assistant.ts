@@ -27,4 +27,11 @@ export interface Assistant extends Timestamps {
 	};
 	dynamicPrompt?: boolean;
 	searchTokens: string[];
+	last24HoursCount: number;
+}
+
+// eslint-disable-next-line no-shadow
+export enum SortKey {
+	POPULAR = "popular",
+	TRENDING = "trending",
 }

@@ -82,7 +82,9 @@ export const actions: Actions = {
 			return fail(400, { error: true, errors });
 		}
 
-		const assistantsCount = await collections.assistants.countDocuments(authCondition(locals));
+		const createdById = locals.user?._id ?? locals.sessionId;
+
+		const assistantsCount = await collections.assistants.countDocuments({ createdById });
 
 		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
 			const errors = [
@@ -93,8 +95,6 @@ export const actions: Actions = {
 			];
 			return fail(400, { error: true, errors });
 		}
-
-		const createdById = locals.user?._id ?? locals.sessionId;
 
 		const newAssistantId = new ObjectId();
 
@@ -139,6 +139,7 @@ export const actions: Actions = {
 			},
 			dynamicPrompt: parse.data.dynamicPrompt,
 			searchTokens: generateSearchTokens(parse.data.name),
+			last24HoursCount: 0,
 			generateSettings: {
 				temperature: parse.data.temperature,
 				top_p: parse.data.top_p,

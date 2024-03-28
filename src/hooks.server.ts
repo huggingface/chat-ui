@@ -1,6 +1,7 @@
 import {
 	ADMIN_API_SECRET,
 	COOKIE_NAME,
+	ENABLE_ASSISTANTS,
 	EXPOSE_API,
 	MESSAGES_BEFORE_LOGIN,
 	PARQUET_EXPORT_SECRET,
@@ -19,9 +20,13 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
+import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
 
 if (!building) {
 	await checkAndRunMigrations();
+	if (ENABLE_ASSISTANTS) {
+		refreshAssistantsCounts();
+	}
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
