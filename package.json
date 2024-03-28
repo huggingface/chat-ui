@@ -59,7 +59,6 @@
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
-		"@google-cloud/vertexai": "^0.5.0",
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
 		"image-size": "^1.0.2",
@@ -85,6 +84,7 @@
 	"optionalDependencies": {
 		"@anthropic-ai/sdk": "^0.17.1",
 		"aws4fetch": "^1.0.17",
-		"openai": "^4.14.2"
+		"openai": "^4.14.2",
+		"@google-cloud/vertexai": "^0.5.0"
 	}
 }
