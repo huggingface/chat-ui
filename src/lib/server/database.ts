@@ -12,6 +12,7 @@ import type { Report } from "$lib/types/Report";
 import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
+import type { AssistantStats } from "$lib/types/AssistantStats";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -32,6 +33,7 @@ export function getCollections(mongoClient: MongoClient) {
 	const conversations = db.collection<Conversation>("conversations");
 	const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
 	const assistants = db.collection<Assistant>("assistants");
+	const assistantStats = db.collection<AssistantStats>("assistants.stats");
 	const reports = db.collection<Report>("reports");
 	const sharedConversations = db.collection<SharedConversation>("sharedConversations");
 	const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
@@ -47,6 +49,7 @@ export function getCollections(mongoClient: MongoClient) {
 		conversations,
 		conversationStats,
 		assistants,
+		assistantStats,
 		reports,
 		sharedConversations,
 		abortedGenerations,
@@ -67,6 +70,7 @@ const {
 	conversations,
 	conversationStats,
 	assistants,
+	assistantStats,
 	reports,
 	sharedConversations,
 	abortedGenerations,
@@ -143,6 +147,11 @@ client.on("open", () => {
 	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
 	assistants.createIndex({ searchTokens: 1 }).catch(console.error);
+	assistants.createIndex({ last24HoursCount: 1 }).catch(console.error);
+	assistantStats
+		// Order of keys is important for the queries
+		.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
+		.catch(console.error);
 	reports.createIndex({ assistantId: 1 }).catch(console.error);
 	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
 

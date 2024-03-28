@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
 import { collections } from "$lib/server/database";
+
+const LOCK_KEY = "migrations";
 
 describe("migrations", () => {
 	it("should not have duplicates guid", async () => {
@@ -11,7 +13,7 @@ describe("migrations", () => {
 	});
 
 	it("should acquire only one lock on DB", async () => {
-		const results = await Promise.all(new Array(1000).fill(0).map(() => acquireLock()));
+		const results = await Promise.all(new Array(1000).fill(0).map(() => acquireLock(LOCK_KEY)));
 		const locks = results.filter((r) => r);
 
 		const semaphores = await collections.semaphores.find({}).toArray();
@@ -23,21 +25,24 @@ describe("migrations", () => {
 	});
 
 	it("should read the lock correctly", async () => {
-		expect(await acquireLock()).toBe(true);
-		expect(await isDBLocked()).toBe(true);
-		expect(await acquireLock()).toBe(false);
-		await releaseLock();
-		expect(await isDBLocked()).toBe(false);
+		const lockId = await acquireLock(LOCK_KEY);
+		assert(lockId);
+		expect(await isDBLocked(LOCK_KEY)).toBe(true);
+		expect(!!(await acquireLock(LOCK_KEY))).toBe(false);
+		await releaseLock(LOCK_KEY, lockId);
+		expect(await isDBLocked(LOCK_KEY)).toBe(false);
 	});
 
 	it("should refresh the lock", async () => {
-		await acquireLock();
+		const lockId = await acquireLock(LOCK_KEY);
+
+		assert(lockId);
 
 		// get the updatedAt time
 
 		const updatedAtInitially = (await collections.semaphores.findOne({}))?.updatedAt;
 
-		await refreshLock();
+		await refreshLock(LOCK_KEY, lockId);
 
 		const updatedAtAfterRefresh = (await collections.semaphores.findOne({}))?.updatedAt;
 

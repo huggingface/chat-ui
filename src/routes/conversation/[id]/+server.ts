@@ -1,4 +1,5 @@
 import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -509,6 +510,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 		},
 	});
+
+	if (conv.assistantId) {
+		await collections.assistantStats.updateOne(
+			{ assistantId: conv.assistantId, "date.at": startOfHour(new Date()), "date.span": "hour" },
+			{ $inc: { count: 1 } },
+			{ upsert: true }
+		);
+	}
 
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
