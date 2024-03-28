@@ -14,12 +14,14 @@ import {
 	endpointAnthropicVertex,
 	endpointAnthropicVertexParametersSchema,
 } from "./anthropic/endpointAnthropicVertex";
+import type { Model } from "$lib/types/Model";
 
 // parameters passed when generating text
 export interface EndpointParameters {
 	messages: Omit<Conversation["messages"][0], "id">[];
 	preprompt?: Conversation["preprompt"];
 	continueMessage?: boolean; // used to signal that the last message will be extended
+	generateSettings?: Partial<Model["parameters"]>;
 }
 
 interface CommonEndpoint {

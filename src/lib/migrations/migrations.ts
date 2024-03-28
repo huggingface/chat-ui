@@ -3,6 +3,8 @@ import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
+const LOCK_KEY = "migrations";
+
 export async function checkAndRunMigrations() {
 	// make sure all GUIDs are unique
 	if (new Set(migrations.map((m) => m._id.toString())).size !== migrations.length) {
@@ -25,16 +27,17 @@ export async function checkAndRunMigrations() {
 	// connect to the database
 	const connectedClient = await client.connect();
 
-	const hasLock = await acquireLock();
+	const lockId = await acquireLock(LOCK_KEY);
 
-	if (!hasLock) {
+	if (!lockId) {
 		// another instance already has the lock, so we exit early
 		console.log(
 			"[MIGRATIONS] Another instance already has the lock. Waiting for DB to be unlocked."
 		);
 
+		// Todo: is this necessary? Can we just return?
 		// block until the lock is released
-		while (await isDBLocked()) {
+		while (await isDBLocked(LOCK_KEY)) {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 		return;
@@ -43,7 +46,7 @@ export async function checkAndRunMigrations() {
 	// once here, we have the lock
 	// make sure to refresh it regularly while it's running
 	const refreshInterval = setInterval(async () => {
-		await refreshLock();
+		await refreshLock(LOCK_KEY, lockId);
 	}, 1000 * 10);
 
 	// iterate over all migrations
@@ -112,5 +115,5 @@ export async function checkAndRunMigrations() {
 	console.log("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
-	await releaseLock();
+	await releaseLock(LOCK_KEY, lockId);
 }
