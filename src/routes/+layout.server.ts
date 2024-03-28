@@ -158,6 +158,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			name: model.name,
 			websiteUrl: model.websiteUrl,
 			modelUrl: model.modelUrl,
+			tokenizer: model.tokenizer,
 			datasetName: model.datasetName,
 			datasetUrl: model.datasetUrl,
 			displayName: model.displayName,

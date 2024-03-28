@@ -28,6 +28,15 @@ const modelConfig = z.object({
 	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
+	tokenizer: z
+		.union([
+			z.string(),
+			z.object({
+				tokenizerUrl: z.string().url(),
+				tokenizerConfigUrl: z.string().url(),
+			}),
+		])
+		.optional(),
 	datasetName: z.string().min(1).optional(),
 	datasetUrl: z.string().url().optional(),
 	userMessageToken: z.string().default(""),

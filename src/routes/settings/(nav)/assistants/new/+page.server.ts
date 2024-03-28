@@ -24,6 +24,21 @@ const newAsssistantSchema = z.object({
 	ragLinkList: z.preprocess(parseStringToList, z.string().url().array().max(10)),
 	ragDomainList: z.preprocess(parseStringToList, z.string().array()),
 	ragAllowAll: z.preprocess((v) => v === "true", z.boolean()),
+	dynamicPrompt: z.preprocess((v) => v === "on", z.boolean()),
+	temperature: z
+		.union([z.literal(""), z.coerce.number().min(0.1).max(2)])
+		.transform((v) => (v === "" ? undefined : v)),
+	top_p: z
+		.union([z.literal(""), z.coerce.number().min(0.05).max(1)])
+		.transform((v) => (v === "" ? undefined : v)),
+
+	repetition_penalty: z
+		.union([z.literal(""), z.coerce.number().min(0.1).max(2)])
+		.transform((v) => (v === "" ? undefined : v)),
+
+	top_k: z
+		.union([z.literal(""), z.coerce.number().min(5).max(100)])
+		.transform((v) => (v === "" ? undefined : v)),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -67,7 +82,9 @@ export const actions: Actions = {
 			return fail(400, { error: true, errors });
 		}
 
-		const assistantsCount = await collections.assistants.countDocuments(authCondition(locals));
+		const createdById = locals.user?._id ?? locals.sessionId;
+
+		const assistantsCount = await collections.assistants.countDocuments({ createdById });
 
 		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
 			const errors = [
@@ -78,8 +95,6 @@ export const actions: Actions = {
 			];
 			return fail(400, { error: true, errors });
 		}
-
-		const createdById = locals.user?._id ?? locals.sessionId;
 
 		const newAssistantId = new ObjectId();
 
@@ -122,7 +137,15 @@ export const actions: Actions = {
 				allowedDomains: parse.data.ragDomainList,
 				allowAllDomains: parse.data.ragAllowAll,
 			},
+			dynamicPrompt: parse.data.dynamicPrompt,
 			searchTokens: generateSearchTokens(parse.data.name),
+			last24HoursCount: 0,
+			generateSettings: {
+				temperature: parse.data.temperature,
+				top_p: parse.data.top_p,
+				repetition_penalty: parse.data.repetition_penalty,
+				top_k: parse.data.top_k,
+			},
 		});
 
 		// add insertedId to user settings
