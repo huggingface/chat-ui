@@ -41,7 +41,7 @@ export const endpoints = {
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
-	vertex: endpointVertex
+	vertex: endpointVertex,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [

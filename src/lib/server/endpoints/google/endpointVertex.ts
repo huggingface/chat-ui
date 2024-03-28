@@ -1,4 +1,4 @@
-import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
+import { VertexAI, HarmCategory, HarmBlockThreshold } from "@google-cloud/vertexai";
 import { buildPrompt } from "$lib/buildPrompt";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
@@ -10,12 +10,10 @@ export const endpointVertexParametersSchema = z.object({
 	type: z.literal("vertex"),
 	location: z.string().default("europe-west1"),
 	project: z.string(),
-	apiEndpoint: z.string().optional()
+	apiEndpoint: z.string().optional(),
 });
 
-export function endpointVertex(
-	input: z.input<typeof endpointVertexParametersSchema>
-): Endpoint {
+export function endpointVertex(input: z.input<typeof endpointVertexParametersSchema>): Endpoint {
 	const { project, location, model, apiEndpoint } = endpointVertexParametersSchema.parse(input);
 
 	const vertex_ai = new VertexAI({
@@ -53,7 +51,7 @@ export function endpointVertex(
 			for await (const data of result.stream) {
 				if (Array.isArray(data?.candidates) && data.candidates.length > 0) {
 					const firstPart = data.candidates[0].content.parts[0];
-					if ('text' in firstPart) {
+					if ("text" in firstPart) {
 						const content = firstPart.text;
 						generatedText += content;
 						const output: TextGenerationStreamOutput = {
@@ -69,12 +67,11 @@ export function endpointVertex(
 						yield output;
 					}
 
-					if (!(data.candidates.slice(-1)[0].finishReason)) break;
+					if (!data.candidates.slice(-1)[0].finishReason) break;
 				} else {
 					break;
 				}
 			}
-
 		})();
 	};
 }
