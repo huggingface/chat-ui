@@ -103,7 +103,7 @@
 
 <form
 	method="POST"
-	class="flex h-full flex-col overflow-y-auto p-4 md:p-8"
+	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
 	enctype="multipart/form-data"
 	use:enhance={async ({ formData }) => {
 		loading = true;
@@ -171,7 +171,7 @@
 		</p>
 	{/if}
 
-	<div class="relative grid h-full w-full flex-1 grid-cols-2 gap-6 text-sm max-sm:grid-cols-1">
+	<div class="grid h-full w-full flex-1 grid-cols-2 gap-6 text-sm max-sm:grid-cols-1">
 		<div class="col-span-1 flex flex-col gap-4">
 			<div>
 				<div class="mb-1 block pb-2 text-sm font-semibold">Avatar</div>
