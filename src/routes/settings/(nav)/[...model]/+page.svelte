@@ -92,7 +92,7 @@
 
 	<button
 		class="{isActive
-			? 'bg-gray-100 text-gray-800'
+			? 'bg-gray-200 text-gray-800'
 			: 'bg-black !text-white'} my-8 flex w-fit items-center rounded-full px-3 py-1 text-base"
 		name="Activate model"
 		on:click|stopPropagation={() => {
