@@ -11,9 +11,12 @@
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
+	import CarbonChat from "~icons/carbon/chat";
+
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
+	import { goto } from "$app/navigation";
 
 	export let data: PageData;
 
@@ -97,13 +100,21 @@
 					class="{isActive
 						? 'bg-gray-100 text-gray-800'
 						: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
-					disabled={isActive}
 					name="Activate model"
 					on:click|stopPropagation={() => {
-						$settings.activeModel = $page.params.assistantId;
+						if (isActive) {
+							goto(`${base}/`);
+						} else {
+							$settings.activeModel = $page.params.assistantId;
+						}
 					}}
 				>
-					{isActive ? "Active" : "Activate"}
+					{#if isActive}
+						<CarbonChat class="mr-1.5 text-sm" />
+						Start Chat
+					{:else}
+						Activate
+					{/if}
 				</button>
 				{#if assistant?.createdByMe}
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"

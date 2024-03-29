@@ -8,6 +8,9 @@
 	import TokensCounter from "$lib/components/TokensCounter.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
+	import CarbonChat from "~icons/carbon/chat";
+
+	import { goto } from "$app/navigation";
 
 	const settings = useSettingsStore();
 
@@ -89,15 +92,23 @@
 
 	<button
 		class="{isActive
-			? 'bg-gray-100'
-			: 'bg-black text-white'} my-8 flex items-center rounded-full px-3 py-1"
-		disabled={isActive}
+			? 'bg-gray-100 text-gray-800'
+			: 'bg-black !text-white'} my-8 flex w-fit items-center rounded-full px-3 py-1 text-base"
 		name="Activate model"
 		on:click|stopPropagation={() => {
-			$settings.activeModel = $page.params.model;
+			if (isActive) {
+				goto(`${base}/`);
+			} else {
+				$settings.activeModel = $page.params.model;
+			}
 		}}
 	>
-		{isActive ? "Active model" : "Activate"}
+		{#if isActive}
+			<CarbonChat class="mr-1.5 text-sm" />
+			Start Chat
+		{:else}
+			Activate
+		{/if}
 	</button>
 
 	<div class="relative flex w-full flex-col gap-2">
