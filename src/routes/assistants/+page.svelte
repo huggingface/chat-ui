@@ -211,7 +211,7 @@
 			<select
 				bind:value={sortValue}
 				on:change={sortAssistants}
-				class="hidden rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 			>
 				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
