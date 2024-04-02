@@ -572,9 +572,7 @@
 
 				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 			</div>
-			<div
-				class="absolute bottom-6 flex w-full justify-center gap-2 md:right-6 md:w-fit md:justify-end"
-			>
+			<div class="absolute bottom-6 flex w-full justify-end gap-2 md:right-0 md:w-fit">
 				<a
 					href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 					class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
