@@ -26,8 +26,6 @@
 		$settings.customPrompts[$page.params.model] !==
 		$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt;
 
-	$: isActive = $settings.activeModel === $page.params.model;
-
 	$: model = $page.data.models.find((el: BackendModel) => el.id === $page.params.model);
 </script>
 
@@ -91,24 +89,17 @@
 	</div>
 
 	<button
-		class="{isActive
-			? 'bg-gray-200 text-gray-800'
-			: 'bg-black !text-white'} my-8 flex w-fit items-center rounded-full px-3 py-1 text-base"
+		class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
 		name="Activate model"
 		on:click|stopPropagation={() => {
-			if (isActive) {
-				goto(`${base}/`);
-			} else {
-				$settings.activeModel = $page.params.model;
-			}
+			settings.instantSet({
+				activeModel: $page.params.model,
+			});
+			goto(`${base}/`);
 		}}
 	>
-		{#if isActive}
-			<CarbonChat class="mr-1.5 text-sm" />
-			Start Chat
-		{:else}
-			Activate
-		{/if}
+		<CarbonChat class="mr-1.5 text-sm" />
+		New chat
 	</button>
 
 	<div class="relative flex w-full flex-col gap-2">

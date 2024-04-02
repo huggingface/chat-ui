@@ -24,8 +24,6 @@
 
 	const settings = useSettingsStore();
 
-	$: isActive = $settings.activeModel === $page.params.assistantId;
-
 	const prefix = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
@@ -97,24 +95,17 @@
 				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
 			>
 				<button
-					class="{isActive
-						? 'bg-gray-200 text-gray-800'
-						: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
+					class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
 					name="Activate model"
 					on:click|stopPropagation={() => {
-						if (isActive) {
-							goto(`${base}/`);
-						} else {
-							$settings.activeModel = $page.params.assistantId;
-						}
+						settings.instantSet({
+							activeModel: $page.params.assistantId,
+						});
+						goto(`${base}/`);
 					}}
 				>
-					{#if isActive}
-						<CarbonChat class="mr-1.5 text-sm" />
-						Start Chat
-					{:else}
-						Activate
-					{/if}
+					<CarbonChat class="mr-1.5 text-sm" />
+					New chat
 				</button>
 				{#if assistant?.createdByMe}
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
