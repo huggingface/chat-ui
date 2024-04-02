@@ -3,9 +3,11 @@
 	import IconGear from "~icons/bi/gear-fill";
 	import { base } from "$app/paths";
 	import type { Assistant } from "$lib/types/Assistant";
+	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import IconInternet from "../icons/IconInternet.svelte";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonUserMultiple from "~icons/carbon/user-multiple";
 
 	import { share } from "$lib/utils/share";
 	import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
@@ -22,6 +24,7 @@
 		| "exampleInputs"
 		| "_id"
 		| "description"
+		| "userCount"
 	>;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
@@ -44,7 +47,7 @@
 		class="relative mt-auto rounded-2xl bg-gray-100 text-gray-600 dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-300"
 	>
 		<div
-			class="mt-3 flex min-w-[80dvw] items-center gap-4 p-4 pr-1 sm:min-w-[440px] md:p-8 md:pt-10 xl:gap-8"
+			class="mt-3 flex min-w-[80dvw] items-center gap-4 p-4 pr-1 sm:min-w-[440px] md:p-8 xl:gap-8"
 		>
 			{#if assistant.avatar}
 				<img
@@ -83,13 +86,20 @@
 				{/if}
 
 				{#if assistant.createdByName}
-					<p class="pt-2 text-sm text-gray-400 dark:text-gray-500">
-						Created by <a
-							class="hover:underline"
-							href="{base}/assistants?user={assistant.createdByName}"
-						>
+					<p class="pt-1 text-sm text-gray-400 dark:text-gray-500">
+						Created by
+						<a class="hover:underline" href="{base}/assistants?user={assistant.createdByName}">
 							{assistant.createdByName}
 						</a>
+						{#if assistant.userCount && assistant.userCount > 1}
+							<span class="mx-1">·</span>
+							<div
+								class="inline-flex items-baseline gap-1 text-sm text-gray-400 dark:text-gray-500"
+								title="Number of users"
+							>
+								<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)} users
+							</div>
+						{/if}
 					</p>
 				{/if}
 			</div>
