@@ -27,6 +27,7 @@ export async function preprocessMessages(
 				// use the WebSearch provider's message template
 				message.content = webSearch.provider.messageTemplator(
 					webSearch,
+					webSearchContext,
 					lastQuestion,
 					previousQuestions
 				);

@@ -1,6 +1,5 @@
 import { searchWeb } from "$lib/server/websearch/searchWeb";
 import { generateQuery } from "$lib/server/websearch/generateQuery";
-import { parseWeb } from "$lib/server/websearch/parseWeb";
 import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import { getWebSearchProvider } from "./searchWeb";
@@ -115,68 +114,57 @@ export async function runWebSearch(
 			.filter(({ link }) => !blockList.some((el) => link.includes(el))) // filter out blocklist links
 			.slice(0, MAX_N_PAGES_SCRAPE); // limit to first 10 links only
 
-		const usedSources = new Set<string>();
 		const topKClosestParagraphs = 8;
-		if (webSearch.provider.doSimilaritySearch) {
-			// fetch the model
-			const embeddingModel =
-				embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
+		// fetch the model
+		const embeddingModel =
+			embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
 
-			if (!embeddingModel) {
-				throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
-			}
+		if (!embeddingModel) {
+			throw new Error(`Embedding model ${conv.embeddingModel} not available anymore`);
+		}
 
-			let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
-			if (webSearch.results.length > 0) {
-				appendUpdate("Browsing results");
-				const promises = webSearch.results.map(async (result) => {
-					const { link } = result;
-					let text = result.text ?? "";
-					if (!text) {
-						try {
-							text = await parseWeb(link);
-							appendUpdate("Browsing webpage", [link]);
-						} catch (e) {
-							appendUpdate("Failed to parse webpage", [(e as Error).message, link], "error");
-							// ignore errors
-						}
+		let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
+		if (webSearch.results.length > 0) {
+			appendUpdate("Browsing results");
+			const promises = webSearch.results.map(async (result) => {
+				const { link } = result;
+				let text = result.text ?? "";
+				if (!text) {
+					try {
+						text = await webSearch.provider.urlParser(link);
+						appendUpdate("Browsing webpage", [link]);
+					} catch (e) {
+						appendUpdate("Failed to parse webpage", [(e as Error).message, link], "error");
+						// ignore errors
 					}
-					const MAX_N_CHUNKS = 100;
-					const texts = chunk(text, embeddingModel.chunkCharLength).slice(0, MAX_N_CHUNKS);
-					return texts.map((t) => ({ source: result, text: t }));
-				});
-				const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
-				paragraphChunks = nestedParagraphChunks.flat();
-				if (!paragraphChunks.length) {
-					throw new Error("No text found on the first 5 results");
 				}
-			} else {
-				throw new Error("No results found for this search query");
-			}
-
-			appendUpdate("Extracting relevant information");
-			const texts = paragraphChunks.map(({ text }) => text);
-			const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
-				topK: topKClosestParagraphs,
+				const MAX_N_CHUNKS = 100;
+				const texts = chunk(text, embeddingModel.chunkCharLength).slice(0, MAX_N_CHUNKS);
+				return texts.map((t) => ({ source: result, text: t }));
 			});
-
-			for (const idx of indices) {
-				const { source } = paragraphChunks[idx];
-				const contextWithId = { idx, text: texts[idx] };
-				const usedSource = webSearch.contextSources.find((cSource) => cSource.link === source.link);
-				if (usedSource) {
-					usedSource.context.push(contextWithId);
-				} else {
-					webSearch.contextSources.push({ ...source, context: [contextWithId] });
-				}
+			const nestedParagraphChunks = (await Promise.all(promises)).slice(0, MAX_N_PAGES_EMBED);
+			paragraphChunks = nestedParagraphChunks.flat();
+			if (!paragraphChunks.length) {
+				throw new Error("No text found on the first 5 results");
 			}
 		} else {
-			const resultsToUse = webSearch.results.slice(0, topKClosestParagraphs);
+			throw new Error("No results found for this search query");
+		}
 
-			webSearch.context = resultsToUse.map((result) => result.text).join("\n");
-			webSearch.contextSources = resultsToUse;
-			for (const { link } of webSearch.results) {
-				usedSources.add(link);
+		appendUpdate("Extracting relevant information");
+		const texts = paragraphChunks.map(({ text }) => text);
+		const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
+			topK: topKClosestParagraphs,
+		});
+
+		for (const idx of indices) {
+			const { source } = paragraphChunks[idx];
+			const contextWithId = { idx, text: texts[idx] };
+			const usedSource = webSearch.contextSources.find((cSource) => cSource.link === source.link);
+			if (usedSource) {
+				usedSource.context.push(contextWithId);
+			} else {
+				webSearch.contextSources.push({ ...source, context: [contextWithId] });
 			}
 		}
 
