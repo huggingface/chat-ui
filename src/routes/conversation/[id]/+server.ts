@@ -474,6 +474,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						message: "No output was generated. Something went wrong.",
 					});
 				}
+
+				if (buffer) {
+					update({
+						type: "stream",
+						token: buffer,
+					});
+				}
 			}
 
 			await collections.conversations.updateOne(
