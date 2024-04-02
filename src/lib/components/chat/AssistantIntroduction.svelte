@@ -96,7 +96,7 @@
 		</div>
 
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
-			<div class="flex flex-row items-center gap-2">
+			<div class="flex flex-row items-center gap-1">
 				<button
 					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner max-sm:px-1.5 md:text-sm dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
 					on:click={() => {
