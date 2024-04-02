@@ -409,6 +409,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let hasError = false;
 
+			let buffer = "";
+
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
@@ -419,12 +421,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
-						// else we get the next token
 						if (!output.token.special) {
-							update({
-								type: "stream",
-								token: output.token.text,
-							});
+							// 33% chance to send the stream update, with a max buffer size of 30 chars
+							buffer += output.token.text;
+
+							if (Math.random() < 0.33 || buffer.length > 30) {
+								update({
+									type: "stream",
+									token: buffer,
+								});
+								buffer = "";
+							}
+
 							// abort check
 							const date = abortedGenerations.get(convId.toString());
 							if (date && date > promptedAt) {
@@ -464,6 +472,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						type: "status",
 						status: "error",
 						message: "No output was generated. Something went wrong.",
+					});
+				}
+
+				if (buffer) {
+					update({
+						type: "stream",
+						token: buffer,
 					});
 				}
 			}
