@@ -528,7 +528,7 @@ You can also set `"service" : "lambda"` to use a lambda instance.
 
 You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
 
-#### Cloudflare
+#### Cloudflare Workers AI
 
 You can also use Cloudflare Workers AI to run your own models with serverless inference.
 
