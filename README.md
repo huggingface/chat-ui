@@ -560,6 +560,9 @@ You can find the list of models available on Cloudflare [here](https://developer
 ]
 ```
 
+> [!NOTE]  
+> Cloudlare Workers AI currently do not support custom sampling parameters like temperature, top_p, etc.
+
 ##### Google Vertex models
 
 Chat UI can connect to the google Vertex API endpoints ([List of supported models](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models)).
