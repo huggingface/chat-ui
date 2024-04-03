@@ -13,6 +13,9 @@ import {
 	endpointAnthropicParametersSchema,
 } from "./anthropic/endpointAnthropic";
 import type { Model } from "$lib/types/Model";
+import endpointCloudflare, {
+	endpointCloudflareParametersSchema,
+} from "./cloudflare/endpointCloudflare";
 
 // parameters passed when generating text
 export interface EndpointParameters {
@@ -42,6 +45,7 @@ export const endpoints = {
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
 	vertex: endpointVertex,
+	cloudflare: endpointCloudflare,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -52,5 +56,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointLlamacppParametersSchema,
 	endpointOllamaParametersSchema,
 	endpointVertexParametersSchema,
+	endpointCloudflareParametersSchema,
 ]);
 export default endpoints;
