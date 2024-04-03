@@ -55,3 +55,15 @@ System: {{preprompt}}\nUser:{{#each messages}}{{#ifUser}}{{content}}\nFalcon:{{/
 ```env
 {{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}
 ```
+
+## CodeLlama 70B
+
+```env
+<s>{{#if @root.preprompt}}Source: system\n\n {{@root.preprompt}} <step> {{/if}}{{#each messages}}{{#ifUser}}Source: user\n\n {{content}} <step> {{/ifUser}}{{#ifAssistant}}Source: assistant\n\n {{content}} <step> {{/ifAssistant}}{{/each}}Source: assistant\nDestination: user\n\n ``
+```
+
+## Gemma
+
+```env
+{{#each messages}}{{#ifUser}}<start_of_turn>user\n{{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}}<end_of_turn>\n<start_of_turn>model\n{{/ifUser}}{{#ifAssistant}}{{content}}<end_of_turn>\n{{/ifAssistant}}{{/each}}
+```

@@ -1,19 +1,6 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
-import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST } from "$env/static/private";
-import { z } from "zod";
-import JSON5 from "json5";
-
-const listSchema = z.array(z.string()).default([]);
-
-const allowList = listSchema.parse(JSON5.parse(WEBSEARCH_ALLOWLIST));
-const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
-
-const queryModifier = [
-	...allowList.map((item) => "site:" + item),
-	...blockList.map((item) => "-site:" + item),
-].join(" ");
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
@@ -79,5 +66,5 @@ Current Question: Where is it being hosted?`,
 		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
 	});
 
-	return (queryModifier + " " + webQuery).trim();
+	return webQuery.trim();
 }

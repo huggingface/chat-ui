@@ -13,9 +13,6 @@ export default {
 			colors: {
 				primary: colors[process.env.PUBLIC_APP_COLOR],
 			},
-			// fontFamily: {
-			// 	sans: ['"Inter"', ...defaultTheme.fontFamily.sans]
-			// },
 			fontSize: {
 				xxs: "0.625rem",
 				smd: "0.94rem",

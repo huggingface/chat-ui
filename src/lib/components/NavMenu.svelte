@@ -8,6 +8,8 @@
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
+	import type { Model } from "$lib/types/Model";
+	import { page } from "$app/stores";
 
 	export let conversations: ConvSidebar[] = [];
 	export let canLogin: boolean;
@@ -40,6 +42,8 @@
 		month: "This month",
 		older: "Older",
 	} as const;
+
+	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -107,6 +111,31 @@
 	>
 		Theme
 	</button>
+	{#if nModels > 1}
+		<a
+			href="{base}/models"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		>
+			Models
+			<span
+				class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
+				>{nModels}</span
+			>
+		</a>
+	{/if}
+	{#if $page.data.enableAssistants}
+		<a
+			href="{base}/assistants"
+			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		>
+			Assistants
+			<span
+				class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
+				>New</span
+			>
+		</a>
+	{/if}
+
 	<a
 		href="{base}/settings"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -114,14 +143,6 @@
 		Settings
 	</a>
 	{#if PUBLIC_APP_NAME === "HuggingChat"}
-		<a
-			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
-			target="_blank"
-			rel="noreferrer"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			Feedback
-		</a>
 		<a
 			href="{base}/privacy"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"

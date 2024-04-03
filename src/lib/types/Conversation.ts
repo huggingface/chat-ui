@@ -14,6 +14,7 @@ export interface Conversation extends Timestamps {
 	embeddingModel: string;
 
 	title: string;
+	rootMessageId?: Message["id"];
 	messages: Message[];
 
 	meta?: {
@@ -22,4 +23,6 @@ export interface Conversation extends Timestamps {
 
 	preprompt?: string;
 	assistantId?: Assistant["_id"];
+
+	userAgent?: string;
 }

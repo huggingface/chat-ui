@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isDesktop } from "$lib/utils/isDesktop";
 	import { createEventDispatcher, onMount } from "svelte";
 
 	export let value = "";
@@ -6,11 +7,9 @@
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
-	// Approximate width from which we disable autofocus
-	const TABLET_VIEWPORT_WIDTH = 768;
 
-	let innerWidth = 0;
 	let textareaElement: HTMLTextAreaElement;
+	let isCompositionOn = false;
 
 	const dispatch = createEventDispatcher<{ submit: void }>();
 
@@ -19,20 +18,24 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		// submit on enter
-		if (event.key === "Enter" && !event.shiftKey) {
+		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
 			event.preventDefault();
+			// blur to close keyboard on mobile
+			textareaElement.blur();
+			// refocus so that user on desktop can start typing without needing to reclick on textarea
+			if (isDesktop(window)) {
+				textareaElement.focus();
+			}
 			dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 		}
 	}
 
 	onMount(() => {
-		if (innerWidth > TABLET_VIEWPORT_WIDTH) {
+		if (isDesktop(window)) {
 			textareaElement.focus();
 		}
 	});
 </script>
-
-<svelte:window bind:innerWidth />
 
 <div class="relative min-w-0 flex-1">
 	<pre
@@ -50,7 +53,9 @@
 		bind:this={textareaElement}
 		{disabled}
 		on:keydown={handleKeydown}
-		on:keypress
+		on:compositionstart={() => (isCompositionOn = true)}
+		on:compositionend={() => (isCompositionOn = false)}
+		on:beforeinput
 		{placeholder}
 	/>
 </div>

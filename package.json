@@ -13,23 +13,28 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest",
 		"updateLocalEnv": "node --loader ts-node/esm scripts/updateLocalEnv.ts",
-		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts"
+		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts",
+		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts"
 	},
 	"devDependencies": {
+		"@faker-js/faker": "^8.4.1",
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^1.3.1",
-		"@sveltejs/kit": "^1.27.6",
+		"@sveltejs/kit": "^1.30.4",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/jsdom": "^21.1.1",
 		"@types/marked": "^4.0.8",
+		"@types/minimist": "^1.2.5",
 		"@types/parquetjs": "^0.10.3",
+		"@types/uuid": "^9.0.8",
 		"@typescript-eslint/eslint-plugin": "^6.x",
 		"@typescript-eslint/parser": "^6.x",
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.30.0",
 		"marked-katex-extension": "^3.0.6",
+		"minimist": "^1.2.8",
 		"prettier": "^2.8.0",
 		"prettier-plugin-svelte": "^2.10.1",
 		"prettier-plugin-tailwindcss": "^0.2.7",
@@ -40,6 +45,7 @@
 		"typescript": "^5.0.0",
 		"unplugin-icons": "^0.16.1",
 		"vite": "^4.5.2",
+		"vite-node": "^1.3.1",
 		"vitest": "^0.31.0"
 	},
 	"type": "module",
@@ -56,6 +62,7 @@
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
 		"image-size": "^1.0.2",
+		"ip-address": "^9.0.5",
 		"jsdom": "^22.0.0",
 		"json5": "^2.2.3",
 		"marked": "^4.3.0",
@@ -71,10 +78,13 @@
 		"sharp": "^0.33.2",
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.4.0",
+		"uuid": "^9.0.1",
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
+		"@anthropic-ai/sdk": "^0.17.1",
 		"aws4fetch": "^1.0.17",
-		"openai": "^4.14.2"
+		"openai": "^4.14.2",
+		"@google-cloud/vertexai": "^0.5.0"
 	}
 }

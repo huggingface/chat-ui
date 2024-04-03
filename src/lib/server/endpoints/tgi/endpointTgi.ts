@@ -16,28 +16,17 @@ export const endpointTgiParametersSchema = z.object({
 export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>): Endpoint {
 	const { url, accessToken, model, authorization } = endpointTgiParametersSchema.parse(input);
 
-	return async ({ conversation, continue: messageContinue }) => {
-		let prompt = await buildPrompt({
-			messages: conversation.messages,
-			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-			preprompt: conversation.preprompt,
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
+		const prompt = await buildPrompt({
+			messages,
+			preprompt,
 			model,
-			id: conversation._id,
+			continueMessage,
 		});
-
-		if (messageContinue) {
-			// start with the full prompt, and for each stop token, try to remove it from the end of the prompt
-			prompt = model.parameters.stop.reduce((acc: string, curr: string) => {
-				if (acc.endsWith(curr)) {
-					return acc.slice(0, acc.length - curr.length);
-				}
-				return acc;
-			}, prompt.trimEnd());
-		}
 
 		return textGenerationStream(
 			{
-				parameters: { ...model.parameters, return_full_text: false },
+				parameters: { ...model.parameters, ...generateSettings, return_full_text: false },
 				model: url,
 				inputs: prompt,
 				accessToken,

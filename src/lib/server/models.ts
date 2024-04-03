@@ -24,11 +24,21 @@ const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
 	/** Used to link to the model page, and for inference */
-	name: z.string().min(1),
+	name: z.string().default(""),
 	displayName: z.string().min(1).optional(),
 	description: z.string().min(1).optional(),
+	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
+	tokenizer: z
+		.union([
+			z.string(),
+			z.object({
+				tokenizerUrl: z.string().url(),
+				tokenizerConfigUrl: z.string().url(),
+			}),
+		])
+		.optional(),
 	datasetName: z.string().min(1).optional(),
 	datasetUrl: z.string().url().optional(),
 	preprompt: z.string().default(""),
@@ -45,9 +55,9 @@ const modelConfig = z.object({
 	endpoints: z.array(endpointSchema).optional(),
 	parameters: z
 		.object({
-			temperature: z.number().min(0).max(1),
+			temperature: z.number().min(0).max(1).optional(),
 			truncate: z.number().int().positive().optional(),
-			max_new_tokens: z.number().int().positive(),
+			max_new_tokens: z.number().int().positive().optional(),
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),
@@ -141,6 +151,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				switch (args.type) {
 					case "tgi":
 						return endpoints.tgi(args);
+					case "anthropic":
+						return endpoints.anthropic(args);
 					case "aws":
 						return await endpoints.aws(args);
 					case "openai":
@@ -149,6 +161,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.llamacpp(args);
 					case "ollama":
 						return endpoints.ollama(args);
+					case "vertex":
+						return await endpoints.vertex(args);
 					default:
 						// for legacy reason
 						return endpoints.tgi(args);

@@ -6,15 +6,20 @@ import endpointAws, { endpointAwsParametersSchema } from "./aws/endpointAws";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/endpointLlamacpp";
 import endpointOllama, { endpointOllamaParametersSchema } from "./ollama/endpointOllama";
+import endpointVertex, { endpointVertexParametersSchema } from "./google/endpointVertex";
+
+import {
+	endpointAnthropic,
+	endpointAnthropicParametersSchema,
+} from "./anthropic/endpointAnthropic";
+import type { Model } from "$lib/types/Model";
 
 // parameters passed when generating text
-interface EndpointParameters {
-	conversation: {
-		messages: Omit<Conversation["messages"][0], "id">[];
-		preprompt?: Conversation["preprompt"];
-		_id?: Conversation["_id"];
-	};
-	continue?: boolean;
+export interface EndpointParameters {
+	messages: Omit<Conversation["messages"][0], "id">[];
+	preprompt?: Conversation["preprompt"];
+	continueMessage?: boolean; // used to signal that the last message will be extended
+	generateSettings?: Partial<Model["parameters"]>;
 }
 
 interface CommonEndpoint {
@@ -31,17 +36,21 @@ export type EndpointGenerator<T extends CommonEndpoint> = (parameters: T) => End
 // list of all endpoint generators
 export const endpoints = {
 	tgi: endpointTgi,
+	anthropic: endpointAnthropic,
 	aws: endpointAws,
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
+	vertex: endpointVertex,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
+	endpointAnthropicParametersSchema,
 	endpointAwsParametersSchema,
 	endpointOAIParametersSchema,
 	endpointTgiParametersSchema,
 	endpointLlamacppParametersSchema,
 	endpointOllamaParametersSchema,
+	endpointVertexParametersSchema,
 ]);
 export default endpoints;

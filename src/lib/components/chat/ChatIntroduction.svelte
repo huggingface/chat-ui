@@ -5,7 +5,6 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconGear from "~icons/bi/gear-fill";
-	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import type { Model } from "$lib/types/Model";
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
@@ -52,8 +51,7 @@
 				<a
 					target="_blank"
 					href={banner.linkHref}
-					class="mr-2 flex items-center underline hover:no-underline"
-					><CarbonArrowUpRight class="mr-1.5 text-xs" /> {banner.linkTitle}</a
+					class="mr-2 flex items-center underline hover:no-underline">{banner.linkTitle}</a
 				>
 			</AnnouncementBanner>
 		{/each}
@@ -61,7 +59,18 @@
 			<div class="flex p-3">
 				<div>
 					<div class="text-sm text-gray-600 dark:text-gray-400">Current Model</div>
-					<div class="font-semibold">{currentModel.displayName}</div>
+					<div class="flex items-center gap-1.5 font-semibold max-sm:text-smd">
+						{#if currentModel.logoUrl}
+							<img
+								class=" overflown aspect-square size-4 rounded border dark:border-gray-700"
+								src={currentModel.logoUrl}
+								alt=""
+							/>
+						{:else}
+							<div class="size-4 rounded border border-transparent bg-gray-300 dark:bg-gray-800" />
+						{/if}
+						{currentModel.displayName}
+					</div>
 				</div>
 				<a
 					href="{base}/settings/{currentModel.id}"
@@ -79,7 +88,7 @@
 				{#each currentModelMetadata.promptExamples as example}
 					<button
 						type="button"
-						class="rounded-xl border bg-gray-50 p-2.5 text-gray-600 hover:bg-gray-100 sm:p-4 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+						class="rounded-xl border bg-gray-50 p-3 text-gray-600 hover:bg-gray-100 max-xl:text-sm xl:p-3.5 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 						on:click={() => dispatch("message", example.prompt)}
 					>
 						{example.title}
@@ -87,4 +96,5 @@
 				{/each}
 			</div>
 		</div>{/if}
+	<div class="h-40 sm:h-24" />
 </div>
