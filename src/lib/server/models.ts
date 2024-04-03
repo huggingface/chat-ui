@@ -113,7 +113,10 @@ async function getChatPromptRender(
 				];
 			}
 
-			const output = tokenizer.apply_chat_template(formattedMessages, { tokenize: false });
+			const output = tokenizer.apply_chat_template(formattedMessages, {
+				tokenize: false,
+				add_generation_prompt: true,
+			});
 
 			if (typeof output !== "string") {
 				throw new Error("Failed to apply chat template, the output is not a string");
