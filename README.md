@@ -539,8 +539,6 @@ You can either specify them directly in your `.env.local` using the `CLOUDFLARE_
 You can find the list of models available on Cloudflare [here](https://developers.cloudflare.com/workers-ai/models/#text-generation).
 
 ```env
-"endpoints": [
-
   {
   "name" : "nousresearch/hermes-2-pro-mistral-7b",
   "tokenizer": "nousresearch/hermes-2-pro-mistral-7b",
@@ -557,7 +555,6 @@ You can find the list of models available on Cloudflare [here](https://developer
     }
   ]
 }
-]
 ```
 
 > [!NOTE]  
