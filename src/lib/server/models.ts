@@ -14,9 +14,10 @@ import endpointTgi from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
 import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
-import { AutoTokenizer, PreTrainedTokenizer } from "@xenova/transformers";
+import type { PreTrainedTokenizer } from "@xenova/transformers";
 
 import JSON5 from "json5";
+import { getTokenizer } from "$lib/utils/getTokenizer";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -80,12 +81,18 @@ async function getChatPromptRender(
 	} else {
 		let tokenizer: PreTrainedTokenizer;
 
+		if (!m.tokenizer) {
+			throw new Error(
+				"No tokenizer specified and no chat prompt template specified for model " + m.name
+			);
+		}
+
 		try {
-			tokenizer = await AutoTokenizer.from_pretrained(m.id ?? m.name);
+			tokenizer = await getTokenizer(m.tokenizer);
 		} catch (e) {
 			throw Error(
 				"Failed to load tokenizer for model " +
-					(m.id ?? m.name) +
+					m.name +
 					" consider setting chatPromptTemplate manually or making sure the model is available on the hub."
 			);
 		}
