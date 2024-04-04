@@ -562,7 +562,7 @@ You can find the list of models available on Cloudflare [here](https://developer
 
 #### Cohere
 
-You can also use Cohere to run their models directly from chat-ui. You will need to have a Cohere account, then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify them directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set them directly in the endpoint config.
+You can also use Cohere to run their models directly from chat-ui. You will need to have a Cohere account, then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify it directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set it in the endpoint config.
 
 Here is an example of a Cohere model config. You can set which model you want to use by setting the `id` field to the model name.
 
