@@ -54,7 +54,7 @@
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
 		"@resvg/resvg-js": "^2.6.0",
-		"@xenova/transformers": "^2.6.0",
+		"@xenova/transformers": "^2.16.1",
 		"autoprefixer": "^10.4.14",
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
@@ -83,8 +83,8 @@
 	},
 	"optionalDependencies": {
 		"@anthropic-ai/sdk": "^0.17.1",
+		"@google-cloud/vertexai": "^0.5.0",
 		"aws4fetch": "^1.0.17",
-		"openai": "^4.14.2",
-		"@google-cloud/vertexai": "^0.5.0"
+		"openai": "^4.14.2"
 	}
 }
