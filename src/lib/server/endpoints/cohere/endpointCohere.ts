@@ -25,7 +25,7 @@ export async function endpointCohere(
 			token: apiKey,
 		});
 	} catch (e) {
-		throw new Error("Failed to import @anthropic-ai/sdk", { cause: e });
+		throw new Error("Failed to import cohere-ai", { cause: e });
 	}
 
 	return async ({ messages, preprompt, generateSettings, continueMessage }) => {
