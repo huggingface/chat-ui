@@ -174,6 +174,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return await endpoints.vertex(args);
 					case "cloudflare":
 						return await endpoints.cloudflare(args);
+					case "cohere":
+						return await endpoints.cohere(args);
 					default:
 						// for legacy reason
 						return endpoints.tgi(args);

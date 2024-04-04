@@ -560,6 +560,28 @@ You can find the list of models available on Cloudflare [here](https://developer
 > [!NOTE]  
 > Cloudlare Workers AI currently do not support custom sampling parameters like temperature, top_p, etc.
 
+#### Cohere
+
+You can also use Cohere to run their models directly from chat-ui. You will need to have a Cohere account, then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify it directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set it in the endpoint config.
+
+Here is an example of a Cohere model config. You can set which model you want to use by setting the `id` field to the model name.
+
+```env
+  {
+    "name" : "CohereForAI/c4ai-command-r-v01",
+    "id": "command-r",
+    "description": "C4AI Command-R is a research release of a 35 billion parameter highly performant generative model",
+    "endpoints": [
+      {
+        "type": "cohere",
+        <!-- optionally specify these, or use COHERE_API_TOKEN
+        "apiKey": "your-api-token"
+        -->
+      }
+    ]
+  }
+```
+
 ##### Google Vertex models
 
 Chat UI can connect to the google Vertex API endpoints ([List of supported models](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models)).
