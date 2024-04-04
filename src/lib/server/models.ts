@@ -78,55 +78,54 @@ async function getChatPromptRender(
 ): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
 	if (m.chatPromptTemplate) {
 		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
-	} else {
-		let tokenizer: PreTrainedTokenizer;
-
-		if (!m.tokenizer) {
-			throw new Error(
-				"No tokenizer specified and no chat prompt template specified for model " + m.name
-			);
-		}
-
-		try {
-			tokenizer = await getTokenizer(m.tokenizer);
-		} catch (e) {
-			throw Error(
-				"Failed to load tokenizer for model " +
-					m.name +
-					" consider setting chatPromptTemplate manually or making sure the model is available on the hub."
-			);
-		}
-
-		const renderTemplate = ({ messages, preprompt }: ChatTemplateInput) => {
-			let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
-				content: message.content,
-				role: message.from,
-			}));
-
-			if (preprompt) {
-				formattedMessages = [
-					{
-						role: "system",
-						content: preprompt,
-					},
-					...formattedMessages,
-				];
-			}
-
-			const output = tokenizer.apply_chat_template(formattedMessages, {
-				tokenize: false,
-				add_generation_prompt: true,
-			});
-
-			if (typeof output !== "string") {
-				throw new Error("Failed to apply chat template, the output is not a string");
-			}
-
-			return output;
-		};
-
-		return renderTemplate;
 	}
+	let tokenizer: PreTrainedTokenizer;
+
+	if (!m.tokenizer) {
+		throw new Error(
+			"No tokenizer specified and no chat prompt template specified for model " + m.name
+		);
+	}
+
+	try {
+		tokenizer = await getTokenizer(m.tokenizer);
+	} catch (e) {
+		throw Error(
+			"Failed to load tokenizer for model " +
+				m.name +
+				" consider setting chatPromptTemplate manually or making sure the model is available on the hub."
+		);
+	}
+
+	const renderTemplate = ({ messages, preprompt }: ChatTemplateInput) => {
+		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
+			content: message.content,
+			role: message.from,
+		}));
+
+		if (preprompt) {
+			formattedMessages = [
+				{
+					role: "system",
+					content: preprompt,
+				},
+				...formattedMessages,
+			];
+		}
+
+		const output = tokenizer.apply_chat_template(formattedMessages, {
+			tokenize: false,
+			add_generation_prompt: true,
+		});
+
+		if (typeof output !== "string") {
+			throw new Error("Failed to apply chat template, the output is not a string");
+		}
+
+		return output;
+	};
+
+	return renderTemplate;
 }
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
