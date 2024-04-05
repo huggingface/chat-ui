@@ -39,7 +39,15 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		throw error(403, "Invalid or expired CSRF token");
 	}
 
-	const { userData } = await getOIDCUserData({ redirectURI: validatedToken.redirectUrl }, code);
+	// @ts-ignore
+	const { userData } = await getOIDCUserData(
+		{ redirectURI: validatedToken.redirectUrl },
+		code
+	).catch((error) => ({ error }));
+
+	if (!userData || userData.error) {
+		throw redirect(302, `${base}/?error=authFailed`);
+	}
 
 	// Filter by allowed user emails
 	if (allowedUserEmails.length > 0) {

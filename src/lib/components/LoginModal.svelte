@@ -9,11 +9,13 @@
 	import Logo from "./icons/Logo.svelte";
 
 	const settings = useSettingsStore();
+	let isLoading = false;
+	$: errorMessage = $page.url.searchParams.get("error");
 </script>
 
 <Modal on:close>
 	<div
-		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-primary-500/40 via-primary-500/10 to-primary-500/0 px-5 pb-8 pt-9 text-center"
+		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center"
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="mr-1" />
@@ -27,6 +29,9 @@
 			continue.
 		</p>
 
+		{#if errorMessage}
+			<p class="py-1 text-sm text-red-500">Oops, something went wrong.</p>
+		{/if}
 		<form
 			action="{base}/{$page.data.loginRequired ? 'login' : 'settings'}"
 			target="_parent"
@@ -37,10 +42,34 @@
 				<button
 					type="submit"
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+					on:click={() => (isLoading = true)}
 				>
-					Sign in
-					{#if PUBLIC_APP_NAME === "HuggingChat"}
-						with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
+					{#if isLoading}
+						<span class="animate-spin">
+							<!-- Loading icon -->
+							<svg
+								class="h-5 w-5 text-white"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+							>
+								<circle
+									class="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="4"
+								/>
+								<path
+									class="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								/>
+							</svg>
+						</span>
+					{:else}
+						Sign in
 					{/if}
 				</button>
 			{:else}
