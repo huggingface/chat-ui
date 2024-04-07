@@ -1,7 +1,7 @@
 import {
 	HF_TOKEN,
 	HF_API_ROOT,
-	MODELS,
+	// MODELS,
 	OLD_MODELS,
 	TASK_MODEL,
 	HF_ACCESS_TOKEN,
@@ -18,7 +18,7 @@ import JSON5 from "json5";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
-const modelConfig = z.object({
+export const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
 	/** Used to link to the model page, and for inference */
@@ -77,12 +77,15 @@ const modelConfig = z.object({
 		})
 		.passthrough()
 		.optional(),
-	multimodal: z.boolean().default(false),
-	unlisted: z.boolean().default(false),
+	multimodal: z.boolean().default(false).optional(),
+	unlisted: z.boolean().default(false).optional(),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(MODELS));
+// Instead of importing string from ENV json that is difficulat to type, we import the ready object
+// const modelsRaw = z.array(modelConfig).parse(JSON5.parse(MODELS));
+import MODELS from "../../../models.config";
+const modelsRaw = z.array(modelConfig).parse(MODELS);
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
