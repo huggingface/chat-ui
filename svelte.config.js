@@ -14,7 +14,6 @@ const config = {
 
 		paths: {
 			base: process.env.APP_BASE || "",
-			relative: true,
 		},
 		csrf: {
 			// handled in hooks.server.ts, because we can have multiple valid origins
