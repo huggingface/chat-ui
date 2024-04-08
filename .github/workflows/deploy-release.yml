@@ -1,9 +1,6 @@
 name: Deploy to production
 on:
-  release:
-    types: [released]
-
-  # to run this workflow manually from the Actions tab
+  # run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
