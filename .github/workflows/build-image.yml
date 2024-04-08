@@ -24,7 +24,6 @@ jobs:
       - name: Extract package version
         id: package-version
         run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
-        if: github.event_name == 'release'
 
       - name: Docker metadata
         id: meta
@@ -71,7 +70,6 @@ jobs:
       - name: Extract package version
         id: package-version
         run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
-        if: github.event_name == 'release'
 
       - name: Docker metadata
         id: meta
