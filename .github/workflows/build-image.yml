@@ -23,8 +23,8 @@ jobs:
 
       - name: Extract package version
         id: package-version
-        run: echo "::set-output name=VERSION::$(jq -r .version package.json)"
-        if: github.event_name != 'pull_request'
+        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+        if: github.event_name == 'release'
 
       - name: Docker metadata
         id: meta
@@ -33,10 +33,9 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui-db
           tags: |
+            type=semver,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.package-version.outputs.VERSION }},enable={{is_default_branch}}
-          flavor: |
-            latest=false
+            type=sha,enable={{is_default_branch}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
