@@ -32,7 +32,7 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui-db
           tags: |
-            type=semver,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
 
@@ -78,7 +78,7 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui
           tags: |
-            type=semver,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
 
