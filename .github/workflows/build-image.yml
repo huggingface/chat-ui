@@ -23,7 +23,13 @@ jobs:
 
       - name: Extract package version
         id: package-version
-        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          MAJOR=$(echo $VERSION | cut -d '.' -f1)
+          echo "MAJOR=$MAJOR" >> $GITHUB_OUTPUT
+          MINOR=$(echo $VERSION | cut -d '.' -f1).$(echo $VERSION | cut -d '.' -f2)
+          echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
 
       - name: Docker metadata
         id: meta
@@ -32,7 +38,9 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui-db
           tags: |
-            type=raw,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.VERSION }},enable=${{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.MAJOR }},enable=${{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.MINOR }},enable=${{github.event_name == 'release'}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
 
@@ -69,7 +77,13 @@ jobs:
 
       - name: Extract package version
         id: package-version
-        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          MAJOR=$(echo $VERSION | cut -d '.' -f1)
+          echo "MAJOR=$MAJOR" >> $GITHUB_OUTPUT
+          MINOR=$(echo $VERSION | cut -d '.' -f1).$(echo $VERSION | cut -d '.' -f2)
+          echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
 
       - name: Docker metadata
         id: meta
@@ -78,7 +92,9 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui
           tags: |
-            type=raw,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.VERSION }},enable=${{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.MAJOR }},enable=${{github.event_name == 'release'}}
+            type=raw,value=${{ steps.package-version.outputs.MINOR }},enable=${{github.event_name == 'release'}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
 
