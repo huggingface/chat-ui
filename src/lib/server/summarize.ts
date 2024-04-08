@@ -8,6 +8,11 @@ export async function summarize(prompt: string) {
 	}
 
 	const messages: Array<Omit<Message, "id">> = [
+		{
+			from: "system",
+			content:
+				"You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence of four words or less. Always start your answer with an emoji relevant to the summary",
+		},
 		{ from: "user", content: "Who is the president of Gabon?" },
 		{ from: "assistant", content: "🇬🇦 President of Gabon" },
 		{ from: "user", content: "Who is Julien Chaumond?" },

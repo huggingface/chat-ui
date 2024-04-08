@@ -10,6 +10,7 @@ import sharp from "sharp";
 import { parseStringToList } from "$lib/utils/parseStringToList";
 import { usageLimits } from "$lib/server/usageLimits";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
+import { isValidOpenAPI } from "$lib/utils/isValidOpenAPI";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -39,6 +40,7 @@ const newAsssistantSchema = z.object({
 	top_k: z
 		.union([z.literal(""), z.coerce.number().min(5).max(100)])
 		.transform((v) => (v === "" ? undefined : v)),
+	functionSpec: z.union([z.literal(""), z.string().refine(isValidOpenAPI, "Invalid OpenAPI spec")]),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -140,6 +142,7 @@ export const actions: Actions = {
 			dynamicPrompt: parse.data.dynamicPrompt,
 			searchTokens: generateSearchTokens(parse.data.name),
 			last24HoursCount: 0,
+			functionSpec: parse.data.functionSpec,
 			generateSettings: {
 				temperature: parse.data.temperature,
 				top_p: parse.data.top_p,

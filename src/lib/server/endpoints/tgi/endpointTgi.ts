@@ -16,12 +16,14 @@ export const endpointTgiParametersSchema = z.object({
 export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>): Endpoint {
 	const { url, accessToken, model, authorization } = endpointTgiParametersSchema.parse(input);
 
-	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings, tools, toolResults }) => {
 		const prompt = await buildPrompt({
 			messages,
 			preprompt,
 			model,
 			continueMessage,
+			tools,
+			toolResults,
 		});
 
 		return textGenerationStream(

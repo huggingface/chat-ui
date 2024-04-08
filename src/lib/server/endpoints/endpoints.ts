@@ -17,6 +17,7 @@ import endpointCloudflare, {
 	endpointCloudflareParametersSchema,
 } from "./cloudflare/endpointCloudflare";
 import { endpointCohere, endpointCohereParametersSchema } from "./cohere/endpointCohere";
+import type { Tool, ToolResult } from "$lib/types/Tool";
 
 // parameters passed when generating text
 export interface EndpointParameters {
@@ -24,6 +25,8 @@ export interface EndpointParameters {
 	preprompt?: Conversation["preprompt"];
 	continueMessage?: boolean; // used to signal that the last message will be extended
 	generateSettings?: Partial<Model["parameters"]>;
+	tools?: Tool[];
+	toolResults?: ToolResult[];
 }
 
 interface CommonEndpoint {

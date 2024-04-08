@@ -28,7 +28,7 @@ export async function endpointCohere(
 		throw new Error("Failed to import cohere-ai", { cause: e });
 	}
 
-	return async ({ messages, preprompt, generateSettings, continueMessage }) => {
+	return async ({ messages, preprompt, generateSettings, continueMessage, tools, toolResults }) => {
 		let system = preprompt;
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
@@ -42,10 +42,12 @@ export async function endpointCohere(
 
 			if (raw) {
 				const prompt = await buildPrompt({
-					messages: messages.filter((message) => message.from !== "system"),
+					messages,
 					model,
 					preprompt: system,
 					continueMessage,
+					tools,
+					toolResults,
 				});
 
 				stream = await cohere.chatStream({
@@ -78,6 +80,8 @@ export async function endpointCohere(
 					temperature: parameters?.temperature,
 					stopSequences: parameters?.stop,
 					frequencyPenalty: parameters?.frequency_penalty,
+					tools,
+					//TODO: Add toolResults
 				});
 			}
 

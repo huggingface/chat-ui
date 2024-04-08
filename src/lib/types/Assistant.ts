@@ -14,6 +14,7 @@ export interface Assistant extends Timestamps {
 	preprompt: string;
 	userCount?: number;
 	featured?: boolean;
+	functionSpec?: string; // openAPI spec
 	rag?: {
 		allowAllDomains: boolean;
 		allowedDomains: string[];

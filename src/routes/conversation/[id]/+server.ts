@@ -23,6 +23,9 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
+import { getToolsFromFunctionSpec } from "$lib/utils/getToolsFromFunctionSpec.js";
+import JSON5 from "json5";
+import type { Call, ToolResult } from "$lib/types/Tool.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -339,10 +342,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			// check if assistant has a rag
 			const assistant = await collections.assistants.findOne<
-				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
+				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings" | "functionSpec">
 			>(
 				{ _id: conv.assistantId },
-				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
+				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1, functionSpec: 1 } }
 			);
 
 			const assistantHasRAG =
@@ -397,6 +400,98 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			}
 
+			const endpoint = await model.getEndpoint();
+
+			// function calls
+			let toolResults: ToolResult[] | undefined = undefined;
+
+			if (model.functions && assistant?.functionSpec) {
+				// turn functionSpec into a list of tools
+				const tools = await getToolsFromFunctionSpec(assistant?.functionSpec);
+
+				let calls: Call[] | undefined = undefined;
+
+				// do the function calling bits here
+				for await (const output of await endpoint({
+					messages: messagesForPrompt,
+					preprompt,
+					generateSettings: assistant?.generateSettings,
+					tools,
+				})) {
+					if (output.generated_text) {
+						console.log({ toolCheck: output.generated_text });
+
+						// look for a code blocks of ```json and parse them
+						// if they're valid json, add them to the calls array
+						const codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
+						if (codeBlocks) {
+							for (const block of codeBlocks) {
+								try {
+									calls = JSON5.parse(block.replace("```json\n", "").slice(0, -3));
+								} catch (e) {
+									console.error(e);
+									// error parsing the calls, do something here.
+								}
+							}
+						}
+					}
+				}
+
+				// skip if direct answer was requested
+				if (!(calls?.length === 1 && calls[0].tool_name === "directly-answer")) {
+					toolResults = calls?.map((call) => {
+						update({
+							type: "tool",
+							name: call.tool_name,
+							messageType: "parameters",
+							parameters: call.parameters,
+						});
+						const tool = tools.find((el) => el.name === call.tool_name);
+
+						const toolAnswer: ToolResult = (() => {
+							if (!tool) {
+								return {
+									key: call.tool_name,
+									status: "error",
+									value: "Could not find tool",
+								};
+							}
+							if (call.tool_name === "get_weather") {
+								if (call.parameters.location === "New York") {
+									return {
+										key: call.tool_name,
+										status: "success",
+										value: "It's sunny. 26C. 10% chance of rain.",
+									};
+								} else if (call.parameters.location === "London") {
+									return {
+										key: call.tool_name,
+										status: "success",
+										value: "It's cloudy. 18C. 50% chance of rain.",
+									};
+								} else {
+									return {
+										key: call.tool_name,
+										status: "error",
+										value: "Location not found",
+									};
+								}
+							}
+							return { key: tool.name, status: "error", value: "Not implemented" };
+						})();
+
+						update({
+							type: "tool",
+							name: toolAnswer?.key,
+							messageType: "message",
+							message: toolAnswer?.value,
+						});
+
+						return toolAnswer;
+					});
+				}
+			}
+
 			// inject websearch result & optionally images into the messages
 			const processedMessages = await preprocessMessages(
 				messagesForPrompt,
@@ -412,12 +507,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			let buffer = "";
 
 			try {
-				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
 					messages: processedMessages,
 					preprompt,
 					continueMessage: isContinue,
 					generateSettings: assistant?.generateSettings,
+					toolResults,
 				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
@@ -465,6 +560,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			} catch (e) {
 				hasError = true;
 				update({ type: "status", status: "error", message: (e as Error).message });
+				console.error(e);
 			} finally {
 				// check if no output was generated
 				if (!hasError && messageToWriteTo.content === previousText) {

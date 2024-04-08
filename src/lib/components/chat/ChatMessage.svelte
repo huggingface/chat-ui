@@ -21,7 +21,7 @@
 	import type { Model } from "$lib/types/Model";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { ToolUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 
@@ -131,6 +131,8 @@
 	$: searchUpdates = (message.updates?.filter(({ type }) => type === "webSearch") ??
 		[]) as WebSearchUpdate[];
 
+	$: tools = (message.updates?.filter(({ type }) => type === "tool") ?? []) as ToolUpdate[];
+
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
 
@@ -207,6 +209,32 @@
 					classNames={tokens.length ? "mb-3.5" : ""}
 					webSearchMessages={searchUpdates}
 				/>
+			{/if}
+
+			{#if tools.length > 0}
+				<div
+					class="border-1 rounded-xl border-purple-800/50 bg-purple-800/20 p-3 pb-3 dark:border-purple-800/70 dark:bg-purple-800/30"
+				>
+					{#each tools as tool}
+						{#if tool.messageType === "parameters"}
+							<h3 class="pb-1 text-purple-700 dark:text-purple-300">
+								Calling tool <span class="font-mono font-bold">{tool.name}</span> with the
+								parameters:
+								<ul class="list-inside list-disc">
+									{#each Object.entries(tool.parameters ?? {}) as [k, v]}
+										<li>
+											<span class="font-mono">{k}</span>: <span class="font-bold">{v}</span>
+										</li>
+									{/each}
+								</ul>
+							</h3>
+						{:else if tool.messageType === "message"}
+							<p class="pb-1 pt-1 font-mono text-purple-700 dark:text-purple-300">
+								{" > "}{tool.message}
+							</p>
+						{/if}
+					{/each}
+				</div>
 			{/if}
 
 			<div
