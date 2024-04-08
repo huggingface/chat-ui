@@ -1,4 +1,4 @@
-name: Buid and Publish Image
+name: Build and Publish Image
 
 on:
   push:
@@ -20,6 +20,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Extract package version
+        id: package-version
+        run: echo "::set-output name=VERSION::$(jq -r .version package.json)"
+        if: github.event_name != 'pull_request'
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -28,9 +34,9 @@ jobs:
             ghcr.io/huggingface/chat-ui-db
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.package-version.outputs.VERSION }},enable={{is_default_branch}}
+          flavor: |
+            latest=false
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
