@@ -24,7 +24,6 @@ jobs:
       - name: Extract package version
         id: package-version
         run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
-        if: github.event_name == 'release'
 
       - name: Docker metadata
         id: meta
@@ -67,6 +66,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Extract package version
+        id: package-version
+        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -74,10 +78,9 @@ jobs:
           images: |
             ghcr.io/huggingface/chat-ui
           tags: |
+            type=semver,value=${{ steps.package-version.outputs.version }},enable={{github.event_name == 'release'}}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=sha,enable={{is_default_branch}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
