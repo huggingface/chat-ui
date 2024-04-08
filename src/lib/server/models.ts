@@ -44,11 +44,7 @@ const modelConfig = z.object({
 	datasetUrl: z.string().url().optional(),
 	preprompt: z.string().default(""),
 	prepromptUrl: z.string().url().optional(),
-	chatPromptTemplate: z
-		.string()
-		.default(
-			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}"
-		), // ChatML
+	chatPromptTemplate: z.string().optional(),
 	promptExamples: z
 		.array(
 			z.object({
@@ -86,8 +82,9 @@ async function getChatPromptRender(
 	let tokenizer: PreTrainedTokenizer;
 
 	if (!m.tokenizer) {
-		throw new Error(
-			"No tokenizer specified and no chat prompt template specified for model " + m.name
+		return compileTemplate<ChatTemplateInput>(
+			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
+			m
 		);
 	}
 
