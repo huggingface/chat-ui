@@ -3,7 +3,7 @@ import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
 import { collections } from "$lib/server/database";
 
-const LOCK_KEY = "migrations";
+const LOCK_KEY = "migrations.test";
 
 describe("migrations", () => {
 	it("should not have duplicates guid", async () => {
@@ -21,7 +21,7 @@ describe("migrations", () => {
 		expect(locks.length).toBe(1);
 		expect(semaphores).toBeDefined();
 		expect(semaphores.length).toBe(1);
-		expect(semaphores?.[0].key).toBe("migrations");
+		expect(semaphores?.[0].key).toBe(LOCK_KEY);
 	});
 
 	it("should read the lock correctly", async () => {
