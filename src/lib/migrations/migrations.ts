@@ -63,12 +63,8 @@ export async function checkAndRunMigrations() {
 				continue;
 			}
 
-			if (migration.runEveryTime) {
-				console.log(`[MIGRATIONS] "${migration.name}" should run every time. Applying...`);
-			} else {
-				// otherwise all is good and we cna run the migration
-				console.log(`[MIGRATIONS] "${migration.name}" not applied yet. Applying...`);
-			}
+            // otherwise all is good and we can run the migration
+            console.log(`[MIGRATIONS] "${migration.name}" ${migration.runEveryTime ? "should run every time" : "not applied yet"}. Applying...`);
 
 			await collections.migrationResults.updateOne(
 				{ _id: migration._id },
