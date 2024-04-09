@@ -359,18 +359,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					assistant.rag.allowedDomains.length > 0 ||
 					assistant.rag.allowAllDomains);
 
-			console.log(assistant?.rag, ENABLE_ASSISTANTS_RAG, assistantHasWebSearch);
-			// perform websearch if needed
+			// perform websearch if requested
+			// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
+			// if the assistant is functions enabled, we don't perform it here
+			// since we will add the websearch as a tool
+
 			if (
 				!isContinue &&
 				((webSearch && !conv.assistantId) || (assistantHasWebSearch && !model.functions))
 			) {
-				messageToWriteTo.webSearch = await runWebSearch(
-					conv,
-					messagesForPrompt,
-					update,
-					assistant?.rag
-				);
+				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, {
+					ragSettings: assistant?.rag,
+				});
 			}
 
 			let preprompt = conv.preprompt;
@@ -404,10 +404,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			const endpoint = await model.getEndpoint();
-
-			// function calls
 			let toolResults: ToolResult[] | undefined = undefined;
 
+			// function calls
 			if (model.functions && (assistant?.functionSpec || assistantHasWebSearch)) {
 				// turn functionSpec into a list of tools
 
@@ -464,94 +463,127 @@ export async function POST({ request, locals, params, getClientAddress }) {
 								try {
 									calls = JSON5.parse(block.replace("```json\n", "").slice(0, -3));
 								} catch (e) {
+									update({
+										type: "error",
+										message: (e as Error).message,
+										name: (e as Error).name,
+									});
 									console.error(e);
-									// error parsing the calls, do something here.
+									// error parsing the calls
 								}
 							}
 						}
 					}
 				}
 
-				toolResults = calls
-					?.map((call) => {
-						if (call.tool_name === "directly-answer") {
-							return null;
+				const toolPromises = calls?.map(async (call) => {
+					if (call.tool_name === "directly-answer") {
+						return null;
+					}
+
+					update({
+						type: "tool",
+						name: call.tool_name,
+						messageType: "parameters",
+						parameters: call.parameters,
+					});
+					const tool = tools.find((el) => el.name === call.tool_name);
+
+					let toolAnswer: ToolResult | Promise<ToolResult> | null = (async () => {
+						if (!tool) {
+							return {
+								key: call.tool_name,
+								status: "error",
+								value: "Could not find tool",
+							};
 						}
-
-						update({
-							type: "tool",
-							name: call.tool_name,
-							messageType: "parameters",
-							parameters: call.parameters,
-						});
-						const tool = tools.find((el) => el.name === call.tool_name);
-
-						const toolAnswer: ToolResult | null = (() => {
-							if (!tool) {
+						if (call.tool_name === "get_weather") {
+							if (call.parameters.location === "New York") {
 								return {
 									key: call.tool_name,
-									status: "error",
-									value: "Could not find tool",
+									status: "success",
+									value: "It's sunny. 26C. 10% chance of rain.",
 								};
-							}
-							if (call.tool_name === "get_weather") {
-								if (call.parameters.location === "New York") {
-									return {
-										key: call.tool_name,
-										status: "success",
-										value: "It's sunny. 26C. 10% chance of rain.",
-									};
-								} else if (call.parameters.location === "London") {
-									return {
-										key: call.tool_name,
-										status: "success",
-										value: "It's cloudy. 18C. 50% chance of rain.",
-									};
-								} else {
-									return {
-										key: call.tool_name,
-										status: "error",
-										value: "Location not found",
-									};
-								}
-							} else if (call.tool_name === "calculator") {
-								try {
-									const query = call.parameters.expression.replace(/[^-()\d/*+.]/g, "");
-									return {
-										key: call.tool_name,
-										status: "success",
-										value: eval(query),
-									};
-								} catch {
-									return {
-										key: call.tool_name,
-										status: "error",
-										value: "Invalid expression",
-									};
-								}
-							} else if (call.tool_name === "websearch") {
-								// TODO: Handle websearch
-								return null;
+							} else if (call.parameters.location === "London") {
+								return {
+									key: call.tool_name,
+									status: "success",
+									value: "It's cloudy. 18C. 50% chance of rain.",
+								};
 							} else {
 								return {
 									key: call.tool_name,
 									status: "error",
-									value: "Not implemented",
+									value: "Location not found",
 								};
 							}
-						})();
+						} else if (call.tool_name === "calculator") {
+							try {
+								const query = call.parameters.expression.replace(/[^-()\d/*+.]/g, "");
+								return {
+									key: call.tool_name,
+									status: "success",
+									value: eval(query),
+								};
+							} catch {
+								return {
+									key: call.tool_name,
+									status: "error",
+									value: "Invalid expression",
+								};
+							}
+						} else if (call.tool_name === "websearch") {
+							try {
+								const webSearchToolResults = await runWebSearch(conv, messagesForPrompt, update, {
+									ragSettings: assistant?.rag,
+									query: call.parameters?.query,
+								});
+								const chunks = webSearchToolResults?.contextSources
+									.map(({ context }) => context)
+									.flat()
+									.sort((a, b) => a.idx - b.idx)
+									.map(({ text }) => text)
+									.join(" ");
 
-						if (toolAnswer) {
-							update({
-								type: "tool",
-								name: toolAnswer.key,
-								messageType: "message",
-								message: toolAnswer.value,
-							});
+								return {
+									key: call.tool_name,
+									status: "success",
+									value: chunks,
+								};
+							} catch (e) {
+								return {
+									key: call.tool_name,
+									status: "error",
+									value: "Error within the websearch. Try again later or with a different query",
+								};
+							}
+						} else {
+							return {
+								key: call.tool_name,
+								status: "error",
+								value: "Not implemented",
+							};
 						}
-						return toolAnswer;
-					})
-					.flatMap((el) => (el ? [el] : []));
+					})();
+
+					if (toolAnswer instanceof Promise) {
+						toolAnswer = await toolAnswer;
+					}
+
+					if (toolAnswer) {
+						update({
+							type: "tool",
+							name: toolAnswer.key,
+							messageType: "message",
+							message: toolAnswer.value,
+						});
+					}
+					return toolAnswer;
+				});
+
+				if (toolPromises) {
+					toolResults = (await Promise.all(toolPromises)).flatMap((el) => (el ? [el] : []));
+				}
 			}
 			// inject websearch result & optionally images into the messages
 			const processedMessages = await preprocessMessages(

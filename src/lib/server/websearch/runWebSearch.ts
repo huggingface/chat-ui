@@ -25,11 +25,16 @@ const listSchema = z.array(z.string()).default([]);
 const allowList = listSchema.parse(JSON5.parse(WEBSEARCH_ALLOWLIST));
 const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
 
+export interface RunWebSearchOptions {
+	ragSettings?: Assistant["rag"];
+	query?: string;
+}
+
 export async function runWebSearch(
 	conv: Conversation,
 	messages: Message[],
 	updatePad: (upd: MessageUpdate) => void,
-	ragSettings?: Assistant["rag"]
+	options?: RunWebSearchOptions
 ) {
 	const prompt = messages[messages.length - 1].content;
 	const webSearch: WebSearch = {
@@ -47,10 +52,10 @@ export async function runWebSearch(
 
 	try {
 		// if the assistant specified direct links, skip the websearch
-		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
+		if (options?.ragSettings && options?.ragSettings?.allowedLinks.length > 0) {
 			appendUpdate("Using links specified in Assistant");
 
-			let linksToUse = [...ragSettings.allowedLinks];
+			let linksToUse = [...options.ragSettings.allowedLinks];
 
 			if (ENABLE_LOCAL_FETCH !== "true") {
 				const localLinks = await Promise.all(
@@ -71,14 +76,14 @@ export async function runWebSearch(
 				return { link, hostname: new URL(link).hostname, title: "", text: "" };
 			});
 		} else {
-			webSearch.searchQuery = await generateQuery(messages);
+			webSearch.searchQuery = options?.query ?? (await generateQuery(messages));
 			const searchProvider = getWebSearchProvider();
 			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 
 			let filters = "";
-			if (ragSettings && ragSettings?.allowedDomains.length > 0) {
+			if (options?.ragSettings && options?.ragSettings?.allowedDomains.length > 0) {
 				appendUpdate("Filtering on specified domains");
-				filters += ragSettings.allowedDomains.map((item) => "site:" + item).join(" OR ");
+				filters += options?.ragSettings.allowedDomains.map((item) => "site:" + item).join(" OR ");
 			}
 
 			// handle the global lists
