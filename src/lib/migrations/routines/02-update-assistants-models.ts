@@ -2,12 +2,13 @@ import type { Migration } from ".";
 import { getCollections } from "$lib/server/database";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import type { Assistant } from "$lib/types/Assistant";
-import { models } from "$lib/server/models";
 
 const updateAssistantsModels: Migration = {
 	_id: new ObjectId("5f9f3f3f3f3f3f3f3f3f3f3f"),
 	name: "Update deprecated assistants models",
 	up: async (client) => {
+		const models = (await import("$lib/server/models")).models;
+
 		const { assistants } = getCollections(client);
 
 		const modelIds = models.map((el) => el.id); // string[]
