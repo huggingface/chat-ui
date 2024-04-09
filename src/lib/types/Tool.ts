@@ -8,7 +8,7 @@ export interface Tool {
 	name: string;
 	description: string;
 	parameter_definitions: Record<string, ToolInput>;
-	spec: string;
+	spec?: string;
 }
 
 export interface ToolResult {

@@ -1,6 +1,8 @@
 import type { Tool } from "$lib/types/Tool";
 
-export async function getToolsFromFunctionSpec(spec: string): Promise<Tool[]> {
+export async function getToolsFromFunctionSpec(spec?: string): Promise<Tool[]> {
+	if (!spec) return [];
+
 	return [
 		{
 			name: "get_weather",
@@ -16,11 +18,17 @@ export async function getToolsFromFunctionSpec(spec: string): Promise<Tool[]> {
 			spec,
 		},
 		{
-			name: "directly-answer",
+			name: "calculator",
 			description:
-				"Use this tool to let the user know you wish to answer directly. Do not try to provide any parameters when using this tool.",
-			parameter_definitions: {},
-			spec,
+				"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, and /, as well as parenthesis ().",
+			parameter_definitions: {
+				expression: {
+					description:
+						"The expression to evaluate. Do not include function names or anything else other than digits, +, -, *, /, and ().",
+					type: "str",
+					required: true,
+				},
+			},
 		},
 	];
 }

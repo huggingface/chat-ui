@@ -348,19 +348,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1, functionSpec: 1 } }
 			);
 
-			const assistantHasRAG =
-				ENABLE_ASSISTANTS_RAG === "true" &&
-				assistant &&
-				((assistant.rag &&
-					(assistant.rag.allowedLinks.length > 0 ||
-						assistant.rag.allowedDomains.length > 0 ||
-						assistant.rag.allowAllDomains)) ||
-					assistant.dynamicPrompt);
+			const assistantHasDynamicPrompt =
+				ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
 
+			const assistantHasWebSearch =
+				ENABLE_ASSISTANTS_RAG === "true" &&
+				!!assistant &&
+				!!assistant.rag &&
+				(assistant.rag.allowedLinks.length > 0 ||
+					assistant.rag.allowedDomains.length > 0 ||
+					assistant.rag.allowAllDomains);
+
+			console.log(assistant?.rag, ENABLE_ASSISTANTS_RAG, assistantHasWebSearch);
 			// perform websearch if needed
 			if (
 				!isContinue &&
-				((webSearch && !conv.assistantId) || (assistantHasRAG && !assistant.dynamicPrompt))
+				((webSearch && !conv.assistantId) || (assistantHasWebSearch && !model.functions))
 			) {
 				messageToWriteTo.webSearch = await runWebSearch(
 					conv,
@@ -372,7 +375,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let preprompt = conv.preprompt;
 
-			if (assistant?.dynamicPrompt && preprompt && ENABLE_ASSISTANTS_RAG === "true") {
+			if (assistantHasDynamicPrompt && preprompt) {
 				// process the preprompt
 				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 				let match;
@@ -405,10 +408,44 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			// function calls
 			let toolResults: ToolResult[] | undefined = undefined;
 
-			if (model.functions && assistant?.functionSpec) {
+			if (model.functions && (assistant?.functionSpec || assistantHasWebSearch)) {
 				// turn functionSpec into a list of tools
-				const tools = await getToolsFromFunctionSpec(assistant?.functionSpec);
 
+				let tools = await getToolsFromFunctionSpec(assistant?.functionSpec);
+
+				// add the directly-answer tool
+				tools = [
+					...tools,
+					{
+						name: "directly-answer",
+						description:
+							"Use this tool to let the user know you wish to answer directly. Do not try to provide any parameters when using this tool.",
+						parameter_definitions: {},
+					},
+				];
+
+				// add websearch tool if relevant
+				if (assistantHasWebSearch) {
+					tools = [
+						...tools,
+						{
+							name: "websearch",
+							description:
+								"Use this tool to search web pages for answers that will help answer the user's query.",
+							parameter_definitions:
+								(assistant.rag?.allowedLinks?.length ?? 0) > 0
+									? {}
+									: {
+											query: {
+												required: true,
+												type: "string",
+												description:
+													"A search query which will be used to fetch the most relevant snippets regarding the user's query",
+											},
+									  },
+						},
+					];
+				}
 				let calls: Call[] | undefined = undefined;
 
 				// do the function calling bits here
@@ -419,8 +456,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					tools,
 				})) {
 					if (output.generated_text) {
-						console.log({ toolCheck: output.generated_text });
-
 						// look for a code blocks of ```json and parse them
 						// if they're valid json, add them to the calls array
 						const codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
@@ -437,9 +472,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 
-				// skip if direct answer was requested
-				if (!(calls?.length === 1 && calls[0].tool_name === "directly-answer")) {
-					toolResults = calls?.map((call) => {
+				toolResults = calls
+					?.map((call) => {
+						if (call.tool_name === "directly-answer") {
+							return null;
+						}
+
 						update({
 							type: "tool",
 							name: call.tool_name,
@@ -448,7 +486,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						});
 						const tool = tools.find((el) => el.name === call.tool_name);
 
-						const toolAnswer: ToolResult = (() => {
+						const toolAnswer: ToolResult | null = (() => {
 							if (!tool) {
 								return {
 									key: call.tool_name,
@@ -476,22 +514,45 @@ export async function POST({ request, locals, params, getClientAddress }) {
 										value: "Location not found",
 									};
 								}
+							} else if (call.tool_name === "calculator") {
+								try {
+									const query = call.parameters.expression.replace(/[^-()\d/*+.]/g, "");
+									return {
+										key: call.tool_name,
+										status: "success",
+										value: eval(query),
+									};
+								} catch {
+									return {
+										key: call.tool_name,
+										status: "error",
+										value: "Invalid expression",
+									};
+								}
+							} else if (call.tool_name === "websearch") {
+								// TODO: Handle websearch
+								return null;
+							} else {
+								return {
+									key: call.tool_name,
+									status: "error",
+									value: "Not implemented",
+								};
 							}
-							return { key: tool.name, status: "error", value: "Not implemented" };
 						})();
 
-						update({
-							type: "tool",
-							name: toolAnswer?.key,
-							messageType: "message",
-							message: toolAnswer?.value,
-						});
-
+						if (toolAnswer) {
+							update({
+								type: "tool",
+								name: toolAnswer.key,
+								messageType: "message",
+								message: toolAnswer.value,
+							});
+						}
 						return toolAnswer;
-					});
-				}
+					})
+					.flatMap((el) => (el ? [el] : []));
 			}
-
 			// inject websearch result & optionally images into the messages
 			const processedMessages = await preprocessMessages(
 				messagesForPrompt,
