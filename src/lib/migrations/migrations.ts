@@ -14,14 +14,6 @@ export async function checkAndRunMigrations() {
 	// check if all migrations have already been run
 	const migrationResults = await collections.migrationResults.find().toArray();
 
-	// if all the migrations._id are in the migrationResults, we can exit early
-	if (
-		migrations.every((m) => migrationResults.some((m2) => m2._id.toString() === m._id.toString()))
-	) {
-		console.log("[MIGRATIONS] All migrations already applied.");
-		return;
-	}
-
 	console.log("[MIGRATIONS] Begin check...");
 
 	// connect to the database
@@ -52,12 +44,12 @@ export async function checkAndRunMigrations() {
 	// iterate over all migrations
 	for (const migration of migrations) {
 		// check if the migration has already been applied
-		const existingMigrationResult = migrationResults.find(
-			(m) => m._id.toString() === migration._id.toString()
-		);
+		const shouldRun =
+			migration.runEveryTime ||
+			!migrationResults.find((m) => m._id.toString() === migration._id.toString());
 
 		// check if the migration has already been applied
-		if (existingMigrationResult) {
+		if (!shouldRun) {
 			console.log(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
 		} else {
 			// check the modifiers to see if some cases match
@@ -71,8 +63,12 @@ export async function checkAndRunMigrations() {
 				continue;
 			}
 
-			// otherwise all is good and we cna run the migration
-			console.log(`[MIGRATIONS] "${migration.name}" not applied yet. Applying...`);
+			// otherwise all is good and we can run the migration
+			console.log(
+				`[MIGRATIONS] "${migration.name}" ${
+					migration.runEveryTime ? "should run every time" : "not applied yet"
+				}. Applying...`
+			);
 
 			await collections.migrationResults.updateOne(
 				{ _id: migration._id },

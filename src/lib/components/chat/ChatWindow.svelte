@@ -309,7 +309,9 @@
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
-								placeholder="Ask anything"
+								placeholder={isReadOnly
+									? "This conversation is read-only. Start a new one to continue!"
+									: "Ask anything"}
 								bind:value={message}
 								on:submit={handleSubmit}
 								on:beforeinput={(ev) => {
@@ -353,16 +355,33 @@
 				<p>
 					Model:
 					{#if !assistant}
-						<a href="{base}/settings/{currentModel.id}" class="hover:underline"
-							>{currentModel.displayName}</a
-						>{:else}
-						{@const model = models.find((m) => m.id === assistant?.modelId)}
-						<a
-							href="{base}/settings/assistants/{assistant._id}"
-							class="inline-flex items-center border-b hover:text-gray-600 dark:border-gray-700 dark:hover:text-gray-300"
-							>{model?.displayName}<CarbonCaretDown class="text-xxs" /></a
-						>{/if} <span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may
-					be inaccurate or false.
+						{#if models.find((m) => m.id === currentModel.id)}
+							<a
+								href="{base}/settings/{currentModel.id}"
+								class="inline-flex items-center hover:underline"
+								>{currentModel.displayName}<CarbonCaretDown class="text-xxs" /></a
+							>
+						{:else}
+							<span class="inline-flex items-center line-through dark:border-gray-700">
+								{currentModel.id}
+							</span>
+						{/if}
+					{:else}
+						{@const model = models.find((m) => m.id === currentModel.id)}
+						{#if model}
+							<a
+								href="{base}/settings/assistants/{assistant._id}"
+								class="inline-flex items-center border-b hover:text-gray-600 dark:border-gray-700 dark:hover:text-gray-300"
+								>{model?.displayName}<CarbonCaretDown class="text-xxs" /></a
+							>
+						{:else}
+							<span class="inline-flex items-center line-through dark:border-gray-700">
+								{currentModel.id}
+							</span>
+						{/if}
+					{/if}
+					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
+					or false.
 				</p>
 				{#if messages.length}
 					<button
