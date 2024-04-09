@@ -363,7 +363,7 @@
 							>
 						{:else}
 							<span class="inline-flex items-center line-through dark:border-gray-700">
-								{currentModel.id}
+								Model: {currentModel.id}
 							</span>
 						{/if}
 					{:else}
