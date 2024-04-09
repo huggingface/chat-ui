@@ -45,8 +45,8 @@ export async function checkAndRunMigrations() {
 	for (const migration of migrations) {
 		// check if the migration has already been applied
 		const shouldRun =
-			!migrationResults.find((m) => m._id.toString() === migration._id.toString()) ||
-			migration.runEveryTime;
+			migration.runEveryTime ||
+			!migrationResults.find((m) => m._id.toString() === migration._id.toString());
 
 		// check if the migration has already been applied
 		if (!shouldRun) {
@@ -63,8 +63,12 @@ export async function checkAndRunMigrations() {
 				continue;
 			}
 
-            // otherwise all is good and we can run the migration
-            console.log(`[MIGRATIONS] "${migration.name}" ${migration.runEveryTime ? "should run every time" : "not applied yet"}. Applying...`);
+			// otherwise all is good and we can run the migration
+			console.log(
+				`[MIGRATIONS] "${migration.name}" ${
+					migration.runEveryTime ? "should run every time" : "not applied yet"
+				}. Applying...`
+			);
 
 			await collections.migrationResults.updateOne(
 				{ _id: migration._id },

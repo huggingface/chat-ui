@@ -46,11 +46,7 @@
 		const module = await import("browser-image-resizer");
 		compress = module.readAndCompressImage;
 
-		if (assistant) {
-			modelId = findCurrentModel(models, assistant.modelId).id;
-		} else {
-			modelId = findCurrentModel(models, $settings.activeModel).id;
-		}
+		modelId = findCurrentModel(models, assistant ? assistant.modelId : $settings.activeModel).id;
 	});
 
 	let inputMessage1 = assistant?.exampleInputs[0] ?? "";

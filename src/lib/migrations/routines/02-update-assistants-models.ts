@@ -5,7 +5,7 @@ import type { Assistant } from "$lib/types/Assistant";
 
 const updateAssistantsModels: Migration = {
 	_id: new ObjectId("5f9f3f3f3f3f3f3f3f3f3f3f"),
-	name: "Update deprecated assistants models",
+	name: "Update deprecated models in assistants with the default model",
 	up: async (client) => {
 		const models = (await import("$lib/server/models")).models;
 

@@ -45,7 +45,6 @@ const migration: Migration = {
 		await assistants.updateMany({}, { $unset: { searchTokens: "" } });
 		return true;
 	},
-	runEveryTime: false,
 };
 
 export default migration;

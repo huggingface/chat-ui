@@ -10,7 +10,7 @@ export interface Migration {
 	down?: (client: MongoClient) => Promise<boolean>;
 	runForFreshInstall?: "only" | "never"; // leave unspecified to run for both
 	runForHuggingChat?: "only" | "never"; // leave unspecified to run for both
-	runEveryTime: boolean;
+	runEveryTime?: boolean;
 }
 
 export const migrations: Migration[] = [updateSearchAssistant, updateAssistantsModels];
