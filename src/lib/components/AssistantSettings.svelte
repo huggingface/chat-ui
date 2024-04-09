@@ -17,6 +17,7 @@
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
 	import HoverTooltip from "./HoverTooltip.svelte";
+	import { findCurrentModel } from "$lib/utils/models";
 
 	type ActionData = {
 		error: boolean;
@@ -46,9 +47,9 @@
 		compress = module.readAndCompressImage;
 
 		if (assistant) {
-			modelId = assistant.modelId;
+			modelId = findCurrentModel(models, assistant.modelId).id;
 		} else {
-			modelId = models.find((model) => model.id === $settings.activeModel)?.id ?? models[0].id;
+			modelId = findCurrentModel(models, $settings.activeModel).id;
 		}
 	});
 
