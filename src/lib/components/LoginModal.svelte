@@ -19,12 +19,13 @@
 			<Logo classNames="mr-1" />
 			{PUBLIC_APP_NAME}
 		</h2>
-		<p class="text-lg font-semibold leading-snug text-gray-800" style="text-wrap: balance;">
+		<p class="text-balance text-lg font-semibold leading-snug text-gray-800">
 			{PUBLIC_APP_DESCRIPTION}
 		</p>
-		<p class="rounded-xl border bg-white/80 p-2 text-base text-gray-800">
-			You have reached the guest message limit, please Sign In with your Hugging Face account to
-			continue.
+		<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
+			You have reached the guest message limit, <strong class="font-semibold"
+				>Sign In with a free Hugging Face account</strong
+			> to continue using HuggingChat.
 		</p>
 
 		<form
