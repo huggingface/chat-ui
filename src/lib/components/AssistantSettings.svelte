@@ -17,6 +17,7 @@
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
 	import HoverTooltip from "./HoverTooltip.svelte";
+	import { findCurrentModel } from "$lib/utils/models";
 
 	type ActionData = {
 		error: boolean;
@@ -45,11 +46,7 @@
 		const module = await import("browser-image-resizer");
 		compress = module.readAndCompressImage;
 
-		if (assistant) {
-			modelId = assistant.modelId;
-		} else {
-			modelId = models.find((model) => model.id === $settings.activeModel)?.id ?? models[0].id;
-		}
+		modelId = findCurrentModel(models, assistant ? assistant.modelId : $settings.activeModel).id;
 	});
 
 	let inputMessage1 = assistant?.exampleInputs[0] ?? "";
@@ -526,7 +523,7 @@
 			{/if}
 		</div>
 
-		<div class="col-span-1 flex h-full flex-col">
+		<div class="relative col-span-1 flex h-full flex-col">
 			<div class="mb-1 flex justify-between text-sm">
 				<span class="font-semibold"> Instructions (System Prompt) </span>
 				{#if dynamicPrompt && templateVariables.length}
@@ -572,26 +569,25 @@
 
 				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
 			</div>
-		</div>
-
-		<div class="fixed bottom-6 right-6 ml-auto mt-6 flex w-fit justify-end gap-2 sm:absolute">
-			<a
-				href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
-				class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
-			>
-				Cancel
-			</a>
-			<button
-				type="submit"
-				disabled={loading}
-				aria-disabled={loading}
-				class="flex items-center justify-center rounded-full bg-black px-8 py-2 font-semibold"
-				class:bg-gray-200={loading}
-				class:text-gray-600={loading}
-				class:text-white={!loading}
-			>
-				{assistant ? "Save" : "Create"}
-			</button>
+			<div class="absolute bottom-6 flex w-full justify-end gap-2 md:right-0 md:w-fit">
+				<a
+					href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
+					class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
+				>
+					Cancel
+				</a>
+				<button
+					type="submit"
+					disabled={loading}
+					aria-disabled={loading}
+					class="flex items-center justify-center rounded-full bg-black px-8 py-2 font-semibold"
+					class:bg-gray-200={loading}
+					class:text-gray-600={loading}
+					class:text-white={!loading}
+				>
+					{assistant ? "Save" : "Create"}
+				</button>
+			</div>
 		</div>
 	</div>
 </form>

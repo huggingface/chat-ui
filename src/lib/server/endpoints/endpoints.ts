@@ -6,11 +6,17 @@ import endpointAws, { endpointAwsParametersSchema } from "./aws/endpointAws";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/endpointLlamacpp";
 import endpointOllama, { endpointOllamaParametersSchema } from "./ollama/endpointOllama";
+import endpointVertex, { endpointVertexParametersSchema } from "./google/endpointVertex";
+
 import {
 	endpointAnthropic,
 	endpointAnthropicParametersSchema,
 } from "./anthropic/endpointAnthropic";
 import type { Model } from "$lib/types/Model";
+import endpointCloudflare, {
+	endpointCloudflareParametersSchema,
+} from "./cloudflare/endpointCloudflare";
+import { endpointCohere, endpointCohereParametersSchema } from "./cohere/endpointCohere";
 
 // parameters passed when generating text
 export interface EndpointParameters {
@@ -39,6 +45,9 @@ export const endpoints = {
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
+	vertex: endpointVertex,
+	cloudflare: endpointCloudflare,
+	cohere: endpointCohere,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -48,5 +57,8 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointTgiParametersSchema,
 	endpointLlamacppParametersSchema,
 	endpointOllamaParametersSchema,
+	endpointVertexParametersSchema,
+	endpointCloudflareParametersSchema,
+	endpointCohereParametersSchema,
 ]);
 export default endpoints;
