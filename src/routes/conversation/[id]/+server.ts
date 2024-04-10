@@ -448,7 +448,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				const toolPromises = calls?.map(async (call) => {
-					if (call.tool_name === "directly-answer") {
+					if (call.tool_name === "directly-answer" || call.tool_name === "directly_answer") {
 						return null;
 					}
 
