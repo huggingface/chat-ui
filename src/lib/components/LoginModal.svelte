@@ -13,18 +13,19 @@
 
 <Modal on:close>
 	<div
-		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-primary-500/40 via-primary-500/10 to-primary-500/0 px-5 pb-8 pt-9 text-center"
+		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center"
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="mr-1" />
 			{PUBLIC_APP_NAME}
 		</h2>
-		<p class="text-lg font-semibold leading-snug text-gray-800" style="text-wrap: balance;">
+		<p class="text-balance text-lg font-semibold leading-snug text-gray-800">
 			{PUBLIC_APP_DESCRIPTION}
 		</p>
-		<p class="rounded-xl border bg-white/80 p-2 text-base text-gray-800">
-			You have reached the guest message limit, please Sign In with your Hugging Face account to
-			continue.
+		<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
+			You have reached the guest message limit, <strong class="font-semibold"
+				>Sign In with a free Hugging Face account</strong
+			> to continue using HuggingChat.
 		</p>
 
 		<form
