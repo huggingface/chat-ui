@@ -412,38 +412,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				let tools = await getToolsFromFunctionSpec(assistant?.functionSpec);
 
-				// add the directly-answer tool
-				tools = [
-					...tools,
-					{
-						name: "directly-answer",
-						description:
-							"Use this tool to let the user know you wish to answer directly. Do not try to provide any parameters when using this tool.",
-						parameter_definitions: {},
-					},
-				];
-
-				// add websearch tool if relevant
-				if (assistantHasWebSearch) {
-					tools = [
-						...tools,
-						{
-							name: "websearch",
-							description:
-								"Use this tool to search web pages for answers that will help answer the user's query.",
-							parameter_definitions:
-								(assistant.rag?.allowedLinks?.length ?? 0) > 0
-									? {}
-									: {
-											query: {
-												required: true,
-												type: "string",
-												description:
-													"A search query which will be used to fetch the most relevant snippets regarding the user's query",
-											},
-									  },
-						},
-					];
+				// remove websearch tool if relevant
+				if (!assistantHasWebSearch) {
+					tools = tools.filter(({ name }) => name !== "websearch");
 				}
 				let calls: Call[] | undefined = undefined;
 
@@ -497,42 +468,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 								value: "Could not find tool",
 							};
 						}
-						if (call.tool_name === "get_weather") {
-							if (call.parameters.location === "New York") {
-								return {
-									key: call.tool_name,
-									status: "success",
-									value: "It's sunny. 26C. 10% chance of rain.",
-								};
-							} else if (call.parameters.location === "London") {
-								return {
-									key: call.tool_name,
-									status: "success",
-									value: "It's cloudy. 18C. 50% chance of rain.",
-								};
-							} else {
-								return {
-									key: call.tool_name,
-									status: "error",
-									value: "Location not found",
-								};
-							}
-						} else if (call.tool_name === "calculator") {
-							try {
-								const query = call.parameters.expression.replace(/[^-()\d/*+.]/g, "");
-								return {
-									key: call.tool_name,
-									status: "success",
-									value: eval(query),
-								};
-							} catch {
-								return {
-									key: call.tool_name,
-									status: "error",
-									value: "Invalid expression",
-								};
-							}
-						} else if (call.tool_name === "websearch") {
+
+						if (tool.call) {
+							return await tool.call(call.parameters);
+						}
+
+						if (tool.name === "websearch") {
 							try {
 								const webSearchToolResults = await runWebSearch(conv, messagesForPrompt, update, {
 									ragSettings: assistant?.rag,
