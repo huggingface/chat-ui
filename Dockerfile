@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/app/.npm \
 COPY --link --chown=1000 . .
 
 RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local \
-    npm run build
+        npm run build && npm run build -- --config vite.telemetry.config.ts
 
 FROM node:20-slim
 
@@ -29,4 +29,4 @@ COPY --from=builder-production /app/node_modules /app/node_modules
 COPY --link --chown=1000 package.json /app/package.json
 COPY --from=builder /app/build /app/build
 
-CMD pm2 start /app/build/index.js -i $CPU_CORES --no-daemon
+CMD pm2 start /app/build/index.js --node-args="--require /app/build/telemetry.cjs" -i $CPU_CORES --no-daemon

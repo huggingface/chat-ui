@@ -23,6 +23,7 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
+import { metrics } from "@opentelemetry/api";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -242,6 +243,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			},
 			messageId
 		);
+
+		const meter = metrics.getMeter("chat-ui");
+		const counter = meter.createCounter("chat-ui.conversations.messages.count", {
+			description: "The number of user messages created",
+		});
+		counter.add(1, {
+			"chat-ui.model": "values.model",
+			"user.email": locals.user?.email || undefined,
+		});
 
 		messageToWriteToId = addChildren(
 			conv,
