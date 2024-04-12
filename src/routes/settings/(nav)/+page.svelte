@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from "svelte";
-
 	import Modal from "$lib/components/Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
@@ -14,8 +12,6 @@
 	import { PUBLIC_APP_DATA_SHARING } from "$env/static/public";
 
 	let isConfirmingDeletion = false;
-
-	const dispatch = createEventDispatcher<{ close: void }>();
 
 	let settings = useSettingsStore();
 </script>
@@ -71,7 +67,7 @@
 		<Modal on:close={() => (isConfirmingDeletion = false)}>
 			<form
 				use:enhance={() => {
-					dispatch("close");
+					isConfirmingDeletion = false;
 				}}
 				method="post"
 				action="{base}/conversations?/delete"
