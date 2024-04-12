@@ -422,7 +422,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
 						if (!output.token.special) {
-							// 33% chance to send the stream update, with a max buffer size of 30 chars
 							buffer += output.token.text;
 
 							// send the first 5 chars
