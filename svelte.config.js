@@ -1,29 +1,31 @@
-import adapter from "@sveltejs/adapter-node";
-import { vitePreprocess } from "@sveltejs/kit/vite";
-import dotenv from "dotenv";
+import adapter from '@sveltejs/adapter-vercel';
+import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import dotenv from 'dotenv';
 
-dotenv.config({ path: "./.env.local" });
-dotenv.config({ path: "./.env" });
+dotenv.config({ path: './.env.local' });
+dotenv.config({ path: './.env' });
 
 process.env.PUBLIC_VERSION = process.env.npm_package_version;
 
-/** @type {import('@sveltejs/kit').Config} */
-const config = {
-	// Consult https://kit.svelte.dev/docs/integrations#preprocessors
-	// for more information about preprocessors
-	preprocess: vitePreprocess(),
+export default defineConfig({
+  kit: {
+    adapter: adapter(),
 
-	kit: {
-		adapter: adapter(),
+    // Opt-in to hydration
+    hydrate: true,
 
-		paths: {
-			base: process.env.APP_BASE || "",
-		},
-		csrf: {
-			// handled in hooks.server.ts, because we can have multiple valid origins
-			checkOrigin: false,
-		},
-	},
-};
+    // Set paths
+    paths: {
+      base: process.env.APP_BASE || '',
+    },
 
-export default config;
+    // Opt-out of built-in CSRF protection
+    csrf: false,
+
+    // Configure Vite
+    vite: () => ({
+      plugins: [svelte()],
+    }),
+  },
+});
