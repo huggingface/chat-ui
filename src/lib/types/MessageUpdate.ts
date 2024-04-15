@@ -14,6 +14,7 @@ export type TextStreamUpdate = {
 interface ToolUpdateBase {
 	type: "tool";
 	name: Tool["name"];
+	uuid: string;
 }
 
 interface ToolUpdateParams extends ToolUpdateBase {

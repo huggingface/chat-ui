@@ -32,6 +32,7 @@ import { getToolsFromFunctionSpec } from "$lib/utils/getToolsFromFunctionSpec.js
 import JSON5 from "json5";
 import type { Call, ToolResult } from "$lib/types/Tool.js";
 import { HfInference } from "@huggingface/inference";
+import { v4 } from "uuid";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -454,6 +455,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				const toolPromises = calls?.map(async (call) => {
+					const uuid = v4();
+
 					if (call.tool_name === "directly-answer" || call.tool_name === "directly_answer") {
 						return null;
 					}
@@ -463,6 +466,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						name: call.tool_name,
 						messageType: "parameters",
 						parameters: call.parameters,
+						uuid,
 					});
 					const tool = tools.find((el) => el.name === call.tool_name);
 
@@ -544,6 +548,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							name: toolAnswer.key,
 							messageType: "message",
 							message: toolAnswer.value,
+							uuid,
 						});
 					}
 					return toolAnswer;

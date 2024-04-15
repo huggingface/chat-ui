@@ -131,7 +131,18 @@
 	$: searchUpdates = (message.updates?.filter(({ type }) => type === "webSearch") ??
 		[]) as WebSearchUpdate[];
 
-	$: tools = (message.updates?.filter(({ type }) => type === "tool") ?? []) as ToolUpdate[];
+	// filter all updates with type === "tool" then group them by uuid field
+
+	$: tools = message.updates
+		?.filter(({ type }) => type === "tool")
+		?.reduce((acc, update) => {
+			if (update.type !== "tool") {
+				return acc;
+			}
+			acc[update.uuid] = acc[update.uuid] ?? [];
+			acc[update.uuid].push(update);
+			return acc;
+		}, {} as Record<string, ToolUpdate[]>);
 
 	$: downloadLink =
 		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
@@ -232,30 +243,39 @@
 				/>
 			{/if}
 
-			{#if tools.length > 0}
-				<div
-					class="border-1 mb-3 rounded-xl border-purple-800/50 bg-purple-800/20 p-3 dark:border-purple-800/70 dark:bg-purple-800/30"
-				>
-					{#each tools as tool}
-						{#if tool.messageType === "parameters"}
-							<h3 class="pb-1 text-purple-700 dark:text-purple-300">
-								Calling tool <span class="font-mono font-bold">{tool.name}</span> with the
-								parameters:
-								<ul class="list-inside list-disc">
-									{#each Object.entries(tool.parameters ?? {}) as [k, v]}
-										<li>
-											<span class="font-mono">{k}</span>: <span class="font-bold">{v}</span>
-										</li>
-									{/each}
-								</ul>
-							</h3>
-						{:else if tool.messageType === "message"}
-							<p class="pb-1 pt-1 font-mono text-purple-700 dark:text-purple-300">
-								{" > "}{tool.message}
-							</p>
+			{#if tools}
+				{#each Object.values(tools) as tool}
+					{#if tool.length > 0}
+						{@const toolName = tool.filter((t) => t.messageType === "parameters")[0].name}
+						{#if toolName}
+							<details
+								class="border-1 group/tool mb-3 w-fit cursor-pointer rounded-xl border-purple-800/50 bg-purple-800/20 p-3 text-purple-700 transition-all dark:border-purple-800/70 dark:bg-purple-800/30 dark:text-purple-300"
+							>
+								<summary class="pb-1 text-purple-700 transition-all dark:text-purple-300">
+									Calling tool <span class="font-mono font-bold">{toolName}</span>
+								</summary>
+								{#each tool as toolUpdate}
+									<div class="my-1 w-full border-b-2 border-purple-500/50" />
+									{#if toolUpdate.messageType === "parameters"}
+										<h3 class="font-bold">Parameters:</h3>
+										<ul class="list-inside list-disc">
+											{#each Object.entries(toolUpdate.parameters ?? {}) as [k, v]}
+												<li>
+													<span class="font-mono">{k}</span>: <span class="font-bold">{v}</span>
+												</li>
+											{/each}
+										</ul>
+									{:else if toolUpdate.messageType === "message"}
+										<h3 class="font-bold">Result:</h3>
+										<p class="pb-1 pt-1 font-mono">
+											{" > "}{toolUpdate.message}
+										</p>
+									{/if}
+								{/each}
+							</details>
 						{/if}
-					{/each}
-				</div>
+					{/if}
+				{/each}
 			{/if}
 
 			<div
