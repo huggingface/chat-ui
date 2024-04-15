@@ -136,7 +136,7 @@
 				href={`${base}/settings/assistants/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
-				<CarbonAdd />Create New assistant
+				<CarbonAdd />Create new assistant
 			</a>
 		</div>
 
