@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { marked } from "marked";
+	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher, tick } from "svelte";
@@ -82,11 +82,11 @@
 	};
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const { extensions, ...defaults } = marked.getDefaults() as marked.MarkedOptions & {
+	const { extensions, ...defaults } = marked.getDefaults() as MarkedOptions & {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		extensions: any;
 	};
-	const options: marked.MarkedOptions = {
+	const options: MarkedOptions = {
 		...defaults,
 		gfm: true,
 		breaks: true,
