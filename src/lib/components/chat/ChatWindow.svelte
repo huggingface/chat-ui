@@ -367,7 +367,7 @@
 							</span>
 						{/if}
 					{:else}
-						{@const model = models.find((m) => m.id === currentModel.id)}
+						{@const model = models.find((m) => m.id === assistant?.modelId)}
 						{#if model}
 							<a
 								href="{base}/settings/assistants/{assistant._id}"
