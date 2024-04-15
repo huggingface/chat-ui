@@ -10,7 +10,9 @@ export const endpointLangserveParametersSchema = z.object({
 	url: z.string().url(),
 });
 
-export function endpointLangserve(input: z.input<typeof endpointLangserveParametersSchema>): Endpoint {
+export function endpointLangserve(
+	input: z.input<typeof endpointLangserveParametersSchema>
+): Endpoint {
 	const { url, model } = endpointLangserveParametersSchema.parse(input);
 
 	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
@@ -27,7 +29,7 @@ export function endpointLangserve(input: z.input<typeof endpointLangserveParamet
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				input: {"text": prompt},
+				input: { text: prompt },
 			}),
 		});
 
@@ -74,7 +76,7 @@ export function endpointLangserve(input: z.input<typeof endpointLangserveParamet
 
 					// Stopping with end event
 					if (eventData.startsWith("event: end")) {
-						stop = true
+						stop = true;
 						yield {
 							token: {
 								id: tokenId++,
@@ -89,7 +91,7 @@ export function endpointLangserve(input: z.input<typeof endpointLangserveParamet
 						continue;
 					}
 
-					if (eventData.startsWith("event: data") && (jsonString.startsWith("data: "))) {
+					if (eventData.startsWith("event: data") && jsonString.startsWith("data: ")) {
 						jsonString = jsonString.slice(6);
 						let data = null;
 

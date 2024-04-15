@@ -17,7 +17,9 @@ import endpointCloudflare, {
 	endpointCloudflareParametersSchema,
 } from "./cloudflare/endpointCloudflare";
 import { endpointCohere, endpointCohereParametersSchema } from "./cohere/endpointCohere";
-import endpointLangserve, { endpointLangserveParametersSchema } from "./langserve/endpointLangserve";
+import endpointLangserve, {
+	endpointLangserveParametersSchema,
+} from "./langserve/endpointLangserve";
 
 // parameters passed when generating text
 export interface EndpointParameters {
