@@ -29,7 +29,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 			throw error(404, "Conversation not found");
 		}
 	} else {
-		// check if the user has access to the conversation
+		// look for the conversation in shared conversations
 		const conv = await collections.sharedConversations.findOne({
 			_id: params.id,
 		});

@@ -204,6 +204,27 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
+			{#if message.files && message.files.length > 0}
+				<div class="grid w-fit grid-cols-2 gap-5">
+					{#each message.files as file}
+						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
+						{#if file.length === 64}
+							<img
+								src={$page.url.pathname + "/output/" + file}
+								alt="input from user"
+								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+							/>
+						{:else}
+							<!-- handle the case where this is a base64 encoded image -->
+							<img
+								src={"data:image/*;base64," + file}
+								alt="input from user"
+								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+							/>
+						{/if}
+					{/each}
+				</div>
+			{/if}
 			{#if searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults
 					classNames={tokens.length ? "mb-3.5" : ""}
@@ -213,7 +234,7 @@
 
 			{#if tools.length > 0}
 				<div
-					class="border-1 rounded-xl border-purple-800/50 bg-purple-800/20 p-3 pb-3 dark:border-purple-800/70 dark:bg-purple-800/30"
+					class="border-1 mb-3 rounded-xl border-purple-800/50 bg-purple-800/20 p-3 dark:border-purple-800/70 dark:bg-purple-800/30"
 				>
 					{#each tools as tool}
 						{#if tool.messageType === "parameters"}

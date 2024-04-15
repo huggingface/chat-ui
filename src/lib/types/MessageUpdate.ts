@@ -48,10 +48,16 @@ export type ErrorUpdate = {
 	name: string;
 };
 
+export type FileUpdate = {
+	type: "file";
+	sha: string;
+};
+
 export type MessageUpdate =
 	| FinalAnswer
 	| TextStreamUpdate
 	| ToolUpdate
 	| WebSearchUpdate
 	| StatusUpdate
-	| ErrorUpdate;
+	| ErrorUpdate
+	| FileUpdate;

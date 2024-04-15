@@ -246,6 +246,9 @@
 				} else if (update.type === "tool") {
 					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
+				} else if (update.type === "file") {
+					messageToWriteTo.files = [...(messageToWriteTo.files ?? []), update.sha];
+					messages = [...messages];
 				} else if (update.type === "error") {
 					error.set(update.message);
 					messageUpdatesAbortController.abort();

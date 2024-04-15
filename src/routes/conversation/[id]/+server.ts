@@ -1,4 +1,9 @@
-import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import {
+	MESSAGES_BEFORE_LOGIN,
+	ENABLE_ASSISTANTS_RAG,
+	HF_TOKEN,
+	HF_ACCESS_TOKEN,
+} from "$env/static/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -26,6 +31,7 @@ import { isURLLocal } from "$lib/server/isURLLocal.js";
 import { getToolsFromFunctionSpec } from "$lib/utils/getToolsFromFunctionSpec.js";
 import JSON5 from "json5";
 import type { Call, ToolResult } from "$lib/types/Tool.js";
+import { HfInference } from "@huggingface/inference";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -498,6 +504,27 @@ export async function POST({ request, locals, params, getClientAddress }) {
 									value: "Error within the websearch. Try again later or with a different query",
 								};
 							}
+						} else if (tool.name === "text2img") {
+							const inference = new HfInference(HF_TOKEN ?? HF_ACCESS_TOKEN);
+							const img = await inference.textToImage({
+								model: "runwayml/stable-diffusion-v1-5",
+								inputs: call.parameters?.prompt,
+							});
+
+							const sha = await uploadFile(img, conv);
+
+							messageToWriteTo.files = [...(messageToWriteTo.files ?? []), sha];
+
+							update({
+								type: "file",
+								sha,
+							});
+
+							return {
+								key: call.tool_name,
+								status: "success",
+								value: `An image has been generated for the following prompt: ${call.parameters?.prompt}. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,
+							};
 						} else {
 							return {
 								key: call.tool_name,
