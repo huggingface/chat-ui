@@ -15,7 +15,7 @@ export function endpointLangserve(
 ): Endpoint {
 	const { url, model } = endpointLangserveParametersSchema.parse(input);
 
-	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
+	return async ({ messages, preprompt, continueMessage }) => {
 		const prompt = await buildPrompt({
 			messages,
 			continueMessage,
@@ -63,7 +63,7 @@ export function endpointLangserve(
 				// Accumulate the data chunk
 				accumulatedData += out.value;
 				// Keep read data to check event type
-				let eventData = out.value;
+				const eventData = out.value;
 
 				// Process each complete JSON object in the accumulated data
 				while (accumulatedData.includes("\n")) {
