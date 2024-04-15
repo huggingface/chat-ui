@@ -1,6 +1,6 @@
 import { buildPrompt } from "$lib/buildPrompt";
 import { z } from "zod";
-import type { Endpoint } from "../../../../../../chat-ui-notworking/src/lib/server/endpoints/endpoints";
+import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
 export const endpointLangserveParametersSchema = z.object({
