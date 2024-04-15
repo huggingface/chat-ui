@@ -58,6 +58,8 @@
 
 	$: message = messages.find((m) => m.id === id) ?? ({} as Message);
 
+	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
+
 	const dispatch = createEventDispatcher<{
 		retry: { content?: string; id: Message["id"] };
 		vote: { score: Message["score"]; id: Message["id"] };
@@ -144,8 +146,7 @@
 			return acc;
 		}, {} as Record<string, ToolUpdate[]>);
 
-	$: downloadLink =
-		message.from === "user" ? `${$page.url.pathname}/message/${message.id}/prompt` : undefined;
+	$: downloadLink = urlNotTrailing + `/message/${message.id}/prompt`;
 
 	let webSearchIsDone = true;
 
@@ -221,7 +222,7 @@
 						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
 						{#if file.length === 64}
 							<img
-								src={$page.url.pathname + "/output/" + file}
+								src={urlNotTrailing + "/output/" + file}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>
@@ -380,7 +381,7 @@
 						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
 						{#if file.length === 64}
 							<img
-								src={$page.url.pathname + "/output/" + file}
+								src={urlNotTrailing + "/output/" + file}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>
