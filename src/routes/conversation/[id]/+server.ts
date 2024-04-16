@@ -368,7 +368,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let preprompt = conv.preprompt;
 
-			if (assistantHasDynamicPrompt) {
+			if (assistantHasDynamicPrompt && preprompt) {
 				// process the preprompt
 				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 				let match;
