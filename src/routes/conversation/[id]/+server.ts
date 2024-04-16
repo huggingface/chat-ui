@@ -345,20 +345,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
 			);
 
-			const assistantHasRAG =
+			const assistantHasDynamicPrompt =
+				ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
+
+			const assistantHasWebSearch =
 				ENABLE_ASSISTANTS_RAG === "true" &&
-				assistant &&
-				((assistant.rag &&
-					(assistant.rag.allowedLinks.length > 0 ||
-						assistant.rag.allowedDomains.length > 0 ||
-						assistant.rag.allowAllDomains)) ||
-					assistant.dynamicPrompt);
+				!!assistant &&
+				!!assistant.rag &&
+				(assistant.rag.allowedLinks.length > 0 ||
+					assistant.rag.allowedDomains.length > 0 ||
+					assistant.rag.allowAllDomains);
 
 			// perform websearch if needed
-			if (
-				!isContinue &&
-				((webSearch && !conv.assistantId) || (assistantHasRAG && !assistant.dynamicPrompt))
-			) {
+			if (!isContinue && (webSearch || assistantHasWebSearch)) {
 				messageToWriteTo.webSearch = await runWebSearch(
 					conv,
 					messagesForPrompt,
@@ -369,7 +368,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let preprompt = conv.preprompt;
 
-			if (assistant?.dynamicPrompt && preprompt && ENABLE_ASSISTANTS_RAG === "true") {
+			if (assistantHasDynamicPrompt && preprompt) {
 				// process the preprompt
 				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 				let match;
