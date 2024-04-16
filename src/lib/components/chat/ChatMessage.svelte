@@ -24,6 +24,7 @@
 	import type { ToolUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
+	import Modal from "../Modal.svelte";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -191,7 +192,29 @@
 	const convTreeStore = useConvTreeStore();
 
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
+
+	$: modalImageToShow = "";
 </script>
+
+{#if modalImageToShow}
+	<!-- show the image file full screen, click outside to exit -->
+	<Modal on:close={() => (modalImageToShow = '')}>
+		{#if modalImageToShow.length === 64}
+			<img
+				src={urlNotTrailing + "/output/" + modalImageToShow}
+				alt="input from user"
+				class="aspect-auto"
+			/>
+		{:else}
+			<!-- handle the case where this is a base64 encoded image -->
+			<img
+				src={"data:image/*;base64," + modalImageToShow}
+				alt="input from user"
+				class="aspect-auto"
+			/>
+		{/if}
+	</Modal>
+{/if}
 
 {#if message.from === "assistant"}
 	<div
@@ -220,20 +243,22 @@
 				<div class="grid w-fit grid-cols-2 gap-5">
 					{#each message.files as file}
 						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
-						{#if file.length === 64}
-							<img
-								src={urlNotTrailing + "/output/" + file}
-								alt="input from user"
-								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-							/>
-						{:else}
-							<!-- handle the case where this is a base64 encoded image -->
-							<img
-								src={"data:image/*;base64," + file}
-								alt="input from user"
-								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-							/>
-						{/if}
+						<button on:click={() => (modalImageToShow = file)}>
+							{#if file.length === 64}
+								<img
+									src={urlNotTrailing + "/output/" + file}
+									alt="output from assistant"
+									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
+								/>
+							{:else}
+								<!-- handle the case where this is a base64 encoded image -->
+								<img
+									src={"data:image/*;base64," + file}
+									alt="output from assistant"
+									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
+								/>
+							{/if}
+						</button>
 					{/each}
 				</div>
 			{/if}
@@ -378,21 +403,22 @@
 			{#if message.files && message.files.length > 0}
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
-						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
-						{#if file.length === 64}
-							<img
-								src={urlNotTrailing + "/output/" + file}
-								alt="input from user"
-								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-							/>
-						{:else}
-							<!-- handle the case where this is a base64 encoded image -->
-							<img
-								src={"data:image/*;base64," + file}
-								alt="input from user"
-								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-							/>
-						{/if}
+						<button on:click={() => (modalImageToShow = file)}>
+							{#if file.length === 64}
+								<img
+									src={urlNotTrailing + "/output/" + file}
+									alt="input from user"
+									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
+								/>
+							{:else}
+								<!-- handle the case where this is a base64 encoded image -->
+								<img
+									src={"data:image/*;base64," + file}
+									alt="input from user"
+									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
+								/>
+							{/if}
+						</button>
 					{/each}
 				</div>
 			{/if}
