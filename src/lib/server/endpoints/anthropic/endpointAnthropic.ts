@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { ANTHROPIC_API_KEY } from "$env/static/private";
-import type { Endpoint } from "../endpoints";
+import type { Endpoint, EndpointMessage } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources";
+import type { MessageFile } from "$lib/types/Message";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -12,6 +14,8 @@ export const endpointAnthropicParametersSchema = z.object({
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 });
+
+type NonSystemMessage = EndpointMessage & { from: "user" | "assistant" };
 
 export async function endpointAnthropic(
 	input: z.input<typeof endpointAnthropicParametersSchema>
@@ -38,15 +42,19 @@ export async function endpointAnthropic(
 			system = messages[0].content;
 		}
 
-		const messagesFormatted = messages
-			.filter((message) => message.from !== "system")
-			.map((message) => ({
-				role: message.from,
-				content: message.content,
-			})) as unknown as {
-			role: "user" | "assistant";
-			content: string;
-		}[];
+		const messagesFormatted = await Promise.all(
+			messages
+				.filter((message): message is NonSystemMessage => message.from !== "system")
+				.map<Promise<MessageParam>>(async (message) => {
+					return {
+						role: message.from,
+						content: [
+							...(message.files ?? []).map(fileToImageBlock),
+							{ type: "text", text: message.content },
+						],
+					};
+				})
+		);
 
 		let tokenId = 0;
 
@@ -94,5 +102,22 @@ export async function endpointAnthropic(
 				} satisfies TextGenerationStreamOutput;
 			}
 		})();
+	};
+}
+
+const supportedMimeTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+function fileToImageBlock(file: MessageFile): ImageBlockParam {
+	if (!supportedMimeTypes.includes(file.mime)) {
+		throw new Error(
+			`Found unsupported mime type: "${file.mime}". Supported: ${supportedMimeTypes.join(", ")}`
+		);
+	}
+	return {
+		type: "image",
+		source: {
+			type: "base64",
+			media_type: file.mime as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+			data: file.value,
+		},
 	};
 }

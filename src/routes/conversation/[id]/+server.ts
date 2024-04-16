@@ -13,14 +13,13 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
-import sizeof from "image-size";
 import type { Assistant } from "$lib/types/Assistant";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
-import { preprocessMessages } from "$lib/server/preprocessMessages.js";
+import { preprocessMessages } from "$lib/server/endpoints/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
 
@@ -147,44 +146,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			files: z.optional(z.array(z.string())),
+			files: z.optional(
+				z.array(z.object({ type: z.literal("base64"), value: z.string(), mime: z.string() }))
+			),
 		})
 		.parse(json);
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		throw error(400, "Message too long.");
 	}
+
 	// files is an array of base64 strings encoding Blob objects
 	// we need to convert this array to an array of File objects
-
-	const files = b64files?.map((file) => {
-		const blob = Buffer.from(file, "base64");
-		return new File([blob], "image.png");
-	});
+	const files =
+		b64files?.map((file) => {
+			const blob = Buffer.from(file.value, "base64");
+			return new File([blob], "file", { type: file.mime });
+		}) ?? [];
 
 	// check sizes
-	if (files) {
-		const filechecks = await Promise.all(
-			files.map(async (file) => {
-				const dimensions = sizeof(Buffer.from(await file.arrayBuffer()));
-				return (
-					file.size > 2 * 1024 * 1024 ||
-					(dimensions.width ?? 0) > 224 ||
-					(dimensions.height ?? 0) > 224
-				);
-			})
-		);
-
-		if (filechecks.some((check) => check)) {
-			throw error(413, "File too large, should be <2MB and 224x224 max.");
-		}
+	// todo: make configurable
+	if (files.some((file) => file.size > 10 * 1024 * 1024)) {
+		throw error(413, "File too large, should be <10MB");
 	}
 
-	let hashes: undefined | string[];
-
-	if (files) {
-		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
-	}
+	const uploadedFiles = await Promise.all(files.map((file) => uploadFile(file, conv)));
 
 	// we will append tokens to the content of this message
 	let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -224,7 +210,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				{
 					from: "assistant",
 					content: "",
-					files: hashes,
+					files: uploadedFiles,
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				},
@@ -250,7 +236,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			{
 				from: "user",
 				content: newPrompt ?? "",
-				files: hashes,
+				files: uploadedFiles,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},
@@ -411,10 +397,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			// inject websearch result & optionally images into the messages
-			const processedMessages = await preprocessMessages(
+			const processedMessages = preprocessMessages(
 				messagesForPrompt,
 				messageToWriteTo.webSearch,
-				model.multimodal,
 				convId
 			);
 
@@ -429,7 +414,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
-					messages: processedMessages,
+					messages: await processedMessages,
 					preprompt,
 					continueMessage: isContinue,
 					generateSettings: assistant?.generateSettings,

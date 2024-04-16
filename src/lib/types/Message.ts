@@ -11,7 +11,12 @@ export type Message = Partial<Timestamps> & {
 	webSearchId?: WebSearch["_id"]; // legacy version
 	webSearch?: WebSearch;
 	score?: -1 | 0 | 1;
-	files?: string[]; // can contain either the hash of the file or the b64 encoded image data on the client side when uploading
+	/**
+	 * Either contains the base64 encoded image data or the hash of the file
+	 * The client will always use base64, while the server uses the hash
+	 * in the typical case
+	 */
+	files?: MessageFile[];
 	interrupted?: boolean;
 
 	// needed for conversation trees
@@ -19,4 +24,10 @@ export type Message = Partial<Timestamps> & {
 
 	// goes one level deep
 	children?: Message["id"][];
+};
+
+export type MessageFile = {
+	type: "hash" | "base64";
+	value: string;
+	mime: string;
 };

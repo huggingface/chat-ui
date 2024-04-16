@@ -92,7 +92,9 @@
 		(lastMessage.from === "user" ||
 			lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1);
 
-	$: sources = files.map((file) => file2base64(file));
+	$: sources = (files ?? []).map((file) =>
+		file2base64(file).then((value) => ({ type: "base64", value, mime: file.type }))
+	);
 
 	function onShare() {
 		dispatch("share");
@@ -235,7 +237,7 @@
 					{#await source then src}
 						<div class="relative h-16 w-16 overflow-hidden rounded-lg shadow-lg">
 							<img
-								src={`data:image/*;base64,${src}`}
+								src={`data:${src.mime};base64,${src.value}`}
 								alt="input content"
 								class="h-full w-full rounded-lg bg-gray-400 object-cover dark:bg-gray-900"
 							/>
