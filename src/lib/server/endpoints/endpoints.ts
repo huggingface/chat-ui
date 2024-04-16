@@ -17,6 +17,10 @@ import endpointCloudflare, {
 	endpointCloudflareParametersSchema,
 } from "./cloudflare/endpointCloudflare";
 import { endpointCohere, endpointCohereParametersSchema } from "./cohere/endpointCohere";
+import endpointLangserve, {
+	endpointLangserveParametersSchema,
+} from "./langserve/endpointLangserve";
+
 import type { Tool, ToolResult } from "$lib/types/Tool";
 
 // parameters passed when generating text
@@ -51,6 +55,7 @@ export const endpoints = {
 	vertex: endpointVertex,
 	cloudflare: endpointCloudflare,
 	cohere: endpointCohere,
+	langserve: endpointLangserve,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -63,5 +68,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointVertexParametersSchema,
 	endpointCloudflareParametersSchema,
 	endpointCohereParametersSchema,
+	endpointLangserveParametersSchema,
 ]);
 export default endpoints;
