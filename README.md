@@ -781,7 +781,7 @@ SERPER_API_KEY=<your serper API key from step 3>
 MESSAGES_BEFORE_LOGIN=<can be any numerical value, or set to 0 to require login>
 ```
 
-You can then run `npm run updateLocalEnv` in the root repository of chat-ui. This will create a `.env.local` file which combines the `.env.template` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
+You can then run `npm run updateLocalEnv` in the root of chat-ui. This will create a `.env.local` file which combines the `.env.template` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
 
 ### Populate database
 
