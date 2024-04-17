@@ -588,11 +588,11 @@ Chat UI can connect to the google Vertex API endpoints ([List of supported model
 
 To enable:
 
-1.  [Select](https://console.cloud.google.com/project) or [create](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project) a Google Cloud project.
-1.  [Enable billing for your project](https://cloud.google.com/billing/docs/how-to/modify-project).
-1.  [Enable the Vertex AI API](https://console.cloud.google.com/flows/enableapi?apiid=aiplatform.googleapis.com).
-1.  [Set up authentication with a service account](https://cloud.google.com/docs/authentication/getting-started)
-    so you can access the API from your local workstation.
+1. [Select](https://console.cloud.google.com/project) or [create](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project) a Google Cloud project.
+1. [Enable billing for your project](https://cloud.google.com/billing/docs/how-to/modify-project).
+1. [Enable the Vertex AI API](https://console.cloud.google.com/flows/enableapi?apiid=aiplatform.googleapis.com).
+1. [Set up authentication with a service account](https://cloud.google.com/docs/authentication/getting-started)
+   so you can access the API from your local workstation.
 
 The service account credentials file can be imported as an environmental variable:
 
@@ -749,7 +749,7 @@ You can preview the production build with `npm run preview`.
 The config file for HuggingChat is stored in the `.env.template` file at the root of the repository. It is the single source of truth that is used to generate the actual `.env.local` file using our CI/CD pipeline. See [updateProdEnv](https://github.com/huggingface/chat-ui/blob/cdb33a9583f5339ade724db615347393ef48f5cd/scripts/updateProdEnv.ts) for more details.
 
 > [!TIP]
-> If you want to make changes to model config for HuggingChat, you should do so against `.env.template`.
+> If you want to make changes to the model config used in production for HuggingChat, you should do so against `.env.template`.
 
 We currently use the following secrets for deploying HuggingChat in addition to the `.env.template` above:
 
@@ -758,21 +758,34 @@ We currently use the following secrets for deploying HuggingChat in addition to 
 - `OPENID_CONFIG`
 - `SERPER_API_KEY`
 
-They are defined as secrets in the repository.
+### Running a copy of HuggingChat locally
 
-### Testing config changes locally
+If you want to run an exact copy of HuggingChat locally, you will need to do the following first:
 
-You can test the config changes locally by first creating an `.env.SECRET_CONFIG` file with the secrets defined above. Then you can run the following command to generate the `.env.local` file:
+1. Create an [OAuth App on the hub](https://huggingface.co/settings/applications/new) with `openid profile email` permissions. Make sure to set the callback URL to something like `http://localhost:5173/chat/login/callback` which matches the right path for your local instance.
+2. Create a [HF Token](https://huggingface.co/settings/tokens) with your Hugging Face account. You will need a Pro account to be able to access some of the larger models available through HuggingChat.
+3. Create a free account with [serper.dev](https://serper.dev/) (you will get 2500 free search queries)
+4. Run an instance of mongoDB, however you want. (Local or remote)
 
-```bash
-npm run updateLocalEnv
+You can then create a new `.env.SECRET_CONFIG` file with the following content
+
+```env
+MONGODB_URL=<link to your mongo DB from step 4>
+HF_TOKEN=<your HF token from step 2>
+OPENID_CONFIG=`{
+  PROVIDER_URL: "https://huggingface.co",
+  CLIENT_ID: "<your client ID from step 1>",
+  CLIENT_SECRET: "<your client secret from step 1>",
+}`
+SERPER_API_KEY=<your serper API key from step 3>
+MESSAGES_BEFORE_LOGIN=<can be any numerical value, or set to 0 to require login>
 ```
 
-This will replace your `.env.local` file with the one that will be used in prod (simply taking `.env.template + .env.SECRET_CONFIG`).
+You can then run `npm run updateLocalEnv` in the root of chat-ui. This will create a `.env.local` file which combines the `.env.template` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
 
 ### Populate database
 
-> [!WARNING]  
+> [!WARNING]
 > The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
 
 You can populate the database using faker data using the `populate` script:
