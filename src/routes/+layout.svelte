@@ -8,6 +8,7 @@
 	import { browser } from "$app/environment";
 
 	import {
+		PUBLIC_APPLE_APP_ID,
 		PUBLIC_APP_DESCRIPTION,
 		PUBLIC_ORIGIN,
 		PUBLIC_PLAUSIBLE_SCRIPT_URL,
@@ -175,6 +176,10 @@
 			data-domain={new URL(PUBLIC_ORIGIN).hostname}
 			src={PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		></script>
+	{/if}
+
+	{#if PUBLIC_APPLE_APP_ID}
+		<meta name="apple-itunes-app" content={`app-id=${PUBLIC_APPLE_APP_ID}`} />
 	{/if}
 </svelte:head>
 
