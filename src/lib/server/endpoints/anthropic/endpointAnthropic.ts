@@ -37,7 +37,7 @@ export async function endpointAnthropic(
 		if (messages?.[0]?.from === "system" && messages[0].content) {
 			system = messages[0].content;
 		} else {
-			messages[0].content = system || '';
+			messages[0].content = system || "";
 		}
 
 		const messagesFormatted = messages

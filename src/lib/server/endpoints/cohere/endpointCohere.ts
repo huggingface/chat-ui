@@ -33,7 +33,7 @@ export async function endpointCohere(
 		if (messages?.[0]?.from === "system" && messages[0].content) {
 			system = messages[0].content;
 		} else {
-			messages[0].content = system || '';
+			messages[0].content = system || "";
 		}
 
 		const parameters = { ...model.parameters, ...generateSettings };
