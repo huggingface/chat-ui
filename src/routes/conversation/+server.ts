@@ -95,6 +95,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		values.preprompt ??= model?.preprompt ?? "";
 	}
 
+	if (messages && messages.length > 0 && messages[0].from === "system") {
+		messages[0].content = values.preprompt;
+	}
+
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		title: title || "New Chat",
