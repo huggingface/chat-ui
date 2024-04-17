@@ -34,8 +34,10 @@ export async function endpointAnthropic(
 
 	return async ({ messages, preprompt, generateSettings }) => {
 		let system = preprompt;
-		if (messages?.[0]?.from === "system") {
+		if (messages?.[0]?.from === "system" && messages[0].content) {
 			system = messages[0].content;
+		} else {
+			messages[0].content = system || '';
 		}
 
 		const messagesFormatted = messages
