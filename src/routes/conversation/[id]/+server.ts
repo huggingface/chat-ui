@@ -447,7 +447,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							messageToWriteTo.content += output.token.text;
 						}
 					} else {
-						messageToWriteTo.interrupted = !output.token.special;
+						messageToWriteTo.interrupted =
+							!output.token.special && !model.parameters.stop?.includes(output.token.text);
 						// add output.generated text to the last message
 						// strip end tokens from the output.generated_text
 						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
