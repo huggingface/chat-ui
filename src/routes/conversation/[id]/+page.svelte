@@ -12,6 +12,7 @@
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
 	import type { MessageUpdate } from "$lib/types/MessageUpdate";
+	import convUpdate from "$lib/stores/convUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -264,6 +265,7 @@
 		} finally {
 			loading = false;
 			pending = false;
+			$convUpdate = $page.params.id;
 			await invalidateAll();
 		}
 	}

@@ -6,6 +6,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
 	import NavConversationItem from "./NavConversationItem.svelte";
+	import InfiniteScroll from "./InfiniteScroll.svelte";
 	import type { LayoutData } from "../../routes/$types";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 	import type { Model } from "$lib/types/Model";
@@ -14,6 +15,7 @@
 	export let conversations: ConvSidebar[] = [];
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
+	export let hasMore: boolean;
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -72,6 +74,9 @@
 			{/each}
 		{/if}
 	{/each}
+	<InfiniteScroll
+	 hasMore={hasMore}
+     on:loadMore />
 </div>
 <div
 	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"

@@ -19,10 +19,12 @@
 
 	import { shareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
+	import convUpdate from "$lib/stores/convUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
@@ -31,6 +33,10 @@
 
 	let isNavOpen = false;
 	let isNavCollapsed = false;
+	let hasMore = true
+	let extraConversation:[]=[]
+	let total =300
+	let extra =50
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
@@ -65,6 +71,7 @@
 				return;
 			}
 
+			fetchData()
 			if ($page.params.id !== id) {
 				await invalidate(UrlDependency.ConversationList);
 			} else {
@@ -91,6 +98,7 @@
 				return;
 			}
 
+			fetchData()
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			console.error(err);
@@ -102,6 +110,45 @@
 		clearTimeout(errorToastTimeout);
 	});
 
+	//for getting extra conversation and maintaning consistency
+	async function fetchData(call : string = '') {
+		if(call === '' && extraConversation.length === 0) return;
+		try {
+			const url = call === 'extra' ? `${base}/conversations/?limit=${extra}&skip=${total+extraConversation.length}` : `${base}/conversations/?limit=${extraConversation.length}&skip=${total}` ;
+			const res = await fetch(url, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (!res.ok) {
+				$error = "Error while fetching onversations, try again.";
+				return;
+			}
+
+			const conversations:[]=(await res.json()).conversations
+			conversations.forEach((conv:ConvSidebar)=>conv.updatedAt=new Date(conv.updatedAt))
+			
+			if(call=='extra') extraConversation=[...extraConversation,...conversations];
+			else extraConversation=[...conversations]
+
+			if(conversations.length==0) hasMore=false
+			else hasMore=true
+
+		} catch (err) {
+			console.error(err);
+			$error = String(err);
+		}	
+   	};
+
+	$: data.conversations=[...data.conversations.slice(0,total),...extraConversation]
+
+	$: if(extraConversation.findIndex(({ id }) => id === $convUpdate)!=-1){
+		fetchData()
+		$convUpdate = null;
+	}
+
 	$: if ($error) onError();
 
 	$: if ($titleUpdate) {
@@ -110,6 +157,7 @@
 		if (convIdx != -1) {
 			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
 		}
+		fetchData()
 		// update data.conversations
 		data.conversations = [...data.conversations];
 
@@ -200,9 +248,11 @@
 			conversations={data.conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
+			hasMore={hasMore}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			on:loadMore={()=>{fetchData('extra')}}
 		/>
 	</MobileNav>
 	<nav
@@ -212,9 +262,11 @@
 			conversations={data.conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
+			hasMore={hasMore}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			on:loadMore={()=>{fetchData('extra')}}
 		/>
 	</nav>
 	{#if currentError}
