@@ -34,10 +34,10 @@
 
 	let isNavOpen = false;
 	let isNavCollapsed = false;
-	let hasMore = true
-	let extraConversation:[]=[]
-	let total =300
-	let extra =50
+	let hasMore = true;
+	let extraConversation: [] = [];
+	let total = 300;
+	let extra = 50;
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
@@ -72,7 +72,7 @@
 				return;
 			}
 
-			fetchData()
+			fetchData();
 			if ($page.params.id !== id) {
 				await invalidate(UrlDependency.ConversationList);
 			} else {
@@ -99,7 +99,7 @@
 				return;
 			}
 
-			fetchData()
+			fetchData();
 			await invalidate(UrlDependency.ConversationList);
 		} catch (err) {
 			console.error(err);
@@ -112,10 +112,13 @@
 	});
 
 	//for getting extra conversation and maintaning consistency
-	async function fetchData(call : string = '') {
-		if(call === '' && extraConversation.length === 0) return;
+	async function fetchData(call: string = "") {
+		if (call === "" && extraConversation.length === 0) return;
 		try {
-			const url = call === 'extra' ? `${base}/conversations/?limit=${extra}&skip=${total+extraConversation.length}` : `${base}/conversations/?limit=${extraConversation.length}&skip=${total}` ;
+			const url =
+				call === "extra"
+					? `${base}/conversations/?limit=${extra}&skip=${total + extraConversation.length}`
+					: `${base}/conversations/?limit=${extraConversation.length}&skip=${total}`;
 			const res = await fetch(url, {
 				method: "GET",
 				headers: {
@@ -128,25 +131,24 @@
 				return;
 			}
 
-			const conversations:[]=(await res.json()).conversations
-			conversations.forEach((conv:ConvSidebar)=>conv.updatedAt=new Date(conv.updatedAt))
-			
-			if(call=='extra') extraConversation=[...extraConversation,...conversations];
-			else extraConversation=[...conversations]
+			const conversations: [] = (await res.json()).conversations;
+			conversations.forEach((conv: ConvSidebar) => (conv.updatedAt = new Date(conv.updatedAt)));
 
-			if(conversations.length==0) hasMore=false
-			else hasMore=true
+			if (call == "extra") extraConversation = [...extraConversation, ...conversations];
+			else extraConversation = [...conversations];
 
+			if (conversations.length == 0) hasMore = false;
+			else hasMore = true;
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
-		}	
-   	};
+		}
+	}
 
-	$: data.conversations=[...data.conversations.slice(0,total),...extraConversation]
+	$: data.conversations = [...data.conversations.slice(0, total), ...extraConversation];
 
-	$: if(extraConversation.findIndex(({ id }) => id === $convUpdate)!=-1){
-		fetchData()
+	$: if (extraConversation.findIndex(({ id }) => id === $convUpdate) != -1) {
+		fetchData();
 		$convUpdate = null;
 	}
 
@@ -158,7 +160,7 @@
 		if (convIdx != -1) {
 			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
 		}
-		fetchData()
+		fetchData();
 		// update data.conversations
 		data.conversations = [...data.conversations];
 
@@ -253,11 +255,13 @@
 			conversations={data.conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
-			hasMore={hasMore}
+			{hasMore}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
-			on:loadMore={()=>{fetchData('extra')}}
+			on:loadMore={() => {
+				fetchData("extra");
+			}}
 		/>
 	</MobileNav>
 	<nav
@@ -267,11 +271,13 @@
 			conversations={data.conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
-			hasMore={hasMore}
+			{hasMore}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
-			on:loadMore={()=>{fetchData('extra')}}
+			on:loadMore={() => {
+				fetchData("extra");
+			}}
 		/>
 	</nav>
 	{#if currentError}

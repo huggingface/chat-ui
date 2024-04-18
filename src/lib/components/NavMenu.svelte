@@ -74,9 +74,7 @@
 			{/each}
 		{/if}
 	{/each}
-	<InfiniteScroll
-	 hasMore={hasMore}
-     on:loadMore />
+	<InfiniteScroll {hasMore} on:loadMore />
 </div>
 <div
 	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
