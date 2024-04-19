@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { openAICompletionToTextGenerationStream } from "./openAICompletionToTextGenerationStream";
 import { openAIChatToTextGenerationStream } from "./openAIChatToTextGenerationStream";
+import { CompletionCreateParamsStreaming } from "openai/resources/completions";
+import { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
 import { buildPrompt } from "$lib/buildPrompt";
 import { OPENAI_API_KEY } from "$env/static/private";
 import type { Endpoint } from "../endpoints";
@@ -47,19 +49,28 @@ export async function endpointOai(
 			});
 
 			const parameters = { ...model.parameters, ...generateSettings };
+			const body: CompletionCreateParamsStreaming = {
+				model: model.id ?? model.name,
+				prompt,
+				stream: true,
+				max_tokens: parameters?.max_new_tokens,
+				stop: parameters?.stop,
+				temperature: parameters?.temperature,
+				top_p: parameters?.top_p,
+				frequency_penalty: parameters?.repetition_penalty,
+			};
 
-			return openAICompletionToTextGenerationStream(
-				await openai.completions.create({
-					model: model.id ?? model.name,
-					prompt,
-					stream: true,
-					max_tokens: parameters?.max_new_tokens,
-					stop: parameters?.stop,
-					temperature: parameters?.temperature,
-					top_p: parameters?.top_p,
-					frequency_penalty: parameters?.repetition_penalty,
-				})
-			);
+			let openAICompletion;
+			if (parameters.extra_body) {
+				/* If extra_body is set, add it to the request using options.
+				Used in openai compatible implementations like vllm. */
+				const combinedBody = {...body, ...parameters.extra_body};
+				openAICompletion = await openai.completions.create(body, {'body': combinedBody});
+			} else {
+				openAICompletion = await openai.completions.create(body);
+			}
+
+			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
 	} else if (completion === "chat_completions") {
 		return async ({ messages, preprompt, generateSettings }) => {
@@ -77,19 +88,28 @@ export async function endpointOai(
 			}
 
 			const parameters = { ...model.parameters, ...generateSettings };
+			const body: ChatCompletionCreateParamsStreaming = {
+				model: model.id ?? model.name,
+				messages: messagesOpenAI,
+				stream: true,
+				max_tokens: parameters?.max_new_tokens,
+				stop: parameters?.stop,
+				temperature: parameters?.temperature,
+				top_p: parameters?.top_p,
+				frequency_penalty: parameters?.repetition_penalty,
+			}
 
-			return openAIChatToTextGenerationStream(
-				await openai.chat.completions.create({
-					model: model.id ?? model.name,
-					messages: messagesOpenAI,
-					stream: true,
-					max_tokens: parameters?.max_new_tokens,
-					stop: parameters?.stop,
-					temperature: parameters?.temperature,
-					top_p: parameters?.top_p,
-					frequency_penalty: parameters?.repetition_penalty,
-				})
-			);
+			let openChatAICompletion;
+			if (parameters.extra_body) {
+				/* If extra_body is set, add it to the request using options.
+				Used in openai compatible implementations like vllm. */
+				const combinedBody = {...body, ...parameters.extra_body};
+				openChatAICompletion = await openai.chat.completions.create(body, {'body': combinedBody});
+			} else {
+				openChatAICompletion = await openai.chat.completions.create(body);
+			}
+
+			return openAIChatToTextGenerationStream(openChatAICompletion);
 		};
 	} else {
 		throw new Error("Invalid completion type");
