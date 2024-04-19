@@ -94,7 +94,8 @@ async function getChatPromptRender(
 		throw Error(
 			"Failed to load tokenizer for model " +
 				m.name +
-				" consider setting chatPromptTemplate manually or making sure the model is available on the hub."
+				" consider setting chatPromptTemplate manually or making sure the model is available on the hub. Error: " +
+				(e as Error).message
 		);
 	}
 

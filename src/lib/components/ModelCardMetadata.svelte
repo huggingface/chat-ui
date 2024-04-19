@@ -1,6 +1,7 @@
 <script lang="ts">
 	import CarbonEarth from "~icons/carbon/earth";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
+	import BIMeta from "~icons/bi/meta";
 	import type { Model } from "$lib/types/Model";
 
 	export let model: Pick<Model, "name" | "datasetName" | "websiteUrl" | "modelUrl" | "datasetUrl">;
@@ -41,8 +42,13 @@
 			class="ml-auto flex items-center hover:underline"
 			rel="noreferrer"
 		>
-			<CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
-			Website
+			{#if model.name === "meta-llama/Meta-Llama-3-70B-Instruct"}
+				<BIMeta class="mr-1.5 shrink-0 text-xs text-gray-400" />
+				Built with Meta Llama 3
+			{:else}
+				<CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
+				Website
+			{/if}
 		</a>
 	{/if}
 </div>
