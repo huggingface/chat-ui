@@ -27,11 +27,11 @@
 			};
 
 			element.addEventListener("scroll", onScroll);
-			element.addEventListener("resize", onScroll as EventListener);
+			element.addEventListener("resize", onScroll);
 			// Cleanup to prevent memory leaks
 			onDestroy(() => {
 				element.removeEventListener("scroll", onScroll);
-				element.removeEventListener("resize", onScroll as EventListener);
+				element.removeEventListener("resize", onScroll);
 			});
 		}
 	}

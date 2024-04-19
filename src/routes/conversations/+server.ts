@@ -8,8 +8,8 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	const settings = await collections.settings.findOne(authCondition(locals));
-	const limit = parseInt(url.searchParams.get("limit") ?? "3");
-	const skip = parseInt(url.searchParams.get("skip") ?? "15");
+	const limit = parseInt(url.searchParams.get("limit") ?? "300");
+	const skip = parseInt(url.searchParams.get("skip") ?? "50");
 
 	const conversations = await collections.conversations
 		.find(authCondition(locals))
