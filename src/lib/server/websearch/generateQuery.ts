@@ -64,6 +64,9 @@ Current Question: Where is it being hosted?`,
 	const webQuery = await generateFromDefaultEndpoint({
 		messages: convQuery,
 		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
+		generateSettings: {
+			max_new_tokens: 30,
+		},
 	});
 
 	return webQuery.trim();
