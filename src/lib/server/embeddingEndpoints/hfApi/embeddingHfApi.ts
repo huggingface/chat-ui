@@ -37,6 +37,7 @@ export async function embeddingEndpointHfApi(
 				if (!response.ok) {
 					console.log(await response.text());
 					console.error("Failed to get embeddings from Hugging Face API", response);
+					return [];
 				}
 
 				const embeddings: Embedding[] = await response.json();
