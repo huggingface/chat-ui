@@ -34,8 +34,8 @@ ENV HOME=/home/user \
 	PATH=/home/user/.local/bin:$PATH
 
 
-COPY --from=builder-production --chown=user /app/node_modules /app/node_modules
-COPY --link --chown=user package.json /app/package.json
-COPY --from=builder --chown=user /app/build /app/build
+COPY --from=builder-production --chown=1000 /app/node_modules /app/node_modules
+COPY --link --chown=1000 package.json /app/package.json
+COPY --from=builder --chown=1000 /app/build /app/build
 
 CMD pm2 start /app/build/index.js -i $CPU_CORES --no-daemon
