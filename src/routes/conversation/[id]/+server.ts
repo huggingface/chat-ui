@@ -432,14 +432,29 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					generateSettings: assistant?.generateSettings,
 					tools,
 				})) {
+					console.log(output.generated_text)
 					if (output.generated_text) {
-						// look for a code blocks of ```json and parse them
-						// if they're valid json, add them to the calls array
-						const codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
+						let codeBlocks = null
+						if (model.name.includes("Ollama-Llama3-fn-calling")) {
+							codeBlocks = ['[\n'+output.generated_text.trimStart().replace(/'/g, '').replace(/"arguments"/g, '"parameters"').replace(/"name"/g, '"tool_name"')+'\n]'];
+						}
+						else {
+							// look for a code blocks of ```json and parse them
+							// if they're valid json, add them to the calls array
+							codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
+						}
+						
+						
 						if (codeBlocks) {
 							for (const block of codeBlocks) {
 								try {
-									calls = JSON5.parse(block.replace("```json\n", "").slice(0, -3));
+									if (model.name.includes("Ollama-Llama3-fn-calling")) {
+										calls = JSON5.parse(block);
+									}
+									else {
+										calls = JSON5.parse(block.replace("```json\n", "").slice(0, -3));
+									}
+									
 								} catch (e) {
 									update({
 										type: "error",
@@ -558,6 +573,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					toolResults = (await Promise.all(toolPromises)).flatMap((el) => (el ? [el] : []));
 				}
 			}
+			console.log(toolResults)
 			// inject websearch result & optionally images into the messages
 			const processedMessages = await preprocessMessages(
 				messagesForPrompt,
@@ -565,6 +581,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				model.multimodal,
 				convId
 			);
+			console.log(processedMessages)
 
 			const previousText = messageToWriteTo.content;
 

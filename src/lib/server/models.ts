@@ -116,18 +116,33 @@ async function getChatPromptRender(
 		}
 
 		if (toolResults && toolResults.length > 0) {
-			formattedMessages = [
-				...formattedMessages,
-				{
-					role: "system",
-					content:
-						"<results>" +
-						toolResults
-							.map((result, idx) => `\nDocument: ${idx}\n${result.key}\n${result.value}`)
-							.join("\n") +
-						"\n</results>",
-				},
-			];
+			if (m.name.includes("Ollama-Llama3-fn-calling")) {
+				formattedMessages = [
+					...formattedMessages,
+					{
+						role: "function-response",
+						content:
+							toolResults
+								.map((result, idx) => `{result: ${result.value}}`)
+								.join("\n")
+					},
+				];
+				console.log(formattedMessages)
+			}
+			else {
+				formattedMessages = [
+					...formattedMessages,
+					{
+						role: "system",
+						content:
+							"<results>" +
+							toolResults
+								.map((result, idx) => `\nDocument: ${idx}\n${result.key}\n${result.value}`)
+								.join("\n") +
+							"\n</results>",
+					},
+				];
+			}
 			tools = [];
 		}
 
@@ -137,6 +152,7 @@ async function getChatPromptRender(
 			chatTemplate = "tool_use";
 		}
 
+		console.log(tokenizer.chat_template)
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
 			add_generation_prompt: true,
@@ -145,6 +161,7 @@ async function getChatPromptRender(
 			// @ts-ignore
 			tools: tools ?? [],
 		});
+		console.log(output)
 
 		if (typeof output !== "string") {
 			throw new Error("Failed to apply chat template, the output is not a string");
