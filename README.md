@@ -607,12 +607,17 @@ Make sure docker has access to the file. Afterwards Google Vertex endpoints can 
 MODELS=`[
 //...
     {
-       "name": "gemini-1.0-pro", //model-name
-       "displayName": "Vertex Gemini Pro 1.0",
-       "location": "europe-west3",
-       "apiEndpoint": "", //alternative api endpoint url
+       "name": "gemini-1.5-pro",
+       "displayName": "Vertex Gemini Pro 1.5",
        "endpoints" : [{
-         "type": "vertex"
+          "type": "vertex",
+          "project": "abc-xyz",
+          "location": "europe-west3",
+          "model": "gemini-1.5-pro-preview-0409", // model-name
+
+          // Optional
+          "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
+          "apiEndpoint": "", // alternative api endpoint url
        }]
      },
 ]`
