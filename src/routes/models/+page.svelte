@@ -64,7 +64,9 @@
 					<dt class="flex items-center gap-2 font-semibold">
 						{model.displayName}
 					</dt>
-					<dd class="text-sm text-gray-500 dark:text-gray-400">{model.description || "-"}</dd>
+					<dd class="whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
+						{model.description || "-"}
+					</dd>
 				</a>
 			{/each}
 		</dl>
