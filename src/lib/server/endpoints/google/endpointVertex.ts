@@ -130,7 +130,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 						logprob: 0,
 						special: isLastChunk,
 					},
-					generated_text: generatedText,
+					generated_text: isLastChunk ? generatedText : null,
 					details: null,
 				};
 				yield output;
