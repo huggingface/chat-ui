@@ -2,6 +2,7 @@ import { VertexAI, HarmCategory, HarmBlockThreshold, type Content } from "@googl
 import type { Endpoint } from "../endpoints";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
 export const endpointVertexParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -114,10 +115,10 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 
 				const content = firstPart.text;
 				generatedText += content;
-				const output = {
+				const output: TextGenerationStreamOutput = {
 					token: {
 						id: tokenId++,
-						text: content,
+						text: content ?? "",
 						logprob: 0,
 						special: isLastChunk,
 					},
