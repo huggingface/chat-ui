@@ -1,4 +1,10 @@
-import { VertexAI, HarmCategory, HarmBlockThreshold, type Content } from "@google-cloud/vertexai";
+import {
+	VertexAI,
+	HarmCategory,
+	HarmBlockThreshold,
+	type Content,
+	type TextPart,
+} from "@google-cloud/vertexai";
 import type { Endpoint } from "../endpoints";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
@@ -108,7 +114,9 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				const candidate = data.candidates[0];
 				if (!candidate.content?.parts?.length) continue; // Skip if no parts are present
 
-				const firstPart = candidate.content.parts.find((part) => "text" in part);
+				const firstPart = candidate.content.parts.find((part) => "text" in part) as
+					| TextPart
+					| undefined;
 				if (!firstPart) continue; // Skip if no text part is found
 
 				const isLastChunk = !!candidate.finishReason;
@@ -118,7 +126,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				const output: TextGenerationStreamOutput = {
 					token: {
 						id: tokenId++,
-						text: content ?? "",
+						text: content,
 						logprob: 0,
 						special: isLastChunk,
 					},
