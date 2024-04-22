@@ -18,12 +18,7 @@ class TransformersJSModelsSingleton {
 
 		if (modelPipelineInstance) {
 			const [, modelPipeline] = modelPipelineInstance;
-
-			// 80% chance to return the pipeline
-			if (Math.random() > 0.2) {
-				return modelPipeline;
-			}
-			// else we dispose of the pipeline to clear memory
+			// dispose of the previous pipeline to clear memory
 			await (await modelPipeline).dispose();
 			this.instances = this.instances.filter(([name]) => name !== modelName);
 		}
