@@ -7,6 +7,7 @@ type MessageUpdateRequestOptions = {
 	isRetry: boolean;
 	isContinue: boolean;
 	webSearch: boolean;
+	tools: boolean;
 	files?: string[];
 };
 export async function fetchMessageUpdates(
@@ -26,6 +27,7 @@ export async function fetchMessageUpdates(
 			is_retry: opts.isRetry,
 			is_continue: opts.isContinue,
 			web_search: opts.webSearch,
+			tools: opts.tools,
 			files: opts.files,
 		}),
 		signal: abortController.signal,

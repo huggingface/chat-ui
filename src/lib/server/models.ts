@@ -253,5 +253,5 @@ export const smallModel = TASK_MODEL
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted"
+	"preprompt" | "parameters" | "multimodal" | "unlisted" | "functions"
 >;

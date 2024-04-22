@@ -22,7 +22,9 @@
 
 	export let data;
 
-	$: ({ messages } = data);
+	$: ({ messages, model: modelId } = data);
+
+	$: currentModel = findCurrentModel([...data.models, ...data.oldModels], modelId);
 
 	let loading = false;
 	let pending = false;
@@ -198,6 +200,8 @@
 					isRetry,
 					isContinue,
 					webSearch: !hasAssistant && $webSearchParameters.useSearch,
+					tools:
+						(!hasAssistant && currentModel.functions && $webSearchParameters.useTools) ?? false,
 					files: isRetry ? undefined : resizedImages,
 				},
 				messageUpdatesAbortController.signal

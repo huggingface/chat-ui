@@ -3,6 +3,7 @@ import {
 	ENABLE_ASSISTANTS_RAG,
 	HF_TOKEN,
 	HF_ACCESS_TOKEN,
+	IMAGE_GENERATION_MODEL,
 } from "$env/static/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
@@ -33,6 +34,10 @@ import JSON5 from "json5";
 import type { Call, ToolResult } from "$lib/types/Tool.js";
 import { HfInference } from "@huggingface/inference";
 import { v4 } from "uuid";
+import directlyAnswer from "$lib/server/tools/directlyAnswer.js";
+import calculator from "$lib/server/tools/calculator.js";
+import websearch from "$lib/server/tools/websearch.js";
+import text2img from "$lib/server/tools/text2img.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -143,6 +148,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		is_continue: isContinue,
 		web_search: webSearch,
+		tools: toolsFlag,
 		files: b64files,
 	} = z
 		.object({
@@ -157,6 +163,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
+			tools: z.optional(z.boolean()),
 			files: z.optional(z.array(z.string())),
 		})
 		.parse(json);
@@ -414,15 +421,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			let toolResults: ToolResult[] | undefined = undefined;
 
 			// function calls
-			if (model.functions && (assistant?.functionSpec || assistantHasWebSearch)) {
-				// turn functionSpec into a list of tools
+			if (model.functions && (toolsFlag || assistantHasWebSearch)) {
+				let tools = [directlyAnswer, calculator, websearch];
 
-				let tools = await getToolsFromFunctionSpec(assistant?.functionSpec);
-
-				// remove websearch tool if relevant
-				if (!assistantHasWebSearch) {
-					tools = tools.filter(({ name }) => name !== "websearch");
+				if (!assistant) {
+					tools = [...tools, text2img];
 				}
+
 				let calls: Call[] | undefined = undefined;
 
 				// do the function calling bits here
@@ -511,7 +516,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						} else if (tool.name === "text2img") {
 							const inference = new HfInference(HF_TOKEN ?? HF_ACCESS_TOKEN);
 							const img = await inference.textToImage({
-								model: "runwayml/stable-diffusion-v1-5",
+								model: IMAGE_GENERATION_MODEL,
 								inputs: call.parameters?.prompt,
 							});
 

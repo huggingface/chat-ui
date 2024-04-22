@@ -15,6 +15,7 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
+	import ToolsToggle from "../ToolsToggle.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import { page } from "$app/stores";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -256,8 +257,10 @@
 
 		<div class="w-full">
 			<div class="flex w-full pb-3">
-				{#if $page.data.settings?.searchEnabled && !assistant}
+				{#if $page.data.settings?.searchEnabled && !assistant && !currentModel.functions}
 					<WebSearchToggle />
+				{:else if currentModel.functions}
+					<ToolsToggle />
 				{/if}
 				{#if loading}
 					<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
