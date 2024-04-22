@@ -601,7 +601,8 @@ The service account credentials file can be imported as an environmental variabl
     GOOGLE_APPLICATION_CREDENTIALS = clientid.json
 ```
 
-Make sure docker has access to the file. Afterwards Google Vertex endpoints can be configured as following:
+Make sure your docker container has access to the file and the variable is correctly set.
+Afterwards Google Vertex endpoints can be configured as following:
 
 ```
 MODELS=`[
