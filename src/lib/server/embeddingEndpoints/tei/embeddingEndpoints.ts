@@ -25,8 +25,13 @@ const getModelInfoByUrl = async (url: string, authorization?: string) => {
 		},
 	});
 
-	const json = await response.json();
-	return json;
+	try {
+		const json = await response.json();
+		return { max_client_batch_size: 32, max_batch_tokens: 16384, ...json };
+	} catch {
+		console.log("Could not get info from TEI embedding endpoint. Using defaults.");
+		return { max_client_batch_size: 32, max_batch_tokens: 16384 };
+	}
 };
 
 export async function embeddingEndpointTei(
