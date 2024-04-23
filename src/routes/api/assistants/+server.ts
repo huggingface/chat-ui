@@ -3,6 +3,7 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
+import { REQUIRE_FEATURED_ASSISTANTS } from "$env/static/private";
 
 const NUM_PER_PAGE = 24;
 
@@ -24,12 +25,16 @@ export async function GET({ url, locals }) {
 		}
 	}
 
+	const shouldBeFeatured = REQUIRE_FEATURED_ASSISTANTS === "true" ? { featured: true } : {};
+
 	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
-		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
-		...(user ? { createdById: user._id } : { featured: true }),
+		...(!createdByCurrentUser &&
+			REQUIRE_FEATURED_ASSISTANTS === "true" && { userCount: { $gt: 1 } }),
+		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...shouldBeFeatured,
 	};
 	const assistants = await collections.assistants
 		.find(filter)

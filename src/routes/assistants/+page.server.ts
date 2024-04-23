@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { ENABLE_ASSISTANTS } from "$env/static/private";
+import { ENABLE_ASSISTANTS, REQUIRE_FEATURED_ASSISTANTS } from "$env/static/private";
 import { collections } from "$lib/server/database.js";
 import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
@@ -21,6 +21,8 @@ export const load = async ({ url, locals }) => {
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.POPULAR;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
+	const shouldBeFeatured = REQUIRE_FEATURED_ASSISTANTS === "true" ? { featured: true } : {};
+
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
 		user = await collections.users.findOne<Pick<User, "_id">>(
@@ -32,12 +34,14 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
-	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
+	// fetch the top assistants sorted by user count from biggest to smallest. filter by model too if modelId is provided or query if query is provided
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
-		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
-		...(user ? { createdById: user._id } : { featured: true }),
+		...(!createdByCurrentUser &&
+			REQUIRE_FEATURED_ASSISTANTS === "true" && { userCount: { $gt: 1 } }),
+		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...shouldBeFeatured,
 	};
 	const assistants = await collections.assistants
 		.find(filter)
