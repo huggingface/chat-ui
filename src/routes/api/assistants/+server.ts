@@ -14,11 +14,6 @@ export async function GET({ url, locals }) {
 	const query = url.searchParams.get("q")?.trim() ?? null;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
-	const shouldBeFeatured =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
-			? { featured: true, userCount: { $gt: 1 } }
-			: {};
-
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
 		user = await collections.users.findOne<Pick<User, "_id">>(
@@ -30,12 +25,23 @@ export async function GET({ url, locals }) {
 		}
 	}
 
+	// if there is no user, we show community assistants, so only show featured assistants
+	const shouldBeFeatured =
+		REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+
+	// if the user queried is not the current user, only show "public" assistants that have been shared before
+	const shouldHaveBeenShared =
+		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+			? { userCount: { $gt: 1 } }
+			: {};
+
 	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 		...shouldBeFeatured,
+		...shouldHaveBeenShared,
 	};
 	const assistants = await collections.assistants
 		.find(filter)
