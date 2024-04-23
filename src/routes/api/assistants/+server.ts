@@ -25,16 +25,23 @@ export async function GET({ url, locals }) {
 		}
 	}
 
-	const shouldBeFeatured = REQUIRE_FEATURED_ASSISTANTS === "true" ? { featured: true } : {};
+	// if there is no user, we show community assistants, so only show featured assistants
+	const shouldBeFeatured =
+		REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+
+	// if the user queried is not the current user, only show "public" assistants that have been shared before
+	const shouldHaveBeenShared =
+		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+			? { userCount: { $gt: 1 } }
+			: {};
 
 	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
-		...(!createdByCurrentUser &&
-			REQUIRE_FEATURED_ASSISTANTS === "true" && { userCount: { $gt: 1 } }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 		...shouldBeFeatured,
+		...shouldHaveBeenShared,
 	};
 	const assistants = await collections.assistants
 		.find(filter)
