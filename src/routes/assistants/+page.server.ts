@@ -21,10 +21,9 @@ export const load = async ({ url, locals }) => {
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.POPULAR;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
-	const shouldBeFeatured = REQUIRE_FEATURED_ASSISTANTS === "true" ? { featured: true } : {};
-	const shouldHaveBeenShared =
+	const shouldBeFeatured =
 		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
-			? { userCount: { $gt: 1 } }
+			? { featured: true, userCount: { $gt: 1 } }
 			: {};
 
 	let user: Pick<User, "_id"> | null = null;
@@ -43,7 +42,6 @@ export const load = async ({ url, locals }) => {
 		...(modelId && { modelId }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
-		...shouldHaveBeenShared,
 		...shouldBeFeatured,
 	};
 	const assistants = await collections.assistants

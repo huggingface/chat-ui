@@ -14,10 +14,9 @@ export async function GET({ url, locals }) {
 	const query = url.searchParams.get("q")?.trim() ?? null;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
-	const shouldBeFeatured = REQUIRE_FEATURED_ASSISTANTS === "true" ? { featured: true } : {};
-	const shouldHaveBeenShared =
+	const shouldBeFeatured =
 		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
-			? { userCount: { $gt: 1 } }
+			? { featured: true, userCount: { $gt: 1 } }
 			: {};
 
 	let user: Pick<User, "_id"> | null = null;
@@ -37,7 +36,6 @@ export async function GET({ url, locals }) {
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 		...shouldBeFeatured,
-		...shouldHaveBeenShared,
 	};
 	const assistants = await collections.assistants
 		.find(filter)
