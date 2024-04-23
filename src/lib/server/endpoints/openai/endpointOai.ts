@@ -64,8 +64,8 @@ export async function endpointOai(
 			if (parameters.extra_body) {
 				/* If extra_body is set, add it to the request using options.
 				Used in openai compatible implementations like vllm. */
-				const combinedBody = {...body, ...parameters.extra_body};
-				openAICompletion = await openai.completions.create(body, {'body': combinedBody});
+				const combinedBody = { ...body, ...parameters.extra_body };
+				openAICompletion = await openai.completions.create(body, { body: combinedBody });
 			} else {
 				openAICompletion = await openai.completions.create(body);
 			}
@@ -97,14 +97,14 @@ export async function endpointOai(
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
-			}
+			};
 
 			let openChatAICompletion;
 			if (parameters.extra_body) {
 				/* If extra_body is set, add it to the request using options.
 				Used in openai compatible implementations like vllm. */
-				const combinedBody = {...body, ...parameters.extra_body};
-				openChatAICompletion = await openai.chat.completions.create(body, {'body': combinedBody});
+				const combinedBody = { ...body, ...parameters.extra_body };
+				openChatAICompletion = await openai.chat.completions.create(body, { body: combinedBody });
 			} else {
 				openChatAICompletion = await openai.chat.completions.create(body);
 			}
