@@ -29,7 +29,6 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
-import { getToolsFromFunctionSpec } from "$lib/utils/getToolsFromFunctionSpec.js";
 import JSON5 from "json5";
 import type { Call, ToolResult } from "$lib/types/Tool.js";
 import { HfInference } from "@huggingface/inference";
@@ -422,10 +421,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			// function calls
 			if (model.functions && (toolsFlag || assistantHasWebSearch)) {
-				let tools = [directlyAnswer, calculator, websearch];
+				let tools = [directlyAnswer, websearch];
 
+				// if it's an assistant, only support websearch for now
 				if (!assistant) {
-					tools = [...tools, text2img];
+					tools = [...tools, text2img, calculator];
 				}
 
 				let calls: Call[] | undefined = undefined;

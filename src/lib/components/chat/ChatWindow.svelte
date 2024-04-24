@@ -257,10 +257,12 @@
 
 		<div class="w-full">
 			<div class="flex w-full pb-3">
-				{#if $page.data.settings?.searchEnabled && !assistant && !currentModel.functions}
-					<WebSearchToggle />
-				{:else if currentModel.functions}
-					<ToolsToggle />
+				{#if !assistant}
+					{#if currentModel.functions}
+						<ToolsToggle />
+					{:else if $page.data.settings?.searchEnabled}
+						<WebSearchToggle />
+					{/if}
 				{/if}
 				{#if loading}
 					<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />

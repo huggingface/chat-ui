@@ -15,13 +15,7 @@
 	role="switch"
 	tabindex="0"
 >
-	<Switch
-		name="useSearch"
-		bind:checked={$webSearchParameters.useTools}
-		on:click
-		on:keydown
-		color="purple"
-	/>
+	<Switch name="useTools" bind:checked={$webSearchParameters.useTools} on:click on:keydown />
 	<div class="whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">Tools</div>
 	<div class="group relative w-max">
 		<CarbonInformation class="text-xs text-gray-500" />

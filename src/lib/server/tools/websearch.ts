@@ -3,7 +3,7 @@ import type { BackendTool } from ".";
 const websearch: BackendTool = {
 	name: "websearch",
 	description:
-		"Use this tool to search web pages for answers that will help answer the user's query.",
+		"Use this tool to search web pages for answers that will help answer the user's query. Only use this tool if you need specific resources from the internet.",
 	parameter_definitions: {
 		query: {
 			required: true,

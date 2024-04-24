@@ -273,16 +273,19 @@
 				{#each Object.values(tools) as tool}
 					{#if tool.length > 0}
 						{@const toolName = tool.filter((t) => t.messageType === "parameters")[0].name}
-						{#if toolName}
+						{#if toolName && toolName !== "websearch"}
 							<details
-								class="border-1 group/tool mb-3 w-fit cursor-pointer rounded-xl border-purple-800/50 bg-purple-800/20 p-3 text-purple-700 transition-all dark:border-purple-800/70 dark:bg-purple-800/30 dark:text-purple-300"
+								class="open:border-1 group/tool w-fit cursor-pointer rounded-xl p-3 text-purple-700
+								 transition-all open:mb-3 open:border-purple-800 open:bg-purple-600/20 open:shadow-sm
+								 dark:text-purple-300 open:dark:border-purple-800/70 open:dark:bg-purple-800/30"
 							>
 								<summary class="pb-1 text-purple-700 transition-all dark:text-purple-300">
 									Calling tool <span class="font-mono font-bold">{toolName}</span>
 								</summary>
 								{#each tool as toolUpdate}
-									<div class="my-1 w-full border-b-2 border-purple-500/50" />
 									{#if toolUpdate.messageType === "parameters"}
+										<div class="my-1 w-full border-b-2 border-purple-500/50" />
+
 										<h3 class="font-bold">Parameters:</h3>
 										<ul class="list-inside list-disc">
 											{#each Object.entries(toolUpdate.parameters ?? {}) as [k, v]}
@@ -291,7 +294,9 @@
 												</li>
 											{/each}
 										</ul>
-									{:else if toolUpdate.messageType === "message"}
+									{:else if toolUpdate.messageType === "message" && toolName !== "text2img"}
+										<div class="my-1 w-full border-b-2 border-purple-500/50" />
+
 										<h3 class="font-bold">Result:</h3>
 										<p class="pb-1 pt-1 font-mono">
 											{" > "}{toolUpdate.message}

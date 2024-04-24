@@ -533,16 +533,12 @@
 							each inference.
 						</p>
 					</label>
-
-					<div class="my-3 ml-0 mr-6 w-full border border-gray-200" />
-					<span class="mt-2 text-smd font-semibold">Function calling </span>
 					<input
-						type="text"
+						type="hidden"
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						name="functionSpec"
 						bind:value={functionSpec}
 					/>
-					<p class="text-xs text-red-500">{getError("functionSpec", form)}</p>
 				</div>
 			{/if}
 		</div>
