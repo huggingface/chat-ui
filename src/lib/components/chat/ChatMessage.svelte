@@ -284,8 +284,8 @@
 									class="pb-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
 									class:text-purple-700={!toolDone}
 									class:dark:text-purple-300={!toolDone}
-									class:text-gray-800={toolDone}
-									class:dark:text-gray-200={toolDone}
+									class:text-gray-600={toolDone}
+									class:dark:text-gray-400={toolDone}
 									class:list-none={!toolDone}
 								>
 									{#if !toolDone}
