@@ -76,7 +76,7 @@
 			pending = true;
 
 			const base64Files = await Promise.all(
-				files.map((file) =>
+				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({ type: "base64" as const, value, mime: file.type }))
 				)
 			);
@@ -118,7 +118,7 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "", files: base64Files },
+						{ from: "assistant", content: "" },
 						newUserMessageId
 					);
 				} else if (messageToRetry?.from === "assistant") {

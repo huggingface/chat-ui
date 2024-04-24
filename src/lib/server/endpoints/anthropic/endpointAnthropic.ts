@@ -4,6 +4,8 @@ import type { Endpoint, EndpointMessage } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources";
 import type { MessageFile } from "$lib/types/Message";
+import { chooseMimeType, convertImage } from "../images";
+import sharp from "sharp";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -49,7 +51,7 @@ export async function endpointAnthropic(
 					return {
 						role: message.from,
 						content: [
-							...(message.files ?? []).map(fileToImageBlock),
+							...(await Promise.all((message.files ?? []).map(fileToImageBlock))),
 							{ type: "text", text: message.content },
 						],
 					};
@@ -105,19 +107,24 @@ export async function endpointAnthropic(
 	};
 }
 
-const supportedMimeTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"];
-function fileToImageBlock(file: MessageFile): ImageBlockParam {
-	if (!supportedMimeTypes.includes(file.mime)) {
-		throw new Error(
-			`Found unsupported mime type: "${file.mime}". Supported: ${supportedMimeTypes.join(", ")}`
-		);
+const supportedMimeTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
+async function fileToImageBlock(file: MessageFile): Promise<ImageBlockParam> {
+	let imageBase64 = file.value;
+
+	// Convert the image if it's an unsupported format
+	const chosenMime = chooseMimeType(supportedMimeTypes, "webp", file.mime);
+	if (chosenMime !== file.mime) {
+		const buffer = Buffer.from(file.value, "base64");
+		const convertedBuffer = await convertImage(sharp(buffer), chosenMime).toBuffer();
+		imageBase64 = convertedBuffer.toString("base64");
 	}
+
 	return {
 		type: "image",
 		source: {
 			type: "base64",
-			media_type: file.mime as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
-			data: file.value,
+			media_type: chosenMime,
+			data: imageBase64,
 		},
 	};
 }

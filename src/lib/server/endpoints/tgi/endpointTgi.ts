@@ -5,6 +5,7 @@ import type { Endpoint, EndpointMessage } from "../endpoints";
 import { z } from "zod";
 import sharp from "sharp";
 import type { MessageFile } from "$lib/types/Message";
+import { chooseMimeType, convertImage } from "../images";
 
 export const endpointTgiParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -68,8 +69,16 @@ async function resizeFiles(message: EndpointMessage): Promise<EndpointMessage> {
 	return { ...message, content };
 }
 
+const supportedMimeTypes = ["image/png", "image/jpeg", "image/webp"] as const;
 async function resizeFile(file: MessageFile): Promise<MessageFile> {
 	const buffer = Buffer.from(file.value, "base64");
-	const resized = await sharp(buffer).resize({ fit: "inside", width: 244, height: 244 }).toBuffer();
-	return { ...file, value: resized.toString("base64") };
+	// TGI requires 224x224 images
+	let image = sharp(buffer).resize({ fit: "inside", width: 224, height: 224 });
+
+	// Convert format if necessary
+	const mime = chooseMimeType(supportedMimeTypes, "webp", file.mime);
+	if (mime !== file.mime) image = convertImage(image, mime);
+
+	const imageBase64 = await image.toBuffer().then((buf) => buf.toString("base64"));
+	return { ...file, mime, value: imageBase64 };
 }
