@@ -37,5 +37,6 @@ ENV HOME=/home/user \
 COPY --from=builder-production --chown=1000 /app/node_modules /app/node_modules
 COPY --link --chown=1000 package.json /app/package.json
 COPY --from=builder --chown=1000 /app/build /app/build
+COPY --chown=1000 gcp-*.json /app/
 
 CMD pm2 start /app/build/index.js -i $CPU_CORES --no-daemon

@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import { ENABLE_ASSISTANTS } from "$env/static/private";
+import { ENABLE_ASSISTANTS, REQUIRE_FEATURED_ASSISTANTS } from "$env/static/private";
 import { collections } from "$lib/server/database.js";
 import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
@@ -32,12 +32,23 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
-	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
+	// if there is no user, we show community assistants, so only show featured assistants
+	const shouldBeFeatured =
+		REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+
+	// if the user queried is not the current user, only show "public" assistants that have been shared before
+	const shouldHaveBeenShared =
+		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+			? { userCount: { $gt: 1 } }
+			: {};
+
+	// fetch the top assistants sorted by user count from biggest to smallest. filter by model too if modelId is provided or query if query is provided
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
-		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
-		...(user ? { createdById: user._id } : { featured: true }),
+		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...shouldBeFeatured,
+		...shouldHaveBeenShared,
 	};
 	const assistants = await collections.assistants
 		.find(filter)
