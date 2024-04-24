@@ -1,6 +1,6 @@
 {
 	"name": "chat-ui",
-	"version": "0.8.2",
+	"version": "0.8.3",
 	"private": true,
 	"packageManager": "npm@9.5.0",
 	"scripts": {
