@@ -214,17 +214,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if (messageToRetry.from === "user" && newPrompt) {
 			// add a sibling to this message from the user, with the alternative prompt
 			// add a children to that sibling, where we can write to
-			const newUserMessageId = addSibling(conv, { from: "user", content: newPrompt }, messageId);
+			const newUserMessageId = addSibling(
+				conv,
+				{ from: "user", content: newPrompt, createdAt: new Date(), updatedAt: new Date() },
+				messageId
+			);
 			messageToWriteToId = addChildren(
 				conv,
-				{ from: "assistant", content: "", files: hashes },
+				{
+					from: "assistant",
+					content: "",
+					files: hashes,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
 				newUserMessageId
 			);
 			messagesForPrompt = buildSubtree(conv, newUserMessageId);
 		} else if (messageToRetry.from === "assistant") {
 			// we're retrying an assistant message, to generate a new answer
 			// just add a sibling to the assistant answer where we can write to
-			messageToWriteToId = addSibling(conv, { from: "assistant", content: "" }, messageId);
+			messageToWriteToId = addSibling(
+				conv,
+				{ from: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
+				messageId
+			);
 			messagesForPrompt = buildSubtree(conv, messageId);
 			messagesForPrompt.pop(); // don't need the latest assistant message in the prompt since we're retrying it
 		}
@@ -410,6 +424,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let buffer = "";
 
+			messageToWriteTo.updatedAt = new Date();
+
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
@@ -460,7 +476,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						}, output.generated_text.trimEnd());
 
 						messageToWriteTo.content = previousText + text;
-						messageToWriteTo.updatedAt = new Date();
 					}
 				}
 			} catch (e) {
