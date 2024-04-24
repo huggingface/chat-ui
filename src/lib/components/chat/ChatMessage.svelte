@@ -16,7 +16,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
-
+	import EosIconLoading from "~icons/eos-icons/loading";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
 
@@ -273,14 +273,26 @@
 				{#each Object.values(tools) as tool}
 					{#if tool.length > 0}
 						{@const toolName = tool.filter((t) => t.messageType === "parameters")[0].name}
+						{@const toolDone = !!tool.find((t) => t.messageType === "message")}
 						{#if toolName && toolName !== "websearch"}
 							<details
-								class="open:border-1 group/tool w-fit cursor-pointer rounded-xl p-3 text-purple-700
+								class="open:border-1 group/tool -ml-1 mb-1 w-fit cursor-pointer rounded-xl px-3 py-1 text-purple-700
 								 transition-all open:mb-3 open:border-purple-800 open:bg-purple-600/20 open:shadow-sm
 								 dark:text-purple-300 open:dark:border-purple-800/70 open:dark:bg-purple-800/30"
 							>
-								<summary class="pb-1 text-purple-700 transition-all dark:text-purple-300">
-									Calling tool <span class="font-mono font-bold">{toolName}</span>
+								<summary
+									class="pb-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
+									class:text-purple-700={!toolDone}
+									class:dark:text-purple-300={!toolDone}
+									class:text-gray-800={toolDone}
+									class:dark:text-gray-200={toolDone}
+									class:list-none={!toolDone}
+								>
+									{#if !toolDone}
+										<EosIconLoading class="inline-block size-4" />
+									{/if}
+									{toolDone ? "Called" : "Calling"} tool
+									<span class="font-mono font-bold">{toolName}</span>
 								</summary>
 								{#each tool as toolUpdate}
 									{#if toolUpdate.messageType === "parameters"}
