@@ -27,6 +27,8 @@ export async function summarize(prompt: string) {
 		{ from: "assistant", content: "🎥 Favorite movie" },
 		{ from: "user", content: "Explain the concept of artificial intelligence in one sentence" },
 		{ from: "assistant", content: "🤖 AI definition" },
+		{ from: "user", content: "Draw a cute cat" },
+		{ from: "assistant", content: "🐱 Cute cat drawing" },
 		{ from: "user", content: prompt },
 	];
 
