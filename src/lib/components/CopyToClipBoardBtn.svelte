@@ -43,7 +43,7 @@
 >
 	<div class="relative">
 		<slot>
-			<IconCopy />
+			<IconCopy classNames="dark:text-gray-700 text-gray-200" />
 		</slot>
 
 		<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
