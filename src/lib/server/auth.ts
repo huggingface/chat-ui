@@ -10,6 +10,7 @@ import {
 	OPENID_TOLERANCE,
 	OPENID_RESOURCE,
 	OPENID_CONFIG,
+	ALLOW_INSECURE_COOKIES,
 } from "$env/static/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -55,7 +56,7 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 		path: "/",
 		// So that it works inside the space's iframe
 		sameSite: dev ? "lax" : "none",
-		secure: !dev,
+		secure: !dev && !(ALLOW_INSECURE_COOKIES === "true"),
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
 	});
