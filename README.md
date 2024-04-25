@@ -24,8 +24,9 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 3. [Web Search](#web-search)
 4. [Text Embedding Models](#text-embedding-models)
 5. [Extra parameters](#extra-parameters)
-6. [Deploying to a HF Space](#deploying-to-a-hf-space)
-7. [Building](#building)
+6. [Common issues](#common-issues)
+7. [Deploying to a HF Space](#deploying-to-a-hf-space)
+8. [Building](#building)
 
 ## No Setup Deploy
 
@@ -734,6 +735,14 @@ MODELS=`[
   }
 ]`
 ```
+
+## Common issues
+
+### 403：You don't have access to this conversation
+
+Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `ALLOW_INSECURE_COOKIES=true` to your `.env.local`.
+
+Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
 
 ## Deploying to a HF Space
 
