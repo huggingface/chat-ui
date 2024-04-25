@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { openAICompletionToTextGenerationStream } from "./openAICompletionToTextGenerationStream";
 import { openAIChatToTextGenerationStream } from "./openAIChatToTextGenerationStream";
-import { CompletionCreateParamsStreaming } from "openai/resources/completions";
-import { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
+import type { CompletionCreateParamsStreaming } from "openai/resources/completions";
+import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
 import { buildPrompt } from "$lib/buildPrompt";
 import { OPENAI_API_KEY } from "$env/static/private";
 import type { Endpoint } from "../endpoints";
