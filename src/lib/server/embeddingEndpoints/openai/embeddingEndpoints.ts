@@ -30,7 +30,7 @@ export async function embeddingEndpointOpenAI(
 					headers: {
 						Accept: "application/json",
 						"Content-Type": "application/json",
-						...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						...(apiKey ? { "Api-Key": apiKey } : {}),
 					},
 					body: JSON.stringify({ input: batchInputs, model: model.name }),
 				});
