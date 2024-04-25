@@ -63,7 +63,7 @@ Current Question: Where is it being hosted?`,
 
 	const webQuery = await generateFromDefaultEndpoint({
 		messages: convQuery,
-		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
+		preprompt: `You are an expert in crafting concise and effective web search queries. Your task is to generate queries that help users find the latest information and updates on a diverse range of topics and events. You are capable of understanding context and user intentions to provide relevant and timely search strategies. Your responses should be short and precise, covering all the key details that a user might be interested in. Remember to adapt your queries to the dynamic nature of web content, ensuring that the results retrieved are up-to-date and from reliable sources. Make sure to Answer with only the query. Stop generation just after Generating query. Today is ${currentDate}`,
 		generateSettings: {
 			max_new_tokens: 30,
 		},
