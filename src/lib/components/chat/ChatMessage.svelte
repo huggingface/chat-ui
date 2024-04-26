@@ -306,7 +306,7 @@
 												</li>
 											{/each}
 										</ul>
-									{:else if toolUpdate.messageType === "message" && toolName !== "text2img"}
+									{:else if toolUpdate.messageType === "message" && toolUpdate.display !== false}
 										<div class="my-1 w-full border-b-2 border-purple-500/50" />
 
 										<h3 class="font-bold">Result:</h3>

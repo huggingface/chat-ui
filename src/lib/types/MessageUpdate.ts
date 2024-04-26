@@ -25,6 +25,7 @@ interface ToolUpdateParams extends ToolUpdateBase {
 interface ToolUpdateMessage extends ToolUpdateBase {
 	messageType: "message";
 	message?: string;
+	display?: boolean;
 }
 
 export type ToolUpdate = ToolUpdateParams | ToolUpdateMessage;

@@ -4,6 +4,7 @@ import {
 	HF_TOKEN,
 	HF_ACCESS_TOKEN,
 	IMAGE_GENERATION_MODEL,
+	ENABLE_LOCAL_FETCH,
 } from "$env/static/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
@@ -37,6 +38,7 @@ import directlyAnswer from "$lib/server/tools/directlyAnswer.js";
 import calculator from "$lib/server/tools/calculator.js";
 import websearch from "$lib/server/tools/websearch.js";
 import text2img from "$lib/server/tools/text2img.js";
+import fetchUrl from "$lib/server/tools/fetchUrl.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -409,7 +411,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				while ((match = urlRegex.exec(preprompt)) !== null) {
 					try {
 						const url = new URL(match[1]);
-						if (await isURLLocal(url)) {
+						if ((await isURLLocal(url)) && ENABLE_LOCAL_FETCH !== "true") {
 							throw new Error("URL couldn't be fetched, it resolved to a local address.");
 						}
 
@@ -439,7 +441,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// if it's an assistant, only support websearch for now
 				if (!assistant) {
-					tools = [...tools, text2img, calculator];
+					tools = [...tools, text2img, calculator, fetchUrl];
 				}
 
 				let calls: Call[] | undefined = undefined;
@@ -519,6 +521,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 									key: call.tool_name,
 									status: "success",
 									value: chunks,
+									display: false,
 								};
 							} catch (e) {
 								return {
@@ -547,6 +550,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 								key: call.tool_name,
 								status: "success",
 								value: `An image has been generated for the following prompt: ${call.parameters?.prompt}. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,
+								display: false,
 							};
 						} else {
 							return {
@@ -567,6 +571,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							name: toolAnswer.key,
 							messageType: "message",
 							message: toolAnswer.value,
+							display: toolAnswer.display,
 							uuid,
 						});
 					}

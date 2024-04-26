@@ -30,7 +30,10 @@ export async function parseWeb(url: string) {
 		return text;
 	} else if (
 		r.headers.get("content-type")?.includes("text/plain") ||
-		r.headers.get("content-type")?.includes("text/markdown")
+		r.headers.get("content-type")?.includes("text/markdown") ||
+		r.headers.get("content-type")?.includes("application/json") ||
+		r.headers.get("content-type")?.includes("application/xml") ||
+		r.headers.get("content-type")?.includes("text/csv")
 	) {
 		return r.text();
 	} else {

@@ -15,6 +15,7 @@ export interface ToolResult {
 	key: string;
 	status: "success" | "error";
 	value: string;
+	display?: boolean;
 }
 
 export interface Call {
