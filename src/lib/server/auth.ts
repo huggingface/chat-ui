@@ -55,7 +55,7 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite: dev ? "lax" : "none",
+		sameSite: dev || ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
 		secure: !dev && !(ALLOW_INSECURE_COOKIES === "true"),
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
