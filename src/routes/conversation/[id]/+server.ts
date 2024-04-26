@@ -3,7 +3,6 @@ import {
 	ENABLE_ASSISTANTS_RAG,
 	HF_TOKEN,
 	HF_ACCESS_TOKEN,
-	IMAGE_GENERATION_MODEL,
 	ENABLE_LOCAL_FETCH,
 } from "$env/static/private";
 import { startOfHour } from "date-fns";
@@ -32,8 +31,10 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
 import JSON5 from "json5";
 import type { Call, ToolResult } from "$lib/types/Tool.js";
-import { HfInference } from "@huggingface/inference";
 import { v4 } from "uuid";
+
+import { Client } from "@gradio/client";
+
 import directlyAnswer from "$lib/server/tools/directlyAnswer.js";
 import calculator from "$lib/server/tools/calculator.js";
 import websearch from "$lib/server/tools/websearch.js";
@@ -531,13 +532,20 @@ export async function POST({ request, locals, params, getClientAddress }) {
 								};
 							}
 						} else if (tool.name === "text2img") {
-							const inference = new HfInference(HF_TOKEN ?? HF_ACCESS_TOKEN);
-							const img = await inference.textToImage({
-								model: IMAGE_GENERATION_MODEL,
-								inputs: call.parameters?.prompt,
+							const app = await Client.connect("ByteDance/Hyper-SDXL-1Step-T2I", {
+								hf_token: (HF_TOKEN ?? HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
 							});
+							const res = await app.predict("/process_image", [
+								1, // number (numeric value between 1 and 8) in 'Number of Images' Slider component
+								512, // number  in 'Image Height' Number component
+								512, // number  in 'Image Width' Number component
+								call.parameters?.prompt, // prompt
+								Math.floor(Math.random() * 1000), // seed random
+							]);
 
-							const sha = await uploadFile(img, conv);
+							const response = await fetch(res.data[0][0].image.url);
+
+							const sha = await uploadFile(await response.blob(), conv);
 
 							messageToWriteTo.files = [...(messageToWriteTo.files ?? []), sha];
 
