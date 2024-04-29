@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } from "$env/static/private";
+import { logger } from "$lib/server/logger";
 
 export const endpointCloudflareParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -104,8 +105,8 @@ export async function endpointCloudflare(
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
-							console.error("Failed to parse JSON", e);
-							console.error("Problematic JSON string:", jsonString);
+							logger.error("Failed to parse JSON", e);
+							logger.error("Problematic JSON string:", jsonString);
 							continue; // Skip this iteration and try the next chunk
 						}
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { EmbeddingEndpoint, Embedding } from "../embeddingEndpoints";
 import { chunk } from "$lib/utils/chunk";
 import { HF_TOKEN } from "$env/static/private";
+import { logger } from "$lib/server/logger";
 
 export const embeddingEndpointHfApiSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -35,8 +36,8 @@ export async function embeddingEndpointHfApi(
 				});
 
 				if (!response.ok) {
-					console.log(await response.text());
-					console.error("Failed to get embeddings from Hugging Face API", response);
+					logger.error(await response.text());
+					logger.error("Failed to get embeddings from Hugging Face API", response);
 					return [];
 				}
 

@@ -2,6 +2,7 @@ import { client, collections } from "$lib/server/database";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
 import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
+import { logger } from "$lib/server/logger";
 
 const LOCK_KEY = "assistants.count";
 
@@ -54,7 +55,7 @@ async function refreshAssistantsCountsHelper() {
 		);
 	} catch (e) {
 		console.log("Refresh assistants counter failed!");
-		console.error(e);
+		logger.error(e);
 	}
 }
 
