@@ -36,7 +36,7 @@ spec:
           resources: {{ toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: config
-              mountPath: /app/.env
+              mountPath: /app/.env.local
               subPath: .env
           {{- if $.Values.externalSecrets.enabled }}
           envFrom:
