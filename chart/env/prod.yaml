@@ -45,3 +45,6 @@ externalSecrets:
   secretName: "chat-ui-prod-secrets"
   parameters:
     MONGODB_URL: "hub-prod-chat-ui-mongodb-url"
+    OPENID_CONFIG: "hub-prod-chat-ui-openid-config"
+    SERPER_API_KEY: "hub-prod-chat-ui-serper-api-key"
+    WEBHOOK_URL_REPORT_ASSISTANT: "hub-prod-chat-ui-webhook-report-assistant"
