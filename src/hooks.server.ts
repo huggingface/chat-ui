@@ -21,12 +21,15 @@ import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
 import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
+import { collectDefaultMetrics } from "prom-client";
+import { register } from "$lib/server/metrics";
 
 if (!building) {
 	await checkAndRunMigrations();
 	if (ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
+	collectDefaultMetrics({ register });
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
