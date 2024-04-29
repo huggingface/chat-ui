@@ -35,7 +35,7 @@ envVars:
   ENABLE_ASSISTANTS_RAG: "true"
   REQUIRE_FEATURED_ASSISTANTS: "true"
   EXPOSE_API: "true"
-  ALTERNATIVE_REDIRECT_URLS: "[huggingchat://login/callback]"
+  ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   MESSAGES_BEFORE_LOGIN: 0
 
