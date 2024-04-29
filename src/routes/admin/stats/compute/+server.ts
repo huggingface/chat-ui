@@ -30,7 +30,7 @@ async function computeStats(params: {
 	// In those cases we need to compute the stats from before the last month as everything is one aggregation
 	const minDate = lastComputed ? lastComputed.date.at : new Date(0);
 
-	console.log("Computing stats for", params.type, params.span, params.dateField, "from", minDate);
+	logger.info("Computing stats for", params.type, params.span, params.dateField, "from", minDate);
 
 	const dateField = params.type === "message" ? "messages." + params.dateField : params.dateField;
 
@@ -214,5 +214,5 @@ async function computeStats(params: {
 
 	await collections.conversations.aggregate(pipeline, { allowDiskUse: true }).next();
 
-	console.log("Computed stats for", params.type, params.span, params.dateField);
+	logger.info("Computed stats for", params.type, params.span, params.dateField);
 }
