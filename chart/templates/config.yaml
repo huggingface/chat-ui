@@ -6,15 +6,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   .env: |
-    NODE_BLOG_AND_DOC={{ $.Values.blogAndDoc.enabled | default "false" | quote }}
-    NODE_API_INFERENCE_URL={{ include "apiInference.url" $ | default "" | quote }}
-    NODE_COOKIE_SECURE={{ $.Values.global.huggingface.ingress.ssl | quote }}
-    NODE_GITALY_HOST={{ (include "hub.gitaly.uri" $) | quote }}
-    NODE_GITALY_INTERNAL_HOST={{ (include "hub.gitaly.uri" $) | quote }}
-    NODE_MOON_URL={{ include "hub.external.url" $ | quote }}
-    NODE_INTERNAL_MOON_URL={{ printf "http://%s.%s.svc.cluster.local" (include "name" $) ($.Release.Namespace) | quote }}
-    NODE_SECURITY_SCANNER_URL={{ include "repoScanner.url" $ | default "" | quote }}
-    NODE_TENSORBOARD_URL={{ include "tensorboard.url" $ | default "" | quote }}
     {{- range $key, $value := $.Values.envVars }}
     {{ $key }}={{ $value | quote }}
     {{- end }}
