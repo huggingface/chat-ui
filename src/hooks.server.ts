@@ -46,6 +46,7 @@ export const handleError: HandleServerError = async ({ error, event }) => {
 		params: event.params,
 		request: event.request,
 		error,
+		errorId,
 	});
 
 	return {
