@@ -34,6 +34,10 @@ spec:
               name: http
               protocol: TCP
           resources: {{ toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/.env
+              subPath: .env
           {{- if $.Values.externalSecrets.enabled }}
           envFrom:
             - secretRef:
