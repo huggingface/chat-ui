@@ -1,0 +1,18 @@
+nodeSelector:
+  role-hub-utils: "true"
+
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Equal
+    
+ingress:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "chat-ui.hub-alb.huggingface.tech"
+    alb.ingress.kubernetes.io/healthcheck-path: "/healthcheck"
+    alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
+    alb.ingress.kubernetes.io/group.name: "hub-prod"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/tags: "Env=prod,Project=hub,Terraform=true"
+    alb.ingress.kubernetes.io/target-node-labels: "role-hub-utils=true"
+    kubernetes.io/ingress.class: "alb"

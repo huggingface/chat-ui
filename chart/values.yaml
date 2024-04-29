@@ -1,0 +1,22 @@
+image:
+  repository: ghcr.io/huggingface
+  name: chat-ui
+  tag: 0.0.0-latest
+  pullPolicy: IfNotPresent
+
+replicas: 3
+
+domain: huggingface.co
+
+service:
+  type: NodePort
+  annotations: { }
+
+ingress:
+  annotations: { }
+
+resources:
+  requests:
+    cpu: 1
+nodeSelector: {}
+tolerations: []
