@@ -20,3 +20,10 @@ resources:
     cpu: 1
 nodeSelector: {}
 tolerations: []
+
+envVars: { }
+externalSecrets:
+  enabled: false
+  secretStoreName: ""
+  secretName: ""
+  parameters: { }

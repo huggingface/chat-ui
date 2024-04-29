@@ -16,3 +16,32 @@ ingress:
     alb.ingress.kubernetes.io/tags: "Env=prod,Project=hub,Terraform=true"
     alb.ingress.kubernetes.io/target-node-labels: "role-hub-utils=true"
     kubernetes.io/ingress.class: "alb"
+
+envVars:
+  APP_BASE: "/chat"
+  PUBLIC_ORIGIN: "https://huggingface.co"
+  PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
+  PUBLIC_ANNOUNCEMENT_BANNERS: "[]"
+  PUBLIC_APP_NAME: "HuggingChat"
+  PUBLIC_APP_ASSETS: "huggingchat"
+  PUBLIC_APP_COLOR: "yellow"
+  PUBLIC_APP_DESCRIPTION: "Making the community's best AI chat models available to everyone."
+  PUBLIC_APP_DISCLAIMER_MESSAGE: "Disclaimer: AI is an area of active research with known problems such as biased generation and misinformation. Do not use this application for high-stakes decisions or advice."
+  PUBLIC_APP_DATA_SHARING: 0
+  PUBLIC_APP_DISCLAIMER: 1
+  PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
+  PUBLIC_APPLE_APP_ID: "6476778843"
+  ENABLE_ASSISTANTS: "true"
+  ENABLE_ASSISTANTS_RAG: "true"
+  REQUIRE_FEATURED_ASSISTANTS: "true"
+  EXPOSE_API: "true"
+  ALTERNATIVE_REDIRECT_URLS: "[huggingchat://login/callback]"
+  WEBSEARCH_BLOCKLIST: '[\"youtube.com\", \"twitter.com\"]'
+  MESSAGES_BEFORE_LOGIN: 0
+
+externalSecrets:
+  enabled: true
+  secretStoreName: "chat-ui-prod-secretstore"
+  secretName: "chat-ui-prod-secrets"
+  parameters:
+    MONGODB_URL: "hub-prod-chat-ui-mongodb-url"
