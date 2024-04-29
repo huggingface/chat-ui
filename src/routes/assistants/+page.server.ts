@@ -18,7 +18,7 @@ export const load = async ({ url, locals }) => {
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const username = url.searchParams.get("user");
 	const query = url.searchParams.get("q")?.trim() ?? null;
-	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.POPULAR;
+	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
 	let user: Pick<User, "_id"> | null = null;
