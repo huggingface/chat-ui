@@ -18,7 +18,59 @@ ingress:
     kubernetes.io/ingress.class: "alb"
 
 envVars:
+  ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   APP_BASE: "/chat"
+  ENABLE_ASSISTANTS: "true"
+  ENABLE_ASSISTANTS_RAG: "true"
+  EXPOSE_API: "true"
+  MESSAGES_BEFORE_LOGIN: 0
+  MODELS: > 
+    [
+      {
+        "name": "CohereForAI/c4ai-command-r-plus",
+        "tokenizer": "Xenova/c4ai-command-r-v01-tokenizer",
+        "description": "Command R+ is Cohere's latest LLM and is the first open weight model to beat GPT4 in the Chatbot Arena!",
+        "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
+        "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
+        "parameters": {
+          "stop": [ "<|END_OF_TURN_TOKEN|>" ],
+          "truncate": 28672,
+          "max_new_tokens": 4096,
+          "temperature": 0.3
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: 
+                                                   
+                       - Wine (x10)
+                       - Eggs (x24)
+                       - Bread (x12)"
+          }, {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          }, {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+    ]
+  OLD_MODELS: >
+    [
+      { "name": "bigcode/starcoder" },
+      { "name": "OpenAssistant/oasst-sft-6-llama-30b-xor" },
+      { "name": "HuggingFaceH4/zephyr-7b-alpha" },
+      { "name": "openchat/openchat_3.5" },
+      { "name": "openchat/openchat-3.5-1210" },
+      { "name": "tiiuae/falcon-180B-chat" },
+      { "name": "codellama/CodeLlama-34b-Instruct-hf" },
+      { "name": "google/gemma-7b-it" },
+      { "name": "meta-llama/Llama-2-70b-chat-hf" },
+      { "name": "codellama/CodeLlama-70b-Instruct-hf" },
+      { "name": "openchat/openchat-3.5-0106" }
+    ]
   PUBLIC_ORIGIN: "https://huggingface.co"
   PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
   PUBLIC_ANNOUNCEMENT_BANNERS: "[]"
@@ -31,13 +83,19 @@ envVars:
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   PUBLIC_APPLE_APP_ID: "6476778843"
-  ENABLE_ASSISTANTS: "true"
-  ENABLE_ASSISTANTS_RAG: "true"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  EXPOSE_API: "true"
-  ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
+  TASK_MODEL: "meta-llama/Meta-Llama-3-8B-Instruct"
+  TEXT_EMBEDDING_MODELS: >
+    [{
+      "name": "bge-base-en-v1-5-sxa",
+      "displayName": "bge-base-en-v1-5-sxa",
+      "chunkCharLength": 512,
+      "endpoints": [{ 
+        "type": "tei",
+        "url": "https://huggingchat-tei.hf.space/"
+      }]
+    }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
-  MESSAGES_BEFORE_LOGIN: 0
 
 externalSecrets:
   enabled: true
@@ -47,6 +105,7 @@ externalSecrets:
     MONGODB_URL: "hub-prod-chat-ui-mongodb-url"
     OPENID_CONFIG: "hub-prod-chat-ui-openid-config"
     SERPER_API_KEY: "hub-prod-chat-ui-serper-api-key"
+    HF_TOKEN: "hub-prod-chat-ui-hf-token"
     WEBHOOK_URL_REPORT_ASSISTANT: "hub-prod-chat-ui-webhook-report-assistant"
     ADMIN_API_SECRET: "hub-prod-chat-ui-admin-api-secret"
     USAGE_LIMITS: "hub-prod-chat-ui-usage-limits"
