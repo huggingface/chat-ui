@@ -3,8 +3,8 @@ import { type Actions, fail, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
-import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
-import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
+import { env as envPublic } from "$env/dynamic/public";
+import { env } from "$env/dynamic/private";
 import { z } from "zod";
 import type { Assistant } from "$lib/types/Assistant";
 import { logger } from "$lib/server/logger";
@@ -86,8 +86,9 @@ export const actions: Actions = {
 			return fail(500, { error: true, message: "Failed to report assistant" });
 		}
 
-		if (WEBHOOK_URL_REPORT_ASSISTANT) {
-			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
+		if (env.WEBHOOK_URL_REPORT_ASSISTANT) {
+			const prefixUrl =
+				envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
 			const assistant = await collections.assistants.findOne<Pick<Assistant, "name">>(
@@ -97,7 +98,7 @@ export const actions: Actions = {
 
 			const username = locals.user?.username;
 
-			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
+			const res = await fetch(env.WEBHOOK_URL_REPORT_ASSISTANT, {
 				method: "POST",
 				headers: {
 					"Content-type": "application/json",
