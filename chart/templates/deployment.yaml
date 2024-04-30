@@ -24,13 +24,19 @@ spec:
           image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           readinessProbe:
-            tcpSocket:
-              port: 3000
+            failureThreshold: 30
+            periodSeconds: 10
+            httpGet:
+              path: /healthcheck
+              port: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
           livenessProbe:
-            tcpSocket:
-              port: 3000
+            failureThreshold: 30
+            periodSeconds: 10
+            httpGet:
+              path: /healthcheck
+              port: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
           ports:
-            - containerPort: 3000
+            - containerPort: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
               name: http
               protocol: TCP
           resources: {{ toYaml .Values.resources | nindent 12 }}
