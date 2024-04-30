@@ -2,6 +2,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
 import { downloadFile } from "./files/downloadFile";
+import { logger } from "$lib/server/logger";
 
 export async function preprocessMessages(
 	messages: Message[],
@@ -44,7 +45,7 @@ Answer the question: ${lastQuestion}`;
 								const b64 = image.toString("base64");
 								return `![](data:${mime};base64,${b64})})`;
 							} catch (e) {
-								console.error(e);
+								logger.error(e);
 							}
 						})
 					);

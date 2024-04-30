@@ -23,6 +23,7 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
+import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -334,7 +335,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 						);
 					} catch (e) {
-						console.error(e);
+						logger.error(e);
 					}
 				}
 			})();

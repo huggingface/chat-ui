@@ -1,6 +1,7 @@
 import { LLM_SUMMERIZATION } from "$env/static/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import type { Message } from "$lib/types/Message";
+import { logger } from "$lib/server/logger";
 
 export async function summarize(prompt: string) {
 	if (!LLM_SUMMERIZATION) {
@@ -41,7 +42,7 @@ export async function summarize(prompt: string) {
 			return summary;
 		})
 		.catch((e) => {
-			console.error(e);
+			logger.error(e);
 			return null;
 		});
 }
