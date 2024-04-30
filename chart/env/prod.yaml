@@ -260,6 +260,7 @@ envVars:
           "unlisted": true
         }
     ]
+  NODE_ENV: "prod"
   OLD_MODELS: >
     [
       { "name": "bigcode/starcoder" },
