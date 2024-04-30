@@ -265,7 +265,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		});
 		counter.add(1, {
 			"chat-ui.model": "values.model",
-			"user.email": locals.user?.email || undefined,
 		});
 
 		messageToWriteToId = addChildren(

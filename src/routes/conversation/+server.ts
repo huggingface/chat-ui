@@ -122,7 +122,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	});
 	counter.add(1, {
 		"chat-ui.model": values.model,
-		"user.email": locals.user?.email || undefined,
 	});
 
 	return new Response(
