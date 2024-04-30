@@ -5,7 +5,6 @@ metadata:
   name: {{ include "name" . }}
   namespace: {{ .Release.Namespace }}
 data:
-  .env: |
-    {{- range $key, $value := $.Values.envVars }}
-    {{ $key }}={{ $value | quote }}
-    {{- end }}
+  {{- range $key, $value := $.Values.envVars }}
+  {{ $key }}={{ $value | quote }}
+  {{- end }}
