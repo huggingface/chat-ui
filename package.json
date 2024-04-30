@@ -54,7 +54,7 @@
 		"@opentelemetry/api": "^1.8.0",
 		"@opentelemetry/auto-instrumentations-node": "^0.44.0",
 		"@opentelemetry/exporter-metrics-otlp-proto": "^0.50.0",
-		"@opentelemetry/sdk-metrics": "^1.23.0",
+		"@opentelemetry/sdk-metrics": "~1.23.0",
 		"@opentelemetry/sdk-node": "^0.50.0",
 		"@opentelemetry/sdk-trace-node": "^1.23.0",
 		"@resvg/resvg-js": "^2.6.0",
