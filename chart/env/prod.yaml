@@ -322,4 +322,4 @@ autoscaling:
   targetCPUUtilizationPercentage: "70"
 
 monitoring:
-  enabled: true
+  enabled: false
