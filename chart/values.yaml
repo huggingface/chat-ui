@@ -18,6 +18,10 @@ ingress:
 resources:
   requests:
     cpu: 1
+    memory: 8Gi
+  limits:
+    cpu: 1
+    memory: 8Gi
 nodeSelector: {}
 tolerations: []
 
@@ -27,3 +31,10 @@ externalSecrets:
   secretStoreName: ""
   secretName: ""
   parameters: { }
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetMemoryUtilizationPercentage: ""
+  targetCPUUtilizationPercentage: ""
