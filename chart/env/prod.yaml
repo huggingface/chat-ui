@@ -19,7 +19,7 @@ ingress:
 
 envVars:
   ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
-  APP_BASE: "/chat"
+  APP_BASE: ""
   ENABLE_ASSISTANTS: "true"
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
