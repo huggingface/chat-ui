@@ -344,7 +344,8 @@
 						}}
 					>
 						<textarea
-							class="w-full whitespace-break-spaces break-words rounded-lg bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max dark:bg-gray-800 dark:text-gray-400"
+							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max dark:bg-gray-800 dark:text-gray-400"
+							rows="5"
 							bind:this={editContentEl}
 							value={message.content.trim()}
 							on:keydown={handleKeyDown}
