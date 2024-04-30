@@ -25,6 +25,7 @@ envVars:
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
   MESSAGES_BEFORE_LOGIN: 0
+  METRICS_PORT: 5565
   MODELS: >
     [
       {
@@ -323,4 +324,4 @@ autoscaling:
   targetCPUUtilizationPercentage: "70"
 
 monitoring:
-  enabled: false
+  enabled: true
