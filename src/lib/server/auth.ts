@@ -18,6 +18,7 @@ import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
 import { collections } from "./database";
 import JSON5 from "json5";
+import { logger } from "$lib/server/logger";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -151,7 +152,7 @@ export async function validateAndParseCsrfToken(
 			return { redirectUrl: data.redirectUrl };
 		}
 	} catch (e) {
-		console.error(e);
+		logger.error(e);
 	}
 	return null;
 }

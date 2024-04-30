@@ -13,6 +13,7 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
+import { logger } from "$lib/server/logger";
 
 if (!MONGODB_URL) {
 	throw new Error(
@@ -25,7 +26,7 @@ const client = new MongoClient(MONGODB_URL, {
 	directConnection: MONGODB_DIRECT_CONNECTION === "true",
 });
 
-export const connectPromise = client.connect().catch(console.error);
+export const connectPromise = client.connect().catch(logger.error);
 
 export function getCollections(mongoClient: MongoClient) {
 	const db = mongoClient.db(MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
@@ -89,25 +90,25 @@ client.on("open", () => {
 			{ sessionId: 1, updatedAt: -1 },
 			{ partialFilterExpression: { sessionId: { $exists: true } } }
 		)
-		.catch(console.error);
+		.catch(logger.error);
 	conversations
 		.createIndex(
 			{ userId: 1, updatedAt: -1 },
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
-		.catch(console.error);
+		.catch(logger.error);
 	conversations
 		.createIndex(
 			{ "message.id": 1, "message.ancestors": 1 },
 			{ partialFilterExpression: { userId: { $exists: true } } }
 		)
-		.catch(console.error);
+		.catch(logger.error);
 	// To do stats on conversations
-	conversations.createIndex({ updatedAt: 1 }).catch(console.error);
+	conversations.createIndex({ updatedAt: 1 }).catch(logger.error);
 	// Not strictly necessary, could use _id, but more convenient. Also for stats
-	conversations.createIndex({ createdAt: 1 }).catch(console.error);
+	conversations.createIndex({ createdAt: 1 }).catch(logger.error);
 	// To do stats on conversation messages
-	conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(console.error);
+	conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(logger.error);
 	// Unique index for stats
 	conversationStats
 		.createIndex(
@@ -120,7 +121,7 @@ client.on("open", () => {
 			},
 			{ unique: true }
 		)
-		.catch(console.error);
+		.catch(logger.error);
 	// Allow easy check of last computed stat for given type/dateField
 	conversationStats
 		.createIndex({
@@ -128,34 +129,34 @@ client.on("open", () => {
 			"date.field": 1,
 			"date.at": 1,
 		})
-		.catch(console.error);
-	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(console.error);
-	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(console.error);
-	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(console.error);
-	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
-	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(console.error);
-	settings.createIndex({ assistants: 1 }).catch(console.error);
-	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(console.error);
-	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(console.error);
+		.catch(logger.error);
+	abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(logger.error);
+	abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(logger.error);
+	sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(logger.error);
+	settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
+	settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(logger.error);
+	settings.createIndex({ assistants: 1 }).catch(logger.error);
+	users.createIndex({ hfUserId: 1 }, { unique: true }).catch(logger.error);
+	users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
 	// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
-	users.createIndex({ username: 1 }).catch(console.error);
-	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
-	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(console.error);
-	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(console.error);
-	assistants.createIndex({ createdById: 1, userCount: -1 }).catch(console.error);
-	assistants.createIndex({ userCount: 1 }).catch(console.error);
-	assistants.createIndex({ featured: 1, userCount: -1 }).catch(console.error);
-	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(console.error);
-	assistants.createIndex({ searchTokens: 1 }).catch(console.error);
-	assistants.createIndex({ last24HoursCount: 1 }).catch(console.error);
+	users.createIndex({ username: 1 }).catch(logger.error);
+	messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
+	sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(logger.error);
+	sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(logger.error);
+	assistants.createIndex({ createdById: 1, userCount: -1 }).catch(logger.error);
+	assistants.createIndex({ userCount: 1 }).catch(logger.error);
+	assistants.createIndex({ featured: 1, userCount: -1 }).catch(logger.error);
+	assistants.createIndex({ modelId: 1, userCount: -1 }).catch(logger.error);
+	assistants.createIndex({ searchTokens: 1 }).catch(logger.error);
+	assistants.createIndex({ last24HoursCount: 1 }).catch(logger.error);
 	assistantStats
 		// Order of keys is important for the queries
 		.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-		.catch(console.error);
-	reports.createIndex({ assistantId: 1 }).catch(console.error);
-	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(console.error);
+		.catch(logger.error);
+	reports.createIndex({ assistantId: 1 }).catch(logger.error);
+	reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(logger.error);
 
 	// Unique index for semaphore and migration results
-	semaphores.createIndex({ key: 1 }, { unique: true }).catch(console.error);
-	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(console.error);
+	semaphores.createIndex({ key: 1 }, { unique: true }).catch(logger.error);
+	semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
 });
