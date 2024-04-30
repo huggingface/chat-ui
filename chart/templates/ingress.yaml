@@ -15,5 +15,5 @@ spec:
                 name: {{ include "name" . }}
                 port:
                   name: http
-            path: /chat
+            path: /
             pathType: Prefix
