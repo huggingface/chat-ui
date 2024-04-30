@@ -10,6 +10,7 @@ import {
 	OPENID_TOLERANCE,
 	OPENID_RESOURCE,
 	OPENID_CONFIG,
+	ALLOW_INSECURE_COOKIES,
 } from "$env/static/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -17,6 +18,7 @@ import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
 import { collections } from "./database";
 import JSON5 from "json5";
+import { logger } from "$lib/server/logger";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -54,8 +56,8 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite: dev ? "lax" : "none",
-		secure: !dev,
+		sameSite: dev || ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
+		secure: !dev && !(ALLOW_INSECURE_COOKIES === "true"),
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
 	});
@@ -150,7 +152,7 @@ export async function validateAndParseCsrfToken(
 			return { redirectUrl: data.redirectUrl };
 		}
 	} catch (e) {
-		console.error(e);
+		logger.error(e);
 	}
 	return null;
 }

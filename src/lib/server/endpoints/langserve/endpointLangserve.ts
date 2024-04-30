@@ -1,26 +1,22 @@
-import { HF_ACCESS_TOKEN, HF_TOKEN } from "$env/static/private";
 import { buildPrompt } from "$lib/buildPrompt";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import type { Endpoint } from "../endpoints";
 import { z } from "zod";
+import type { Endpoint } from "../endpoints";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { logger } from "$lib/server/logger";
 
-export const endpointLlamacppParametersSchema = z.object({
+export const endpointLangserveParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
-	type: z.literal("llamacpp"),
-	url: z.string().url().default("http://127.0.0.1:8080"),
-	accessToken: z
-		.string()
-		.min(1)
-		.default(HF_TOKEN ?? HF_ACCESS_TOKEN),
+	type: z.literal("langserve"),
+	url: z.string().url(),
 });
 
-export function endpointLlamacpp(
-	input: z.input<typeof endpointLlamacppParametersSchema>
+export function endpointLangserve(
+	input: z.input<typeof endpointLangserveParametersSchema>
 ): Endpoint {
-	const { url, model } = endpointLlamacppParametersSchema.parse(input);
-	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
+	const { url, model } = endpointLangserveParametersSchema.parse(input);
+
+	return async ({ messages, preprompt, continueMessage }) => {
 		const prompt = await buildPrompt({
 			messages,
 			continueMessage,
@@ -28,23 +24,13 @@ export function endpointLlamacpp(
 			model,
 		});
 
-		const parameters = { ...model.parameters, ...generateSettings };
-
-		const r = await fetch(`${url}/completion`, {
+		const r = await fetch(`${url}/stream`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				prompt,
-				stream: true,
-				temperature: parameters.temperature,
-				top_p: parameters.top_p,
-				top_k: parameters.top_k,
-				stop: parameters.stop,
-				repeat_penalty: parameters.repetition_penalty,
-				n_predict: parameters.max_new_tokens,
-				cache_prompt: true,
+				input: { text: prompt },
 			}),
 		});
 
@@ -77,20 +63,40 @@ export function endpointLlamacpp(
 
 				// Accumulate the data chunk
 				accumulatedData += out.value;
+				// Keep read data to check event type
+				const eventData = out.value;
 
 				// Process each complete JSON object in the accumulated data
 				while (accumulatedData.includes("\n")) {
 					// Assuming each JSON object ends with a newline
 					const endIndex = accumulatedData.indexOf("\n");
 					let jsonString = accumulatedData.substring(0, endIndex).trim();
-
 					// Remove the processed part from the buffer
+
 					accumulatedData = accumulatedData.substring(endIndex + 1);
 
-					if (jsonString.startsWith("data: ")) {
+					// Stopping with end event
+					if (eventData.startsWith("event: end")) {
+						stop = true;
+						yield {
+							token: {
+								id: tokenId++,
+								text: "",
+								logprob: 0,
+								special: true,
+							},
+							generated_text: generatedText,
+							details: null,
+						} satisfies TextGenerationStreamOutput;
+						reader?.cancel();
+						continue;
+					}
+
+					if (eventData.startsWith("event: data") && jsonString.startsWith("data: ")) {
 						jsonString = jsonString.slice(6);
 						let data = null;
 
+						// Handle the parsed data
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
@@ -98,25 +104,19 @@ export function endpointLlamacpp(
 							logger.error("Problematic JSON string:", jsonString);
 							continue; // Skip this iteration and try the next chunk
 						}
-
-						// Handle the parsed data
-						if (data.content || data.stop) {
-							generatedText += data.content;
+						// Assuming content within data is a plain string
+						if (data) {
+							generatedText += data;
 							const output: TextGenerationStreamOutput = {
 								token: {
 									id: tokenId++,
-									text: data.content ?? "",
+									text: data,
 									logprob: 0,
 									special: false,
 								},
-								generated_text: data.stop ? generatedText : null,
+								generated_text: null,
 								details: null,
 							};
-							if (data.stop) {
-								stop = true;
-								output.token.special = true;
-								reader?.cancel();
-							}
 							yield output;
 						}
 					}
@@ -126,4 +126,4 @@ export function endpointLlamacpp(
 	};
 }
 
-export default endpointLlamacpp;
+export default endpointLangserve;

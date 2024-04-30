@@ -18,6 +18,7 @@ import type { PreTrainedTokenizer } from "@xenova/transformers";
 
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
+import { logger } from "$lib/server/logger";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -91,11 +92,13 @@ async function getChatPromptRender(
 	try {
 		tokenizer = await getTokenizer(m.tokenizer);
 	} catch (e) {
-		throw Error(
+		logger.error(
 			"Failed to load tokenizer for model " +
 				m.name +
-				" consider setting chatPromptTemplate manually or making sure the model is available on the hub."
+				" consider setting chatPromptTemplate manually or making sure the model is available on the hub. Error: " +
+				(e as Error).message
 		);
+		process.exit();
 	}
 
 	const renderTemplate = ({ messages, preprompt }: ChatTemplateInput) => {
@@ -177,6 +180,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return await endpoints.cloudflare(args);
 					case "cohere":
 						return await endpoints.cohere(args);
+					case "langserve":
+						return await endpoints.langserve(args);
 					default:
 						// for legacy reason
 						return endpoints.tgi(args);

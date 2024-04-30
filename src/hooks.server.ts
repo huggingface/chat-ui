@@ -6,7 +6,7 @@ import {
 	MESSAGES_BEFORE_LOGIN,
 	PARQUET_EXPORT_SECRET,
 } from "$env/static/private";
-import type { Handle } from "@sveltejs/kit";
+import type { Handle, HandleServerError } from "@sveltejs/kit";
 import {
 	PUBLIC_GOOGLE_ANALYTICS_ID,
 	PUBLIC_ORIGIN,
@@ -21,6 +21,7 @@ import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
 import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
+import { logger } from "$lib/server/logger";
 
 if (!building) {
 	await checkAndRunMigrations();
@@ -28,6 +29,31 @@ if (!building) {
 		refreshAssistantsCounts();
 	}
 }
+
+export const handleError: HandleServerError = async ({ error, event }) => {
+	// handle 404
+	if (event.route.id === null) {
+		return {
+			message: `Page ${event.url.pathname} not found`,
+		};
+	}
+
+	const errorId = crypto.randomUUID();
+
+	logger.error({
+		locals: event.locals,
+		url: event.request.url,
+		params: event.params,
+		request: event.request,
+		error,
+		errorId,
+	});
+
+	return {
+		message: "An error occurred",
+		errorId,
+	};
+};
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (event.url.pathname.startsWith(`${base}/api/`) && EXPOSE_API !== "true") {
