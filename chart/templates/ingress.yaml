@@ -16,4 +16,4 @@ spec:
                 port:
                   name: http
             path: /chat
-            pathType: ImplementationSpecific
+            pathType: Prefix
