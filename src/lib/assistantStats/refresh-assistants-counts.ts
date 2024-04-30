@@ -1,4 +1,4 @@
-import { client, collections } from "$lib/server/database";
+import { MongoDBClient, collections } from "$lib/server/database";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
 import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
@@ -15,7 +15,7 @@ async function refreshAssistantsCountsHelper() {
 	}
 
 	try {
-		await client.withSession((session) =>
+		await MongoDBClient.instance.withSession((session) =>
 			session.withTransaction(async () => {
 				await collections.assistants
 					.aggregate([

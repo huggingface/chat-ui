@@ -1,8 +1,8 @@
-import { client, collections } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
 import { logger } from "$lib/server/logger";
+import { MongoDBClient } from "$lib/server/database";
 
 const LOCK_KEY = "migrations";
 
@@ -13,12 +13,9 @@ export async function checkAndRunMigrations() {
 	}
 
 	// check if all migrations have already been run
-	const migrationResults = await collections.migrationResults.find().toArray();
+	const migrationResults = await MongoDBClient.collections.migrationResults.find().toArray();
 
 	logger.info("[MIGRATIONS] Begin check...");
-
-	// connect to the database
-	const connectedClient = await client.connect();
 
 	const lockId = await acquireLock(LOCK_KEY);
 
@@ -71,7 +68,7 @@ export async function checkAndRunMigrations() {
 				}. Applying...`
 			);
 
-			await collections.migrationResults.updateOne(
+			await MongoDBClient.collections.migrationResults.updateOne(
 				{ _id: migration._id },
 				{
 					$set: {
@@ -82,12 +79,12 @@ export async function checkAndRunMigrations() {
 				{ upsert: true }
 			);
 
-			const session = connectedClient.startSession();
+			const session = MongoDBClient.instance.startSession();
 			let result = false;
 
 			try {
 				await session.withTransaction(async () => {
-					result = await migration.up(connectedClient);
+					result = await migration.up(MongoDBClient);
 				});
 			} catch (e) {
 				logger.info(`[MIGRATIONS]  "${migration.name}" failed!`);
@@ -96,7 +93,7 @@ export async function checkAndRunMigrations() {
 				await session.endSession();
 			}
 
-			await collections.migrationResults.updateOne(
+			await MongoDBClient.collections.migrationResults.updateOne(
 				{ _id: migration._id },
 				{
 					$set: {

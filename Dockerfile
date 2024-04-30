@@ -32,6 +32,8 @@ USER user
 ENV HOME=/home/user \
 	PATH=/home/user/.local/bin:$PATH
 
+WORKDIR /app
+
 RUN touch /app/.env.local
 COPY --from=builder --chown=1000 /app/.env /app/.env
 
