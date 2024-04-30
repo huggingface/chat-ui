@@ -14,8 +14,9 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import { logger } from "$lib/server/logger";
+import { building } from "$app/environment";
 
-if (!env.MONGODB_URL) {
+if (!env.MONGODB_URL && !building) {
 	throw new Error(
 		"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
 	);
