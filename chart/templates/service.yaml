@@ -11,5 +11,11 @@ spec:
     port: 80
     protocol: TCP
     targetPort: http
+  {{- if $.Values.monitoring.enabled }}
+  - name: metrics
+    port: 5565
+    protocol: TCP
+    targetPort: http
+  {{- end }}
   selector: {{ include "labels.standard" . | nindent 4 }}
   type: {{.Values.service.type}}

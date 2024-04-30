@@ -319,3 +319,6 @@ autoscaling:
   maxReplicas: 10
   targetMemoryUtilizationPercentage: "70"
   targetCPUUtilizationPercentage: "70"
+
+monitoring:
+  enabled: true
