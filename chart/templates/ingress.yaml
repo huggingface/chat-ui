@@ -15,4 +15,5 @@ spec:
                 name: {{ include "name" . }}
                 port:
                   name: http
+            path: /chat-test
             pathType: ImplementationSpecific
