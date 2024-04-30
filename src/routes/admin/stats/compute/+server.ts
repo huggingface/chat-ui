@@ -1,15 +1,16 @@
 import { json } from "@sveltejs/kit";
 import type { ConversationStats } from "$lib/types/ConversationStats";
 import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database.js";
+import { logger } from "$lib/server/logger";
 
 // Triger like this:
 // curl -X POST "http://localhost:5173/chat/admin/stats/compute" -H "Authorization: Bearer <ADMIN_API_SECRET>"
 
 export async function POST() {
 	for (const span of ["day", "week", "month"] as const) {
-		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch(console.error);
-		computeStats({ dateField: "createdAt", type: "conversation", span }).catch(console.error);
-		computeStats({ dateField: "createdAt", type: "message", span }).catch(console.error);
+		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch(logger.error);
+		computeStats({ dateField: "createdAt", type: "conversation", span }).catch(logger.error);
+		computeStats({ dateField: "createdAt", type: "message", span }).catch(logger.error);
 	}
 
 	return json({}, { status: 202 });
@@ -29,7 +30,7 @@ async function computeStats(params: {
 	// In those cases we need to compute the stats from before the last month as everything is one aggregation
 	const minDate = lastComputed ? lastComputed.date.at : new Date(0);
 
-	console.log("Computing stats for", params.type, params.span, params.dateField, "from", minDate);
+	logger.info("Computing stats for", params.type, params.span, params.dateField, "from", minDate);
 
 	const dateField = params.type === "message" ? "messages." + params.dateField : params.dateField;
 
@@ -213,5 +214,5 @@ async function computeStats(params: {
 
 	await collections.conversations.aggregate(pipeline, { allowDiskUse: true }).next();
 
-	console.log("Computed stats for", params.type, params.span, params.dateField);
+	logger.info("Computed stats for", params.type, params.span, params.dateField);
 }

@@ -7,6 +7,7 @@ import { unlink } from "node:fs/promises";
 import { uploadFile } from "@huggingface/hub";
 import parquet from "parquetjs";
 import { z } from "zod";
+import { logger } from "$lib/server/logger.js";
 
 // Triger like this:
 // curl -X POST "http://localhost:5173/chat/admin/export" -H "Authorization: Bearer <ADMIN_API_SECRET>" -H "Content-Type: application/json" -d '{"model": "OpenAssistant/oasst-sft-6-llama-30b-xor"}'
@@ -41,7 +42,7 @@ export async function POST({ request }) {
 	const writer = await parquet.ParquetWriter.openFile(schema, fileName);
 
 	let count = 0;
-	console.log("Exporting conversations for model", model);
+	logger.info("Exporting conversations for model", model);
 
 	for await (const conversation of collections.settings.aggregate<{
 		title: string;
@@ -88,11 +89,11 @@ export async function POST({ request }) {
 		++count;
 
 		if (count % 1_000 === 0) {
-			console.log("Exported", count, "conversations");
+			logger.info("Exported", count, "conversations");
 		}
 	}
 
-	console.log("exporting convos with userId");
+	logger.info("exporting convos with userId");
 
 	for await (const conversation of collections.settings.aggregate<{
 		title: string;
@@ -133,13 +134,13 @@ export async function POST({ request }) {
 		++count;
 
 		if (count % 1_000 === 0) {
-			console.log("Exported", count, "conversations");
+			logger.info("Exported", count, "conversations");
 		}
 	}
 
 	await writer.close();
 
-	console.log("Uploading", fileName, "to Hugging Face Hub");
+	logger.info("Uploading", fileName, "to Hugging Face Hub");
 
 	await uploadFile({
 		file: pathToFileURL(fileName) as URL,
@@ -150,7 +151,7 @@ export async function POST({ request }) {
 		},
 	});
 
-	console.log("Upload done");
+	logger.info("Upload done");
 
 	await unlink(fileName);
 

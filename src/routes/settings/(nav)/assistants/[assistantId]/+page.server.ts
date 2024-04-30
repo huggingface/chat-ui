@@ -7,6 +7,7 @@ import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
 import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
 import { z } from "zod";
 import type { Assistant } from "$lib/types/Assistant";
+import { logger } from "$lib/server/logger";
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
@@ -109,7 +110,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				console.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
+				logger.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
 			}
 		}
 
