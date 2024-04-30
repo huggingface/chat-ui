@@ -6,7 +6,7 @@ image:
 
 replicas: 3
 
-domain: chat-ui.hub-alb.huggingface.tech
+domain: huggingface.co
 
 service:
   type: NodePort
