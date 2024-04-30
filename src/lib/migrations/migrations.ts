@@ -2,6 +2,7 @@ import { client, collections } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { logger } from "$lib/server/logger";
 
 const LOCK_KEY = "migrations";
 
@@ -14,7 +15,7 @@ export async function checkAndRunMigrations() {
 	// check if all migrations have already been run
 	const migrationResults = await collections.migrationResults.find().toArray();
 
-	console.log("[MIGRATIONS] Begin check...");
+	logger.info("[MIGRATIONS] Begin check...");
 
 	// connect to the database
 	const connectedClient = await client.connect();
@@ -23,7 +24,7 @@ export async function checkAndRunMigrations() {
 
 	if (!lockId) {
 		// another instance already has the lock, so we exit early
-		console.log(
+		logger.info(
 			"[MIGRATIONS] Another instance already has the lock. Waiting for DB to be unlocked."
 		);
 
@@ -50,21 +51,21 @@ export async function checkAndRunMigrations() {
 
 		// check if the migration has already been applied
 		if (!shouldRun) {
-			console.log(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
+			logger.info(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
 		} else {
 			// check the modifiers to see if some cases match
 			if (
 				(migration.runForHuggingChat === "only" && !isHuggingChat) ||
 				(migration.runForHuggingChat === "never" && isHuggingChat)
 			) {
-				console.log(
+				logger.info(
 					`[MIGRATIONS] "${migration.name}" should not be applied for this run. Skipping...`
 				);
 				continue;
 			}
 
 			// otherwise all is good and we can run the migration
-			console.log(
+			logger.info(
 				`[MIGRATIONS] "${migration.name}" ${
 					migration.runEveryTime ? "should run every time" : "not applied yet"
 				}. Applying...`
@@ -89,8 +90,8 @@ export async function checkAndRunMigrations() {
 					result = await migration.up(connectedClient);
 				});
 			} catch (e) {
-				console.log(`[MIGRATION[]  "${migration.name}" failed!`);
-				console.error(e);
+				logger.info(`[MIGRATIONS]  "${migration.name}" failed!`);
+				logger.error(e);
 			} finally {
 				await session.endSession();
 			}
@@ -108,7 +109,7 @@ export async function checkAndRunMigrations() {
 		}
 	}
 
-	console.log("[MIGRATIONS] All migrations applied. Releasing lock");
+	logger.info("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
 	await releaseLock(LOCK_KEY, lockId);
