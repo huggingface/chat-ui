@@ -6,7 +6,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   progressDeadlineSeconds: 600
+  {{- if not $.Values.autoscaling.enabled }}
   replicas: {{ .Values.replicas }}
+  {{- end }}
   revisionHistoryLimit: 10
   selector:
     matchLabels: {{ include "labels.standard" . | nindent 6 }}
