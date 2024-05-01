@@ -8,8 +8,10 @@ import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
-import { building } from "$app/environment";
+import { building, dev } from "$app/environment";
 import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
+import { collectDefaultMetrics } from "prom-client";
+import { register } from "$lib/server/metrics";
 import { logger } from "$lib/server/logger";
 
 if (!building) {
@@ -17,10 +19,16 @@ if (!building) {
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
+	collectDefaultMetrics({ register });
 }
 
 export const handleError: HandleServerError = async ({ error, event }) => {
 	// handle 404
+
+	if (building) {
+		throw error;
+	}
+
 	if (event.route.id === null) {
 		return {
 			message: `Page ${event.url.pathname} not found`,
@@ -45,6 +53,15 @@ export const handleError: HandleServerError = async ({ error, event }) => {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// only allow metrics from localhost if we're not in dev mode
+	if (
+		event.url.pathname.startsWith(`${base}/metrics`) &&
+		!dev &&
+		event.request.headers.get("host") !== "localhost:3000"
+	) {
+		return new Response("Forbidden", { status: 403 });
+	}
+
 	if (event.url.pathname.startsWith(`${base}/api/`) && env.EXPOSE_API !== "true") {
 		return new Response("API is disabled", { status: 403 });
 	}
