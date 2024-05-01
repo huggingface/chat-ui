@@ -22,7 +22,7 @@ RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local \
     npm run build
 
 FROM node:20-slim
-RUN npm install -g pm2
+RUN npm install -g vite-node
 
 RUN userdel -r node
 
@@ -39,4 +39,4 @@ COPY --link --chown=1000 package.json /app/package.json
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --chown=1000 gcp-*.json /app/
 
-CMD pm2 start /app/build/index.js -i $CPU_CORES --no-daemon
+CMD vite-node --options.transformMode.ssr='/.*/' /app/scripts/server.ts

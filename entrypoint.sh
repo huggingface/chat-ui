@@ -26,4 +26,4 @@ if [ "$INCLUDE_DB" = "true" ] ; then
 fi;
 
 npm run build
-npm run preview -- --host 0.0.0.0 --port 3000
+npm vite-node --options.transformMode.ssr='/.*/' /app/scripts/server.ts -- --host 0.0.0.0 --port 3000

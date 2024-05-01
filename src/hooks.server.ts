@@ -35,6 +35,11 @@ if (!building) {
 
 export const handleError: HandleServerError = async ({ error, event }) => {
 	// handle 404
+
+	if (building) {
+		throw error;
+	}
+
 	if (event.route.id === null) {
 		return {
 			message: `Page ${event.url.pathname} not found`,
