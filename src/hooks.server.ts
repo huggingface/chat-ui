@@ -19,6 +19,7 @@ if (!building) {
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
+	register.clear();
 	collectDefaultMetrics({ register });
 }
 
@@ -129,18 +130,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 		if (nativeFormContentTypes.includes(requestContentType)) {
-			const referer = event.request.headers.get("referer");
+			const origin = event.request.headers.get("origin");
 
-			if (!referer) {
-				return errorResponse(403, "Non-JSON form requests need to have a referer");
+			if (!origin) {
+				return errorResponse(403, "Non-JSON form requests need to have an origin");
 			}
 
 			const validOrigins = [
-				new URL(event.request.url).origin,
-				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).origin] : []),
+				new URL(event.request.url).host,
+				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).host] : []),
 			];
 
-			if (!validOrigins.includes(new URL(referer).origin)) {
+			if (!validOrigins.includes(new URL(origin).host)) {
 				return errorResponse(403, "Invalid referer for POST request");
 			}
 		}

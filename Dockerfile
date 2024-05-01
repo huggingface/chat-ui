@@ -21,7 +21,10 @@ COPY --link --chown=1000 . .
 RUN npm run build
 
 FROM node:20-slim
-RUN npm install -g dotenv-cli vite-node
+EXPOSE 3000
+EXPOSE 3001
+
+RUN npm install -g dotenv-cli
 
 RUN userdel -r node
 
@@ -40,6 +43,8 @@ COPY --from=builder --chown=1000 /app/.env /app/.env
 COPY --from=builder-production --chown=1000 /app/node_modules /app/node_modules
 COPY --link --chown=1000 package.json /app/package.json
 COPY --from=builder --chown=1000 /app/build /app/build
+COPY --from=builder --chown=1000 /app/scripts /app/scripts
+
 COPY --chown=1000 gcp-*.json /app/
 
-CMD dotenv -e /app/.env -c -- vite-node --options.transformMode.ssr='/.*/' /app/scripts/server.ts
+CMD dotenv -e /app/.env -c -- node /app/scripts/server.js
