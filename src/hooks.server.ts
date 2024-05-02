@@ -13,8 +13,10 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { collectDefaultMetrics } from "prom-client";
 import { register } from "$lib/server/metrics";
 import { logger } from "$lib/server/logger";
+import { maintainAbortedGenerations } from "$lib/server/abortedGenerations";
 
 if (!building) {
+	maintainAbortedGenerations();
 	await checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();

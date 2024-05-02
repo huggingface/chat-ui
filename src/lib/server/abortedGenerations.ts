@@ -11,7 +11,7 @@ process.on("SIGINT", () => {
 
 export let abortedGenerations: Map<string, Date> = new Map();
 
-async function maintainAbortedGenerations() {
+export async function maintainAbortedGenerations() {
 	while (!closed) {
 		await setTimeout(1000);
 
@@ -26,5 +26,3 @@ async function maintainAbortedGenerations() {
 		}
 	}
 }
-
-maintainAbortedGenerations();
