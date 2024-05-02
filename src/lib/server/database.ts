@@ -58,7 +58,10 @@ export class MongoDBClient {
 		return this._instance;
 	}
 
-	public static get collections() {
+	public static get collections(): typeof this._collections {
+		if (building) {
+			return {} as typeof this._collections;
+		}
 		if (!this._collections) {
 			const db = this.instance.db(
 				env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
@@ -81,6 +84,7 @@ export class MongoDBClient {
 				semaphores: db.collection<Semaphore>("semaphores"),
 			};
 		}
+
 		return this._collections;
 	}
 
@@ -179,6 +183,4 @@ export class MongoDBClient {
 	}
 }
 
-export const collections = !building
-	? MongoDBClient.collections
-	: ({} as (typeof MongoDBClient)["_collections"]);
+export const collections = MongoDBClient.collections;
