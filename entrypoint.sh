@@ -2,7 +2,7 @@ ENV_LOCAL_PATH=/app/.env.local
 
 if test -z "${DOTENV_LOCAL}" ; then
     if ! test -f "${ENV_LOCAL_PATH}" ; then
-        echo "DOTENV_LOCAL was not found in the ENV variables and .env.local is not set using a bind volume. We are using the default .env config."
+        echo "DOTENV_LOCAL was not found in the ENV variables and .env.local is not set using a bind volume. Make sure to set environment variables properly. "
     fi;
 else
     echo "DOTENV_LOCAL was found in the ENV variables. Creating .env.local file."
@@ -10,20 +10,8 @@ else
 fi;
 
 if [ "$INCLUDE_DB" = "true" ] ; then
-    echo "INCLUDE_DB is set to true."
-
-    MONGODB_CONFIG="MONGODB_URL=mongodb://localhost:27017"
-    if ! grep -q "^${MONGODB_CONFIG}$" ${ENV_LOCAL_PATH}; then
-      echo "Appending MONGODB_URL"
-      touch /app/.env.local
-      echo -e "\n${MONGODB_CONFIG}" >> ${ENV_LOCAL_PATH}
-    fi
-
-    mkdir -p /data/db
-    mongod &
     echo "Starting local MongoDB instance"
-
+    nohup mongod &
 fi;
 
-npm run build
-npm vite-node --options.transformMode.ssr='/.*/' /app/scripts/server.js -- --host 0.0.0.0 --port 3000
+dotenv -e /app/.env -c -- node /app/scripts/server.mjs -- --host 0.0.0.0 --port 3000

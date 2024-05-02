@@ -8,6 +8,9 @@ export default {
 	content: ["./src/**/*.{html,js,svelte,ts}"],
 	theme: {
 		extend: {
+			colors: {
+				primary: colors[process.env.PUBLIC_APP_COLOR],
+			},
 			fontSize: {
 				xxs: "0.625rem",
 				smd: "0.94rem",
