@@ -1,7 +1,7 @@
 import { afterEach, assert, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 
 const LOCK_KEY = "migrations.test";
 
@@ -40,11 +40,11 @@ describe("migrations", () => {
 
 		// get the updatedAt time
 
-		const updatedAtInitially = (await collections.semaphores.findOne({}))?.updatedAt;
+		const updatedAtInitially = (await Database.getInstance().getCollections().semaphores.findOne({}))?.updatedAt;
 
 		await refreshLock(LOCK_KEY, lockId);
 
-		const updatedAtAfterRefresh = (await collections.semaphores.findOne({}))?.updatedAt;
+		const updatedAtAfterRefresh = (await Database.getInstance().getCollections().semaphores.findOne({}))?.updatedAt;
 
 		expect(updatedAtInitially).toBeDefined();
 		expect(updatedAtAfterRefresh).toBeDefined();
@@ -53,6 +53,6 @@ describe("migrations", () => {
 });
 
 afterEach(async () => {
-	await collections.semaphores.deleteMany({});
-	await collections.migrationResults.deleteMany({});
+	await Database.getInstance().getCollections().semaphores.deleteMany({});
+	await Database.getInstance().getCollections().migrationResults.deleteMany({});
 });

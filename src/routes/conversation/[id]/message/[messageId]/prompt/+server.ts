@@ -1,6 +1,6 @@
 import { buildPrompt } from "$lib/buildPrompt";
 import { authCondition } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
@@ -10,10 +10,10 @@ import { ObjectId } from "mongodb";
 export async function GET({ params, locals }) {
 	const conv =
 		params.id.length === 7
-			? await collections.sharedConversations.findOne({
+			? await Database.getInstance().getCollections().sharedConversations.findOne({
 					_id: params.id,
 			  })
-			: await collections.conversations.findOne({
+			: await Database.getInstance().getCollections().conversations.findOne({
 					_id: new ObjectId(params.id),
 					...authCondition(locals),
 			  });

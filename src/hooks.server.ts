@@ -12,7 +12,7 @@ import {
 	PUBLIC_ORIGIN,
 	PUBLIC_APP_DISCLAIMER,
 } from "$env/static/public";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { base } from "$app/paths";
 import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
@@ -24,13 +24,18 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { collectDefaultMetrics } from "prom-client";
 import { register } from "$lib/server/metrics";
 import { logger } from "$lib/server/logger";
+import { AbortedGenerations } from "$lib/server/abortedGenerations";
 
+// TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
 	await checkAndRunMigrations();
 	if (ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
 	collectDefaultMetrics({ register });
+
+	// Init AbortedGenerations refresh process
+	new AbortedGenerations();
 }
 
 export const handleError: HandleServerError = async ({ error, event }) => {
@@ -162,7 +167,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		// if the request is a POST request we refresh the cookie
 		refreshSessionCookie(event.cookies, secretSessionId);
 
-		await collections.sessions.updateOne(
+		await Database.getInstance().getCollections().sessions.updateOne(
 			{ sessionId },
 			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
 		);
@@ -189,7 +194,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			!event.url.pathname.startsWith(`${base}/settings`) &&
 			!!PUBLIC_APP_DISCLAIMER
 		) {
-			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
+			const hasAcceptedEthicsModal = await Database.getInstance().getCollections().settings.countDocuments({
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },
 			});

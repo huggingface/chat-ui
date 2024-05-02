@@ -1,11 +1,11 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { sha256 } from "$lib/utils/sha256";
-import { collections } from "../database";
+import { Database } from "$lib/server/database";
 
 export async function uploadFile(file: Blob, conv: Conversation): Promise<string> {
 	const sha = await sha256(await file.text());
 
-	const upload = collections.bucket.openUploadStream(`${conv._id}-${sha}`, {
+	const upload = Database.getInstance().getCollections().bucket.openUploadStream(`${conv._id}-${sha}`, {
 		metadata: { conversation: conv._id.toString(), mime: "image/jpeg" },
 	});
 

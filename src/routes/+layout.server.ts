@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from "./$types";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
@@ -22,7 +22,7 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
 
-	const settings = await collections.settings.findOne(authCondition(locals));
+	const settings = await Database.getInstance().getCollections().settings.findOne(authCondition(locals));
 
 	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
 	if (
@@ -31,7 +31,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
 	) {
 		settings.activeModel = defaultModel.id;
-		await collections.settings.updateOne(authCondition(locals), {
+		await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
 			$set: { activeModel: defaultModel.id },
 		});
 	}
@@ -42,7 +42,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		models.find((m) => m.id === settings?.activeModel)?.unlisted === true
 	) {
 		settings.activeModel = defaultModel.id;
-		await collections.settings.updateOne(authCondition(locals), {
+		await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
 			$set: { activeModel: defaultModel.id },
 		});
 	}
@@ -54,14 +54,14 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const assistant = assistantActive
 		? JSON.parse(
 				JSON.stringify(
-					await collections.assistants.findOne({
+					await Database.getInstance().getCollections().assistants.findOne({
 						_id: new ObjectId(settings?.activeModel),
 					})
 				)
 		  )
 		: null;
 
-	const conversations = await collections.conversations
+	const conversations = await Database.getInstance().getCollections().conversations
 		.find(authCondition(locals))
 		.sort({ updatedAt: -1 })
 		.project<
@@ -85,7 +85,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
 	];
 
-	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
+	const assistants = await Database.getInstance().getCollections().assistants.find({ _id: { $in: assistantIds } }).toArray();
 
 	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
 
@@ -98,7 +98,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			// get the number of messages where `from === "assistant"` across all conversations.
 			const totalMessages =
 				(
-					await collections.conversations
+					await Database.getInstance().getCollections().conversations
 						.aggregate([
 							{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
 							{ $project: { messages: 1 } },

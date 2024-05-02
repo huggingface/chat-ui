@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
 import { authCondition, requiresUser } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { fail, type Actions, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -43,7 +43,7 @@ const newAsssistantSchema = z.object({
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
 	const hash = await sha256(await avatar.text());
-	const upload = collections.bucket.openUploadStream(`${assistantId.toString()}`, {
+	const upload = Database.getInstance().getCollections().bucket.openUploadStream(`${assistantId.toString()}`, {
 		metadata: { type: avatar.type, hash },
 	});
 
@@ -84,7 +84,7 @@ export const actions: Actions = {
 
 		const createdById = locals.user?._id ?? locals.sessionId;
 
-		const assistantsCount = await collections.assistants.countDocuments({ createdById });
+		const assistantsCount = await Database.getInstance().getCollections().assistants.countDocuments({ createdById });
 
 		if (usageLimits?.assistants && assistantsCount > usageLimits.assistants) {
 			const errors = [
@@ -121,7 +121,7 @@ export const actions: Actions = {
 			hash = await uploadAvatar(new File([image], "avatar.jpg"), newAssistantId);
 		}
 
-		const { insertedId } = await collections.assistants.insertOne({
+		const { insertedId } = await Database.getInstance().getCollections().assistants.insertOne({
 			_id: newAssistantId,
 			createdById,
 			createdByName: locals.user?.username ?? locals.user?.name,
@@ -150,7 +150,7 @@ export const actions: Actions = {
 
 		// add insertedId to user settings
 
-		await collections.settings.updateOne(authCondition(locals), {
+		await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
 			$addToSet: { assistants: insertedId },
 		});
 

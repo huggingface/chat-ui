@@ -1,4 +1,4 @@
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { z } from "zod";
 import { authCondition } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
@@ -18,7 +18,7 @@ export async function POST({ request, locals }) {
 		})
 		.parse(body);
 
-	await collections.settings.updateOne(
+	await Database.getInstance().getCollections().settings.updateOne(
 		authCondition(locals),
 		{
 			$set: {

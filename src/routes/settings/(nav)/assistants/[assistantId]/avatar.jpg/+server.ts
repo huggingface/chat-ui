@@ -1,9 +1,9 @@
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { error, type RequestHandler } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export const GET: RequestHandler = async ({ params }) => {
-	const assistant = await collections.assistants.findOne({
+	const assistant = await Database.getInstance().getCollections().assistants.findOne({
 		_id: new ObjectId(params.assistantId),
 	});
 
@@ -15,14 +15,14 @@ export const GET: RequestHandler = async ({ params }) => {
 		throw error(404, "No avatar found");
 	}
 
-	const fileId = collections.bucket.find({ filename: assistant._id.toString() });
+	const fileId = Database.getInstance().getCollections().bucket.find({ filename: assistant._id.toString() });
 
 	const content = await fileId.next().then(async (file) => {
 		if (!file?._id) {
 			throw error(404, "Avatar not found");
 		}
 
-		const fileStream = collections.bucket.openDownloadStream(file?._id);
+		const fileStream = Database.getInstance().getCollections().bucket.openDownloadStream(file?._id);
 
 		const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
 			const chunks: Uint8Array[] = [];

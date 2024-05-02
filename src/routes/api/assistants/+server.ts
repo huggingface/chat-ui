@@ -1,4 +1,4 @@
-import { collections } from "$lib/server/database.js";
+import { Database } from "$lib/server/database";
 import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
@@ -16,7 +16,7 @@ export async function GET({ url, locals }) {
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
-		user = await collections.users.findOne<Pick<User, "_id">>(
+		user = await Database.getInstance().getCollections().users.findOne<Pick<User, "_id">>(
 			{ username },
 			{ projection: { _id: 1 } }
 		);
@@ -43,14 +43,14 @@ export async function GET({ url, locals }) {
 		...shouldBeFeatured,
 		...shouldHaveBeenShared,
 	};
-	const assistants = await collections.assistants
+	const assistants = await Database.getInstance().getCollections().assistants
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({ userCount: -1 })
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await collections.assistants.countDocuments(filter);
+	const numTotalItems = await Database.getInstance().getCollections().assistants.countDocuments(filter);
 
 	return Response.json({
 		assistants,

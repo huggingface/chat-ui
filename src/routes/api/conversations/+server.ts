@@ -1,4 +1,4 @@
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 
@@ -8,7 +8,7 @@ export async function GET({ locals, url }) {
 	const p = parseInt(url.searchParams.get("p") ?? "0");
 
 	if (locals.user?._id || locals.sessionId) {
-		const convs = await collections.conversations
+		const convs = await Database.getInstance().getCollections().conversations
 			.find({
 				...authCondition(locals),
 			})

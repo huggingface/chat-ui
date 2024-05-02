@@ -7,7 +7,7 @@ import { MONGODB_URL } from "$env/static/private";
 import { faker } from "@faker-js/faker";
 import { ObjectId } from "mongodb";
 
-import { collections } from "../src/lib/server/database.ts";
+import { Database } from "$lib/server/database";
 import { models } from "../src/lib/server/models.ts";
 import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
@@ -107,10 +107,10 @@ async function seed() {
 
 	if (flags.includes("reset")) {
 		console.log("Starting reset of DB");
-		await collections.users.deleteMany({});
-		await collections.settings.deleteMany({});
-		await collections.assistants.deleteMany({});
-		await collections.conversations.deleteMany({});
+		await Database.getInstance().getCollections().users.deleteMany({});
+		await Database.getInstance().getCollections().settings.deleteMany({});
+		await Database.getInstance().getCollections().assistants.deleteMany({});
+		await Database.getInstance().getCollections().conversations.deleteMany({});
 		console.log("Reset done");
 	}
 
@@ -126,11 +126,11 @@ async function seed() {
 			avatarUrl: faker.image.avatar(),
 		}));
 
-		await collections.users.insertMany(newUsers);
+		await Database.getInstance().getCollections().users.insertMany(newUsers);
 		console.log("Done creating users.");
 	}
 
-	const users = await collections.users.find().toArray();
+	const users = await Database.getInstance().getCollections().users.find().toArray();
 	if (flags.includes("settings") || flags.includes("all")) {
 		console.log("Updating settings for all users");
 		users.forEach(async (user) => {
@@ -145,7 +145,7 @@ async function seed() {
 				customPrompts: {},
 				assistants: [],
 			};
-			await collections.settings.updateOne(
+			await Database.getInstance().getCollections().settings.updateOne(
 				{ userId: user._id },
 				{ $set: { ...settings } },
 				{ upsert: true }
@@ -177,8 +177,8 @@ async function seed() {
 					}),
 					{ count: faker.number.int({ min: 3, max: 10 }) }
 				);
-				await collections.assistants.insertMany(assistants);
-				await collections.settings.updateOne(
+				await Database.getInstance().getCollections().assistants.insertMany(assistants);
+				await Database.getInstance().getCollections().settings.updateOne(
 					{ userId: user._id },
 					{ $set: { assistants: assistants.map((a) => a._id.toString()) } },
 					{ upsert: true }
@@ -194,7 +194,7 @@ async function seed() {
 			users.map(async (user) => {
 				const conversations = faker.helpers.multiple(
 					async () => {
-						const settings = await collections.settings.findOne<Settings>({ userId: user._id });
+						const settings = await Database.getInstance().getCollections().settings.findOne<Settings>({ userId: user._id });
 
 						const assistantId =
 							settings?.assistants && settings.assistants.length > 0 && faker.datatype.boolean(0.1)
@@ -203,7 +203,7 @@ async function seed() {
 
 						const preprompt =
 							(assistantId
-								? await collections.assistants
+								? await Database.getInstance().getCollections().assistants
 										.findOne({ _id: assistantId })
 										.then((assistant: Assistant) => assistant?.preprompt ?? "")
 								: faker.helpers.maybe(() => faker.hacker.phrase(), { probability: 0.5 })) ?? "";
@@ -229,7 +229,7 @@ async function seed() {
 					{ count: faker.number.int({ min: 10, max: 200 }) }
 				);
 
-				await collections.conversations.insertMany(await Promise.all(conversations));
+				await Database.getInstance().getCollections().conversations.insertMany(await Promise.all(conversations));
 			})
 		);
 		console.log("Done creating conversations.");

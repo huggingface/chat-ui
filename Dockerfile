@@ -18,8 +18,7 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN --mount=type=secret,id=DOTENV_LOCAL,dst=.env.local \
-    npm run build
+RUN npm run build
 
 FROM node:20-slim
 RUN npm install -g vite-node
@@ -39,4 +38,4 @@ COPY --link --chown=1000 package.json /app/package.json
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --chown=1000 gcp-*.json /app/
 
-CMD vite-node --options.transformMode.ssr='/.*/' /app/scripts/server.ts
+CMD node /app/build/index.js

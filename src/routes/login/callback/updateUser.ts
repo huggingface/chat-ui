@@ -1,5 +1,5 @@
 import { refreshSessionCookie } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { z } from "zod";
@@ -59,7 +59,7 @@ export async function updateUser(params: {
 	// This approach allows us to adapt to different OIDC providers flexibly.
 
 	// check if user already exists
-	const existingUser = await collections.users.findOne({ hfUserId });
+	const existingUser = await Database.getInstance().getCollections().users.findOne({ hfUserId });
 	let userId = existingUser?._id;
 
 	// update session cookie on login
@@ -67,7 +67,7 @@ export async function updateUser(params: {
 	const secretSessionId = crypto.randomUUID();
 	const sessionId = await sha256(secretSessionId);
 
-	if (await collections.sessions.findOne({ sessionId })) {
+	if (await Database.getInstance().getCollections().sessions.findOne({ sessionId })) {
 		throw error(500, "Session ID collision");
 	}
 
@@ -75,14 +75,14 @@ export async function updateUser(params: {
 
 	if (existingUser) {
 		// update existing user if any
-		await collections.users.updateOne(
+		await Database.getInstance().getCollections().users.updateOne(
 			{ _id: existingUser._id },
 			{ $set: { username, name, avatarUrl } }
 		);
 
 		// remove previous session if it exists and add new one
-		await collections.sessions.deleteOne({ sessionId: previousSessionId });
-		await collections.sessions.insertOne({
+		await Database.getInstance().getCollections().sessions.deleteOne({ sessionId: previousSessionId });
+		await Database.getInstance().getCollections().sessions.insertOne({
 			_id: new ObjectId(),
 			sessionId: locals.sessionId,
 			userId: existingUser._id,
@@ -94,7 +94,7 @@ export async function updateUser(params: {
 		});
 	} else {
 		// user doesn't exist yet, create a new one
-		const { insertedId } = await collections.users.insertOne({
+		const { insertedId } = await Database.getInstance().getCollections().users.insertOne({
 			_id: new ObjectId(),
 			createdAt: new Date(),
 			updatedAt: new Date(),
@@ -107,7 +107,7 @@ export async function updateUser(params: {
 
 		userId = insertedId;
 
-		await collections.sessions.insertOne({
+		await Database.getInstance().getCollections().sessions.insertOne({
 			_id: new ObjectId(),
 			sessionId: locals.sessionId,
 			userId,
@@ -119,7 +119,7 @@ export async function updateUser(params: {
 		});
 
 		// move pre-existing settings to new user
-		const { matchedCount } = await collections.settings.updateOne(
+		const { matchedCount } = await Database.getInstance().getCollections().settings.updateOne(
 			{ sessionId: previousSessionId },
 			{
 				$set: { userId, updatedAt: new Date() },
@@ -129,7 +129,7 @@ export async function updateUser(params: {
 
 		if (!matchedCount) {
 			// if no settings found for user, create default settings
-			await collections.settings.insertOne({
+			await Database.getInstance().getCollections().settings.insertOne({
 				userId,
 				ethicsModalAcceptedAt: new Date(),
 				updatedAt: new Date(),
@@ -143,7 +143,7 @@ export async function updateUser(params: {
 	refreshSessionCookie(cookies, secretSessionId);
 
 	// migrate pre-existing conversations
-	await collections.conversations.updateMany(
+	await Database.getInstance().getCollections().conversations.updateMany(
 		{ sessionId: previousSessionId },
 		{
 			$set: { userId },

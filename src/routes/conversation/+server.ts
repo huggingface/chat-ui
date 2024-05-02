@@ -1,5 +1,5 @@
 import type { RequestHandler } from "./$types";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
@@ -30,7 +30,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 	const values = parsedBody.data;
 
-	const convCount = await collections.conversations.countDocuments(authCondition(locals));
+	const convCount = await Database.getInstance().getCollections().conversations.countDocuments(authCondition(locals));
 
 	if (usageLimits?.conversations && convCount > usageLimits?.conversations) {
 		throw error(
@@ -61,7 +61,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	let embeddingModel: string;
 
 	if (values.fromShare) {
-		const conversation = await collections.sharedConversations.findOne({
+		const conversation = await Database.getInstance().getCollections().sharedConversations.findOne({
 			_id: values.fromShare,
 		});
 
@@ -85,7 +85,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	// get preprompt from assistant if it exists
-	const assistant = await collections.assistants.findOne({
+	const assistant = await Database.getInstance().getCollections().assistants.findOne({
 		_id: new ObjectId(values.assistantId),
 	});
 
@@ -99,7 +99,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		messages[0].content = values.preprompt;
 	}
 
-	const res = await collections.conversations.insertOne({
+	const res = await Database.getInstance().getCollections().conversations.insertOne({
 		_id: new ObjectId(),
 		title: title || "New Chat",
 		rootMessageId,

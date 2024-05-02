@@ -1,5 +1,5 @@
 import type { Migration } from ".";
-import { getCollections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 
 const updateAssistantsModels: Migration = {
@@ -8,7 +8,7 @@ const updateAssistantsModels: Migration = {
 	up: async (client) => {
 		const models = (await import("$lib/server/models")).models;
 
-		const { assistants } = getCollections(client);
+		const { assistants } = Database.getInstance().getCollections();
 
 		const modelIds = models.map((el) => el.id); // string[]
 		const defaultModelId = models[0].id;

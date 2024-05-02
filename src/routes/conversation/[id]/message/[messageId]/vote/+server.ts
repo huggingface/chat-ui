@@ -1,5 +1,5 @@
 import { authCondition } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -13,7 +13,7 @@ export async function POST({ params, request, locals }) {
 	const conversationId = new ObjectId(params.id);
 	const messageId = params.messageId;
 
-	const document = await collections.conversations.updateOne(
+	const document = await Database.getInstance().getCollections().conversations.updateOne(
 		{
 			_id: conversationId,
 			...authCondition(locals),

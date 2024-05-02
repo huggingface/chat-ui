@@ -1,11 +1,11 @@
 import { base } from "$app/paths";
-import { collections } from "$lib/server/database.js";
+import { Database } from "$lib/server/database";
 import { redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export const load = async ({ params }) => {
 	try {
-		const assistant = await collections.assistants.findOne({
+		const assistant = await Database.getInstance().getCollections().assistants.findOne({
 			_id: new ObjectId(params.assistantId),
 		});
 

@@ -1,5 +1,5 @@
 import { PARQUET_EXPORT_DATASET, PARQUET_EXPORT_HF_TOKEN } from "$env/static/private";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { pathToFileURL } from "node:url";
@@ -44,7 +44,7 @@ export async function POST({ request }) {
 	let count = 0;
 	logger.info("Exporting conversations for model", model);
 
-	for await (const conversation of collections.settings.aggregate<{
+	for await (const conversation of Database.getInstance().getCollections().settings.aggregate<{
 		title: string;
 		created_at: Date;
 		updated_at: Date;
@@ -95,7 +95,7 @@ export async function POST({ request }) {
 
 	logger.info("exporting convos with userId");
 
-	for await (const conversation of collections.settings.aggregate<{
+	for await (const conversation of Database.getInstance().getCollections().settings.aggregate<{
 		title: string;
 		created_at: Date;
 		updated_at: Date;

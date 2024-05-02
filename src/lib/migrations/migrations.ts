@@ -1,4 +1,4 @@
-import { client, collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
@@ -13,12 +13,12 @@ export async function checkAndRunMigrations() {
 	}
 
 	// check if all migrations have already been run
-	const migrationResults = await collections.migrationResults.find().toArray();
+	const migrationResults = await Database.getInstance().getCollections().migrationResults.find().toArray();
 
 	logger.info("[MIGRATIONS] Begin check...");
 
 	// connect to the database
-	const connectedClient = await client.connect();
+	const connectedClient = await Database.getInstance().getClient().connect();
 
 	const lockId = await acquireLock(LOCK_KEY);
 
@@ -71,7 +71,7 @@ export async function checkAndRunMigrations() {
 				}. Applying...`
 			);
 
-			await collections.migrationResults.updateOne(
+			await Database.getInstance().getCollections().migrationResults.updateOne(
 				{ _id: migration._id },
 				{
 					$set: {
@@ -96,7 +96,7 @@ export async function checkAndRunMigrations() {
 				await session.endSession();
 			}
 
-			await collections.migrationResults.updateOne(
+			await Database.getInstance().getCollections().migrationResults.updateOne(
 				{ _id: migration._id },
 				{
 					$set: {

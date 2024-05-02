@@ -1,7 +1,7 @@
 import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
@@ -10,7 +10,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
@@ -38,13 +38,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// check if the user has access to the conversation
-	const convBeforeCheck = await collections.conversations.findOne({
+	const convBeforeCheck = await Database.getInstance().getCollections().conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
 	});
 
 	if (convBeforeCheck && !convBeforeCheck.rootMessageId) {
-		const res = await collections.conversations.updateOne(
+		const res = await Database.getInstance().getCollections().conversations.updateOne(
 			{
 				_id: convId,
 			},
@@ -61,7 +61,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		}
 	}
 
-	const conv = await collections.conversations.findOne({
+	const conv = await Database.getInstance().getCollections().conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
 	});
@@ -71,7 +71,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// register the event for ratelimiting
-	await collections.messageEvents.insertOne({
+	await Database.getInstance().getCollections().messageEvents.insertOne({
 		userId,
 		createdAt: new Date(),
 		ip: getClientAddress(),
@@ -83,7 +83,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
 		const totalMessages =
 			(
-				await collections.conversations
+				await Database.getInstance().getCollections().conversations
 					.aggregate([
 						{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
 						{ $project: { messages: 1 } },
@@ -103,8 +103,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (usageLimits?.messagesPerMinute) {
 		// check if the user is rate limited
 		const nEvents = Math.max(
-			await collections.messageEvents.countDocuments({ userId }),
-			await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+			await Database.getInstance().getCollections().messageEvents.countDocuments({ userId }),
+			await Database.getInstance().getCollections().messageEvents.countDocuments({ ip: getClientAddress() })
 		);
 		if (nEvents > usageLimits.messagesPerMinute) {
 			throw error(429, ERROR_MESSAGES.rateLimited);
@@ -281,7 +281,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// update the conversation with the new messages
-	await collections.conversations.updateOne(
+	await Database.getInstance().getCollections().conversations.updateOne(
 		{
 			_id: convId,
 		},
@@ -323,7 +323,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					try {
 						conv.title = (await summarize(conv.messages[1].content)) ?? conv.title;
 						update({ type: "status", status: "title", message: conv.title });
-						await collections.conversations.updateOne(
+						await Database.getInstance().getCollections().conversations.updateOne(
 							{
 								_id: convId,
 							},
@@ -340,7 +340,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			})();
 
-			await collections.conversations.updateOne(
+			await Database.getInstance().getCollections().conversations.updateOne(
 				{
 					_id: convId,
 				},
@@ -353,7 +353,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			// check if assistant has a rag
-			const assistant = await collections.assistants.findOne<
+			const assistant = await Database.getInstance().getCollections().assistants.findOne<
 				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
 			>(
 				{ _id: conv.assistantId },
@@ -451,7 +451,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 
 							// abort check
-							const date = abortedGenerations.get(convId.toString());
+							const date = AbortedGenerations.getInstance().getList().get(convId.toString());
 							if (date && date > promptedAt) {
 								break;
 							}
@@ -500,7 +500,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			}
 
-			await collections.conversations.updateOne(
+			await Database.getInstance().getCollections().conversations.updateOne(
 				{
 					_id: convId,
 				},
@@ -527,7 +527,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		},
 		async cancel() {
 			if (!doneStreaming) {
-				await collections.conversations.updateOne(
+				await Database.getInstance().getCollections().conversations.updateOne(
 					{
 						_id: convId,
 					},
@@ -544,7 +544,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	});
 
 	if (conv.assistantId) {
-		await collections.assistantStats.updateOne(
+		await Database.getInstance().getCollections().assistantStats.updateOne(
 			{ assistantId: conv.assistantId, "date.at": startOfHour(new Date()), "date.span": "hour" },
 			{ $inc: { count: 1 } },
 			{ upsert: true }
@@ -562,7 +562,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 export async function DELETE({ locals, params }) {
 	const convId = new ObjectId(params.id);
 
-	const conv = await collections.conversations.findOne({
+	const conv = await Database.getInstance().getCollections().conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
 	});
@@ -571,7 +571,7 @@ export async function DELETE({ locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	await collections.conversations.deleteOne({ _id: conv._id });
+	await Database.getInstance().getCollections().conversations.deleteOne({ _id: conv._id });
 
 	return new Response();
 }
@@ -583,7 +583,7 @@ export async function PATCH({ request, locals, params }) {
 
 	const convId = new ObjectId(params.id);
 
-	const conv = await collections.conversations.findOne({
+	const conv = await Database.getInstance().getCollections().conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
 	});
@@ -592,7 +592,7 @@ export async function PATCH({ request, locals, params }) {
 		throw error(404, "Conversation not found");
 	}
 
-	await collections.conversations.updateOne(
+	await Database.getInstance().getCollections().conversations.updateOne(
 		{
 			_id: convId,
 		},

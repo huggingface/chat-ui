@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import type { ConversationStats } from "$lib/types/ConversationStats";
-import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database.js";
+import { CONVERSATION_STATS_COLLECTION, Database } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 
 // Triger like this:
@@ -21,7 +21,7 @@ async function computeStats(params: {
 	span: ConversationStats["date"]["span"];
 	type: ConversationStats["type"];
 }) {
-	const lastComputed = await collections.conversationStats.findOne(
+	const lastComputed = await Database.getInstance().getCollections().conversationStats.findOne(
 		{ "date.field": params.dateField, "date.span": params.span, type: params.type },
 		{ sort: { "date.at": -1 } }
 	);
@@ -212,7 +212,7 @@ async function computeStats(params: {
 		},
 	];
 
-	await collections.conversations.aggregate(pipeline, { allowDiskUse: true }).next();
+	await Database.getInstance().getCollections().conversations.aggregate(pipeline, { allowDiskUse: true }).next();
 
 	logger.info("Computed stats for", params.type, params.span, params.dateField);
 }

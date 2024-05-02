@@ -1,4 +1,4 @@
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +16,7 @@ Object.freeze(newMessage);
 describe("addChildren", async () => {
 	it("should let you append on legacy conversations", async () => {
 		const convId = await insertLegacyConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		const convLength = conv.messages.length;
@@ -26,14 +26,14 @@ describe("addChildren", async () => {
 	});
 	it("should not let you create branches on legacy conversations", async () => {
 		const convId = await insertLegacyConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		expect(() => addChildren(conv, newMessage, conv.messages[0].id)).toThrow();
 	});
 	it("should not let you create a message that already exists", async () => {
 		const convId = await insertLegacyConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		const messageThatAlreadyExists: Message = {
@@ -46,7 +46,7 @@ describe("addChildren", async () => {
 	});
 	it("should let you create branches on conversations with subtrees", async () => {
 		const convId = await insertSideBranchesConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		const nChildren = conv.messages[0].children?.length;
@@ -57,7 +57,7 @@ describe("addChildren", async () => {
 
 	it("should let you create a new leaf", async () => {
 		const convId = await insertSideBranchesConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		const parentId = conv.messages[conv.messages.length - 1].id;
@@ -84,7 +84,7 @@ describe("addChildren", async () => {
 
 	it("should throw if you don't specify a parentId in a conversation with messages", async () => {
 		const convId = await insertLegacyConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		expect(() => addChildren(conv, newMessage)).toThrow();
@@ -92,7 +92,7 @@ describe("addChildren", async () => {
 
 	it("should return the id of the new message", async () => {
 		const convId = await insertLegacyConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await Database.getInstance().getCollections().conversations.findOne({ _id: new ObjectId(convId) });
 		if (!conv) throw new Error("Conversation not found");
 
 		expect(addChildren(conv, newMessage, conv.messages[conv.messages.length - 1].id)).toEqual(

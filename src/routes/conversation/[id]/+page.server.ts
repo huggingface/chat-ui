@@ -1,4 +1,4 @@
-import { collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
 import { authCondition } from "$lib/server/auth";
@@ -12,7 +12,7 @@ export const load = async ({ params, depends, locals }) => {
 	// if the conver
 	if (params.id.length === 7) {
 		// shared link of length 7
-		conversation = await collections.sharedConversations.findOne({
+		conversation = await Database.getInstance().getCollections().sharedConversations.findOne({
 			_id: params.id,
 		});
 		shared = true;
@@ -22,7 +22,7 @@ export const load = async ({ params, depends, locals }) => {
 		}
 	} else {
 		// todo: add validation on params.id
-		conversation = await collections.conversations.findOne({
+		conversation = await Database.getInstance().getCollections().conversations.findOne({
 			_id: new ObjectId(params.id),
 			...authCondition(locals),
 		});
@@ -31,7 +31,7 @@ export const load = async ({ params, depends, locals }) => {
 
 		if (!conversation) {
 			const conversationExists =
-				(await collections.conversations.countDocuments({
+				(await Database.getInstance().getCollections().conversations.countDocuments({
 					_id: new ObjectId(params.id),
 				})) !== 0;
 
@@ -57,7 +57,7 @@ export const load = async ({ params, depends, locals }) => {
 		assistant: convertedConv.assistantId
 			? JSON.parse(
 					JSON.stringify(
-						await collections.assistants.findOne({
+						await Database.getInstance().getCollections().assistants.findOne({
 							_id: new ObjectId(convertedConv.assistantId),
 						})
 					)

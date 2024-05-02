@@ -1,4 +1,4 @@
-import { client, collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
 import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
@@ -15,9 +15,9 @@ async function refreshAssistantsCountsHelper() {
 	}
 
 	try {
-		await client.withSession((session) =>
+		await Database.getInstance().client.withSession((session) =>
 			session.withTransaction(async () => {
-				await collections.assistants
+				await Database.getInstance().getCollections().assistants
 					.aggregate([
 						{ $project: { _id: 1 } },
 						{ $set: { last24HoursCount: 0 } },
