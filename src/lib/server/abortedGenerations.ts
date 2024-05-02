@@ -2,6 +2,7 @@
 
 import { setTimeout } from "node:timers/promises";
 import { collections } from "./database";
+import { logger } from "$lib/server/logger";
 
 let closed = false;
 process.on("SIGINT", () => {
@@ -21,7 +22,7 @@ async function maintainAbortedGenerations() {
 				aborts.map(({ conversationId, createdAt }) => [conversationId.toString(), createdAt])
 			);
 		} catch (err) {
-			console.error(err);
+			logger.error(err);
 		}
 	}
 }

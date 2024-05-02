@@ -9,6 +9,7 @@ license: apache-2.0
 base_path: /chat
 app_port: 3000
 failure_strategy: rollback
+load_balancing_strategy: random
 ---
 
 # Chat UI
@@ -23,8 +24,9 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 3. [Web Search](#web-search)
 4. [Text Embedding Models](#text-embedding-models)
 5. [Extra parameters](#extra-parameters)
-6. [Deploying to a HF Space](#deploying-to-a-hf-space)
-7. [Building](#building)
+6. [Common issues](#common-issues)
+7. [Deploying to a HF Space](#deploying-to-a-hf-space)
+8. [Building](#building)
 
 ## No Setup Deploy
 
@@ -600,18 +602,24 @@ The service account credentials file can be imported as an environmental variabl
     GOOGLE_APPLICATION_CREDENTIALS = clientid.json
 ```
 
-Make sure docker has access to the file. Afterwards Google Vertex endpoints can be configured as following:
+Make sure your docker container has access to the file and the variable is correctly set.
+Afterwards Google Vertex endpoints can be configured as following:
 
 ```
 MODELS=`[
 //...
     {
-       "name": "gemini-1.0-pro", //model-name
-       "displayName": "Vertex Gemini Pro 1.0",
-       "location": "europe-west3",
-       "apiEndpoint": "", //alternative api endpoint url
+       "name": "gemini-1.5-pro",
+       "displayName": "Vertex Gemini Pro 1.5",
        "endpoints" : [{
-         "type": "vertex"
+          "type": "vertex",
+          "project": "abc-xyz",
+          "location": "europe-west3",
+          "model": "gemini-1.5-pro-preview-0409", // model-name
+
+          // Optional
+          "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
+          "apiEndpoint": "", // alternative api endpoint url
        }]
      },
 ]`
@@ -727,6 +735,14 @@ MODELS=`[
   }
 ]`
 ```
+
+## Common issues
+
+### 403：You don't have access to this conversation
+
+Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `ALLOW_INSECURE_COOKIES=true` to your `.env.local`.
+
+Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
 
 ## Deploying to a HF Space
 
