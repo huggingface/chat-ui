@@ -23,6 +23,7 @@ ingress:
     kubernetes.io/ingress.class: "alb"
 
 envVars:
+  ADDRESS_HEADER: 'X-Forwarded-For'
   ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   APP_BASE: "/chat"
   ENABLE_ASSISTANTS: "true"
@@ -308,6 +309,7 @@ envVars:
       }]
     }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
+  XFF_DEPTH: '2'
 
 externalSecrets:
   enabled: true
