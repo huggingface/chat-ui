@@ -6,7 +6,6 @@ let options: pino.LoggerOptions = {};
 
 if (dev) {
 	options = {
-		level: env.LOG_LEVEL ?? "debug",
 		transport: {
 			target: "pino-pretty",
 			options: {
@@ -16,4 +15,4 @@ if (dev) {
 	};
 }
 
-export const logger = pino(options);
+export const logger = pino({ ...options, level: env.LOG_LEVEL ?? "info" });
