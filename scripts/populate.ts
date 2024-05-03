@@ -2,12 +2,13 @@ import readline from "readline";
 import minimist from "minimist";
 
 // @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
-import { MONGODB_URL } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 import { faker } from "@faker-js/faker";
 import { ObjectId } from "mongodb";
 
-import { collections } from "../src/lib/server/database.ts";
+// @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
+import { collections } from "$lib/server/database";
 import { models } from "../src/lib/server/models.ts";
 import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
@@ -17,6 +18,7 @@ import { defaultEmbeddingModel } from "../src/lib/server/embeddingModels.ts";
 import { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
+import { generateSearchTokens } from "../src/lib/utils/searchTokens.ts";
 
 const rl = readline.createInterface({
 	input: process.stdin,
@@ -158,10 +160,11 @@ async function seed() {
 		console.log("Creating assistants for all users");
 		await Promise.all(
 			users.map(async (user) => {
+				const name = faker.animal.insect();
 				const assistants = faker.helpers.multiple<Assistant>(
 					() => ({
 						_id: new ObjectId(),
-						name: faker.animal.insect(),
+						name,
 						createdById: user._id,
 						createdByName: user.username,
 						createdAt: faker.date.recent({ days: 30 }),
@@ -174,6 +177,8 @@ async function seed() {
 						exampleInputs: faker.helpers.multiple(() => faker.lorem.sentence(), {
 							count: faker.number.int({ min: 0, max: 4 }),
 						}),
+						searchTokens: generateSearchTokens(name),
+						last24HoursCount: faker.number.int({ min: 0, max: 1000 }),
 					}),
 					{ count: faker.number.int({ min: 3, max: 10 }) }
 				);
@@ -241,7 +246,7 @@ async function seed() {
 	try {
 		rl.question(
 			"You're about to run a seeding script on the following MONGODB_URL: \x1b[31m" +
-				MONGODB_URL +
+				env.MONGODB_URL +
 				"\x1b[0m\n\n With the following flags: \x1b[31m" +
 				flags.join("\x1b[0m , \x1b[31m") +
 				"\x1b[0m\n \n\n Are you sure you want to continue? (yes/no): ",

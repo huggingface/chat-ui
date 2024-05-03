@@ -1,9 +1,9 @@
-import { collections } from "$lib/server/database.js";
+import { collections } from "$lib/server/database";
 import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
-import { REQUIRE_FEATURED_ASSISTANTS } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 const NUM_PER_PAGE = 24;
 
@@ -27,11 +27,11 @@ export async function GET({ url, locals }) {
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
 
 	// if the user queried is not the current user, only show "public" assistants that have been shared before
 	const shouldHaveBeenShared =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
 			? { userCount: { $gt: 1 } }
 			: {};
 

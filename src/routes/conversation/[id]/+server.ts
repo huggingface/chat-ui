@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -10,7 +10,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
@@ -77,7 +77,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	// guest mode check
 	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
@@ -361,10 +361,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			const assistantHasDynamicPrompt =
-				ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
+				env.ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
 
 			const assistantHasWebSearch =
-				ENABLE_ASSISTANTS_RAG === "true" &&
+				env.ENABLE_ASSISTANTS_RAG === "true" &&
 				!!assistant &&
 				!!assistant.rag &&
 				(assistant.rag.allowedLinks.length > 0 ||
@@ -451,7 +451,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 
 							// abort check
-							const date = abortedGenerations.get(convId.toString());
+							const date = AbortedGenerations.getInstance().getList().get(convId.toString());
 							if (date && date > promptedAt) {
 								break;
 							}

@@ -395,7 +395,7 @@
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
 							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
 						{:else}
-							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 							<div class="max-sm:hidden">Share this conversation</div>
 						{/if}
 					</button>
