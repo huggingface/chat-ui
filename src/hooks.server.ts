@@ -8,7 +8,7 @@ import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
-import { building, dev } from "$app/environment";
+import { building } from "$app/environment";
 import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
