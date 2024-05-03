@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
 import { authCondition } from "$lib/server/auth.js";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { redirect } from "@sveltejs/kit";
 
@@ -13,7 +13,7 @@ export async function load({ params, locals, parent }) {
 	}
 
 	if (locals.user?._id ?? locals.sessionId) {
-		await Database.getInstance().getCollections().settings.updateOne(
+		await collections.settings.updateOne(
 			authCondition(locals),
 			{
 				$set: {

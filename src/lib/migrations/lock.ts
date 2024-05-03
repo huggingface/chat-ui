@@ -1,4 +1,4 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 
 /**
@@ -8,7 +8,7 @@ export async function acquireLock(key: string): Promise<ObjectId | false> {
 	try {
 		const id = new ObjectId();
 
-		const insert = await Database.getInstance().getCollections().semaphores.insertOne({
+		const insert = await collections.semaphores.insertOne({
 			_id: id,
 			key,
 			createdAt: new Date(),
@@ -23,21 +23,21 @@ export async function acquireLock(key: string): Promise<ObjectId | false> {
 }
 
 export async function releaseLock(key: string, lockId: ObjectId) {
-	await Database.getInstance().getCollections().semaphores.deleteOne({
+	await collections.semaphores.deleteOne({
 		_id: lockId,
 		key,
 	});
 }
 
 export async function isDBLocked(key: string): Promise<boolean> {
-	const res = await Database.getInstance().getCollections().semaphores.countDocuments({
+	const res = await collections.semaphores.countDocuments({
 		key,
 	});
 	return res > 0;
 }
 
 export async function refreshLock(key: string, lockId: ObjectId): Promise<boolean> {
-	const result = await Database.getInstance().getCollections().semaphores.updateOne(
+	const result = await collections.semaphores.updateOne(
 		{
 			_id: lockId,
 			key,

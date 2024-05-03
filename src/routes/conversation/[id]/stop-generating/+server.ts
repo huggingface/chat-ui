@@ -1,5 +1,5 @@
 import { authCondition } from "$lib/server/auth";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -9,7 +9,7 @@ import { ObjectId } from "mongodb";
 export async function POST({ params, locals }) {
 	const conversationId = new ObjectId(params.id);
 
-	const conversation = await Database.getInstance().getCollections().conversations.findOne({
+	const conversation = await collections.conversations.findOne({
 		_id: conversationId,
 		...authCondition(locals),
 	});
@@ -18,7 +18,7 @@ export async function POST({ params, locals }) {
 		throw error(404, "Conversation not found");
 	}
 
-	await Database.getInstance().getCollections().abortedGenerations.updateOne(
+	await collections.abortedGenerations.updateOne(
 		{ conversationId },
 		{ $set: { updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
 		{ upsert: true }

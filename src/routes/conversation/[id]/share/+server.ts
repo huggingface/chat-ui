@@ -1,5 +1,5 @@
 import { authCondition } from "$lib/server/auth";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import { getShareUrl } from "$lib/utils/getShareUrl";
 import { hashConv } from "$lib/utils/hashConv";
@@ -8,7 +8,7 @@ import { ObjectId } from "mongodb";
 import { nanoid } from "nanoid";
 
 export async function POST({ params, url, locals }) {
-	const conversation = await Database.getInstance().getCollections().conversations.findOne({
+	const conversation = await collections.conversations.findOne({
 		_id: new ObjectId(params.id),
 		...authCondition(locals),
 	});
@@ -19,7 +19,7 @@ export async function POST({ params, url, locals }) {
 
 	const hash = await hashConv(conversation);
 
-	const existingShare = await Database.getInstance().getCollections().sharedConversations.findOne({ hash });
+	const existingShare = await collections.sharedConversations.findOne({ hash });
 
 	if (existingShare) {
 		return new Response(
@@ -44,10 +44,10 @@ export async function POST({ params, url, locals }) {
 		assistantId: conversation.assistantId,
 	};
 
-	await Database.getInstance().getCollections().sharedConversations.insertOne(shared);
+	await collections.sharedConversations.insertOne(shared);
 
 	// copy files from `${conversation._id}-` to `${shared._id}-`
-	const files = await Database.getInstance().getCollections().bucket
+	const files = await collections.bucket
 		.find({ filename: { $regex: `${conversation._id}-` } })
 		.toArray();
 
@@ -55,8 +55,8 @@ export async function POST({ params, url, locals }) {
 		files.map(async (file) => {
 			const newFilename = file.filename.replace(`${conversation._id}-`, `${shared._id}-`);
 			// copy files from `${conversation._id}-` to `${shared._id}-` by downloading and reuploaidng
-			const downloadStream = Database.getInstance().getCollections().bucket.openDownloadStream(file._id);
-			const uploadStream = Database.getInstance().getCollections().bucket.openUploadStream(newFilename, {
+			const downloadStream = collections.bucket.openDownloadStream(file._id);
+			const uploadStream = collections.bucket.openUploadStream(newFilename, {
 				metadata: { ...file.metadata, conversation: shared._id.toString() },
 			});
 			downloadStream.pipe(uploadStream);

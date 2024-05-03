@@ -1,9 +1,9 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
-import { REQUIRE_FEATURED_ASSISTANTS } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 const NUM_PER_PAGE = 24;
 
@@ -16,7 +16,7 @@ export async function GET({ url, locals }) {
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
-		user = await Database.getInstance().getCollections().users.findOne<Pick<User, "_id">>(
+		user = await collections.users.findOne<Pick<User, "_id">>(
 			{ username },
 			{ projection: { _id: 1 } }
 		);
@@ -27,11 +27,11 @@ export async function GET({ url, locals }) {
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
 
 	// if the user queried is not the current user, only show "public" assistants that have been shared before
 	const shouldHaveBeenShared =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
 			? { userCount: { $gt: 1 } }
 			: {};
 
@@ -43,14 +43,14 @@ export async function GET({ url, locals }) {
 		...shouldBeFeatured,
 		...shouldHaveBeenShared,
 	};
-	const assistants = await Database.getInstance().getCollections().assistants
+	const assistants = await collections.assistants
 		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({ userCount: -1 })
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await Database.getInstance().getCollections().assistants.countDocuments(filter);
+	const numTotalItems = await collections.assistants.countDocuments(filter);
 
 	return Response.json({
 		assistants,

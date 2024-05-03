@@ -1,5 +1,5 @@
-import { PARQUET_EXPORT_DATASET, PARQUET_EXPORT_HF_TOKEN } from "$env/static/private";
-import { Database } from "$lib/server/database";
+import { env } from "$env/dynamic/private";
+import { collections } from "$lib/server/database";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { pathToFileURL } from "node:url";
@@ -13,7 +13,7 @@ import { logger } from "$lib/server/logger.js";
 // curl -X POST "http://localhost:5173/chat/admin/export" -H "Authorization: Bearer <ADMIN_API_SECRET>" -H "Content-Type: application/json" -d '{"model": "OpenAssistant/oasst-sft-6-llama-30b-xor"}'
 
 export async function POST({ request }) {
-	if (!PARQUET_EXPORT_DATASET || !PARQUET_EXPORT_HF_TOKEN) {
+	if (!env.PARQUET_EXPORT_DATASET || !env.PARQUET_EXPORT_HF_TOKEN) {
 		throw error(500, "Parquet export is not configured.");
 	}
 
@@ -44,7 +44,7 @@ export async function POST({ request }) {
 	let count = 0;
 	logger.info("Exporting conversations for model", model);
 
-	for await (const conversation of Database.getInstance().getCollections().settings.aggregate<{
+	for await (const conversation of collections.settings.aggregate<{
 		title: string;
 		created_at: Date;
 		updated_at: Date;
@@ -95,7 +95,7 @@ export async function POST({ request }) {
 
 	logger.info("exporting convos with userId");
 
-	for await (const conversation of Database.getInstance().getCollections().settings.aggregate<{
+	for await (const conversation of collections.settings.aggregate<{
 		title: string;
 		created_at: Date;
 		updated_at: Date;
@@ -144,10 +144,10 @@ export async function POST({ request }) {
 
 	await uploadFile({
 		file: pathToFileURL(fileName) as URL,
-		credentials: { accessToken: PARQUET_EXPORT_HF_TOKEN },
+		credentials: { accessToken: env.PARQUET_EXPORT_HF_TOKEN },
 		repo: {
 			type: "dataset",
-			name: PARQUET_EXPORT_DATASET,
+			name: env.PARQUET_EXPORT_DATASET,
 		},
 	});
 

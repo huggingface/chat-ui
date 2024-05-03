@@ -1,5 +1,5 @@
 import ChatThumbnail from "./ChatThumbnail.svelte";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { error, type RequestHandler } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import type { SvelteComponent } from "svelte";
@@ -13,7 +13,7 @@ import InterBold from "../../../../../static/fonts/Inter-Bold.ttf";
 import sharp from "sharp";
 
 export const GET: RequestHandler = (async ({ params }) => {
-	const assistant = await Database.getInstance().getCollections().assistants.findOne({
+	const assistant = await collections.assistants.findOne({
 		_id: new ObjectId(params.assistantId),
 	});
 
@@ -22,11 +22,11 @@ export const GET: RequestHandler = (async ({ params }) => {
 	}
 
 	let avatar = "";
-	const fileId = Database.getInstance().getCollections().bucket.find({ filename: assistant._id.toString() });
+	const fileId = collections.bucket.find({ filename: assistant._id.toString() });
 	const file = await fileId.next();
 	if (file) {
 		avatar = await (async () => {
-			const fileStream = Database.getInstance().getCollections().bucket.openDownloadStream(file?._id);
+			const fileStream = collections.bucket.openDownloadStream(file?._id);
 
 			const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
 				const chunks: Uint8Array[] = [];

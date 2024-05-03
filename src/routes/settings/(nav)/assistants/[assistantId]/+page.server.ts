@@ -1,15 +1,15 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { type Actions, fail, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
-import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
-import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
+import { env as envPublic } from "$env/dynamic/public";
+import { env } from "$env/dynamic/private";
 import { z } from "zod";
 import type { Assistant } from "$lib/types/Assistant";
 import { logger } from "$lib/server/logger";
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
-	const assistant = await Database.getInstance().getCollections().assistants.findOne({ _id: new ObjectId(assistantId) });
+	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
 	if (!assistant) {
 		throw Error("Assistant not found");
@@ -31,10 +31,10 @@ export const actions: Actions = {
 			return fail(400, { error: true, message: (e as Error).message });
 		}
 
-		await Database.getInstance().getCollections().assistants.deleteOne({ _id: assistant._id });
+		await collections.assistants.deleteOne({ _id: assistant._id });
 
 		// and remove it from all users settings
-		await Database.getInstance().getCollections().settings.updateMany(
+		await collections.settings.updateMany(
 			{
 				assistants: { $in: [assistant._id] },
 			},
@@ -44,12 +44,12 @@ export const actions: Actions = {
 		);
 
 		// and delete all avatars
-		const fileCursor = Database.getInstance().getCollections().bucket.find({ filename: assistant._id.toString() });
+		const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
 
 		// Step 2: Delete the existing file if it exists
 		let fileId = await fileCursor.next();
 		while (fileId) {
-			await Database.getInstance().getCollections().bucket.delete(fileId._id);
+			await collections.bucket.delete(fileId._id);
 			fileId = await fileCursor.next();
 		}
 
@@ -57,7 +57,7 @@ export const actions: Actions = {
 	},
 	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
-		const report = await Database.getInstance().getCollections().reports.findOne({
+		const report = await collections.reports.findOne({
 			createdBy: locals.user?._id ?? locals.sessionId,
 			assistantId: new ObjectId(params.assistantId),
 		});
@@ -73,7 +73,7 @@ export const actions: Actions = {
 			return fail(400, { error: true, message: "Invalid report reason" });
 		}
 
-		const { acknowledged } = await Database.getInstance().getCollections().reports.insertOne({
+		const { acknowledged } = await collections.reports.insertOne({
 			_id: new ObjectId(),
 			assistantId: new ObjectId(params.assistantId),
 			createdBy: locals.user?._id ?? locals.sessionId,
@@ -86,18 +86,19 @@ export const actions: Actions = {
 			return fail(500, { error: true, message: "Failed to report assistant" });
 		}
 
-		if (WEBHOOK_URL_REPORT_ASSISTANT) {
-			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
+		if (env.WEBHOOK_URL_REPORT_ASSISTANT) {
+			const prefixUrl =
+				envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
-			const assistant = await Database.getInstance().getCollections().assistants.findOne<Pick<Assistant, "name">>(
+			const assistant = await collections.assistants.findOne<Pick<Assistant, "name">>(
 				{ _id: new ObjectId(params.assistantId) },
 				{ projection: { name: 1 } }
 			);
 
 			const username = locals.user?.username;
 
-			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
+			const res = await fetch(env.WEBHOOK_URL_REPORT_ASSISTANT, {
 				method: "POST",
 				headers: {
 					"Content-type": "application/json",
@@ -118,7 +119,7 @@ export const actions: Actions = {
 	},
 
 	subscribe: async ({ params, locals }) => {
-		const assistant = await Database.getInstance().getCollections().assistants.findOne({
+		const assistant = await collections.assistants.findOne({
 			_id: new ObjectId(params.assistantId),
 		});
 
@@ -127,26 +128,26 @@ export const actions: Actions = {
 		}
 
 		// don't push if it's already there
-		const settings = await Database.getInstance().getCollections().settings.findOne(authCondition(locals));
+		const settings = await collections.settings.findOne(authCondition(locals));
 
 		if (settings?.assistants?.includes(assistant._id)) {
 			return fail(400, { error: true, message: "Already subscribed" });
 		}
 
-		const result = await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
+		const result = await collections.settings.updateOne(authCondition(locals), {
 			$addToSet: { assistants: assistant._id },
 		});
 
 		// reduce count only if push succeeded
 		if (result.modifiedCount > 0) {
-			await Database.getInstance().getCollections().assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: 1 } });
+			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: 1 } });
 		}
 
 		return { from: "subscribe", ok: true, message: "Assistant added" };
 	},
 
 	unsubscribe: async ({ params, locals }) => {
-		const assistant = await Database.getInstance().getCollections().assistants.findOne({
+		const assistant = await collections.assistants.findOne({
 			_id: new ObjectId(params.assistantId),
 		});
 
@@ -154,13 +155,13 @@ export const actions: Actions = {
 			return fail(404, { error: true, message: "Assistant not found" });
 		}
 
-		const result = await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
+		const result = await collections.settings.updateOne(authCondition(locals), {
 			$pull: { assistants: assistant._id },
 		});
 
 		// reduce count only if pull succeeded
 		if (result.modifiedCount > 0) {
-			await Database.getInstance().getCollections().assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
+			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
 		}
 
 		throw redirect(302, `${base}/settings`);

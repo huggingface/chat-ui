@@ -2,12 +2,13 @@ import readline from "readline";
 import minimist from "minimist";
 
 // @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
-import { MONGODB_URL } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 import { faker } from "@faker-js/faker";
 import { ObjectId } from "mongodb";
 
-import { Database } from "$lib/server/database";
+// @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
+import { collections } from "$lib/server/database";
 import { models } from "../src/lib/server/models.ts";
 import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
@@ -17,6 +18,7 @@ import { defaultEmbeddingModel } from "../src/lib/server/embeddingModels.ts";
 import { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
+import { generateSearchTokens } from "../src/lib/utils/searchTokens.ts";
 
 const rl = readline.createInterface({
 	input: process.stdin,
@@ -107,10 +109,10 @@ async function seed() {
 
 	if (flags.includes("reset")) {
 		console.log("Starting reset of DB");
-		await Database.getInstance().getCollections().users.deleteMany({});
-		await Database.getInstance().getCollections().settings.deleteMany({});
-		await Database.getInstance().getCollections().assistants.deleteMany({});
-		await Database.getInstance().getCollections().conversations.deleteMany({});
+		await collections.users.deleteMany({});
+		await collections.settings.deleteMany({});
+		await collections.assistants.deleteMany({});
+		await collections.conversations.deleteMany({});
 		console.log("Reset done");
 	}
 
@@ -126,11 +128,11 @@ async function seed() {
 			avatarUrl: faker.image.avatar(),
 		}));
 
-		await Database.getInstance().getCollections().users.insertMany(newUsers);
+		await collections.users.insertMany(newUsers);
 		console.log("Done creating users.");
 	}
 
-	const users = await Database.getInstance().getCollections().users.find().toArray();
+	const users = await collections.users.find().toArray();
 	if (flags.includes("settings") || flags.includes("all")) {
 		console.log("Updating settings for all users");
 		users.forEach(async (user) => {
@@ -145,7 +147,7 @@ async function seed() {
 				customPrompts: {},
 				assistants: [],
 			};
-			await Database.getInstance().getCollections().settings.updateOne(
+			await collections.settings.updateOne(
 				{ userId: user._id },
 				{ $set: { ...settings } },
 				{ upsert: true }
@@ -158,10 +160,11 @@ async function seed() {
 		console.log("Creating assistants for all users");
 		await Promise.all(
 			users.map(async (user) => {
+				const name = faker.animal.insect();
 				const assistants = faker.helpers.multiple<Assistant>(
 					() => ({
 						_id: new ObjectId(),
-						name: faker.animal.insect(),
+						name,
 						createdById: user._id,
 						createdByName: user.username,
 						createdAt: faker.date.recent({ days: 30 }),
@@ -174,11 +177,13 @@ async function seed() {
 						exampleInputs: faker.helpers.multiple(() => faker.lorem.sentence(), {
 							count: faker.number.int({ min: 0, max: 4 }),
 						}),
+						searchTokens: generateSearchTokens(name),
+						last24HoursCount: faker.number.int({ min: 0, max: 1000 }),
 					}),
 					{ count: faker.number.int({ min: 3, max: 10 }) }
 				);
-				await Database.getInstance().getCollections().assistants.insertMany(assistants);
-				await Database.getInstance().getCollections().settings.updateOne(
+				await collections.assistants.insertMany(assistants);
+				await collections.settings.updateOne(
 					{ userId: user._id },
 					{ $set: { assistants: assistants.map((a) => a._id.toString()) } },
 					{ upsert: true }
@@ -194,7 +199,7 @@ async function seed() {
 			users.map(async (user) => {
 				const conversations = faker.helpers.multiple(
 					async () => {
-						const settings = await Database.getInstance().getCollections().settings.findOne<Settings>({ userId: user._id });
+						const settings = await collections.settings.findOne<Settings>({ userId: user._id });
 
 						const assistantId =
 							settings?.assistants && settings.assistants.length > 0 && faker.datatype.boolean(0.1)
@@ -203,7 +208,7 @@ async function seed() {
 
 						const preprompt =
 							(assistantId
-								? await Database.getInstance().getCollections().assistants
+								? await collections.assistants
 										.findOne({ _id: assistantId })
 										.then((assistant: Assistant) => assistant?.preprompt ?? "")
 								: faker.helpers.maybe(() => faker.hacker.phrase(), { probability: 0.5 })) ?? "";
@@ -229,7 +234,7 @@ async function seed() {
 					{ count: faker.number.int({ min: 10, max: 200 }) }
 				);
 
-				await Database.getInstance().getCollections().conversations.insertMany(await Promise.all(conversations));
+				await collections.conversations.insertMany(await Promise.all(conversations));
 			})
 		);
 		console.log("Done creating conversations.");
@@ -241,7 +246,7 @@ async function seed() {
 	try {
 		rl.question(
 			"You're about to run a seeding script on the following MONGODB_URL: \x1b[31m" +
-				MONGODB_URL +
+				env.MONGODB_URL +
 				"\x1b[0m\n\n With the following flags: \x1b[31m" +
 				flags.join("\x1b[0m , \x1b[31m") +
 				"\x1b[0m\n \n\n Are you sure you want to continue? (yes/no): ",

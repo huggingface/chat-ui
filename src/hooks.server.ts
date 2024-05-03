@@ -1,25 +1,14 @@
-import {
-	ADMIN_API_SECRET,
-	COOKIE_NAME,
-	ENABLE_ASSISTANTS,
-	EXPOSE_API,
-	MESSAGES_BEFORE_LOGIN,
-	PARQUET_EXPORT_SECRET,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
+import { env as envPublic } from "$env/dynamic/public";
 import type { Handle, HandleServerError } from "@sveltejs/kit";
-import {
-	PUBLIC_GOOGLE_ANALYTICS_ID,
-	PUBLIC_ORIGIN,
-	PUBLIC_APP_DISCLAIMER,
-} from "$env/static/public";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
-import { building, dev } from "$app/environment";
+import { building } from "$app/environment";
 import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
@@ -28,7 +17,7 @@ import { MetricsServer } from "$lib/server/metrics";
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
 	await checkAndRunMigrations();
-	if (ENABLE_ASSISTANTS) {
+	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
 
@@ -77,7 +66,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		request: event.request,
 	});
 
-	if (event.url.pathname.startsWith(`${base}/api/`) && EXPOSE_API !== "true") {
+	if (event.url.pathname.startsWith(`${base}/api/`) && env.EXPOSE_API !== "true") {
 		return new Response("API is disabled", { status: 403 });
 	}
 
@@ -94,7 +83,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
-		const ADMIN_SECRET = ADMIN_API_SECRET || PARQUET_EXPORT_SECRET;
+		const ADMIN_SECRET = env.ADMIN_API_SECRET || env.PARQUET_EXPORT_SECRET;
 
 		if (!ADMIN_SECRET) {
 			return errorResponse(500, "Admin API is not configured");
@@ -105,7 +94,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const token = event.cookies.get(COOKIE_NAME);
+	const token = event.cookies.get(env.COOKIE_NAME);
 
 	let secretSessionId: string;
 	let sessionId: string;
@@ -124,7 +113,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		secretSessionId = crypto.randomUUID();
 		sessionId = await sha256(secretSessionId);
 
-		if (await Database.getInstance().getCollections().sessions.findOne({ sessionId })) {
+		if (await collections.sessions.findOne({ sessionId })) {
 			return errorResponse(500, "Session ID collision");
 		}
 	}
@@ -144,18 +133,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		refreshSessionCookie(event.cookies, event.locals.sessionId);
 
 		if (nativeFormContentTypes.includes(requestContentType)) {
-			const referer = event.request.headers.get("referer");
+			const origin = event.request.headers.get("origin");
 
-			if (!referer) {
-				return errorResponse(403, "Non-JSON form requests need to have a referer");
+			if (!origin) {
+				return errorResponse(403, "Non-JSON form requests need to have an origin");
 			}
 
 			const validOrigins = [
-				new URL(event.request.url).origin,
-				...(PUBLIC_ORIGIN ? [new URL(PUBLIC_ORIGIN).origin] : []),
+				new URL(event.request.url).host,
+				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).host] : []),
 			];
 
-			if (!validOrigins.includes(new URL(referer).origin)) {
+			if (!validOrigins.includes(new URL(origin).host)) {
 				return errorResponse(403, "Invalid referer for POST request");
 			}
 		}
@@ -165,7 +154,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		// if the request is a POST request we refresh the cookie
 		refreshSessionCookie(event.cookies, secretSessionId);
 
-		await Database.getInstance().getCollections().sessions.updateOne(
+		await collections.sessions.updateOne(
 			{ sessionId },
 			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
 		);
@@ -179,7 +168,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!event.locals.user &&
 			requiresUser &&
-			!((MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0)
+			!((env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
@@ -190,9 +179,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!requiresUser &&
 			!event.url.pathname.startsWith(`${base}/settings`) &&
-			!!PUBLIC_APP_DISCLAIMER
+			!!envPublic.PUBLIC_APP_DISCLAIMER
 		) {
-			const hasAcceptedEthicsModal = await Database.getInstance().getCollections().settings.countDocuments({
+			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },
 			});
@@ -213,7 +202,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 			replaced = true;
 
-			return chunk.html.replace("%gaId%", PUBLIC_GOOGLE_ANALYTICS_ID);
+			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
 	});
 

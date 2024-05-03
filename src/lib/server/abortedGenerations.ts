@@ -1,7 +1,7 @@
 // Shouldn't be needed if we dove into sveltekit internals, see https://github.com/huggingface/chat-ui/pull/88#issuecomment-1523173850
 
-import { Database } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
+import { collections } from "$lib/server/database";
 
 export class AbortedGenerations {
 	private static instance: AbortedGenerations;
@@ -30,7 +30,7 @@ export class AbortedGenerations {
 
 	private async updateList() {
 		try {
-			const aborts = await Database.getInstance().getCollections().abortedGenerations.find({}).sort({ createdAt: 1 }).toArray();
+			const aborts = await collections.abortedGenerations.find({}).sort({ createdAt: 1 }).toArray();
 
 			this.abortedGenerations = new Map(
 				aborts.map(({ conversationId, createdAt }) => [conversationId.toString(), createdAt])
@@ -39,5 +39,4 @@ export class AbortedGenerations {
 			logger.error(err);
 		}
 	}
-
 }

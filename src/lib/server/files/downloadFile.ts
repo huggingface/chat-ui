@@ -1,5 +1,5 @@
 import { error } from "@sveltejs/kit";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 
@@ -7,7 +7,7 @@ export async function downloadFile(
 	sha256: string,
 	convId: Conversation["_id"] | SharedConversation["_id"]
 ) {
-	const fileId = Database.getInstance().getCollections().bucket.find({ filename: `${convId.toString()}-${sha256}` });
+	const fileId = collections.bucket.find({ filename: `${convId.toString()}-${sha256}` });
 	let mime = "";
 
 	const content = await fileId.next().then(async (file) => {
@@ -20,7 +20,7 @@ export async function downloadFile(
 
 		mime = file.metadata?.mime;
 
-		const fileStream = Database.getInstance().getCollections().bucket.openDownloadStream(file._id);
+		const fileStream = collections.bucket.openDownloadStream(file._id);
 
 		const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
 			const chunks: Uint8Array[] = [];

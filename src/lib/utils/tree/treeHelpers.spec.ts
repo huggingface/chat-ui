@@ -1,11 +1,11 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
 
 // function used to insert conversations used for testing
 
 export const insertLegacyConversation = async () => {
-	const res = await Database.getInstance().getCollections().conversations.insertOne({
+	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -39,7 +39,7 @@ export const insertLegacyConversation = async () => {
 };
 
 export const insertLinearBranchConversation = async () => {
-	const res = await Database.getInstance().getCollections().conversations.insertOne({
+	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -83,7 +83,7 @@ export const insertLinearBranchConversation = async () => {
 };
 
 export const insertSideBranchesConversation = async () => {
-	const res = await Database.getInstance().getCollections().conversations.insertOne({
+	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),

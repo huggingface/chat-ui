@@ -1,15 +1,15 @@
 import { z } from "zod";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
 
 export const endpointCloudflareParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("cloudflare"),
-	accountId: z.string().default(CLOUDFLARE_ACCOUNT_ID),
-	apiToken: z.string().default(CLOUDFLARE_API_TOKEN),
+	accountId: z.string().default(env.CLOUDFLARE_ACCOUNT_ID),
+	apiToken: z.string().default(env.CLOUDFLARE_API_TOKEN),
 });
 
 export async function endpointCloudflare(

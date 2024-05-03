@@ -1,4 +1,4 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { z } from "zod";
 import { ObjectId } from "mongodb";
@@ -8,7 +8,7 @@ export async function GET({ locals, params }) {
 	const convId = new ObjectId(id);
 
 	if (locals.user?._id || locals.sessionId) {
-		const conv = await Database.getInstance().getCollections().conversations.findOne({
+		const conv = await collections.conversations.findOne({
 			_id: convId,
 			...authCondition(locals),
 		});

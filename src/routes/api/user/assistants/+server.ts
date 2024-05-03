@@ -1,13 +1,13 @@
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 
 export async function GET({ locals }) {
 	if (locals.user?._id || locals.sessionId) {
-		const settings = await Database.getInstance().getCollections().settings.findOne(authCondition(locals));
+		const settings = await collections.settings.findOne(authCondition(locals));
 
-		const conversations = await Database.getInstance().getCollections().conversations
+		const conversations = await collections.conversations
 			.find(authCondition(locals))
 			.sort({ updatedAt: -1 })
 			.project<Pick<Conversation, "assistantId">>({
@@ -24,7 +24,7 @@ export async function GET({ locals }) {
 			...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
 		];
 
-		const assistants = await Database.getInstance().getCollections().assistants.find({ _id: { $in: assistantIds } }).toArray();
+		const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
 		const res = assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))

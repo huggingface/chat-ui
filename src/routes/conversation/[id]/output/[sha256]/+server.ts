@@ -1,5 +1,5 @@
 import { authCondition } from "$lib/server/auth";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		const convId = new ObjectId(z.string().parse(params.id));
 
 		// check if the user has access to the conversation
-		const conv = await Database.getInstance().getCollections().conversations.findOne({
+		const conv = await collections.conversations.findOne({
 			_id: convId,
 			...authCondition(locals),
 		});
@@ -30,7 +30,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		}
 	} else {
 		// check if the user has access to the conversation
-		const conv = await Database.getInstance().getCollections().sharedConversations.findOne({
+		const conv = await collections.sharedConversations.findOne({
 			_id: params.id,
 		});
 

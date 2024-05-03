@@ -1,4 +1,4 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import type { LayoutServerLoad } from "./$types";
 import type { Report } from "$lib/types/Report";
 
@@ -8,7 +8,7 @@ export const load = (async ({ locals, parent }) => {
 	let reportsByUser: string[] = [];
 	const createdBy = locals.user?._id ?? locals.sessionId;
 	if (createdBy) {
-		const reports = await Database.getInstance().getCollections().reports
+		const reports = await collections.reports
 			.find<Pick<Report, "assistantId">>({ createdBy }, { projection: { _id: 0, assistantId: 1 } })
 			.toArray();
 		reportsByUser = reports.map((r) => r.assistantId.toString());

@@ -1,6 +1,6 @@
 import { assert, it, describe, afterEach, vi, expect } from "vitest";
 import type { Cookies } from "@sveltejs/kit";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { updateUser } from "./updateUser";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
@@ -27,7 +27,7 @@ const cookiesMock: Cookies = {
 };
 
 const insertRandomUser = async () => {
-	const res = await Database.getInstance().getCollections().users.insertOne({
+	const res = await collections.users.insertOne({
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -41,7 +41,7 @@ const insertRandomUser = async () => {
 };
 
 const insertRandomConversations = async (count: number) => {
-	const res = await Database.getInstance().getCollections().conversations.insertMany(
+	const res = await collections.conversations.insertMany(
 		new Array(count).fill(0).map(() => ({
 			_id: new ObjectId(),
 			title: "random title",
@@ -63,7 +63,7 @@ describe("login", () => {
 
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
-		const existingUser = await Database.getInstance().getCollections().users.findOne({ hfUserId: userData.sub });
+		const existingUser = await collections.users.findOne({ hfUserId: userData.sub });
 
 		assert.equal(existingUser?.name, userData.name);
 
@@ -77,14 +77,14 @@ describe("login", () => {
 
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
-		const conversationCount = await Database.getInstance().getCollections().conversations.countDocuments({
+		const conversationCount = await collections.conversations.countDocuments({
 			userId: insertedId,
 			sessionId: { $exists: false },
 		});
 
 		assert.equal(conversationCount, 2);
 
-		await Database.getInstance().getCollections().conversations.deleteMany({ userId: insertedId });
+		await collections.conversations.deleteMany({ userId: insertedId });
 	});
 
 	it("should create default settings for new user", async () => {
@@ -94,7 +94,7 @@ describe("login", () => {
 
 		assert.exists(user);
 
-		const settings = await Database.getInstance().getCollections().settings.findOne({ userId: user?._id });
+		const settings = await collections.settings.findOne({ userId: user?._id });
 
 		expect(settings).toMatchObject({
 			userId: user?._id,
@@ -104,11 +104,11 @@ describe("login", () => {
 			...DEFAULT_SETTINGS,
 		});
 
-		await Database.getInstance().getCollections().settings.deleteOne({ userId: user?._id });
+		await collections.settings.deleteOne({ userId: user?._id });
 	});
 
 	it("should migrate pre-existing settings for pre-existing user", async () => {
-		const { insertedId } = await Database.getInstance().getCollections().settings.insertOne({
+		const { insertedId } = await collections.settings.insertOne({
 			sessionId: locals.sessionId,
 			ethicsModalAcceptedAt: new Date(),
 			updatedAt: new Date(),
@@ -119,14 +119,14 @@ describe("login", () => {
 
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
-		const settings = await Database.getInstance().getCollections().settings.findOne({
+		const settings = await collections.settings.findOne({
 			_id: insertedId,
 			sessionId: { $exists: false },
 		});
 
 		assert.exists(settings);
 
-		const user = await Database.getInstance().getCollections().users.findOne({ hfUserId: userData.sub });
+		const user = await collections.users.findOne({ hfUserId: userData.sub });
 
 		expect(settings).toMatchObject({
 			userId: user?._id,
@@ -137,13 +137,13 @@ describe("login", () => {
 			shareConversationsWithModelAuthors: false,
 		});
 
-		await Database.getInstance().getCollections().settings.deleteOne({ userId: user?._id });
+		await collections.settings.deleteOne({ userId: user?._id });
 	});
 });
 
 afterEach(async () => {
-	await Database.getInstance().getCollections().users.deleteMany({ hfUserId: userData.sub });
-	await Database.getInstance().getCollections().sessions.deleteMany({});
+	await collections.users.deleteMany({ hfUserId: userData.sub });
+	await collections.sessions.deleteMany({});
 
 	locals.userId = "1234567890";
 	locals.sessionId = "1234567890";

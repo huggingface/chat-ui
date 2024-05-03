@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
 import { requiresUser } from "$lib/server/auth";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { fail, type Actions, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -43,7 +43,7 @@ const newAsssistantSchema = z.object({
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
 	const hash = await sha256(await avatar.text());
-	const upload = Database.getInstance().getCollections().bucket.openUploadStream(`${assistantId.toString()}`, {
+	const upload = collections.bucket.openUploadStream(`${assistantId.toString()}`, {
 		metadata: { type: avatar.type, hash },
 	});
 
@@ -60,7 +60,7 @@ const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string
 
 export const actions: Actions = {
 	default: async ({ request, locals, params }) => {
-		const assistant = await Database.getInstance().getCollections().assistants.findOne({
+		const assistant = await collections.assistants.findOne({
 			_id: new ObjectId(params.assistantId),
 		});
 
@@ -116,28 +116,28 @@ export const actions: Actions = {
 				return fail(400, { error: true, errors });
 			}
 
-			const fileCursor = Database.getInstance().getCollections().bucket.find({ filename: assistant._id.toString() });
+			const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
 
 			// Step 2: Delete the existing file if it exists
 			let fileId = await fileCursor.next();
 			while (fileId) {
-				await Database.getInstance().getCollections().bucket.delete(fileId._id);
+				await collections.bucket.delete(fileId._id);
 				fileId = await fileCursor.next();
 			}
 
 			hash = await uploadAvatar(new File([image], "avatar.jpg"), assistant._id);
 		} else if (deleteAvatar) {
 			// delete the avatar
-			const fileCursor = Database.getInstance().getCollections().bucket.find({ filename: assistant._id.toString() });
+			const fileCursor = collections.bucket.find({ filename: assistant._id.toString() });
 
 			let fileId = await fileCursor.next();
 			while (fileId) {
-				await Database.getInstance().getCollections().bucket.delete(fileId._id);
+				await collections.bucket.delete(fileId._id);
 				fileId = await fileCursor.next();
 			}
 		}
 
-		const { acknowledged } = await Database.getInstance().getCollections().assistants.updateOne(
+		const { acknowledged } = await collections.assistants.updateOne(
 			{
 				_id: assistant._id,
 			},

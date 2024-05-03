@@ -1,11 +1,11 @@
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 
 export async function GET({ params }) {
 	const id = params.id;
 	const assistantId = new ObjectId(id);
 
-	const assistant = await Database.getInstance().getCollections().assistants.findOne({
+	const assistant = await collections.assistants.findOne({
 		_id: assistantId,
 	});
 

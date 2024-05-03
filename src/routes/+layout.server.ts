@@ -1,28 +1,18 @@
 import type { LayoutServerLoad } from "./$types";
-import { Database } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
-import {
-	SERPAPI_KEY,
-	SERPER_API_KEY,
-	SERPSTACK_API_KEY,
-	MESSAGES_BEFORE_LOGIN,
-	YDC_API_KEY,
-	USE_LOCAL_WEBSEARCH,
-	SEARXNG_QUERY_URL,
-	ENABLE_ASSISTANTS,
-	ENABLE_ASSISTANTS_RAG,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
 
-	const settings = await Database.getInstance().getCollections().settings.findOne(authCondition(locals));
+	const settings = await collections.settings.findOne(authCondition(locals));
 
 	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
 	if (
@@ -31,7 +21,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
 	) {
 		settings.activeModel = defaultModel.id;
-		await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
+		await collections.settings.updateOne(authCondition(locals), {
 			$set: { activeModel: defaultModel.id },
 		});
 	}
@@ -42,26 +32,26 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		models.find((m) => m.id === settings?.activeModel)?.unlisted === true
 	) {
 		settings.activeModel = defaultModel.id;
-		await Database.getInstance().getCollections().settings.updateOne(authCondition(locals), {
+		await collections.settings.updateOne(authCondition(locals), {
 			$set: { activeModel: defaultModel.id },
 		});
 	}
 
-	const enableAssistants = ENABLE_ASSISTANTS === "true";
+	const enableAssistants = env.ENABLE_ASSISTANTS === "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
 	const assistant = assistantActive
 		? JSON.parse(
 				JSON.stringify(
-					await Database.getInstance().getCollections().assistants.findOne({
+					await collections.assistants.findOne({
 						_id: new ObjectId(settings?.activeModel),
 					})
 				)
 		  )
 		: null;
 
-	const conversations = await Database.getInstance().getCollections().conversations
+	const conversations = await collections.conversations
 		.find(authCondition(locals))
 		.sort({ updatedAt: -1 })
 		.project<
@@ -85,9 +75,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
 	];
 
-	const assistants = await Database.getInstance().getCollections().assistants.find({ _id: { $in: assistantIds } }).toArray();
+	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	let loginRequired = false;
 
@@ -98,7 +88,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			// get the number of messages where `from === "assistant"` across all conversations.
 			const totalMessages =
 				(
-					await Database.getInstance().getCollections().conversations
+					await collections.conversations
 						.aggregate([
 							{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
 							{ $project: { messages: 1 } },
@@ -136,12 +126,12 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		}) satisfies ConvSidebar[],
 		settings: {
 			searchEnabled: !!(
-				SERPAPI_KEY ||
-				SERPER_API_KEY ||
-				SERPSTACK_API_KEY ||
-				YDC_API_KEY ||
-				USE_LOCAL_WEBSEARCH ||
-				SEARXNG_QUERY_URL
+				env.SERPAPI_KEY ||
+				env.SERPER_API_KEY ||
+				env.SERPSTACK_API_KEY ||
+				env.YDC_API_KEY ||
+				env.USE_LOCAL_WEBSEARCH ||
+				env.SEARXNG_QUERY_URL
 			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
@@ -188,7 +178,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		},
 		assistant,
 		enableAssistants,
-		enableAssistantsRAG: ENABLE_ASSISTANTS_RAG === "true",
+		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,

@@ -14,6 +14,7 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import { logger } from "$lib/server/logger";
+import { building } from "$app/environment";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -70,7 +71,9 @@ export class Database {
 	 * Return map of database's collections
 	 */
 	public getCollections() {
-		const db = this.client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+		const db = this.client.db(
+			env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
+		);
 
 		const conversations = db.collection<Conversation>("conversations");
 		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
@@ -105,7 +108,6 @@ export class Database {
 		};
 	}
 
-
 	/**
 	 * Init database once connected: Index creation
 	 * @private
@@ -132,25 +134,19 @@ export class Database {
 				{ partialFilterExpression: { sessionId: { $exists: true } } }
 			)
 			.catch(logger.error);
-
 		conversations
 			.createIndex(
 				{ userId: 1, updatedAt: -1 },
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
 			.catch(logger.error);
-
 		conversations
 			.createIndex(
 				{ "message.id": 1, "message.ancestors": 1 },
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
 			.catch(logger.error);
-
-		// To do stats on conversations
-		conversations.createIndex({ updatedAt: 1 }).catch(logger.error);
 		// Not strictly necessary, could use _id, but more convenient. Also for stats
-		conversations.createIndex({ createdAt: 1 }).catch(logger.error);
 		// To do stats on conversation messages
 		conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(logger.error);
 		// Unique index for stats
@@ -174,7 +170,9 @@ export class Database {
 				"date.at": 1,
 			})
 			.catch(logger.error);
-		abortedGenerations.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 }).catch(logger.error);
+		abortedGenerations
+			.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 })
+			.catch(logger.error);
 		abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(logger.error);
 		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(logger.error);
 		settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
@@ -204,5 +202,8 @@ export class Database {
 		semaphores.createIndex({ key: 1 }, { unique: true }).catch(logger.error);
 		semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
 	}
-
 }
+
+export const collections = building
+	? ({} as unknown as ReturnType<typeof Database.prototype.getCollections>)
+	: Database.getInstance().getCollections();
