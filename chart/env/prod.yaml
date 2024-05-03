@@ -1,3 +1,7 @@
+image:
+  repository: registry.internal.huggingface.tech/chat-ui
+  name: chat-ui
+
 nodeSelector:
   role-hub-utils: "true"
 
