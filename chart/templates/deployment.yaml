@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels: {{ include "labels.standard" . | nindent 4 }}
+  name: {{ include "name" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  progressDeadlineSeconds: 600
+  {{- if not $.Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels: {{ include "labels.standard" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels: {{ include "labels.standard" . | nindent 8 }}
+      {{- if $.Values.envVars.NODE_LOG_STRUCTURED_DATA }}
+      annotations:
+        co.elastic.logs/json.expand_keys: "true"
+      {{- end }}
+    spec:
+      containers:
+        - name: chat-ui
+          image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          readinessProbe:
+            failureThreshold: 30
+            periodSeconds: 10
+            httpGet:
+              path: {{ $.Values.envVars.APP_BASE | default "" }}/healthcheck
+              port: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
+          livenessProbe:
+            failureThreshold: 30
+            periodSeconds: 10
+            httpGet:
+              path: {{ $.Values.envVars.APP_BASE | default "" }}/healthcheck
+              port: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
+          ports:
+            - containerPort: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
+              name: http
+              protocol: TCP
+            {{- if $.Values.monitoring.enabled }}
+            - containerPort: {{ $.Values.envVars.METRICS_PORT | default 5565 | int }}
+              name: metrics
+              protocol: TCP
+            {{- end }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "name" . }}
+          {{- if $.Values.externalSecrets.enabled }}
+            - secretRef:
+                name: {{ $.Values.externalSecrets.secretName }}
+          {{- end }}
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "name" . }}

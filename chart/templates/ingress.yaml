@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations: {{ toYaml .Values.ingress.annotations | nindent 4 }}
+  labels: {{ include "labels.standard" . | nindent 4 }}
+  name: {{ include "name" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  rules:
+    - host: {{ .Values.domain }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: {{ include "name" . }}
+                port:
+                  name: http
+            path: {{ $.Values.ingress.path | default "/" }}
+            pathType: Prefix
