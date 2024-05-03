@@ -24,7 +24,8 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN npm run build
+RUN APP_BASE="/chat" npm run build
+RUN #npm run build
 
 # mongo image
 FROM mongo:latest as mongo
