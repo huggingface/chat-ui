@@ -308,6 +308,9 @@ envVars:
       }]
     }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
+  ADDRESS_HEADER: 'X-Forwarded-For'
+  XFF_DEPTH: '2'
+
 
 externalSecrets:
   enabled: true
