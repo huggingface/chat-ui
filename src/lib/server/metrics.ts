@@ -40,5 +40,4 @@ export class MetricsServer {
 
 		return MetricsServer.instance;
 	}
-
 }
