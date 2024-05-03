@@ -30,7 +30,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/huggingface/chat-ui
+            registry.internal.huggingface.tech/chat-ui/chat-ui
           tags: |
             type=raw,value=${{ steps.package-version.outputs.VERSION }},enable=${{github.event_name == 'release'}}
             type=raw,value=${{ steps.package-version.outputs.MAJOR }},enable=${{github.event_name == 'release'}}
