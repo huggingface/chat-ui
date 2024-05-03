@@ -263,6 +263,7 @@ envVars:
         }
     ]
   NODE_ENV: "prod"
+  NODE_LOG_STRUCTURED_DATA: true
   OLD_MODELS: >
     [
       { "name": "bigcode/starcoder" },

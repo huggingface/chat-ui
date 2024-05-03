@@ -20,6 +20,10 @@ spec:
   template:
     metadata:
       labels: {{ include "labels.standard" . | nindent 8 }}
+      {{- if $.Values.envVars.NODE_LOG_STRUCTURED_DATA }}
+      annotations:
+        co.elastic.logs/json.expand_keys: "true"
+      {{- end }}
     spec:
       containers:
         - name: chat-ui
