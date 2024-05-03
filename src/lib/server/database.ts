@@ -14,6 +14,7 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import { logger } from "$lib/server/logger";
+import { building } from "$app/environment";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -203,4 +204,6 @@ export class Database {
 	}
 }
 
-export const collections = Database.getInstance().getCollections();
+export const collections = building
+	? ({} as unknown as ReturnType<typeof Database.prototype.getCollections>)
+	: Database.getInstance().getCollections();
