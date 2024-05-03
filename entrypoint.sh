@@ -14,4 +14,4 @@ if [ "$INCLUDE_DB" = "true" ] ; then
     nohup mongod &
 fi;
 
-dotenv -e /app/.env -c -- node /app/scripts/server.mjs -- --host 0.0.0.0 --port 3000
+dotenv -e /app/.env -c -- node /app/build/index.js -- --host 0.0.0.0 --port 3000

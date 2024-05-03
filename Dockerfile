@@ -24,8 +24,7 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN APP_BASE="/chat" npm run build
-RUN #npm run build
+RUN npm run build
 
 # mongo image
 FROM mongo:latest as mongo
@@ -78,8 +77,6 @@ RUN touch /app/.env.local
 COPY --chown=1000 package.json /app/package.json
 COPY --chown=1000 .env /app/.env
 COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
-COPY --chown=1000 scripts/server.mjs /app/scripts/server.mjs
-
 COPY --chown=1000 gcp-*.json /app/
 
 #import the build & dependencies
