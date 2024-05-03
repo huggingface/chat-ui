@@ -12,6 +12,11 @@ declare global {
 			sessionId: string;
 			user?: User;
 		}
+
+		interface Error {
+			message: string;
+			errorId?: ReturnType<typeof crypto.randomUUID>;
+		}
 		// interface PageData {}
 		// interface Platform {}
 	}

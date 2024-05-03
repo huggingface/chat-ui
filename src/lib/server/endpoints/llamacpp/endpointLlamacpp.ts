@@ -1,8 +1,9 @@
-import { HF_ACCESS_TOKEN, HF_TOKEN } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { buildPrompt } from "$lib/buildPrompt";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
 import { z } from "zod";
+import { logger } from "$lib/server/logger";
 
 export const endpointLlamacppParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -12,7 +13,7 @@ export const endpointLlamacppParametersSchema = z.object({
 	accessToken: z
 		.string()
 		.min(1)
-		.default(HF_TOKEN ?? HF_ACCESS_TOKEN),
+		.default(env.HF_TOKEN ?? env.HF_ACCESS_TOKEN),
 });
 
 export function endpointLlamacpp(
@@ -93,8 +94,8 @@ export function endpointLlamacpp(
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
-							console.error("Failed to parse JSON", e);
-							console.error("Problematic JSON string:", jsonString);
+							logger.error("Failed to parse JSON", e);
+							logger.error("Problematic JSON string:", jsonString);
 							continue; // Skip this iteration and try the next chunk
 						}
 

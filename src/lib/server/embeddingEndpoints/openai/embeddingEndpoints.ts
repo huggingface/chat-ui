@@ -1,14 +1,14 @@
 import { z } from "zod";
 import type { EmbeddingEndpoint, Embedding } from "../embeddingEndpoints";
 import { chunk } from "$lib/utils/chunk";
-import { OPENAI_API_KEY } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 export const embeddingEndpointOpenAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("openai"),
 	url: z.string().url().default("https://api.openai.com/v1/embeddings"),
-	apiKey: z.string().default(OPENAI_API_KEY),
+	apiKey: z.string().default(env.OPENAI_API_KEY),
 });
 
 export async function embeddingEndpointOpenAI(
