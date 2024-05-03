@@ -10,7 +10,7 @@
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
 
 	import { share } from "$lib/utils/share";
-	import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/stores";
 
 	export let assistant: Pick<
@@ -35,7 +35,8 @@
 		(assistant?.rag?.allowedLinks?.length ?? 0) > 0 ||
 		assistant?.dynamicPrompt;
 
-	const prefix = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || $page.url.origin}${base}`;
+	const prefix =
+		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
 

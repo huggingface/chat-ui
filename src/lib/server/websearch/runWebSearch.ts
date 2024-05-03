@@ -5,7 +5,7 @@ import { chunk } from "$lib/utils/chunk";
 import { findSimilarSentences } from "$lib/server/sentenceSimilarity";
 import { getWebSearchProvider } from "./searchWeb";
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
-import { WEBSEARCH_ALLOWLIST, WEBSEARCH_BLOCKLIST, ENABLE_LOCAL_FETCH } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
@@ -22,8 +22,8 @@ const MAX_N_PAGES_EMBED = 5 as const;
 
 const listSchema = z.array(z.string()).default([]);
 
-const allowList = listSchema.parse(JSON5.parse(WEBSEARCH_ALLOWLIST));
-const blockList = listSchema.parse(JSON5.parse(WEBSEARCH_BLOCKLIST));
+const allowList = listSchema.parse(JSON5.parse(env.WEBSEARCH_ALLOWLIST));
+const blockList = listSchema.parse(JSON5.parse(env.WEBSEARCH_BLOCKLIST));
 
 export async function runWebSearch(
 	conv: Conversation,
@@ -52,7 +52,7 @@ export async function runWebSearch(
 
 			let linksToUse = [...ragSettings.allowedLinks];
 
-			if (ENABLE_LOCAL_FETCH !== "true") {
+			if (env.ENABLE_LOCAL_FETCH !== "true") {
 				const localLinks = await Promise.all(
 					linksToUse.map(async (link) => {
 						try {

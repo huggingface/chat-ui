@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
-import { ENABLE_ASSISTANTS, REQUIRE_FEATURED_ASSISTANTS } from "$env/static/private";
-import { collections } from "$lib/server/database.js";
+import { env } from "$env/dynamic/private";
+import { Database, collections } from "$lib/server/database.js";
 import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
@@ -10,7 +10,7 @@ import type { Filter } from "mongodb";
 const NUM_PER_PAGE = 24;
 
 export const load = async ({ url, locals }) => {
-	if (!ENABLE_ASSISTANTS) {
+	if (!env.ENABLE_ASSISTANTS) {
 		throw redirect(302, `${base}/`);
 	}
 
@@ -34,11 +34,11 @@ export const load = async ({ url, locals }) => {
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
 
 	// if the user queried is not the current user, only show "public" assistants that have been shared before
 	const shouldHaveBeenShared =
-		REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
 			? { userCount: { $gt: 1 } }
 			: {};
 
@@ -50,8 +50,9 @@ export const load = async ({ url, locals }) => {
 		...shouldBeFeatured,
 		...shouldHaveBeenShared,
 	};
-	const assistants = await collections.assistants
-		.find(filter)
+	const assistants = await Database.getInstance()
+		.getCollections()
+		.assistants.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
@@ -60,7 +61,9 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await collections.assistants.countDocuments(filter);
+	const numTotalItems = await Database.getInstance()
+		.getCollections()
+		.assistants.countDocuments(filter);
 
 	return {
 		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,

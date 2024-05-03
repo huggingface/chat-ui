@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { goto } from "$app/navigation";
@@ -95,8 +95,8 @@
 		/>
 		<meta
 			property="og:image"
-			content="{PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+			content="{envPublic.PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
 		/>
 		<meta property="og:url" content={$page.url.href} />
 	{/if}
