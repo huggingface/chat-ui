@@ -380,8 +380,7 @@
 							</span>
 						{/if}
 					{/if}
-					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
-					or false.
+					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> 답변 내용은 정확하지 않거나 틀릴 수 있습니다.
 				</p>
 				{#if messages.length}
 					<button
