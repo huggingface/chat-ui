@@ -57,14 +57,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: ["build-and-publish-huggingchat-image"]
     steps:
-      - name: Set GITHUB_SHA_SHORT
-        run: echo "GITHUB_SHA_SHORT=${{ env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT }}" >> $GITHUB_ENV
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4.5.0
 
       - name: Gen values
         run: |
           VALUES=$(cat <<-END
           image:
-            tag: "${{ env.GITHUB_SHA_SHORT }}"
+            tag: "sha-${{ env.GITHUB_SHA_SHORT }}"
           END
           )
           echo "VALUES=$(echo "$VALUES" | yq -o=json | jq tostring)" >> $GITHUB_ENV
