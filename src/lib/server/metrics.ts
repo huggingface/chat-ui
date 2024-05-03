@@ -8,7 +8,7 @@ export class MetricsServer {
 
 	private constructor() {
 		const app = express();
-		const port = env.METRICS_PORT || "3001";
+		const port = env.METRICS_PORT || "5565";
 
 		const server = app.listen(port, () => {
 			logger.info(`Metrics server listening on port ${port}`);
