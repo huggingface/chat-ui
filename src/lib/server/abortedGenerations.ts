@@ -25,7 +25,7 @@ export class AbortedGenerations {
 	}
 
 	public getList(): Map<string, Date> {
-		return this.getList();
+		return this.abortedGenerations;
 	}
 
 	private async updateList() {
