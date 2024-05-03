@@ -1,11 +1,12 @@
-import { SEARXNG_QUERY_URL } from "$env/static/private";
+import { env } from "$env/dynamic/private";
+import { logger } from "$lib/server/logger";
 
 export async function searchSearxng(query: string) {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
 
 	// Insert the query into the URL template
-	let url = SEARXNG_QUERY_URL.replace("<query>", query);
+	let url = env.SEARXNG_QUERY_URL.replace("<query>", query);
 
 	// Check if "&format=json" already exists in the URL
 	if (!url.includes("&format=json")) {
@@ -18,7 +19,7 @@ export async function searchSearxng(query: string) {
 	})
 		.then((response) => response.json() as Promise<{ results: { url: string }[] }>)
 		.catch((error) => {
-			console.error("Failed to fetch or parse JSON", error);
+			logger.error("Failed to fetch or parse JSON", error);
 			throw new Error("Failed to fetch or parse JSON");
 		});
 

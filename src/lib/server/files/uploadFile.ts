@@ -1,6 +1,6 @@
 import type { Conversation } from "$lib/types/Conversation";
 import { sha256 } from "$lib/utils/sha256";
-import { collections } from "../database";
+import { collections } from "$lib/server/database";
 
 export async function uploadFile(file: Blob, conv: Conversation): Promise<string> {
 	const sha = await sha256(await file.text());
