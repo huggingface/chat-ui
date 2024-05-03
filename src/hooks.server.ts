@@ -59,14 +59,12 @@ export const handleError: HandleServerError = async ({ error, event }) => {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
-	// only allow metrics from localhost if we're not in dev mode
-	if (
-		event.url.pathname.startsWith(`${base}/metrics`) &&
-		!dev &&
-		event.request.headers.get("host") !== "localhost:3000"
-	) {
-		return new Response("Forbidden", { status: 403 });
-	}
+	logger.info({
+		locals: event.locals,
+		url: event.url.pathname,
+		params: event.params,
+		request: event.request,
+	});
 
 	if (event.url.pathname.startsWith(`${base}/api/`) && env.EXPOSE_API !== "true") {
 		return new Response("API is disabled", { status: 403 });
