@@ -59,7 +59,7 @@ export const handleError: HandleServerError = async ({ error, event }) => {
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
-	logger.info({
+	logger.debug({
 		locals: event.locals,
 		url: event.url.pathname,
 		params: event.params,
