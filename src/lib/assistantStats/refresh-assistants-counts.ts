@@ -1,4 +1,4 @@
-import { client, collections } from "$lib/server/database";
+import { Database } from "$lib/server/database";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
 import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
@@ -15,44 +15,49 @@ async function refreshAssistantsCountsHelper() {
 	}
 
 	try {
-		await client.withSession((session) =>
-			session.withTransaction(async () => {
-				await collections.assistants
-					.aggregate([
-						{ $project: { _id: 1 } },
-						{ $set: { last24HoursCount: 0 } },
-						{
-							$unionWith: {
-								coll: "assistants.stats",
-								pipeline: [
-									{ $match: { "date.at": { $gte: subDays(new Date(), 1) }, "date.span": "hour" } },
-									{
-										$group: {
-											_id: "$assistantId",
-											last24HoursCount: { $sum: "$count" },
+		await Database.getInstance()
+			.getClient()
+			.withSession((session) =>
+				session.withTransaction(async () => {
+					await Database.getInstance()
+						.getCollections()
+						.assistants.aggregate([
+							{ $project: { _id: 1 } },
+							{ $set: { last24HoursCount: 0 } },
+							{
+								$unionWith: {
+									coll: "assistants.stats",
+									pipeline: [
+										{
+											$match: { "date.at": { $gte: subDays(new Date(), 1) }, "date.span": "hour" },
 										},
-									},
-								],
+										{
+											$group: {
+												_id: "$assistantId",
+												last24HoursCount: { $sum: "$count" },
+											},
+										},
+									],
+								},
 							},
-						},
-						{
-							$group: {
-								_id: "$_id",
-								last24HoursCount: { $sum: "$last24HoursCount" },
+							{
+								$group: {
+									_id: "$_id",
+									last24HoursCount: { $sum: "$last24HoursCount" },
+								},
 							},
-						},
-						{
-							$merge: {
-								into: "assistants",
-								on: "_id",
-								whenMatched: "merge",
-								whenNotMatched: "discard",
+							{
+								$merge: {
+									into: "assistants",
+									on: "_id",
+									whenMatched: "merge",
+									whenNotMatched: "discard",
+								},
 							},
-						},
-					])
-					.next();
-			})
-		);
+						])
+						.next();
+				})
+			);
 	} catch (e) {
 		logger.error("Refresh assistants counter failed!");
 		logger.error(e);

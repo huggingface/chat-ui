@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import type { ConversationStats } from "$lib/types/ConversationStats";
-import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database.js";
+import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 
 // Triger like this:

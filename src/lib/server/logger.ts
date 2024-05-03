@@ -1,11 +1,11 @@
 import pino from "pino";
 import { dev } from "$app/environment";
+import { env } from "$env/dynamic/private";
 
 let options: pino.LoggerOptions = {};
 
 if (dev) {
 	options = {
-		level: "debug",
 		transport: {
 			target: "pino-pretty",
 			options: {
@@ -15,4 +15,4 @@ if (dev) {
 	};
 }
 
-export const logger = pino(options);
+export const logger = pino({ ...options, level: env.LOG_LEVEL ?? "info" });

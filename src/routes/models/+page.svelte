@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { PUBLIC_APP_NAME } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { base } from "$app/paths";
@@ -36,7 +36,7 @@
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">All models available on {PUBLIC_APP_NAME}</h3>
+		<h3 class="text-gray-500">All models available on {envPublic.PUBLIC_APP_NAME}</h3>
 		<dl class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
 			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
 				<a
