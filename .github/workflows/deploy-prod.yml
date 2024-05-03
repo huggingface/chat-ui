@@ -59,6 +59,16 @@ jobs:
     steps:
       - name: Set GITHUB_SHA_SHORT
         run: echo "GITHUB_SHA_SHORT=${{ env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT }}" >> $GITHUB_ENV
+
+      - name: Gen values
+        run: |
+          VALUES=$(cat <<-END
+          image:
+            tag: "${{ env.GITHUB_SHA_SHORT }}"
+          END
+          )
+          echo "VALUES=$(echo "$VALUES" | yq -o=json | jq tostring)" >> $GITHUB_ENV
+
       - name: Deploy on infra-deployments
         uses: aurelien-baudet/workflow-dispatch@v2
         with:
@@ -69,4 +79,4 @@ jobs:
           display-workflow-run-url-interval: 10s
           ref: refs/heads/main
           token: ${{ secrets.ARGO_CD_TOKEN }}
-          inputs: '{"path": "hub/chat-ui/chat-ui.yaml", "values": ${{ env.GITHUB_SHA_SHORT }}, "url": "${{ github.event.head_commit.url }}"}'
+          inputs: '{"path": "hub/chat-ui/chat-ui.yaml", "values": ${{ env.VALUES }}, "url": "${{ github.event.head_commit.url }}"}'
