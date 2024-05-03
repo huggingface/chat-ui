@@ -1,4 +1,4 @@
-import { collections } from "$lib/server/database.js";
+import { collections } from "$lib/server/database";
 import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";

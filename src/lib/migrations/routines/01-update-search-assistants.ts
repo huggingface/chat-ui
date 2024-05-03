@@ -1,14 +1,14 @@
 import type { Migration } from ".";
+import { collections } from "$lib/server/database";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import type { Assistant } from "$lib/types/Assistant";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
-import { MongoDBClient } from "$lib/server/database";
 
 const migration: Migration = {
 	_id: new ObjectId("5f9f3e3e3e3e3e3e3e3e3e3e"),
 	name: "Update search assistants",
 	up: async () => {
-		const { assistants } = MongoDBClient.collections;
+		const { assistants } = collections;
 		let ops: AnyBulkWriteOperation<Assistant>[] = [];
 
 		for await (const assistant of assistants
@@ -41,7 +41,8 @@ const migration: Migration = {
 		return true;
 	},
 	down: async () => {
-		await MongoDBClient.collections.assistants.updateMany({}, { $unset: { searchTokens: "" } });
+		const { assistants } = collections;
+		await assistants.updateMany({}, { $unset: { searchTokens: "" } });
 		return true;
 	},
 };

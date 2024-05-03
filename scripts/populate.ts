@@ -7,7 +7,8 @@ import { env } from "$env/dynamic/private";
 import { faker } from "@faker-js/faker";
 import { ObjectId } from "mongodb";
 
-import { collections } from "../src/lib/server/database.ts";
+// @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
+import { collections } from "$lib/server/database";
 import { models } from "../src/lib/server/models.ts";
 import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";

@@ -13,16 +13,18 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { collectDefaultMetrics } from "prom-client";
 import { register } from "$lib/server/metrics";
 import { logger } from "$lib/server/logger";
-import { maintainAbortedGenerations } from "$lib/server/abortedGenerations";
+import { AbortedGenerations } from "$lib/server/abortedGenerations";
 
+// TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
-	maintainAbortedGenerations();
 	await checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
 	register.clear();
 	collectDefaultMetrics({ register });
+
+	AbortedGenerations.getInstance();
 }
 
 export const handleError: HandleServerError = async ({ error, event }) => {

@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
 import { env } from "$env/dynamic/private";
-import { collections } from "$lib/server/database.js";
+import { Database, collections } from "$lib/server/database.js";
 import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
@@ -50,8 +50,9 @@ export const load = async ({ url, locals }) => {
 		...shouldBeFeatured,
 		...shouldHaveBeenShared,
 	};
-	const assistants = await collections.assistants
-		.find(filter)
+	const assistants = await Database.getInstance()
+		.getCollections()
+		.assistants.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
@@ -60,7 +61,9 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await collections.assistants.countDocuments(filter);
+	const numTotalItems = await Database.getInstance()
+		.getCollections()
+		.assistants.countDocuments(filter);
 
 	return {
 		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,

@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { Collection, GridFSBucket, MongoClient } from "mongodb";
+import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
@@ -18,91 +18,102 @@ import { building } from "$app/environment";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
-export class MongoDBClient {
-	private static _instance: MongoClient;
-	private static _collections: {
-		conversations: Collection<Conversation>;
-		conversationStats: Collection<ConversationStats>;
-		assistants: Collection<Assistant>;
-		assistantStats: Collection<AssistantStats>;
-		reports: Collection<Report>;
-		sharedConversations: Collection<SharedConversation>;
-		abortedGenerations: Collection<AbortedGeneration>;
-		settings: Collection<Settings>;
-		users: Collection<User>;
-		sessions: Collection<Session>;
-		messageEvents: Collection<MessageEvent>;
-		bucket: GridFSBucket;
-		migrationResults: Collection<MigrationResult>;
-		semaphores: Collection<Semaphore>;
-	};
+export class Database {
+	private client: MongoClient;
 
-	private constructor() {}
+	private static instance: Database;
 
-	public static get instance(): MongoClient {
-		if (!this._instance) {
-			if (!env.MONGODB_URL && !building) {
-				throw new Error("Please specify the MONGODB_URL environment variable inside .env.local.");
-			}
-			this._instance = new MongoClient(env.MONGODB_URL, {
-				directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
-			});
-
-			this._instance.connect().catch(logger.error);
-
-			this._instance.once("open", async () => {
-				logger.info("Connected to MongoDB");
-				this.buildIndexes();
-			});
-		}
-		return this._instance;
-	}
-
-	public static get collections(): typeof this._collections {
-		if (building) {
-			return {} as typeof this._collections;
-		}
-		if (!this._collections) {
-			const db = this.instance.db(
-				env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
+	private constructor() {
+		if (!env.MONGODB_URL) {
+			throw new Error(
+				"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
 			);
-
-			this._collections = {
-				conversations: db.collection<Conversation>("conversations"),
-				conversationStats: db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION),
-				assistants: db.collection<Assistant>("assistants"),
-				assistantStats: db.collection<AssistantStats>("assistants.stats"),
-				reports: db.collection<Report>("reports"),
-				sharedConversations: db.collection<SharedConversation>("sharedConversations"),
-				abortedGenerations: db.collection<AbortedGeneration>("abortedGenerations"),
-				settings: db.collection<Settings>("settings"),
-				users: db.collection<User>("users"),
-				sessions: db.collection<Session>("sessions"),
-				messageEvents: db.collection<MessageEvent>("messageEvents"),
-				bucket: new GridFSBucket(db, { bucketName: "files" }),
-				migrationResults: db.collection<MigrationResult>("migrationResults"),
-				semaphores: db.collection<Semaphore>("semaphores"),
-			};
 		}
 
-		return this._collections;
+		this.client = new MongoClient(env.MONGODB_URL, {
+			directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
+		});
+
+		this.client.connect().catch(logger.error);
+		this.client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+		this.client.on("open", () => this.initDatabase());
 	}
 
-	private static buildIndexes() {
-		const {
+	public static getInstance(): Database {
+		if (!Database.instance) {
+			Database.instance = new Database();
+		}
+
+		return Database.instance;
+	}
+
+	/**
+	 * Return mongoClient
+	 */
+	public getClient(): MongoClient {
+		return this.client;
+	}
+
+	/**
+	 * Return map of database's collections
+	 */
+	public getCollections() {
+		const db = this.client.db(
+			env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
+		);
+
+		const conversations = db.collection<Conversation>("conversations");
+		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
+		const assistants = db.collection<Assistant>("assistants");
+		const assistantStats = db.collection<AssistantStats>("assistants.stats");
+		const reports = db.collection<Report>("reports");
+		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
+		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
+		const settings = db.collection<Settings>("settings");
+		const users = db.collection<User>("users");
+		const sessions = db.collection<Session>("sessions");
+		const messageEvents = db.collection<MessageEvent>("messageEvents");
+		const bucket = new GridFSBucket(db, { bucketName: "files" });
+		const migrationResults = db.collection<MigrationResult>("migrationResults");
+		const semaphores = db.collection<Semaphore>("semaphores");
+
+		return {
 			conversations,
 			conversationStats,
-			abortedGenerations,
-			settings,
-			users,
-			messageEvents,
-			sessions,
 			assistants,
 			assistantStats,
 			reports,
 			sharedConversations,
+			abortedGenerations,
+			settings,
+			users,
+			sessions,
+			messageEvents,
+			bucket,
+			migrationResults,
 			semaphores,
-		} = this.collections;
+		};
+	}
+
+	/**
+	 * Init database once connected: Index creation
+	 * @private
+	 */
+	private initDatabase() {
+		const {
+			conversations,
+			conversationStats,
+			assistants,
+			assistantStats,
+			reports,
+			sharedConversations,
+			abortedGenerations,
+			settings,
+			users,
+			sessions,
+			messageEvents,
+			semaphores,
+		} = this.getCollections();
 
 		conversations
 			.createIndex(
@@ -122,10 +133,7 @@ export class MongoDBClient {
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
 			.catch(logger.error);
-		// To do stats on conversations
-		conversations.createIndex({ updatedAt: 1 }).catch(logger.error);
 		// Not strictly necessary, could use _id, but more convenient. Also for stats
-		conversations.createIndex({ createdAt: 1 }).catch(logger.error);
 		// To do stats on conversation messages
 		conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(logger.error);
 		// Unique index for stats
@@ -183,4 +191,4 @@ export class MongoDBClient {
 	}
 }
 
-export const collections = MongoDBClient.collections;
+export const collections = Database.getInstance().getCollections();

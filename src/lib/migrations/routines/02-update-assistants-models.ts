@@ -1,5 +1,5 @@
 import type { Migration } from ".";
-import { MongoDBClient } from "$lib/server/database";
+import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 
 const updateAssistantsModels: Migration = {
@@ -7,11 +7,14 @@ const updateAssistantsModels: Migration = {
 	name: "Update deprecated models in assistants with the default model",
 	up: async () => {
 		const models = (await import("$lib/server/models")).models;
+
+		const { assistants } = collections;
+
 		const modelIds = models.map((el) => el.id); // string[]
 		const defaultModelId = models[0].id;
 
 		// Find all assistants whose modelId is not in modelIds, and update it to use defaultModelId
-		await MongoDBClient.collections.assistants.updateMany(
+		await assistants.updateMany(
 			{ modelId: { $nin: modelIds } },
 			{ $set: { modelId: defaultModelId } }
 		);
