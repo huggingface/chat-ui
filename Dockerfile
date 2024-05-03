@@ -18,7 +18,8 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN npm run build
+RUN APP_BASE="/chat" npm run build
+RUN #npm run build
 
 FROM node:20-slim
 RUN npm install -g vite-node

@@ -1,6 +1,5 @@
 // Shouldn't be needed if we dove into sveltekit internals, see https://github.com/huggingface/chat-ui/pull/88#issuecomment-1523173850
 
-import { setTimeout } from "node:timers/promises";
 import { Database } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 

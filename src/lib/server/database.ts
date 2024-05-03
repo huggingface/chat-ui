@@ -33,9 +33,22 @@ export class Database {
 			directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
 		});
 
-		this.client.connect().catch(logger.error);
+		this.client.connect().catch((err) => {
+			logger.error("Connection error", err);
+			process.exit(1);
+		});
 		this.client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 		this.client.on("open", () => this.initDatabase());
+
+		// Disconnect DB on process kill
+		process.on("SIGINT", async () => {
+			await this.client.close(true);
+
+			// https://github.com/sveltejs/kit/issues/9540
+			setTimeout(() => {
+				process.exit(0);
+			}, 100);
+		});
 	}
 
 	public static getInstance(): Database {

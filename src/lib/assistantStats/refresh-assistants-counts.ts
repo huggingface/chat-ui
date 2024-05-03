@@ -15,7 +15,7 @@ async function refreshAssistantsCountsHelper() {
 	}
 
 	try {
-		await Database.getInstance().client.withSession((session) =>
+		await Database.getInstance().getClient().withSession((session) =>
 			session.withTransaction(async () => {
 				await Database.getInstance().getCollections().assistants
 					.aggregate([
