@@ -10,8 +10,11 @@ export type Model = Pick<
 	| "promptExamples"
 	| "parameters"
 	| "description"
+	| "logoUrl"
 	| "modelUrl"
+	| "tokenizer"
 	| "datasetUrl"
 	| "preprompt"
 	| "multimodal"
+	| "unlisted"
 >;

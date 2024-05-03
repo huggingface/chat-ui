@@ -15,21 +15,18 @@ export const endpointAwsParametersSchema = z.object({
 	region: z.string().optional(),
 });
 
-export async function endpointAws({
-	url,
-	accessKey,
-	secretKey,
-	sessionToken,
-	model,
-	region,
-	service,
-}: z.infer<typeof endpointAwsParametersSchema>): Promise<Endpoint> {
+export async function endpointAws(
+	input: z.input<typeof endpointAwsParametersSchema>
+): Promise<Endpoint> {
 	let AwsClient;
 	try {
 		AwsClient = (await import("aws4fetch")).AwsClient;
 	} catch (e) {
 		throw new Error("Failed to import aws4fetch");
 	}
+
+	const { url, accessKey, secretKey, sessionToken, model, region, service } =
+		endpointAwsParametersSchema.parse(input);
 
 	const aws = new AwsClient({
 		accessKeyId: accessKey,
@@ -39,17 +36,17 @@ export async function endpointAws({
 		region,
 	});
 
-	return async ({ conversation }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 		const prompt = await buildPrompt({
-			messages: conversation.messages,
-			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-			preprompt: conversation.preprompt,
+			messages,
+			continueMessage,
+			preprompt,
 			model,
 		});
 
 		return textGenerationStream(
 			{
-				parameters: { ...model.parameters, return_full_text: false },
+				parameters: { ...model.parameters, ...generateSettings, return_full_text: false },
 				model: url,
 				inputs: prompt,
 			},

@@ -53,4 +53,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker image
-        run: docker build --secret id=DOTENV_LOCAL,src=conf/.env.ci -t chat-ui:latest .
+        run: docker build --secret id=DOTENV_LOCAL,src=.env.ci -t chat-ui:latest .

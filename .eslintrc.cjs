@@ -34,6 +34,7 @@ module.exports = {
 				argsIgnorePattern: "^_",
 			},
 		],
+		"object-shorthand": ["error", "always"],
 	},
 	env: {
 		browser: true,

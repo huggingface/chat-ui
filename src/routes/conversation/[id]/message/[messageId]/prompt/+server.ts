@@ -2,6 +2,8 @@ import { buildPrompt } from "$lib/buildPrompt";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
+import { buildSubtree } from "$lib/utils/tree/buildSubtree";
+import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -24,7 +26,7 @@ export async function GET({ params, locals }) {
 
 	const messageIndex = conv.messages.findIndex((msg) => msg.id === messageId);
 
-	if (messageIndex === -1) {
+	if (!isMessageId(messageId) || messageIndex === -1) {
 		throw error(404, "Message not found");
 	}
 
@@ -34,13 +36,12 @@ export async function GET({ params, locals }) {
 		throw error(404, "Conversation model not found");
 	}
 
-	const messagesUpTo = conv.messages.slice(0, messageIndex + 1);
+	const messagesUpTo = buildSubtree(conv, messageId);
 
 	const prompt = await buildPrompt({
 		preprompt: conv.preprompt,
-		webSearch: messagesUpTo[messagesUpTo.length - 1].webSearch,
 		messages: messagesUpTo,
-		model: model,
+		model,
 	});
 
 	return new Response(

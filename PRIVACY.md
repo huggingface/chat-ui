@@ -1,12 +1,12 @@
 ## Privacy
 
-> Last updated: October 4, 2023
+> Last updated: April 15, 2024
 
 Users of HuggingChat are authenticated through their HF user account.
 
-By default, your conversations may be shared with the respective models' authors to improve their training data and model over time. Model authors are the custodians of the data collected by their model, even if it's hosted on our platform.
+We endorse Privacy by Design. As such, your conversations are private to you and will not be shared with anyone, including model authors, for any purpose, including for research or model training purposes.
 
-If you disable data sharing in your settings, your conversations will not be used for any downstream usage (including for research or model training purposes), and they will only be stored to let you access past conversations. You can click on the Delete icon to delete any past conversation at any moment.
+You conversation data will only be stored to let you access past conversations. You can click on the Delete icon to delete any past conversation at any moment.
 
 🗓 Please also consult huggingface.co's main privacy policy at <https://huggingface.co/privacy>. To exercise any of your legal privacy rights, please send an email to <privacy@huggingface.co>.
 
@@ -14,12 +14,18 @@ If you disable data sharing in your settings, your conversations will not be use
 
 The goal of this app is to showcase that it is now possible to build an open source alternative to ChatGPT. 💪
 
-For now (October 2023), it's running:
+We aim to always provide a diverse set of state of the art open LLMs, hence we rotate the available models over time.
+
+Historically, HuggingChat has been running models such as:
 
 - [Llama 2 70B](https://huggingface.co/meta-llama/Llama-2-70b-chat-hf)
 - [CodeLlama 35B](https://about.fb.com/news/2023/08/code-llama-ai-for-coding/)
 - [Falcon 180B](https://www.tii.ae/news/technology-innovation-institute-introduces-worlds-most-powerful-open-llm-falcon-180b)
 - [Mistral 7B](https://mistral.ai/news/announcing-mistral-7b/)
+- [Cohere Command R+](https://huggingface.co/chat/models/CohereForAI/c4ai-command-r-plus)
+- [Google Gemma 7B](https://huggingface.co/chat/models/google/gemma-1.1-7b-it)
+
+This is only a partial list. Check the [models](https://huggingface.co/chat/models/) page for up-to-date list of the best available LLMs.
 
 ## Technical details
 

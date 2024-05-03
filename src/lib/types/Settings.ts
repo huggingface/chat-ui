@@ -1,4 +1,5 @@
 import { defaultModel } from "$lib/server/models";
+import type { Assistant } from "./Assistant";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
@@ -18,10 +19,15 @@ export interface Settings extends Timestamps {
 
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
+
+	assistants?: Assistant["_id"][];
 }
 
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: false,
 	activeModel: defaultModel.id,
+	hideEmojiOnSidebar: false,
+	customPrompts: {},
+	assistants: [],
 };

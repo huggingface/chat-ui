@@ -5,6 +5,8 @@ import { updateUser } from "./updateUser";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { defaultModel } from "$lib/server/models";
+import { findUser } from "$lib/server/auth";
+import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 const userData = {
 	preferred_username: "new-username",
@@ -12,6 +14,7 @@ const userData = {
 	picture: "https://example.com/avatar.png",
 	sub: "1234567890",
 };
+Object.freeze(userData);
 
 const locals = {
 	userId: "1234567890",
@@ -32,7 +35,6 @@ const insertRandomUser = async () => {
 		name: userData.name,
 		avatarUrl: userData.picture,
 		hfUserId: userData.sub,
-		sessionId: locals.sessionId,
 	});
 
 	return res.insertedId;
@@ -45,6 +47,7 @@ const insertRandomConversations = async (count: number) => {
 			title: "random title",
 			messages: [],
 			model: defaultModel.id,
+			embeddingModel: defaultEmbeddingModel.id,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			sessionId: locals.sessionId,
@@ -87,7 +90,7 @@ describe("login", () => {
 	it("should create default settings for new user", async () => {
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
-		const user = await collections.users.findOne({ sessionId: locals.sessionId });
+		const user = await findUser(locals.sessionId);
 
 		assert.exists(user);
 
@@ -140,5 +143,9 @@ describe("login", () => {
 
 afterEach(async () => {
 	await collections.users.deleteMany({ hfUserId: userData.sub });
+	await collections.sessions.deleteMany({});
+
+	locals.userId = "1234567890";
+	locals.sessionId = "1234567890";
 	vi.clearAllMocks();
 });

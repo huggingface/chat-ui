@@ -1,13 +1,17 @@
-import type { Message } from "./Message";
-import type { Timestamps } from "./Timestamps";
+import type { Conversation } from "./Conversation";
 
-export interface SharedConversation extends Timestamps {
+export type SharedConversation = Pick<
+	Conversation,
+	| "model"
+	| "embeddingModel"
+	| "title"
+	| "rootMessageId"
+	| "messages"
+	| "preprompt"
+	| "assistantId"
+	| "createdAt"
+	| "updatedAt"
+> & {
 	_id: string;
-
 	hash: string;
-
-	model: string;
-	title: string;
-	messages: Message[];
-	preprompt?: string;
-}
+};

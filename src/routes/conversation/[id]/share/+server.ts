@@ -32,13 +32,16 @@ export async function POST({ params, url, locals }) {
 
 	const shared: SharedConversation = {
 		_id: nanoid(7),
-		createdAt: new Date(),
-		messages: conversation.messages,
 		hash,
+		createdAt: new Date(),
 		updatedAt: new Date(),
+		rootMessageId: conversation.rootMessageId,
+		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
+		embeddingModel: conversation.embeddingModel,
 		preprompt: conversation.preprompt,
+		assistantId: conversation.assistantId,
 	};
 
 	await collections.sharedConversations.insertOne(shared);

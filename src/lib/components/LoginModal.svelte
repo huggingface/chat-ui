@@ -4,9 +4,11 @@
 	import { PUBLIC_APP_DESCRIPTION, PUBLIC_APP_NAME } from "$env/static/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import type { LayoutData } from "../../routes/$types";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
-	export let settings: LayoutData["settings"];
+
+	const settings = useSettingsStore();
 </script>
 
 <Modal on:close>
@@ -17,12 +19,13 @@
 			<Logo classNames="mr-1" />
 			{PUBLIC_APP_NAME}
 		</h2>
-		<p class="text-lg font-semibold leading-snug text-gray-800" style="text-wrap: balance;">
+		<p class="text-balance text-lg font-semibold leading-snug text-gray-800">
 			{PUBLIC_APP_DESCRIPTION}
 		</p>
-		<p class="rounded-xl border bg-white/80 p-2 text-base text-gray-800">
-			You have reached the guest message limit, please Sign In with your Hugging Face account to
-			continue.
+		<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
+			You have reached the guest message limit, <strong class="font-semibold"
+				>Sign In with a free Hugging Face account</strong
+			> to continue using HuggingChat.
 		</p>
 
 		<form
@@ -42,13 +45,15 @@
 					{/if}
 				</button>
 			{:else}
-				<input type="hidden" name="ethicsModalAccepted" value={true} />
-				{#each Object.entries(settings) as [key, val]}
-					<input type="hidden" name={key} value={val} />
-				{/each}
 				<button
-					type="submit"
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+					on:click={(e) => {
+						if (!cookiesAreEnabled()) {
+							e.preventDefault();
+							window.open(window.location.href, "_blank");
+						}
+						$settings.ethicsModalAccepted = true;
+					}}
 				>
 					Start chatting
 				</button>

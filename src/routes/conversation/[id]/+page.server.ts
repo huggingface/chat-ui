@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
 import { authCondition } from "$lib/server/auth";
 import { UrlDependency } from "$lib/types/UrlDependency";
+import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation.js";
 
 export const load = async ({ params, depends, locals }) => {
 	let conversation;
@@ -44,11 +45,24 @@ export const load = async ({ params, depends, locals }) => {
 			throw error(404, "Conversation not found.");
 		}
 	}
+
+	const convertedConv = { ...conversation, ...convertLegacyConversation(conversation) };
+
 	return {
-		messages: conversation.messages,
-		title: conversation.title,
-		model: conversation.model,
-		preprompt: conversation.preprompt,
+		messages: convertedConv.messages,
+		title: convertedConv.title,
+		model: convertedConv.model,
+		preprompt: convertedConv.preprompt,
+		rootMessageId: convertedConv.rootMessageId,
+		assistant: convertedConv.assistantId
+			? JSON.parse(
+					JSON.stringify(
+						await collections.assistants.findOne({
+							_id: new ObjectId(convertedConv.assistantId),
+						})
+					)
+			  )
+			: null,
 		shared,
 	};
 };

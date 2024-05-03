@@ -27,7 +27,7 @@ Current Question: What about Mexico?
 			content: `Previous questions: 
 - When is the next formula 1 grand prix?
 
-Current Question: Where is it being hosted ?`,
+Current Question: Where is it being hosted?`,
 		},
 		{
 			from: "assistant",
@@ -41,12 +41,12 @@ Current Question: Where is it being hosted ?`,
 			from: "assistant",
 			content: "Epson F2270 DTG printer printhead",
 		},
-		{ from: "user", content: "What were the news yesterday ?" },
+		{ from: "user", content: "What were the news yesterday?" },
 		{
 			from: "assistant",
 			content: `news ${format(new Date(Date.now() - 864e5), "MMMM d, yyyy")}`,
 		},
-		{ from: "user", content: "What is the current weather in Paris ?" },
+		{ from: "user", content: "What is the current weather in Paris?" },
 		{ from: "assistant", content: `weather in Paris ${currentDate}` },
 		{
 			from: "user",
@@ -56,13 +56,18 @@ Current Question: Where is it being hosted ?`,
 							.map(({ content }) => `- ${content}`)
 							.join("\n")}`
 					: "") +
-				"\n\nCurrent Question:" +
+				"\n\nCurrent Question: " +
 				lastMessage.content,
 		},
 	];
 
-	return await generateFromDefaultEndpoint({
+	const webQuery = await generateFromDefaultEndpoint({
 		messages: convQuery,
 		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
+		generateSettings: {
+			max_new_tokens: 30,
+		},
 	});
+
+	return webQuery.trim();
 }

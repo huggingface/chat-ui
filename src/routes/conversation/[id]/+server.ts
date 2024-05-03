@@ -1,4 +1,5 @@
-import { MESSAGES_BEFORE_LOGIN, RATE_LIMIT } from "$env/static/private";
+import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
@@ -9,11 +10,19 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import type { WebSearch } from "$lib/types/WebSearch";
 import { abortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
-import { uploadFile } from "$lib/server/files/uploadFile.js";
+import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
+import type { Assistant } from "$lib/types/Assistant";
+import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
+import { isMessageId } from "$lib/utils/tree/isMessageId";
+import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
+import { addChildren } from "$lib/utils/tree/addChildren.js";
+import { addSibling } from "$lib/utils/tree/addSibling.js";
+import { preprocessMessages } from "$lib/server/preprocessMessages.js";
+import { usageLimits } from "$lib/server/usageLimits";
+import { isURLLocal } from "$lib/server/isURLLocal.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -28,6 +37,29 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// check if the user has access to the conversation
+	const convBeforeCheck = await collections.conversations.findOne({
+		_id: convId,
+		...authCondition(locals),
+	});
+
+	if (convBeforeCheck && !convBeforeCheck.rootMessageId) {
+		const res = await collections.conversations.updateOne(
+			{
+				_id: convId,
+			},
+			{
+				$set: {
+					...convBeforeCheck,
+					...convertLegacyConversation(convBeforeCheck),
+				},
+			}
+		);
+
+		if (!res.acknowledged) {
+			throw error(500, "Failed to convert conversation");
+		}
+	}
+
 	const conv = await collections.conversations.findOne({
 		_id: convId,
 		...authCondition(locals),
@@ -39,23 +71,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// register the event for ratelimiting
 	await collections.messageEvents.insertOne({
-		userId: userId,
+		userId,
 		createdAt: new Date(),
 		ip: getClientAddress(),
 	});
 
+	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+
 	// guest mode check
-	if (
-		!locals.user?._id &&
-		requiresUser &&
-		(MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0) > 0
-	) {
+	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
 		const totalMessages =
 			(
 				await collections.conversations
 					.aggregate([
-						{ $match: authCondition(locals) },
+						{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
 						{ $project: { messages: 1 } },
+						{ $limit: messagesBeforeLogin + 1 },
 						{ $unwind: "$messages" },
 						{ $match: { "messages.from": "assistant" } },
 						{ $count: "messages" },
@@ -63,19 +94,27 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.toArray()
 			)[0]?.messages ?? 0;
 
-		if (totalMessages > parseInt(MESSAGES_BEFORE_LOGIN)) {
+		if (totalMessages > messagesBeforeLogin) {
 			throw error(429, "Exceeded number of messages before login");
 		}
 	}
 
-	// check if the user is rate limited
-	const nEvents = Math.max(
-		await collections.messageEvents.countDocuments({ userId }),
-		await collections.messageEvents.countDocuments({ ip: getClientAddress() })
-	);
+	if (usageLimits?.messagesPerMinute) {
+		// check if the user is rate limited
+		const nEvents = Math.max(
+			await collections.messageEvents.countDocuments({ userId }),
+			await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+		);
+		if (nEvents > usageLimits.messagesPerMinute) {
+			throw error(429, ERROR_MESSAGES.rateLimited);
+		}
+	}
 
-	if (RATE_LIMIT != "" && nEvents > parseInt(RATE_LIMIT)) {
-		throw error(429, ERROR_MESSAGES.rateLimited);
+	if (usageLimits?.messages && conv.messages.length > usageLimits.messages) {
+		throw error(
+			429,
+			`This conversation has more than ${usageLimits.messages} messages. Start a new one to continue`
+		);
 	}
 
 	// fetch the model
@@ -90,22 +129,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	const {
 		inputs: newPrompt,
-		response_id: responseId,
 		id: messageId,
-		is_retry,
+		is_retry: isRetry,
+		is_continue: isContinue,
 		web_search: webSearch,
 		files: b64files,
 	} = z
 		.object({
-			inputs: z.string().trim().min(1),
-			id: z.optional(z.string().uuid()),
-			response_id: z.optional(z.string().uuid()),
+			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
+			inputs: z.optional(
+				z
+					.string()
+					.trim()
+					.min(1)
+					.transform((s) => s.replace(/\r\n/g, "\n"))
+			),
 			is_retry: z.optional(z.boolean()),
+			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
 			files: z.optional(z.array(z.string())),
 		})
 		.parse(json);
 
+	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
+		throw error(400, "Message too long.");
+	}
 	// files is an array of base64 strings encoding Blob objects
 	// we need to convert this array to an array of File objects
 
@@ -138,61 +186,122 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
 	}
 
-	// get the list of messages
-	// while checking for retries
-	let messages = (() => {
-		if (is_retry && messageId) {
-			// if the message is a retry, replace the message and remove the messages after it
-			let retryMessageIdx = conv.messages.findIndex((message) => message.id === messageId);
-			if (retryMessageIdx === -1) {
-				retryMessageIdx = conv.messages.length;
-			}
-			return [
-				...conv.messages.slice(0, retryMessageIdx),
-				{
-					content: newPrompt,
-					from: "user",
-					id: messageId as Message["id"],
-					updatedAt: new Date(),
-					files: conv.messages[retryMessageIdx]?.files,
-				},
-			];
-		} // else append the message at the bottom
+	// we will append tokens to the content of this message
+	let messageToWriteToId: Message["id"] | undefined = undefined;
+	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
+	let messagesForPrompt: Message[] = [];
 
-		return [
-			...conv.messages,
+	if (isContinue && messageId) {
+		// if it's the last message and we continue then we build the prompt up to the last message
+		// we will strip the end tokens afterwards when the prompt is built
+		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
+			throw error(400, "Can only continue the last message");
+		}
+		messageToWriteToId = messageId;
+		messagesForPrompt = buildSubtree(conv, messageId);
+	} else if (isRetry && messageId) {
+		// two cases, if we're retrying a user message with a newPrompt set,
+		// it means we're editing a user message
+		// if we're retrying on an assistant message, newPrompt cannot be set
+		// it means we're retrying the last assistant message for a new answer
+
+		const messageToRetry = conv.messages.find((message) => message.id === messageId);
+
+		if (!messageToRetry) {
+			throw error(404, "Message not found");
+		}
+
+		if (messageToRetry.from === "user" && newPrompt) {
+			// add a sibling to this message from the user, with the alternative prompt
+			// add a children to that sibling, where we can write to
+			const newUserMessageId = addSibling(
+				conv,
+				{ from: "user", content: newPrompt, createdAt: new Date(), updatedAt: new Date() },
+				messageId
+			);
+			messageToWriteToId = addChildren(
+				conv,
+				{
+					from: "assistant",
+					content: "",
+					files: hashes,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+				newUserMessageId
+			);
+			messagesForPrompt = buildSubtree(conv, newUserMessageId);
+		} else if (messageToRetry.from === "assistant") {
+			// we're retrying an assistant message, to generate a new answer
+			// just add a sibling to the assistant answer where we can write to
+			messageToWriteToId = addSibling(
+				conv,
+				{ from: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
+				messageId
+			);
+			messagesForPrompt = buildSubtree(conv, messageId);
+			messagesForPrompt.pop(); // don't need the latest assistant message in the prompt since we're retrying it
+		}
+	} else {
+		// just a normal linear conversation, so we add the user message
+		// and the blank assistant message back to back
+		const newUserMessageId = addChildren(
+			conv,
 			{
-				content: newPrompt,
 				from: "user",
-				id: (messageId as Message["id"]) || crypto.randomUUID(),
+				content: newPrompt ?? "",
+				files: hashes,
 				createdAt: new Date(),
 				updatedAt: new Date(),
-				files: hashes,
 			},
-		];
-	})() satisfies Message[];
+			messageId
+		);
 
+		messageToWriteToId = addChildren(
+			conv,
+			{
+				from: "assistant",
+				content: "",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+			newUserMessageId
+		);
+		// build the prompt from the user message
+		messagesForPrompt = buildSubtree(conv, newUserMessageId);
+	}
+
+	const messageToWriteTo = conv.messages.find((message) => message.id === messageToWriteToId);
+	if (!messageToWriteTo) {
+		throw error(500, "Failed to create message");
+	}
+	if (messagesForPrompt.length === 0) {
+		throw error(500, "Failed to create prompt");
+	}
+
+	// update the conversation with the new messages
 	await collections.conversations.updateOne(
 		{
 			_id: convId,
 		},
 		{
 			$set: {
-				messages,
+				messages: conv.messages,
 				title: conv.title,
 				updatedAt: new Date(),
 			},
 		}
 	);
 
+	let doneStreaming = false;
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
-			const updates: MessageUpdate[] = [];
-
+			messageToWriteTo.updates ??= [];
 			function update(newUpdate: MessageUpdate) {
 				if (newUpdate.type !== "stream") {
-					updates.push(newUpdate);
+					messageToWriteTo?.updates?.push(newUpdate);
 				}
 
 				if (newUpdate.type === "stream" && newUpdate.token === "") {
@@ -209,10 +318,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			update({ type: "status", status: "started" });
 
 			const summarizeIfNeeded = (async () => {
-				if (conv.title === "New Chat" && messages.length === 1) {
+				if (conv.title === "New Chat" && conv.messages.length === 3) {
 					try {
-						conv.title = (await summarize(newPrompt)) ?? conv.title;
+						conv.title = (await summarize(conv.messages[1].content)) ?? conv.title;
 						update({ type: "status", status: "title", message: conv.title });
+						await collections.conversations.updateOne(
+							{
+								_id: convId,
+							},
+							{
+								$set: {
+									title: conv?.title,
+									updatedAt: new Date(),
+								},
+							}
+						);
 					} catch (e) {
 						console.error(e);
 					}
@@ -225,125 +345,217 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				},
 				{
 					$set: {
-						messages,
 						title: conv.title,
 						updatedAt: new Date(),
 					},
 				}
 			);
 
-			let webSearchResults: WebSearch | undefined;
+			// check if assistant has a rag
+			const assistant = await collections.assistants.findOne<
+				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
+			>(
+				{ _id: conv.assistantId },
+				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
+			);
 
-			if (webSearch) {
-				webSearchResults = await runWebSearch(conv, newPrompt, update);
+			const assistantHasDynamicPrompt =
+				ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
+
+			const assistantHasWebSearch =
+				ENABLE_ASSISTANTS_RAG === "true" &&
+				!!assistant &&
+				!!assistant.rag &&
+				(assistant.rag.allowedLinks.length > 0 ||
+					assistant.rag.allowedDomains.length > 0 ||
+					assistant.rag.allowAllDomains);
+
+			// perform websearch if needed
+			if (!isContinue && (webSearch || assistantHasWebSearch)) {
+				messageToWriteTo.webSearch = await runWebSearch(
+					conv,
+					messagesForPrompt,
+					update,
+					assistant?.rag
+				);
 			}
 
-			messages[messages.length - 1].webSearch = webSearchResults;
+			let preprompt = conv.preprompt;
 
-			conv.messages = messages;
+			if (assistantHasDynamicPrompt && preprompt) {
+				// process the preprompt
+				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
+				let match;
+				while ((match = urlRegex.exec(preprompt)) !== null) {
+					try {
+						const url = new URL(match[1]);
+						if (await isURLLocal(url)) {
+							throw new Error("URL couldn't be fetched, it resolved to a local address.");
+						}
+
+						const res = await fetch(url.href);
+
+						if (!res.ok) {
+							throw new Error("URL couldn't be fetched, error " + res.status);
+						}
+						const text = await res.text();
+						preprompt = preprompt.replaceAll(match[0], text);
+					} catch (e) {
+						preprompt = preprompt.replaceAll(match[0], (e as Error).message);
+					}
+				}
+
+				if (messagesForPrompt[0].from === "system") {
+					messagesForPrompt[0].content = preprompt;
+				}
+			}
+
+			// inject websearch result & optionally images into the messages
+			const processedMessages = await preprocessMessages(
+				messagesForPrompt,
+				messageToWriteTo.webSearch,
+				model.multimodal,
+				convId
+			);
+
+			const previousText = messageToWriteTo.content;
+
+			let hasError = false;
+
+			let buffer = "";
+
+			messageToWriteTo.updatedAt = new Date();
 
 			try {
 				const endpoint = await model.getEndpoint();
-				for await (const output of await endpoint({ conversation: conv })) {
+				for await (const output of await endpoint({
+					messages: processedMessages,
+					preprompt,
+					continueMessage: isContinue,
+					generateSettings: assistant?.generateSettings,
+				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
-						// else we get the next token
 						if (!output.token.special) {
-							update({
-								type: "stream",
-								token: output.token.text,
-							});
+							buffer += output.token.text;
 
-							// if the last message is not from assistant, it means this is the first token
-							const lastMessage = messages[messages.length - 1];
-
-							if (lastMessage?.from !== "assistant") {
-								// so we create a new message
-								messages = [
-									...messages,
-									// id doesn't match the backend id but it's not important for assistant messages
-									// First token has a space at the beginning, trim it
-									{
-										from: "assistant",
-										content: output.token.text.trimStart(),
-										webSearch: webSearchResults,
-										updates: updates,
-										id: (responseId as Message["id"]) || crypto.randomUUID(),
-										createdAt: new Date(),
-										updatedAt: new Date(),
-									},
-								];
-							} else {
-								// abort check
-								const date = abortedGenerations.get(convId.toString());
-								if (date && date > promptedAt) {
-									break;
-								}
-
-								if (!output) {
-									break;
-								}
-
-								// otherwise we just concatenate tokens
-								lastMessage.content += output.token.text;
+							// send the first 5 chars
+							// and leave the rest in the buffer
+							if (buffer.length >= 5) {
+								update({
+									type: "stream",
+									token: buffer.slice(0, 5),
+								});
+								buffer = buffer.slice(5);
 							}
+
+							// abort check
+							const date = abortedGenerations.get(convId.toString());
+							if (date && date > promptedAt) {
+								break;
+							}
+							// no output check
+							if (!output) {
+								break;
+							}
+
+							// otherwise we just concatenate tokens
+							messageToWriteTo.content += output.token.text;
 						}
 					} else {
+						messageToWriteTo.interrupted =
+							!output.token.special && !model.parameters.stop?.includes(output.token.text);
 						// add output.generated text to the last message
-						messages = [
-							...messages.slice(0, -1),
-							{
-								...messages[messages.length - 1],
-								content: output.generated_text,
-								updates: updates,
-								updatedAt: new Date(),
-							},
-						];
+						// strip end tokens from the output.generated_text
+						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
+							if (acc.endsWith(curr)) {
+								messageToWriteTo.interrupted = false;
+								return acc.slice(0, acc.length - curr.length);
+							}
+							return acc;
+						}, output.generated_text.trimEnd());
+
+						messageToWriteTo.content = previousText + text;
 					}
 				}
 			} catch (e) {
-				console.error(e);
+				hasError = true;
 				update({ type: "status", status: "error", message: (e as Error).message });
+			} finally {
+				// check if no output was generated
+				if (!hasError && messageToWriteTo.content === previousText) {
+					update({
+						type: "status",
+						status: "error",
+						message: "No output was generated. Something went wrong.",
+					});
+				}
+
+				if (buffer) {
+					update({
+						type: "stream",
+						token: buffer,
+					});
+				}
 			}
+
 			await collections.conversations.updateOne(
 				{
 					_id: convId,
 				},
 				{
 					$set: {
-						messages,
+						messages: conv.messages,
 						title: conv?.title,
 						updatedAt: new Date(),
 					},
 				}
 			);
 
+			// used to detect if cancel() is called bc of interrupt or just because the connection closes
+			doneStreaming = true;
+
 			update({
 				type: "finalAnswer",
-				text: messages[messages.length - 1].content,
+				text: messageToWriteTo.content,
 			});
 
 			await summarizeIfNeeded;
+			controller.close();
 			return;
 		},
 		async cancel() {
-			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						messages,
-						title: conv.title,
-						updatedAt: new Date(),
+			if (!doneStreaming) {
+				await collections.conversations.updateOne(
+					{
+						_id: convId,
 					},
-				}
-			);
+					{
+						$set: {
+							messages: conv.messages,
+							title: conv.title,
+							updatedAt: new Date(),
+						},
+					}
+				);
+			}
 		},
 	});
 
+	if (conv.assistantId) {
+		await collections.assistantStats.updateOne(
+			{ assistantId: conv.assistantId, "date.at": startOfHour(new Date()), "date.span": "hour" },
+			{ $inc: { count: 1 } },
+			{ upsert: true }
+		);
+	}
+
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
-	return new Response(stream);
+	return new Response(stream, {
+		headers: {
+			"Content-Type": "text/event-stream",
+		},
+	});
 }
 
 export async function DELETE({ locals, params }) {

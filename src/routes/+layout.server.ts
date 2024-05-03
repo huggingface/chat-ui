@@ -1,4 +1,3 @@
-import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
@@ -9,108 +8,187 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import {
 	SERPAPI_KEY,
 	SERPER_API_KEY,
+	SERPSTACK_API_KEY,
 	MESSAGES_BEFORE_LOGIN,
 	YDC_API_KEY,
 	USE_LOCAL_WEBSEARCH,
+	SEARXNG_QUERY_URL,
+	ENABLE_ASSISTANTS,
+	ENABLE_ASSISTANTS_RAG,
 } from "$env/static/private";
+import { ObjectId } from "mongodb";
+import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
-export const load: LayoutServerLoad = async ({ locals, depends, url }) => {
-	const { conversations } = collections;
-	const urlModel = url.searchParams.get("model");
-
+export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
-
-	if (urlModel) {
-		const isValidModel = validateModel(models).safeParse(urlModel).success;
-
-		if (isValidModel) {
-			await collections.settings.updateOne(
-				authCondition(locals),
-				{ $set: { activeModel: urlModel } },
-				{ upsert: true }
-			);
-		}
-
-		throw redirect(302, url.pathname);
-	}
 
 	const settings = await collections.settings.findOne(authCondition(locals));
 
 	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
-	if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
+	if (
+		settings &&
+		!validateModel(models).safeParse(settings?.activeModel).success &&
+		!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
+	) {
 		settings.activeModel = defaultModel.id;
 		await collections.settings.updateOne(authCondition(locals), {
 			$set: { activeModel: defaultModel.id },
 		});
 	}
 
-	// get the number of messages where `from === "assistant"` across all conversations.
-	const totalMessages =
-		(
-			await conversations
-				.aggregate([
-					{ $match: authCondition(locals) },
-					{ $project: { messages: 1 } },
-					{ $unwind: "$messages" },
-					{ $match: { "messages.from": "assistant" } },
-					{ $count: "messages" },
-				])
-				.toArray()
-		)[0]?.messages ?? 0;
+	// if the model is unlisted, set the active model to the default model
+	if (
+		settings?.activeModel &&
+		models.find((m) => m.id === settings?.activeModel)?.unlisted === true
+	) {
+		settings.activeModel = defaultModel.id;
+		await collections.settings.updateOne(authCondition(locals), {
+			$set: { activeModel: defaultModel.id },
+		});
+	}
+
+	const enableAssistants = ENABLE_ASSISTANTS === "true";
+
+	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
+
+	const assistant = assistantActive
+		? JSON.parse(
+				JSON.stringify(
+					await collections.assistants.findOne({
+						_id: new ObjectId(settings?.activeModel),
+					})
+				)
+		  )
+		: null;
+
+	const conversations = await collections.conversations
+		.find(authCondition(locals))
+		.sort({ updatedAt: -1 })
+		.project<
+			Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId">
+		>({
+			title: 1,
+			model: 1,
+			_id: 1,
+			updatedAt: 1,
+			createdAt: 1,
+			assistantId: 1,
+		})
+		.limit(300)
+		.toArray();
+
+	const userAssistants = settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
+	const userAssistantsSet = new Set(userAssistants);
+
+	const assistantIds = [
+		...userAssistants.map((el) => new ObjectId(el)),
+		...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
+	];
+
+	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
 	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
 
-	const userHasExceededMessages = messagesBeforeLogin > 0 && totalMessages > messagesBeforeLogin;
+	let loginRequired = false;
 
-	const loginRequired = requiresUser && !locals.user && userHasExceededMessages;
+	if (requiresUser && !locals.user && messagesBeforeLogin) {
+		if (conversations.length > messagesBeforeLogin) {
+			loginRequired = true;
+		} else {
+			// get the number of messages where `from === "assistant"` across all conversations.
+			const totalMessages =
+				(
+					await collections.conversations
+						.aggregate([
+							{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
+							{ $project: { messages: 1 } },
+							{ $limit: messagesBeforeLogin + 1 },
+							{ $unwind: "$messages" },
+							{ $match: { "messages.from": "assistant" } },
+							{ $count: "messages" },
+						])
+						.toArray()
+				)[0]?.messages ?? 0;
+
+			loginRequired = totalMessages > messagesBeforeLogin;
+		}
+	}
 
 	return {
-		conversations: await conversations
-			.find(authCondition(locals))
-			.sort({ updatedAt: -1 })
-			.project<Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt">>({
-				title: 1,
-				model: 1,
-				_id: 1,
-				updatedAt: 1,
-				createdAt: 1,
-			})
-			.map((conv) => ({
+		conversations: conversations.map((conv) => {
+			if (settings?.hideEmojiOnSidebar) {
+				conv.title = conv.title.replace(/\p{Emoji}/gu, "");
+			}
+
+			// remove invalid unicode and trim whitespaces
+			conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
+
+			return {
 				id: conv._id.toString(),
-				title: settings?.hideEmojiOnSidebar ? conv.title.replace(/\p{Emoji}/gu, "") : conv.title,
+				title: conv.title,
 				model: conv.model ?? defaultModel,
-			}))
-			.toArray(),
+				updatedAt: conv.updatedAt,
+				assistantId: conv.assistantId?.toString(),
+				avatarHash:
+					conv.assistantId &&
+					assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
+			};
+		}) satisfies ConvSidebar[],
 		settings: {
-			shareConversationsWithModelAuthors:
-				settings?.shareConversationsWithModelAuthors ??
-				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
+			searchEnabled: !!(
+				SERPAPI_KEY ||
+				SERPER_API_KEY ||
+				SERPSTACK_API_KEY ||
+				YDC_API_KEY ||
+				USE_LOCAL_WEBSEARCH ||
+				SEARXNG_QUERY_URL
+			),
+			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
-			searchEnabled: !!(SERPAPI_KEY || SERPER_API_KEY || YDC_API_KEY || USE_LOCAL_WEBSEARCH),
+			shareConversationsWithModelAuthors:
+				settings?.shareConversationsWithModelAuthors ??
+				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
+			assistants: userAssistants,
 		},
 		models: models.map((model) => ({
 			id: model.id,
 			name: model.name,
 			websiteUrl: model.websiteUrl,
 			modelUrl: model.modelUrl,
+			tokenizer: model.tokenizer,
 			datasetName: model.datasetName,
 			datasetUrl: model.datasetUrl,
 			displayName: model.displayName,
 			description: model.description,
+			logoUrl: model.logoUrl,
 			promptExamples: model.promptExamples,
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
+			unlisted: model.unlisted,
 		})),
 		oldModels,
+		assistants: assistants
+			.filter((el) => userAssistantsSet.has(el._id.toString()))
+			.map((el) => ({
+				...el,
+				_id: el._id.toString(),
+				createdById: undefined,
+				createdByMe:
+					el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+			})),
 		user: locals.user && {
+			id: locals.user._id.toString(),
 			username: locals.user.username,
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
 		},
+		assistant,
+		enableAssistants,
+		enableAssistantsRAG: ENABLE_ASSISTANTS_RAG === "true",
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,

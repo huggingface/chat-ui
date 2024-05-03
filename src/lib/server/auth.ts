@@ -1,11 +1,12 @@
 import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
-import { addHours, addYears } from "date-fns";
+import { addHours, addWeeks } from "date-fns";
 import {
 	COOKIE_NAME,
 	OPENID_CLIENT_ID,
 	OPENID_CLIENT_SECRET,
 	OPENID_PROVIDER_URL,
 	OPENID_SCOPES,
+	OPENID_NAME_CLAIM,
 	OPENID_TOLERANCE,
 	OPENID_RESOURCE,
 	OPENID_CONFIG,
@@ -14,6 +15,8 @@ import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
+import { collections } from "./database";
+import JSON5 from "json5";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -30,16 +33,20 @@ const stringWithDefault = (value: string) =>
 		.default(value)
 		.transform((el) => (el ? el : value));
 
-const OIDConfig = z
+export const OIDConfig = z
 	.object({
 		CLIENT_ID: stringWithDefault(OPENID_CLIENT_ID),
 		CLIENT_SECRET: stringWithDefault(OPENID_CLIENT_SECRET),
 		PROVIDER_URL: stringWithDefault(OPENID_PROVIDER_URL),
 		SCOPES: stringWithDefault(OPENID_SCOPES),
+		NAME_CLAIM: stringWithDefault(OPENID_NAME_CLAIM).refine(
+			(el) => !["preferred_username", "email", "picture", "sub"].includes(el),
+			{ message: "nameClaim cannot be one of the restricted keys." }
+		),
 		TOLERANCE: stringWithDefault(OPENID_TOLERANCE),
 		RESOURCE: stringWithDefault(OPENID_RESOURCE),
 	})
-	.parse(JSON.parse(OPENID_CONFIG));
+	.parse(JSON5.parse(OPENID_CONFIG));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
@@ -50,10 +57,19 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 		sameSite: dev ? "lax" : "none",
 		secure: !dev,
 		httpOnly: true,
-		expires: addYears(new Date(), 1),
+		expires: addWeeks(new Date(), 2),
 	});
 }
 
+export async function findUser(sessionId: string) {
+	const session = await collections.sessions.findOne({ sessionId });
+
+	if (!session) {
+		return null;
+	}
+
+	return await collections.users.findOne({ _id: session.userId });
+}
 export const authCondition = (locals: App.Locals) => {
 	return locals.user
 		? { userId: locals.user._id }
