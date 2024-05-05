@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
 import { authCondition } from "$lib/server/auth.js";
-import { collections } from "$lib/server/database.js";
+import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { redirect } from "@sveltejs/kit";
 

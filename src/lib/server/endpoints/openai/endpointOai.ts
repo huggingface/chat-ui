@@ -4,7 +4,7 @@ import { openAIChatToTextGenerationStream } from "./openAIChatToTextGenerationSt
 import type { CompletionCreateParamsStreaming } from "openai/resources/completions";
 import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
 import { buildPrompt } from "$lib/buildPrompt";
-import { OPENAI_API_KEY } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import type { Endpoint } from "../endpoints";
 
 export const endpointOAIParametersSchema = z.object({
@@ -12,7 +12,7 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	apiKey: z.string().default(OPENAI_API_KEY ?? "sk-"),
+	apiKey: z.string().default(env.OPENAI_API_KEY ?? "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),

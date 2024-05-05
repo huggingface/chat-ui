@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/stores";
 	import { base } from "$app/paths";
-	import { PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
@@ -78,7 +78,7 @@
 			</a>
 		{/if}
 		<CopyToClipBoardBtn
-			value="{PUBLIC_ORIGIN || $page.url.origin}{base}/models/{model.id}"
+			value="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/models/{model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
 			<div class="flex items-center gap-1.5 hover:underline">

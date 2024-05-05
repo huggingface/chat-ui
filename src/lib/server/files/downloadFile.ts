@@ -1,5 +1,5 @@
 import { error } from "@sveltejs/kit";
-import { collections } from "../database";
+import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 
