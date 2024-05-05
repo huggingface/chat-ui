@@ -1,10 +1,4 @@
-import {
-	MESSAGES_BEFORE_LOGIN,
-	ENABLE_ASSISTANTS_RAG,
-	HF_TOKEN,
-	HF_ACCESS_TOKEN,
-	ENABLE_LOCAL_FETCH,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -16,7 +10,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
@@ -40,6 +34,7 @@ import calculator from "$lib/server/tools/calculator.js";
 import websearch from "$lib/server/tools/websearch.js";
 import text2img from "$lib/server/tools/text2img.js";
 import fetchUrl from "$lib/server/tools/fetchUrl.js";
+import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -93,7 +88,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	// guest mode check
 	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
@@ -353,7 +348,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 						);
 					} catch (e) {
-						console.error(e);
+						logger.error(e);
 					}
 				}
 			})();
@@ -379,10 +374,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 
 			const assistantHasDynamicPrompt =
-				ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
+				env.ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
 
 			const assistantHasWebSearch =
-				ENABLE_ASSISTANTS_RAG === "true" &&
+				env.ENABLE_ASSISTANTS_RAG === "true" &&
 				!!assistant &&
 				!!assistant.rag &&
 				(assistant.rag.allowedLinks.length > 0 ||
@@ -412,7 +407,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				while ((match = urlRegex.exec(preprompt)) !== null) {
 					try {
 						const url = new URL(match[1]);
-						if ((await isURLLocal(url)) && ENABLE_LOCAL_FETCH !== "true") {
+						if ((await isURLLocal(url)) && env.ENABLE_LOCAL_FETCH !== "true") {
 							throw new Error("URL couldn't be fetched, it resolved to a local address.");
 						}
 
@@ -533,7 +528,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 						} else if (tool.name === "text2img") {
 							const app = await Client.connect("ByteDance/Hyper-SDXL-1Step-T2I", {
-								hf_token: (HF_TOKEN ?? HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
+								hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
 							});
 							const res = await app.predict("/process_image", [
 								1, // number (numeric value between 1 and 8) in 'Number of Images' Slider component
@@ -630,7 +625,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 
 							// abort check
-							const date = abortedGenerations.get(convId.toString());
+							const date = AbortedGenerations.getInstance().getList().get(convId.toString());
 							if (date && date > promptedAt) {
 								break;
 							}

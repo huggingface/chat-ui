@@ -2,6 +2,7 @@ import { buildPrompt } from "$lib/buildPrompt";
 import { z } from "zod";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import { logger } from "$lib/server/logger";
 
 export const endpointLangserveParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -99,8 +100,8 @@ export function endpointLangserve(
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
-							console.error("Failed to parse JSON", e);
-							console.error("Problematic JSON string:", jsonString);
+							logger.error("Failed to parse JSON", e);
+							logger.error("Problematic JSON string:", jsonString);
 							continue; // Skip this iteration and try the next chunk
 						}
 						// Assuming content within data is a plain string
