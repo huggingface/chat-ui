@@ -18,12 +18,13 @@ export const endpointOAIParametersSchema = z.object({
 		.default("chat_completions"),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
+	extraBody: z.record(z.string()).optional(),
 });
 
 export async function endpointOai(
 	input: z.input<typeof endpointOAIParametersSchema>
 ): Promise<Endpoint> {
-	const { baseURL, apiKey, completion, model, defaultHeaders, defaultQuery } =
+	const { baseURL, apiKey, completion, model, defaultHeaders, defaultQuery, extraBody } =
 		endpointOAIParametersSchema.parse(input);
 	let OpenAI;
 	try {
@@ -60,15 +61,9 @@ export async function endpointOai(
 				frequency_penalty: parameters?.repetition_penalty,
 			};
 
-			let openAICompletion;
-			if (parameters.extra_body) {
-				/* If extra_body is set, add it to the request using options.
-				Used in openai compatible implementations like vllm. */
-				const combinedBody = { ...body, ...parameters.extra_body };
-				openAICompletion = await openai.completions.create(body, { body: combinedBody });
-			} else {
-				openAICompletion = await openai.completions.create(body);
-			}
+			const openAICompletion = await openai.completions.create(body, {
+				body: { ...body, ...extraBody },
+			});
 
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
@@ -99,15 +94,9 @@ export async function endpointOai(
 				frequency_penalty: parameters?.repetition_penalty,
 			};
 
-			let openChatAICompletion;
-			if (parameters.extra_body) {
-				/* If extra_body is set, add it to the request using options.
-				Used in openai compatible implementations like vllm. */
-				const combinedBody = { ...body, ...parameters.extra_body };
-				openChatAICompletion = await openai.chat.completions.create(body, { body: combinedBody });
-			} else {
-				openChatAICompletion = await openai.chat.completions.create(body);
-			}
+			const openChatAICompletion = await openai.chat.completions.create(body, {
+				body: { ...body, ...extraBody },
+			});
 
 			return openAIChatToTextGenerationStream(openChatAICompletion);
 		};
