@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
-import { ENABLE_ASSISTANTS } from "$env/static/private";
-import { collections } from "$lib/server/database.js";
+import { env } from "$env/dynamic/private";
+import { Database, collections } from "$lib/server/database.js";
 import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
@@ -10,7 +10,7 @@ import type { Filter } from "mongodb";
 const NUM_PER_PAGE = 24;
 
 export const load = async ({ url, locals }) => {
-	if (!ENABLE_ASSISTANTS) {
+	if (!env.ENABLE_ASSISTANTS) {
 		throw redirect(302, `${base}/`);
 	}
 
@@ -18,7 +18,7 @@ export const load = async ({ url, locals }) => {
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const username = url.searchParams.get("user");
 	const query = url.searchParams.get("q")?.trim() ?? null;
-	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.POPULAR;
+	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
 	let user: Pick<User, "_id"> | null = null;
@@ -32,15 +32,27 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
-	// fetch the top assistants sorted by user count from biggest to smallest, filter out all assistants with only 1 users. filter by model too if modelId is provided
+	// if there is no user, we show community assistants, so only show featured assistants
+	const shouldBeFeatured =
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+
+	// if the user queried is not the current user, only show "public" assistants that have been shared before
+	const shouldHaveBeenShared =
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+			? { userCount: { $gt: 1 } }
+			: {};
+
+	// fetch the top assistants sorted by user count from biggest to smallest. filter by model too if modelId is provided or query if query is provided
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
-		...(!createdByCurrentUser && { userCount: { $gt: 1 } }),
-		...(user ? { createdById: user._id } : { featured: true }),
+		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...shouldBeFeatured,
+		...shouldHaveBeenShared,
 	};
-	const assistants = await collections.assistants
-		.find(filter)
+	const assistants = await Database.getInstance()
+		.getCollections()
+		.assistants.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
@@ -49,7 +61,9 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await collections.assistants.countDocuments(filter);
+	const numTotalItems = await Database.getInstance()
+		.getCollections()
+		.assistants.countDocuments(filter);
 
 	return {
 		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,

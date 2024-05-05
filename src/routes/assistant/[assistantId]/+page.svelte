@@ -6,7 +6,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
 	import { applyAction, enhance } from "$app/forms";
-	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/stores";
 	import IconGear from "~icons/bi/gear-fill";
 
@@ -24,15 +24,16 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={data.assistant.name + " - " + PUBLIC_APP_NAME} />
+	<meta property="og:title" content={data.assistant.name + " - " + envPublic.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
 	<meta
 		property="og:description"
-		content={`Use the ${data.assistant.name} assistant inside of ${PUBLIC_APP_NAME}`}
+		content={`Use the ${data.assistant.name} assistant inside of ${envPublic.PUBLIC_APP_NAME}`}
 	/>
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/assistant/{data.assistant._id}/thumbnail.png"
+		content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/assistant/{data.assistant
+			._id}/thumbnail.png"
 	/>
 	<meta property="og:url" content={$page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />

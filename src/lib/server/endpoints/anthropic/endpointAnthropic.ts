@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ANTHROPIC_API_KEY } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
@@ -8,7 +8,7 @@ export const endpointAnthropicParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("anthropic"),
 	baseURL: z.string().url().default("https://api.anthropic.com"),
-	apiKey: z.string().default(ANTHROPIC_API_KEY ?? "sk-"),
+	apiKey: z.string().default(env.ANTHROPIC_API_KEY ?? "sk-"),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 });
