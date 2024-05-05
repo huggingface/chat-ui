@@ -18,7 +18,6 @@
 	},
 	"devDependencies": {
 		"@faker-js/faker": "^8.4.1",
-		"@gradio/client": "https://gitpkg.now.sh/gradio-app/gradio/client/js?2a2a151",
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^1.3.1",
@@ -53,6 +52,7 @@
 	"type": "module",
 	"dependencies": {
 		"@apidevtools/swagger-parser": "^10.1.0",
+		"@gradio/client": "^0.18.0",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
