@@ -153,6 +153,9 @@ export function spatialParser() {
 		return node.parentElement && !node.parentElement.isSameNode(document.body);
 	};
 
+	const possibleCodeParents = Array.from(document.querySelectorAll("pre, p"));
+	const possibleTableParents = Array.from(document.querySelectorAll("table"));
+	const possibleListParents = Array.from(document.querySelectorAll("ul, ol"));
 	/**
 	 * We want to find the highest parent of text node in the cluster.
 	 * For example in this case: <p><span>Text here</span></p>
@@ -180,10 +183,6 @@ export function spatialParser() {
 				"disconnected node found, this should not really be possible when traversing through the dom"
 			);
 		}
-
-		const possibleCodeParents = Array.from(document.querySelectorAll("pre, p"));
-		const possibleTableParents = Array.from(document.querySelectorAll("table"));
-		const possibleListParents = Array.from(document.querySelectorAll("ul, ol"));
 
 		// if the parent is a span, code or div tag check if there is a pre tag or p tag above it
 		if (["span", "code", "div"].includes(parent.nodeName.toLowerCase())) {
@@ -486,12 +485,17 @@ export function spatialParser() {
 		return criticalClusters;
 	};
 
+	const allowListedAttributes = ["href", "src", "alt", "title", "class", "id"];
 	function serializeHTMLElement(node: Element): SerializedHTMLElement {
 		return {
 			tagName: node.tagName.toLowerCase(),
-			attributes: Object.fromEntries(
-				Array.from(node.attributes).map(({ name, value }) => [name, value])
-			),
+			attributes: allowListedAttributes.reduce((acc, attr) => {
+				const value = node.getAttribute(attr);
+				if (value) {
+					acc[attr] = value;
+				}
+				return acc;
+			}, {} as Record<string, string>),
 			content: Array.from(node.childNodes).map(serializeNode).filter(Boolean),
 		};
 	}
