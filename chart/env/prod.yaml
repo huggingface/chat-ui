@@ -12,7 +12,6 @@ tolerations:
 ingress:
   path: "/chat"
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: "chat-ui.hub-alb.huggingface.tech"
     alb.ingress.kubernetes.io/healthcheck-path: "/healthcheck"
     alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
     alb.ingress.kubernetes.io/group.name: "hub-prod"
