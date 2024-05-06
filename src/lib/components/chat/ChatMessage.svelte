@@ -25,6 +25,14 @@
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 
+	function addInlineCitations(md: string, webSearchSources: WebSearchUpdate["sources"] = []) {
+		return md.replace(/ *\[(\d+)\]/g, (textToReplace, index) => {
+			const source = webSearchSources[Number(index) - 1];
+			if (!source) return textToReplace;
+			return ` <sup><a href="${source.link}" target="_blank" rel="noreferrer" class="text-primary-400 no-underline hover:underline font-bold">${index}</a></sup>`;
+		});
+	}
+
 	function sanitizeMd(md: string) {
 		let ret = md
 			.replace(/<\|[a-z]*$/, "")
@@ -100,7 +108,7 @@
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(addInlineCitations(sanitizeMd(message.content), webSearchSources));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));

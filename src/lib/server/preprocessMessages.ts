@@ -13,7 +13,7 @@ export async function preprocessMessages(
 	return await Promise.all(
 		structuredClone(messages).map(async (message, idx) => {
 			const webSearchContext = webSearch?.contextSources
-				.map(({ context }) => context.trim())
+				.map(({ context }, citationIdx) => `[${citationIdx + 1}]: ${context.trim()}`)
 				.join("\n\n----------\n\n");
 
 			// start by adding websearch to the last message
@@ -25,7 +25,8 @@ export async function preprocessMessages(
 					.map((el) => el.content);
 				const currentDate = format(new Date(), "MMMM d, yyyy");
 
-				message.content = `I searched the web using the query: ${webSearch.searchQuery}.
+				message.content = `I searched the web using the query: ${webSearch.searchQuery}
+When referencing the following results, include an inline citation like [1] [2] [3] etc in your answer at the end of the relevant chunk of text. Do not include a dedicated citation/sources section.
 Today is ${currentDate} and here are the results:
 =====================
 ${webSearchContext}
