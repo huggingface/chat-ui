@@ -18,11 +18,11 @@ ingress:
 
 resources:
   requests:
-    cpu: 1
-    memory: 8Gi
+    cpu: 2
+    memory: 4Gi
   limits:
-    cpu: 1
-    memory: 8Gi
+    cpu: 2
+    memory: 4Gi
 nodeSelector: {}
 tolerations: []
 
