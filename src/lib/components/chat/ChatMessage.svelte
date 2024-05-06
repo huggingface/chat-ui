@@ -26,9 +26,9 @@
 	import { useConvTreeStore } from "$lib/stores/convTree";
 
 	function addInlineCitations(md: string, webSearchSources: WebSearchUpdate["sources"] = []) {
-		return md.replace(/ *\[(\d+)\]/g, (textToReplace, index) => {
+		return md.replace(/ *\[\[(\d+)\]\]/gm, (textToReplace, index) => {
 			const source = webSearchSources[Number(index) - 1];
-			if (!source) return textToReplace;
+			if (!source) return "";
 			return ` <sup><a href="${source.link}" target="_blank" rel="noreferrer" class="text-primary-400 no-underline hover:underline font-bold">${index}</a></sup>`;
 		});
 	}
