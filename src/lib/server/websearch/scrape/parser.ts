@@ -1,5 +1,13 @@
 import type { SerializedHTMLElement } from "./types";
 
+type DBSCANOptions<T> = {
+	dataset: T[];
+	epsilon?: number;
+	epsilonCompare?: (distance: number, epsilon: number) => boolean;
+	minimumPoints?: number;
+	distanceFunction: (a: T, b: T) => number;
+};
+
 export function spatialParser() {
 	/**
 	 * Implementation for dbscan, inlined and migrated to typescript from https://github.com/cdxOo/dbscan (MIT License)
@@ -10,13 +18,7 @@ export function spatialParser() {
 		epsilonCompare,
 		minimumPoints,
 		distanceFunction,
-	}: {
-		dataset: T[];
-		epsilon?: number;
-		epsilonCompare?: (distance: number, epsilon: number) => boolean;
-		minimumPoints?: number;
-		distanceFunction: (a: T, b: T) => number;
-	}) => {
+	}: DBSCANOptions<T>) => {
 		epsilon = epsilon || 1; // aka maxDistance
 		epsilonCompare = epsilonCompare || ((dist, e) => dist < e);
 		minimumPoints = minimumPoints || 2;
@@ -33,7 +35,7 @@ export function spatialParser() {
 			clusteredIndices[i] = true;
 		};
 
-		const uniqueMerge = <T>(targetArray: T[], sourceArray: T[]) => {
+		const uniqueMerge = <U>(targetArray: U[], sourceArray: U[]) => {
 			for (let i = 0; i < sourceArray.length; i += 1) {
 				const item = sourceArray[i];
 				if (targetArray.indexOf(item) < 0) {
@@ -81,7 +83,7 @@ export function spatialParser() {
 			}
 		};
 
-		dataset.forEach((unused, index) => {
+		dataset.forEach((_, index) => {
 			if (!isVisited(index)) {
 				markVisited(index);
 
@@ -235,7 +237,7 @@ export function spatialParser() {
 		}
 
 		if (parentNode && parentNode instanceof Element) {
-			if (barredNodes.some((node) => node.contains(parentNode))) {
+			if (barredNodes.some((barredNode) => barredNode.contains(parentNode))) {
 				return false;
 			}
 		}
