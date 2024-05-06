@@ -1,4 +1,4 @@
-import type { SerializedHTMLElement } from "./htmlToMarkdown/types";
+import type { SerializedHTMLElement } from "./types";
 
 export function spatialParser() {
 	/**
@@ -130,7 +130,7 @@ export function spatialParser() {
 		"i",
 	];
 
-	type ReadableNode = Element;
+	type ReadableNode = HTMLElement;
 	type NodeWithRect = {
 		node: ReadableNode;
 		rect: DOMRect;
@@ -156,12 +156,7 @@ export function spatialParser() {
 	 * For example in this case: <p><span>Text here</span></p>
 	 * the P tag is highest parent.
 	 */
-	const findHighestDirectParentOfReadableNode = (node: Node): Element => {
-		// For image tag the parent is the image tag itself
-		if (node.nodeType === 1 && node.nodeName.toLowerCase() === "img") {
-			return node as HTMLImageElement;
-		}
-
+	const findHighestDirectParentOfReadableNode = (node: Node): HTMLElement => {
 		// go up the tree until the parent is no longer an only child
 		let parent = node.parentElement;
 		// if the parent is an inline tag, then go up one more level
@@ -184,32 +179,31 @@ export function spatialParser() {
 			);
 		}
 
-		if (["span", "code", "div", "p"].includes(parent.nodeName.toLowerCase())) {
-			const maxDepth = 3;
-			let depth = 0;
-			let tempParent: HTMLElement | null = parent;
-			while (tempParent && !tempParent.matches("p, pre") && depth < maxDepth) {
-				if (!tempParent.parentElement) break;
-				tempParent = tempParent.parentElement;
-				depth += 1;
-			}
+		const possibleCodeParents = Array.from(document.querySelectorAll("pre, p"));
+		const possibleTableParents = Array.from(document.querySelectorAll("table"));
+		const possibleListParents = Array.from(document.querySelectorAll("ul, ol"));
 
-			if (tempParent.matches("p, pre")) {
-				parent = tempParent;
+		// if the parent is a span, code or div tag check if there is a pre tag or p tag above it
+		if (["span", "code", "div"].includes(parent.nodeName.toLowerCase())) {
+			const hasParent = possibleCodeParents.find((tag) => tag.contains(parent)) as HTMLElement;
+			if (hasParent) {
+				parent = hasParent;
 			}
 		}
-		if (["td", "th", "tr", "li", "p"].includes(parent.nodeName.toLowerCase())) {
-			const maxDepth = 5;
-			let depth = 0;
-			let tempParent = parent;
-			while (tempParent && !tempParent.matches("ul, ol, table") && depth < maxDepth) {
-				if (!tempParent.parentElement) break;
-				tempParent = tempParent.parentElement;
-				depth += 1;
-			}
 
-			if (tempParent.matches("ul, ol, table")) {
-				parent = tempParent;
+		// if the parent is a li tag check if there is a ul or ol tag above it
+		if (parent.nodeName.toLowerCase() === "li") {
+			const hasParent = possibleListParents.find((tag) => tag.contains(parent)) as HTMLElement;
+			if (hasParent) {
+				parent = hasParent;
+			}
+		}
+
+		// if the parent is a td, th, tr tag check if there is a table tag above it
+		if (["td", "th", "tr"].includes(parent.nodeName.toLowerCase())) {
+			const hasParent = possibleTableParents.find((tag) => tag.contains(parent)) as HTMLElement;
+			if (hasParent) {
+				parent = hasParent;
 			}
 		}
 
@@ -218,11 +212,7 @@ export function spatialParser() {
 	const barredNodes = Array.from(document.querySelectorAll(IgnoredTagsList.join(",")));
 
 	const doesNodePassHeuristics = (node: Node) => {
-		if (node.nodeType === 1 && node.nodeName.toLowerCase() === "img") {
-			return (node as HTMLImageElement).alt.trim().length > 0;
-		}
-
-		if ((node.textContent ?? "").trim().length === 0) {
+		if ((node.textContent ?? "").trim().length < 10) {
 			return false;
 		}
 
@@ -253,33 +243,17 @@ export function spatialParser() {
 		return true;
 	};
 
-	const isTextOrImageNode = (node: Node) => {
-		if (node.nodeType === 1 && node.nodeName.toLowerCase() === "img") {
-			return true;
-		}
-
-		if (node.nodeType === 3) {
-			return true;
-		}
-
-		return false;
-	};
-
 	const getAllReadableNodes = (): NodeWithRect[] => {
 		if (!document.body) throw new Error("Page failed to load");
-		const treeWalker = document.createTreeWalker(
-			document.body,
-			NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-			{
-				acceptNode(node) {
-					if (isTextOrImageNode(node) && doesNodePassHeuristics(node)) {
-						return NodeFilter.FILTER_ACCEPT;
-					} else {
-						return NodeFilter.FILTER_SKIP;
-					}
-				},
-			}
-		);
+		const treeWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+			acceptNode(node) {
+				if (doesNodePassHeuristics(node)) {
+					return NodeFilter.FILTER_ACCEPT;
+				} else {
+					return NodeFilter.FILTER_SKIP;
+				}
+			},
+		});
 
 		const readableNodes = [];
 
@@ -293,13 +267,18 @@ export function spatialParser() {
 		 */
 
 		const parentsForReadableNodes = readableNodes.map(findHighestDirectParentOfReadableNode);
-		const uniqueParents: Element[] = [];
+		const listWithOnlyParents: HTMLElement[] = [];
+		// find unique nodes in the parent list, a unique node is a node that is not a child of any other node in the list
 		for (let i = 0; i < parentsForReadableNodes.length; i++) {
 			const node = parentsForReadableNodes[i];
-			if (!parentsForReadableNodes.slice(0, i).some((otherNode) => otherNode.contains(node))) {
-				uniqueParents.push(node);
-			}
+			const hasParentInList = parentsForReadableNodes.find((otherNode, idx) => {
+				if (i === idx) return false;
+				return otherNode.contains(node);
+			});
+			listWithOnlyParents.push(hasParentInList ? hasParentInList : node);
 		}
+
+		const uniqueParents = Array.from(new Set(listWithOnlyParents));
 
 		return uniqueParents.map((node) => {
 			return {
@@ -339,11 +318,10 @@ export function spatialParser() {
 	 * Clusters nodes using dbscan
 	 */
 	const clusterReadableNodes = (nodes: NodeWithRect[]) => {
-		const { clusters, noise } = DBSCAN({
+		const { clusters } = DBSCAN({
 			dataset: nodes,
-			epsilon: 32,
-			// nodes that are by itself are considered noise.
-			minimumPoints: 2,
+			epsilon: 28,
+			minimumPoints: 1,
 			distanceFunction,
 		});
 
@@ -351,7 +329,9 @@ export function spatialParser() {
 	};
 
 	const totalTextLength = (cluster: number[]) => {
-		return cluster.map((t) => readableNodes[t].node.textContent?.trim()).join("").length;
+		return cluster
+			.map((t) => readableNodes[t].node.innerText?.replaceAll(/ {2}|\r\n|\n|\r/gm, ""))
+			.join("").length;
 	};
 
 	const approximatelyEqual = (a: number, b: number, epsilon = 1) => {
@@ -359,30 +339,80 @@ export function spatialParser() {
 	};
 
 	const getClusterBounds = (cluster: number[]) => {
-		const firstElementBounds = readableNodes[cluster[0]].rect;
-		const lastElementBounds = readableNodes[cluster[cluster.length - 1]].rect;
-
+		const leftMostPoint = Math.min(...cluster.map((c) => readableNodes[c].rect.x));
+		const topMostPoint = Math.min(...cluster.map((c) => readableNodes[c].rect.y));
+		const rightMostPoint = Math.max(
+			...cluster.map((c) => readableNodes[c].rect.x + readableNodes[c].rect.width)
+		);
+		const bottomMostPoint = Math.max(
+			...cluster.map((c) => readableNodes[c].rect.y + readableNodes[c].rect.height)
+		);
 		return {
-			x: firstElementBounds.x,
-			y: firstElementBounds.y,
-			height: lastElementBounds.y + lastElementBounds.height - firstElementBounds.y,
-			width: lastElementBounds.x + lastElementBounds.width - firstElementBounds.x,
+			// left most element
+			x: leftMostPoint,
+			y: topMostPoint,
+			width: rightMostPoint - leftMostPoint,
+			height: bottomMostPoint - topMostPoint,
 		};
 	};
+
+	const round = (num: number, decimalPlaces = 2) => {
+		const factor = Math.pow(10, decimalPlaces);
+		return Math.round(num * factor) / factor;
+	};
+
+	/** minimum distance to center of the screen */
+	const clusterCentrality = (cluster: number[]) => {
+		const bounds = getClusterBounds(cluster);
+		const centerOfScreen = window.innerWidth / 2;
+		// the cluster contains the center of the screen
+		if (bounds.x < centerOfScreen && bounds.x + bounds.width > centerOfScreen) {
+			return 0;
+		}
+
+		// the cluster is to the left of the screen
+		if (bounds.x + bounds.width < centerOfScreen) {
+			return centerOfScreen - (bounds.x + bounds.width);
+		}
+
+		// the cluster is to the right of the screen
+		return bounds.x - centerOfScreen;
+	};
+	/** measure of text share that belong to the cluster */
+	const percentageTextShare = (cluster: number[], totalLength: number) => {
+		// apply an exponentially increasing penalty for centrality per 100 pixels distance from center
+
+		return round((totalTextLength(cluster) / totalLength) * 100);
+	};
+
+	const shouldMergeClusters = (clusterA: number[], clusterB: number[]) => {
+		const clusterABounds = getClusterBounds(clusterA);
+		const clusterBBounds = getClusterBounds(clusterB);
+
+		// A cluster is horizontally aligned if the x and width are roughly equal
+		const isHorizontallyAligned =
+			approximatelyEqual(clusterABounds.x, clusterBBounds.x, 40) &&
+			approximatelyEqual(clusterABounds.width, clusterBBounds.width, 40);
+
+		if (!isHorizontallyAligned) return false;
+
+		// check the y gap between the clusters
+		const higherCluster = clusterABounds.y < clusterBBounds.y ? clusterABounds : clusterBBounds;
+		const lowerCluster = clusterABounds.y < clusterBBounds.y ? clusterBBounds : clusterABounds;
+		const yGap = lowerCluster.y - (higherCluster.y + higherCluster.height);
+
+		if (approximatelyEqual(yGap, 0, 100)) return true;
+	};
+
 	const findCriticalClusters = (clusters: number[][]) => {
 		// merge the clusters that have similar widths and x position
 
 		let i = 0;
 		while (i < clusters.length) {
 			const cluster = clusters[i];
-			const clusterBounds = getClusterBounds(cluster);
 			for (let j = i + 1; j < clusters.length; j++) {
 				const otherCluster = clusters[j];
-				const otherClusterBounds = getClusterBounds(otherCluster);
-				if (
-					approximatelyEqual(clusterBounds.x, otherClusterBounds.x, 40) &&
-					approximatelyEqual(clusterBounds.width, otherClusterBounds.width, 40)
-				) {
+				if (shouldMergeClusters(cluster, otherCluster)) {
 					cluster.push(...otherCluster);
 					clusters.splice(j, 1);
 					j -= 1;
@@ -392,16 +422,66 @@ export function spatialParser() {
 			i++;
 		}
 
-		// TODO: Think about centrality, and text density as metrics
-		// to make this selection process include more clusters than just the one that has most amount of text.
-		const clusterWithMostText = clusters.reduce((acc, curr) => {
-			if (totalTextLength(curr) > totalTextLength(acc)) {
-				return curr;
-			}
-			return acc;
-		}, clusters[0]);
+		const totalText = totalTextLength(clusters.flat());
 
-		return [clusterWithMostText];
+		// sort in descending order of text share
+		const clusterWithMetrics = clusters.map((cluster) => {
+			const centrality = clusterCentrality(cluster);
+			return {
+				cluster,
+				centrality,
+				percentageTextShare: percentageTextShare(cluster, totalText),
+			};
+		});
+
+		// if there is a dominant cluster with more than 60% text share, return that
+		const dominantCluster = clusterWithMetrics[0].percentageTextShare > 60;
+		if (dominantCluster) return [clusterWithMetrics[0].cluster];
+
+		// clusters are sorted by text share after applying a penalty for centrality
+		const sortedClusters = clusterWithMetrics.sort((a, b) => {
+			const penaltyForA = Math.pow(0.9, a.centrality / 100);
+			const penaltyForB = Math.pow(0.9, b.centrality / 100);
+			const adjustedTextShareA = a.percentageTextShare * penaltyForA;
+			const adjustedTextShareB = b.percentageTextShare * penaltyForB;
+
+			return adjustedTextShareB - adjustedTextShareA;
+		});
+
+		// find all clusters that are similar to the largest cluster in terms of text share
+		// and see if they are enough to cover at least 60% of the text share
+		const largeTextShareClusters = sortedClusters.filter((c) =>
+			approximatelyEqual(c.percentageTextShare, sortedClusters[0].percentageTextShare, 10)
+		);
+
+		const totalTextShareOfLargeClusters = largeTextShareClusters.reduce(
+			(acc, cluster) => acc + cluster.percentageTextShare,
+			0
+		);
+
+		if (totalTextShareOfLargeClusters > 60) {
+			return largeTextShareClusters.map((c) => c.cluster);
+		}
+
+		// choose clusters till the text share is greater than 60%
+		let totalTextShare = 0;
+		const criticalClusters = [];
+		for (const cluster of sortedClusters) {
+			/** Ignore clusters with less than 2%*/
+			if (cluster.percentageTextShare < 2) continue;
+			if (totalTextShare > 60) break;
+			criticalClusters.push(cluster.cluster);
+			totalTextShare += cluster.percentageTextShare;
+		}
+
+		// if the total text share is less than 60% then return an empty array
+		// as this website should not be particularly useful for the web search anyways
+		// this should almost never happen on structured website with a lot of text
+		if (totalTextShare < 60) {
+			return [];
+		}
+
+		return criticalClusters;
 	};
 
 	function serializeHTMLElement(node: Element): SerializedHTMLElement {
@@ -460,10 +540,6 @@ export function spatialParser() {
 		});
 	});
 
-	console.log(clusters.map((cluster) => cluster.map((index) => readableNodes[index].node)));
-	console.log(criticalClusters.map((cluster) => cluster.map((index) => readableNodes[index].node)));
-
-	// TODO: Return this in the format decided by @saghen
 	const elements = filteredNodes
 		.filter(
 			(node, idx, nodes) => !nodes.slice(idx + 1).some((otherNode) => node.node === otherNode.node)
