@@ -26,9 +26,9 @@ export async function scrapeUrl(url: string, maxCharsPerElem: number) {
 		setTimeout(() => reject(new Error("Timeout")), 2000)
 	);
 	return Promise.race([timeout, page.evaluate(spatialParser)])
-		.then(({ elements, ...page }) => ({
-			...page,
-			markdownTree: htmlToMarkdownTree(page.title, elements, maxCharsPerElem),
+		.then(({ elements, ...parsed }) => ({
+			...parsed,
+			markdownTree: htmlToMarkdownTree(parsed.title, elements, maxCharsPerElem),
 		}))
 		.finally(() => page.close());
 }
