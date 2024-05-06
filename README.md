@@ -767,17 +767,10 @@ You can preview the production build with `npm run preview`.
 
 ## Config changes for HuggingChat
 
-The config file for HuggingChat is stored in the `.env.template` file at the root of the repository. It is the single source of truth that is used to generate the actual `.env.local` file using our CI/CD pipeline. See [updateProdEnv](https://github.com/huggingface/chat-ui/blob/cdb33a9583f5339ade724db615347393ef48f5cd/scripts/updateProdEnv.ts) for more details.
+The config file for HuggingChat is stored in the `chart/env/prod.yaml` file. It is the source of truth for the environment variables used for our CI/CD pipeline. For HuggingChat, as we need to customize the app color, as well as the base path, we build a custom docker image. You can find the workflow here.
 
 > [!TIP]
-> If you want to make changes to the model config used in production for HuggingChat, you should do so against `.env.template`.
-
-We currently use the following secrets for deploying HuggingChat in addition to the `.env.template` above:
-
-- `MONGODB_URL`
-- `HF_TOKEN`
-- `OPENID_CONFIG`
-- `SERPER_API_KEY`
+> If you want to make changes to the model config used in production for HuggingChat, you should do so against `chart/env/prod.yaml`.
 
 ### Running a copy of HuggingChat locally
 
@@ -802,7 +795,7 @@ SERPER_API_KEY=<your serper API key from step 3>
 MESSAGES_BEFORE_LOGIN=<can be any numerical value, or set to 0 to require login>
 ```
 
-You can then run `npm run updateLocalEnv` in the root of chat-ui. This will create a `.env.local` file which combines the `.env.template` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
+You can then run `npm run updateLocalEnv` in the root of chat-ui. This will create a `.env.local` file which combines the `chart/env/prod.yaml` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
 
 ### Populate database
 
