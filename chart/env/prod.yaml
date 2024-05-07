@@ -81,7 +81,9 @@ envVars:
         "parameters": {
           "stop": ["<|eot_id|>"],
           "truncate": 6144,
-          "max_new_tokens": 2047
+          "max_new_tokens": 2047,
+          "temperature": 0.6,
+          "top_p" : 0.9
         }
       },
       {
@@ -94,6 +96,7 @@ envVars:
         "parameters": {
           "truncate" : 24576,
           "max_new_tokens" : 8192,
+          "temperature": 0.6
         },
         "preprompt" : "You are Zephyr, an assistant developed by KAIST AI, Argilla, and Hugging Face. You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. You are happy to help with writing, analysis, question answering, math, coding, and all sorts of other tasks.",
         "promptExamples" : [
