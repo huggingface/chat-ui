@@ -12,6 +12,10 @@ import {
 	endpointAnthropic,
 	endpointAnthropicParametersSchema,
 } from "./anthropic/endpointAnthropic";
+import {
+	endpointAnthropicVertex,
+	endpointAnthropicVertexParametersSchema,
+} from "./anthropic/endpointAnthropicVertex";
 import type { Model } from "$lib/types/Model";
 import endpointCloudflare, {
 	endpointCloudflareParametersSchema,
@@ -44,6 +48,7 @@ export type EndpointGenerator<T extends CommonEndpoint> = (parameters: T) => End
 export const endpoints = {
 	tgi: endpointTgi,
 	anthropic: endpointAnthropic,
+	anthropicvertex: endpointAnthropicVertex,
 	aws: endpointAws,
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
@@ -56,6 +61,7 @@ export const endpoints = {
 
 export const endpointSchema = z.discriminatedUnion("type", [
 	endpointAnthropicParametersSchema,
+	endpointAnthropicVertexParametersSchema,
 	endpointAwsParametersSchema,
 	endpointOAIParametersSchema,
 	endpointTgiParametersSchema,
