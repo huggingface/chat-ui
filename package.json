@@ -55,7 +55,7 @@
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
-		"@resvg/resvg-js": "^2.6.0",
+		"@resvg/resvg-js": "^2.6.2",
 		"@xenova/transformers": "^2.16.1",
 		"autoprefixer": "^10.4.14",
 		"browser-image-resizer": "^2.4.1",
