@@ -3,6 +3,7 @@ import type { EmbeddingBackendModel } from "../../embeddingModels";
 import { getSentenceSimilarity, innerProduct } from "../../sentenceSimilarity";
 import { MarkdownElementType, type MarkdownElement } from "../markdown/types";
 import { stringifyMarkdownElement } from "../markdown/utils/stringify";
+import { getCombinedSentenceSimilarity } from "./combine";
 import { flattenTree } from "./tree";
 
 const MIN_CHARS = 3000;
@@ -16,7 +17,14 @@ export async function findContextSources(
 	const sourcesMarkdownElems = sources.map((source) => flattenTree(source.page.markdownTree));
 	const markdownElems = sourcesMarkdownElems.flat();
 
-	const embeddings = await getSentenceSimilarity(
+	// When using CPU embedding (transformersjs), join sentences together to the max character limit
+	// to reduce inference time
+	const embeddingFunc =
+		embeddingModel.endpoints[0].type === "transformersjs"
+			? getCombinedSentenceSimilarity
+			: getSentenceSimilarity;
+
+	const embeddings = await embeddingFunc(
 		embeddingModel,
 		prompt,
 		markdownElems
