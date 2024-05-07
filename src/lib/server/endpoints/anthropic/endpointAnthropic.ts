@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ANTHROPIC_API_KEY } from "$env/static/private";
 import type { Endpoint, EndpointMessage } from "../endpoints";
+import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources";
 import type { MessageFile } from "$lib/types/Message";
@@ -12,7 +12,7 @@ export const endpointAnthropicParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("anthropic"),
 	baseURL: z.string().url().default("https://api.anthropic.com"),
-	apiKey: z.string().default(ANTHROPIC_API_KEY ?? "sk-"),
+	apiKey: z.string().default(env.ANTHROPIC_API_KEY ?? "sk-"),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 });

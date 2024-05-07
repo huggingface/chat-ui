@@ -2,7 +2,7 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
 
@@ -23,7 +23,8 @@
 
 	$: isActive = $settings.activeModel === $page.params.assistantId;
 
-	const prefix = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || $page.url.origin}${base}`;
+	const prefix =
+		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
 

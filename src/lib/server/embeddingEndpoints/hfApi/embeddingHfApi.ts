@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { EmbeddingEndpoint, Embedding } from "../embeddingEndpoints";
 import { chunk } from "$lib/utils/chunk";
-import { HF_TOKEN } from "$env/static/private";
+import { env } from "$env/dynamic/private";
+import { logger } from "$lib/server/logger";
 
 export const embeddingEndpointHfApiSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -10,7 +11,7 @@ export const embeddingEndpointHfApiSchema = z.object({
 	authorization: z
 		.string()
 		.optional()
-		.transform((v) => (!v && HF_TOKEN ? "Bearer " + HF_TOKEN : v)), // if the header is not set but HF_TOKEN is, use it as the authorization header
+		.transform((v) => (!v && env.HF_TOKEN ? "Bearer " + env.HF_TOKEN : v)), // if the header is not set but HF_TOKEN is, use it as the authorization header
 });
 
 export async function embeddingEndpointHfApi(
@@ -35,8 +36,8 @@ export async function embeddingEndpointHfApi(
 				});
 
 				if (!response.ok) {
-					console.log(await response.text());
-					console.error("Failed to get embeddings from Hugging Face API", response);
+					logger.error(await response.text());
+					logger.error("Failed to get embeddings from Hugging Face API", response);
 					return [];
 				}
 

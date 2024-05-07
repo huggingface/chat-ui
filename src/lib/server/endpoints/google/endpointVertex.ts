@@ -26,10 +26,11 @@ export const endpointVertexParametersSchema = z.object({
 			HarmBlockThreshold.BLOCK_ONLY_HIGH,
 		])
 		.optional(),
+	tools: z.array(z.any()),
 });
 
 export function endpointVertex(input: z.input<typeof endpointVertexParametersSchema>): Endpoint {
-	const { project, location, model, apiEndpoint, safetyThreshold } =
+	const { project, location, model, apiEndpoint, safetyThreshold, tools } =
 		endpointVertexParametersSchema.parse(input);
 
 	const vertex_ai = new VertexAI({
@@ -39,6 +40,8 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 	});
 
 	return async ({ messages, preprompt, generateSettings }) => {
+		const parameters = { ...model.parameters, ...generateSettings };
+
 		const generativeModel = vertex_ai.getGenerativeModel({
 			model: model.id ?? model.name,
 			safetySettings: safetyThreshold
@@ -66,10 +69,11 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				  ]
 				: undefined,
 			generationConfig: {
-				maxOutputTokens: generateSettings?.max_new_tokens ?? 4096,
-				stopSequences: generateSettings?.stop,
-				temperature: generateSettings?.temperature ?? 1,
+				maxOutputTokens: parameters?.max_new_tokens ?? 4096,
+				stopSequences: parameters?.stop,
+				temperature: parameters?.temperature ?? 1,
 			},
+			tools,
 		});
 
 		// Preprompt is the same as the first system message.
