@@ -1,0 +1,44 @@
+image:
+  repository: ghcr.io/huggingface
+  name: chat-ui
+  tag: 0.0.0-latest
+  pullPolicy: IfNotPresent
+
+replicas: 3
+
+domain: huggingface.co
+
+service:
+  type: NodePort
+  annotations: { }
+
+ingress:
+  path: "/"
+  annotations: { }
+
+resources:
+  requests:
+    cpu: 2
+    memory: 4Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+nodeSelector: {}
+tolerations: []
+
+envVars: { }
+externalSecrets:
+  enabled: false
+  secretStoreName: ""
+  secretName: ""
+  parameters: { }
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetMemoryUtilizationPercentage: ""
+  targetCPUUtilizationPercentage: ""
+
+monitoring:
+  enabled: false

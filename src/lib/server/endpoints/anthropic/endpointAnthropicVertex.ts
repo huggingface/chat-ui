@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ANTHROPIC_VERTEX_PROJECT_ID } from "$env/static/private";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
@@ -8,7 +7,7 @@ export const endpointAnthropicVertexParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("anthropic-vertex"),
 	region: z.string().default("us-central1"),
-	projectId: z.string().default(ANTHROPIC_VERTEX_PROJECT_ID ?? ""),
+	projectId: z.string(),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 });

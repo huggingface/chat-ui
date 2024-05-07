@@ -1,9 +1,10 @@
-import { LLM_SUMMERIZATION } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import type { Message } from "$lib/types/Message";
+import { logger } from "$lib/server/logger";
 
 export async function summarize(prompt: string) {
-	if (!LLM_SUMMERIZATION) {
+	if (!env.LLM_SUMMERIZATION) {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
@@ -27,7 +28,11 @@ export async function summarize(prompt: string) {
 
 	return await generateFromDefaultEndpoint({
 		messages,
-		preprompt: `You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence of four words or less. Always start your answer with an emoji relevant to the summary.`,
+		preprompt:
+			"You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it, only summarize the user's query. Always start your answer with an emoji relevant to the summary",
+		generateSettings: {
+			max_new_tokens: 15,
+		},
 	})
 		.then((summary) => {
 			// add an emoji if none is found in the first three characters
@@ -37,7 +42,7 @@ export async function summarize(prompt: string) {
 			return summary;
 		})
 		.catch((e) => {
-			console.error(e);
+			logger.error(e);
 			return null;
 		});
 }

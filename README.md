@@ -9,6 +9,7 @@ license: apache-2.0
 base_path: /chat
 app_port: 3000
 failure_strategy: rollback
+load_balancing_strategy: random
 ---
 
 # Chat UI
@@ -23,8 +24,9 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 3. [Web Search](#web-search)
 4. [Text Embedding Models](#text-embedding-models)
 5. [Extra parameters](#extra-parameters)
-6. [Deploying to a HF Space](#deploying-to-a-hf-space)
-7. [Building](#building)
+6. [Common issues](#common-issues)
+7. [Deploying to a HF Space](#deploying-to-a-hf-space)
+8. [Building](#building)
 
 ## No Setup Deploy
 
@@ -504,7 +506,7 @@ MODELS=`[
 ]`
 ```
 
-We also support using Anthropic models running on Vertex AI. Authentication is done using Google Application Default Credentials. Project ID can be provided via the `ANTHROPIC_VERTEX_PROJECT_ID` env variable, or alternatively through the `endpoints.projectId` as per the following example:
+We also support using Anthropic models running on Vertex AI. Authentication is done using Google Application Default Credentials. Project ID can be provided through the `endpoints.projectId` as per the following example:
 
 ```
 MODELS=`[
@@ -570,6 +572,125 @@ You can also specify your Amazon SageMaker instance as an endpoint for chat-ui. 
 You can also set `"service" : "lambda"` to use a lambda instance.
 
 You can get the `accessKey` and `secretKey` from your AWS user, under programmatic access.
+
+#### Cloudflare Workers AI
+
+You can also use Cloudflare Workers AI to run your own models with serverless inference.
+
+You will need to have a Cloudflare account, then get your [account ID](https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/) as well as your [API token](https://developers.cloudflare.com/workers-ai/get-started/rest-api/#1-get-an-api-token) for Workers AI.
+
+You can either specify them directly in your `.env.local` using the `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` variables, or you can set them directly in the endpoint config.
+
+You can find the list of models available on Cloudflare [here](https://developers.cloudflare.com/workers-ai/models/#text-generation).
+
+```env
+  {
+  "name" : "nousresearch/hermes-2-pro-mistral-7b",
+  "tokenizer": "nousresearch/hermes-2-pro-mistral-7b",
+  "parameters": {
+    "stop": ["<|im_end|>"]
+  },
+  "endpoints" : [
+    {
+      "type" : "cloudflare"
+      <!-- optionally specify these
+      "accountId": "your-account-id",
+      "authToken": "your-api-token"
+      -->
+    }
+  ]
+}
+```
+
+> [!NOTE]  
+> Cloudlare Workers AI currently do not support custom sampling parameters like temperature, top_p, etc.
+
+#### Cohere
+
+You can also use Cohere to run their models directly from chat-ui. You will need to have a Cohere account, then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify it directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set it in the endpoint config.
+
+Here is an example of a Cohere model config. You can set which model you want to use by setting the `id` field to the model name.
+
+```env
+  {
+    "name" : "CohereForAI/c4ai-command-r-v01",
+    "id": "command-r",
+    "description": "C4AI Command-R is a research release of a 35 billion parameter highly performant generative model",
+    "endpoints": [
+      {
+        "type": "cohere",
+        <!-- optionally specify these, or use COHERE_API_TOKEN
+        "apiKey": "your-api-token"
+        -->
+      }
+    ]
+  }
+```
+
+##### Google Vertex models
+
+Chat UI can connect to the google Vertex API endpoints ([List of supported models](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models)).
+
+To enable:
+
+1. [Select](https://console.cloud.google.com/project) or [create](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project) a Google Cloud project.
+1. [Enable billing for your project](https://cloud.google.com/billing/docs/how-to/modify-project).
+1. [Enable the Vertex AI API](https://console.cloud.google.com/flows/enableapi?apiid=aiplatform.googleapis.com).
+1. [Set up authentication with a service account](https://cloud.google.com/docs/authentication/getting-started)
+   so you can access the API from your local workstation.
+
+The service account credentials file can be imported as an environmental variable:
+
+```env
+    GOOGLE_APPLICATION_CREDENTIALS = clientid.json
+```
+
+Make sure your docker container has access to the file and the variable is correctly set.
+Afterwards Google Vertex endpoints can be configured as following:
+
+```
+MODELS=`[
+//...
+    {
+       "name": "gemini-1.5-pro",
+       "displayName": "Vertex Gemini Pro 1.5",
+       "endpoints" : [{
+          "type": "vertex",
+          "project": "abc-xyz",
+          "location": "europe-west3",
+          "model": "gemini-1.5-pro-preview-0409", // model-name
+
+          // Optional
+          "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
+          "apiEndpoint": "", // alternative api endpoint url,
+          "tools": [{
+            "googleSearchRetrieval": {
+              "disableAttribution": true
+            }
+          }]
+       }]
+     },
+]`
+
+```
+
+##### LangServe
+
+LangChain applications that are deployed using LangServe can be called with the following config:
+
+```
+MODELS=`[
+//...
+    {
+       "name": "summarization-chain", //model-name
+       "endpoints" : [{
+         "type": "langserve",
+         "url" : "http://127.0.0.1:8100",
+       }]
+     },
+]`
+
+```
 
 ### Custom endpoint authorization
 
@@ -663,6 +784,14 @@ MODELS=`[
 ]`
 ```
 
+## Common issues
+
+### 403：You don't have access to this conversation
+
+Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `ALLOW_INSECURE_COOKIES=true` to your `.env.local`.
+
+Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
+
 ## Deploying to a HF Space
 
 Create a `DOTENV_LOCAL` secret to your HF space with the content of your .env.local, and they will be picked up automatically when you run.
@@ -681,33 +810,39 @@ You can preview the production build with `npm run preview`.
 
 ## Config changes for HuggingChat
 
-The config file for HuggingChat is stored in the `.env.template` file at the root of the repository. It is the single source of truth that is used to generate the actual `.env.local` file using our CI/CD pipeline. See [updateProdEnv](https://github.com/huggingface/chat-ui/blob/cdb33a9583f5339ade724db615347393ef48f5cd/scripts/updateProdEnv.ts) for more details.
+The config file for HuggingChat is stored in the `chart/env/prod.yaml` file. It is the source of truth for the environment variables used for our CI/CD pipeline. For HuggingChat, as we need to customize the app color, as well as the base path, we build a custom docker image. You can find the workflow here.
 
 > [!TIP]
-> If you want to make changes to model config for HuggingChat, you should do so against `.env.template`.
+> If you want to make changes to the model config used in production for HuggingChat, you should do so against `chart/env/prod.yaml`.
 
-We currently use the following secrets for deploying HuggingChat in addition to the `.env.template` above:
+### Running a copy of HuggingChat locally
 
-- `MONGODB_URL`
-- `HF_TOKEN`
-- `OPENID_CONFIG`
-- `SERPER_API_KEY`
+If you want to run an exact copy of HuggingChat locally, you will need to do the following first:
 
-They are defined as secrets in the repository.
+1. Create an [OAuth App on the hub](https://huggingface.co/settings/applications/new) with `openid profile email` permissions. Make sure to set the callback URL to something like `http://localhost:5173/chat/login/callback` which matches the right path for your local instance.
+2. Create a [HF Token](https://huggingface.co/settings/tokens) with your Hugging Face account. You will need a Pro account to be able to access some of the larger models available through HuggingChat.
+3. Create a free account with [serper.dev](https://serper.dev/) (you will get 2500 free search queries)
+4. Run an instance of mongoDB, however you want. (Local or remote)
 
-### Testing config changes locally
+You can then create a new `.env.SECRET_CONFIG` file with the following content
 
-You can test the config changes locally by first creating an `.env.SECRET_CONFIG` file with the secrets defined above. Then you can run the following command to generate the `.env.local` file:
-
-```bash
-npm run updateLocalEnv
+```env
+MONGODB_URL=<link to your mongo DB from step 4>
+HF_TOKEN=<your HF token from step 2>
+OPENID_CONFIG=`{
+  PROVIDER_URL: "https://huggingface.co",
+  CLIENT_ID: "<your client ID from step 1>",
+  CLIENT_SECRET: "<your client secret from step 1>",
+}`
+SERPER_API_KEY=<your serper API key from step 3>
+MESSAGES_BEFORE_LOGIN=<can be any numerical value, or set to 0 to require login>
 ```
 
-This will replace your `.env.local` file with the one that will be used in prod (simply taking `.env.template + .env.SECRET_CONFIG`).
+You can then run `npm run updateLocalEnv` in the root of chat-ui. This will create a `.env.local` file which combines the `chart/env/prod.yaml` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
 
 ### Populate database
 
-> [!WARNING]  
+> [!WARNING]
 > The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
 
 You can populate the database using faker data using the `populate` script:

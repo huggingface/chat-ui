@@ -1,4 +1,4 @@
-import { MESSAGES_BEFORE_LOGIN, ENABLE_ASSISTANTS_RAG } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -10,7 +10,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { abortedGenerations } from "$lib/server/abortedGenerations";
+import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
@@ -23,6 +23,7 @@ import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
+import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -76,7 +77,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	// guest mode check
 	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
@@ -214,17 +215,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		if (messageToRetry.from === "user" && newPrompt) {
 			// add a sibling to this message from the user, with the alternative prompt
 			// add a children to that sibling, where we can write to
-			const newUserMessageId = addSibling(conv, { from: "user", content: newPrompt }, messageId);
+			const newUserMessageId = addSibling(
+				conv,
+				{ from: "user", content: newPrompt, createdAt: new Date(), updatedAt: new Date() },
+				messageId
+			);
 			messageToWriteToId = addChildren(
 				conv,
-				{ from: "assistant", content: "", files: hashes },
+				{
+					from: "assistant",
+					content: "",
+					files: hashes,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
 				newUserMessageId
 			);
 			messagesForPrompt = buildSubtree(conv, newUserMessageId);
 		} else if (messageToRetry.from === "assistant") {
 			// we're retrying an assistant message, to generate a new answer
 			// just add a sibling to the assistant answer where we can write to
-			messageToWriteToId = addSibling(conv, { from: "assistant", content: "" }, messageId);
+			messageToWriteToId = addSibling(
+				conv,
+				{ from: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
+				messageId
+			);
 			messagesForPrompt = buildSubtree(conv, messageId);
 			messagesForPrompt.pop(); // don't need the latest assistant message in the prompt since we're retrying it
 		}
@@ -320,7 +335,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							}
 						);
 					} catch (e) {
-						console.error(e);
+						logger.error(e);
 					}
 				}
 			})();
@@ -345,20 +360,19 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
 			);
 
-			const assistantHasRAG =
-				ENABLE_ASSISTANTS_RAG === "true" &&
-				assistant &&
-				((assistant.rag &&
-					(assistant.rag.allowedLinks.length > 0 ||
-						assistant.rag.allowedDomains.length > 0 ||
-						assistant.rag.allowAllDomains)) ||
-					assistant.dynamicPrompt);
+			const assistantHasDynamicPrompt =
+				env.ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
+
+			const assistantHasWebSearch =
+				env.ENABLE_ASSISTANTS_RAG === "true" &&
+				!!assistant &&
+				!!assistant.rag &&
+				(assistant.rag.allowedLinks.length > 0 ||
+					assistant.rag.allowedDomains.length > 0 ||
+					assistant.rag.allowAllDomains);
 
 			// perform websearch if needed
-			if (
-				!isContinue &&
-				((webSearch && !conv.assistantId) || (assistantHasRAG && !assistant.dynamicPrompt))
-			) {
+			if (!isContinue && (webSearch || assistantHasWebSearch)) {
 				messageToWriteTo.webSearch = await runWebSearch(
 					conv,
 					messagesForPrompt,
@@ -369,7 +383,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let preprompt = conv.preprompt;
 
-			if (assistant?.dynamicPrompt && preprompt && ENABLE_ASSISTANTS_RAG === "true") {
+			if (assistantHasDynamicPrompt && preprompt) {
 				// process the preprompt
 				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 				let match;
@@ -409,6 +423,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let hasError = false;
 
+			let buffer = "";
+
+			messageToWriteTo.updatedAt = new Date();
+
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
@@ -419,14 +437,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {
-						// else we get the next token
 						if (!output.token.special) {
-							update({
-								type: "stream",
-								token: output.token.text,
-							});
+							buffer += output.token.text;
+
+							// send the first 5 chars
+							// and leave the rest in the buffer
+							if (buffer.length >= 5) {
+								update({
+									type: "stream",
+									token: buffer.slice(0, 5),
+								});
+								buffer = buffer.slice(5);
+							}
+
 							// abort check
-							const date = abortedGenerations.get(convId.toString());
+							const date = AbortedGenerations.getInstance().getList().get(convId.toString());
 							if (date && date > promptedAt) {
 								break;
 							}
@@ -439,7 +464,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							messageToWriteTo.content += output.token.text;
 						}
 					} else {
-						messageToWriteTo.interrupted = !output.token.special;
+						messageToWriteTo.interrupted =
+							!output.token.special && !model.parameters.stop?.includes(output.token.text);
 						// add output.generated text to the last message
 						// strip end tokens from the output.generated_text
 						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
@@ -451,7 +477,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						}, output.generated_text.trimEnd());
 
 						messageToWriteTo.content = previousText + text;
-						messageToWriteTo.updatedAt = new Date();
 					}
 				}
 			} catch (e) {
@@ -464,6 +489,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						type: "status",
 						status: "error",
 						message: "No output was generated. Something went wrong.",
+					});
+				}
+
+				if (buffer) {
+					update({
+						type: "stream",
+						token: buffer,
 					});
 				}
 			}

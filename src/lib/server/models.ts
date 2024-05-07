@@ -1,11 +1,4 @@
-import {
-	HF_TOKEN,
-	HF_API_ROOT,
-	MODELS,
-	OLD_MODELS,
-	TASK_MODEL,
-	HF_ACCESS_TOKEN,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
@@ -14,7 +7,11 @@ import endpointTgi from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
 import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
+import type { PreTrainedTokenizer } from "@xenova/transformers";
+
 import JSON5 from "json5";
+import { getTokenizer } from "$lib/utils/getTokenizer";
+import { logger } from "$lib/server/logger";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -39,23 +36,9 @@ const modelConfig = z.object({
 		.optional(),
 	datasetName: z.string().min(1).optional(),
 	datasetUrl: z.string().url().optional(),
-	userMessageToken: z.string().default(""),
-	userMessageEndToken: z.string().default(""),
-	assistantMessageToken: z.string().default(""),
-	assistantMessageEndToken: z.string().default(""),
-	messageEndToken: z.string().default(""),
 	preprompt: z.string().default(""),
 	prepromptUrl: z.string().url().optional(),
-	chatPromptTemplate: z
-		.string()
-		.default(
-			"{{preprompt}}" +
-				"{{#each messages}}" +
-				"{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}" +
-				"{{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}" +
-				"{{/each}}" +
-				"{{assistantMessageToken}}"
-		),
+	chatPromptTemplate: z.string().optional(),
 	promptExamples: z
 		.array(
 			z.object({
@@ -82,13 +65,69 @@ const modelConfig = z.object({
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(MODELS));
+const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+
+async function getChatPromptRender(
+	m: z.infer<typeof modelConfig>
+): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
+	if (m.chatPromptTemplate) {
+		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
+	}
+	let tokenizer: PreTrainedTokenizer;
+
+	if (!m.tokenizer) {
+		return compileTemplate<ChatTemplateInput>(
+			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
+			m
+		);
+	}
+
+	try {
+		tokenizer = await getTokenizer(m.tokenizer);
+	} catch (e) {
+		logger.error(
+			"Failed to load tokenizer for model " +
+				m.name +
+				" consider setting chatPromptTemplate manually or making sure the model is available on the hub. Error: " +
+				(e as Error).message
+		);
+		process.exit();
+	}
+
+	const renderTemplate = ({ messages, preprompt }: ChatTemplateInput) => {
+		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
+			content: message.content,
+			role: message.from,
+		}));
+
+		if (preprompt) {
+			formattedMessages = [
+				{
+					role: "system",
+					content: preprompt,
+				},
+				...formattedMessages,
+			];
+		}
+
+		const output = tokenizer.apply_chat_template(formattedMessages, {
+			tokenize: false,
+			add_generation_prompt: true,
+		});
+
+		if (typeof output !== "string") {
+			throw new Error("Failed to apply chat template, the output is not a string");
+		}
+
+		return output;
+	};
+
+	return renderTemplate;
+}
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
-	userMessageEndToken: m?.userMessageEndToken || m?.messageEndToken,
-	assistantMessageEndToken: m?.assistantMessageEndToken || m?.messageEndToken,
-	chatPromptRender: compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m),
+	chatPromptRender: await getChatPromptRender(m),
 	id: m.id || m.name,
 	displayName: m.displayName || m.name,
 	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
@@ -101,8 +140,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		if (!m.endpoints) {
 			return endpointTgi({
 				type: "tgi",
-				url: `${HF_API_ROOT}/${m.name}`,
-				accessToken: HF_TOKEN ?? HF_ACCESS_TOKEN,
+				url: `${env.HF_API_ROOT}/${m.name}`,
+				accessToken: env.HF_TOKEN ?? env.HF_ACCESS_TOKEN,
 				weight: 1,
 				model: m,
 			});
@@ -130,6 +169,14 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.llamacpp(args);
 					case "ollama":
 						return endpoints.ollama(args);
+					case "vertex":
+						return await endpoints.vertex(args);
+					case "cloudflare":
+						return await endpoints.cloudflare(args);
+					case "cohere":
+						return await endpoints.cohere(args);
+					case "langserve":
+						return await endpoints.langserve(args);
 					default:
 						// for legacy reason
 						return endpoints.tgi(args);
@@ -147,7 +194,7 @@ export const models = await Promise.all(modelsRaw.map((e) => processModel(e).the
 export const defaultModel = models[0];
 
 // Models that have been deprecated
-export const oldModels = OLD_MODELS
+export const oldModels = env.OLD_MODELS
 	? z
 			.array(
 				z.object({
@@ -156,7 +203,7 @@ export const oldModels = OLD_MODELS
 					displayName: z.string().min(1).optional(),
 				})
 			)
-			.parse(JSON5.parse(OLD_MODELS))
+			.parse(JSON5.parse(env.OLD_MODELS))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
@@ -167,9 +214,9 @@ export const validateModel = (_models: BackendModel[]) => {
 
 // if `TASK_MODEL` is string & name of a model in `MODELS`, then we use `MODELS[TASK_MODEL]`, else we try to parse `TASK_MODEL` as a model config itself
 
-export const smallModel = TASK_MODEL
-	? (models.find((m) => m.name === TASK_MODEL) ||
-			(await processModel(modelConfig.parse(JSON5.parse(TASK_MODEL))).then((m) =>
+export const smallModel = env.TASK_MODEL
+	? (models.find((m) => m.name === env.TASK_MODEL) ||
+			(await processModel(modelConfig.parse(JSON5.parse(env.TASK_MODEL))).then((m) =>
 				addEndpoint(m)
 			))) ??
 	  defaultModel

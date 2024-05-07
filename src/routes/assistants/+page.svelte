@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { goto } from "$app/navigation";
@@ -95,8 +95,8 @@
 		/>
 		<meta
 			property="og:image"
-			content="{PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+			content="{envPublic.PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
 		/>
 		<meta property="og:url" content={$page.url.href} />
 	{/if}
@@ -136,7 +136,7 @@
 				href={`${base}/settings/assistants/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
-				<CarbonAdd />Create New assistant
+				<CarbonAdd />Create new assistant
 			</a>
 		</div>
 
@@ -211,10 +211,10 @@
 			<select
 				bind:value={sortValue}
 				on:change={sortAssistants}
-				class="hidden rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 			>
-				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
+				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 			</select>
 		</div>
 
