@@ -480,8 +480,8 @@ MODELS=`[
           // optionals
           "apiKey": "sk-ant-...",
           "baseURL": "https://api.anthropic.com",
-          defaultHeaders: {},
-          defaultQuery: {}
+          "defaultHeaders": {},
+          "defaultQuery": {}
         }
       ]
   },
@@ -498,8 +498,51 @@ MODELS=`[
           // optionals
           "apiKey": "sk-ant-...",
           "baseURL": "https://api.anthropic.com",
-          defaultHeaders: {},
-          defaultQuery: {}
+          "defaultHeaders": {},
+          "defaultQuery": {}
+        }
+      ]
+  }
+]`
+```
+
+We also support using Anthropic models running on Vertex AI. Authentication is done using Google Application Default Credentials. Project ID can be provided through the `endpoints.projectId` as per the following example:
+
+```
+MODELS=`[
+  {
+      "name": "claude-3-sonnet@20240229",
+      "displayName": "Claude 3 Sonnet",
+      "description": "Ideal balance of intelligence and speed",
+      "parameters": {
+        "max_new_tokens": 4096,
+      },
+      "endpoints": [
+        {
+          "type": "anthropic-vertex",
+          "region": "us-central1",
+          "projectId": "gcp-project-id",
+          // optionals
+          "defaultHeaders": {},
+          "defaultQuery": {}
+        }
+      ]
+  },
+  {
+      "name": "claude-3-haiku@20240307",
+      "displayName": "Claude 3 Haiku",
+      "description": "Fastest, most compact model for near-instant responsiveness",
+      "parameters": {
+         "max_new_tokens": 4096
+      },
+      "endpoints": [
+        {
+          "type": "anthropic-vertex",
+          "region": "us-central1",
+          "projectId": "gcp-project-id",
+          // optionals
+          "defaultHeaders": {},
+          "defaultQuery": {}
         }
       ]
   }
