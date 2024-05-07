@@ -1,0 +1,24 @@
+{
+	"background_color": "#ffffff",
+	"name": "HuggingChat",
+	"short_name": "HuggingChat",
+	"display": "standalone",
+	"start_url": "/chat",
+	"icons": [
+		{
+			"src": "/chat/huggingchat/icon-128x128.png",
+			"sizes": "128x128",
+			"type": "image/png"
+		},
+		{
+			"src": "/chat/huggingchat/icon-256x256.png",
+			"sizes": "256x256",
+			"type": "image/png"
+		},
+		{
+			"src": "/chat/huggingchat/icon-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png"
+		}
+	]
+}
