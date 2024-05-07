@@ -6,6 +6,7 @@ import {
 	type BrowserContextOptions,
 } from "playwright";
 import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
+import { env } from "$env/dynamic/private";
 
 async function initPlaywrightService() {
 	if (playwrightService) return playwrightService;
@@ -32,9 +33,11 @@ async function initPlaywrightService() {
 		locale: "en-US",
 	};
 	const ctx = await browser.newContext(options);
-	const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch).then((blker) =>
-		blker.blockFonts().blockMedias().blockFrames()
-	);
+	const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch).then((blker) => {
+		const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
+		if (env.WEBSEARCH_DISABLE_JAVASCRIPT) return mostBlocked.blockScripts();
+		return mostBlocked;
+	});
 	return Object.freeze({ ctx, blocker });
 }
 let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }>;
@@ -46,8 +49,8 @@ export async function loadPage(url: string): Promise<Page> {
 	const page = await ctx.newPage();
 	await blocker.enableBlockingInPage(page);
 
-	await page.goto(url, { waitUntil: "load", timeout: 2500 }).catch(() => {
-		console.warn(`Failed to load page within 2.5s: ${url}`);
+	await page.goto(url, { waitUntil: "load", timeout: 2000 }).catch(() => {
+		console.warn(`Failed to load page within 2s: ${url}`);
 	});
 
 	return page;
