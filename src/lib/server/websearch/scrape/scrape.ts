@@ -31,7 +31,7 @@ export async function scrapeUrl(url: string, maxCharsPerElem: number) {
 			markdownTree: htmlToMarkdownTree(parsed.title, elements, maxCharsPerElem),
 		}))
 		.catch((cause) => {
-			throw Error("Spatial parsing failed", { cause });
+			throw Error("Parsing failed", { cause });
 		})
 		.finally(() => page.close());
 }

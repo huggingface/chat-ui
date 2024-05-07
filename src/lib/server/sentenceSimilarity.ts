@@ -18,7 +18,9 @@ export async function getSentenceSimilarity(
 	];
 
 	const embeddingEndpoint = await embeddingModel.getEndpoint();
-	const output = await embeddingEndpoint({ inputs });
+	const output = await embeddingEndpoint({ inputs }).catch((err) => {
+		throw Error("Failed to generate embeddings for sentence similarity", { cause: err });
+	});
 
 	const queryEmbedding: Embedding = output[0];
 	const sentencesEmbeddings: Embedding[] = output.slice(1);
