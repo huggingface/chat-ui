@@ -11,7 +11,7 @@ import { scrape } from "./scrape/scrape";
 import { findContextSources } from "./embed/embed";
 import { removeParents } from "./markdown/tree";
 
-const MAX_N_PAGES_TO_SCRAPE = 10 as const;
+const MAX_N_PAGES_TO_SCRAPE = 8 as const;
 const MAX_N_PAGES_TO_EMBED = 5 as const;
 
 export type AppendUpdate = (message: string, args?: string[], type?: "error" | "update") => void;
