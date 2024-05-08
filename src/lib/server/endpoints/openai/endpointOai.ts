@@ -18,7 +18,7 @@ export const endpointOAIParametersSchema = z.object({
 		.default("chat_completions"),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
-	extraBody: z.record(z.string()).optional(),
+	extraBody: z.record(z.any()).optional(),
 });
 
 export async function endpointOai(
