@@ -8,9 +8,13 @@ import { logger } from "$lib/server/logger";
 
 export async function POST() {
 	for (const span of ["day", "week", "month"] as const) {
-		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch(logger.error);
-		computeStats({ dateField: "createdAt", type: "conversation", span }).catch(logger.error);
-		computeStats({ dateField: "createdAt", type: "message", span }).catch(logger.error);
+		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch((e) =>
+			logger.error(e)
+		);
+		computeStats({ dateField: "createdAt", type: "conversation", span }).catch((e) =>
+			logger.error(e)
+		);
+		computeStats({ dateField: "createdAt", type: "message", span }).catch((e) => logger.error(e));
 	}
 
 	return json({}, { status: 202 });

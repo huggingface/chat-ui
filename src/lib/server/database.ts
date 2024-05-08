@@ -133,22 +133,24 @@ export class Database {
 				{ sessionId: 1, updatedAt: -1 },
 				{ partialFilterExpression: { sessionId: { $exists: true } } }
 			)
-			.catch(logger.error);
+			.catch((e) => logger.error(e));
 		conversations
 			.createIndex(
 				{ userId: 1, updatedAt: -1 },
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
-			.catch(logger.error);
+			.catch((e) => logger.error(e));
 		conversations
 			.createIndex(
 				{ "message.id": 1, "message.ancestors": 1 },
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
-			.catch(logger.error);
+			.catch((e) => logger.error(e));
 		// Not strictly necessary, could use _id, but more convenient. Also for stats
 		// To do stats on conversation messages
-		conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(logger.error);
+		conversations
+			.createIndex({ "messages.createdAt": 1 }, { sparse: true })
+			.catch((e) => logger.error(e));
 		// Unique index for stats
 		conversationStats
 			.createIndex(
@@ -161,7 +163,7 @@ export class Database {
 				},
 				{ unique: true }
 			)
-			.catch(logger.error);
+			.catch((e) => logger.error(e));
 		// Allow easy check of last computed stat for given type/dateField
 		conversationStats
 			.createIndex({
@@ -169,38 +171,50 @@ export class Database {
 				"date.field": 1,
 				"date.at": 1,
 			})
-			.catch(logger.error);
+			.catch((e) => logger.error(e));
 		abortedGenerations
 			.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 })
-			.catch(logger.error);
-		abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(logger.error);
-		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(logger.error);
-		settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
-		settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(logger.error);
-		settings.createIndex({ assistants: 1 }).catch(logger.error);
-		users.createIndex({ hfUserId: 1 }, { unique: true }).catch(logger.error);
-		users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
+			.catch((e) => logger.error(e));
+		abortedGenerations
+			.createIndex({ conversationId: 1 }, { unique: true })
+			.catch((e) => logger.error(e));
+		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
+		settings
+			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
+			.catch((e) => logger.error(e));
+		settings
+			.createIndex({ userId: 1 }, { unique: true, sparse: true })
+			.catch((e) => logger.error(e));
+		settings.createIndex({ assistants: 1 }).catch((e) => logger.error(e));
+		users.createIndex({ hfUserId: 1 }, { unique: true }).catch((e) => logger.error(e));
+		users
+			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
+			.catch((e) => logger.error(e));
 		// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
-		users.createIndex({ username: 1 }).catch(logger.error);
-		messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
-		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(logger.error);
-		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(logger.error);
-		assistants.createIndex({ createdById: 1, userCount: -1 }).catch(logger.error);
-		assistants.createIndex({ userCount: 1 }).catch(logger.error);
-		assistants.createIndex({ featured: 1, userCount: -1 }).catch(logger.error);
-		assistants.createIndex({ modelId: 1, userCount: -1 }).catch(logger.error);
-		assistants.createIndex({ searchTokens: 1 }).catch(logger.error);
-		assistants.createIndex({ last24HoursCount: 1 }).catch(logger.error);
+		users.createIndex({ username: 1 }).catch((e) => logger.error(e));
+		messageEvents
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+			.catch((e) => logger.error(e));
+		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch((e) => logger.error(e));
+		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch((e) => logger.error(e));
+		assistants.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ featured: 1, userCount: -1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
 		assistantStats
 			// Order of keys is important for the queries
 			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-			.catch(logger.error);
-		reports.createIndex({ assistantId: 1 }).catch(logger.error);
-		reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(logger.error);
+			.catch((e) => logger.error(e));
+		reports.createIndex({ assistantId: 1 }).catch((e) => logger.error(e));
+		reports.createIndex({ createdBy: 1, assistantId: 1 }).catch((e) => logger.error(e));
 
 		// Unique index for semaphore and migration results
-		semaphores.createIndex({ key: 1 }, { unique: true }).catch(logger.error);
-		semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
+		semaphores.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
+		semaphores
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+			.catch((e) => logger.error(e));
 	}
 }
 
