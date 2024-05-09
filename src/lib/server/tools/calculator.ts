@@ -2,8 +2,10 @@ import type { BackendTool } from ".";
 
 const calculator: BackendTool = {
 	name: "calculator",
+	displayName: "Calculator",
 	description:
 		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, and /, as well as parenthesis ().",
+	isOnByDefault: true,
 	parameter_definitions: {
 		equation: {
 			description:

@@ -3,6 +3,7 @@ import type { ObjectId } from "mongodb";
 import updateSearchAssistant from "./01-update-search-assistants";
 import updateAssistantsModels from "./02-update-assistants-models";
 import type { Database } from "$lib/server/database";
+import addToolsToSettings from "./03-add-tools-in-settings";
 
 export interface Migration {
 	_id: ObjectId;
@@ -14,4 +15,8 @@ export interface Migration {
 	runEveryTime?: boolean;
 }
 
-export const migrations: Migration[] = [updateSearchAssistant, updateAssistantsModels];
+export const migrations: Migration[] = [
+	updateSearchAssistant,
+	updateAssistantsModels,
+	addToolsToSettings,
+];

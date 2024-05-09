@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { env } from "$env/dynamic/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
+import { tools } from "$lib/server/tools";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -142,6 +143,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
+			tools: settings?.tools ?? {},
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -162,6 +164,15 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
+		tools: tools
+			.filter((tool) => !tool.isHidden)
+			.map((tool) => ({
+				name: tool.name,
+				displayName: tool.displayName,
+				description: tool.description,
+				isOnByDefault: tool.isOnByDefault,
+				isLocked: tool.isLocked,
+			})),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
 			.map((el) => ({

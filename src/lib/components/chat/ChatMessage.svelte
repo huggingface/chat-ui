@@ -292,7 +292,9 @@
 										<EosIconLoading class="inline-block size-4" />
 									{/if}
 									{toolDone ? "Called" : "Calling"} tool
-									<span class="font-mono font-bold">{toolName}</span>
+									<span class="font-mono font-bold"
+										>{$page.data.tools.find((el) => el.name === toolName)?.displayName}</span
+									>
 								</summary>
 								{#each tool as toolUpdate}
 									{#if toolUpdate.messageType === "parameters"}

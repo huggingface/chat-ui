@@ -3,7 +3,9 @@ import { parseWeb } from "../websearch/parseWeb";
 
 const fetchUrl: BackendTool = {
 	name: "fetchUrl",
+	displayName: "URL Fetcher",
 	description: "A tool that can be used to fetch an URL and return the content directly.",
+	isOnByDefault: true,
 	parameter_definitions: {
 		url: {
 			description: "The url that should be fetched.",
