@@ -107,7 +107,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		secretSessionId = sessionId = email;
 
 		event.locals.user = {
-			_id: '', // Hide the "Sign Out" button
+			_id: 'jwt-user', // Special value to hide the "Sign Out" button
 			name: email,
 			email: email
 		};
