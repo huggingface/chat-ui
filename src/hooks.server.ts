@@ -13,6 +13,7 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
+import { jwtDecode } from "jwt-decode";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -95,11 +96,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const token = event.cookies.get(env.COOKIE_NAME);
+	const jwt = event.cookies.get(env.COOKIE_JWT_NAME);
 
 	let secretSessionId: string;
 	let sessionId: string;
 
-	if (token) {
+	if (jwt) {
+		const { email } = jwtDecode(jwt);
+
+		secretSessionId = sessionId = email;
+
+		event.locals.user = {
+			_id: '', // Hide the "Sign Out" button
+			name: email,
+			email: email
+		};
+	} else if (token) {
 		secretSessionId = token;
 		sessionId = await sha256(token);
 
