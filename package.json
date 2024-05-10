@@ -94,6 +94,7 @@
 		"@anthropic-ai/sdk": "^0.17.1",
 		"@anthropic-ai/vertex-sdk": "^0.3.0",
 		"@google-cloud/vertexai": "^1.1.0",
+		"@resvg/resvg-js-linux-x64-gnu": "^2.6.2",
 		"aws4fetch": "^1.0.17",
 		"cohere-ai": "^7.9.0",
 		"openai": "^4.14.2"
