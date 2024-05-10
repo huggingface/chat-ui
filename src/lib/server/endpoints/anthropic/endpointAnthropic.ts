@@ -107,7 +107,7 @@ export async function endpointAnthropic(
 	};
 }
 
-const supportedMimeTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
+const supportedMimeTypes = ["image/jpeg", "image/gif", "image/webp"] as const;
 async function fileToImageBlock(file: MessageFile): Promise<ImageBlockParam> {
 	let imageBase64 = file.value;
 

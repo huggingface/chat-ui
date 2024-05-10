@@ -7,7 +7,7 @@ const isOutputFormat = (format: string): format is (typeof outputFormats)[number
 
 export function convertImage(sharpInst: Sharp, outputMime: string): Sharp {
 	const [type, format] = outputMime.split("/");
-	if (type === "image") throw Error(`Requested non-image mime type: ${outputMime}`);
+	if (type !== "image") throw Error(`Requested non-image mime type: ${outputMime}`);
 	if (!isOutputFormat(format)) {
 		throw Error(`Requested to convert to an unsupported format: ${format}`);
 	}

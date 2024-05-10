@@ -133,7 +133,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		is_continue: isContinue,
 		web_search: webSearch,
-		files: b64files,
+		files: inputFiles,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -148,7 +148,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
 			files: z.optional(
-				z.array(z.object({ type: z.literal("base64"), value: z.string(), mime: z.string() }))
+				z.array(
+					z.object({
+						type: z.literal("base64").or(z.literal("hash")),
+						value: z.string(),
+						mime: z.string(),
+					})
+				)
 			),
 		})
 		.parse(json);
@@ -157,21 +163,27 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		throw error(400, "Message too long.");
 	}
 
-	// files is an array of base64 strings encoding Blob objects
-	// we need to convert this array to an array of File objects
-	const files =
-		b64files?.map((file) => {
-			const blob = Buffer.from(file.value, "base64");
-			return new File([blob], "file", { type: file.mime });
-		}) ?? [];
+	// each file is either:
+	// base64 string requiring upload to the server
+	// hash pointing to an existing file
+	const hashFiles = inputFiles?.filter((file) => file.type === "hash") ?? [];
+	const b64Files =
+		inputFiles
+			?.filter((file) => file.type !== "hash")
+			.map((file) => {
+				const blob = Buffer.from(file.value, "base64");
+				return new File([blob], "file", { type: file.mime });
+			}) ?? [];
 
 	// check sizes
 	// todo: make configurable
-	if (files.some((file) => file.size > 10 * 1024 * 1024)) {
+	if (b64Files.some((file) => file.size > 10 * 1024 * 1024)) {
 		throw error(413, "File too large, should be <10MB");
 	}
 
-	const uploadedFiles = await Promise.all(files.map((file) => uploadFile(file, conv)));
+	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv))).then(
+		(files) => [...files, ...hashFiles]
+	);
 
 	// we will append tokens to the content of this message
 	let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -203,7 +215,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			// add a children to that sibling, where we can write to
 			const newUserMessageId = addSibling(
 				conv,
-				{ from: "user", content: newPrompt, createdAt: new Date(), updatedAt: new Date() },
+				{
+					from: "user",
+					content: newPrompt,
+					files: uploadedFiles,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
 				messageId
 			);
 			messageToWriteToId = addChildren(
@@ -211,7 +229,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				{
 					from: "assistant",
 					content: "",
-					files: uploadedFiles,
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				},

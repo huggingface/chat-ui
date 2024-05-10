@@ -110,7 +110,11 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "user", content: prompt },
+						{
+							from: "user",
+							content: prompt,
+							files: messageToRetry.files,
+						},
 						messageId
 					);
 					messageToWriteToId = addChildren(
@@ -171,6 +175,7 @@
 			}
 
 			messages = [...messages];
+			const userMessage = messages.find((message) => message.id === messageId);
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
@@ -188,7 +193,7 @@
 					isRetry,
 					isContinue,
 					webSearch: !hasAssistant && $webSearchParameters.useSearch,
-					files: isRetry ? undefined : base64Files,
+					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
