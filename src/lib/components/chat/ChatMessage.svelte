@@ -16,7 +16,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
-	import EosIconLoading from "~icons/eos-icons/loading";
+	import CarbonTools from "~icons/carbon/tools";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
 
@@ -279,44 +279,67 @@
 						{@const toolDone = !!tool.find((t) => t.messageType === "message")}
 						{#if toolName && toolName !== "websearch"}
 							<details
-								class="open:border-1 group/tool -ml-1 mb-1 w-fit cursor-pointer rounded-xl px-3 py-1 text-purple-700
-								 transition-all open:mb-3 open:border-purple-800 open:bg-purple-600/20 open:shadow-sm
-								 dark:text-purple-300 open:dark:border-purple-800/70 open:dark:bg-purple-800/30"
+								class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1.5 pr-2.5 text-smd shadow-sm transition-all open:mb-3
+								open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10"
 							>
 								<summary
-									class="pb-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
-									class:text-purple-700={!toolDone}
-									class:dark:text-purple-300={!toolDone}
-									class:text-gray-600={toolDone}
-									class:dark:text-gray-400={toolDone}
-									class:list-none={!toolDone}
+									class="flex select-none list-none items-center gap-1.5 py-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
 								>
-									{#if !toolDone}
-										<EosIconLoading class="inline-block size-4" />
-									{/if}
-									{toolDone ? "Called" : "Calling"} tool
-									<span class="font-mono font-bold"
-										>{availableTools.find((el) => el.name === toolName)?.displayName}</span
+									<div
+										class="relative grid size-[22px] place-items-center rounded bg-purple-600/10 dark:bg-purple-600/20"
 									>
+										<svg
+											class="absolute inset-0 text-purple-500/40 transition-opacity {!toolDone
+												? 'opacity-100'
+												: 'opacity-0'}"
+											width="22"
+											height="22"
+											viewBox="0 0 38 38"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<path
+												class="loading-path"
+												d="M8 2.5H30C30 2.5 35.5 2.5 35.5 8V30C35.5 30 35.5 35.5 30 35.5H8C8 35.5 2.5 35.5 2.5 30V8C2.5 8 2.5 2.5 8 2.5Z"
+												stroke="currentColor"
+												stroke-width="1"
+												stroke-linecap="round"
+												id="shape"
+											/>
+										</svg>
+										<CarbonTools class="text-xs text-purple-700 dark:text-purple-500" />
+									</div>
+
+									<span>
+										{toolDone ? "Called" : "Calling"} tool
+										<span class="font-semibold"
+											>{availableTools.find((el) => el.name === toolName)?.displayName}</span
+										>
+									</span>
 								</summary>
 								{#each tool as toolUpdate}
 									{#if toolUpdate.messageType === "parameters"}
-										<div class="my-1 w-full border-b-2 border-purple-500/50" />
-
-										<h3 class="font-bold">Parameters:</h3>
-										<ul class="list-inside list-disc">
+										<div class="my-1 flex items-center gap-2 opacity-80">
+											<h3 class="text-sm">Parameters</h3>
+											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
+										</div>
+										<ul class="py-1 text-sm">
 											{#each Object.entries(toolUpdate.parameters ?? {}) as [k, v]}
 												<li>
-													<span class="font-mono">{k}</span>: <span class="font-bold">{v}</span>
+													<span class="font-semibold">{k}</span>:
+													<span>{v}</span>
 												</li>
 											{/each}
 										</ul>
 									{:else if toolUpdate.messageType === "message" && toolUpdate.display !== false}
-										<div class="my-1 w-full border-b-2 border-purple-500/50" />
+										<div class="my-1 flex items-center gap-2 opacity-80">
+											<h3 class="text-sm">Result</h3>
+											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
+										</div>
 
-										<h3 class="font-bold">Result:</h3>
-										<p class="pb-1 pt-1 font-mono">
-											{" > "}{toolUpdate.message}
+										<p class="pb-1 pt-1 text-sm font-semibold">
+											<span class="font-normal text-gray-500/50">></span>
+											{toolUpdate.message}
 										</p>
 									{/if}
 								{/each}
@@ -576,3 +599,20 @@
 		</svelte:fragment>
 	</svelte:self>
 {/if}
+
+<style>
+	details summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.loading-path {
+		stroke-dasharray: 61.45;
+		animation: loading 2s linear infinite;
+	}
+
+	@keyframes loading {
+		to {
+			stroke-dashoffset: 122.9;
+		}
+	}
+</style>

@@ -17,20 +17,20 @@
 <details class="group relative bottom-0 h-full min-h-8">
 	<summary
 		class="absolute bottom-0 flex h-8
-	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
+	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white px-2 py-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
 	>
 		<IconTool />
 		Tools
-		<span class="text-gray-500 dark:text-gray-400"> ({activeToolCount}) </span>
+		<span class="text-gray-400 dark:text-gray-500"> ({activeToolCount}) </span>
 	</summary>
 	<div
 		class="absolute bottom-10 h-max w-max
 	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white p-0.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 	>
-		<div class="grid grid-cols-2 gap-x-4 p-2">
+		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
 			{#each $page.data.tools as tool}
 				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}
-				<div class="flex items-center gap-1">
+				<div class="flex items-center gap-1.5">
 					<input
 						type="checkbox"
 						id={tool.name}
