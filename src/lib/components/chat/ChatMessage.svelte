@@ -22,6 +22,7 @@
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import type { ToolUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import type { ToolFront } from "$lib/types/Tool";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import Modal from "../Modal.svelte";
@@ -194,6 +195,8 @@
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 
 	$: modalImageToShow = "";
+
+	const availableTools: ToolFront[] = $page.data.tools;
 </script>
 
 {#if modalImageToShow}
@@ -293,7 +296,7 @@
 									{/if}
 									{toolDone ? "Called" : "Calling"} tool
 									<span class="font-mono font-bold"
-										>{$page.data.tools.find((el) => el.name === toolName)?.displayName}</span
+										>{availableTools.find((el) => el.name === toolName)?.displayName}</span
 									>
 								</summary>
 								{#each tool as toolUpdate}

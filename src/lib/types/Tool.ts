@@ -15,6 +15,11 @@ export interface Tool {
 	isHidden?: true; // should it be hidden from the user ?
 }
 
+export type ToolFront = Pick<
+	Tool,
+	"name" | "displayName" | "description" | "isOnByDefault" | "isLocked"
+>;
+
 export interface ToolResult {
 	key: string;
 	status: "success" | "error";

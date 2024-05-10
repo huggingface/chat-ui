@@ -15,7 +15,7 @@
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import WebSearchToggle from "../WebSearchToggle.svelte";
-	import ToolsToggle from "../ToolsMenu.svelte";
+	import ToolsMenu from "../ToolsMenu.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import { page } from "$app/stores";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -33,7 +33,6 @@
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import { useConvTreeStore } from "$lib/stores/convTree";
-	import ToolsMenu from "../ToolsMenu.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -260,7 +259,7 @@
 			<div class="flex w-full pb-3">
 				{#if !assistant}
 					{#if currentModel.functions}
-						<ToolsMenu />
+						<ToolsMenu {loading} />
 					{:else if $page.data.settings?.searchEnabled}
 						<WebSearchToggle />
 					{/if}
@@ -401,7 +400,7 @@
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
 							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
 						{:else}
-							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
+							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
 							<div class="max-sm:hidden">Share this conversation</div>
 						{/if}
 					</button>

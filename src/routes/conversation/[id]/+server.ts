@@ -35,6 +35,7 @@ import websearch from "$lib/server/tools/websearch.js";
 import text2img from "$lib/server/tools/text2img.js";
 import fetchUrl from "$lib/server/tools/fetchUrl.js";
 import { logger } from "$lib/server/logger.js";
+import type { BackendTool } from "$lib/server/tools/index.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -145,7 +146,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		is_continue: isContinue,
 		web_search: webSearch,
-		tools: toolsFlag,
+		tools: toolsPreferences,
 		files: b64files,
 	} = z
 		.object({
@@ -160,7 +161,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			tools: z.optional(z.boolean()),
+			tools: z.record(z.boolean()).optional(),
 			files: z.optional(z.array(z.string())),
 		})
 		.parse(json);
@@ -391,7 +392,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			if (
 				!isContinue &&
-				((webSearch && !conv.assistantId) || (assistantHasWebSearch && !model.functions))
+				!model.functions &&
+				((webSearch && !conv.assistantId) || assistantHasWebSearch)
 			) {
 				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, {
 					ragSettings: assistant?.rag,
@@ -431,13 +433,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const endpoint = await model.getEndpoint();
 			let toolResults: ToolResult[] | undefined = undefined;
 
-			// function calls
-			if (model.functions && (toolsFlag || assistantHasWebSearch)) {
-				let tools = [directlyAnswer, websearch];
+			// function calls, if no assistant or assistant has websearch enabled
+			if (model.functions && (!assistant || assistantHasWebSearch)) {
+				let tools: BackendTool[] = [];
 
 				// if it's an assistant, only support websearch for now
 				if (!assistant) {
-					tools = [...tools, text2img, calculator, fetchUrl];
+					// filter based on tool preferences, add the tools that are on by default
+					tools = [directlyAnswer, text2img, calculator, fetchUrl, websearch].filter((el) => {
+						if (el.isLocked && el.isOnByDefault) {
+							return true;
+						}
+
+						return toolsPreferences?.[el.name] ?? el.isOnByDefault;
+					});
+				} else {
+					// an assistant can currently only use tools for websearch
+					tools = [directlyAnswer, websearch];
 				}
 
 				let calls: Call[] | undefined = undefined;

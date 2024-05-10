@@ -2,7 +2,7 @@ import type { BackendTool } from ".";
 
 const text2img: BackendTool = {
 	name: "text2img",
-	displayName: "Text to Image",
+	displayName: "Text-to-Image",
 	description: "Use this tool to generate an image from a prompt.",
 	isOnByDefault: true,
 	parameter_definitions: {

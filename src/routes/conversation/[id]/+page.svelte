@@ -19,12 +19,11 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
+	import { useSettingsStore } from "$lib/stores/settings.js";
 
 	export let data;
 
-	$: ({ messages, model: modelId } = data);
-
-	$: currentModel = findCurrentModel([...data.models, ...data.oldModels], modelId);
+	$: ({ messages } = data);
 
 	let loading = false;
 	let pending = false;
@@ -200,8 +199,7 @@
 					isRetry,
 					isContinue,
 					webSearch: !hasAssistant && $webSearchParameters.useSearch,
-					tools:
-						(!hasAssistant && currentModel.functions && $webSearchParameters.useTools) ?? false,
+					tools: $settings.tools, // preference for tools
 					files: isRetry ? undefined : resizedImages,
 				},
 				messageUpdatesAbortController.signal
@@ -373,6 +371,7 @@
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
 	const convTreeStore = createConvTreeStore();
+	const settings = useSettingsStore();
 </script>
 
 <svelte:head>

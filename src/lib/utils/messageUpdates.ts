@@ -7,7 +7,7 @@ type MessageUpdateRequestOptions = {
 	isRetry: boolean;
 	isContinue: boolean;
 	webSearch: boolean;
-	tools: boolean;
+	tools?: Record<string, boolean>;
 	files?: string[];
 };
 export async function fetchMessageUpdates(
