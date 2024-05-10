@@ -14,10 +14,10 @@
 	}).length;
 </script>
 
-<details class="group relative bottom-0 h-full">
+<details class="group relative bottom-0 h-full min-h-8">
 	<summary
-		class="bottom-0 flex h-8
-	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white p-1.5 shadow-sm group-open:absolute group-open:bottom-0 hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
+		class="absolute bottom-0 flex h-8
+	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
 	>
 		<IconTool />
 		Tools
