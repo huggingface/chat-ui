@@ -11,5 +11,4 @@ SECRET_CONFIG
 .idea
 !.env.ci
 !.env
-!.env.template
 gcp-*.json

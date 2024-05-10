@@ -154,7 +154,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			inputs: z.optional(
 				z
 					.string()
-					.trim()
 					.min(1)
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
