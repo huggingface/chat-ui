@@ -4,7 +4,8 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { AppendUpdate } from "../runWebSearch";
 import { getWebSearchProvider, searchWeb } from "./endpoints";
 import { generateQuery } from "./generateQuery";
-import { isURL, isURLStringLocal } from "$lib/server/isURLLocal";
+import { isURLStringLocal } from "$lib/server/isURLLocal";
+import { isURL } from "$lib/utils/url";
 
 import z from "zod";
 import JSON5 from "json5";

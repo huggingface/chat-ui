@@ -8,6 +8,8 @@ import {
 import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
 import { env } from "$env/dynamic/private";
 
+// Singleton initialized by initPlaywrightService
+let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }>;
 async function initPlaywrightService() {
 	if (playwrightService) return playwrightService;
 
@@ -40,7 +42,6 @@ async function initPlaywrightService() {
 	});
 	return Object.freeze({ ctx, blocker });
 }
-let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }>;
 
 export async function loadPage(url: string): Promise<Page> {
 	if (!playwrightService) playwrightService = initPlaywrightService();

@@ -36,13 +36,3 @@ export function isURLStringLocal(url: string) {
 		return true;
 	}
 }
-
-// TODO: move this to a generic url helper
-export function isURL(url: string) {
-	try {
-		new URL(url);
-		return true;
-	} catch (e) {
-		return false;
-	}
-}

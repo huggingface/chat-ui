@@ -14,15 +14,11 @@ export function spatialParser() {
 	 */
 	const DBSCAN = <T>({
 		dataset,
-		epsilon,
-		epsilonCompare,
-		minimumPoints,
+		epsilon = 1,
+		epsilonCompare = (dist, e) => dist < e,
+		minimumPoints = 2,
 		distanceFunction,
 	}: DBSCANOptions<T>) => {
-		epsilon = epsilon || 1; // aka maxDistance
-		epsilonCompare = epsilonCompare || ((dist, e) => dist < e);
-		minimumPoints = minimumPoints || 2;
-
 		const visitedIndices: Record<number, boolean> = {};
 		const isVisited = (i: number) => visitedIndices[i];
 		const markVisited = (i: number) => {
