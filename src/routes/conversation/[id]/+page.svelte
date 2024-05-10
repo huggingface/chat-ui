@@ -19,6 +19,7 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
+	import { isReducedMotion } from "$lib/utils/isReduceMotion.js";
 
 	export let data;
 
@@ -74,6 +75,7 @@
 			$isAborted = false;
 			loading = true;
 			pending = true;
+			const reducedMotionMode = isReducedMotion(window);
 
 			const module = await import("browser-image-resizer");
 			// currently, only IDEFICS is supported by TGI
@@ -209,6 +211,8 @@
 			files = [];
 
 			const messageUpdates: MessageUpdate[] = [];
+			let messageContent: string = "";
+
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
 					messageUpdatesAbortController.abort();
@@ -224,8 +228,12 @@
 
 				if (update.type === "stream") {
 					pending = false;
-					messageToWriteTo.content += update.token;
+					messageContent += update.token;
 					messages = [...messages];
+
+					if (!reducedMotionMode) {
+						messageToWriteTo.content = messageContent;
+					}
 				} else if (update.type === "webSearch") {
 					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
@@ -250,6 +258,10 @@
 			}
 
 			messageToWriteTo.updates = messageUpdates;
+
+			if (reducedMotionMode) {
+				messageToWriteTo.content = messageContent;
+			}
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
