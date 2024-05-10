@@ -547,7 +547,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 								512, // number  in 'Image Width' Number component
 								call.parameters?.prompt, // prompt
 								Math.floor(Math.random() * 1000), // seed random
-							])) as { data: Array<Array<{ image: { url: string } }>> };
+							])) as unknown as { data: Array<Array<{ image: { url: string } }>> };
 
 							const response = await fetch(res?.data?.[0]?.[0]?.image?.url ?? "error");
 
