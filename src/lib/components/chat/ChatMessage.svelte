@@ -279,7 +279,7 @@
 						{@const toolDone = !!tool.find((t) => t.messageType === "message")}
 						{#if toolName && toolName !== "websearch"}
 							<details
-								class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1.5 pr-2.5 text-smd shadow-sm transition-all open:mb-3
+								class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm transition-all open:mb-3
 								open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10"
 							>
 								<summary
