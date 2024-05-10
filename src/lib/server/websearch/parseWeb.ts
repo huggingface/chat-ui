@@ -32,7 +32,9 @@ export async function parseWeb(url: string) {
 		r.headers.get("content-type")?.includes("text/plain") ||
 		r.headers.get("content-type")?.includes("text/markdown")
 	) {
-		return r.text();
+		const text = await r.text();
+		// JSON.stringify is needed to turn string concatenation into a single string (ex: "Hello, " + "world!" -> "Hello, world!")
+		return JSON.stringify(text);
 	} else {
 		throw new Error("Unsupported content type");
 	}
