@@ -10,7 +10,6 @@ import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
 import { parseStringToList } from "$lib/utils/parseStringToList";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
-import { isValidOpenAPI } from "$lib/utils/isValidOpenAPI";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
