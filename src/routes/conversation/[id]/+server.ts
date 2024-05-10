@@ -367,10 +367,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			// check if assistant has a rag
 			const assistant = await collections.assistants.findOne<
-				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings" | "functionSpec">
+				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
 			>(
 				{ _id: conv.assistantId },
-				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1, functionSpec: 1 } }
+				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
 			);
 
 			const assistantHasDynamicPrompt =
