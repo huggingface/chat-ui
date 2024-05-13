@@ -1,12 +1,12 @@
 import type { SerializedHTMLElement } from "./types";
 
-type DBSCANOptions<T> = {
+interface DBSCANOptions<T> {
 	dataset: T[];
 	epsilon?: number;
 	epsilonCompare?: (distance: number, epsilon: number) => boolean;
 	minimumPoints?: number;
 	distanceFunction: (a: T, b: T) => number;
-};
+}
 
 export function spatialParser() {
 	/**

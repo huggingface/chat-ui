@@ -4,6 +4,7 @@ import { loadPage } from "./playwright";
 
 import { spatialParser } from "./parser";
 import { htmlToMarkdownTree } from "../markdown/tree";
+import { timeout } from "$lib/utils/timeout";
 
 export const scrape =
 	(appendUpdate: AppendUpdate, maxCharsPerElem: number) =>
@@ -22,10 +23,7 @@ export const scrape =
 export async function scrapeUrl(url: string, maxCharsPerElem: number) {
 	const page = await loadPage(url);
 
-	const timeout = new Promise<never>((_, reject) =>
-		setTimeout(() => reject(new Error("Timeout")), 2000)
-	);
-	return Promise.race([timeout, page.evaluate(spatialParser)])
+	return timeout(page.evaluate(spatialParser), 2000)
 		.then(({ elements, ...parsed }) => ({
 			...parsed,
 			markdownTree: htmlToMarkdownTree(parsed.title, elements, maxCharsPerElem),

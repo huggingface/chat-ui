@@ -10,6 +10,7 @@ import { env } from "$env/dynamic/private";
 
 // Singleton initialized by initPlaywrightService
 let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }>;
+
 async function initPlaywrightService() {
 	if (playwrightService) return playwrightService;
 
@@ -37,7 +38,7 @@ async function initPlaywrightService() {
 	const ctx = await browser.newContext(options);
 	const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch).then((blker) => {
 		const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
-		if (env.WEBSEARCH_DISABLE_JAVASCRIPT) return mostBlocked.blockScripts();
+		if (env.WEBSEARCH_JAVASCRIPT) return mostBlocked.blockScripts();
 		return mostBlocked;
 	});
 	return Object.freeze({ ctx, blocker });
