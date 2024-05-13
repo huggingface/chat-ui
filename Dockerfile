@@ -83,6 +83,10 @@ COPY --chown=1000 gcp-*.json /app/
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
 
+USER root
+RUN npx playwright install-deps
+USER user
+
 RUN chmod +x /app/entrypoint.sh
 
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]
