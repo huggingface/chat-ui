@@ -24,6 +24,7 @@ import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
 import { logger } from "$lib/server/logger.js";
+import { MetricsServer } from "$lib/server/metrics"
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -549,6 +550,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			{ upsert: true }
 		);
 	}
+
+	const metricsServer = MetricsServer.getInstance();
+	metricsServer.incrementMessagesTotal(conv.model);
 
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
