@@ -15,7 +15,6 @@ export const scrape =
 			return { ...source, page };
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);
-			console.error(`Failed to parse webpage: ${source.link}`, e);
 			appendUpdate("Failed to parse webpage", [message, source.link], "error");
 		}
 	};
