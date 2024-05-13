@@ -1,7 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { getJson, type GoogleParameters } from "serpapi";
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { isURL } from "$lib/utils/url";
+import { isURL } from "$lib/utils/isUrl";
 
 type SerpApiResponse = {
 	organic_results: {

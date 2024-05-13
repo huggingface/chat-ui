@@ -1,7 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { isURL } from "$lib/utils/url";
+import { isURL } from "$lib/utils/isUrl";
 
 export default async function searchSearxng(query: string): Promise<WebSearchSource[]> {
 	const abortController = new AbortController();
