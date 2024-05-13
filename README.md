@@ -228,7 +228,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 #### Multi modal model
 
-We currently support IDEFICS, hosted on TGI, and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a PRO HF Api token. For Anthropic, see the [Anthropic section](#Anthropic)
+We currently support IDEFICS, hosted on TGI, OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a PRO HF Api token. For OpenAI, see the [OpenAI section](#OpenAI). For Anthropic, see the [Anthropic section](#Anthropic).
 
 ```env
     {
