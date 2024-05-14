@@ -1,14 +1,9 @@
 import { z } from "zod";
-import type { Endpoint, EndpointMessage } from "../endpoints";
+import type { Endpoint } from "../endpoints";
 import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources";
-import type { MessageFile } from "$lib/types/Message";
-import {
-	createImageProcessorOptionsValidator,
-	makeImageProcessor,
-	type ImageProcessorOptions,
-} from "../images";
+import { createImageProcessorOptionsValidator } from "../images";
+import { endpointMessagesToAnthropicMessages } from "./utils";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -23,6 +18,7 @@ export const endpointAnthropicParametersSchema = z.object({
 			image: createImageProcessorOptionsValidator({
 				supportedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
 				preferredMimeType: "image/webp",
+				// The 4 / 3 compensates for the 33% increase in size when converting to base64
 				maxSizeInMB: (5 / 4) * 3,
 				maxWidth: 4096,
 				maxHeight: 4096,
@@ -30,8 +26,6 @@ export const endpointAnthropicParametersSchema = z.object({
 		})
 		.default({}),
 });
-
-type NonSystemMessage = EndpointMessage & { from: "user" | "assistant" };
 
 export async function endpointAnthropic(
 	input: z.input<typeof endpointAnthropicParametersSchema>
@@ -58,22 +52,6 @@ export async function endpointAnthropic(
 			system = messages[0].content;
 		}
 
-		const messagesFormatted = await Promise.all(
-			messages
-				.filter((message): message is NonSystemMessage => message.from !== "system")
-				.map<Promise<MessageParam>>(async (message) => {
-					return {
-						role: message.from,
-						content: [
-							...(await Promise.all(
-								(message.files ?? []).map((file) => fileToImageBlock(file, multimodal.image))
-							)),
-							{ type: "text", text: message.content },
-						],
-					};
-				})
-		);
-
 		let tokenId = 0;
 
 		const parameters = { ...model.parameters, ...generateSettings };
@@ -81,7 +59,7 @@ export async function endpointAnthropic(
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-				messages: messagesFormatted,
+				messages: await endpointMessagesToAnthropicMessages(messages, multimodal),
 				max_tokens: parameters?.max_new_tokens,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
@@ -120,22 +98,5 @@ export async function endpointAnthropic(
 				} satisfies TextGenerationStreamOutput;
 			}
 		})();
-	};
-}
-
-async function fileToImageBlock(
-	file: MessageFile,
-	opts: ImageProcessorOptions<"image/png" | "image/jpeg" | "image/webp">
-): Promise<ImageBlockParam> {
-	const processor = makeImageProcessor(opts);
-	const { image, mime } = await processor(file);
-
-	return {
-		type: "image",
-		source: {
-			type: "base64",
-			media_type: mime,
-			data: image.toString("base64"),
-		},
 	};
 }
