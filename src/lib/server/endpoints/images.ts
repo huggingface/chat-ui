@@ -1,7 +1,7 @@
 import type { Sharp } from "sharp";
 import sharp from "sharp";
 import type { MessageFile } from "$lib/types/Message";
-import { z } from "zod";
+import { z, type util } from "zod";
 
 export interface ImageProcessorOptions<TMimeType extends string = string> {
 	supportedMimeTypes: TMimeType[];
@@ -29,12 +29,8 @@ export function createImageProcessorOptionsValidator<TMimeType extends string = 
 				)
 				.default(defaults.supportedMimeTypes),
 			preferredMimeType: z
-				.enum<string, [TMimeType, ...TMimeType[]]>([
-					defaults.supportedMimeTypes[0],
-					...defaults.supportedMimeTypes.slice(1),
-				])
-				.default(defaults.preferredMimeType),
-			// The 4 / 3 compensates for the 33% increase in size when converting to base64
+				.enum([defaults.supportedMimeTypes[0], ...defaults.supportedMimeTypes.slice(1)])
+				.default(defaults.preferredMimeType as util.noUndefined<TMimeType>),
 			maxSizeInMB: z.number().positive().default(defaults.maxSizeInMB),
 			maxWidth: z.number().int().positive().default(defaults.maxWidth),
 			maxHeight: z.number().int().positive().default(defaults.maxHeight),
