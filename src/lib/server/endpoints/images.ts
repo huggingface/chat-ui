@@ -3,21 +3,33 @@ import sharp from "sharp";
 import type { MessageFile } from "$lib/types/Message";
 import { z } from "zod";
 
-export function createImageProcessorOptionsValidator<MimeType extends string = string>(
-	defaults: ImageProcessorOptions<MimeType>
+export interface ImageProcessorOptions<TMimeType extends string = string> {
+	supportedMimeTypes: TMimeType[];
+	preferredMimeType: TMimeType;
+	maxSizeInMB: number;
+	maxWidth: number;
+	maxHeight: number;
+}
+export type ImageProcessor<TMimeType extends string = string> = (file: MessageFile) => Promise<{
+	image: Buffer;
+	mime: TMimeType;
+}>;
+
+export function createImageProcessorOptionsValidator<TMimeType extends string = string>(
+	defaults: ImageProcessorOptions<TMimeType>
 ) {
 	return z
 		.object({
 			supportedMimeTypes: z
 				.array(
-					z.enum<string, [MimeType, ...MimeType[]]>([
+					z.enum<string, [TMimeType, ...TMimeType[]]>([
 						defaults.supportedMimeTypes[0],
 						...defaults.supportedMimeTypes.slice(1),
 					])
 				)
 				.default(defaults.supportedMimeTypes),
 			preferredMimeType: z
-				.enum<string, [MimeType, ...MimeType[]]>([
+				.enum<string, [TMimeType, ...TMimeType[]]>([
 					defaults.supportedMimeTypes[0],
 					...defaults.supportedMimeTypes.slice(1),
 				])
@@ -30,20 +42,9 @@ export function createImageProcessorOptionsValidator<MimeType extends string = s
 		.default(defaults);
 }
 
-export interface ImageProcessorOptions<MimeType extends string = string> {
-	supportedMimeTypes: MimeType[];
-	preferredMimeType: MimeType;
-	maxSizeInMB: number;
-	maxWidth: number;
-	maxHeight: number;
-}
-export type ImageProcessor<MimeType extends string = string> = (file: MessageFile) => Promise<{
-	image: Buffer;
-	mime: MimeType;
-}>;
-export function makeImageProcessor<MimeType extends string = string>(
-	options: ImageProcessorOptions<MimeType>
-): ImageProcessor<MimeType> {
+export function makeImageProcessor<TMimeType extends string = string>(
+	options: ImageProcessorOptions<TMimeType>
+): ImageProcessor<TMimeType> {
 	return async (file) => {
 		const { supportedMimeTypes, preferredMimeType, maxSizeInMB, maxWidth, maxHeight } = options;
 		const { mime, value } = file;
@@ -57,7 +58,7 @@ export function makeImageProcessor<MimeType extends string = string>(
 		if (width === undefined || height === undefined) throw Error("Failed to read image size");
 
 		const tooLargeInSize = width > maxWidth || height > maxHeight;
-		const tooLargeInBytes = buffer.byteLength > maxSizeInMB * 1024 * 1024;
+		const tooLargeInBytes = buffer.byteLength > maxSizeInMB * 1000 * 1000;
 
 		const outputMime = chooseMimeType(supportedMimeTypes, preferredMimeType, mime, {
 			preferSizeReduction: tooLargeInBytes,
@@ -91,10 +92,10 @@ export function makeImageProcessor<MimeType extends string = string>(
 	};
 }
 
-type OutputFormat = "png" | "jpeg" | "webp" | "avif" | "tiff" | "gif";
-const outputFormats: OutputFormat[] = ["png", "jpeg", "webp", "avif", "tiff", "gif"];
+const outputFormats = ["png", "jpeg", "webp", "avif", "tiff", "gif"] as const;
+type OutputImgFormat = (typeof outputFormats)[number];
 const isOutputFormat = (format: string): format is (typeof outputFormats)[number] =>
-	outputFormats.includes(format as OutputFormat);
+	outputFormats.includes(format as OutputImgFormat);
 
 export function convertImage(sharpInst: Sharp, outputMime: string): Sharp {
 	const [type, format] = outputMime.split("/");
@@ -113,7 +114,7 @@ export function convertImage(sharpInst: Sharp, outputMime: string): Sharp {
 const blocklistedMimes = ["image/heic", "image/heif"];
 
 /** Sorted from largest to smallest */
-const mimesBySize = [
+const mimesBySizeDesc = [
 	"image/png",
 	"image/tiff",
 	"image/gif",
@@ -146,7 +147,7 @@ function chooseMimeType<T extends readonly string[]>(
 
 	if (blocklistedMimes.includes(mime)) throw Error(`Received blocklisted mime type: ${mime}`);
 
-	const smallestMime = mimesBySize.findLast((m) => supportedMimes.includes(m));
+	const smallestMime = mimesBySizeDesc.findLast((m) => supportedMimes.includes(m));
 	return smallestMime ?? preferredMime;
 }
 

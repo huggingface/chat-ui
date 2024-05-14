@@ -12,10 +12,9 @@ export type Message = Partial<Timestamps> & {
 	webSearch?: WebSearch;
 	score?: -1 | 0 | 1;
 	/**
-	 * Either contains the base64 encoded image data or the hash of the file
-	 * The client will always use base64, while the server uses the hash
-	 * in the typical case
-	 */
+	 * Either contains the base64 encoded image data
+	 * or the hash of the file stored on the server
+	 **/
 	files?: MessageFile[];
 	interrupted?: boolean;
 

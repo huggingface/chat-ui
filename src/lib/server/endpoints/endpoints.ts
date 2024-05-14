@@ -33,7 +33,6 @@ export interface EndpointParameters {
 
 interface CommonEndpoint {
 	weight: number;
-	// todo: add multi modal options here
 }
 // type signature for the endpoint
 export type Endpoint = (

@@ -463,7 +463,7 @@ MODELS=`[
 
 #### Anthropic
 
-We also support Anthropic models (including multimodal ones) through the official SDK. You may provide your API key via the `ANTHROPIC_API_KEY` env variable, or alternatively, through the `endpoints.apiKey` as per the following example.
+We also support Anthropic models (including multimodal ones via `multmodal: true`) through the official SDK. You may provide your API key via the `ANTHROPIC_API_KEY` env variable, or alternatively, through the `endpoints.apiKey` as per the following example.
 
 ```
 MODELS=`[
