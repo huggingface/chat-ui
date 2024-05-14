@@ -1,7 +1,7 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
-import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
-import type { EndpointMessage } from "../endpoints/endpoints";
+import type { EndpointMessage } from "../../endpoints/endpoints";
+import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");

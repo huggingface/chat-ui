@@ -28,7 +28,6 @@ envVars:
   ENABLE_ASSISTANTS: "true"
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
-  MESSAGES_BEFORE_LOGIN: 0
   METRICS_PORT: 5565
   LOG_LEVEL: "debug"
   MODELS: >
@@ -81,7 +80,9 @@ envVars:
         "parameters": {
           "stop": ["<|eot_id|>"],
           "truncate": 6144,
-          "max_new_tokens": 2047
+          "max_new_tokens": 2047,
+          "temperature": 0.6,
+          "top_p" : 0.9
         }
       },
       {
@@ -94,6 +95,7 @@ envVars:
         "parameters": {
           "truncate" : 24576,
           "max_new_tokens" : 8192,
+          "temperature": 0.6
         },
         "preprompt" : "You are Zephyr, an assistant developed by KAIST AI, Argilla, and Hugging Face. You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. You are happy to help with writing, analysis, question answering, math, coding, and all sorts of other tasks.",
         "promptExamples" : [
@@ -323,6 +325,7 @@ externalSecrets:
     WEBHOOK_URL_REPORT_ASSISTANT: "hub-prod-chat-ui-webhook-report-assistant"
     ADMIN_API_SECRET: "hub-prod-chat-ui-admin-api-secret"
     USAGE_LIMITS: "hub-prod-chat-ui-usage-limits"
+    MESSAGES_BEFORE_LOGIN: "hub-prod-chat-ui-messages-before-login"
 
 autoscaling:
   enabled: true

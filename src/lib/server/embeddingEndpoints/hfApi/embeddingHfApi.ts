@@ -32,7 +32,12 @@ export async function embeddingEndpointHfApi(
 						"Content-Type": "application/json",
 						...(authorization ? { Authorization: authorization } : {}),
 					},
-					body: JSON.stringify({ inputs: batchInputs }),
+					body: JSON.stringify({
+						inputs: {
+							source_sentence: batchInputs[0],
+							sentences: batchInputs.slice(1),
+						},
+					}),
 				});
 
 				if (!response.ok) {

@@ -170,6 +170,8 @@ You can enable the web search through an API by adding `YDC_API_KEY` ([docs.you.
 
 You can also simply enable the local google websearch by setting `USE_LOCAL_WEBSEARCH=true` in your `.env.local` or specify a SearXNG instance by adding the query URL to `SEARXNG_QUERY_URL`.
 
+You can enable Javascript when parsing webpages to improve compatibility with `WEBSEARCH_JAVASCRIPT=true` at the cost of increased CPU usage. You'll want at least 4 cores when enabling.
+
 ### Custom models
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
@@ -519,6 +521,51 @@ MODELS=`[
           // optionals
           "apiKey": "sk-ant-...",
           "baseURL": "https://api.anthropic.com",
+          "defaultHeaders": {},
+          "defaultQuery": {}
+        }
+      ]
+  }
+]`
+```
+
+We also support using Anthropic models running on Vertex AI. Authentication is done using Google Application Default Credentials. Project ID can be provided through the `endpoints.projectId` as per the following example:
+
+```
+MODELS=`[
+  {
+      "name": "claude-3-sonnet@20240229",
+      "displayName": "Claude 3 Sonnet",
+      "description": "Ideal balance of intelligence and speed",
+      "multimodal": true,
+      "parameters": {
+        "max_new_tokens": 4096,
+      },
+      "endpoints": [
+        {
+          "type": "anthropic-vertex",
+          "region": "us-central1",
+          "projectId": "gcp-project-id",
+          // optionals
+          "defaultHeaders": {},
+          "defaultQuery": {}
+        }
+      ]
+  },
+  {
+      "name": "claude-3-haiku@20240307",
+      "displayName": "Claude 3 Haiku",
+      "description": "Fastest, most compact model for near-instant responsiveness",
+      "multimodal": true,
+      "parameters": {
+         "max_new_tokens": 4096
+      },
+      "endpoints": [
+        {
+          "type": "anthropic-vertex",
+          "region": "us-central1",
+          "projectId": "gcp-project-id",
+          // optionals
           "defaultHeaders": {},
           "defaultQuery": {}
         }

@@ -16,11 +16,8 @@ export async function preprocessMessages(
 
 function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"]) {
 	const webSearchContext = webSearch?.contextSources
-		.map(({ context }) => context)
-		.flat()
-		.sort((a, b) => a.idx - b.idx)
-		.map(({ text }) => text)
-		.join(" ");
+		.map(({ context }) => context.trim())
+		.join("\n\n----------\n\n");
 
 	// No web search context available, skip
 	if (!webSearch || !webSearchContext?.trim()) return messages;
@@ -36,7 +33,7 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 
 	const finalMessage = {
 		...messages[messages.length - 1],
-		content: `I searched the web using the query: ${webSearch.searchQuery}. 
+		content: `I searched the web using the query: ${webSearch.searchQuery}.
 Today is ${currentDate} and here are the results:
 =====================
 ${webSearchContext}
