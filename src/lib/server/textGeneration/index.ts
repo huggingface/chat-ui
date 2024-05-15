@@ -32,12 +32,9 @@ export async function* textGeneration(
 
 	// TODO: should be a better way to detect if the conversation is new
 	// TODO: dont wait for this
+	let titlePromise: Promise<string> | undefined;
 	if (conv.title === "New Chat" && conv.messages.length === 3) {
-		const title = (await generateTitle(conv.messages[1].content)) ?? "New Chat";
-		yield {
-			type: TextGenerationUpdateType.Title,
-			title,
-		};
+		titlePromise = generateTitle(conv.messages[1].content).then((title) => title ?? "New Chat");
 	}
 
 	// perform websearch if requested
@@ -69,4 +66,11 @@ export async function* textGeneration(
 		convId
 	);
 	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
+
+	if (titlePromise) {
+		yield {
+			type: TextGenerationUpdateType.Title,
+			title: await titlePromise,
+		};
+	}
 }
