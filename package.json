@@ -52,6 +52,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@e2b/code-interpreter": "^0.0.5",
 		"@gradio/client": "^0.19.0",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
