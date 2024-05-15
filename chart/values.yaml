@@ -16,6 +16,7 @@ ingress:
   enabled: true
   path: "/"
   annotations: { }
+  # className: "nginx"
 
 resources:
   requests:

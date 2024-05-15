@@ -7,6 +7,9 @@ metadata:
   name: {{ include "name" . }}
   namespace: {{ .Release.Namespace }}
 spec:
+  {{ if $.Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{ end }}
   rules:
     - host: {{ .Values.domain }}
       http:
