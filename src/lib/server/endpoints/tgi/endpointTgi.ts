@@ -35,9 +35,9 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 		endpointTgiParametersSchema.parse(input);
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
-	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings, isMultimodal }) => {
 		const messagesWithResizedFiles = await Promise.all(
-			messages.map((message) => prepareMessage(message, imageProcessor))
+			messages.map((message) => prepareMessage(Boolean(isMultimodal), message, imageProcessor))
 		);
 
 		const prompt = await buildPrompt({
@@ -80,9 +80,12 @@ const whiteImage = {
 };
 
 async function prepareMessage(
+	isMultimodal: boolean,
 	message: EndpointMessage,
 	imageProcessor: ImageProcessor
 ): Promise<EndpointMessage> {
+	if (!isMultimodal) return message;
+
 	const files = await Promise.all(message.files?.map(imageProcessor) ?? [whiteImage]);
 	const markdowns = files.map(
 		(file) => `![](data:${file.mime};base64,${file.image.toString("base64")})`

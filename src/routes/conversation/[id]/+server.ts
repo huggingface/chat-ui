@@ -435,6 +435,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					preprompt,
 					continueMessage: isContinue,
 					generateSettings: assistant?.generateSettings,
+					isMultimodal: model.multimodal,
 				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {

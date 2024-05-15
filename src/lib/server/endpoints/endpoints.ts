@@ -33,6 +33,7 @@ export interface EndpointParameters {
 	preprompt?: Conversation["preprompt"];
 	continueMessage?: boolean; // used to signal that the last message will be extended
 	generateSettings?: Partial<Model["parameters"]>;
+	isMultimodal?: boolean;
 }
 
 interface CommonEndpoint {
