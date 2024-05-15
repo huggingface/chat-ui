@@ -1,6 +1,6 @@
 import { ToolResultStatus } from "$lib/types/Tool";
-import type { BackendTool } from ".";
-import { parseWeb } from "../websearch/parseWeb";
+import type { BackendTool } from "..";
+import { parseWeb } from "../../websearch/parseWeb";
 
 const fetchUrl: BackendTool = {
 	name: "fetchUrl",

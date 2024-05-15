@@ -5,10 +5,9 @@ import type { Tool, ToolResult } from "$lib/types/Tool";
 import type { TextGenerationUpdate } from "../textGeneration/types";
 import calculator from "./calculator";
 import codeInterpreter from "./codeInterpreter";
-import directlyAnswer from "./directlyAnswer";
-import fetchUrl from "./fetchUrl";
-import text2img from "./text2img";
-import websearch from "./websearch";
+import fetchUrl from "./web/url";
+import text2image from "./multimodal/text2image";
+import websearch from "./web/search";
 
 interface BackendToolContext {
 	conv: Conversation;
@@ -27,8 +26,7 @@ export interface BackendTool extends Tool {
 export const allTools: BackendTool[] = [
 	calculator,
 	codeInterpreter,
-	directlyAnswer,
 	fetchUrl,
-	text2img,
+	text2image,
 	websearch,
 ];

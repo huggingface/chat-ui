@@ -4,7 +4,7 @@ import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
-import { ToolResultStatus, type Tool, type ToolResult } from "$lib/types/Tool";
+import { ToolResultStatus } from "$lib/types/Tool";
 import stream from "stream";
 
 export const endpointCohereParametersSchema = z.object({
@@ -35,9 +35,6 @@ export async function endpointCohere(
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
 		}
-
-		tools = tools?.filter((tool) => tool.name !== "directly_answer")?.map(toCohereTool);
-		console.log(toolResults);
 
 		const parameters = { ...model.parameters, ...generateSettings };
 
@@ -145,14 +142,6 @@ export async function endpointCohere(
 				}
 			}
 		})();
-	};
-}
-
-function toCohereTool(tool: Tool): Cohere.Tool {
-	return {
-		name: tool.name,
-		description: tool.description,
-		parameterDefinitions: tool.parameter_definitions,
 	};
 }
 

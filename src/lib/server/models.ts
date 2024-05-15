@@ -12,6 +12,7 @@ import type { PreTrainedTokenizer } from "@xenova/transformers";
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
+import { ToolResultStatus } from "$lib/types/Tool";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -112,26 +113,50 @@ async function getChatPromptRender(
 		}
 
 		if (toolResults && toolResults.length > 0) {
+			// todo: should update the command r+ tokenizer to support system messages at any location
+			// or use the `rag` mode without the citations
 			formattedMessages = [
-				...formattedMessages,
 				{
 					role: "system",
 					content:
-						"<results>" +
-						toolResults
-							.map((result, idx) => `\nDocument: ${idx}\n${result.key}\n${result.value}`)
-							.join("\n") +
+						"\n\n<results>\n" +
+						toolResults.flatMap((result, idx) => {
+							if (result.status === ToolResultStatus.Error) {
+								return `Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message;
+							}
+							return (
+								`Document: ${idx}\n` +
+								result.outputs
+									.flatMap((output) =>
+										Object.entries(output).map(([title, text]) => `${title}\n${text}`)
+									)
+									.join("\n")
+							);
+						}) +
 						"\n</results>",
 				},
+				...formattedMessages,
 			];
 			tools = [];
 		}
 
 		let chatTemplate: string | undefined = undefined;
 
-		if ((tools?.length ?? 0) > 0) {
+		if (tools && tools.length > 0) {
 			chatTemplate = "tool_use";
 		}
+
+		const documents = (toolResults ?? []).flatMap((result) => {
+			if (result.status === ToolResultStatus.Error) {
+				return [{ title: `Tool "${result.call.name}" error`, text: "\n" + result.message }];
+			}
+			return result.outputs.flatMap((output) =>
+				Object.entries(output).map(([title, text]) => ({
+					title: `Tool "${result.call.name}" ${title}`,
+					text: "\n" + text,
+				}))
+			);
+		});
 
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
@@ -140,6 +165,7 @@ async function getChatPromptRender(
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
 			tools: tools ?? [],
+			documents,
 		});
 
 		if (typeof output !== "string") {

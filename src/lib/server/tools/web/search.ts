@@ -1,6 +1,6 @@
 import { ToolResultStatus } from "$lib/types/Tool";
-import type { BackendTool } from ".";
-import { runWebSearch } from "../websearch/runWebSearch";
+import type { BackendTool } from "..";
+import { runWebSearch } from "../../websearch/runWebSearch";
 
 const websearch: BackendTool = {
 	name: "websearch",

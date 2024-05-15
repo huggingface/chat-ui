@@ -1,7 +1,9 @@
 import { ToolResultStatus, type ToolCall, type ToolResult } from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
+import JSON5 from "json5";
 import type { BackendTool } from "../tools";
 import {
+	TextGenerationStatus,
 	TextGenerationToolUpdateType,
 	TextGenerationUpdateType,
 	type TextGenerationContext,
@@ -10,7 +12,8 @@ import {
 
 import { allTools } from "../tools";
 import directlyAnswer from "../tools/directlyAnswer";
-import websearch from "../tools/websearch";
+import websearch from "../tools/web/search";
+import { z } from "zod";
 
 export function pickTools(
 	toolsPreference: Record<string, boolean>,
@@ -40,7 +43,36 @@ export async function* runTools(
 		generateSettings: assistant?.generateSettings,
 		tools,
 	})) {
-		calls.push(...(output.token.toolCalls ?? []));
+		// model natively supports tool calls
+		if (output.token.toolCalls) {
+			calls.push(...output.token.toolCalls);
+			continue;
+		}
+
+		// look for a code blocks of ```json and parse them
+		// if they're valid json, add them to the calls array
+		if (output.generated_text) {
+			console.log(output.generated_text);
+			const codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
+			if (!codeBlocks) continue;
+
+			for (const block of codeBlocks) {
+				const trimmedBlock = block.replace("```json\n", "").slice(0, -3);
+				try {
+					calls.push(
+						...JSON5.parse(trimmedBlock).filter(isExternalToolCall).map(externalToToolCall)
+					);
+				} catch (cause) {
+					// error parsing the calls
+					yield {
+						type: TextGenerationUpdateType.Status,
+						status: TextGenerationStatus.Error,
+						message: cause instanceof Error ? cause.message : String(cause),
+					};
+					console.error(cause);
+				}
+			}
+		}
 	}
 
 	const toolResults: ToolResult[] = [];
@@ -79,4 +111,20 @@ export async function* runTools(
 	}
 
 	return toolResults;
+}
+
+const externalToolCall = z.object({
+	tool_name: z.string(),
+	parameters: z.record(z.string()),
+});
+type ExternalToolCall = z.infer<typeof externalToolCall>;
+function isExternalToolCall(call: unknown): call is ExternalToolCall {
+	return externalToolCall.safeParse(call).success;
+}
+
+function externalToToolCall(call: ExternalToolCall): ToolCall {
+	return {
+		name: call.tool_name,
+		parameters: call.parameters,
+	};
 }

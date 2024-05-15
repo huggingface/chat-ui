@@ -1,6 +1,6 @@
-import type { BackendTool } from ".";
-import { uploadFile } from "../files/uploadFile";
-import { TextGenerationUpdateType } from "../textGeneration/types";
+import type { BackendTool } from "..";
+import { uploadFile } from "../../files/uploadFile";
+import { TextGenerationUpdateType } from "../../textGeneration/types";
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
 import { ToolResultStatus } from "$lib/types/Tool";
