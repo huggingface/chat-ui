@@ -9,33 +9,21 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
-import type { Assistant } from "$lib/types/Assistant";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
-import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
-import { isURLLocal } from "$lib/server/isURLLocal.js";
-import JSON5 from "json5";
-import type { Call, ToolResult } from "$lib/types/Tool.js";
-import { v4 } from "uuid";
-
-import { Client } from "@gradio/client";
-
-import directlyAnswer from "$lib/server/tools/directlyAnswer.js";
-import calculator from "$lib/server/tools/calculator.js";
-import websearch from "$lib/server/tools/websearch.js";
-import text2img from "$lib/server/tools/text2img.js";
-import fetchUrl from "$lib/server/tools/fetchUrl.js";
-import { logger } from "$lib/server/logger.js";
-import type { BackendTool } from "$lib/server/tools/index.js";
+import { textGeneration } from "$lib/server/textGeneration";
+import {
+	TextGenerationToolUpdateType,
+	TextGenerationUpdateType,
+	TextGenerationWebSearchUpdateType,
+	type TextGenerationContext,
+} from "$lib/server/textGeneration/types";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -314,13 +302,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		async start(controller) {
 			messageToWriteTo.updates ??= [];
 			function update(newUpdate: MessageUpdate) {
-				if (newUpdate.type !== "stream") {
-					messageToWriteTo?.updates?.push(newUpdate);
-				}
-
-				if (newUpdate.type === "stream" && newUpdate.token === "") {
-					return;
-				}
+				console.log(newUpdate);
+				if (newUpdate.type !== "stream") messageToWriteTo?.updates?.push(newUpdate);
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
 
 				if (newUpdate.type === "finalAnswer") {
@@ -329,339 +312,98 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			}
 
-			update({ type: "status", status: "started" });
-
-			const summarizeIfNeeded = (async () => {
-				if (conv.title === "New Chat" && conv.messages.length === 3) {
-					try {
-						conv.title = (await summarize(conv.messages[1].content)) ?? conv.title;
-						update({ type: "status", status: "title", message: conv.title });
-						await collections.conversations.updateOne(
-							{
-								_id: convId,
-							},
-							{
-								$set: {
-									title: conv?.title,
-									updatedAt: new Date(),
-								},
-							}
-						);
-					} catch (e) {
-						logger.error(e);
-					}
-				}
-			})();
-
 			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						title: conv.title,
-						updatedAt: new Date(),
-					},
-				}
+				{ _id: convId },
+				{ $set: { title: conv.title, updatedAt: new Date() } }
 			);
-
-			// check if assistant has a rag
-			const assistant = await collections.assistants.findOne<
-				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
-			>(
-				{ _id: conv.assistantId },
-				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
-			);
-
-			const assistantHasDynamicPrompt =
-				env.ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
-
-			const assistantHasWebSearch =
-				env.ENABLE_ASSISTANTS_RAG === "true" &&
-				!!assistant &&
-				!!assistant.rag &&
-				(assistant.rag.allowedLinks.length > 0 ||
-					assistant.rag.allowedDomains.length > 0 ||
-					assistant.rag.allowAllDomains);
-
-			// perform websearch if requested
-			// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
-			// if the assistant is functions enabled, we don't perform it here
-			// since we will add the websearch as a tool
-
-			if (
-				!isContinue &&
-				!model.functions &&
-				((webSearch && !conv.assistantId) || assistantHasWebSearch)
-			) {
-				messageToWriteTo.webSearch = await runWebSearch(conv, messagesForPrompt, update, {
-					ragSettings: assistant?.rag,
-				});
-			}
-
-			let preprompt = conv.preprompt;
-
-			if (assistantHasDynamicPrompt && preprompt) {
-				// process the preprompt
-				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
-				let match;
-				while ((match = urlRegex.exec(preprompt)) !== null) {
-					try {
-						const url = new URL(match[1]);
-						if ((await isURLLocal(url)) && env.ENABLE_LOCAL_FETCH !== "true") {
-							throw new Error("URL couldn't be fetched, it resolved to a local address.");
-						}
-
-						const res = await fetch(url.href);
-
-						if (!res.ok) {
-							throw new Error("URL couldn't be fetched, error " + res.status);
-						}
-						const text = await res.text();
-						preprompt = preprompt.replaceAll(match[0], text);
-					} catch (e) {
-						preprompt = preprompt.replaceAll(match[0], (e as Error).message);
-					}
-				}
-
-				if (messagesForPrompt[0].from === "system") {
-					messagesForPrompt[0].content = preprompt;
-				}
-			}
-
-			const endpoint = await model.getEndpoint();
-			let toolResults: ToolResult[] | undefined = undefined;
-
-			// function calls, if no assistant or assistant has websearch enabled
-			if (model.functions && (!assistant || assistantHasWebSearch)) {
-				let tools: BackendTool[] = [];
-
-				// if it's an assistant, only support websearch for now
-				if (!assistant) {
-					// filter based on tool preferences, add the tools that are on by default
-					tools = [directlyAnswer, text2img, calculator, fetchUrl, websearch].filter((el) => {
-						if (el.isLocked && el.isOnByDefault) {
-							return true;
-						}
-
-						return toolsPreferences?.[el.name] ?? el.isOnByDefault;
-					});
-				} else {
-					// an assistant can currently only use tools for websearch
-					tools = [directlyAnswer, websearch];
-				}
-
-				let calls: Call[] | undefined = undefined;
-
-				// do the function calling bits here
-				for await (const output of await endpoint({
-					messages: messagesForPrompt,
-					preprompt,
-					generateSettings: assistant?.generateSettings,
-					tools,
-				})) {
-					if (output.generated_text) {
-						// look for a code blocks of ```json and parse them
-						// if they're valid json, add them to the calls array
-						const codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
-						if (codeBlocks) {
-							for (const block of codeBlocks) {
-								try {
-									calls = JSON5.parse(block.replace("```json\n", "").slice(0, -3));
-								} catch (e) {
-									update({
-										type: "error",
-										message: (e as Error).message,
-										name: (e as Error).name,
-									});
-									console.error(e);
-									// error parsing the calls
-								}
-							}
-						}
-					}
-				}
-
-				const toolPromises = calls?.map(async (call) => {
-					const uuid = v4();
-
-					if (call.tool_name === "directly-answer" || call.tool_name === "directly_answer") {
-						return null;
-					}
-
-					update({
-						type: "tool",
-						name: call.tool_name,
-						messageType: "parameters",
-						parameters: call.parameters,
-						uuid,
-					});
-					const tool = tools.find((el) => el.name === call.tool_name);
-
-					let toolAnswer: ToolResult | Promise<ToolResult> | null = (async () => {
-						if (!tool) {
-							return {
-								key: call.tool_name,
-								status: "error",
-								value: "Could not find tool",
-							};
-						}
-
-						if (tool.call) {
-							return await tool.call(call.parameters);
-						}
-
-						if (tool.name === "websearch") {
-							try {
-								const webSearchToolResults = await runWebSearch(conv, messagesForPrompt, update, {
-									ragSettings: assistant?.rag,
-									query: call.parameters?.query,
-								});
-								const chunks = webSearchToolResults?.contextSources
-									.map(({ context }) => context)
-									.flat()
-									.sort((a, b) => a.idx - b.idx)
-									.map(({ text }) => text)
-									.join(" ");
-
-								return {
-									key: call.tool_name,
-									status: "success",
-									value: chunks,
-									display: false,
-								};
-							} catch (e) {
-								return {
-									key: call.tool_name,
-									status: "error",
-									value: "Error within the websearch. Try again later or with a different query",
-								};
-							}
-						} else if (tool.name === "text2img") {
-							const app = await Client.connect("ByteDance/Hyper-SDXL-1Step-T2I", {
-								hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
-							});
-							const res = (await app.predict("/process_image", [
-								1, // number (numeric value between 1 and 8) in 'Number of Images' Slider component
-								512, // number  in 'Image Height' Number component
-								512, // number  in 'Image Width' Number component
-								call.parameters?.prompt, // prompt
-								Math.floor(Math.random() * 1000), // seed random
-							])) as unknown as { data: Array<Array<{ image: { url: string } }>> };
-
-							const response = await fetch(res?.data?.[0]?.[0]?.image?.url ?? "error");
-
-							const sha = await uploadFile(await response.blob(), conv);
-
-							messageToWriteTo.files = [...(messageToWriteTo.files ?? []), sha];
-
-							update({
-								type: "file",
-								sha,
-							});
-
-							return {
-								key: call.tool_name,
-								status: "success",
-								value: `An image has been generated for the following prompt: ${call.parameters?.prompt}. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,
-								display: false,
-							};
-						} else {
-							return {
-								key: call.tool_name,
-								status: "error",
-								value: "Not implemented",
-							};
-						}
-					})();
-
-					if (toolAnswer instanceof Promise) {
-						toolAnswer = await toolAnswer;
-					}
-
-					if (toolAnswer) {
-						update({
-							type: "tool",
-							name: toolAnswer.key,
-							messageType: "message",
-							message: toolAnswer.value,
-							display: toolAnswer.display,
-							uuid,
-						});
-					}
-					return toolAnswer;
-				});
-
-				if (toolPromises) {
-					toolResults = (await Promise.all(toolPromises)).flatMap((el) => (el ? [el] : []));
-				}
-			}
-			// inject websearch result & optionally images into the messages
-			const processedMessages = await preprocessMessages(
-				messagesForPrompt,
-				messageToWriteTo.webSearch,
-				model.multimodal,
-				convId
-			);
-
-			const previousText = messageToWriteTo.content;
-
-			let hasError = false;
-
-			let buffer = "";
-
 			messageToWriteTo.updatedAt = new Date();
 
+			let hasError = false;
+			const initialMessageContent = messageToWriteTo.content;
 			try {
-				for await (const output of await endpoint({
-					messages: processedMessages,
-					preprompt,
-					continueMessage: isContinue,
-					generateSettings: assistant?.generateSettings,
-					toolResults,
-				})) {
-					// if not generated_text is here it means the generation is not done
-					if (!output.generated_text) {
-						if (!output.token.special) {
-							buffer += output.token.text;
-
-							// send the first 5 chars
-							// and leave the rest in the buffer
-							if (buffer.length >= 5) {
-								update({
-									type: "stream",
-									token: buffer.slice(0, 5),
-								});
-								buffer = buffer.slice(5);
-							}
-
-							// abort check
-							const date = AbortedGenerations.getInstance().getList().get(convId.toString());
-							if (date && date > promptedAt) {
-								break;
-							}
-							// no output check
-							if (!output) {
-								break;
-							}
-
-							// otherwise we just concatenate tokens
-							messageToWriteTo.content += output.token.text;
+				const ctx: TextGenerationContext = {
+					model,
+					endpoint: await model.getEndpoint(),
+					conv,
+					messages: messagesForPrompt,
+					assistant: undefined,
+					isContinue: isContinue ?? false,
+					webSearch: webSearch ?? false,
+					toolsPreference: toolsPreferences ?? {},
+					promptedAt,
+				};
+				for await (const event of textGeneration(ctx)) {
+					if (event.type === TextGenerationUpdateType.Status) {
+						update({ type: "status", status: event.status, message: event.message });
+					}
+					if (event.type === TextGenerationUpdateType.Title) {
+						conv.title = event.title;
+						await collections.conversations.updateOne(
+							{ _id: convId },
+							{ $set: { title: conv?.title, updatedAt: new Date() } }
+						);
+						update({ type: "status", status: "title", message: event.title });
+					}
+					if (event.type === TextGenerationUpdateType.FinalAnswer) {
+						messageToWriteTo.interrupted = event.interrupted;
+						messageToWriteTo.content = initialMessageContent + event.text;
+						update({ type: "finalAnswer", text: event.text });
+					}
+					if (event.type === TextGenerationUpdateType.Stream) {
+						if (event.token === "") continue;
+						messageToWriteTo.content += event.token;
+						update({ type: "stream", token: event.token });
+					}
+					if (event.type === TextGenerationUpdateType.File) {
+						messageToWriteTo.files = [...(messageToWriteTo.files ?? []), event.sha];
+						update({ type: "file", sha: event.sha });
+					}
+					if (event.type === TextGenerationUpdateType.Tool) {
+						if (event.subtype === TextGenerationToolUpdateType.Message) {
+							update({
+								type: "tool",
+								name: event.name,
+								messageType: "message",
+								message: event.message,
+								display: event.display,
+								uuid: event.uuid,
+							});
+						} else {
+							update({
+								type: "tool",
+								name: event.name,
+								messageType: "parameters",
+								parameters: event.parameters,
+								uuid: event.uuid,
+							});
 						}
-					} else {
-						messageToWriteTo.interrupted =
-							!output.token.special && !model.parameters.stop?.includes(output.token.text);
-						// add output.generated text to the last message
-						// strip end tokens from the output.generated_text
-						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
-							if (acc.endsWith(curr)) {
-								messageToWriteTo.interrupted = false;
-								return acc.slice(0, acc.length - curr.length);
-							}
-							return acc;
-						}, output.generated_text.trimEnd());
-
-						messageToWriteTo.content = previousText + text;
+					}
+					if (event.type === TextGenerationUpdateType.WebSearch) {
+						if (event.subtype === TextGenerationWebSearchUpdateType.Update) {
+							update({
+								type: "webSearch",
+								messageType: "update",
+								message: event.message,
+								args: event.args,
+							});
+						} else if (event.subtype === TextGenerationWebSearchUpdateType.Error) {
+							update({
+								type: "webSearch",
+								messageType: "error",
+								message: event.message,
+								args: event.args,
+							});
+						} else if (event.subtype === TextGenerationWebSearchUpdateType.Sources) {
+							update({
+								type: "webSearch",
+								messageType: "sources",
+								sources: event.sources,
+								message: event.message,
+							});
+						} else if (event.subtype === TextGenerationWebSearchUpdateType.FinalAnswer) {
+							// something else too?
+							messageToWriteTo.webSearch = event.webSearch;
+						}
 					}
 				}
 			} catch (e) {
@@ -670,62 +412,31 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				console.error(e);
 			} finally {
 				// check if no output was generated
-				if (!hasError && messageToWriteTo.content === previousText) {
+				if (!hasError && messageToWriteTo.content === initialMessageContent) {
 					update({
 						type: "status",
 						status: "error",
 						message: "No output was generated. Something went wrong.",
 					});
 				}
-
-				if (buffer) {
-					update({
-						type: "stream",
-						token: buffer,
-					});
-				}
 			}
 
 			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						messages: conv.messages,
-						title: conv?.title,
-						updatedAt: new Date(),
-					},
-				}
+				{ _id: convId },
+				{ $set: { messages: conv.messages, title: conv?.title, updatedAt: new Date() } }
 			);
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;
 
-			update({
-				type: "finalAnswer",
-				text: messageToWriteTo.content,
-			});
-
-			await summarizeIfNeeded;
 			controller.close();
-			return;
 		},
 		async cancel() {
-			if (!doneStreaming) {
-				await collections.conversations.updateOne(
-					{
-						_id: convId,
-					},
-					{
-						$set: {
-							messages: conv.messages,
-							title: conv.title,
-							updatedAt: new Date(),
-						},
-					}
-				);
-			}
+			if (doneStreaming) return;
+			await collections.conversations.updateOne(
+				{ _id: convId },
+				{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
+			);
 		},
 	});
 

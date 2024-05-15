@@ -4,6 +4,8 @@ import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
+import { ToolResultStatus, type Tool, type ToolResult } from "$lib/types/Tool";
+import stream from "stream";
 
 export const endpointCohereParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -33,6 +35,9 @@ export async function endpointCohere(
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
 		}
+
+		tools = tools?.filter((tool) => tool.name !== "directly_answer")?.map(toCohereTool);
+		console.log(toolResults);
 
 		const parameters = { ...model.parameters, ...generateSettings };
 
@@ -69,20 +74,34 @@ export async function endpointCohere(
 						message: message.content,
 					})) satisfies Cohere.ChatMessage[];
 
-				stream = await cohere.chatStream({
-					model: model.id ?? model.name,
-					chatHistory: formattedMessages.slice(0, -1),
-					message: formattedMessages[formattedMessages.length - 1].message,
-					preamble: system,
-					p: parameters?.top_p,
-					k: parameters?.top_k,
-					maxTokens: parameters?.max_new_tokens,
-					temperature: parameters?.temperature,
-					stopSequences: parameters?.stop,
-					frequencyPenalty: parameters?.frequency_penalty,
-					tools,
-					//TODO: Add toolResults
-				});
+				stream = await cohere
+					.chatStream({
+						model: model.id ?? model.name,
+						chatHistory: formattedMessages.slice(0, -1),
+						message: formattedMessages[formattedMessages.length - 1].message,
+						preamble: system,
+						p: parameters?.top_p,
+						k: parameters?.top_k,
+						maxTokens: parameters?.max_new_tokens,
+						temperature: parameters?.temperature,
+						stopSequences: parameters?.stop,
+						frequencyPenalty: parameters?.frequency_penalty,
+						tools,
+						toolResults: toolResults?.map((toolResult) => {
+							if (toolResult.status === ToolResultStatus.Error) {
+								return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
+							}
+							return { call: toolResult.call, outputs: toolResult.outputs };
+						}),
+					})
+					.catch((err) => {
+						if (err.body) {
+							convertWebStreamToBuffer(err.body).then(console.log).catch(console.error);
+						} else {
+							console.error(err);
+						}
+						throw err;
+					});
 			}
 
 			for await (const output of stream) {
@@ -97,6 +116,18 @@ export async function endpointCohere(
 						generated_text: null,
 						details: null,
 					} satisfies TextGenerationStreamOutput;
+				} else if (output.eventType === "tool-calls-generation") {
+					yield {
+						token: {
+							id: tokenId++,
+							text: "",
+							logprob: 0,
+							special: true,
+							toolCalls: output.toolCalls,
+						},
+						generated_text: null,
+						details: null,
+					};
 				} else if (output.eventType === "stream-end") {
 					if (["ERROR", "ERROR_TOXIC", "ERROR_LIMIT"].includes(output.finishReason)) {
 						throw new Error(output.finishReason);
@@ -115,4 +146,35 @@ export async function endpointCohere(
 			}
 		})();
 	};
+}
+
+function toCohereTool(tool: Tool): Cohere.Tool {
+	return {
+		name: tool.name,
+		description: tool.description,
+		parameterDefinitions: tool.parameter_definitions,
+	};
+}
+
+async function convertWebStreamToBuffer(webReadableStream) {
+	return new Promise((resolve, reject) => {
+		const chunks = [];
+
+		stream.pipeline(
+			webReadableStream,
+			new stream.Writable({
+				write(chunk, encoding, callback) {
+					chunks.push(chunk);
+					callback();
+				},
+			}),
+			(err) => {
+				if (err) {
+					reject(err);
+				} else {
+					resolve(Buffer.concat(chunks).toString("utf-8"));
+				}
+			}
+		);
+	});
 }

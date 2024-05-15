@@ -1,3 +1,4 @@
+import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from ".";
 import { parseWeb } from "../websearch/parseWeb";
 
@@ -13,26 +14,17 @@ const fetchUrl: BackendTool = {
 			required: true,
 		},
 	},
-	call: async (params) => {
-		try {
-			const blocks = params.url.split("\n");
-			const url = blocks[blocks.length - 1];
+	async *call(params) {
+		const blocks = params.url.split("\n");
+		const url = blocks[blocks.length - 1];
 
-			const content = await parseWeb(url);
+		const content = await parseWeb(url);
 
-			return {
-				key: "fetchUrl",
-				status: "success",
-				value: content,
-				display: false,
-			};
-		} catch (e) {
-			return {
-				key: "fetchUrl",
-				status: "error",
-				value: "Fetching the webpage failed because :" + (e as Error).message,
-			};
-		}
+		return {
+			status: ToolResultStatus.Success,
+			outputs: [{ fetchUrl: content }],
+			display: false,
+		};
 	},
 };
 

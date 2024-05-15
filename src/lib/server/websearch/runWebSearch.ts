@@ -16,6 +16,12 @@ import type { Assistant } from "$lib/types/Assistant";
 import { z } from "zod";
 import JSON5 from "json5";
 import { isURLLocal } from "../isURLLocal";
+import {
+	TextGenerationUpdateType,
+	TextGenerationWebSearchUpdateType,
+	type TextGenerationUpdate,
+	type TextGenerationWebSearchUpdate,
+} from "../textGeneration/types";
 
 const MAX_N_PAGES_SCRAPE = 10 as const;
 const MAX_N_PAGES_EMBED = 5 as const;
@@ -30,12 +36,12 @@ export interface RunWebSearchOptions {
 	query?: string;
 }
 
-export async function runWebSearch(
+// TODO: probably revert back to an update function because of the async
+export async function* runWebSearch(
 	conv: Conversation,
 	messages: Message[],
-	updatePad: (upd: MessageUpdate) => void,
 	options?: RunWebSearchOptions
-) {
+): AsyncGenerator<TextGenerationUpdate, WebSearch, undefined> {
 	const prompt = messages[messages.length - 1].content;
 	const webSearch: WebSearch = {
 		prompt,
@@ -46,14 +52,24 @@ export async function runWebSearch(
 		updatedAt: new Date(),
 	};
 
-	function appendUpdate(message: string, args?: string[], type?: "error" | "update") {
-		updatePad({ type: "webSearch", messageType: type ?? "update", message, args });
+	function makeUpdate(
+		message: string,
+		args?: string[],
+		subtype: TextGenerationWebSearchUpdateType = TextGenerationWebSearchUpdateType.Update
+	): TextGenerationWebSearchUpdate {
+		if (subtype === TextGenerationWebSearchUpdateType.Update) {
+			return { type: TextGenerationUpdateType.WebSearch, subtype, message, args };
+		}
+		if (subtype === TextGenerationWebSearchUpdateType.Error) {
+			return { type: TextGenerationUpdateType.WebSearch, subtype, message, args };
+		}
+		throw new Error(`Invalid web search update subtype: ${subtype}`);
 	}
 
 	try {
 		// if the assistant specified direct links, skip the websearch
 		if (options?.ragSettings && options?.ragSettings?.allowedLinks.length > 0) {
-			appendUpdate("Using links specified in Assistant");
+			yield makeUpdate("Using links specified in Assistant");
 
 			let linksToUse = [...options.ragSettings.allowedLinks];
 
@@ -78,11 +94,11 @@ export async function runWebSearch(
 		} else {
 			webSearch.searchQuery = options?.query ?? (await generateQuery(messages));
 			const searchProvider = getWebSearchProvider();
-			appendUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
+			yield makeUpdate(`Searching ${searchProvider}`, [webSearch.searchQuery]);
 
 			let filters = "";
 			if (options?.ragSettings && options?.ragSettings?.allowedDomains.length > 0) {
-				appendUpdate("Filtering on specified domains");
+				yield makeUpdate("Filtering on specified domains");
 				filters += options?.ragSettings.allowedDomains.map((item) => "site:" + item).join(" OR ");
 			}
 
@@ -125,16 +141,20 @@ export async function runWebSearch(
 
 		let paragraphChunks: { source: WebSearchSource; text: string }[] = [];
 		if (webSearch.results.length > 0) {
-			appendUpdate("Browsing results");
+			yield makeUpdate("Browsing results");
 			const promises = webSearch.results.map(async (result) => {
 				const { link } = result;
 				let text = result.text ?? "";
 				if (!text) {
 					try {
 						text = await parseWeb(link);
-						appendUpdate("Browsing webpage", [link]);
+						makeUpdate("Browsing webpage", [link]);
 					} catch (e) {
-						appendUpdate("Failed to parse webpage", [(e as Error).message, link], "error");
+						makeUpdate(
+							"Failed to parse webpage",
+							[(e as Error).message, link],
+							TextGenerationWebSearchUpdateType.Error
+						);
 						// ignore errors
 					}
 				}
@@ -151,7 +171,7 @@ export async function runWebSearch(
 			throw new Error("No results found for this search query");
 		}
 
-		appendUpdate("Extracting relevant information");
+		yield makeUpdate("Extracting relevant information");
 		const topKClosestParagraphs = 8;
 		const texts = paragraphChunks.map(({ text }) => text);
 		const indices = await findSimilarSentences(embeddingModel, prompt, texts, {
@@ -168,15 +188,20 @@ export async function runWebSearch(
 				webSearch.contextSources.push({ ...source, context: [contextWithId] });
 			}
 		}
-		updatePad({
-			type: "webSearch",
-			messageType: "sources",
-			message: "sources",
+		yield {
+			type: TextGenerationUpdateType.WebSearch,
+			subtype: TextGenerationWebSearchUpdateType.Sources,
 			sources: webSearch.contextSources,
-		});
+			message: "Sources",
+		};
 	} catch (searchError) {
+		console.error(searchError);
 		if (searchError instanceof Error) {
-			appendUpdate("An error occurred", [JSON.stringify(searchError.message)], "error");
+			yield makeUpdate(
+				"An error occurred",
+				[JSON.stringify(searchError.message)],
+				TextGenerationWebSearchUpdateType.Error
+			);
 		}
 	}
 

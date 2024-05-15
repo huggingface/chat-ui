@@ -1,4 +1,6 @@
+import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from ".";
+import { runWebSearch } from "../websearch/runWebSearch";
 
 const websearch: BackendTool = {
 	name: "websearch",
@@ -13,6 +15,24 @@ const websearch: BackendTool = {
 			description:
 				"A search query which will be used to fetch the most relevant snippets regarding the user's query",
 		},
+	},
+	async *call({ query }, { conv, assistant, messages }) {
+		const webSearchToolResults = yield* runWebSearch(conv, messages, {
+			ragSettings: assistant?.rag,
+			query,
+		});
+		const chunks = webSearchToolResults?.contextSources
+			.map(({ context }) => context)
+			.flat()
+			.sort((a, b) => a.idx - b.idx)
+			.map(({ text }) => text)
+			.join(" ");
+
+		return {
+			status: ToolResultStatus.Success,
+			outputs: [{ websearch: chunks }],
+			display: false,
+		};
 	},
 };
 

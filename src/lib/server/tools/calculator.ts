@@ -1,7 +1,8 @@
+import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from ".";
 
 const calculator: BackendTool = {
-	name: "calculator",
+	name: "query_calculator",
 	displayName: "Calculator",
 	description:
 		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, and /, as well as parenthesis ().",
@@ -14,21 +15,19 @@ const calculator: BackendTool = {
 			required: true,
 		},
 	},
-	call: async (params) => {
+	async *call(params) {
 		try {
 			const blocks = params.equation.split("\n");
 			const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
 
 			return {
-				key: "calculator",
-				status: "success",
-				value: eval(query),
+				status: ToolResultStatus.Success,
+				outputs: [{ calculator: eval(query) }],
 			};
 		} catch (e) {
 			return {
-				key: "calculator",
-				status: "error",
-				value: "Invalid expression",
+				status: ToolResultStatus.Error,
+				message: "Invalid expression",
 			};
 		}
 	},

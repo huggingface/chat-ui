@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { env } from "$env/dynamic/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
-import { tools } from "$lib/server/tools";
+import { allTools } from "$lib/server/tools";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -164,7 +164,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
-		tools: tools
+		tools: allTools
 			.filter((tool) => !tool.isHidden)
 			.map((tool) => ({
 				name: tool.name,

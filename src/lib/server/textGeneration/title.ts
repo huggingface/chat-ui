@@ -3,7 +3,7 @@ import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndp
 import type { Message } from "$lib/types/Message";
 import { logger } from "$lib/server/logger";
 
-export async function summarize(prompt: string) {
+export async function generateTitle(prompt: string) {
 	if (!env.LLM_SUMMERIZATION) {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}

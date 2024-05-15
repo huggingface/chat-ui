@@ -20,14 +20,25 @@ export type ToolFront = Pick<
 	"name" | "displayName" | "description" | "isOnByDefault" | "isLocked"
 >;
 
-export interface ToolResult {
-	key: string;
-	status: "success" | "error";
-	value: string;
+export enum ToolResultStatus {
+	Success = "success",
+	Error = "error",
+}
+interface ToolResultSuccess {
+	status: ToolResultStatus.Success;
+	call: ToolCall;
+	outputs: Record<string, unknown>[];
 	display?: boolean;
 }
+interface ToolResultError {
+	status: ToolResultStatus.Error;
+	call: ToolCall;
+	message: string;
+	display?: boolean;
+}
+export type ToolResult = ToolResultSuccess | ToolResultError;
 
-export interface Call {
-	tool_name: string;
+export interface ToolCall {
+	name: string;
 	parameters: Record<string, string>;
 }

@@ -1,4 +1,4 @@
-import type { Call, Tool } from "./Tool";
+import type { ToolCall, Tool } from "./Tool";
 import type { WebSearchSource } from "./WebSearch";
 
 export type FinalAnswer = {
@@ -19,7 +19,7 @@ interface ToolUpdateBase {
 
 interface ToolUpdateParams extends ToolUpdateBase {
 	messageType: "parameters";
-	parameters: Call["parameters"];
+	parameters: ToolCall["parameters"];
 }
 
 interface ToolUpdateMessage extends ToolUpdateBase {
