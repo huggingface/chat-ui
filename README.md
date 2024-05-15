@@ -273,9 +273,11 @@ If `endpoints` are left unspecified, ChatUI will look for the model on the hoste
 
 ##### OpenAI API compatible models
 
-Chat UI can be used with any API server that supports OpenAI API compatibility, for example [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol).
+Chat UI can be used with any API server that supports OpenAI API compatibility, for example [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol) and [vllm](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
 The following example config makes Chat UI works with [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), the `endpoint.baseUrl` is the url of the OpenAI API compatible server, this overrides the baseUrl to be used by OpenAI instance. The `endpoint.completion` determine which endpoint to be used, default is `chat_completions` which uses `v1/chat/completions`, change to `endpoint.completion` to `completions` to use the `v1/completions` endpoint.
+
+Parameters not supported by OpenAI (e.g., top_k, repetition_penalty, etc.) must be set in the extraBody of endpoints. Be aware that setting them in parameters will cause them to be omitted.
 
 ```
 MODELS=`[
@@ -285,15 +287,17 @@ MODELS=`[
     "parameters": {
       "temperature": 0.9,
       "top_p": 0.95,
-      "repetition_penalty": 1.2,
-      "top_k": 50,
-      "truncate": 1000,
       "max_new_tokens": 1024,
       "stop": []
     },
     "endpoints": [{
       "type" : "openai",
-      "baseURL": "http://localhost:8000/v1"
+      "baseURL": "http://localhost:8000/v1",
+      "extraBody": {
+        "repetition_penalty": 1.2,
+        "top_k": 50,
+        "truncate": 1000
+      }
     }]
   }
 ]`
