@@ -22,6 +22,6 @@ export async function uploadFile(file: File, conv: Conversation): Promise<Messag
 	return new Promise((resolve, reject) => {
 		upload.once("finish", () => resolve({ type: "hash", value: sha, mime: file.type }));
 		upload.once("error", reject);
-		setTimeout(() => reject(new Error("Upload timed out")), 20000);
+		setTimeout(() => reject(new Error("Upload timed out")), 20_000);
 	});
 }
