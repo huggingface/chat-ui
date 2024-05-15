@@ -201,7 +201,7 @@
 
 {#if modalImageToShow}
 	<!-- show the image file full screen, click outside to exit -->
-	<Modal on:close={() => (modalImageToShow = "")}>
+	<Modal width="max-w-[90dvw]" on:close={() => (modalImageToShow = "")}>
 		{#if modalImageToShow.length === 64}
 			<img
 				src={urlNotTrailing + "/output/" + modalImageToShow}
