@@ -13,6 +13,7 @@ service:
   annotations: { }
 
 ingress:
+  enabled: true
   path: "/"
   annotations: { }
 
