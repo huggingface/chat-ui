@@ -1,9 +1,7 @@
 import { z } from "zod";
-import type { Endpoint } from "../endpoints";
 import { env } from "$env/dynamic/private";
+import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { createImageProcessorOptionsValidator } from "../images";
-import { endpointMessagesToAnthropicMessages } from "./utils";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -13,24 +11,12 @@ export const endpointAnthropicParametersSchema = z.object({
 	apiKey: z.string().default(env.ANTHROPIC_API_KEY ?? "sk-"),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
-	multimodal: z
-		.object({
-			image: createImageProcessorOptionsValidator({
-				supportedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
-				preferredMimeType: "image/webp",
-				// The 4 / 3 compensates for the 33% increase in size when converting to base64
-				maxSizeInMB: (5 / 4) * 3,
-				maxWidth: 4096,
-				maxHeight: 4096,
-			}),
-		})
-		.default({}),
 });
 
 export async function endpointAnthropic(
 	input: z.input<typeof endpointAnthropicParametersSchema>
 ): Promise<Endpoint> {
-	const { baseURL, apiKey, model, defaultHeaders, defaultQuery, multimodal } =
+	const { baseURL, apiKey, model, defaultHeaders, defaultQuery } =
 		endpointAnthropicParametersSchema.parse(input);
 	let Anthropic;
 	try {
@@ -52,6 +38,16 @@ export async function endpointAnthropic(
 			system = messages[0].content;
 		}
 
+		const messagesFormatted = messages
+			.filter((message) => message.from !== "system")
+			.map((message) => ({
+				role: message.from,
+				content: message.content,
+			})) as unknown as {
+			role: "user" | "assistant";
+			content: string;
+		}[];
+
 		let tokenId = 0;
 
 		const parameters = { ...model.parameters, ...generateSettings };
@@ -59,7 +55,7 @@ export async function endpointAnthropic(
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-				messages: await endpointMessagesToAnthropicMessages(messages, multimodal),
+				messages: messagesFormatted,
 				max_tokens: parameters?.max_new_tokens,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,

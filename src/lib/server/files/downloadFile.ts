@@ -2,16 +2,15 @@ import { error } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
-import type { MessageFile } from "$lib/types/Message";
 
 export async function downloadFile(
 	sha256: string,
 	convId: Conversation["_id"] | SharedConversation["_id"]
-): Promise<MessageFile & { type: "base64" }> {
+) {
 	const fileId = collections.bucket.find({ filename: `${convId.toString()}-${sha256}` });
 	let mime = "";
 
-	const buffer = await fileId.next().then(async (file) => {
+	const content = await fileId.next().then(async (file) => {
 		if (!file) {
 			throw error(404, "File not found");
 		}
@@ -33,5 +32,5 @@ export async function downloadFile(
 		return fileBuffer;
 	});
 
-	return { type: "base64", value: buffer.toString("base64"), mime };
+	return { content, mime };
 }
