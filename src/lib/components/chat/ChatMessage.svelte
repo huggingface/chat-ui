@@ -308,17 +308,17 @@
 			{#if message.files && message.files.length > 0}
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
-						<!-- handle the case where this is a hash that points to an image in the db -->
-						{#if file.type === "hash"}
+						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
+						{#if file.length === 64}
 							<img
-								src={$page.url.pathname + "/output/" + file.value}
+								src={$page.url.pathname + "/output/" + file}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>
 						{:else}
 							<!-- handle the case where this is a base64 encoded image -->
 							<img
-								src={`data:${file.mime};base64,${file.value}`}
+								src={"data:image/*;base64," + file}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>

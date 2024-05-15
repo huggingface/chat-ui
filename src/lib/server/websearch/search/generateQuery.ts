@@ -1,6 +1,5 @@
 import type { Message } from "$lib/types/Message";
 import { format } from "date-fns";
-import type { EndpointMessage } from "../../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 
 export async function generateQuery(messages: Message[]) {
@@ -10,7 +9,7 @@ export async function generateQuery(messages: Message[]) {
 
 	const lastMessage = userMessages.slice(-1)[0];
 
-	const convQuery: Array<EndpointMessage> = [
+	const convQuery: Array<Omit<Message, "id">> = [
 		{
 			from: "user",
 			content: `Previous Questions:

@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { createImageProcessorOptionsValidator } from "../images";
-import { endpointMessagesToAnthropicMessages } from "./utils";
 
 export const endpointAnthropicVertexParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -12,24 +10,12 @@ export const endpointAnthropicVertexParametersSchema = z.object({
 	projectId: z.string(),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
-	multimodal: z
-		.object({
-			image: createImageProcessorOptionsValidator({
-				supportedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
-				preferredMimeType: "image/webp",
-				// The 4 / 3 compensates for the 33% increase in size when converting to base64
-				maxSizeInMB: (5 / 4) * 3,
-				maxWidth: 4096,
-				maxHeight: 4096,
-			}),
-		})
-		.default({}),
 });
 
 export async function endpointAnthropicVertex(
 	input: z.input<typeof endpointAnthropicVertexParametersSchema>
 ): Promise<Endpoint> {
-	const { region, projectId, model, defaultHeaders, defaultQuery, multimodal } =
+	const { region, projectId, model, defaultHeaders, defaultQuery } =
 		endpointAnthropicVertexParametersSchema.parse(input);
 	let AnthropicVertex;
 	try {
@@ -52,11 +38,21 @@ export async function endpointAnthropicVertex(
 			system = messages[0].content;
 		}
 
+		const messagesFormatted = messages
+			.filter((message) => message.from !== "system")
+			.map((message) => ({
+				role: message.from,
+				content: message.content,
+			})) as unknown as {
+			role: "user" | "assistant";
+			content: string;
+		}[];
+
 		let tokenId = 0;
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-				messages: await endpointMessagesToAnthropicMessages(messages, multimodal),
+				messages: messagesFormatted,
 				max_tokens: model.parameters?.max_new_tokens,
 				temperature: model.parameters?.temperature,
 				top_p: model.parameters?.top_p,

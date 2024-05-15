@@ -6,10 +6,6 @@ import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/
 import { buildPrompt } from "$lib/buildPrompt";
 import { env } from "$env/dynamic/private";
 import type { Endpoint } from "../endpoints";
-import type OpenAI from "openai";
-import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
-import type { MessageFile } from "$lib/types/Message";
-import type { EndpointMessage } from "../endpoints";
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -23,41 +19,13 @@ export const endpointOAIParametersSchema = z.object({
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 	extraBody: z.record(z.any()).optional(),
-	multimodal: z
-		.object({
-			image: createImageProcessorOptionsValidator({
-				supportedMimeTypes: [
-					"image/png",
-					"image/jpeg",
-					"image/webp",
-					"image/avif",
-					"image/tiff",
-					"image/gif",
-				],
-				preferredMimeType: "image/webp",
-				maxSizeInMB: Infinity,
-				maxWidth: 4096,
-				maxHeight: 4096,
-			}),
-		})
-		.default({}),
 });
 
 export async function endpointOai(
 	input: z.input<typeof endpointOAIParametersSchema>
 ): Promise<Endpoint> {
-	const {
-		baseURL,
-		apiKey,
-		completion,
-		model,
-		defaultHeaders,
-		defaultQuery,
-		multimodal,
-		extraBody,
-	} = endpointOAIParametersSchema.parse(input);
-
-	/* eslint-disable-next-line no-shadow */
+	const { baseURL, apiKey, completion, model, defaultHeaders, defaultQuery, extraBody } =
+		endpointOAIParametersSchema.parse(input);
 	let OpenAI;
 	try {
 		OpenAI = (await import("openai")).OpenAI;
@@ -71,8 +39,6 @@ export async function endpointOai(
 		defaultHeaders,
 		defaultQuery,
 	});
-
-	const imageProcessor = makeImageProcessor(multimodal.image);
 
 	if (completion === "completions") {
 		return async ({ messages, preprompt, continueMessage, generateSettings }) => {
@@ -103,8 +69,10 @@ export async function endpointOai(
 		};
 	} else if (completion === "chat_completions") {
 		return async ({ messages, preprompt, generateSettings }) => {
-			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor);
+			let messagesOpenAI = messages.map((message) => ({
+				role: message.from,
+				content: message.content,
+			}));
 
 			if (messagesOpenAI?.[0]?.role !== "system") {
 				messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
@@ -135,40 +103,4 @@ export async function endpointOai(
 	} else {
 		throw new Error("Invalid completion type");
 	}
-}
-
-async function prepareMessages(
-	messages: EndpointMessage[],
-	imageProcessor: ReturnType<typeof makeImageProcessor>
-): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-	return Promise.all(
-		messages.map(async (message) => {
-			if (message.from === "user") {
-				return {
-					role: message.from,
-					content: [
-						...(await prepareFiles(imageProcessor, message.files ?? [])),
-						{ type: "text", text: message.content },
-					],
-				};
-			}
-			return {
-				role: message.from,
-				content: message.content,
-			};
-		})
-	);
-}
-
-async function prepareFiles(
-	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	files: MessageFile[]
-): Promise<OpenAI.Chat.Completions.ChatCompletionContentPartImage[]> {
-	const processedFiles = await Promise.all(files.map(imageProcessor));
-	return processedFiles.map((file) => ({
-		type: "image_url" as const,
-		image_url: {
-			url: `data:${file.mime};base64,${file.image.toString("base64")}`,
-		},
-	}));
 }

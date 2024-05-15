@@ -75,10 +75,20 @@
 			loading = true;
 			pending = true;
 
-			const base64Files = await Promise.all(
-				(files ?? []).map((file) =>
-					file2base64(file).then((value) => ({ type: "base64" as const, value, mime: file.type }))
-				)
+			const module = await import("browser-image-resizer");
+			// currently, only IDEFICS is supported by TGI
+			// the size of images is hardcoded to 224x224 in TGI
+			// this will need to be configurable when support for more models is added
+			const resizedImages = await Promise.all(
+				files.map(async (file) => {
+					return await module
+						.readAndCompressImage(file, {
+							maxHeight: 224,
+							maxWidth: 224,
+							quality: 1,
+						})
+						.then(async (el) => await file2base64(el as File));
+				})
 			);
 
 			let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -110,11 +120,7 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{
-							from: "user",
-							content: prompt,
-							files: messageToRetry.files,
-						},
+						{ from: "user", content: prompt },
 						messageId
 					);
 					messageToWriteToId = addChildren(
@@ -122,7 +128,7 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "" },
+						{ from: "assistant", content: "", files: resizedImages },
 						newUserMessageId
 					);
 				} else if (messageToRetry?.from === "assistant") {
@@ -148,7 +154,7 @@
 					{
 						from: "user",
 						content: prompt ?? "",
-						files: base64Files,
+						files: resizedImages,
 						createdAt: new Date(),
 						updatedAt: new Date(),
 					},
@@ -175,7 +181,6 @@
 			}
 
 			messages = [...messages];
-			const userMessage = messages.find((message) => message.id === messageId);
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
@@ -193,7 +198,7 @@
 					isRetry,
 					isContinue,
 					webSearch: !hasAssistant && $webSearchParameters.useSearch,
-					files: isRetry ? userMessage?.files : base64Files,
+					files: isRetry ? undefined : resizedImages,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
