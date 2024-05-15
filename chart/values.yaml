@@ -17,6 +17,8 @@ ingress:
   path: "/"
   annotations: { }
   # className: "nginx"
+  tls: { }
+    # secretName: XXX
 
 resources:
   requests:
