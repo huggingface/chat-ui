@@ -22,7 +22,7 @@ const calculator: BackendTool = {
 
 			return {
 				status: ToolResultStatus.Success,
-				outputs: [{ calculator: eval(query) }],
+				outputs: [{ calculator: Function(`return ${query}`)() }],
 			};
 		} catch (e) {
 			return {

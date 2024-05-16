@@ -52,16 +52,13 @@ export async function* runTools(
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
-			console.log(output.generated_text);
-			const codeBlocks = output.generated_text.match(/```json\n(.*?)```/gs);
-			if (!codeBlocks) continue;
+			const codeBlocks = Array.from(output.generated_text.matchAll(/```json\n(.*?)```/gs));
+			if (codeBlocks.length === 0) continue;
 
-			for (const block of codeBlocks) {
-				const trimmedBlock = block.replace("```json\n", "").slice(0, -3);
+			// grab only the capture group from the regex match
+			for (const [, block] of codeBlocks) {
 				try {
-					calls.push(
-						...JSON5.parse(trimmedBlock).filter(isExternalToolCall).map(externalToToolCall)
-					);
+					calls.push(...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall));
 				} catch (cause) {
 					// error parsing the calls
 					yield {
