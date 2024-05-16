@@ -13,11 +13,9 @@ export async function preprocessMessages(
 	return await Promise.all(
 		structuredClone(messages).map(async (message, idx) => {
 			const webSearchContext = webSearch?.contextSources
-				.map(({ context }) => context)
-				.flat()
-				.sort((a, b) => a.idx - b.idx)
-				.map(({ text }) => text)
-				.join(" ");
+				.map(({ context }) => context.trim())
+				.join("\n\n----------\n\n");
+
 			// start by adding websearch to the last message
 			if (idx === messages.length - 1 && webSearch && webSearchContext?.trim()) {
 				const lastQuestion = messages.findLast((el) => el.from === "user")?.content ?? "";
@@ -27,7 +25,7 @@ export async function preprocessMessages(
 					.map((el) => el.content);
 				const currentDate = format(new Date(), "MMMM d, yyyy");
 
-				message.content = `I searched the web using the query: ${webSearch.searchQuery}. 
+				message.content = `I searched the web using the query: ${webSearch.searchQuery}.
 Today is ${currentDate} and here are the results:
 =====================
 ${webSearchContext}

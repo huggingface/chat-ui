@@ -17,16 +17,10 @@ const websearch: BackendTool = {
 		},
 	},
 	async *call({ query }, { conv, assistant, messages }) {
-		const webSearchToolResults = yield* runWebSearch(conv, messages, {
-			ragSettings: assistant?.rag,
-			query,
-		});
+		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, query);
 		const chunks = webSearchToolResults?.contextSources
 			.map(({ context }) => context)
-			.flat()
-			.sort((a, b) => a.idx - b.idx)
-			.map(({ text }) => text)
-			.join(" ");
+			.join("\n------------\n");
 
 		return {
 			status: ToolResultStatus.Success,

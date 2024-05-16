@@ -5,7 +5,7 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
 import { ToolResultStatus } from "$lib/types/Tool";
-import stream from "stream";
+import { pipeline, Writable, Readable } from "node:stream";
 
 export const endpointCohereParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -91,13 +91,14 @@ export async function endpointCohere(
 							return { call: toolResult.call, outputs: toolResult.outputs };
 						}),
 					})
-					.catch((err) => {
-						if (err.body) {
-							convertWebStreamToBuffer(err.body).then(console.log).catch(console.error);
-						} else {
-							console.error(err);
-						}
-						throw err;
+					.catch(async (err) => {
+						if (!err.body) throw err;
+
+						// Decode the error message and throw
+						const message = await convertStreamToBuffer(err.body).catch(() => {
+							throw err;
+						});
+						throw Error(message, { cause: err });
 					});
 			}
 
@@ -145,14 +146,14 @@ export async function endpointCohere(
 	};
 }
 
-async function convertWebStreamToBuffer(webReadableStream) {
-	return new Promise((resolve, reject) => {
-		const chunks = [];
+async function convertStreamToBuffer(webReadableStream: Readable) {
+	return new Promise<string>((resolve, reject) => {
+		const chunks: Buffer[] = [];
 
-		stream.pipeline(
+		pipeline(
 			webReadableStream,
-			new stream.Writable({
-				write(chunk, encoding, callback) {
+			new Writable({
+				write(chunk, _, callback) {
 					chunks.push(chunk);
 					callback();
 				},

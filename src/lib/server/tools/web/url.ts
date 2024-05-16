@@ -1,6 +1,7 @@
+import { stringifyMarkdownElement } from "$lib/server/websearch/markdown/utils/stringify";
+import { scrapeUrl } from "$lib/server/websearch/scrape/scrape";
 import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from "..";
-import { parseWeb } from "../../websearch/parseWeb";
 
 const fetchUrl: BackendTool = {
 	name: "fetchUrl",
@@ -18,11 +19,11 @@ const fetchUrl: BackendTool = {
 		const blocks = params.url.split("\n");
 		const url = blocks[blocks.length - 1];
 
-		const content = await parseWeb(url);
+		const { title, markdownTree } = await scrapeUrl(url, Infinity);
 
 		return {
 			status: ToolResultStatus.Success,
-			outputs: [{ fetchUrl: content }],
+			outputs: [{ title, text: stringifyMarkdownElement(markdownTree) }],
 			display: false,
 		};
 	},

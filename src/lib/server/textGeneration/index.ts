@@ -1,7 +1,7 @@
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import { preprocessMessages } from "$lib/server/preprocessMessages.js";
 
-import { generateTitle } from "./title";
+import { generateTitleForConversation } from "./title";
 import {
 	assistantHasDynamicPrompt,
 	assistantHasWebSearch,
@@ -17,10 +17,18 @@ import {
 	type TextGenerationContext,
 } from "./types";
 import { generate } from "./generate";
+import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 
-export async function* textGeneration(
+export async function* textGeneration(ctx: TextGenerationContext) {
+	yield* mergeAsyncGenerators([
+		textGenerationWithoutTitle(ctx),
+		generateTitleForConversation(ctx.conv),
+	]);
+}
+
+async function* textGenerationWithoutTitle(
 	ctx: TextGenerationContext
-): AsyncIterable<TextGenerationUpdate> {
+): AsyncGenerator<TextGenerationUpdate, undefined, undefined> {
 	yield {
 		type: TextGenerationUpdateType.Status,
 		status: TextGenerationStatus.Started,
@@ -29,13 +37,6 @@ export async function* textGeneration(
 	ctx.assistant ??= await getAssistantById(ctx.conv.assistantId);
 	const { model, conv, messages, assistant, isContinue, webSearch, toolsPreference } = ctx;
 	const convId = conv._id;
-
-	// TODO: should be a better way to detect if the conversation is new
-	// TODO: dont wait for this
-	let titlePromise: Promise<string> | undefined;
-	if (conv.title === "New Chat" && conv.messages.length === 3) {
-		titlePromise = generateTitle(conv.messages[1].content).then((title) => title ?? "New Chat");
-	}
 
 	// perform websearch if requested
 	// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
@@ -46,10 +47,9 @@ export async function* textGeneration(
 		!model.functions &&
 		((webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
 	) {
-		webSearchResult = yield* runWebSearch(conv, messages, { ragSettings: assistant?.rag });
+		webSearchResult = yield* runWebSearch(conv, messages, assistant?.rag);
 	}
 
-	// process preprompt
 	let preprompt = conv.preprompt;
 	if (assistantHasDynamicPrompt(assistant) && preprompt) {
 		preprompt = await processPreprompt(preprompt);
@@ -66,11 +66,4 @@ export async function* textGeneration(
 		convId
 	);
 	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
-
-	if (titlePromise) {
-		yield {
-			type: TextGenerationUpdateType.Title,
-			title: await titlePromise,
-		};
-	}
 }

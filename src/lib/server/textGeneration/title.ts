@@ -2,6 +2,28 @@ import { env } from "$env/dynamic/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import type { Message } from "$lib/types/Message";
 import { logger } from "$lib/server/logger";
+import { TextGenerationUpdateType, type TextGenerationUpdate } from "./types";
+import type { Conversation } from "$lib/types/Conversation";
+
+export async function* generateTitleForConversation(
+	conv: Conversation
+): AsyncGenerator<TextGenerationUpdate, undefined, undefined> {
+	try {
+		const userMessage = conv.messages.find((m) => m.from === "user");
+		// HACK: detect if the conversation is new
+		if (conv.title !== "New Chat" || !userMessage) return;
+
+		const prompt = userMessage.content;
+		const title = (await generateTitle(prompt)) ?? "New Chat";
+
+		yield {
+			type: TextGenerationUpdateType.Title,
+			title,
+		};
+	} catch (cause) {
+		console.error(Error("Failed whilte generating title for conversation", { cause }));
+	}
+}
 
 export async function generateTitle(prompt: string) {
 	if (!env.LLM_SUMMERIZATION) {

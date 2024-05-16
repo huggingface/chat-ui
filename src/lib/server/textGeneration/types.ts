@@ -59,25 +59,25 @@ export enum TextGenerationWebSearchUpdateType {
 	Sources = "sources",
 	FinalAnswer = "finalAnswer",
 }
-interface TextGenerationWebSearchErrorUpdate {
+export interface TextGenerationWebSearchErrorUpdate {
 	type: TextGenerationUpdateType.WebSearch;
 	subtype: TextGenerationWebSearchUpdateType.Error;
 	message: string;
 	args?: string[];
 }
-interface TextGenerationWebSearchGeneralUpdate {
+export interface TextGenerationWebSearchGeneralUpdate {
 	type: TextGenerationUpdateType.WebSearch;
 	subtype: TextGenerationWebSearchUpdateType.Update;
 	message: string;
 	args?: string[];
 }
-interface TextGenerationWebSearchSourcesUpdate {
+export interface TextGenerationWebSearchSourcesUpdate {
 	type: TextGenerationUpdateType.WebSearch;
 	subtype: TextGenerationWebSearchUpdateType.Sources;
 	message: string;
 	sources: WebSearchSource[];
 }
-interface TextGenerationWebSearchFinalAnswerUpdate {
+export interface TextGenerationWebSearchFinalAnswerUpdate {
 	type: TextGenerationUpdateType.WebSearch;
 	subtype: TextGenerationWebSearchUpdateType.FinalAnswer;
 	webSearch: WebSearch;

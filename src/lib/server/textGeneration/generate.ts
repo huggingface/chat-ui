@@ -11,7 +11,6 @@ export async function* generate(
 	toolResults: ToolResult[],
 	preprompt?: string
 ): AsyncIterable<TextGenerationUpdate> {
-	let buffer = "";
 	for await (const output of await endpoint({
 		messages,
 		preprompt,
@@ -32,36 +31,20 @@ export async function* generate(
 			}
 
 			yield { type: TextGenerationUpdateType.FinalAnswer, text, interrupted };
+			continue;
 		}
 
-		// todo: and if there is a special token?
-		if (!output.token.special) {
-			buffer += output.token.text;
+		// ignore special tokens
+		if (output.token.special) continue;
 
-			// send 5 chars and leave the rest in the buffer
-			if (buffer.length >= 5) {
-				yield {
-					type: TextGenerationUpdateType.Stream,
-					token: buffer.slice(0, 5),
-				};
-				buffer = buffer.slice(5);
-			}
+		// pass down normal token
+		yield { type: TextGenerationUpdateType.Stream, token: output.token.text };
 
-			// abort check
-			const date = AbortedGenerations.getInstance().getList().get(conv._id.toString());
-			if (date && date > promptedAt) break;
+		// abort check
+		const date = AbortedGenerations.getInstance().getList().get(conv._id.toString());
+		if (date && date > promptedAt) break;
 
-			// no output check
-			if (!output) break;
-		}
+		// no output check
+		if (!output) break;
 	}
-
-	// pass down the remaining buffer
-	// TODO: ensure this happens before the final answer
-	// if (buffer) {
-	// 	yield {
-	// 		type: TextGenerationUpdateType.Stream,
-	// 		token: buffer,
-	// 	};
-	// }
 }
