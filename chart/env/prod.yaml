@@ -190,14 +190,14 @@ envVars:
           },
           "promptExamples": [
             {
-              "title": "Write an email from bullet list",
-              "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+              "title": "我的名字用中文怎么写？",
+              "prompt": "请扮演一个起名大师，我将会给你一个我的英文名字，教我如何用中文写我的名字。"
             }, {
-              "title": "Code a snake game",
-              "prompt": "Code a basic snake game in python, give explanations for each step."
+              "title": "信息检索",
+              "prompt": "请列出22年中国纯电动车销量最高的20款车型"
             }, {
-              "title": "Assist in a task",
-              "prompt": "How do I make a delicious lemon cheesecake?"
+              "title": "行程规划",
+              "prompt": "请帮我设计一个为期一周的中国行程。"
             }
           ]
         },
