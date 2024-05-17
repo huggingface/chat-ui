@@ -283,16 +283,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
-		{
-			_id: convId,
-		},
-		{
-			$set: {
-				messages: conv.messages,
-				title: conv.title,
-				updatedAt: new Date(),
-			},
-		}
+		{ _id: convId },
+		{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
 	);
 
 	let doneStreaming = false;
@@ -302,7 +294,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		async start(controller) {
 			messageToWriteTo.updates ??= [];
 			function update(newUpdate: MessageUpdate) {
-				console.log(newUpdate);
 				if (newUpdate.type !== "stream") messageToWriteTo?.updates?.push(newUpdate);
 				controller.enqueue(JSON.stringify(newUpdate) + "\n");
 
@@ -359,21 +350,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						update({ type: "file", sha: event.sha });
 					}
 					if (event.type === TextGenerationUpdateType.Tool) {
-						if (event.subtype === TextGenerationToolUpdateType.Message) {
+						if (event.subtype === TextGenerationToolUpdateType.Call) {
 							update({
 								type: "tool",
-								name: event.name,
-								messageType: "message",
-								message: event.message,
-								display: event.display,
-								uuid: event.uuid,
-							});
-						} else {
-							update({
-								type: "tool",
-								name: event.name,
+								name: event.toolCall.name,
 								messageType: "parameters",
-								parameters: event.parameters,
+								parameters: event.toolCall.parameters,
 								uuid: event.uuid,
 							});
 						}

@@ -76,19 +76,21 @@ export async function* runTools(
 	for (const call of calls) {
 		const uuid = uuidV4();
 
-		yield {
-			type: TextGenerationUpdateType.Tool,
-			subtype: TextGenerationToolUpdateType.Parameters,
-			name: call.name,
-			parameters: call.parameters,
-			uuid,
-		};
-
 		const tool = tools.find((el) => el.name === call.name);
+
 		if (!tool) {
 			toolResults.push({ call, status: ToolResultStatus.Error, message: "Could not find tool" });
 			continue;
 		}
+		// Special case for directly_answer tool where we ignore
+		if (tool.name === "directly_answer") continue;
+
+		yield {
+			type: TextGenerationUpdateType.Tool,
+			subtype: TextGenerationToolUpdateType.Call,
+			uuid,
+			toolCall: call,
+		};
 		try {
 			const toolResult = yield* tool.call(call.parameters, {
 				conv,
@@ -96,6 +98,12 @@ export async function* runTools(
 				preprompt,
 				assistant,
 			});
+			yield {
+				type: TextGenerationUpdateType.Tool,
+				subtype: TextGenerationToolUpdateType.Result,
+				uuid,
+				toolResult: { ...toolResult, call } as ToolResult,
+			};
 			toolResults.push({ ...toolResult, call } as ToolResult);
 		} catch (cause) {
 			console.error(Error(`Failed while running tool ${call.name}`), { cause });

@@ -1,5 +1,5 @@
 import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
-import type { Tool } from "$lib/types/Tool";
+import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { Assistant } from "$lib/types/Assistant";
@@ -90,27 +90,25 @@ export type TextGenerationWebSearchUpdate =
 
 // Tool
 export enum TextGenerationToolUpdateType {
-	Parameters = "parameters",
-	Message = "message",
+	/** A request to call a tool alongside it's parameters */
+	Call = "call",
+	/** The result of a tool call */
+	Result = "result",
 }
 interface TextGenerationToolBaseUpdate<TSubType extends TextGenerationToolUpdateType> {
 	type: TextGenerationUpdateType.Tool;
 	subtype: TSubType;
-	name: Tool["name"];
 	uuid: string;
 }
-interface TextGenerationToolParametersUpdate
-	extends TextGenerationToolBaseUpdate<TextGenerationToolUpdateType.Parameters> {
-	parameters: Record<string, string>;
+interface TextGenerationToolCallUpdate
+	extends TextGenerationToolBaseUpdate<TextGenerationToolUpdateType.Call> {
+	toolCall: ToolCall;
 }
-interface TextGenerationToolMessageUpdate
-	extends TextGenerationToolBaseUpdate<TextGenerationToolUpdateType.Message> {
-	message?: string;
-	display?: boolean;
+interface TextGenerationToolCallResultUpdate
+	extends TextGenerationToolBaseUpdate<TextGenerationToolUpdateType.Result> {
+	toolResult: ToolResult;
 }
-type TextGenerationToolUpdate =
-	| TextGenerationToolParametersUpdate
-	| TextGenerationToolMessageUpdate;
+type TextGenerationToolUpdate = TextGenerationToolCallUpdate | TextGenerationToolCallResultUpdate;
 
 // Everything else
 interface TextGenerationTitleUpdate {

@@ -4,6 +4,7 @@ import type { Message } from "$lib/types/Message";
 import type { Tool, ToolResult } from "$lib/types/Tool";
 import type { TextGenerationUpdate } from "../textGeneration/types";
 import calculator from "./calculator";
+import directlyAnswer from "./directlyAnswer";
 // import codeInterpreter from "./codeInterpreter";
 import fetchUrl from "./web/url";
 import text2image from "./multimodal/text2image";
@@ -23,4 +24,10 @@ export interface BackendTool extends Tool {
 	): AsyncGenerator<TextGenerationUpdate, Omit<ToolResult, "call">, undefined>;
 }
 
-export const allTools: BackendTool[] = [calculator, fetchUrl, text2image, websearch];
+export const allTools: BackendTool[] = [
+	directlyAnswer,
+	calculator,
+	fetchUrl,
+	text2image,
+	websearch,
+];

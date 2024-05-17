@@ -1,4 +1,4 @@
-import { stringifyMarkdownElement } from "$lib/server/websearch/markdown/utils/stringify";
+import { stringifyMarkdownElementTree } from "$lib/server/websearch/markdown/utils/stringify";
 import { scrapeUrl } from "$lib/server/websearch/scrape/scrape";
 import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from "..";
@@ -23,7 +23,7 @@ const fetchUrl: BackendTool = {
 
 		return {
 			status: ToolResultStatus.Success,
-			outputs: [{ title, text: stringifyMarkdownElement(markdownTree) }],
+			outputs: [{ title, text: stringifyMarkdownElementTree(markdownTree) }],
 			display: false,
 		};
 	},

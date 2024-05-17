@@ -26,6 +26,13 @@ export function stringifyMarkdownElement(elem: MarkdownElement): string {
 	return `${content}\n\n`;
 }
 
+/** Converts a tree of markdown elements to a string with formatting */
+export function stringifyMarkdownElementTree(elem: MarkdownElement): string {
+	const stringified = stringifyMarkdownElement(elem);
+	if (!("children" in elem)) return stringified;
+	return stringified + elem.children.map(stringifyMarkdownElementTree).join("");
+}
+
 // ----- HTML Elements -----
 
 /** Ignores all non-inline tag types and grabs their text. Converts inline tags to markdown */
