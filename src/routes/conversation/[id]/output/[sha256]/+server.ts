@@ -39,9 +39,9 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		}
 	}
 
-	const { content, mime } = await downloadFile(sha256, params.id);
+	const { value, mime } = await downloadFile(sha256, params.id);
 
-	return new Response(content, {
+	return new Response(Buffer.from(value, "base64"), {
 		headers: {
 			"Content-Type": mime ?? "application/octet-stream",
 		},

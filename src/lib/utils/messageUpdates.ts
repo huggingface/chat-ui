@@ -1,3 +1,4 @@
+import type { MessageFile } from "$lib/types/Message";
 import {
 	type MessageUpdate,
 	type MessageStreamUpdate,
@@ -42,7 +43,7 @@ type MessageUpdateRequestOptions = {
 	isContinue: boolean;
 	webSearch: boolean;
 	tools?: Record<string, boolean>;
-	files?: string[];
+	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
 	conversationId: string,

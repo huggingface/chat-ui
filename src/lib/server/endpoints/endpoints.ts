@@ -1,4 +1,5 @@
 import type { Conversation } from "$lib/types/Conversation";
+import type { Message } from "$lib/types/Message";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { endpointTgi, endpointTgiParametersSchema } from "./tgi/endpointTgi";
 import { z } from "zod";
@@ -27,14 +28,17 @@ import endpointLangserve, {
 
 import type { Tool, ToolResult } from "$lib/types/Tool";
 
+export type EndpointMessage = Omit<Message, "id">;
+
 // parameters passed when generating text
 export interface EndpointParameters {
-	messages: Omit<Conversation["messages"][0], "id">[];
+	messages: EndpointMessage[];
 	preprompt?: Conversation["preprompt"];
 	continueMessage?: boolean; // used to signal that the last message will be extended
 	generateSettings?: Partial<Model["parameters"]>;
 	tools?: Tool[];
 	toolResults?: ToolResult[];
+	isMultimodal?: boolean;
 }
 
 interface CommonEndpoint {

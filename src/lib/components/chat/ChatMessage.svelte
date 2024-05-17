@@ -448,20 +448,21 @@
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
 						<button on:click={() => (modalImageToShow = file)}>
-							{#if file.length === 64}
-								<img
-									src={urlNotTrailing + "/output/" + file}
-									alt="input from user"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
-								/>
-							{:else}
-								<!-- handle the case where this is a base64 encoded image -->
-								<img
-									src={"data:image/*;base64," + file}
-									alt="input from user"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
-								/>
-							{/if}
+              <!-- handle the case where this is a hash that points to an image in the db -->
+              {#if file.type === "hash"}
+                <img
+                  src={$page.url.pathname + "/output/" + file.value}
+                  alt="input from user"
+                  class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+                />
+              {:else}
+                <!-- handle the case where this is a base64 encoded image -->
+                <img
+                  src={`data:${file.mime};base64,${file.value}`}
+                  alt="input from user"
+                  class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+                />
+              {/if}
 						</button>
 					{/each}
 				</div>
