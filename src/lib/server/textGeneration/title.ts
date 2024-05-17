@@ -2,12 +2,12 @@ import { env } from "$env/dynamic/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import type { Message } from "$lib/types/Message";
 import { logger } from "$lib/server/logger";
-import { TextGenerationUpdateType, type TextGenerationUpdate } from "./types";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 
 export async function* generateTitleForConversation(
 	conv: Conversation
-): AsyncGenerator<TextGenerationUpdate, undefined, undefined> {
+): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	try {
 		const userMessage = conv.messages.find((m) => m.from === "user");
 		// HACK: detect if the conversation is new
@@ -17,7 +17,7 @@ export async function* generateTitleForConversation(
 		const title = (await generateTitle(prompt)) ?? "New Chat";
 
 		yield {
-			type: TextGenerationUpdateType.Title,
+			type: MessageUpdateType.Title,
 			title,
 		};
 	} catch (cause) {

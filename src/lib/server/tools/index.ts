@@ -1,11 +1,11 @@
 import type { Assistant } from "$lib/types/Assistant";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Tool, ToolResult } from "$lib/types/Tool";
-import type { TextGenerationUpdate } from "../textGeneration/types";
+
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
-// import codeInterpreter from "./codeInterpreter";
 import fetchUrl from "./web/url";
 import text2image from "./multimodal/text2image";
 import websearch from "./web/search";
@@ -21,7 +21,7 @@ export interface BackendTool extends Tool {
 	call(
 		params: Record<string, string>,
 		context: BackendToolContext
-	): AsyncGenerator<TextGenerationUpdate, Omit<ToolResult, "call">, undefined>;
+	): AsyncGenerator<MessageUpdate, Omit<ToolResult, "call">, undefined>;
 }
 
 export const allTools: BackendTool[] = [

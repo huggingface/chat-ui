@@ -1,16 +1,13 @@
 import type { ToolResult } from "$lib/types/Tool";
-import {
-	TextGenerationUpdateType,
-	type TextGenerationContext,
-	type TextGenerationUpdate,
-} from "./types";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import { AbortedGenerations } from "../abortedGenerations";
+import type { TextGenerationContext } from "./types";
 
 export async function* generate(
 	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: TextGenerationContext,
 	toolResults: ToolResult[],
 	preprompt?: string
-): AsyncIterable<TextGenerationUpdate> {
+): AsyncIterable<MessageUpdate> {
 	for await (const output of await endpoint({
 		messages,
 		preprompt,
@@ -30,7 +27,7 @@ export async function* generate(
 				text = text.slice(0, text.length - stopToken.length);
 			}
 
-			yield { type: TextGenerationUpdateType.FinalAnswer, text, interrupted };
+			yield { type: MessageUpdateType.FinalAnswer, text, interrupted };
 			continue;
 		}
 
@@ -38,7 +35,7 @@ export async function* generate(
 		if (output.token.special) continue;
 
 		// pass down normal token
-		yield { type: TextGenerationUpdateType.Stream, token: output.token.text };
+		yield { type: MessageUpdateType.Stream, token: output.token.text };
 
 		// abort check
 		const date = AbortedGenerations.getInstance().getList().get(conv._id.toString());

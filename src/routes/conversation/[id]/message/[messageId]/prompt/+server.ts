@@ -15,7 +15,7 @@ export async function GET({ params, locals }) {
 			  })
 			: await collections.conversations.findOne({
 					_id: new ObjectId(params.id),
-					...authCondition(locals),
+					// ...authCondition(locals),
 			  });
 
 	if (conv === null) {

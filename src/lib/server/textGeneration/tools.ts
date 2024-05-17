@@ -3,12 +3,12 @@ import { v4 as uuidV4 } from "uuid";
 import JSON5 from "json5";
 import type { BackendTool } from "../tools";
 import {
-	TextGenerationStatus,
-	TextGenerationToolUpdateType,
-	TextGenerationUpdateType,
-	type TextGenerationContext,
-	type TextGenerationUpdate,
-} from "./types";
+	MessageToolUpdateType,
+	MessageUpdateStatus,
+	MessageUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
+import type { TextGenerationContext } from "./types";
 
 import { allTools } from "../tools";
 import directlyAnswer from "../tools/directlyAnswer";
@@ -33,7 +33,7 @@ export async function* runTools(
 	{ endpoint, conv, messages, assistant }: TextGenerationContext,
 	tools: BackendTool[],
 	preprompt?: string
-): AsyncGenerator<TextGenerationUpdate, ToolResult[], undefined> {
+): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
 	const calls: ToolCall[] = [];
 
 	// do the function calling bits here
@@ -62,8 +62,8 @@ export async function* runTools(
 				} catch (cause) {
 					// error parsing the calls
 					yield {
-						type: TextGenerationUpdateType.Status,
-						status: TextGenerationStatus.Error,
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.Error,
 						message: cause instanceof Error ? cause.message : String(cause),
 					};
 					console.error(cause);
@@ -86,10 +86,10 @@ export async function* runTools(
 		if (tool.name === "directly_answer") continue;
 
 		yield {
-			type: TextGenerationUpdateType.Tool,
-			subtype: TextGenerationToolUpdateType.Call,
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Call,
 			uuid,
-			toolCall: call,
+			call,
 		};
 		try {
 			const toolResult = yield* tool.call(call.parameters, {
@@ -99,10 +99,10 @@ export async function* runTools(
 				assistant,
 			});
 			yield {
-				type: TextGenerationUpdateType.Tool,
-				subtype: TextGenerationToolUpdateType.Result,
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
 				uuid,
-				toolResult: { ...toolResult, call } as ToolResult,
+				result: { ...toolResult, call } as ToolResult,
 			};
 			toolResults.push({ ...toolResult, call } as ToolResult);
 		} catch (cause) {

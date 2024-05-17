@@ -21,7 +21,16 @@
 	import type { Model } from "$lib/types/Model";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
-	import type { ToolUpdate, WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageToolUpdateType,
+		MessageWebSearchUpdateType,
+		type MessageToolUpdate,
+		type MessageToolCallUpdate,
+		type MessageToolResultUpdate,
+		type MessageWebSearchSourcesUpdate,
+		type MessageWebSearchUpdate,
+	} from "$lib/types/MessageUpdate";
+	import { isMessageToolCallUpdate, isMessageToolResultUpdate } from "$lib/utils/messageUpdates";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
@@ -133,7 +142,7 @@
 	}
 
 	$: searchUpdates = (message.updates?.filter(({ type }) => type === "webSearch") ??
-		[]) as WebSearchUpdate[];
+		[]) as MessageWebSearchUpdate[];
 
 	// filter all updates with type === "tool" then group them by uuid field
 
@@ -146,18 +155,20 @@
 			acc[update.uuid] = acc[update.uuid] ?? [];
 			acc[update.uuid].push(update);
 			return acc;
-		}, {} as Record<string, ToolUpdate[]>);
+		}, {} as Record<string, MessageToolUpdate[]>);
 
 	$: downloadLink = urlNotTrailing + `/message/${message.id}/prompt`;
 
 	let webSearchIsDone = true;
 
-	$: webSearchIsDone =
-		searchUpdates.length > 0 && searchUpdates[searchUpdates.length - 1].messageType === "sources";
+	$: webSearchIsDone = searchUpdates.some(
+		(update) => update.subtype === MessageWebSearchUpdateType.Finished
+	);
 
-	$: webSearchSources =
-		searchUpdates &&
-		searchUpdates?.filter(({ messageType }) => messageType === "sources")?.[0]?.sources;
+	$: webSearchSources = searchUpdates?.find(
+		(update): update is MessageWebSearchSourcesUpdate =>
+			update.subtype === MessageWebSearchUpdateType.Sources
+	)?.sources;
 
 	$: if (isCopied) {
 		setTimeout(() => {
@@ -275,8 +286,8 @@
 			{#if tools}
 				{#each Object.values(tools) as tool}
 					{#if tool.length > 0}
-						{@const toolName = tool.filter((t) => t.messageType === "parameters")[0].name}
-						{@const toolDone = !!tool.find((t) => t.messageType === "message")}
+						{@const toolName = tool.find(isMessageToolCallUpdate)?.call.name}
+						{@const toolDone = tool.some(isMessageToolResultUpdate)}
 						{#if toolName && toolName !== "websearch"}
 							<details
 								class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm transition-all open:mb-3
@@ -318,29 +329,19 @@
 									</span>
 								</summary>
 								{#each tool as toolUpdate}
-									{#if toolUpdate.messageType === "parameters"}
+									{#if toolUpdate.subtype === MessageToolUpdateType.Call}
 										<div class="my-1 flex items-center gap-2 opacity-80">
 											<h3 class="text-sm">Parameters</h3>
 											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
 										</div>
 										<ul class="py-1 text-sm">
-											{#each Object.entries(toolUpdate.parameters ?? {}) as [k, v]}
+											{#each Object.entries(toolUpdate.call.parameters ?? {}) as [k, v]}
 												<li>
 													<span class="font-semibold">{k}</span>:
 													<span>{v}</span>
 												</li>
 											{/each}
 										</ul>
-									{:else if toolUpdate.messageType === "message" && toolUpdate.display !== false}
-										<div class="my-1 flex items-center gap-2 opacity-80">
-											<h3 class="text-sm">Result</h3>
-											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
-										</div>
-
-										<p class="pb-1 pt-1 text-sm font-semibold">
-											<span class="font-normal text-gray-500/50">></span>
-											{toolUpdate.message}
-										</p>
 									{/if}
 								{/each}
 							</details>

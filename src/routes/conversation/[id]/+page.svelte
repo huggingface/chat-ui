@@ -11,7 +11,11 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import type { MessageUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageUpdateStatus,
+		MessageUpdateType,
+		type MessageUpdate,
+	} from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -224,36 +228,34 @@
 
 				messageUpdates.push(update);
 
-				if (update.type === "stream") {
+				if (update.type === MessageUpdateType.Stream) {
 					pending = false;
 					messageToWriteTo.content += update.token;
 					messages = [...messages];
-				} else if (update.type === "webSearch") {
+				} else if (
+					update.type === MessageUpdateType.WebSearch ||
+					update.type === MessageUpdateType.Tool
+				) {
 					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
-				} else if (update.type === "status") {
-					if (update.status === "title" && update.message) {
-						const convInData = data.conversations.find(({ id }) => id === $page.params.id);
-						if (convInData) {
-							convInData.title = update.message;
+				} else if (
+					update.type === MessageUpdateType.Status &&
+					update.status === MessageUpdateStatus.Error
+				) {
+					$error = update.message ?? "An error has occurred";
+				} else if (update.type === MessageUpdateType.Title) {
+					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+					if (convInData) {
+						convInData.title = update.title;
 
-							$titleUpdate = {
-								title: update.message,
-								convId: $page.params.id,
-							};
-						}
-					} else if (update.status === "error") {
-						$error = update.message ?? "An error has occurred";
+						$titleUpdate = {
+							title: update.title,
+							convId: $page.params.id,
+						};
 					}
-				} else if (update.type === "tool") {
-					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
-					messages = [...messages];
-				} else if (update.type === "file") {
+				} else if (update.type === MessageUpdateType.File) {
 					messageToWriteTo.files = [...(messageToWriteTo.files ?? []), update.sha];
 					messages = [...messages];
-				} else if (update.type === "error") {
-					error.set(update.message);
-					messageUpdatesAbortController.abort();
 				}
 			}
 

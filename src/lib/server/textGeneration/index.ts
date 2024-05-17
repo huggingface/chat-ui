@@ -11,13 +11,13 @@ import {
 import { pickTools, runTools } from "./tools";
 import type { WebSearch } from "$lib/types/WebSearch";
 import {
-	type TextGenerationUpdate,
-	TextGenerationUpdateType,
-	TextGenerationStatus,
-	type TextGenerationContext,
-} from "./types";
+	type MessageUpdate,
+	MessageUpdateType,
+	MessageUpdateStatus,
+} from "$lib/types/MessageUpdate";
 import { generate } from "./generate";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
+import type { TextGenerationContext } from "./types";
 
 export async function* textGeneration(ctx: TextGenerationContext) {
 	yield* mergeAsyncGenerators([
@@ -28,10 +28,10 @@ export async function* textGeneration(ctx: TextGenerationContext) {
 
 async function* textGenerationWithoutTitle(
 	ctx: TextGenerationContext
-): AsyncGenerator<TextGenerationUpdate, undefined, undefined> {
+): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	yield {
-		type: TextGenerationUpdateType.Status,
-		status: TextGenerationStatus.Started,
+		type: MessageUpdateType.Status,
+		status: MessageUpdateStatus.Started,
 	};
 
 	ctx.assistant ??= await getAssistantById(ctx.conv.assistantId);

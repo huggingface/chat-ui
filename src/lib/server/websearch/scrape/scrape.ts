@@ -1,16 +1,16 @@
 import type { WebSearchScrapedSource, WebSearchSource } from "$lib/types/WebSearch";
+import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 import { loadPage } from "./playwright";
 
 import { spatialParser } from "./parser";
 import { htmlToMarkdownTree } from "../markdown/tree";
 import { timeout } from "$lib/utils/timeout";
-import type { TextGenerationWebSearchUpdate } from "$lib/server/textGeneration/types";
 import { makeErrorUpdate, makeGeneralUpdate } from "../update";
 
 export const scrape = (maxCharsPerElem: number) =>
 	async function* (
 		source: WebSearchSource
-	): AsyncGenerator<TextGenerationWebSearchUpdate, WebSearchScrapedSource | undefined, undefined> {
+	): AsyncGenerator<MessageWebSearchUpdate, WebSearchScrapedSource | undefined, undefined> {
 		try {
 			const page = await scrapeUrl(source.link, maxCharsPerElem);
 			yield makeGeneralUpdate({ message: "Browsing webpage", args: [source.link] });

@@ -1,9 +1,9 @@
 import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
-import { TextGenerationUpdateType } from "../../textGeneration/types";
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
 import { ToolResultStatus } from "$lib/types/Tool";
+import { MessageUpdateType } from "$lib/types/MessageUpdate";
 
 const text2img: BackendTool = {
 	name: "text2img",
@@ -34,7 +34,7 @@ const text2img: BackendTool = {
 
 		const sha = await uploadFile(await response.blob(), conv);
 
-		yield { type: TextGenerationUpdateType.File, sha };
+		yield { type: MessageUpdateType.File, sha };
 
 		return {
 			status: ToolResultStatus.Success,

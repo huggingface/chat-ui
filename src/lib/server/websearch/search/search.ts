@@ -9,8 +9,8 @@ import { isURL } from "$lib/utils/isUrl";
 import z from "zod";
 import JSON5 from "json5";
 import { env } from "$env/dynamic/private";
-import type { TextGenerationWebSearchUpdate } from "$lib/server/textGeneration/types";
 import { makeGeneralUpdate } from "../update";
+import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 
 const listSchema = z.array(z.string()).default([]);
 const allowList = listSchema.parse(JSON5.parse(env.WEBSEARCH_ALLOWLIST));
@@ -21,7 +21,7 @@ export async function* search(
 	ragSettings?: Assistant["rag"],
 	query?: string
 ): AsyncGenerator<
-	TextGenerationWebSearchUpdate,
+	MessageWebSearchUpdate,
 	{ searchQuery: string; pages: WebSearchSource[] },
 	undefined
 > {

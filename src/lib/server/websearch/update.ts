@@ -1,50 +1,46 @@
 import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import {
-	TextGenerationUpdateType,
-	TextGenerationWebSearchUpdateType,
-	type TextGenerationWebSearchErrorUpdate,
-	type TextGenerationWebSearchFinalAnswerUpdate,
-	type TextGenerationWebSearchGeneralUpdate,
-	type TextGenerationWebSearchSourcesUpdate,
-} from "../textGeneration/types";
+	MessageUpdateType,
+	MessageWebSearchUpdateType,
+	type MessageWebSearchErrorUpdate,
+	type MessageWebSearchFinishedUpdate,
+	type MessageWebSearchGeneralUpdate,
+	type MessageWebSearchSourcesUpdate,
+} from "$lib/types/MessageUpdate";
 
 export function makeGeneralUpdate(
-	update: Pick<TextGenerationWebSearchGeneralUpdate, "message" | "args">
-): TextGenerationWebSearchGeneralUpdate {
+	update: Pick<MessageWebSearchGeneralUpdate, "message" | "args">
+): MessageWebSearchGeneralUpdate {
 	return {
-		type: TextGenerationUpdateType.WebSearch,
-		subtype: TextGenerationWebSearchUpdateType.Update,
+		type: MessageUpdateType.WebSearch,
+		subtype: MessageWebSearchUpdateType.Update,
 		...update,
 	};
 }
 
 export function makeErrorUpdate(
-	update: Pick<TextGenerationWebSearchErrorUpdate, "message" | "args">
-): TextGenerationWebSearchErrorUpdate {
+	update: Pick<MessageWebSearchErrorUpdate, "message" | "args">
+): MessageWebSearchErrorUpdate {
 	return {
-		type: TextGenerationUpdateType.WebSearch,
-		subtype: TextGenerationWebSearchUpdateType.Error,
+		type: MessageUpdateType.WebSearch,
+		subtype: MessageWebSearchUpdateType.Error,
 		...update,
 	};
 }
 
-export function makeSourcesUpdate(
-	sources: WebSearchSource[]
-): TextGenerationWebSearchSourcesUpdate {
+export function makeSourcesUpdate(sources: WebSearchSource[]): MessageWebSearchSourcesUpdate {
 	return {
-		type: TextGenerationUpdateType.WebSearch,
-		subtype: TextGenerationWebSearchUpdateType.Sources,
+		type: MessageUpdateType.WebSearch,
+		subtype: MessageWebSearchUpdateType.Sources,
 		message: "sources",
 		sources,
 	};
 }
 
-export function makeFinalAnswerUpdate(
-	webSearch: WebSearch
-): TextGenerationWebSearchFinalAnswerUpdate {
+export function makeFinalAnswerUpdate(webSearch: WebSearch): MessageWebSearchFinishedUpdate {
 	return {
-		type: TextGenerationUpdateType.WebSearch,
-		subtype: TextGenerationWebSearchUpdateType.FinalAnswer,
+		type: MessageUpdateType.WebSearch,
+		subtype: MessageWebSearchUpdateType.Finished,
 		webSearch,
 	};
 }

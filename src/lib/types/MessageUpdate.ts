@@ -1,65 +1,109 @@
-import type { ToolCall, Tool } from "./Tool";
-import type { WebSearchSource } from "./WebSearch";
-
-export type FinalAnswer = {
-	type: "finalAnswer";
-	text: string;
-};
-
-export type TextStreamUpdate = {
-	type: "stream";
-	token: string;
-};
-
-interface ToolUpdateBase {
-	type: "tool";
-	name: Tool["name"];
-	uuid: string;
-}
-
-interface ToolUpdateParams extends ToolUpdateBase {
-	messageType: "parameters";
-	parameters: ToolCall["parameters"];
-}
-
-interface ToolUpdateMessage extends ToolUpdateBase {
-	messageType: "message";
-	message?: string;
-	display?: boolean;
-}
-
-export type ToolUpdate = ToolUpdateParams | ToolUpdateMessage;
-
-export type WebSearchUpdate = {
-	type: "webSearch";
-	messageType: "update" | "error" | "sources";
-	message: string;
-	args?: string[];
-	sources?: WebSearchSource[];
-};
-
-export type StatusUpdate = {
-	type: "status";
-	status: "started" | "pending" | "finished" | "error" | "title";
-	message?: string;
-};
-
-export type ErrorUpdate = {
-	type: "error";
-	message: string;
-	name: string;
-};
-
-export type FileUpdate = {
-	type: "file";
-	sha: string;
-};
+import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import type { ToolCall, ToolResult } from "$lib/types/Tool";
 
 export type MessageUpdate =
-	| FinalAnswer
-	| TextStreamUpdate
-	| ToolUpdate
-	| WebSearchUpdate
-	| StatusUpdate
-	| ErrorUpdate
-	| FileUpdate;
+	| MessageStatusUpdate
+	| MessageTitleUpdate
+	| MessageToolUpdate
+	| MessageWebSearchUpdate
+	| MessageStreamUpdate
+	| MessageFileUpdate
+	| MessageFinalAnswerUpdate;
+
+export enum MessageUpdateType {
+	Status = "status",
+	Title = "title",
+	Tool = "tool",
+	WebSearch = "webSearch",
+	Stream = "stream",
+	File = "file",
+	FinalAnswer = "finalAnswer",
+}
+
+// Status
+export enum MessageUpdateStatus {
+	Started = "started",
+	Error = "error",
+	Finished = "finished",
+}
+export interface MessageStatusUpdate {
+	type: MessageUpdateType.Status;
+	status: MessageUpdateStatus;
+	message?: string;
+}
+
+// Web search
+export enum MessageWebSearchUpdateType {
+	Update = "update",
+	Error = "error",
+	Sources = "sources",
+	Finished = "finished",
+}
+export interface MessageWebSearchErrorUpdate {
+	type: MessageUpdateType.WebSearch;
+	subtype: MessageWebSearchUpdateType.Error;
+	message: string;
+	args?: string[];
+}
+export interface MessageWebSearchGeneralUpdate {
+	type: MessageUpdateType.WebSearch;
+	subtype: MessageWebSearchUpdateType.Update;
+	message: string;
+	args?: string[];
+}
+export interface MessageWebSearchSourcesUpdate {
+	type: MessageUpdateType.WebSearch;
+	subtype: MessageWebSearchUpdateType.Sources;
+	message: string;
+	sources: WebSearchSource[];
+}
+export interface MessageWebSearchFinishedUpdate {
+	type: MessageUpdateType.WebSearch;
+	subtype: MessageWebSearchUpdateType.Finished;
+	webSearch: WebSearch;
+}
+export type MessageWebSearchUpdate =
+	| MessageWebSearchErrorUpdate
+	| MessageWebSearchGeneralUpdate
+	| MessageWebSearchSourcesUpdate
+	| MessageWebSearchFinishedUpdate;
+
+// Tool
+export enum MessageToolUpdateType {
+	/** A request to call a tool alongside it's parameters */
+	Call = "call",
+	/** The result of a tool call */
+	Result = "result",
+}
+interface MessageToolBaseUpdate<TSubType extends MessageToolUpdateType> {
+	type: MessageUpdateType.Tool;
+	subtype: TSubType;
+	uuid: string;
+}
+export interface MessageToolCallUpdate extends MessageToolBaseUpdate<MessageToolUpdateType.Call> {
+	call: ToolCall;
+}
+export interface MessageToolResultUpdate
+	extends MessageToolBaseUpdate<MessageToolUpdateType.Result> {
+	result: ToolResult;
+}
+export type MessageToolUpdate = MessageToolCallUpdate | MessageToolResultUpdate;
+
+// Everything else
+export interface MessageTitleUpdate {
+	type: MessageUpdateType.Title;
+	title: string;
+}
+export interface MessageStreamUpdate {
+	type: MessageUpdateType.Stream;
+	token: string;
+}
+export interface MessageFileUpdate {
+	type: MessageUpdateType.File;
+	sha: string;
+}
+export interface MessageFinalAnswerUpdate {
+	type: MessageUpdateType.FinalAnswer;
+	text: string;
+	interrupted: boolean;
+}

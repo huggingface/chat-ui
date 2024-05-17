@@ -8,7 +8,12 @@ import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
+import {
+	MessageUpdateStatus,
+	MessageUpdateType,
+	MessageWebSearchUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import sizeof from "image-size";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
@@ -18,12 +23,7 @@ import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
-import {
-	TextGenerationToolUpdateType,
-	TextGenerationUpdateType,
-	TextGenerationWebSearchUpdateType,
-	type TextGenerationContext,
-} from "$lib/server/textGeneration/types";
+import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -293,12 +293,55 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const stream = new ReadableStream({
 		async start(controller) {
 			messageToWriteTo.updates ??= [];
-			function update(newUpdate: MessageUpdate) {
-				if (newUpdate.type !== "stream") messageToWriteTo?.updates?.push(newUpdate);
-				controller.enqueue(JSON.stringify(newUpdate) + "\n");
+			async function update(event: MessageUpdate) {
+				if (!messageToWriteTo || !conv) {
+					throw Error("No message or conversation to write events to");
+				}
 
-				if (newUpdate.type === "finalAnswer") {
-					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
+				// Add token to content or skip if empty
+				if (event.type === MessageUpdateType.Stream) {
+					if (event.token === "") return;
+					messageToWriteTo.content += event.token;
+				}
+
+				// Set the title
+				else if (event.type === MessageUpdateType.Title) {
+					conv.title = event.title;
+					await collections.conversations.updateOne(
+						{ _id: convId },
+						{ $set: { title: conv?.title, updatedAt: new Date() } }
+					);
+				}
+
+				// Set the final text and the interrupted flag
+				else if (event.type === MessageUpdateType.FinalAnswer) {
+					messageToWriteTo.interrupted = event.interrupted;
+					messageToWriteTo.content = initialMessageContent + event.text;
+				}
+
+				// Add file
+				else if (event.type === MessageUpdateType.File) {
+					messageToWriteTo.files = [...(messageToWriteTo.files ?? []), event.sha];
+				}
+
+				// Set web search
+				else if (
+					event.type === MessageUpdateType.WebSearch &&
+					event.subtype === MessageWebSearchUpdateType.Finished
+				) {
+					messageToWriteTo.webSearch = event.webSearch;
+				}
+
+				// Append to the persistent message updates if it's not a stream update
+				if (event.type !== "stream") {
+					messageToWriteTo?.updates?.push(event);
+				}
+
+				// Send the update to the client
+				controller.enqueue(JSON.stringify(event) + "\n");
+
+				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
+				if (event.type === "finalAnswer") {
 					controller.enqueue(" ".repeat(4096));
 				}
 			}
@@ -323,81 +366,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					toolsPreference: toolsPreferences ?? {},
 					promptedAt,
 				};
-				for await (const event of textGeneration(ctx)) {
-					if (event.type === TextGenerationUpdateType.Status) {
-						update({ type: "status", status: event.status, message: event.message });
-					}
-					if (event.type === TextGenerationUpdateType.Title) {
-						conv.title = event.title;
-						await collections.conversations.updateOne(
-							{ _id: convId },
-							{ $set: { title: conv?.title, updatedAt: new Date() } }
-						);
-						update({ type: "status", status: "title", message: event.title });
-					}
-					if (event.type === TextGenerationUpdateType.FinalAnswer) {
-						messageToWriteTo.interrupted = event.interrupted;
-						messageToWriteTo.content = initialMessageContent + event.text;
-						update({ type: "finalAnswer", text: event.text });
-					}
-					if (event.type === TextGenerationUpdateType.Stream) {
-						if (event.token === "") continue;
-						messageToWriteTo.content += event.token;
-						update({ type: "stream", token: event.token });
-					}
-					if (event.type === TextGenerationUpdateType.File) {
-						messageToWriteTo.files = [...(messageToWriteTo.files ?? []), event.sha];
-						update({ type: "file", sha: event.sha });
-					}
-					if (event.type === TextGenerationUpdateType.Tool) {
-						if (event.subtype === TextGenerationToolUpdateType.Call) {
-							update({
-								type: "tool",
-								name: event.toolCall.name,
-								messageType: "parameters",
-								parameters: event.toolCall.parameters,
-								uuid: event.uuid,
-							});
-						}
-					}
-					if (event.type === TextGenerationUpdateType.WebSearch) {
-						if (event.subtype === TextGenerationWebSearchUpdateType.Update) {
-							update({
-								type: "webSearch",
-								messageType: "update",
-								message: event.message,
-								args: event.args,
-							});
-						} else if (event.subtype === TextGenerationWebSearchUpdateType.Error) {
-							update({
-								type: "webSearch",
-								messageType: "error",
-								message: event.message,
-								args: event.args,
-							});
-						} else if (event.subtype === TextGenerationWebSearchUpdateType.Sources) {
-							update({
-								type: "webSearch",
-								messageType: "sources",
-								sources: event.sources,
-								message: event.message,
-							});
-						} else if (event.subtype === TextGenerationWebSearchUpdateType.FinalAnswer) {
-							// something else too?
-							messageToWriteTo.webSearch = event.webSearch;
-						}
-					}
-				}
+				// run the text generation and send updates to the client
+				for await (const event of textGeneration(ctx)) await update(event);
 			} catch (e) {
 				hasError = true;
-				update({ type: "status", status: "error", message: (e as Error).message });
+				await update({
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Error,
+					message: (e as Error).message,
+				});
 				console.error(e);
 			} finally {
 				// check if no output was generated
 				if (!hasError && messageToWriteTo.content === initialMessageContent) {
-					update({
-						type: "status",
-						status: "error",
+					await update({
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.Error,
 						message: "No output was generated. Something went wrong.",
 					});
 				}

@@ -4,7 +4,7 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { WebSearch, WebSearchScrapedSource } from "$lib/types/WebSearch";
 import type { Assistant } from "$lib/types/Assistant";
-import type { TextGenerationWebSearchUpdate } from "../textGeneration/types";
+import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 
 import { search } from "./search/search";
 import { scrape } from "./scrape/scrape";
@@ -26,7 +26,7 @@ export async function* runWebSearch(
 	messages: Message[],
 	ragSettings?: Assistant["rag"],
 	query?: string
-): AsyncGenerator<TextGenerationWebSearchUpdate, WebSearch, undefined> {
+): AsyncGenerator<MessageWebSearchUpdate, WebSearch, undefined> {
 	const prompt = messages[messages.length - 1].content;
 	const createdAt = new Date();
 	const updatedAt = new Date();
