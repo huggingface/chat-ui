@@ -13,14 +13,13 @@ import { runWebSearch } from "$lib/server/websearch/runWebSearch";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { summarize } from "$lib/server/summarize";
 import { uploadFile } from "$lib/server/files/uploadFile";
-import sizeof from "image-size";
 import type { Assistant } from "$lib/types/Assistant";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
-import { preprocessMessages } from "$lib/server/preprocessMessages.js";
+import { preprocessMessages } from "$lib/server/endpoints/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
 import { isURLLocal } from "$lib/server/isURLLocal.js";
 import { logger } from "$lib/server/logger.js";
@@ -134,7 +133,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		is_continue: isContinue,
 		web_search: webSearch,
-		files: b64files,
+		files: inputFiles,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -147,44 +146,43 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			files: z.optional(z.array(z.string())),
+			files: z.optional(
+				z.array(
+					z.object({
+						type: z.literal("base64").or(z.literal("hash")),
+						value: z.string(),
+						mime: z.string(),
+					})
+				)
+			),
 		})
 		.parse(json);
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		throw error(400, "Message too long.");
 	}
-	// files is an array of base64 strings encoding Blob objects
-	// we need to convert this array to an array of File objects
 
-	const files = b64files?.map((file) => {
-		const blob = Buffer.from(file, "base64");
-		return new File([blob], "image.png");
-	});
+	// each file is either:
+	// base64 string requiring upload to the server
+	// hash pointing to an existing file
+	const hashFiles = inputFiles?.filter((file) => file.type === "hash") ?? [];
+	const b64Files =
+		inputFiles
+			?.filter((file) => file.type !== "hash")
+			.map((file) => {
+				const blob = Buffer.from(file.value, "base64");
+				return new File([blob], "file", { type: file.mime });
+			}) ?? [];
 
 	// check sizes
-	if (files) {
-		const filechecks = await Promise.all(
-			files.map(async (file) => {
-				const dimensions = sizeof(Buffer.from(await file.arrayBuffer()));
-				return (
-					file.size > 2 * 1024 * 1024 ||
-					(dimensions.width ?? 0) > 224 ||
-					(dimensions.height ?? 0) > 224
-				);
-			})
-		);
-
-		if (filechecks.some((check) => check)) {
-			throw error(413, "File too large, should be <2MB and 224x224 max.");
-		}
+	// todo: make configurable
+	if (b64Files.some((file) => file.size > 10 * 1024 * 1024)) {
+		throw error(413, "File too large, should be <10MB");
 	}
 
-	let hashes: undefined | string[];
-
-	if (files) {
-		hashes = await Promise.all(files.map(async (file) => await uploadFile(file, conv)));
-	}
+	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv))).then(
+		(files) => [...files, ...hashFiles]
+	);
 
 	// we will append tokens to the content of this message
 	let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -216,7 +214,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			// add a children to that sibling, where we can write to
 			const newUserMessageId = addSibling(
 				conv,
-				{ from: "user", content: newPrompt, createdAt: new Date(), updatedAt: new Date() },
+				{
+					from: "user",
+					content: newPrompt,
+					files: uploadedFiles,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
 				messageId
 			);
 			messageToWriteToId = addChildren(
@@ -224,7 +228,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				{
 					from: "assistant",
 					content: "",
-					files: hashes,
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				},
@@ -250,7 +253,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			{
 				from: "user",
 				content: newPrompt ?? "",
-				files: hashes,
+				files: uploadedFiles,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},
@@ -411,10 +414,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			// inject websearch result & optionally images into the messages
-			const processedMessages = await preprocessMessages(
+			const processedMessages = preprocessMessages(
 				messagesForPrompt,
 				messageToWriteTo.webSearch,
-				model.multimodal,
 				convId
 			);
 
@@ -429,10 +431,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			try {
 				const endpoint = await model.getEndpoint();
 				for await (const output of await endpoint({
-					messages: processedMessages,
+					messages: await processedMessages,
 					preprompt,
 					continueMessage: isContinue,
 					generateSettings: assistant?.generateSettings,
+					isMultimodal: model.multimodal,
 				})) {
 					// if not generated_text is here it means the generation is not done
 					if (!output.generated_text) {

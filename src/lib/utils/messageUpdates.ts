@@ -1,3 +1,4 @@
+import type { MessageFile } from "$lib/types/Message";
 import type { MessageUpdate, TextStreamUpdate } from "$lib/types/MessageUpdate";
 
 type MessageUpdateRequestOptions = {
@@ -7,7 +8,7 @@ type MessageUpdateRequestOptions = {
 	isRetry: boolean;
 	isContinue: boolean;
 	webSearch: boolean;
-	files?: string[];
+	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
