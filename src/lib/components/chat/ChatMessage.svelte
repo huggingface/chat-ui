@@ -25,8 +25,6 @@
 		MessageToolUpdateType,
 		MessageWebSearchUpdateType,
 		type MessageToolUpdate,
-		type MessageToolCallUpdate,
-		type MessageToolResultUpdate,
 		type MessageWebSearchSourcesUpdate,
 		type MessageWebSearchUpdate,
 	} from "$lib/types/MessageUpdate";
