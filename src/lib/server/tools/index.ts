@@ -6,8 +6,10 @@ import type { Tool, ToolResult } from "$lib/types/Tool";
 
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
+import imageEditing from "./images/editing";
+import imageGeneration from "./images/generation";
+import parsePdf from "./parse/pdf";
 import fetchUrl from "./web/url";
-import text2image from "./multimodal/text2image";
 import websearch from "./web/search";
 
 interface BackendToolContext {
@@ -28,6 +30,8 @@ export const allTools: BackendTool[] = [
 	directlyAnswer,
 	calculator,
 	fetchUrl,
-	text2image,
+	parsePdf,
+	imageEditing,
+	imageGeneration,
 	websearch,
 ];

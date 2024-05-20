@@ -77,6 +77,8 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 			return {
 				type: MessageUpdateType.File,
 				sha: update.sha,
+				// assume jpeg but could be any image. should be harmless
+				mime: "image/jpeg",
 			};
 		}
 

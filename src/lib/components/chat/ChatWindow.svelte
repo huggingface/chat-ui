@@ -281,7 +281,7 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal}
+						{#if currentModel.multimodal || currentModel.functions}
 							<UploadBtn bind:files classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}

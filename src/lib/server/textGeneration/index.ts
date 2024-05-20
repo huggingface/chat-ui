@@ -1,5 +1,5 @@
 import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { preprocessMessages } from "$lib/server/preprocessMessages.js";
+import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
 import {
@@ -59,11 +59,6 @@ async function* textGenerationWithoutTitle(
 	const tools = pickTools(toolsPreference, Boolean(assistant));
 	const toolResults = yield* runTools(ctx, tools, preprompt);
 
-	const processedMessages = await preprocessMessages(
-		messages,
-		webSearchResult,
-		model.multimodal,
-		convId
-	);
+	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
 	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
 }

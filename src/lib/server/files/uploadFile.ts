@@ -4,7 +4,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { fileTypeFromBuffer } from "file-type";
 import { collections } from "$lib/server/database";
 
-export async function uploadFile(file: File, conv: Conversation): Promise<MessageFile> {
+export async function uploadFile(file: Blob | File, conv: Conversation): Promise<MessageFile> {
 	const sha = await sha256(await file.text());
 	const buffer = await file.arrayBuffer();
 

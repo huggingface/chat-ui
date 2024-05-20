@@ -66,7 +66,6 @@ export async function* runTools(
 						status: MessageUpdateStatus.Error,
 						message: cause instanceof Error ? cause.message : String(cause),
 					};
-					console.error(cause);
 				}
 			}
 		}
@@ -120,7 +119,7 @@ export async function* runTools(
 
 const externalToolCall = z.object({
 	tool_name: z.string(),
-	parameters: z.record(z.string()),
+	parameters: z.record(z.any()),
 });
 type ExternalToolCall = z.infer<typeof externalToolCall>;
 function isExternalToolCall(call: unknown): call is ExternalToolCall {
@@ -128,8 +127,30 @@ function isExternalToolCall(call: unknown): call is ExternalToolCall {
 }
 
 function externalToToolCall(call: ExternalToolCall): ToolCall {
+	const tool = allTools.find((el) => el.name === call.tool_name);
+	if (tool === undefined) {
+		throw new Error(`Could not find tool ${call.tool_name}`);
+	}
+
+	const parametersWithDefaults = Object.fromEntries(
+		Object.entries(tool.parameterDefinitions).map(([key, definition]) => {
+			const value = call.parameters[key];
+
+			// Required so ensure it's there
+			if (definition.required) {
+				if (value === undefined) {
+					throw new Error(`Missing required parameter ${key} for tool ${call.tool_name}`);
+				}
+				return [key, value];
+			}
+
+			// Optional so use default if not there
+			return [key, value ?? definition.default];
+		})
+	);
+
 	return {
 		name: call.tool_name,
-		parameters: call.parameters,
+		parameters: parametersWithDefaults,
 	};
 }

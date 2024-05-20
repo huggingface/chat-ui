@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
-	import type { Message } from "$lib/types/Message";
+	import type { Message, MessageFile } from "$lib/types/Message";
+	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
@@ -203,24 +204,24 @@
 
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 
-	$: modalImageToShow = "";
+	$: modalImageToShow = null as MessageFile | null;
 
 	const availableTools: ToolFront[] = $page.data.tools;
 </script>
 
-{#if modalImageToShow}
+{#if modalImageToShow !== null}
 	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="max-w-[90dvw]" on:close={() => (modalImageToShow = "")}>
-		{#if modalImageToShow.length === 64}
+	<Modal width="max-w-[90dvw]" on:close={() => (modalImageToShow = null)}>
+		{#if modalImageToShow.type === "hash"}
 			<img
-				src={urlNotTrailing + "/output/" + modalImageToShow}
+				src={urlNotTrailing + "/output/" + modalImageToShow.value}
 				alt="input from user"
 				class="aspect-auto"
 			/>
 		{:else}
 			<!-- handle the case where this is a base64 encoded image -->
 			<img
-				src={"data:image/*;base64," + modalImageToShow}
+				src={`data:${modalImageToShow.mime};base64,${modalImageToShow.value}`}
 				alt="input from user"
 				class="aspect-auto"
 			/>
@@ -256,16 +257,16 @@
 					{#each message.files as file}
 						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
 						<button on:click={() => (modalImageToShow = file)}>
-							{#if file.length === 64}
+							{#if file.type === "hash"}
 								<img
-									src={urlNotTrailing + "/output/" + file}
+									src={urlNotTrailing + "/output/" + file.value}
 									alt="output from assistant"
 									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
 								/>
 							{:else}
 								<!-- handle the case where this is a base64 encoded image -->
 								<img
-									src={"data:image/*;base64," + file}
+									src={`data:${file.mime};base64,${file.value}`}
 									alt="output from assistant"
 									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
 								/>
@@ -448,21 +449,21 @@
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
 						<button on:click={() => (modalImageToShow = file)}>
-              <!-- handle the case where this is a hash that points to an image in the db -->
-              {#if file.type === "hash"}
-                <img
-                  src={$page.url.pathname + "/output/" + file.value}
-                  alt="input from user"
-                  class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-                />
-              {:else}
-                <!-- handle the case where this is a base64 encoded image -->
-                <img
-                  src={`data:${file.mime};base64,${file.value}`}
-                  alt="input from user"
-                  class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-                />
-              {/if}
+							<!-- handle the case where this is a hash that points to an image in the db -->
+							{#if file.type === "hash"}
+								<img
+									src={$page.url.pathname + "/output/" + file.value}
+									alt="input from user"
+									class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+								/>
+							{:else}
+								<!-- handle the case where this is a base64 encoded image -->
+								<img
+									src={`data:${file.mime};base64,${file.value}`}
+									alt="input from user"
+									class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
+								/>
+							{/if}
 						</button>
 					{/each}
 				</div>

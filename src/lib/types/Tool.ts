@@ -1,14 +1,21 @@
-interface ToolInput {
-	description: string;
-	type: string;
-	required?: boolean;
-}
+type ToolInput =
+	| {
+			description: string;
+			type: string;
+			required: true;
+	  }
+	| {
+			description: string;
+			type: string;
+			required: false;
+			default: string | number | boolean;
+	  };
 
 export interface Tool {
 	name: string;
 	displayName?: string;
 	description: string;
-	parameter_definitions: Record<string, ToolInput>;
+	parameterDefinitions: Record<string, ToolInput>;
 	spec?: string;
 	isOnByDefault?: true; // will it be toggled if the user hasn't tweaked it in settings ?
 	isLocked?: true; // can the user enable/disable it ?

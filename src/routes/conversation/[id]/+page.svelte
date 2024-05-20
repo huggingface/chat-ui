@@ -249,7 +249,10 @@
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
-					messageToWriteTo.files = [...(messageToWriteTo.files ?? []), update.sha];
+					messageToWriteTo.files = [
+						...(messageToWriteTo.files ?? []),
+						{ type: "hash", value: update.sha, mime: update.mime },
+					];
 					messages = [...messages];
 				}
 			}

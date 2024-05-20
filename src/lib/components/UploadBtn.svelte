@@ -17,7 +17,7 @@
 		bind:files={filelist}
 		class="absolute w-full cursor-pointer opacity-0"
 		type="file"
-		accept="image/*"
+		accept="image/*,application/pdf"
 	/>
-	<CarbonUpload class="mr-2 text-xs " /> Upload image
+	<CarbonUpload class="mr-2 text-xs " /> Upload file
 </button>
