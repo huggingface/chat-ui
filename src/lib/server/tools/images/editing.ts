@@ -47,17 +47,27 @@ const imageEditing: BackendTool = {
 			"run_edit",
 			[
 				image,
-				prompt,
+				String(prompt),
 				"", // negative prompt
 				7, // guidance scale
 				20, // steps
 			]
 		);
+
 		const outputImage = await fetch(outputs[0].url)
 			.then((res) => res.blob())
-			.then((blob) => uploadFile(blob, conv));
+			.then(
+				(blob) =>
+					new File([blob], `${prompt}.${blob.type.split("/")[1] ?? "png"}`, { type: blob.type })
+			)
+			.then((file) => uploadFile(file, conv));
 
-		yield { type: MessageUpdateType.File, sha: outputImage.value, mime: outputImage.mime };
+		yield {
+			type: MessageUpdateType.File,
+			name: outputImage.name,
+			sha: outputImage.value,
+			mime: outputImage.mime,
+		};
 
 		return {
 			status: ToolResultStatus.Success,

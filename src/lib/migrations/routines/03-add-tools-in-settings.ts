@@ -3,7 +3,7 @@ import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 
 const addToolsToSettings: Migration = {
-	_id: new ObjectId(3),
+	_id: new ObjectId("5c9c4c4c4c4c4c4c4c4c4c4c"),
 	name: "Add empty 'tools' record in settings",
 	up: async () => {
 		const { settings } = collections;

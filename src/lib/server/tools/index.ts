@@ -21,7 +21,7 @@ interface BackendToolContext {
 
 export interface BackendTool extends Tool {
 	call(
-		params: Record<string, string>,
+		params: Record<string, string | number | boolean>,
 		context: BackendToolContext
 	): AsyncGenerator<MessageUpdate, Omit<ToolResult, "call">, undefined>;
 }

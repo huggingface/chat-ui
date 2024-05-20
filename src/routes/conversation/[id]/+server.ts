@@ -152,6 +152,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				z.array(
 					z.object({
 						type: z.literal("base64").or(z.literal("hash")),
+						name: z.string(),
 						value: z.string(),
 						mime: z.string(),
 					})
@@ -173,7 +174,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			?.filter((file) => file.type !== "hash")
 			.map((file) => {
 				const blob = Buffer.from(file.value, "base64");
-				return new File([blob], "file", { type: file.mime });
+				return new File([blob], file.name, { type: file.mime });
 			}) ?? [];
 
 	// check sizes
@@ -324,7 +325,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// Add file
 				else if (event.type === MessageUpdateType.File) {
-					messageToWriteTo.files = [...(messageToWriteTo.files ?? []), { type: 'hash', value: event.sha, mime: event.mime }];
+					messageToWriteTo.files = [
+						...(messageToWriteTo.files ?? []),
+						{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
+					];
 				}
 
 				// Set web search

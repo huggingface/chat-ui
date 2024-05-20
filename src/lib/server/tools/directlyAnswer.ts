@@ -7,7 +7,7 @@ const directlyAnswer: BackendTool = {
 	isHidden: true,
 	isLocked: true,
 	description: "Use this tool to let the user know you wish to answer directly",
-	parameter_definitions: {},
+	parameterDefinitions: {},
 	async *call() {
 		return {
 			status: ToolResultStatus.Success,

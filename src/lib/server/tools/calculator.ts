@@ -7,7 +7,7 @@ const calculator: BackendTool = {
 	description:
 		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, and /, as well as parenthesis ().",
 	isOnByDefault: true,
-	parameter_definitions: {
+	parameterDefinitions: {
 		equation: {
 			description:
 				"The formula to evaluate. EXACTLY as you would plug into a calculator. No words, no letters, only numbers and operators. Letters will make the tool crash.",
@@ -17,7 +17,7 @@ const calculator: BackendTool = {
 	},
 	async *call(params) {
 		try {
-			const blocks = params.equation.split("\n");
+			const blocks = String(params.equation).split("\n");
 			const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
 
 			return {

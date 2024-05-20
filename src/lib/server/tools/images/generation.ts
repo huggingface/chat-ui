@@ -52,7 +52,7 @@ const imageGeneration: BackendTool = {
 				Number(numberOfImages), // number (numeric value between 1 and 8) in 'Number of Images' Slider component
 				512, // number in 'Image Height' Number component
 				512, // number in 'Image Width' Number component
-				prompt, // prompt
+				String(prompt), // prompt
 				Math.floor(Math.random() * 1000), // seed random
 			]
 		);
@@ -60,12 +60,21 @@ const imageGeneration: BackendTool = {
 			outputs[0].map((output) =>
 				fetch(output.image.url)
 					.then((res) => res.blob())
-					.then((blob) => uploadFile(blob, conv))
+					.then(
+						(blob) =>
+							new File([blob], `${prompt}.${blob.type.split("/")[1] ?? "png"}`, { type: blob.type })
+					)
+					.then((file) => uploadFile(file, conv))
 			)
 		);
 
 		for (const image of imageBlobs) {
-			yield { type: MessageUpdateType.File, sha: image.value, mime: image.mime };
+			yield {
+				type: MessageUpdateType.File,
+				name: image.name,
+				sha: image.value,
+				mime: image.mime,
+			};
 		}
 
 		return {

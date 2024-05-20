@@ -1,6 +1,6 @@
 import { env } from "$env/dynamic/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
-import type { EndpointMessage } from "./endpoints/endpoints";
+import type { EndpointMessage } from "../endpoints/endpoints";
 import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";

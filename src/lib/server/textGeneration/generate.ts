@@ -2,9 +2,12 @@ import type { ToolResult } from "$lib/types/Tool";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import { AbortedGenerations } from "../abortedGenerations";
 import type { TextGenerationContext } from "./types";
+import type { EndpointMessage } from "../endpoints/endpoints";
+
+type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
 export async function* generate(
-	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: TextGenerationContext,
+	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
 	toolResults: ToolResult[],
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {

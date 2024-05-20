@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Message } from "$lib/types/Message";
+	import type { Message, MessageFile } from "$lib/types/Message";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
@@ -93,7 +93,7 @@
 		(lastMessage.from === "user" ||
 			lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1);
 
-	$: sources = files?.map((file) =>
+	$: sources = files?.map<Promise<MessageFile>>((file) =>
 		file2base64(file).then((value) => ({ type: "base64", value, mime: file.type, name: file.name }))
 	);
 
@@ -237,7 +237,7 @@
 				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
-							{src}
+							file={src}
 							on:close={() => {
 								files = files.filter((_, i) => i !== index);
 							}}

@@ -4,7 +4,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { fileTypeFromBuffer } from "file-type";
 import { collections } from "$lib/server/database";
 
-export async function uploadFile(file: Blob | File, conv: Conversation): Promise<MessageFile> {
+export async function uploadFile(file: File, conv: Conversation): Promise<MessageFile> {
 	const sha = await sha256(await file.text());
 	const buffer = await file.arrayBuffer();
 
@@ -20,7 +20,9 @@ export async function uploadFile(file: Blob | File, conv: Conversation): Promise
 
 	// only return the filename when upload throws a finish event or a 20s time out occurs
 	return new Promise((resolve, reject) => {
-		upload.once("finish", () => resolve({ type: "hash", value: sha, mime: file.type }));
+		upload.once("finish", () =>
+			resolve({ type: "hash", value: sha, mime: file.type, name: file.name })
+		);
 		upload.once("error", reject);
 		setTimeout(() => reject(new Error("Upload timed out")), 20_000);
 	});

@@ -8,7 +8,7 @@ const websearch: BackendTool = {
 	isOnByDefault: true,
 	description:
 		"Use this tool to search web pages for answers that will help answer the user's query. Only use this tool if you need specific resources from the internet.",
-	parameter_definitions: {
+	parameterDefinitions: {
 		query: {
 			required: true,
 			type: "string",
@@ -17,7 +17,7 @@ const websearch: BackendTool = {
 		},
 	},
 	async *call({ query }, { conv, assistant, messages }) {
-		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, query);
+		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, String(query));
 		const chunks = webSearchToolResults?.contextSources
 			.map(({ context }) => context)
 			.join("\n------------\n");

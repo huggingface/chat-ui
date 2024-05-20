@@ -8,7 +8,7 @@ const fetchUrl: BackendTool = {
 	displayName: "URL Fetcher",
 	description: "A tool that can be used to fetch an URL and return the content directly.",
 	isOnByDefault: true,
-	parameter_definitions: {
+	parameterDefinitions: {
 		url: {
 			description: "The url that should be fetched.",
 			type: "str",
@@ -16,7 +16,7 @@ const fetchUrl: BackendTool = {
 		},
 	},
 	async *call(params) {
-		const blocks = params.url.split("\n");
+		const blocks = String(params.url).split("\n");
 		const url = blocks[blocks.length - 1];
 
 		const { title, markdownTree } = await scrapeUrl(url, Infinity);

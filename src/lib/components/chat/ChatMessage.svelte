@@ -2,7 +2,6 @@
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import type { MessageUpdate } from "$lib/types/MessageUpdate";
 	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
@@ -20,6 +19,7 @@
 	import CarbonTools from "~icons/carbon/tools";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
+	import UploadedFile from "./UploadedFile.svelte";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import {
@@ -446,25 +446,15 @@
 	>
 		<div class="flex w-full flex-col">
 			{#if message.files && message.files.length > 0}
-				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
+				<div class="grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
-						<button on:click={() => (modalImageToShow = file)}>
-							<!-- handle the case where this is a hash that points to an image in the db -->
-							{#if file.type === "hash"}
-								<img
-									src={$page.url.pathname + "/output/" + file.value}
-									alt="input from user"
-									class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-								/>
-							{:else}
-								<!-- handle the case where this is a base64 encoded image -->
-								<img
-									src={`data:${file.mime};base64,${file.value}`}
-									alt="input from user"
-									class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
-								/>
-							{/if}
-						</button>
+						{#if file.mime.startsWith("image/")}
+							<button on:click={() => (modalImageToShow = file)}>
+								<UploadedFile {file} canClose={false} />
+							</button>
+						{:else}
+							<UploadedFile {file} canClose={false} />
+						{/if}
 					{/each}
 				</div>
 			{/if}

@@ -14,6 +14,16 @@ import { allTools } from "../tools";
 import directlyAnswer from "../tools/directlyAnswer";
 import websearch from "../tools/web/search";
 import { z } from "zod";
+import { logger } from "../logger";
+import { toolHasName } from "../tools/utils";
+import type { MessageFile } from "$lib/types/Message";
+
+function makeFilesPrompt(files: MessageFile[]): string {
+	if (files.length === 0) return "";
+
+	const stringifiedFiles = files.map((file) => `  - ${file.name} (${file.mime})`).join("\n");
+	return `${files.length} file${files.length === 1 ? "" : "s"} attached:\n${stringifiedFiles}`;
+}
 
 export function pickTools(
 	toolsPreference: Record<string, boolean>,
@@ -35,6 +45,10 @@ export async function* runTools(
 	preprompt?: string
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
 	const calls: ToolCall[] = [];
+
+	// inform the model if there are files attached
+	const userMessage = messages.find((message) => message.from === "user");
+	preprompt = `${preprompt ?? ""}\n${makeFilesPrompt(userMessage?.files ?? [])}`.trim();
 
 	// do the function calling bits here
 	for await (const output of await endpoint({
@@ -58,7 +72,9 @@ export async function* runTools(
 			// grab only the capture group from the regex match
 			for (const [, block] of codeBlocks) {
 				try {
-					calls.push(...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall));
+					calls.push(
+						...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall).filter(Boolean)
+					);
 				} catch (cause) {
 					// error parsing the calls
 					yield {
@@ -82,7 +98,7 @@ export async function* runTools(
 			continue;
 		}
 		// Special case for directly_answer tool where we ignore
-		if (tool.name === "directly_answer") continue;
+		if (toolHasName("directly_answer", tool)) continue;
 
 		yield {
 			type: MessageUpdateType.Tool,
@@ -126,28 +142,34 @@ function isExternalToolCall(call: unknown): call is ExternalToolCall {
 	return externalToolCall.safeParse(call).success;
 }
 
-function externalToToolCall(call: ExternalToolCall): ToolCall {
-	const tool = allTools.find((el) => el.name === call.tool_name);
+function externalToToolCall(call: ExternalToolCall): ToolCall | undefined {
+	// Convert - to _ since some models insist on using _ instead of -
+	const tool = allTools.find((tool) => toolHasName(call.tool_name, tool));
 	if (tool === undefined) {
-		throw new Error(`Could not find tool ${call.tool_name}`);
+		logger.debug(`Model requested tool that does not exist: "${call.tool_name}". Skipping tool...`);
+		return;
 	}
 
-	const parametersWithDefaults = Object.fromEntries(
-		Object.entries(tool.parameterDefinitions).map(([key, definition]) => {
-			const value = call.parameters[key];
+	const parametersWithDefaults: Record<string, string> = {};
 
-			// Required so ensure it's there
-			if (definition.required) {
-				if (value === undefined) {
-					throw new Error(`Missing required parameter ${key} for tool ${call.tool_name}`);
-				}
-				return [key, value];
+	for (const [key, definition] of Object.entries(tool.parameterDefinitions)) {
+		const value = call.parameters[key];
+
+		// Required so ensure it's there, otherwise return undefined
+		if (definition.required) {
+			if (value === undefined) {
+				logger.debug(
+					`Model requested tool "${call.tool_name}" but was missing required parameter "${key}". Skipping tool...`
+				);
+				return;
 			}
+			parametersWithDefaults[key] = value;
+			continue;
+		}
 
-			// Optional so use default if not there
-			return [key, value ?? definition.default];
-		})
-	);
+		// Optional so use default if not there
+		parametersWithDefaults[key] = value ?? definition.default;
+	}
 
 	return {
 		name: call.tool_name,

@@ -82,7 +82,12 @@
 
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
-					file2base64(file).then((value) => ({ type: "base64" as const, value, mime: file.type }))
+					file2base64(file).then((value) => ({
+						type: "base64" as const,
+						value,
+						mime: file.type,
+						name: file.name,
+					}))
 				)
 			);
 
@@ -251,7 +256,7 @@
 				} else if (update.type === MessageUpdateType.File) {
 					messageToWriteTo.files = [
 						...(messageToWriteTo.files ?? []),
-						{ type: "hash", value: update.sha, mime: update.mime },
+						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
 					];
 					messages = [...messages];
 				}

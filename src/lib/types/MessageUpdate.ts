@@ -100,8 +100,9 @@ export interface MessageStreamUpdate {
 }
 export interface MessageFileUpdate {
 	type: MessageUpdateType.File;
+	name: string;
 	sha: string;
-  mime: string;
+	mime: string;
 }
 export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
