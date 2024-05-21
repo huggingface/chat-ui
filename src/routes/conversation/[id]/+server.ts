@@ -344,6 +344,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messageToWriteTo?.updates?.push(event);
 				}
 
+				// Avoid remote keylogging attack executed by watching packet lengths
+				// by padding the text with null chars to a fixed length
+				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
+				if (event.type === MessageUpdateType.Stream) {
+					event = { ...event, token: event.token.padEnd(16, "\0") };
+				}
+
 				// Send the update to the client
 				controller.enqueue(JSON.stringify(event) + "\n");
 

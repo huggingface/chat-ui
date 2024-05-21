@@ -226,6 +226,12 @@
 					break;
 				}
 
+				// Remove null characters added due to remote keylogging prevention
+				// See server code for more details
+				if (update.type === MessageUpdateType.Stream) {
+					update.token = update.token.replaceAll("\0", "");
+				}
+
 				messageUpdates.push(update);
 
 				if (update.type === MessageUpdateType.Stream) {
