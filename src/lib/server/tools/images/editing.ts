@@ -26,19 +26,39 @@ const imageEditing: BackendTool = {
 			type: "string",
 			required: true,
 		},
+		fileIndex: {
+			description: "Index of the file to edit",
+			type: "number",
+			required: true,
+		},
 	},
-	async *call({ prompt }, { conv, messages }) {
+	async *call({ prompt, fileIndex }, { conv, messages }) {
+		prompt = String(prompt);
+		fileIndex = Number(fileIndex);
+
 		const latestUserMessage = messages.findLast((message) => message.from === "user");
-		const images = latestUserMessage?.files?.filter((file) => file.mime.startsWith("image/"));
+		const images = latestUserMessage?.files ?? [];
 		if (!images || images.length === 0) {
 			return {
 				status: ToolResultStatus.Error,
 				message: "User did not provide an image to edit.",
 			};
 		}
+		if (fileIndex >= images.length) {
+			return {
+				status: ToolResultStatus.Error,
+				message: "Model provided an invalid file index",
+			};
+		}
+		if (!images[fileIndex].mime.startsWith("image/")) {
+			return {
+				status: ToolResultStatus.Error,
+				message: "Model provided a file indx which is not an image",
+			};
+		}
 
 		// todo: should handle multiple images
-		const image = await downloadFile(images[0].value, conv._id)
+		const image = await downloadFile(images[fileIndex].value, conv._id)
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
@@ -47,7 +67,7 @@ const imageEditing: BackendTool = {
 			"run_edit",
 			[
 				image,
-				String(prompt),
+				prompt,
 				"", // negative prompt
 				7, // guidance scale
 				20, // steps
@@ -56,10 +76,7 @@ const imageEditing: BackendTool = {
 
 		const outputImage = await fetch(outputs[0].url)
 			.then((res) => res.blob())
-			.then(
-				(blob) =>
-					new File([blob], `${prompt}.${blob.type.split("/")[1] ?? "png"}`, { type: blob.type })
-			)
+			.then((blob) => new File([blob], outputs[0].orig_name, { type: blob.type }))
 			.then((file) => uploadFile(file, conv));
 
 		yield {

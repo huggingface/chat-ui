@@ -250,7 +250,7 @@
 		<div class="w-full">
 			<div class="flex w-full pb-3">
 				{#if !assistant}
-					{#if currentModel.functions}
+					{#if currentModel.tools}
 						<ToolsMenu {loading} />
 					{:else if $page.data.settings?.searchEnabled}
 						<WebSearchToggle />
@@ -271,7 +271,7 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal || currentModel.functions}
+						{#if currentModel.multimodal || currentModel.tools}
 							<UploadBtn bind:files classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}

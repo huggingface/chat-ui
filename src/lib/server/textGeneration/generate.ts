@@ -18,6 +18,7 @@ export async function* generate(
 		generateSettings: assistant?.generateSettings,
 		toolResults,
 	})) {
+		// text generation completed
 		if (output.generated_text) {
 			let interrupted =
 				!output.token.special && !model.parameters.stop?.includes(output.token.text);

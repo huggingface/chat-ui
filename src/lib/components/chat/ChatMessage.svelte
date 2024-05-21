@@ -145,7 +145,7 @@
 
 	// filter all updates with type === "tool" then group them by uuid field
 
-	$: tools = message.updates
+	$: toolUpdates = message.updates
 		?.filter(({ type }) => type === "tool")
 		?.reduce((acc, update) => {
 			if (update.type !== "tool") {
@@ -209,7 +209,7 @@
 	const availableTools: ToolFront[] = $page.data.tools;
 </script>
 
-{#if modalImageToShow !== null}
+{#if modalImageToShow}
 	<!-- show the image file full screen, click outside to exit -->
 	<Modal width="max-w-[90dvw]" on:close={() => (modalImageToShow = null)}>
 		{#if modalImageToShow.type === "hash"}
@@ -252,7 +252,7 @@
 		<div
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
-			{#if message.files && message.files.length > 0}
+			{#if message.files?.length}
 				<div class="grid w-fit grid-cols-2 gap-5">
 					{#each message.files as file}
 						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
@@ -282,8 +282,8 @@
 				/>
 			{/if}
 
-			{#if tools}
-				{#each Object.values(tools) as tool}
+			{#if toolUpdates}
+				{#each Object.values(toolUpdates) as tool}
 					{#if tool.length > 0}
 						{@const toolName = tool.find(isMessageToolCallUpdate)?.call.name}
 						{@const toolDone = tool.some(isMessageToolResultUpdate)}
@@ -384,7 +384,7 @@
 				</div>
 			{/if}
 		</div>
-		{#if !loading && (message.content || tools)}
+		{#if !loading && (message.content || toolUpdates)}
 			<div
 				class="absolute bottom-1 right-0 -mb-4 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
 		{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
@@ -444,9 +444,9 @@
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
 	>
-		<div class="flex w-full flex-col">
-			{#if message.files && message.files.length > 0}
-				<div class="grid w-fit grid-cols-2 gap-5 px-5">
+		<div class="flex w-full flex-col gap-2">
+			{#if message.files?.length}
+				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
 						{#if file.mime.startsWith("image/")}
 							<button on:click={() => (modalImageToShow = file)}>

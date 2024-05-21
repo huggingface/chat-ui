@@ -160,7 +160,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
-			functions: model.functions,
+			tools: model.tools,
 			unlisted: model.unlisted,
 		})),
 		oldModels,

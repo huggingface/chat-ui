@@ -1,7 +1,7 @@
 import { ToolResultStatus, type ToolCall, type ToolResult } from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
 import JSON5 from "json5";
-import type { BackendTool } from "../tools";
+import type { BackendTool, BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
 	MessageUpdateStatus,
@@ -17,12 +17,17 @@ import { z } from "zod";
 import { logger } from "../logger";
 import { toolHasName } from "../tools/utils";
 import type { MessageFile } from "$lib/types/Message";
+import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 
 function makeFilesPrompt(files: MessageFile[]): string {
 	if (files.length === 0) return "";
 
-	const stringifiedFiles = files.map((file) => `  - ${file.name} (${file.mime})`).join("\n");
-	return `${files.length} file${files.length === 1 ? "" : "s"} attached:\n${stringifiedFiles}`;
+	const stringifiedFiles = files
+		.map((file, idx) => `  - fileIndex ${idx} | ${file.name} (${file.mime})`)
+		.join("\n");
+	return `The user attached ${files.length} file${
+		files.length === 1 ? "" : "s"
+	}:\n${stringifiedFiles}`;
 }
 
 export function pickTools(
@@ -37,6 +42,49 @@ export function pickTools(
 		if (el.isLocked && el.isOnByDefault) return true;
 		return toolsPreference?.[el.name] ?? el.isOnByDefault;
 	});
+}
+
+async function* runTool(
+	{ conv, messages, preprompt, assistant }: BackendToolContext,
+	tools: BackendTool[],
+	call: ToolCall
+): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
+	const uuid = uuidV4();
+
+	const tool = tools.find((el) => el.name === call.name);
+	if (!tool) return { call, status: ToolResultStatus.Error, message: "Could not find tool" };
+
+	// Special case for directly_answer tool where we ignore
+	if (toolHasName("directly_answer", tool)) return;
+
+	yield {
+		type: MessageUpdateType.Tool,
+		subtype: MessageToolUpdateType.Call,
+		uuid,
+		call,
+	};
+	try {
+		const toolResult = yield* tool.call(call.parameters, {
+			conv,
+			messages,
+			preprompt,
+			assistant,
+		});
+		yield {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid,
+			result: { ...toolResult, call } as ToolResult,
+		};
+		return { ...toolResult, call } as ToolResult;
+	} catch (cause) {
+		console.error(Error(`Failed while running tool ${call.name}`), { cause });
+		return {
+			call,
+			status: ToolResultStatus.Error,
+			message: cause instanceof Error ? cause.message : String(cause),
+		};
+	}
 }
 
 export async function* runTools(
@@ -87,50 +135,11 @@ export async function* runTools(
 		}
 	}
 
-	const toolResults: ToolResult[] = [];
-	for (const call of calls) {
-		const uuid = uuidV4();
-
-		const tool = tools.find((el) => el.name === call.name);
-
-		if (!tool) {
-			toolResults.push({ call, status: ToolResultStatus.Error, message: "Could not find tool" });
-			continue;
-		}
-		// Special case for directly_answer tool where we ignore
-		if (toolHasName("directly_answer", tool)) continue;
-
-		yield {
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Call,
-			uuid,
-			call,
-		};
-		try {
-			const toolResult = yield* tool.call(call.parameters, {
-				conv,
-				messages,
-				preprompt,
-				assistant,
-			});
-			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Result,
-				uuid,
-				result: { ...toolResult, call } as ToolResult,
-			};
-			toolResults.push({ ...toolResult, call } as ToolResult);
-		} catch (cause) {
-			console.error(Error(`Failed while running tool ${call.name}`), { cause });
-			toolResults.push({
-				call,
-				status: ToolResultStatus.Error,
-				message: cause instanceof Error ? cause.message : String(cause),
-			});
-		}
-	}
-
-	return toolResults;
+	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant };
+	const toolResults: (ToolResult | undefined)[] = yield* mergeAsyncGenerators(
+		calls.map((call) => runTool(toolContext, tools, call))
+	);
+	return toolResults.filter((result): result is ToolResult => result !== undefined);
 }
 
 const externalToolCall = z.object({
@@ -145,7 +154,7 @@ function isExternalToolCall(call: unknown): call is ExternalToolCall {
 function externalToToolCall(call: ExternalToolCall): ToolCall | undefined {
 	// Convert - to _ since some models insist on using _ instead of -
 	const tool = allTools.find((tool) => toolHasName(call.tool_name, tool));
-	if (tool === undefined) {
+	if (!tool) {
 		logger.debug(`Model requested tool that does not exist: "${call.tool_name}". Skipping tool...`);
 		return;
 	}

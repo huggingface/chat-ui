@@ -62,7 +62,7 @@ const modelConfig = z.object({
 		.passthrough()
 		.optional(),
 	multimodal: z.boolean().default(false),
-	functions: z.boolean().default(false),
+	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
@@ -112,7 +112,7 @@ async function getChatPromptRender(
 			];
 		}
 
-		if (toolResults && toolResults.length > 0) {
+		if (toolResults?.length) {
 			// todo: should update the command r+ tokenizer to support system messages at any location
 			// or use the `rag` mode without the citations
 			formattedMessages = [
@@ -120,19 +120,23 @@ async function getChatPromptRender(
 					role: "system",
 					content:
 						"\n\n<results>\n" +
-						toolResults.flatMap((result, idx) => {
-							if (result.status === ToolResultStatus.Error) {
-								return `Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message;
-							}
-							return (
-								`Document: ${idx}\n` +
-								result.outputs
-									.flatMap((output) =>
-										Object.entries(output).map(([title, text]) => `${title}\n${text}`)
-									)
-									.join("\n")
-							);
-						}) +
+						toolResults
+							.flatMap((result, idx) => {
+								if (result.status === ToolResultStatus.Error) {
+									return (
+										`Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message
+									);
+								}
+								return (
+									`Document: ${idx}\n` +
+									result.outputs
+										.flatMap((output) =>
+											Object.entries(output).map(([title, text]) => `${title}\n${text}`)
+										)
+										.join("\n")
+								);
+							})
+							.join("\n\n") +
 						"\n</results>",
 				},
 				...formattedMessages,
@@ -140,11 +144,7 @@ async function getChatPromptRender(
 			tools = [];
 		}
 
-		let chatTemplate: string | undefined = undefined;
-
-		if (tools && tools.length > 0) {
-			chatTemplate = "tool_use";
-		}
+		const chatTemplate = tools?.length ? "tool_use" : undefined;
 
 		const documents = (toolResults ?? []).flatMap((result) => {
 			if (result.status === ToolResultStatus.Error) {
@@ -288,5 +288,5 @@ export const smallModel = env.TASK_MODEL
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted" | "functions"
+	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools"
 >;

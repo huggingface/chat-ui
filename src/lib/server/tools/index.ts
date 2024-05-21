@@ -12,7 +12,7 @@ import parsePdf from "./parse/pdf";
 import fetchUrl from "./web/url";
 import websearch from "./web/search";
 
-interface BackendToolContext {
+export interface BackendToolContext {
 	conv: Conversation;
 	messages: Message[];
 	preprompt?: string;

@@ -15,7 +15,7 @@
 	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
 	$: lastMessage = webSearchMessages
 		.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
-		.slice(-1)[0];
+		.at(-1) as MessageWebSearchUpdate;
 	$: loading = !sources && lastMessage.subtype !== MessageWebSearchUpdateType.Error;
 </script>
 

@@ -40,11 +40,11 @@ async function* textGenerationWithoutTitle(
 
 	// perform websearch if requested
 	// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
-	// if functions are enabled, we don't perform it here since we will add the websearch as a tool
+	// if tools are enabled, we don't perform it here since we will add the websearch as a tool
 	let webSearchResult: WebSearch | undefined;
 	if (
 		!isContinue &&
-		!model.functions &&
+		!model.tools &&
 		((webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
 	) {
 		webSearchResult = yield* runWebSearch(conv, messages, assistant?.rag);
