@@ -299,9 +299,8 @@
 										class="relative grid size-[22px] place-items-center rounded bg-purple-600/10 dark:bg-purple-600/20"
 									>
 										<svg
-											class="absolute inset-0 text-purple-500/40 transition-opacity {!toolDone
-												? 'opacity-100'
-												: 'opacity-0'}"
+											class="absolute inset-0 text-purple-500/40 transition-opacity"
+											class:invisible={toolDone}
 											width="22"
 											height="22"
 											viewBox="0 0 38 38"

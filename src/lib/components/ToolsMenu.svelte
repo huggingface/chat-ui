@@ -8,10 +8,9 @@
 	const settings = useSettingsStore();
 
 	// active tools are all the checked tools, either from settings or on by default
-	$: activeToolCount = $page.data.tools.filter((tool: ToolFront) => {
-		const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault;
-		return isChecked;
-	}).length;
+	$: activeToolCount = $page.data.tools.filter(
+		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+	).length;
 </script>
 
 <details class="group relative bottom-0 h-full min-h-8">
