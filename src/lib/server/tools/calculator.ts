@@ -1,11 +1,12 @@
 import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from ".";
+import vm from "node:vm";
 
 const calculator: BackendTool = {
 	name: "query_calculator",
 	displayName: "Calculator",
 	description:
-		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, and /, as well as parenthesis ().",
+		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, ** (power) and /, as well as parenthesis ().",
 	isOnByDefault: true,
 	parameterDefinitions: {
 		equation: {
@@ -22,7 +23,7 @@ const calculator: BackendTool = {
 
 			return {
 				status: ToolResultStatus.Success,
-				outputs: [{ calculator: Function(`return ${query}`)() }],
+				outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
 			};
 		} catch (e) {
 			return {
