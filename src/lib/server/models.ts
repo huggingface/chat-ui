@@ -191,7 +191,6 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
 });
 
-// FIXME: temporary
 export type ProcessedModel = Awaited<ReturnType<typeof processModel>> & {
 	getEndpoint: () => Promise<Endpoint>;
 };

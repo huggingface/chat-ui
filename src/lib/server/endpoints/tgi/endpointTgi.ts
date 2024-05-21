@@ -35,7 +35,15 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 		endpointTgiParametersSchema.parse(input);
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
-	return async ({ messages, preprompt, continueMessage, generateSettings, tools, toolResults, isMultimodal }) => {
+	return async ({
+		messages,
+		preprompt,
+		continueMessage,
+		generateSettings,
+		tools,
+		toolResults,
+		isMultimodal,
+	}) => {
 		const messagesWithResizedFiles = await Promise.all(
 			messages.map((message) => prepareMessage(Boolean(isMultimodal), message, imageProcessor))
 		);
