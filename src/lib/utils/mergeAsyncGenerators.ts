@@ -19,7 +19,7 @@ export async function* mergeAsyncGenerators<T, TReturn>(
 		);
 	}
 
-	while (promises.size > 0) {
+	while (promises.size) {
 		const { gen, value, done } = await Promise.race(promises.values());
 		if (done) {
 			results.set(gen, value as TReturn);
