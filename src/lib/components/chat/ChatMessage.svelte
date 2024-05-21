@@ -147,7 +147,7 @@
 
 	$: toolUpdates = message.updates
 		?.filter(({ type }) => type === "tool")
-		?.reduce((acc, update) => {
+		.reduce((acc, update) => {
 			if (update.type !== "tool") {
 				return acc;
 			}

@@ -9,6 +9,7 @@ export type GradioImage = {
 	is_stream: boolean;
 	meta: Record<string, unknown>;
 };
+
 type GradioResponse = {
 	data: unknown[];
 };

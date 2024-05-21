@@ -52,10 +52,12 @@ async function* runTool(
 	const uuid = uuidV4();
 
 	const tool = tools.find((el) => el.name === call.name);
-	if (!tool) return { call, status: ToolResultStatus.Error, message: "Could not find tool" };
+	if (!tool) {
+		return { call, status: ToolResultStatus.Error, message: `Could not find tool "${call.name}"` };
+	}
 
 	// Special case for directly_answer tool where we ignore
-	if (toolHasName("directly_answer", tool)) return;
+	if (toolHasName(directlyAnswer.name, tool)) return;
 
 	yield {
 		type: MessageUpdateType.Tool,
@@ -146,7 +148,9 @@ const externalToolCall = z.object({
 	tool_name: z.string(),
 	parameters: z.record(z.any()),
 });
+
 type ExternalToolCall = z.infer<typeof externalToolCall>;
+
 function isExternalToolCall(call: unknown): call is ExternalToolCall {
 	return externalToolCall.safeParse(call).success;
 }

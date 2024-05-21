@@ -8,7 +8,7 @@
 	 * Due to a bug with Svelte, we cannot use bind:files with multiple
 	 * So we use this workaround
 	 **/
-	let onFileChange = (e: Event) => {
+	const onFileChange = (e: Event) => {
 		if (!e.target) return;
 		const target = e.target as HTMLInputElement;
 		files = [...files, ...(target.files ?? [])];

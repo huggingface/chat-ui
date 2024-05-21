@@ -7,8 +7,7 @@ import type { ObjectId } from "mongodb";
 export async function processPreprompt(preprompt: string) {
 	const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 
-	let match;
-	while ((match = urlRegex.exec(preprompt)) !== null) {
+	for (const match of preprompt.matchAll(urlRegex)) {
 		try {
 			const url = new URL(match[1]);
 			if ((await isURLLocal(url)) && env.ENABLE_LOCAL_FETCH !== "true") {
