@@ -15,7 +15,7 @@ import { logger } from "$lib/server/logger";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
-const modelConfig = z.object({
+export const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
 	/** Used to link to the model page, and for inference */
@@ -125,7 +125,7 @@ async function getChatPromptRender(
 	return renderTemplate;
 }
 
-const processModel = async (m: z.infer<typeof modelConfig>) => ({
+export const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
 	chatPromptRender: await getChatPromptRender(m),
 	id: m.id || m.name,
@@ -134,7 +134,7 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
 });
 
-const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
+export const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	...m,
 	getEndpoint: async (): Promise<Endpoint> => {
 		if (!m.endpoints) {
