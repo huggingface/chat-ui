@@ -60,7 +60,7 @@ envVars:
       },
       {
         "name" : "meta-llama/Meta-Llama-3-70B-Instruct",
-        "description": "Generation over generation, Meta Llama 3 demonstrates state-of-the-art performance on a wide range of industry benchmarks and offers new capabilities, including improved reasoning.",
+        "description": "Meta Llama 3 delivers top performance on various benchmarks and introduces new features like better reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/llama3/",
