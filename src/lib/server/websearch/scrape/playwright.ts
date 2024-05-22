@@ -52,7 +52,7 @@ export async function loadPage(url: string): Promise<{ res?: Response; page: Pag
 	const page = await ctx.newPage();
 	await blocker.enableBlockingInPage(page);
 
-	const res = await page.goto(url, { waitUntil: "load", timeout: 2000 }).catch(() => {
+	const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
 		console.warn(`Failed to load page within 2s: ${url}`);
 	});
 

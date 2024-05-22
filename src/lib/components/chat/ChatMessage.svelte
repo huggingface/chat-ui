@@ -253,7 +253,7 @@
 			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
 			{#if message.files?.length}
-				<div class="grid w-fit grid-cols-2 gap-5">
+				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
 					{#each message.files as file}
 						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
 						<button on:click={() => (modalImageToShow = file)}>
@@ -328,7 +328,7 @@
 								</summary>
 								{#each tool as toolUpdate}
 									{#if toolUpdate.subtype === MessageToolUpdateType.Call}
-										<div class="my-1 flex items-center gap-2 opacity-80">
+										<div class="mt-1 flex items-center gap-2 opacity-80">
 											<h3 class="text-sm">Parameters</h3>
 											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
 										</div>
