@@ -51,7 +51,7 @@ const pdfParser: BackendTool = {
 			.then((res) => res.blob());
 
 		const outputs = await callSpace<PdfParserInput, PdfParserOutput>(
-			"saghen/pdf-to-markdown",
+			"huggingchat/pdf-to-markdown",
 			"predict",
 			[pdf, false]
 		);

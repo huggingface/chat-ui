@@ -20,7 +20,9 @@ import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 
 function makeFilesPrompt(files: MessageFile[]): string {
-	if (files.length === 0) return "";
+	if (files.length === 0) {
+		return "The user has not uploaded any files. Do not attempt to use any tools that require files";
+	}
 
 	const stringifiedFiles = files
 		.map((file, idx) => `  - fileIndex ${idx} | ${file.name} (${file.mime})`)

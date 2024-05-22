@@ -13,7 +13,7 @@
 <div
 	class="group relative flex items-center rounded-xl shadow-sm"
 	class:w-24={file.mime.startsWith("image/")}
-	class:w-64={!file.mime.startsWith("image/")}
+	class:w-72={!file.mime.startsWith("image/")}
 >
 	{#if file.mime.startsWith("image/")}
 		<div class="size-24 overflow-hidden rounded-xl">
