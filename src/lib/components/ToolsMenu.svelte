@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/stores";
+	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
 	import IconTool from "./icons/IconTool.svelte";
@@ -7,13 +8,23 @@
 	export let loading = false;
 	const settings = useSettingsStore();
 
+	let detailsEl: HTMLDetailsElement;
+
 	// active tools are all the checked tools, either from settings or on by default
 	$: activeToolCount = $page.data.tools.filter(
 		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
 	).length;
 </script>
 
-<details class="group relative bottom-0 h-full min-h-8">
+<details
+	class="group relative bottom-0 h-full min-h-8"
+	bind:this={detailsEl}
+	use:clickOutside={() => {
+		if (detailsEl.hasAttribute("open")) {
+			detailsEl.removeAttribute("open");
+		}
+	}}
+>
 	<summary
 		class="absolute bottom-0 flex h-8
 	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white px-2 py-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
