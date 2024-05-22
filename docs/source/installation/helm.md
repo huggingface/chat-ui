@@ -1,6 +1,10 @@
 # Helm
 
-> [!DANGER] > **We highly discourage using the chart**. The Helm chart is a work in progress and should be considered unstable. Breaking changes to the chart may be pushed without migration guides or notice. Contributions welcome!
+<Tip warning={true}>
+
+**We highly discourage using the chart**. The Helm chart is a work in progress and should be considered unstable. Breaking changes to the chart may be pushed without migration guides or notice. Contributions welcome!
+
+</Tip>
 
 For installation on Kubernetes, you may use the helm chart in `/chart`. Please note that no chart repository has been setup, so you'll need to clone the repository and install the chart by path. The production values may be found at `chart/env/prod.yaml`.
 

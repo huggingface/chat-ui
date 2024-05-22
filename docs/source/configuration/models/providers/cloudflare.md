@@ -34,5 +34,8 @@ MODELS=`[
 ]`
 ```
 
-> [!NOTE]
-> Cloudlare Workers AI currently do not support custom sampling parameters like temperature, top_p, etc.
+<Tip warning={true}>
+
+Cloudlare Workers AI currently do not support custom sampling parameters like temperature, top_p, etc.
+
+</Tip>
