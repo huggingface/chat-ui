@@ -99,7 +99,7 @@ export async function* runTools(
 	const calls: ToolCall[] = [];
 
 	// inform the model if there are files attached
-	const userMessage = messages.find((message) => message.from === "user");
+	const userMessage = messages.findLast((message) => message.from === "user");
 	preprompt = `${preprompt ?? ""}\n${makeFilesPrompt(userMessage?.files ?? [])}`.trim();
 
 	// do the function calling bits here
