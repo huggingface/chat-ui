@@ -12,7 +12,7 @@ export async function GET({ locals, url }) {
 			.find({
 				...authCondition(locals),
 			})
-			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
+			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>({
 				title: 1,
 				updatedAt: 1,
 				model: 1,
@@ -27,6 +27,7 @@ export async function GET({ locals, url }) {
 			title: conv.title,
 			updatedAt: conv.updatedAt,
 			modelId: conv.model,
+			assistantId: conv.assistantId,
 		}));
 
 		return Response.json(res);
