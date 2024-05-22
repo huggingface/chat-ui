@@ -8,6 +8,7 @@
 	import { page } from "$app/stores";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
+	import CarbonTools from "~icons/carbon/tools";
 
 	export let data: PageData;
 </script>
@@ -43,7 +44,7 @@
 					href="{base}/models/{model.id}"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
-					<div class="flex items-center justify-between">
+					<div class="flex items-center justify-between gap-1">
 						{#if model.logoUrl}
 							<img
 								class=" overflown aspect-square size-6 rounded border dark:border-gray-700"
@@ -52,6 +53,13 @@
 							/>
 						{:else}
 							<div class="size-6 rounded border border-transparent bg-gray-300 dark:bg-gray-800" />
+						{/if}
+						{#if model.tools}
+							<div
+								class="ml-auto grid size-[21px] place-items-center rounded-lg border border-purple-300 dark:border-purple-700"
+							>
+								<CarbonTools class="text-xxs text-purple-700 dark:text-purple-500" />
+							</div>
 						{/if}
 						{#if index === 0}
 							<div
