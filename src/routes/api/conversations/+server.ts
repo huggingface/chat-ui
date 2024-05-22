@@ -16,6 +16,7 @@ export async function GET({ locals, url }) {
 				title: 1,
 				updatedAt: 1,
 				model: 1,
+				assistantId: 1,
 			})
 			.sort({ updatedAt: -1 })
 			.skip(p * NUM_PER_PAGE)
