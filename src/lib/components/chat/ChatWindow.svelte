@@ -170,7 +170,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-6 pb-52">
+				<div class="flex h-max flex-col gap-6 pb-52 2xl:gap-7">
 					<ChatMessage
 						{loading}
 						{messages}
