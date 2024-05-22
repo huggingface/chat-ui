@@ -6,6 +6,7 @@ import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { pipeline, Writable, Readable } from "node:stream";
+import { toolHasName } from "$lib/utils/tools";
 
 export const endpointCohereParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -35,6 +36,12 @@ export async function endpointCohere(
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
 		}
+
+		// Tools must use [A-z_] for their names and directly_answer is banned
+		// It's safe to convert the tool names because we treat - and _ the same
+		tools = tools
+			?.filter((tool) => !toolHasName("directly_answer", tool))
+			.map((tool) => ({ ...tool, name: tool.name.replaceAll("-", "_") }));
 
 		const parameters = { ...model.parameters, ...generateSettings };
 
