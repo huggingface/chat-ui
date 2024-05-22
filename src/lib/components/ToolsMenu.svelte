@@ -3,7 +3,9 @@
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import IconTool from "./icons/IconTool.svelte";
+	import CarbonInformation from "~icons/carbon/information";
 
 	export let loading = false;
 	const settings = useSettingsStore();
@@ -34,10 +36,20 @@
 		<span class="text-gray-400 dark:text-gray-500"> ({activeToolCount}) </span>
 	</summary>
 	<div
-		class="absolute bottom-10 h-max w-max
-	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white p-0.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+		class="absolute bottom-10 h-max w-max select-none items-center gap-1 rounded-lg border bg-white p-0.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 	>
 		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
+			<div class="col-span-2 mb-1 flex items-center gap-1.5 text-sm text-gray-500">
+				Available tools
+				{#if isHuggingChat}
+					<a
+						href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/454"
+						target="_blank"
+						class="hover:brightness-0 dark:hover:brightness-200"
+						><CarbonInformation class="text-xs" /></a
+					>
+				{/if}
+			</div>
 			{#each $page.data.tools as tool}
 				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}
 				<div class="flex items-center gap-1.5">
