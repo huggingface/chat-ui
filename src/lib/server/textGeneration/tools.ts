@@ -53,7 +53,7 @@ async function* runTool(
 ): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
 	const uuid = uuidV4();
 
-	const tool = tools.find((el) => el.name === call.name);
+	const tool = tools.find((el) => toolHasName(call.name, el));
 	if (!tool) {
 		return { call, status: ToolResultStatus.Error, message: `Could not find tool "${call.name}"` };
 	}
