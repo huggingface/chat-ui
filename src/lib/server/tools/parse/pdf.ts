@@ -1,14 +1,10 @@
 import type { BackendTool } from "..";
 import { ToolResultStatus } from "$lib/types/Tool";
-import { callSpace, type GradioImage } from "../utils";
+import { callSpace } from "../utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
 
-type PdfParserInput = [Blob /* pdf */, boolean /* include images */];
-type PdfParserOutput = [
-	string /* markdown */,
-	Record<string, unknown> /* metadata */,
-	GradioImage[] | undefined /* extracted images if enabled */
-];
+type PdfParserInput = [Blob /* pdf */];
+type PdfParserOutput = [string /* markdown */, Record<string, unknown> /* metadata */];
 
 const pdfParser: BackendTool = {
 	name: "pdf-parser",
@@ -53,7 +49,7 @@ const pdfParser: BackendTool = {
 		const outputs = await callSpace<PdfParserInput, PdfParserOutput>(
 			"huggingchat/pdf-to-markdown",
 			"predict",
-			[pdf, false]
+			[pdf]
 		);
 
 		const outputMarkdown = outputs[0];
