@@ -29,9 +29,9 @@ export interface BackendTool extends Tool {
 export const allTools: BackendTool[] = [
 	directlyAnswer,
 	websearch,
-	calculator,
+	imageGeneration,
 	fetchUrl,
 	imageEditing,
 	parsePdf,
-	imageGeneration,
+	calculator,
 ];
