@@ -55,4 +55,3 @@ Tool implementations are placed in `src/lib/server/tools`, with helpers availabl
 ## Adding Support for Additional Models
 
 The TGI implementation uses a custom tokenizer and hard coded schema for supporting tools. The Cohere implementation, on the other hand, uses the native support in the SDK to emit tool calls. This is the recommended way to add support for more models. Please see the `endpoints/cohere` section of the code for implementation details.
-

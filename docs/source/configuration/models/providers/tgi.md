@@ -3,7 +3,7 @@
 | Feature                     | Available |
 | --------------------------- | --------- |
 | [Tools](../tools)           | Yes\*     |
-| [Multimodal](../multimodal) | Yes\*       |
+| [Multimodal](../multimodal) | Yes\*     |
 
 \* Tools are only supported with the Cohere Command R+ model with the Xenova tokenizers. Please see the [Tools](../tools) section.
 
