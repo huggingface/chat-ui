@@ -24,5 +24,5 @@
 		on:change={onFileChange}
 		accept="image/*,application/pdf"
 	/>
-	<CarbonUpload class="mr-2 text-xs" /> Upload file
+	<CarbonUpload class="mr-2 text-xxs" /> Upload file
 </button>

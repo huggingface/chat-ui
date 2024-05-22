@@ -328,7 +328,7 @@
 								</summary>
 								{#each tool as toolUpdate}
 									{#if toolUpdate.subtype === MessageToolUpdateType.Call}
-										<div class="my-1 flex items-center gap-2 opacity-80">
+										<div class="mt-1 flex items-center gap-2 opacity-80">
 											<h3 class="text-sm">Parameters</h3>
 											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
 										</div>
