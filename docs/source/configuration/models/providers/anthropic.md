@@ -1,7 +1,7 @@
 # Anthropic
 
 | Feature                                        | Available |
-|------------------------------------------------|-----------|
+| ---------------------------------------------- | --------- |
 | [Tools](/configuration/models/tools)           | No        |
 | [Multimodal](/configuration/models/multimodal) | Yes       |
 

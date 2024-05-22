@@ -4,7 +4,7 @@ This document discusses the high level overview of the Chat UI codebase. If you'
 
 ## Overview
 
-Chat UI provides a simple interface connecting LLMs to external information and tools. The project uses [MongoDB](https://www.mongodb.com/) and [SvelteKit](https://kit.svelte.dev/) with [Tailwind](https://tailwindcss.com/). 
+Chat UI provides a simple interface connecting LLMs to external information and tools. The project uses [MongoDB](https://www.mongodb.com/) and [SvelteKit](https://kit.svelte.dev/) with [Tailwind](https://tailwindcss.com/).
 
 ## Code Map
 

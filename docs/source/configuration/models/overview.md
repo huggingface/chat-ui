@@ -48,8 +48,9 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 ```handlebars
 {{preprompt}}
 {{#each messages}}
-  {{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
-  {{#ifAssistant}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}
+	{{#ifUser}}{{@root.userMessageToken}}{{content}}{{@root.userMessageEndToken}}{{/ifUser}}
+	{{#ifAssistant
+	}}{{@root.assistantMessageToken}}{{content}}{{@root.assistantMessageEndToken}}{{/ifAssistant}}
 {{/each}}
 {{assistantMessageToken}}
 ```

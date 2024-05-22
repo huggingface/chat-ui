@@ -1,6 +1,5 @@
 # Ollama
 
-
 We also support the Ollama inference server. Spin up a model with
 
 ```bash

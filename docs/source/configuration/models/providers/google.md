@@ -1,7 +1,7 @@
 # Google
 
 | Feature                                        | Available |
-|------------------------------------------------|-----------|
+| ---------------------------------------------- | --------- |
 | [Tools](/configuration/models/tools)           | No        |
 | [Multimodal](/configuration/models/multimodal) | No        |
 
@@ -46,3 +46,4 @@ MODELS=`[
     }]
   },
 ]`
+```

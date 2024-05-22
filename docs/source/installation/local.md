@@ -11,7 +11,6 @@ MONGODB_URL=<the URL to your MongoDB instance>
 HF_TOKEN=<your access token>
 ```
 
-
 ## Database
 
 The chat history is stored in a MongoDB instance, and having a DB instance available is needed for Chat UI to work.

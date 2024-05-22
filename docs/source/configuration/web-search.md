@@ -15,14 +15,13 @@ Chat UI features a powerful Web Search feature. A high level overview of how it 
 
 Many providers are supported for the web search, or you can use locally scraped Google results.
 
-
 ### Local
 
-For locally scraped Google results, put `USE_LOCAL_WEBSEARCH=true` in your `.env.local`. Please note that you may hit rate limits as we make no attempt to make the traffic look legitimate. To avoid this, you may choose a third party provider, such as Serper, used on the official instance.
+For locally scraped Google results, put `USE_LOCAL_WEBSEARCH=true` in your `.env.local`. Please note that you may hit rate limits as we make no attempt to make the traffic look legitimate. To avoid this, you may choose a provider, such as Serper, used on the official instance.
 
 ### SearXNG
 
-> SearXNG is a free internet metasearch engine which aggregates results from various search services and databases. Users are neither tracked nor profiled. 
+> SearXNG is a free internet metasearch engine which aggregates results from various search services and databases. Users are neither tracked nor profiled.
 
 You may enable support via the `SEARXNG_QUERY_URL` where `<query>` will be replaceed with the query keywords. Please see [ the official documentation ](https://docs.searxng.org/dev/search_api.html) for more information
 
@@ -41,7 +40,7 @@ SERPSTACK_API_KEY=serpstack api key here
 
 ## Block/Allow List
 
-You may block or allow specific websites from the web search results. When using an allow list, only the links in the allowlist will be used. For supported search engines, the links will be blocked from the results directly. Any URL in the results that *partially* or fully matches the entry will be filtered out.
+You may block or allow specific websites from the web search results. When using an allow list, only the links in the allowlist will be used. For supported search engines, the links will be blocked from the results directly. Any URL in the results that **partially or fully matches** the entry will be filtered out.
 
 ```ini
 WEBSEARCH_BLOCKLIST=`["youtube.com", "https://example.com/foo/bar"]`
