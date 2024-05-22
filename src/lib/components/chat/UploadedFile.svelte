@@ -3,7 +3,7 @@
 	import { page } from "$app/stores";
 	import type { MessageFile } from "$lib/types/Message";
 	import CarbonClose from "~icons/carbon/close";
-	import CarbonDocument from "~icons/carbon/document";
+	import CarbonDocumentBlank from "~icons/carbon/document-blank";
 
 	export let file: MessageFile;
 	export let canClose = true;
@@ -11,7 +11,7 @@
 </script>
 
 <div
-	class="group relative flex items-center rounded-xl shadow-lg"
+	class="group relative flex items-center rounded-xl shadow-sm"
 	class:w-24={file.mime.startsWith("image/")}
 	class:w-64={!file.mime.startsWith("image/")}
 >
@@ -27,26 +27,28 @@
 		</div>
 	{:else}
 		<div
-			class="flex h-16 w-64 items-center gap-2 overflow-hidden rounded-xl bg-gray-200 p-2 dark:bg-gray-800"
+			class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
 		>
-			<CarbonDocument class="h-12 w-12 rounded-lg p-2 dark:bg-blue-600" />
-			<div class="flex flex-col">
-				<div class="text-md max-w-72 truncate px-2 text-gray-800 dark:text-gray-200">
-					{file.name}
-				</div>
-				<div class="px-2 text-sm text-gray-800 dark:text-gray-200">
-					{file.mime.split("/")[1].toUpperCase()}
-				</div>
+			<div
+				class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-900"
+			>
+				<CarbonDocumentBlank class="text-lg " />
 			</div>
+			<dl class="flex flex-col truncate leading-tight">
+				<dd class="text-smd">
+					{file.name}
+				</dd>
+				<dt class="text-xs text-gray-500">{file.mime.split("/")[1].toUpperCase()}</dt>
+			</dl>
 		</div>
 	{/if}
 	<!-- add a button on top that removes the image -->
 	{#if canClose}
 		<button
-			class="invisible absolute -right-2 -top-2 rounded-full bg-gray-300 p-1 group-hover:visible dark:bg-gray-700"
+			class="invisible absolute -right-2 -top-2 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
 			on:click={() => dispatch("close")}
 		>
-			<CarbonClose class="text-md font-black text-gray-300  hover:text-gray-100" />
+			<CarbonClose class=" text-xs  text-white" />
 		</button>
 	{/if}
 </div>
