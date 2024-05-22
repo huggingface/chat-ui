@@ -16,7 +16,7 @@
 	class:w-64={!file.mime.startsWith("image/")}
 >
 	{#if file.mime.startsWith("image/")}
-		<div class="h-24 w-24 overflow-hidden rounded-xl">
+		<div class="size-24 overflow-hidden rounded-xl">
 			<img
 				src={file.type === "base64"
 					? `data:${file.mime};base64,${file.value}`
@@ -27,18 +27,18 @@
 		</div>
 	{:else}
 		<div
-			class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
+			class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
 		>
 			<div
-				class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-900"
+				class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
 			>
-				<CarbonDocumentBlank class="text-lg " />
+				<CarbonDocumentBlank class="text-base text-gray-700 dark:text-gray-300" />
 			</div>
 			<dl class="flex flex-col truncate leading-tight">
-				<dd class="text-smd">
+				<dd class="text-sm">
 					{file.name}
 				</dd>
-				<dt class="text-xs text-gray-500">{file.mime.split("/")[1].toUpperCase()}</dt>
+				<dt class="text-xs text-gray-400">{file.mime.split("/")[1].toUpperCase()}</dt>
 			</dl>
 		</div>
 	{/if}
