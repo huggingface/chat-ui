@@ -1,9 +1,9 @@
 # LangServe
 
-| Feature                                        | Available |
-| ---------------------------------------------- | --------- |
-| [Tools](/configuration/models/tools)           | No        |
-| [Multimodal](/configuration/models/multimodal) | No        |
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | No        |
+| [Multimodal](../multimodal) | No        |
 
 LangChain applications that are deployed using LangServe can be called with the following config:
 

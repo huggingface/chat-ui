@@ -2,8 +2,11 @@
 
 The config file for HuggingChat is stored in the `chart/env/prod.yaml` file. It is the source of truth for the environment variables used for our CI/CD pipeline. For HuggingChat, as we need to customize the app color, as well as the base path, we build a custom docker image. You can find the workflow here.
 
-> [!TIP]
-> If you want to make changes to the model config used in production for HuggingChat, you should do so against `chart/env/prod.yaml`.
+<Tip>
+
+If you want to make changes to the model config used in production for HuggingChat, you should do so against `chart/env/prod.yaml`.
+
+</Tip>
 
 ### Running a copy of HuggingChat locally
 
@@ -16,7 +19,7 @@ If you want to run an exact copy of HuggingChat locally, you will need to do the
 
 You can then create a new `.env.SECRET_CONFIG` file with the following content
 
-```env
+```ini
 MONGODB_URL=<link to your mongo DB from step 4>
 HF_TOKEN=<your HF token from step 2>
 OPENID_CONFIG=`{
@@ -32,8 +35,11 @@ You can then run `npm run updateLocalEnv` in the root of chat-ui. This will crea
 
 ### Populate database
 
-> [!WARNING]
-> The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
+<Tip warning={true}>
+
+The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
+
+</Tip>
 
 You can populate the database using faker data using the `populate` script:
 

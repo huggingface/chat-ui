@@ -1,9 +1,9 @@
 # Cohere
 
-| Feature                                        | Available |
-| ---------------------------------------------- | --------- |
-| [Tools](/configuration/models/tools)           | Yes       |
-| [Multimodal](/configuration/models/multimodal) | No        |
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | Yes       |
+| [Multimodal](../multimodal) | No        |
 
 You may use Cohere to run their models directly from Chat UI. You will need to have a Cohere account, then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify it directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set it in the endpoint config.
 

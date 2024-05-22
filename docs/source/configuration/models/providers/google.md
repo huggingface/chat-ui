@@ -1,9 +1,9 @@
 # Google
 
-| Feature                                        | Available |
-| ---------------------------------------------- | --------- |
-| [Tools](/configuration/models/tools)           | No        |
-| [Multimodal](/configuration/models/multimodal) | No        |
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | No        |
+| [Multimodal](../multimodal) | No        |
 
 Chat UI can connect to the google Vertex API endpoints ([List of supported models](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models)).
 

@@ -1,9 +1,9 @@
 # Llama.cpp
 
-| Feature                                        | Available |
-| ---------------------------------------------- | --------- |
-| [Tools](/configuration/models/tools)           | No        |
-| [Multimodal](/configuration/models/multimodal) | No        |
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | No        |
+| [Multimodal](../multimodal) | No        |
 
 Chat UI supports the llama.cpp API server directly without the need for an adapter. You can do this using the `llamacpp` endpoint type.
 

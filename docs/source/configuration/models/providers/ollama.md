@@ -1,5 +1,10 @@
 # Ollama
 
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | No        |
+| [Multimodal](../multimodal) | No        |
+
 We also support the Ollama inference server. Spin up a model with
 
 ```bash

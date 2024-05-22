@@ -1,9 +1,9 @@
 # Cloudflare
 
-| Feature                                        | Available |
-| ---------------------------------------------- | --------- |
-| [Tools](/configuration/models/tools)           | No        |
-| [Multimodal](/configuration/models/multimodal) | No        |
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | No        |
+| [Multimodal](../multimodal) | No        |
 
 You may use Cloudflare Workers AI to run your own models with serverless inference.
 
@@ -13,7 +13,7 @@ You can either specify them directly in your `.env.local` using the `CLOUDFLARE_
 
 You can find the list of models available on Cloudflare [here](https://developers.cloudflare.com/workers-ai/models/#text-generation).
 
-```env
+```ini
 MODELS=`[
   {
     "name" : "nousresearch/hermes-2-pro-mistral-7b",

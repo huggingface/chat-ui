@@ -23,7 +23,7 @@ For locally scraped Google results, put `USE_LOCAL_WEBSEARCH=true` in your `.env
 
 > SearXNG is a free internet metasearch engine which aggregates results from various search services and databases. Users are neither tracked nor profiled.
 
-You may enable support via the `SEARXNG_QUERY_URL` where `<query>` will be replaceed with the query keywords. Please see [ the official documentation ](https://docs.searxng.org/dev/search_api.html) for more information
+You may enable support via the `SEARXNG_QUERY_URL` where `<query>` will be replaceed with the query keywords. Please see [the official documentation](https://docs.searxng.org/dev/search_api.html) for more information
 
 Example: `https://searxng.yourdomain.com/search?q=<query>&engines=duckduckgo,google&format=json`
 

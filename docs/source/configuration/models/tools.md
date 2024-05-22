@@ -1,10 +1,6 @@
 # Tools
 
-Tool calling instructs the model to generate an output matching a user-defined schema, which may be parsed for invoking external tools. The model simply chooses the tools and their parameters. Currently, only `TGI` and `Cohere` with `Command R+` are supported. If you're interested in extending tools support, please see the `src/lib/server/endpoints/cohere` provider for native tool calling.
-
-## Adding tools
-
-Tool implementations are placed in `src/lib/server/tools`, with helpers available for easy integration with HuggingFace Zero GPU spaces. In the future, there may be an OpenAPI interface for adding tools.
+Tool calling instructs the model to generate an output matching a user-defined schema, which may be parsed for invoking external tools. The model simply chooses the tools and their parameters. Currently, only `TGI` and `Cohere` with `Command R+` are supported.
 
 ## TGI Configuration
 
@@ -51,3 +47,12 @@ MODELS=`[
   }
 ]`
 ```
+
+## Adding Tools
+
+Tool implementations are placed in `src/lib/server/tools`, with helpers available for easy integration with HuggingFace Zero GPU spaces. In the future, there may be an OpenAPI interface for adding tools.
+
+## Adding Support for Additional Models
+
+The TGI implementation uses a custom tokenizer and hard coded schema for supporting tools. The Cohere implementation, on the other hand, uses the native support in the SDK to emit tool calls. This is the recommended way to add support for more models. Please see the `endpoints/cohere` section of the code for implementation details.
+

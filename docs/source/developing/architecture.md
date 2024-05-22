@@ -24,11 +24,11 @@ Provides a common streaming interface for many third party LLM and embedding pro
 
 ### `websearch`
 
-Implements web search querying and RAG. See the [Web Search](/configuration/web-search) section for more information.
+Implements web search querying and RAG. See the [Web Search](../configuration/web-search) section for more information.
 
 ### `tools`
 
-Provides a common interface for external tools called by LLMs. See the [Tools](/configuration/models/tools) section for more information
+Provides a common interface for external tools called by LLMs. See the [Tools](../configuration/models/tools) section for more information
 
 ### `migrations`
 

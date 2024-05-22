@@ -1,9 +1,9 @@
 # Amazon Web Services (AWS)
 
-| Feature                                        | Available |
-| ---------------------------------------------- | --------- |
-| [Tools](/configuration/models/tools)           | No        |
-| [Multimodal](/configuration/models/multimodal) | No        |
+| Feature                     | Available |
+| --------------------------- | --------- |
+| [Tools](../tools)           | No        |
+| [Multimodal](../multimodal) | No        |
 
 You may specify your Amazon SageMaker instance as an endpoint for Chat UI:
 
