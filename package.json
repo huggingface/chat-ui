@@ -54,7 +54,7 @@
 	"type": "module",
 	"dependencies": {
 		"@cliqz/adblocker-playwright": "^1.27.2",
-		"@gradio/client": "^0.19.3",
+		"@gradio/client": "^0.19.4",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.6.3",
 		"@iconify-json/bi": "^1.1.21",
