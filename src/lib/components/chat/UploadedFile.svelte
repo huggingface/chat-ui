@@ -13,7 +13,7 @@
 <div
 	class="group relative flex items-center rounded-xl shadow-lg"
 	class:w-24={file.mime.startsWith("image/")}
-	class:w-64={!file.mime.startsWith("image/")}
+	class:w-72={!file.mime.startsWith("image/")}
 >
 	{#if file.mime.startsWith("image/")}
 		<div class="h-24 w-24 overflow-hidden rounded-xl">
@@ -27,11 +27,11 @@
 		</div>
 	{:else}
 		<div
-			class="flex h-16 w-64 items-center gap-2 overflow-hidden rounded-xl bg-gray-200 p-2 dark:bg-gray-800"
+			class="flex h-16 w-72 items-center gap-2 overflow-hidden rounded-xl bg-gray-200 p-2 dark:bg-gray-800"
 		>
 			<CarbonDocument class="h-12 w-12 rounded-lg p-2 dark:bg-blue-600" />
 			<div class="flex flex-col">
-				<div class="text-md max-w-72 truncate px-2 text-gray-800 dark:text-gray-200">
+				<div class="text-md max-w-48 truncate px-2 text-gray-800 dark:text-gray-200">
 					{file.name}
 				</div>
 				<div class="px-2 text-sm text-gray-800 dark:text-gray-200">
