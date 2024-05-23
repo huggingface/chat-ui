@@ -20,7 +20,9 @@ export async function uploadFile(file: File, conv: Conversation): Promise<Messag
 
 	// only return the filename when upload throws a finish event or a 20s time out occurs
 	return new Promise((resolve, reject) => {
-		upload.once("finish", () => resolve({ type: "hash", value: sha, mime: file.type }));
+		upload.once("finish", () =>
+			resolve({ type: "hash", value: sha, mime: file.type, name: file.name })
+		);
 		upload.once("error", reject);
 		setTimeout(() => reject(new Error("Upload timed out")), 20_000);
 	});

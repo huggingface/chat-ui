@@ -44,6 +44,9 @@ export async function GET({ params, locals }) {
 		model,
 	});
 
+	const userMessage = conv.messages[messageIndex];
+	const assistantMessage = conv.messages[messageIndex + 1];
+
 	return new Response(
 		JSON.stringify(
 			{
@@ -54,6 +57,8 @@ export async function GET({ params, locals }) {
 					...model.parameters,
 					return_full_text: false,
 				},
+				userMessage,
+				...(assistantMessage ? { assistantMessage } : {}),
 			},
 			null,
 			2
