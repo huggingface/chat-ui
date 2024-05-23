@@ -43,7 +43,6 @@ const documentParser: BackendTool = {
 		}
 
 		const file = files[fileIndex];
-		console.log(file);
 		const fileBlob = await downloadFile(files[fileIndex].value, conv._id)
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
@@ -54,7 +53,11 @@ const documentParser: BackendTool = {
 			[fileBlob, file.name]
 		);
 
-		const documentMarkdown = outputs[0];
+		let documentMarkdown = outputs[0];
+		// TODO: quick fix for avoiding context limit. eventually should use the tokenizer
+		if (documentMarkdown.length > 30_000) {
+			documentMarkdown = documentMarkdown.slice(0, 30_000) + "\n\n... (truncated)";
+		}
 		return {
 			status: ToolResultStatus.Success,
 			outputs: [{ [file.name]: documentMarkdown }],
