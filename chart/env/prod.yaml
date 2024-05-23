@@ -39,6 +39,7 @@ envVars:
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
+        "tools": true,
         "parameters": {
           "stop": ["<|END_OF_TURN_TOKEN|>"],
           "truncate" : 28672,
@@ -47,20 +48,20 @@ envVars:
         },
         "promptExamples" : [
           {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+            "title": "Generate a mouse portrait",
+            "prompt": "Generate the portrait of a scientific mouse in its laboratory."
+          }, {
+            "title": "Review a pull request",
+            "prompt": "Review this pull request: https://github.com/huggingface/chat-ui/pull/1131/files"
           }, {
             "title": "Code a snake game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
       },
       {
         "name" : "meta-llama/Meta-Llama-3-70B-Instruct",
-        "description": "Generation over generation, Meta Llama 3 demonstrates state-of-the-art performance on a wide range of industry benchmarks and offers new capabilities, including improved reasoning.",
+        "description": "Meta Llama 3 delivers top performance on various benchmarks and introduces new features like better reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/llama3/",

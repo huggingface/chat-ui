@@ -1,16 +1,22 @@
 <script lang="ts">
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageWebSearchUpdateType,
+		type MessageWebSearchUpdate,
+	} from "$lib/types/MessageUpdate";
+	import { isMessageWebSearchSourcesUpdate } from "$lib/utils/messageUpdates";
 
 	import CarbonError from "~icons/carbon/error-filled";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconInternet from "./icons/IconInternet.svelte";
 
 	export let classNames = "";
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let webSearchMessages: MessageWebSearchUpdate[] = [];
 
-	$: sources = webSearchMessages.find((m) => m.sources)?.sources;
-	$: lastMessage = webSearchMessages.filter((m) => m.messageType !== "sources").slice(-1)[0];
-	$: loading = !sources && lastMessage.messageType !== "error";
+	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
+	$: lastMessage = webSearchMessages
+		.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
+		.at(-1) as MessageWebSearchUpdate;
+	$: loading = !sources && lastMessage.subtype !== MessageWebSearchUpdateType.Error;
 </script>
 
 <details
@@ -47,7 +53,7 @@
 				{#if sources}
 					Completed
 				{:else}
-					{lastMessage.message}
+					{"message" in lastMessage ? lastMessage.message : "An error occurred"}
 				{/if}
 			</dt>
 		</dl>
@@ -61,7 +67,7 @@
 		{:else}
 			<ol>
 				{#each webSearchMessages as message}
-					{#if message.messageType === "update"}
+					{#if message.subtype === MessageWebSearchUpdateType.Update}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<div
@@ -79,7 +85,7 @@
 								</p>
 							{/if}
 						</li>
-					{:else if message.messageType === "error"}
+					{:else if message.subtype === MessageWebSearchUpdateType.Error}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<CarbonError
