@@ -211,7 +211,6 @@
 			files = [];
 
 			const messageUpdates: MessageUpdate[] = [];
-			let messageContent: string = "";
 
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
@@ -226,14 +225,9 @@
 
 				messageUpdates.push(update);
 
-				if (update.type === "stream") {
+				if (update.type === "stream" && !reducedMotionMode) {
 					pending = false;
-					messageContent += update.token;
 					messages = [...messages];
-
-					if (!reducedMotionMode) {
-						messageToWriteTo.content = messageContent;
-					}
 				} else if (update.type === "webSearch") {
 					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
@@ -258,10 +252,6 @@
 			}
 
 			messageToWriteTo.updates = messageUpdates;
-
-			if (reducedMotionMode) {
-				messageToWriteTo.content = messageContent;
-			}
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
