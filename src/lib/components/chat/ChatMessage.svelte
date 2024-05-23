@@ -285,7 +285,7 @@
 
 			{#if toolUpdates}
 				{#each Object.values(toolUpdates) as tool}
-					{#if tool.length > 0}
+					{#if tool.length}
 						{@const toolName = tool.find(isMessageToolCallUpdate)?.call.name}
 						{@const toolDone = tool.some(isMessageToolResultUpdate)}
 						{#if toolName && toolName !== "websearch"}
