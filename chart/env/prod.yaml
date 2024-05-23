@@ -43,7 +43,7 @@ envVars:
         "parameters": {
           "stop": ["<|END_OF_TURN_TOKEN|>"],
           "truncate" : 28672,
-          "max_new_tokens" : 4096,
+          "max_new_tokens" : 2048,
           "temperature" : 0.3
         },
         "promptExamples" : [
