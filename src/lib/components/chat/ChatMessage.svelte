@@ -227,7 +227,7 @@
 			{#if webSearchSources?.length}
 				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
 					<div class="text-gray-400">Sources:</div>
-					{#each webSearchSources as { link, title, hostname }}
+					{#each webSearchSources as { link, title }}
 						<a
 							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
 							href={link}
@@ -235,10 +235,10 @@
 						>
 							<img
 								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={hostname}"
+								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname}"
 								alt="{title} favicon"
 							/>
-							<div>{hostname.replace(/^www\./, "")}</div>
+							<div>{new URL(link).hostname.replace(/^www\./, "")}</div>
 						</a>
 					{/each}
 				</div>
@@ -308,17 +308,17 @@
 			{#if message.files && message.files.length > 0}
 				<div class="mx-auto grid w-fit grid-cols-2 gap-5 px-5">
 					{#each message.files as file}
-						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
-						{#if file.length === 64}
+						<!-- handle the case where this is a hash that points to an image in the db -->
+						{#if file.type === "hash"}
 							<img
-								src={$page.url.pathname + "/output/" + file}
+								src={$page.url.pathname + "/output/" + file.value}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>
 						{:else}
 							<!-- handle the case where this is a base64 encoded image -->
 							<img
-								src={"data:image/*;base64," + file}
+								src={`data:${file.mime};base64,${file.value}`}
 								alt="input from user"
 								class="my-2 aspect-auto max-h-48 rounded-lg shadow-lg"
 							/>

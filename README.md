@@ -170,6 +170,8 @@ You can enable the web search through an API by adding `YDC_API_KEY` ([docs.you.
 
 You can also simply enable the local google websearch by setting `USE_LOCAL_WEBSEARCH=true` in your `.env.local` or specify a SearXNG instance by adding the query URL to `SEARXNG_QUERY_URL`.
 
+You can enable Javascript when parsing webpages to improve compatibility with `WEBSEARCH_JAVASCRIPT=true` at the cost of increased CPU usage. You'll want at least 4 cores when enabling.
+
 ### Custom models
 
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
@@ -228,7 +230,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 #### Multi modal model
 
-We currently only support IDEFICS as a multimodal model, hosted on TGI. You can enable it by using the following config (if you have a PRO HF Api token):
+We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on TGI), OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](#OpenAI). For Anthropic, see the [Anthropic section](#Anthropic).
 
 ```env
     {
@@ -463,14 +465,34 @@ MODELS=`[
 
 #### Anthropic
 
-We also support Anthropic models through the official SDK. You may provide your API key via the `ANTHROPIC_API_KEY` env variable, or alternatively, through the `endpoints.apiKey` as per the following example.
+We also support Anthropic models (including multimodal ones via `multmodal: true`) through the official SDK. You may provide your API key via the `ANTHROPIC_API_KEY` env variable, or alternatively, through the `endpoints.apiKey` as per the following example.
 
 ```
 MODELS=`[
   {
+      "name": "claude-3-haiku-20240307",
+      "displayName": "Claude 3 Haiku",
+      "description": "Fastest and most compact model for near-instant responsiveness",
+      "multimodal": true,
+      "parameters": {
+        "max_new_tokens": 4096,
+      },
+      "endpoints": [
+        {
+          "type": "anthropic",
+          // optionals
+          "apiKey": "sk-ant-...",
+          "baseURL": "https://api.anthropic.com",
+          "defaultHeaders": {},
+          "defaultQuery": {}
+        }
+      ]
+  },
+  {
       "name": "claude-3-sonnet-20240229",
       "displayName": "Claude 3 Sonnet",
       "description": "Ideal balance of intelligence and speed",
+      "multimodal": true,
       "parameters": {
         "max_new_tokens": 4096,
       },
@@ -489,6 +511,7 @@ MODELS=`[
       "name": "claude-3-opus-20240229",
       "displayName": "Claude 3 Opus",
       "description": "Most powerful model for highly complex tasks",
+      "multimodal": true,
       "parameters": {
          "max_new_tokens": 4096
       },
@@ -514,6 +537,7 @@ MODELS=`[
       "name": "claude-3-sonnet@20240229",
       "displayName": "Claude 3 Sonnet",
       "description": "Ideal balance of intelligence and speed",
+      "multimodal": true,
       "parameters": {
         "max_new_tokens": 4096,
       },
@@ -532,6 +556,7 @@ MODELS=`[
       "name": "claude-3-haiku@20240307",
       "displayName": "Claude 3 Haiku",
       "description": "Fastest, most compact model for near-instant responsiveness",
+      "multimodal": true,
       "parameters": {
          "max_new_tokens": 4096
       },
