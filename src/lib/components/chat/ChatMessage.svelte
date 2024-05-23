@@ -211,7 +211,7 @@
 
 {#if modalImageToShow}
 	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="max-w-[500px]" on:close={() => (modalImageToShow = null)}>
+	<Modal width="sm:max-w-[500px]" on:close={() => (modalImageToShow = null)}>
 		{#if modalImageToShow.type === "hash"}
 			<img
 				src={urlNotTrailing + "/output/" + modalImageToShow.value}
