@@ -4,7 +4,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from "..";
 
 const fetchUrl: BackendTool = {
-	name: "fetchUrl",
+	name: "fetch_url",
 	displayName: "URL Fetcher",
 	description: "A tool that can be used to fetch an URL and return the content directly.",
 	isOnByDefault: true,
