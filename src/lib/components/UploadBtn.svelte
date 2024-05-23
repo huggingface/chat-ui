@@ -22,7 +22,7 @@
 		class="absolute w-full cursor-pointer opacity-0"
 		type="file"
 		on:change={onFileChange}
-		accept="image/*,application/pdf"
+		accept="*/*"
 	/>
 	<CarbonUpload class="mr-2 text-xxs" /> Upload file
 </button>
