@@ -4,7 +4,7 @@ import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
-import { ToolResultStatus } from "$lib/types/Tool";
+import { ToolResultStatus, type ToolCall } from "$lib/types/Tool";
 import { pipeline, Writable, Readable } from "node:stream";
 import { toolHasName } from "$lib/utils/tools";
 
@@ -128,7 +128,7 @@ export async function endpointCohere(
 							text: "",
 							logprob: 0,
 							special: true,
-							toolCalls: output.toolCalls,
+							toolCalls: output.toolCalls as ToolCall[],
 						},
 						generated_text: null,
 						details: null,
