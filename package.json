@@ -56,7 +56,7 @@
 		"@cliqz/adblocker-playwright": "^1.27.2",
 		"@gradio/client": "^0.19.4",
 		"@huggingface/hub": "^0.5.1",
-		"@huggingface/inference": "^2.6.3",
+		"@huggingface/inference": "^2.7.0",
 		"@iconify-json/bi": "^1.1.21",
 		"@playwright/browser-chromium": "^1.43.1",
 		"@resvg/resvg-js": "^2.6.2",
