@@ -8,7 +8,7 @@ import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
 import imageEditing from "./images/editing";
 import imageGeneration from "./images/generation";
-import parsePdf from "./parse/pdf";
+import documentParser from "./documentParser";
 import fetchUrl from "./web/url";
 import websearch from "./web/search";
 
@@ -32,6 +32,6 @@ export const allTools: BackendTool[] = [
 	imageGeneration,
 	fetchUrl,
 	imageEditing,
-	parsePdf,
+	documentParser,
 	calculator,
 ];
