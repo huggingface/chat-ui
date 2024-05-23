@@ -34,6 +34,7 @@
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import Modal from "../Modal.svelte";
+	import { toolHasName } from "$lib/utils/tools";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -322,7 +323,7 @@
 									<span>
 										{toolDone ? "Called" : "Calling"} tool
 										<span class="font-semibold"
-											>{availableTools.find((el) => el.name === toolName)?.displayName}</span
+											>{availableTools.find((el) => toolHasName(toolName, el))?.displayName}</span
 										>
 									</span>
 								</summary>

@@ -15,7 +15,7 @@ type ImageEditingInput = [
 type ImageEditingOutput = [GradioImage];
 
 const imageEditing: BackendTool = {
-	name: "image-editing",
+	name: "image_editing",
 	displayName: "Image Editing",
 	description: "Use this tool to edit an image from a prompt.",
 	isOnByDefault: true,
@@ -26,18 +26,24 @@ const imageEditing: BackendTool = {
 			type: "string",
 			required: true,
 		},
+		fileMessageIndex: {
+			description: "Index of the message containing the file to edit",
+			type: "number",
+			required: true,
+		},
 		fileIndex: {
 			description: "Index of the file to edit",
 			type: "number",
 			required: true,
 		},
 	},
-	async *call({ prompt, fileIndex }, { conv, messages }) {
+	async *call({ prompt, fileMessageIndex, fileIndex }, { conv, messages }) {
 		prompt = String(prompt);
+		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
 
-		const latestUserMessage = messages.findLast((message) => message.from === "user");
-		const images = latestUserMessage?.files ?? [];
+		const message = messages[fileMessageIndex];
+		const images = message?.files ?? [];
 		if (!images || images.length === 0) {
 			return {
 				status: ToolResultStatus.Error,

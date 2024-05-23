@@ -14,7 +14,7 @@ type ImageGenerationInput = [
 type ImageGenerationOutput = [{ image: GradioImage }[]];
 
 const imageGeneration: BackendTool = {
-	name: "image-generation",
+	name: "image_generation",
 	displayName: "Image Generation",
 	description: "Use this tool to generate an image from a prompt.",
 	isOnByDefault: true,

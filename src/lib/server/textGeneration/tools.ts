@@ -19,17 +19,18 @@ import { toolHasName } from "../tools/utils";
 import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 
-function makeFilesPrompt(files: MessageFile[]): string {
+function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string {
 	if (files.length === 0) {
 		return "The user has not uploaded any files. Do not attempt to use any tools that require files";
 	}
 
 	const stringifiedFiles = files
-		.map((file, idx) => `  - fileIndex ${idx} | ${file.name} (${file.mime})`)
+		.map(
+			(file, fileIndex) =>
+				`  - fileMessageIndex ${fileMessageIndex} | fileIndex ${fileIndex} | ${file.name} (${file.mime})`
+		)
 		.join("\n");
-	return `The user attached ${files.length} file${
-		files.length === 1 ? "" : "s"
-	}:\n${stringifiedFiles}`;
+	return `Attached ${files.length} file${files.length === 1 ? "" : "s"}:\n${stringifiedFiles}`;
 }
 
 export function pickTools(
@@ -98,13 +99,17 @@ export async function* runTools(
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
 	const calls: ToolCall[] = [];
 
-	// inform the model if there are files attached
-	const userMessage = messages.findLast((message) => message.from === "user");
-	preprompt = `${preprompt ?? ""}\n${makeFilesPrompt(userMessage?.files ?? [])}`.trim();
+	const messagesWithFilesPrompt = messages.map((message, idx) => {
+		if (!message.files?.length) return message;
+		return {
+			...message,
+			content: `${message.content}\n${makeFilesPrompt(message.files, idx)}`,
+		};
+	});
 
 	// do the function calling bits here
 	for await (const output of await endpoint({
-		messages,
+		messages: messagesWithFilesPrompt,
 		preprompt,
 		generateSettings: assistant?.generateSettings,
 		tools,

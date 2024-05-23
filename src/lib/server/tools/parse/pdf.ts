@@ -7,22 +7,28 @@ type PdfParserInput = [Blob /* pdf */];
 type PdfParserOutput = [string /* markdown */, Record<string, unknown> /* metadata */];
 
 const pdfParser: BackendTool = {
-	name: "pdf-parser",
+	name: "pdf_parser",
 	displayName: "PDF Parser",
 	description: "Use this tool to parse a PDF and get its content in markdown format.",
 	isOnByDefault: true,
 	parameterDefinitions: {
+		fileMessageIndex: {
+			description: "Index of the message containing the pdf file to parse",
+			type: "number",
+			required: true,
+		},
 		fileIndex: {
 			description: "Index of the pdf file to parse",
 			type: "number",
 			required: true,
 		},
 	},
-	async *call({ fileIndex }, { conv, messages }) {
+	async *call({ fileMessageIndex, fileIndex }, { conv, messages }) {
+		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
 
-		const latestUserMessage = messages.findLast((message) => message.from === "user");
-		const pdfs = latestUserMessage?.files ?? [];
+		const message = messages[fileMessageIndex];
+		const pdfs = message?.files ?? [];
 		if (!pdfs || pdfs.length === 0) {
 			return {
 				status: ToolResultStatus.Error,
