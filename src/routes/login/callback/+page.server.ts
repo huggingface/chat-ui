@@ -24,10 +24,11 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		throw error(400, errorName + (errorDescription ? ": " + errorDescription : ""));
 	}
 
-	const { code, state } = z
+	const { code, state, iss } = z
 		.object({
 			code: z.string(),
 			state: z.string(),
+			iss: z.string().optional(),
 		})
 		.parse(Object.fromEntries(url.searchParams.entries()));
 
@@ -39,7 +40,11 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		throw error(403, "Invalid or expired CSRF token");
 	}
 
-	const { userData } = await getOIDCUserData({ redirectURI: validatedToken.redirectUrl }, code);
+	const { userData } = await getOIDCUserData(
+		{ redirectURI: validatedToken.redirectUrl },
+		code,
+		iss
+	);
 
 	// Filter by allowed user emails
 	if (allowedUserEmails.length > 0) {
