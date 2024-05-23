@@ -14,6 +14,7 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
 import { jwtDecode } from "jwt-decode";
+import { ObjectId } from "mongodb";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -102,14 +103,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 	let sessionId: string;
 
 	if (jwt) {
-		const { email } = jwtDecode(jwt);
+		const { email } = jwtDecode<{ email: string }>(jwt);
 
 		secretSessionId = sessionId = email;
 
 		event.locals.user = {
-			_id: 'jwt-user', // Special value to hide the "Sign Out" button
+			_id: new ObjectId("000000000000000000000000"),
 			name: email,
-			email: email
+			email,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			hfUserId: email,
+			avatarUrl: "",
 		};
 	} else if (token) {
 		secretSessionId = token;
