@@ -31,7 +31,7 @@
 		class="absolute bottom-0 flex h-8
 	cursor-pointer select-none items-center gap-1 rounded-lg border bg-white px-2 py-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
 	>
-		<IconTool />
+		<IconTool classNames="dark:text-purple-600" />
 		Tools
 		<span class="text-gray-400 dark:text-gray-500"> ({activeToolCount}) </span>
 	</summary>
