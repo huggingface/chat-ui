@@ -81,7 +81,7 @@
 		"parquetjs": "^0.11.2",
 		"pino": "^9.0.0",
 		"pino-pretty": "^11.0.0",
-		"playwright": "^1.40.0",
+		"playwright": "^1.44.1",
 		"postcss": "^8.4.31",
 		"saslprep": "^1.0.3",
 		"satori": "^0.10.11",
