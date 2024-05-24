@@ -356,6 +356,7 @@ externalSecrets:
     ADMIN_API_SECRET: "hub-prod-chat-ui-admin-api-secret"
     USAGE_LIMITS: "hub-prod-chat-ui-usage-limits"
     MESSAGES_BEFORE_LOGIN: "hub-prod-chat-ui-messages-before-login"
+    IP_TOKEN_SECRET: "hub-prod-chat-ui-ip-token-secret"
 
 autoscaling:
   enabled: true

@@ -2,6 +2,9 @@ import type { BackendTool } from ".";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { callSpace } from "./utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
+import { collections } from "../database";
+import { env } from "$env/dynamic/private";
+import { SignJWT } from "jose";
 
 type PdfParserInput = [Blob /* pdf */, string /* filename */];
 type PdfParserOutput = [string /* markdown */, Record<string, unknown> /* metadata */];
@@ -47,10 +50,21 @@ const documentParser: BackendTool = {
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
+		const session = await collections.sessions.findOne({ sessionId: conv.sessionId });
+		const ipTokenSecret = env.IP_TOKEN_SECRET;
+		const ipToken = ipTokenSecret
+			? await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
+					.setProtectedHeader({ alg: "HS256" })
+					.setIssuedAt()
+					.setExpirationTime("1m")
+					.sign(new TextEncoder().encode(ipTokenSecret))
+			: undefined;
+
 		const outputs = await callSpace<PdfParserInput, PdfParserOutput>(
 			"huggingchat/document-parser",
 			"predict",
-			[fileBlob, file.name]
+			[fileBlob, file.name],
+			ipToken
 		);
 
 		let documentMarkdown = outputs[0];

@@ -1,8 +1,11 @@
 import type { BackendTool } from "..";
+import { SignJWT } from "jose";
 import { uploadFile } from "../../files/uploadFile";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { callSpace, type GradioImage } from "../utils";
+import { collections } from "$lib/server/database";
+import { env } from "$env/dynamic/private";
 
 type ImageGenerationInput = [
 	number /* number (numeric value between 1 and 8) in 'Number of Images' Slider component */,
@@ -45,6 +48,16 @@ const imageGeneration: BackendTool = {
 		},
 	},
 	async *call({ prompt, numberOfImages }, { conv }) {
+		const session = await collections.sessions.findOne({ sessionId: conv.sessionId });
+		const ipTokenSecret = env.IP_TOKEN_SECRET;
+		const ipToken = ipTokenSecret
+			? await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
+					.setProtectedHeader({ alg: "HS256" })
+					.setIssuedAt()
+					.setExpirationTime("1m")
+					.sign(new TextEncoder().encode(ipTokenSecret))
+			: undefined;
+
 		const outputs = await callSpace<ImageGenerationInput, ImageGenerationOutput>(
 			"ByteDance/Hyper-SDXL-1Step-T2I",
 			"/process_image",
@@ -54,7 +67,8 @@ const imageGeneration: BackendTool = {
 				512, // number in 'Image Width' Number component
 				String(prompt), // prompt
 				Math.floor(Math.random() * 1000), // seed random
-			]
+			],
+			ipToken
 		);
 		const imageBlobs = await Promise.all(
 			outputs[0].map((output) =>

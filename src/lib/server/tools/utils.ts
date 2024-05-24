@@ -16,9 +16,21 @@ type GradioResponse = {
 export async function callSpace<TInput extends unknown[], TOutput extends unknown[]>(
 	name: string,
 	func: string,
-	parameters: TInput
+	parameters: TInput,
+	ipToken: string | undefined
 ): Promise<TOutput> {
-	const client = await Client.connect(name, {
+	class CustomClient extends Client {
+		fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+			init = init || {};
+			init.headers = {
+				...(init.headers || {}),
+				...(ipToken ? { "X-IP-Token": ipToken } : {}),
+			};
+			return super.fetch(input, init);
+		}
+	}
+
+	const client = await CustomClient.connect(name, {
 		hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
 	});
 	return await client
