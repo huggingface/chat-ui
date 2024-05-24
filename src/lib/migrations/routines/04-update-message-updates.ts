@@ -147,7 +147,7 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 }
 
 const updateMessageUpdates: Migration = {
-	_id: new ObjectId("5f9f4f4f4f4f4f4f4f4f4f4f"),
+	_id: new ObjectId("5f9f7f7f7f7f7f7f7f7f7f7f"),
 	name: "Convert message updates to the new schema",
 	up: async () => {
 		const allConversations = collections.conversations.find({});
