@@ -4,6 +4,7 @@ import {
 	devices,
 	type Page,
 	type BrowserContextOptions,
+	type Response,
 } from "playwright";
 import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
 import { env } from "$env/dynamic/private";
@@ -44,16 +45,16 @@ async function initPlaywrightService() {
 	return Object.freeze({ ctx, blocker });
 }
 
-export async function loadPage(url: string): Promise<Page> {
+export async function loadPage(url: string): Promise<{ res?: Response; page: Page }> {
 	if (!playwrightService) playwrightService = initPlaywrightService();
 	const { ctx, blocker } = await playwrightService;
 
 	const page = await ctx.newPage();
 	await blocker.enableBlockingInPage(page);
 
-	await page.goto(url, { waitUntil: "load", timeout: 2000 }).catch(() => {
+	const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
 		console.warn(`Failed to load page within 2s: ${url}`);
 	});
 
-	return page;
+	return { res: res ?? undefined, page };
 }
