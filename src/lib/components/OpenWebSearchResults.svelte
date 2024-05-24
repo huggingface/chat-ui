@@ -16,7 +16,10 @@
 	$: lastMessage = webSearchMessages
 		.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
 		.at(-1) as MessageWebSearchUpdate;
-	$: loading = !sources && lastMessage.subtype !== MessageWebSearchUpdateType.Error;
+	$: errored = webSearchMessages.some(
+		(update) => update.subtype === MessageWebSearchUpdateType.Error
+	);
+	$: loading = !sources && !errored;
 </script>
 
 <details

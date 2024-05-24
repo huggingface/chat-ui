@@ -11,6 +11,8 @@ import {
 	type MessageWebSearchSourcesUpdate,
 	type MessageWebSearchErrorUpdate,
 	MessageWebSearchUpdateType,
+	type MessageToolErrorUpdate,
+	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
 
 export const isMessageWebSearchUpdate = (update: MessageUpdate): update is MessageWebSearchUpdate =>
@@ -32,8 +34,12 @@ export const isMessageToolUpdate = (update: MessageUpdate): update is MessageToo
 	update.type === MessageUpdateType.Tool;
 export const isMessageToolCallUpdate = (update: MessageUpdate): update is MessageToolCallUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Call;
-export const isMessageToolResultUpdate = (update: MessageUpdate): update is MessageToolCallUpdate =>
+export const isMessageToolResultUpdate = (
+	update: MessageUpdate
+): update is MessageToolResultUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Result;
+export const isMessageToolErrorUpdate = (update: MessageUpdate): update is MessageToolErrorUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
 
 type MessageUpdateRequestOptions = {
 	base: string;
