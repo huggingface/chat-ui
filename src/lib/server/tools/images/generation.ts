@@ -5,13 +5,17 @@ import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { callSpace, type GradioImage } from "../utils";
 
 type ImageGenerationInput = [
-	number /* number (numeric value between 1 and 8) in 'Number of Images' Slider component */,
-	number /* number in 'Image Height' Number component */,
-	number /* number in 'Image Width' Number component */,
 	string /* prompt */,
-	number /* seed random */
+	string /* negative prompt */,
+	boolean /* use negative prompt */,
+	number /* seed */,
+	number /* number in 'Image Width' Number component */,
+	number /* number in 'Image Height' Number component */,
+	number /* guidance scale */,
+	number /* number of inference steps */,
+	boolean /* whether to randomize seed */
 ];
-type ImageGenerationOutput = [{ image: GradioImage }[]];
+type ImageGenerationOutput = [{ image: GradioImage }[], number /* seed */];
 
 const imageGeneration: BackendTool = {
 	name: "image_generation",
@@ -25,37 +29,51 @@ const imageGeneration: BackendTool = {
 			type: "string",
 			required: true,
 		},
-		numberOfImages: {
-			description: "Number of images to generate, between 1 and 8.",
-			type: "number",
+		negativePrompt: {
+			description:
+				"A negative prompt for avoiding certain types of images. Describe the image visually in simple terms, separate terms with a comma.",
+			type: "string",
 			required: false,
-			default: 1,
+			default:
+				"(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation, NSFW",
 		},
 		width: {
 			description: "Width of the generated image.",
 			type: "number",
 			required: false,
-			default: 1024,
+			default: 512,
 		},
 		height: {
 			description: "Height of the generated image.",
 			type: "number",
 			required: false,
-			default: 1024,
+			default: 512,
+		},
+		steps: {
+			description:
+				"Number of diffusion steps to generate the image. Minimum 1. Default 8. maximum 15.",
+			type: "number",
+			required: false,
+			default: 8,
 		},
 	},
-	async *call({ prompt, numberOfImages }, { conv }) {
+	async *call({ prompt, negativePrompt, width, height, steps }, { conv }) {
 		const outputs = await callSpace<ImageGenerationInput, ImageGenerationOutput>(
-			"ByteDance/Hyper-SDXL-1Step-T2I",
-			"/process_image",
+			"KingNish/SDXL-Flash",
+			"/run",
 			[
-				Number(numberOfImages), // number (numeric value between 1 and 8) in 'Number of Images' Slider component
-				512, // number in 'Image Height' Number component
-				512, // number in 'Image Width' Number component
 				String(prompt), // prompt
-				Math.floor(Math.random() * 1000), // seed random
+				String(negativePrompt), // negative prompt
+				true, // use negative prompt
+				0, // seed, unused because randomized
+				Number(width), // number in 'Image Width' Number component
+				Number(height), // number in 'Image Height' Number component
+				3, // guidance scale
+				Number(steps), // number of inference steps
+				true, // whether to randomize seed
 			]
 		);
+
 		const imageBlobs = await Promise.all(
 			outputs[0].map((output) =>
 				fetch(output.image.url)
