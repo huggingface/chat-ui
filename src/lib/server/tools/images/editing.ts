@@ -2,11 +2,8 @@ import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import { callSpace, type GradioImage } from "../utils";
+import { callSpace, getIpToken, type GradioImage } from "../utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
-import { collections } from "$lib/server/database";
-import { env } from "$env/dynamic/private";
-import { SignJWT } from "jose";
 
 type ImageEditingInput = [
 	Blob /* image */,
@@ -71,15 +68,7 @@ const imageEditing: BackendTool = {
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
-		const session = await collections.sessions.findOne({ sessionId: conv.sessionId });
-		const ipTokenSecret = env.IP_TOKEN_SECRET;
-		const ipToken = ipTokenSecret
-			? await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
-					.setProtectedHeader({ alg: "HS256" })
-					.setIssuedAt()
-					.setExpirationTime("1m")
-					.sign(new TextEncoder().encode(ipTokenSecret))
-			: undefined;
+		const ipToken = await getIpToken(conv.sessionId);
 
 		const outputs = await callSpace<ImageEditingInput, ImageEditingOutput>(
 			"multimodalart/cosxl",

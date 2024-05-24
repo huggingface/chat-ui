@@ -1,5 +1,8 @@
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
+import { collections } from "../database";
+import { SignJWT } from "jose";
+import type { Conversation } from "$lib/types/Conversation";
 
 export type GradioImage = {
 	path: string;
@@ -36,6 +39,19 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 	return await client
 		.predict(func, parameters)
 		.then((res) => (res as unknown as GradioResponse).data as TOutput);
+}
+
+export async function getIpToken(sessionId: Conversation["sessionId"]) {
+	const session = await collections.sessions.findOne({ sessionId });
+	const ipTokenSecret = env.IP_TOKEN_SECRET;
+	const ipToken = ipTokenSecret
+		? await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
+				.setProtectedHeader({ alg: "HS256" })
+				.setIssuedAt()
+				.setExpirationTime("1m")
+				.sign(new TextEncoder().encode(ipTokenSecret))
+		: undefined;
+	return ipToken;
 }
 
 export { toolHasName } from "$lib/utils/tools";

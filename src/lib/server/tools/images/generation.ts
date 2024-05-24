@@ -1,11 +1,8 @@
 import type { BackendTool } from "..";
-import { SignJWT } from "jose";
 import { uploadFile } from "../../files/uploadFile";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import { callSpace, type GradioImage } from "../utils";
-import { collections } from "$lib/server/database";
-import { env } from "$env/dynamic/private";
+import { callSpace, getIpToken, type GradioImage } from "../utils";
 
 type ImageGenerationInput = [
 	number /* number (numeric value between 1 and 8) in 'Number of Images' Slider component */,
@@ -48,15 +45,7 @@ const imageGeneration: BackendTool = {
 		},
 	},
 	async *call({ prompt, numberOfImages }, { conv }) {
-		const session = await collections.sessions.findOne({ sessionId: conv.sessionId });
-		const ipTokenSecret = env.IP_TOKEN_SECRET;
-		const ipToken = ipTokenSecret
-			? await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
-					.setProtectedHeader({ alg: "HS256" })
-					.setIssuedAt()
-					.setExpirationTime("1m")
-					.sign(new TextEncoder().encode(ipTokenSecret))
-			: undefined;
+		const ipToken = await getIpToken(conv.sessionId);
 
 		const outputs = await callSpace<ImageGenerationInput, ImageGenerationOutput>(
 			"ByteDance/Hyper-SDXL-1Step-T2I",
