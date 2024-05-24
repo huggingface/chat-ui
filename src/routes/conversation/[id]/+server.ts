@@ -8,21 +8,21 @@ import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import { runWebSearch } from "$lib/server/websearch/runWebSearch";
-import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { summarize } from "$lib/server/summarize";
+import {
+	MessageUpdateStatus,
+	MessageUpdateType,
+	MessageWebSearchUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
-import type { Assistant } from "$lib/types/Assistant";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
-import { preprocessMessages } from "$lib/server/endpoints/preprocessMessages.js";
 import { usageLimits } from "$lib/server/usageLimits";
-import { isURLLocal } from "$lib/server/isURLLocal.js";
-import { logger } from "$lib/server/logger.js";
+import { textGeneration } from "$lib/server/textGeneration";
+import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -133,6 +133,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_retry: isRetry,
 		is_continue: isContinue,
 		web_search: webSearch,
+		tools: toolsPreferences,
 		files: inputFiles,
 	} = z
 		.object({
@@ -146,10 +147,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
+			tools: z.record(z.boolean()).optional(),
 			files: z.optional(
 				z.array(
 					z.object({
 						type: z.literal("base64").or(z.literal("hash")),
+						name: z.string(),
 						value: z.string(),
 						mime: z.string(),
 					})
@@ -171,7 +174,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			?.filter((file) => file.type !== "hash")
 			.map((file) => {
 				const blob = Buffer.from(file.value, "base64");
-				return new File([blob], "file", { type: file.mime });
+				return new File([blob], file.name, { type: file.mime });
 			}) ?? [];
 
 	// check sizes
@@ -284,16 +287,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// update the conversation with the new messages
 	await collections.conversations.updateOne(
-		{
-			_id: convId,
-		},
-		{
-			$set: {
-				messages: conv.messages,
-				title: conv.title,
-				updatedAt: new Date(),
-			},
-		}
+		{ _id: convId },
+		{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
 	);
 
 	let doneStreaming = false;
@@ -302,246 +297,126 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const stream = new ReadableStream({
 		async start(controller) {
 			messageToWriteTo.updates ??= [];
-			function update(newUpdate: MessageUpdate) {
-				if (newUpdate.type !== "stream") {
-					messageToWriteTo?.updates?.push(newUpdate);
+			async function update(event: MessageUpdate) {
+				if (!messageToWriteTo || !conv) {
+					throw Error("No message or conversation to write events to");
 				}
 
-				if (newUpdate.type === "stream" && newUpdate.token === "") {
-					return;
+				// Add token to content or skip if empty
+				if (event.type === MessageUpdateType.Stream) {
+					if (event.token === "") return;
+					messageToWriteTo.content += event.token;
 				}
-				controller.enqueue(JSON.stringify(newUpdate) + "\n");
 
-				if (newUpdate.type === "finalAnswer") {
-					// 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
+				// Set the title
+				else if (event.type === MessageUpdateType.Title) {
+					conv.title = event.title;
+					await collections.conversations.updateOne(
+						{ _id: convId },
+						{ $set: { title: conv?.title, updatedAt: new Date() } }
+					);
+				}
+
+				// Set the final text and the interrupted flag
+				else if (event.type === MessageUpdateType.FinalAnswer) {
+					messageToWriteTo.interrupted = event.interrupted;
+					messageToWriteTo.content = initialMessageContent + event.text;
+				}
+
+				// Add file
+				else if (event.type === MessageUpdateType.File) {
+					messageToWriteTo.files = [
+						...(messageToWriteTo.files ?? []),
+						{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
+					];
+				}
+
+				// Set web search
+				else if (
+					event.type === MessageUpdateType.WebSearch &&
+					event.subtype === MessageWebSearchUpdateType.Finished
+				) {
+					messageToWriteTo.webSearch = event.webSearch;
+				}
+
+				// Append to the persistent message updates if it's not a stream update
+				if (event.type !== "stream") {
+					messageToWriteTo?.updates?.push(event);
+				}
+
+				// Avoid remote keylogging attack executed by watching packet lengths
+				// by padding the text with null chars to a fixed length
+				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
+				if (event.type === MessageUpdateType.Stream) {
+					event = { ...event, token: event.token.padEnd(16, "\0") };
+				}
+
+				// Send the update to the client
+				controller.enqueue(JSON.stringify(event) + "\n");
+
+				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
+				if (event.type === "finalAnswer") {
 					controller.enqueue(" ".repeat(4096));
 				}
 			}
 
-			update({ type: "status", status: "started" });
-
-			const summarizeIfNeeded = (async () => {
-				if (conv.title === "New Chat" && conv.messages.length === 3) {
-					try {
-						conv.title = (await summarize(conv.messages[1].content)) ?? conv.title;
-						update({ type: "status", status: "title", message: conv.title });
-						await collections.conversations.updateOne(
-							{
-								_id: convId,
-							},
-							{
-								$set: {
-									title: conv?.title,
-									updatedAt: new Date(),
-								},
-							}
-						);
-					} catch (e) {
-						logger.error(e);
-					}
-				}
-			})();
-
 			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						title: conv.title,
-						updatedAt: new Date(),
-					},
-				}
+				{ _id: convId },
+				{ $set: { title: conv.title, updatedAt: new Date() } }
 			);
-
-			// check if assistant has a rag
-			const assistant = await collections.assistants.findOne<
-				Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">
-			>(
-				{ _id: conv.assistantId },
-				{ projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1 } }
-			);
-
-			const assistantHasDynamicPrompt =
-				env.ENABLE_ASSISTANTS_RAG === "true" && !!assistant && !!assistant?.dynamicPrompt;
-
-			const assistantHasWebSearch =
-				env.ENABLE_ASSISTANTS_RAG === "true" &&
-				!!assistant &&
-				!!assistant.rag &&
-				(assistant.rag.allowedLinks.length > 0 ||
-					assistant.rag.allowedDomains.length > 0 ||
-					assistant.rag.allowAllDomains);
-
-			// perform websearch if needed
-			if (!isContinue && (webSearch || assistantHasWebSearch)) {
-				messageToWriteTo.webSearch = await runWebSearch(
-					conv,
-					messagesForPrompt,
-					update,
-					assistant?.rag
-				);
-			}
-
-			let preprompt = conv.preprompt;
-
-			if (assistantHasDynamicPrompt && preprompt) {
-				// process the preprompt
-				const urlRegex = /{{\s?url=(.*?)\s?}}/g;
-				let match;
-				while ((match = urlRegex.exec(preprompt)) !== null) {
-					try {
-						const url = new URL(match[1]);
-						if (await isURLLocal(url)) {
-							throw new Error("URL couldn't be fetched, it resolved to a local address.");
-						}
-
-						const res = await fetch(url.href);
-
-						if (!res.ok) {
-							throw new Error("URL couldn't be fetched, error " + res.status);
-						}
-						const text = await res.text();
-						preprompt = preprompt.replaceAll(match[0], text);
-					} catch (e) {
-						preprompt = preprompt.replaceAll(match[0], (e as Error).message);
-					}
-				}
-
-				if (messagesForPrompt[0].from === "system") {
-					messagesForPrompt[0].content = preprompt;
-				}
-			}
-
-			// inject websearch result & optionally images into the messages
-			const processedMessages = preprocessMessages(
-				messagesForPrompt,
-				messageToWriteTo.webSearch,
-				convId
-			);
-
-			const previousText = messageToWriteTo.content;
-
-			let hasError = false;
-
-			let buffer = "";
-
 			messageToWriteTo.updatedAt = new Date();
 
+			let hasError = false;
+			const initialMessageContent = messageToWriteTo.content;
 			try {
-				const endpoint = await model.getEndpoint();
-				for await (const output of await endpoint({
-					messages: await processedMessages,
-					preprompt,
-					continueMessage: isContinue,
-					generateSettings: assistant?.generateSettings,
-					isMultimodal: model.multimodal,
-				})) {
-					// if not generated_text is here it means the generation is not done
-					if (!output.generated_text) {
-						if (!output.token.special) {
-							buffer += output.token.text;
-
-							// send the first 5 chars
-							// and leave the rest in the buffer
-							if (buffer.length >= 5) {
-								update({
-									type: "stream",
-									token: buffer.slice(0, 5),
-								});
-								buffer = buffer.slice(5);
-							}
-
-							// abort check
-							const date = AbortedGenerations.getInstance().getList().get(convId.toString());
-							if (date && date > promptedAt) {
-								break;
-							}
-							// no output check
-							if (!output) {
-								break;
-							}
-
-							// otherwise we just concatenate tokens
-							messageToWriteTo.content += output.token.text;
-						}
-					} else {
-						messageToWriteTo.interrupted =
-							!output.token.special && !model.parameters.stop?.includes(output.token.text);
-						// add output.generated text to the last message
-						// strip end tokens from the output.generated_text
-						const text = (model.parameters.stop ?? []).reduce((acc: string, curr: string) => {
-							if (acc.endsWith(curr)) {
-								messageToWriteTo.interrupted = false;
-								return acc.slice(0, acc.length - curr.length);
-							}
-							return acc;
-						}, output.generated_text.trimEnd());
-
-						messageToWriteTo.content = previousText + text;
-					}
-				}
+				const ctx: TextGenerationContext = {
+					model,
+					endpoint: await model.getEndpoint(),
+					conv,
+					messages: messagesForPrompt,
+					assistant: undefined,
+					isContinue: isContinue ?? false,
+					webSearch: webSearch ?? false,
+					toolsPreference: toolsPreferences ?? {},
+					promptedAt,
+				};
+				// run the text generation and send updates to the client
+				for await (const event of textGeneration(ctx)) await update(event);
 			} catch (e) {
 				hasError = true;
-				update({ type: "status", status: "error", message: (e as Error).message });
+				await update({
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Error,
+					message: (e as Error).message,
+				});
+				console.error(e);
 			} finally {
 				// check if no output was generated
-				if (!hasError && messageToWriteTo.content === previousText) {
-					update({
-						type: "status",
-						status: "error",
+				if (!hasError && messageToWriteTo.content === initialMessageContent) {
+					await update({
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.Error,
 						message: "No output was generated. Something went wrong.",
 					});
 				}
-
-				if (buffer) {
-					update({
-						type: "stream",
-						token: buffer,
-					});
-				}
 			}
 
 			await collections.conversations.updateOne(
-				{
-					_id: convId,
-				},
-				{
-					$set: {
-						messages: conv.messages,
-						title: conv?.title,
-						updatedAt: new Date(),
-					},
-				}
+				{ _id: convId },
+				{ $set: { messages: conv.messages, title: conv?.title, updatedAt: new Date() } }
 			);
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;
 
-			update({
-				type: "finalAnswer",
-				text: messageToWriteTo.content,
-			});
-
-			await summarizeIfNeeded;
 			controller.close();
-			return;
 		},
 		async cancel() {
-			if (!doneStreaming) {
-				await collections.conversations.updateOne(
-					{
-						_id: convId,
-					},
-					{
-						$set: {
-							messages: conv.messages,
-							title: conv.title,
-							updatedAt: new Date(),
-						},
-					}
-				);
-			}
+			if (doneStreaming) return;
+			await collections.conversations.updateOne(
+				{ _id: convId },
+				{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
+			);
 		},
 	});
 

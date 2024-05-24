@@ -1,35 +1,35 @@
 import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
 
 import type { Conversation } from "$lib/types/Conversation";
-import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
 import type { WebSearch, WebSearchScrapedSource } from "$lib/types/WebSearch";
 import type { Assistant } from "$lib/types/Assistant";
+import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 
 import { search } from "./search/search";
 import { scrape } from "./scrape/scrape";
 import { findContextSources } from "./embed/embed";
 import { removeParents } from "./markdown/tree";
+import {
+	makeErrorUpdate,
+	makeFinalAnswerUpdate,
+	makeGeneralUpdate,
+	makeSourcesUpdate,
+} from "./update";
+import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 
 const MAX_N_PAGES_TO_SCRAPE = 8 as const;
 const MAX_N_PAGES_TO_EMBED = 5 as const;
 
-export type AppendUpdate = (message: string, args?: string[], type?: "error" | "update") => void;
-const makeAppendUpdate =
-	(updatePad: (upd: MessageUpdate) => void): AppendUpdate =>
-	(message, args, type) =>
-		updatePad({ type: "webSearch", messageType: type ?? "update", message, args });
-
-export async function runWebSearch(
+export async function* runWebSearch(
 	conv: Conversation,
 	messages: Message[],
-	updatePad: (upd: MessageUpdate) => void,
-	ragSettings?: Assistant["rag"]
-): Promise<WebSearch> {
+	ragSettings?: Assistant["rag"],
+	query?: string
+): AsyncGenerator<MessageWebSearchUpdate, WebSearch, undefined> {
 	const prompt = messages[messages.length - 1].content;
 	const createdAt = new Date();
 	const updatedAt = new Date();
-	const appendUpdate = makeAppendUpdate(updatePad);
 
 	try {
 		const embeddingModel =
@@ -39,29 +39,26 @@ export async function runWebSearch(
 		}
 
 		// Search the web
-		const { searchQuery, pages } = await search(messages, ragSettings, appendUpdate);
+		const { searchQuery, pages } = yield* search(messages, ragSettings, query);
 		if (pages.length === 0) throw Error("No results found for this search query");
 
 		// Scrape pages
-		appendUpdate("Browsing search results");
+		yield makeGeneralUpdate({ message: "Browsing search results" });
 
-		const scrapedPages = await Promise.all(
-			pages
-				.slice(0, MAX_N_PAGES_TO_SCRAPE)
-				.map(scrape(appendUpdate, embeddingModel.chunkCharLength))
-		).then((allScrapedPages) =>
-			allScrapedPages
-				.filter((p): p is WebSearchScrapedSource => Boolean(p))
-				.filter((p) => p.page.markdownTree.children.length > 0)
-				.slice(0, MAX_N_PAGES_TO_EMBED)
+		const allScrapedPages = yield* mergeAsyncGenerators(
+			pages.slice(0, MAX_N_PAGES_TO_SCRAPE).map(scrape(embeddingModel.chunkCharLength))
 		);
+		const scrapedPages = allScrapedPages
+			.filter((p): p is WebSearchScrapedSource => Boolean(p))
+			.filter((p) => p.page.markdownTree.children.length > 0)
+			.slice(0, MAX_N_PAGES_TO_EMBED);
 
 		if (!scrapedPages.length) {
 			throw Error(`No text found in the first ${MAX_N_PAGES_TO_SCRAPE} results`);
 		}
 
 		// Chunk the text of each of the elements and find the most similar chunks to the prompt
-		appendUpdate("Extracting relevant information");
+		yield makeGeneralUpdate({ message: "Extracting relevant information" });
 		const contextSources = await findContextSources(scrapedPages, prompt, embeddingModel).then(
 			(ctxSources) =>
 				ctxSources.map((source) => ({
@@ -69,14 +66,9 @@ export async function runWebSearch(
 					page: { ...source.page, markdownTree: removeParents(source.page.markdownTree) },
 				}))
 		);
-		updatePad({
-			type: "webSearch",
-			messageType: "sources",
-			message: "sources",
-			sources: contextSources,
-		});
+		yield makeSourcesUpdate(contextSources);
 
-		return {
+		const webSearch: WebSearch = {
 			prompt,
 			searchQuery,
 			results: scrapedPages.map(({ page, ...source }) => ({
@@ -87,11 +79,14 @@ export async function runWebSearch(
 			createdAt,
 			updatedAt,
 		};
+		yield makeFinalAnswerUpdate(webSearch);
+		return webSearch;
 	} catch (searchError) {
 		const message = searchError instanceof Error ? searchError.message : String(searchError);
 		console.error(message);
-		appendUpdate("An error occurred", [JSON.stringify(message)], "error");
-		return {
+		yield makeErrorUpdate({ message: "An error occurred", args: [message] });
+
+		const webSearch: WebSearch = {
 			prompt,
 			searchQuery: "",
 			results: [],
@@ -99,5 +94,7 @@ export async function runWebSearch(
 			createdAt,
 			updatedAt,
 		};
+		yield makeFinalAnswerUpdate(webSearch);
+		return webSearch;
 	}
 }

@@ -1,14 +1,41 @@
 import { env } from "$env/dynamic/private";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
-import type { EndpointMessage } from "./endpoints/endpoints";
+import type { EndpointMessage } from "../endpoints/endpoints";
 import { logger } from "$lib/server/logger";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import type { Conversation } from "$lib/types/Conversation";
 
-export async function summarize(prompt: string) {
+export async function* generateTitleForConversation(
+	conv: Conversation
+): AsyncGenerator<MessageUpdate, undefined, undefined> {
+	try {
+		const userMessage = conv.messages.find((m) => m.from === "user");
+		// HACK: detect if the conversation is new
+		if (conv.title !== "New Chat" || !userMessage) return;
+
+		const prompt = userMessage.content;
+		const title = (await generateTitle(prompt)) ?? "New Chat";
+
+		yield {
+			type: MessageUpdateType.Title,
+			title,
+		};
+	} catch (cause) {
+		console.error(Error("Failed whilte generating title for conversation", { cause }));
+	}
+}
+
+export async function generateTitle(prompt: string) {
 	if (!env.LLM_SUMMERIZATION) {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
 	const messages: Array<EndpointMessage> = [
+		{
+			from: "system",
+			content:
+				"You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence of four words or less. Always start your answer with an emoji relevant to the summary",
+		},
 		{ from: "user", content: "Who is the president of Gabon?" },
 		{ from: "assistant", content: "🇬🇦 President of Gabon" },
 		{ from: "user", content: "Who is Julien Chaumond?" },
@@ -23,6 +50,8 @@ export async function summarize(prompt: string) {
 		{ from: "assistant", content: "🎥 Favorite movie" },
 		{ from: "user", content: "Explain the concept of artificial intelligence in one sentence" },
 		{ from: "assistant", content: "🤖 AI definition" },
+		{ from: "user", content: "Draw a cute cat" },
+		{ from: "assistant", content: "🐱 Cute cat drawing" },
 		{ from: "user", content: prompt },
 	];
 

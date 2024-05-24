@@ -27,6 +27,7 @@ export type Message = Partial<Timestamps> & {
 
 export type MessageFile = {
 	type: "hash" | "base64";
+	name: string;
 	value: string;
 	mime: string;
 };
