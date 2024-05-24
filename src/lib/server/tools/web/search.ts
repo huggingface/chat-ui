@@ -23,7 +23,6 @@ const websearch: BackendTool = {
 			.join("\n------------\n");
 
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [{ websearch: chunks }],
 			display: false,
 		};

@@ -22,7 +22,6 @@ const fetchUrl: BackendTool = {
 		const { title, markdownTree } = await scrapeUrl(url, Infinity);
 
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [{ title, text: stringifyMarkdownElementTree(markdownTree) }],
 			display: false,
 		};
