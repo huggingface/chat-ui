@@ -106,10 +106,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	let sessionId: string;
 
 	if (email) {
-		secretSessionId = sessionId = email;
+		secretSessionId = sessionId = await sha256(email);
 
 		event.locals.user = {
-			_id: new ObjectId(email),
+			// generate id based on email
+			_id: new ObjectId(sessionId.slice(0, 24)),
 			name: email,
 			email,
 			createdAt: new Date(),
