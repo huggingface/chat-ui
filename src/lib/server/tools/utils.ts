@@ -42,16 +42,16 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 }
 
 export async function getIpToken(sessionId: Conversation["sessionId"]) {
-	const session = await collections.sessions.findOne({ sessionId });
 	const ipTokenSecret = env.IP_TOKEN_SECRET;
-	const ipToken = ipTokenSecret
-		? await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
-				.setProtectedHeader({ alg: "HS256" })
-				.setIssuedAt()
-				.setExpirationTime("1m")
-				.sign(new TextEncoder().encode(ipTokenSecret))
-		: undefined;
-	return ipToken;
+	if (!ipTokenSecret) {
+		return;
+	}
+	const session = await collections.sessions.findOne({ sessionId });
+	return await new SignJWT({ ip: session?.ip ?? "", user: session?.userId ?? "" })
+		.setProtectedHeader({ alg: "HS256" })
+		.setIssuedAt()
+		.setExpirationTime("1m")
+		.sign(new TextEncoder().encode(ipTokenSecret));
 }
 
 export { toolHasName } from "$lib/utils/tools";
