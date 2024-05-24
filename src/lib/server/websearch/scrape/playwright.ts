@@ -43,7 +43,7 @@ async function initPlaywrightService() {
 		return mostBlocked;
 	});
 
-	// Clera the singleton when the context closes
+	// Clear the singleton when the context closes
 	ctx.on("close", () => {
 		playwrightService = undefined;
 	});
