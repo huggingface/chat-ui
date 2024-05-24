@@ -1,5 +1,5 @@
 import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
-import type { ToolCall, ToolResult, ToolResultStatus } from "$lib/types/Tool";
+import type { ToolCall, ToolResult } from "$lib/types/Tool";
 
 export type MessageUpdate =
 	| MessageStatusUpdate

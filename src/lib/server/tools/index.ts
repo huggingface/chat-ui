@@ -2,7 +2,7 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import type { Tool, ToolResult, ToolResultError, ToolResultSuccess } from "$lib/types/Tool";
+import type { Tool, ToolResultError, ToolResultSuccess } from "$lib/types/Tool";
 
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
