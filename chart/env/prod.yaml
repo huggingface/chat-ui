@@ -39,7 +39,7 @@ envVars:
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
-        "tools": true,
+        "tools": false,
         "parameters": {
           "stop": ["<|END_OF_TURN_TOKEN|>"],
           "truncate" : 28672,
