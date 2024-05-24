@@ -69,19 +69,38 @@ async function* runTool(
 		call,
 	};
 	try {
-		const toolResult = yield* tool.call(call.parameters, {
-			conv,
-			messages,
-			preprompt,
-			assistant,
-		});
-		yield {
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Result,
-			uuid,
-			result: { ...toolResult, call } as ToolResult,
-		};
-		return { ...toolResult, call } as ToolResult;
+		try {
+			const toolResult = yield* tool.call(call.parameters, {
+				conv,
+				messages,
+				preprompt,
+				assistant,
+			});
+			if (toolResult.status === ToolResultStatus.Error) {
+				yield {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid,
+					message: toolResult.message,
+				};
+			} else {
+				yield {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid,
+					result: { ...toolResult, call } as ToolResult,
+				};
+			}
+
+			return { ...toolResult, call } as ToolResult;
+		} catch (e) {
+			yield {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Error,
+				uuid,
+				message: e instanceof Error ? e.message : String(e),
+			};
+		}
 	} catch (cause) {
 		console.error(Error(`Failed while running tool ${call.name}`), { cause });
 		return {
