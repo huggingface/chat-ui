@@ -150,7 +150,7 @@ const updateMessageUpdates: Migration = {
 	_id: new ObjectId("5f9f4f4f4f4f4f4f4f4f4f4f"),
 	name: "Convert message updates to the new schema",
 	up: async () => {
-		const allConversations = collections.conversations.find({}, { projection: { messages: 1 } });
+		const allConversations = collections.conversations.find({});
 
 		let conversation: WithId<Pick<Conversation, "messages">> | null = null;
 		while ((conversation = await allConversations.tryNext())) {
