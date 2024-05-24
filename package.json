@@ -73,7 +73,6 @@
 		"ip-address": "^9.0.5",
 		"jsdom": "^22.0.0",
 		"json5": "^2.2.3",
-		"jwt-decode": "^4.0.0",
 		"marked": "^12.0.1",
 		"marked-katex-extension": "^5.0.1",
 		"mongodb": "^5.8.0",

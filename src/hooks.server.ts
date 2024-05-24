@@ -13,7 +13,6 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
-import { jwtDecode } from "jwt-decode";
 import { ObjectId } from "mongodb";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
@@ -97,24 +96,27 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const token = event.cookies.get(env.COOKIE_NAME);
-	const jwt = event.cookies.get(env.COOKIE_JWT_NAME);
+
+	// if the trusted email header is set we use it to get the user email
+	const email = env.TRUSTED_EMAIL_HEADER
+		? event.request.headers.get(env.TRUSTED_EMAIL_HEADER)
+		: null;
 
 	let secretSessionId: string;
 	let sessionId: string;
 
-	if (jwt) {
-		const { email } = jwtDecode<{ email: string }>(jwt);
-
+	if (email) {
 		secretSessionId = sessionId = email;
 
 		event.locals.user = {
-			_id: new ObjectId("000000000000000000000000"),
+			_id: new ObjectId(email),
 			name: email,
 			email,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			hfUserId: email,
 			avatarUrl: "",
+			logoutDisabled: true,
 		};
 	} else if (token) {
 		secretSessionId = token;
