@@ -8,7 +8,7 @@ The default config for Chat UI is stored in the `.env` file. You will need to ov
 
 ```ini
 MONGODB_URL=<the URL to your MongoDB instance>
-HF_TOKEN=<your access token>
+HF_TOKEN=<your access token> # find your token at hf.co/settings/token
 ```
 
 ## Database
@@ -27,7 +27,8 @@ Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricin
 
 ## Starting the server
 
-- Install dependencies with `npm ci`
-- Build the project with `npm run build`
-- Start the server with `npm run preview`
-- Access your instance at http://localhost:4173 🎉
+```bash
+npm ci # install dependencies
+npm run build # build the project
+npm run preview -- --open # start the server with & open your instance at http://localhost:4173
+```
