@@ -31,13 +31,13 @@ export enum ToolResultStatus {
 	Success = "success",
 	Error = "error",
 }
-interface ToolResultSuccess {
+export interface ToolResultSuccess {
 	status: ToolResultStatus.Success;
 	call: ToolCall;
 	outputs: Record<string, unknown>[];
 	display?: boolean;
 }
-interface ToolResultError {
+export interface ToolResultError {
 	status: ToolResultStatus.Error;
 	call: ToolCall;
 	message: string;

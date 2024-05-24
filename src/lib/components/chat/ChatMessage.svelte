@@ -29,7 +29,11 @@
 		type MessageWebSearchSourcesUpdate,
 		type MessageWebSearchUpdate,
 	} from "$lib/types/MessageUpdate";
-	import { isMessageToolCallUpdate, isMessageToolResultUpdate } from "$lib/utils/messageUpdates";
+	import {
+		isMessageToolCallUpdate,
+		isMessageToolResultUpdate,
+		isMessageToolErrorUpdate,
+	} from "$lib/utils/messageUpdates";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
@@ -287,6 +291,7 @@
 				{#each Object.values(toolUpdates) as tool}
 					{#if tool.length}
 						{@const toolName = tool.find(isMessageToolCallUpdate)?.call.name}
+						{@const toolError = tool.some(isMessageToolErrorUpdate)}
 						{@const toolDone = tool.some(isMessageToolResultUpdate)}
 						{#if toolName && toolName !== "websearch"}
 							<details
@@ -301,7 +306,7 @@
 									>
 										<svg
 											class="absolute inset-0 text-purple-500/40 transition-opacity"
-											class:invisible={toolDone}
+											class:invisible={toolDone || toolError}
 											width="22"
 											height="22"
 											viewBox="0 0 38 38"
@@ -321,7 +326,7 @@
 									</div>
 
 									<span>
-										{toolDone ? "Called" : "Calling"} tool
+										{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 										<span class="font-semibold"
 											>{availableTools.find((el) => toolHasName(toolName, el))?.displayName}</span
 										>
@@ -341,6 +346,12 @@
 												</li>
 											{/each}
 										</ul>
+									{:else if toolUpdate.subtype === MessageToolUpdateType.Error}
+										<div class="mt-1 flex items-center gap-2 opacity-80">
+											<h3 class="text-sm">Error</h3>
+											<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
+										</div>
+										<p class="text-sm">{toolUpdate.message}</p>
 									{/if}
 								{/each}
 							</details>
