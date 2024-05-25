@@ -24,37 +24,41 @@ export const scrape = (maxCharsPerElem: number) =>
 export async function scrapeUrl(url: string, maxCharsPerElem: number) {
 	const { res, page } = await loadPage(url);
 
-	if (!res) throw Error("Failed to load page");
+	try {
+		if (!res) throw Error("Failed to load page");
 
-	// Check if it's a non-html content type that we can handle directly
-	// TODO: direct mappings to markdown can be added for markdown, csv and others
-	const contentType = res.headers()["content-type"] ?? "";
-	if (
-		contentType.includes("text/plain") ||
-		contentType.includes("text/markdown") ||
-		contentType.includes("application/json") ||
-		contentType.includes("application/xml") ||
-		contentType.includes("text/csv")
-	) {
-		const title = await page.title();
-		const content = await page.content();
-		return {
-			title,
-			markdownTree: htmlToMarkdownTree(
+		// Check if it's a non-html content type that we can handle directly
+		// TODO: direct mappings to markdown can be added for markdown, csv and others
+		const contentType = res.headers()["content-type"] ?? "";
+		if (
+			contentType.includes("text/plain") ||
+			contentType.includes("text/markdown") ||
+			contentType.includes("application/json") ||
+			contentType.includes("application/xml") ||
+			contentType.includes("text/csv")
+		) {
+			const title = await page.title();
+			const content = await page.content();
+			return {
 				title,
-				[{ tagName: "p", attributes: {}, content: [content] }],
-				maxCharsPerElem
-			),
-		};
-	}
+				markdownTree: htmlToMarkdownTree(
+					title,
+					[{ tagName: "p", attributes: {}, content: [content] }],
+					maxCharsPerElem
+				),
+			};
+		}
 
-	return timeout(page.evaluate(spatialParser), 2000)
-		.then(({ elements, ...parsed }) => ({
-			...parsed,
-			markdownTree: htmlToMarkdownTree(parsed.title, elements, maxCharsPerElem),
-		}))
-		.catch((cause) => {
-			throw Error("Parsing failed", { cause });
-		})
-		.finally(() => page.close());
+		const scrapedOutput = await timeout(page.evaluate(spatialParser), 2000)
+			.then(({ elements, ...parsed }) => ({
+				...parsed,
+				markdownTree: htmlToMarkdownTree(parsed.title, elements, maxCharsPerElem),
+			}))
+			.catch((cause) => {
+				throw Error("Parsing failed", { cause });
+			});
+		return scrapedOutput;
+	} finally {
+		page.close();
+	}
 }
