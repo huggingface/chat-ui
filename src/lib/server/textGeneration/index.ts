@@ -59,7 +59,7 @@ async function* textGenerationWithoutTitle(
 
 	let toolResults: ToolResult[] = [];
 
-	if (model.tools) {
+	if (model.tools && !conv.assistantId) {
 		const tools = pickTools(toolsPreference, Boolean(assistant));
 		toolResults = yield* runTools(ctx, tools, preprompt);
 	}
