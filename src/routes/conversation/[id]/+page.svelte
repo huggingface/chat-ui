@@ -238,6 +238,7 @@
 				messageUpdates.push(update);
 
 				if (update.type === MessageUpdateType.Stream && !reducedMotionMode) {
+					messageToWriteTo.content += update.token;
 					pending = false;
 					messages = [...messages];
 				} else if (
