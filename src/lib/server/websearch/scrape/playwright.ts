@@ -10,7 +10,7 @@ import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
 import { env } from "$env/dynamic/private";
 
 // Singleton initialized by initPlaywrightService
-let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }>;
+let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }> | undefined;
 
 async function initPlaywrightService() {
 	if (playwrightService) return playwrightService;
@@ -42,6 +42,12 @@ async function initPlaywrightService() {
 		if (env.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
 		return mostBlocked;
 	});
+
+	// Clear the singleton when the context closes
+	ctx.on("close", () => {
+		playwrightService = undefined;
+	});
+
 	return Object.freeze({ ctx, blocker });
 }
 

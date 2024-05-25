@@ -74,6 +74,8 @@ export enum MessageToolUpdateType {
 	Call = "call",
 	/** The result of a tool call */
 	Result = "result",
+	/** Error while running tool */
+	Error = "error",
 }
 interface MessageToolBaseUpdate<TSubType extends MessageToolUpdateType> {
 	type: MessageUpdateType.Tool;
@@ -87,7 +89,13 @@ export interface MessageToolResultUpdate
 	extends MessageToolBaseUpdate<MessageToolUpdateType.Result> {
 	result: ToolResult;
 }
-export type MessageToolUpdate = MessageToolCallUpdate | MessageToolResultUpdate;
+export interface MessageToolErrorUpdate extends MessageToolBaseUpdate<MessageToolUpdateType.Error> {
+	message: string;
+}
+export type MessageToolUpdate =
+	| MessageToolCallUpdate
+	| MessageToolResultUpdate
+	| MessageToolErrorUpdate;
 
 // Everything else
 export interface MessageTitleUpdate {

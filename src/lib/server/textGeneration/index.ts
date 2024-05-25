@@ -18,6 +18,7 @@ import {
 import { generate } from "./generate";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
+import type { ToolResult } from "$lib/types/Tool";
 
 export async function* textGeneration(ctx: TextGenerationContext) {
 	yield* mergeAsyncGenerators([
@@ -56,8 +57,12 @@ async function* textGenerationWithoutTitle(
 		if (messages[0].from === "system") messages[0].content = preprompt;
 	}
 
-	const tools = pickTools(toolsPreference, Boolean(assistant));
-	const toolResults = yield* runTools(ctx, tools, preprompt);
+	let toolResults: ToolResult[] = [];
+
+	if (model.tools && !conv.assistantId) {
+		const tools = pickTools(toolsPreference, Boolean(assistant));
+		toolResults = yield* runTools(ctx, tools, preprompt);
+	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
 	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
