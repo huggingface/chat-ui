@@ -23,6 +23,7 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
+	import { isReducedMotion } from "$lib/utils/isReduceMotion.js";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 
 	export let data;
@@ -79,6 +80,7 @@
 			$isAborted = false;
 			loading = true;
 			pending = true;
+			const reducedMotionMode = isReducedMotion(window);
 
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
@@ -215,6 +217,7 @@
 			files = [];
 
 			const messageUpdates: MessageUpdate[] = [];
+
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
 					messageUpdatesAbortController.abort();
@@ -234,9 +237,8 @@
 
 				messageUpdates.push(update);
 
-				if (update.type === MessageUpdateType.Stream) {
+				if (update.type === MessageUpdateType.Stream && !reducedMotionMode) {
 					pending = false;
-					messageToWriteTo.content += update.token;
 					messages = [...messages];
 				} else if (
 					update.type === MessageUpdateType.WebSearch ||

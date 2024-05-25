@@ -37,6 +37,7 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
+	import { isReducedMotion } from "$lib/utils/isReduceMotion";
 	import Modal from "../Modal.svelte";
 	import { toolHasName } from "$lib/utils/tools";
 
@@ -87,6 +88,7 @@
 
 	let initialized = false;
 
+	const reducedMotionMode = isReducedMotion(window);
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
@@ -123,6 +125,10 @@
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
 
 	afterUpdate(() => {
+		if (reducedMotionMode) {
+			return;
+		}
+
 		loadingEl?.$destroy();
 		clearTimeout(pendingTimeout);
 
@@ -364,6 +370,9 @@
 				class="prose max-w-none max-sm:prose-sm dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}
 			>
+				{#if isLast && loading && reducedMotionMode}
+					<IconLoading classNames="loading inline ml-2 first:ml-0" />
+				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
