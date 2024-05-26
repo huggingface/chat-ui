@@ -361,8 +361,16 @@ autoscaling:
   enabled: true
   minReplicas: 6
   maxReplicas: 30
-  targetMemoryUtilizationPercentage: "70"
-  targetCPUUtilizationPercentage: "70"
+  targetMemoryUtilizationPercentage: "50"
+  targetCPUUtilizationPercentage: "50"
+
+resources:
+  requests:
+    cpu: 4
+    memory: 8Gi
+  limits:
+    cpu: 4
+    memory: 8Gi
 
 monitoring:
   enabled: true
