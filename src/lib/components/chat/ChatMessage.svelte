@@ -2,7 +2,7 @@
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -88,7 +88,8 @@
 
 	let initialized = false;
 
-	const reducedMotionMode = isReducedMotion(window);
+	let reducedMotionMode = false;
+
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
@@ -123,6 +124,10 @@
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
+
+	onMount(() => {
+		reducedMotionMode = isReducedMotion(window);
+	});
 
 	afterUpdate(() => {
 		if (reducedMotionMode) {
