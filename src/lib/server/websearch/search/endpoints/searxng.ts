@@ -1,7 +1,9 @@
 import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
+import type { WebSearchSource } from "$lib/types/WebSearch";
+import { isURL } from "$lib/utils/isUrl";
 
-export async function searchSearxng(query: string) {
+export default async function searchSearxng(query: string): Promise<WebSearchSource[]> {
 	const abortController = new AbortController();
 	setTimeout(() => abortController.abort(), 10000);
 
@@ -20,7 +22,7 @@ export async function searchSearxng(query: string) {
 		.then((response) => response.json() as Promise<{ results: { url: string }[] }>)
 		.catch((error) => {
 			logger.error("Failed to fetch or parse JSON", error);
-			throw new Error("Failed to fetch or parse JSON");
+			throw new Error("Failed to fetch or parse JSON", { cause: error });
 		});
 
 	// Extract 'url' elements from the JSON response and trim to the top 5 URLs
@@ -31,5 +33,5 @@ export async function searchSearxng(query: string) {
 	}
 
 	// Map URLs to the correct object shape
-	return { organic_results: urls.map((link) => ({ link })) };
+	return urls.filter(isURL).map((link) => ({ link }));
 }
