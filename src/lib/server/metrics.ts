@@ -1,4 +1,4 @@
-import { collectDefaultMetrics, Registry, Counter} from "prom-client";
+import { collectDefaultMetrics, Registry, Counter } from "prom-client";
 import express from "express";
 import { logger } from "$lib/server/logger";
 import { env } from "$env/dynamic/private";
@@ -23,14 +23,14 @@ export class MetricsServer {
 			name: "conversations_total",
 			help: "Total number of conversations",
 			labelNames: ["model"],
-			registers: [register]
+			registers: [register],
 		});
 
 		this.messagesTotal = new Counter({
 			name: "messages_total",
 			help: "Total number of messages",
 			labelNames: ["model"],
-			registers: [register]
+			registers: [register],
 		});
 
 		app.get("/metrics", (req, res) => {
@@ -64,5 +64,4 @@ export class MetricsServer {
 	public incrementMessagesTotal(model: string) {
 		this.messagesTotal.labels(model).inc();
 	}
-
 }
