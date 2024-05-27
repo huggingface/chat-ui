@@ -122,3 +122,14 @@
 		{/each}
 	</details>
 {/if}
+
+<style>
+	details summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.loading-path {
+		stroke-dasharray: 61.45;
+		animation: loading 2s linear infinite;
+	}
+</style>
