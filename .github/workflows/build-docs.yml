@@ -2,10 +2,9 @@ name: Build documentation
 
 on:
   push:
-    tags:
-      - "v*"
     branches:
       - main
+      - v*-release
 
 jobs:
   build:
