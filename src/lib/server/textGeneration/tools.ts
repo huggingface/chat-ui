@@ -18,6 +18,7 @@ import { logger } from "../logger";
 import { toolHasName } from "../tools/utils";
 import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
+import { MetricsServer } from "../metrics";
 
 function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string {
 	if (files.length === 0) {
@@ -62,6 +63,9 @@ async function* runTool(
 	// Special case for directly_answer tool where we ignore
 	if (toolHasName(directlyAnswer.name, tool)) return;
 
+	const startTime = Date.now();
+	MetricsServer.getMetrics().tool.toolUseCount.inc({ tool: call.name });
+
 	yield {
 		type: MessageUpdateType.Tool,
 		subtype: MessageToolUpdateType.Call,
@@ -92,8 +96,14 @@ async function* runTool(
 				};
 			}
 
+			MetricsServer.getMetrics().tool.toolUseDuration.observe(
+				{ tool: call.name },
+				Date.now() - startTime
+			);
+
 			return { ...toolResult, call } as ToolResult;
 		} catch (e) {
+			MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
 			yield {
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Error,
@@ -102,6 +112,7 @@ async function* runTool(
 			};
 		}
 	} catch (cause) {
+		MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
 		console.error(Error(`Failed while running tool ${call.name}`), { cause });
 		return {
 			call,
@@ -125,6 +136,8 @@ export async function* runTools(
 			content: `${message.content}\n${makeFilesPrompt(message.files, idx)}`,
 		};
 	});
+
+	const pickToolStartTime = Date.now();
 
 	// do the function calling bits here
 	for await (const output of await endpoint({
@@ -162,6 +175,11 @@ export async function* runTools(
 			}
 		}
 	}
+
+	MetricsServer.getMetrics().tool.timeToChooseTools.observe(
+		{ model: conv.model },
+		Date.now() - pickToolStartTime
+	);
 
 	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant };
 	const toolResults: (ToolResult | undefined)[] = yield* mergeAsyncGenerators(

@@ -6,16 +6,24 @@ import { spatialParser } from "./parser";
 import { htmlToMarkdownTree } from "../markdown/tree";
 import { timeout } from "$lib/utils/timeout";
 import { makeErrorUpdate, makeGeneralUpdate } from "../update";
+import { MetricsServer } from "$lib/server/metrics";
 
 export const scrape = (maxCharsPerElem: number) =>
 	async function* (
 		source: WebSearchSource
 	): AsyncGenerator<MessageWebSearchUpdate, WebSearchScrapedSource | undefined, undefined> {
 		try {
+			const startTime = Date.now();
+			MetricsServer.getMetrics().webSearch.pageFetchCount.inc();
+
 			const page = await scrapeUrl(source.link, maxCharsPerElem);
+
+			MetricsServer.getMetrics().webSearch.pageFetchDuration.observe(Date.now() - startTime);
+
 			yield makeGeneralUpdate({ message: "Browsing webpage", args: [source.link] });
 			return { ...source, page };
 		} catch (e) {
+			MetricsServer.getMetrics().webSearch.pageFetchCountError.inc();
 			const message = e instanceof Error ? e.message : String(e);
 			yield makeErrorUpdate({ message: "Failed to parse webpage", args: [message, source.link] });
 		}
