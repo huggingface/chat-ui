@@ -2,8 +2,8 @@ name: Build PR Documentation
 
 on:
   pull_request:
-    paths:
-      - "docs/**"
+    # paths:
+    #   - "docs/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
