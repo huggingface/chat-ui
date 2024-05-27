@@ -1,6 +1,6 @@
 import type { WebSearchScrapedSource, WebSearchSource } from "$lib/types/WebSearch";
 import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
-import { loadPage } from "./playwright";
+import { withPage } from "./playwright";
 
 import { spatialParser } from "./parser";
 import { htmlToMarkdownTree } from "../markdown/tree";
@@ -30,9 +30,7 @@ export const scrape = (maxCharsPerElem: number) =>
 	};
 
 export async function scrapeUrl(url: string, maxCharsPerElem: number) {
-	const { res, page } = await loadPage(url);
-
-	try {
+	return withPage(url, async (page, res) => {
 		if (!res) throw Error("Failed to load page");
 
 		// Check if it's a non-html content type that we can handle directly
@@ -66,7 +64,5 @@ export async function scrapeUrl(url: string, maxCharsPerElem: number) {
 				throw Error("Parsing failed", { cause });
 			});
 		return scrapedOutput;
-	} finally {
-		page.close();
-	}
+	});
 }
