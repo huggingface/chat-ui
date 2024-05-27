@@ -116,8 +116,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 
-	const metricsServer = MetricsServer.getInstance();
-	metricsServer.incrementConversationsTotal(values.model);
+	MetricsServer.getMetrics().model.conversationsTotal.inc({ model: values.model });
 
 	return new Response(
 		JSON.stringify({

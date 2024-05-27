@@ -294,6 +294,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	let doneStreaming = false;
 
+	let lastTokenTimestamp: undefined | Date = undefined;
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -307,6 +309,25 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				if (event.type === MessageUpdateType.Stream) {
 					if (event.token === "") return;
 					messageToWriteTo.content += event.token;
+
+					// add to token total
+					MetricsServer.getMetrics().model.tokenCountTotal.inc({ model: model?.id });
+
+					// if this is the first token, add to time to first token
+					if (!lastTokenTimestamp) {
+						MetricsServer.getMetrics().model.timeToFirstToken.observe(
+							{ model: model?.id },
+							Date.now() - promptedAt.getTime()
+						);
+						lastTokenTimestamp = new Date();
+					}
+
+					// add to time per token
+					MetricsServer.getMetrics().model.timePerOutputToken.observe(
+						{ model: model?.id },
+						Date.now() - (lastTokenTimestamp ?? promptedAt).getTime()
+					);
+					lastTokenTimestamp = new Date();
 				}
 
 				// Set the title
@@ -322,6 +343,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
+
+					// add to latency
+					MetricsServer.getMetrics().model.latency.observe(
+						{ model: model?.id },
+						Date.now() - promptedAt.getTime()
+					);
 				}
 
 				// Add file
@@ -429,9 +456,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		);
 	}
 
-	const metricsServer = MetricsServer.getInstance();
-	metricsServer.incrementMessagesTotal(conv.model);
-
+	const metrics = MetricsServer.getMetrics();
+	metrics.model.messagesTotal.inc({ model: model?.id });
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
 		headers: {
