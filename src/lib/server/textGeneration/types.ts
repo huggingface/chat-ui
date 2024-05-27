@@ -14,6 +14,6 @@ export interface TextGenerationContext {
 	webSearch: boolean;
 	toolsPreference: Record<string, boolean>;
 	promptedAt: Date;
-	userId: string;
 	ip: string;
+	userName?: string;
 }

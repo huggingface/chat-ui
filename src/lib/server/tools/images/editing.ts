@@ -37,7 +37,7 @@ const imageEditing: BackendTool = {
 			required: true,
 		},
 	},
-	async *call({ prompt, fileMessageIndex, fileIndex }, { conv, messages, userId, ip }) {
+	async *call({ prompt, fileMessageIndex, fileIndex }, { conv, messages, ip, userName }) {
 		prompt = String(prompt);
 		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
@@ -68,7 +68,7 @@ const imageEditing: BackendTool = {
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
-		const ipToken = await getIpToken(userId, ip);
+		const ipToken = await getIpToken(ip, userName);
 
 		const outputs = await callSpace<ImageEditingInput, ImageEditingOutput>(
 			"multimodalart/cosxl",

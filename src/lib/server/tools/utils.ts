@@ -39,12 +39,12 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 		.then((res) => (res as unknown as GradioResponse).data as TOutput);
 }
 
-export async function getIpToken(userId: string, ip: string) {
+export async function getIpToken(ip: string, userName?: string) {
 	const ipTokenSecret = env.IP_TOKEN_SECRET;
 	if (!ipTokenSecret) {
 		return;
 	}
-	return await new SignJWT({ ip, user: userId })
+	return await new SignJWT({ ip, user: userName })
 		.setProtectedHeader({ alg: "HS256" })
 		.setIssuedAt()
 		.setExpirationTime("1m")
