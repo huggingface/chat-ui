@@ -331,14 +331,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					];
 				}
 
-				// Set web search
-				else if (
-					event.type === MessageUpdateType.WebSearch &&
-					event.subtype === MessageWebSearchUpdateType.Finished
-				) {
-					messageToWriteTo.webSearch = event.webSearch;
-				}
-
 				// Append to the persistent message updates if it's not a stream update
 				if (event.type !== "stream") {
 					messageToWriteTo?.updates?.push(event);

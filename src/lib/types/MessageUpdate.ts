@@ -39,7 +39,7 @@ export enum MessageWebSearchUpdateType {
 	Sources = "sources",
 	Finished = "finished",
 }
-interface BaseMessageWebSearchUpdate<TSubType extends MessageWebSearchUpdateType> {
+export interface BaseMessageWebSearchUpdate<TSubType extends MessageWebSearchUpdateType> {
 	type: MessageUpdateType.WebSearch;
 	subtype: TSubType;
 }
@@ -59,9 +59,8 @@ export interface MessageWebSearchSourcesUpdate
 	sources: WebSearchSource[];
 }
 export interface MessageWebSearchFinishedUpdate
-	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Finished> {
-	webSearch: WebSearch;
-}
+	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Finished> {}
+
 export type MessageWebSearchUpdate =
 	| MessageWebSearchErrorUpdate
 	| MessageWebSearchGeneralUpdate
