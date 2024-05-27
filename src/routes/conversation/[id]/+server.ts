@@ -11,7 +11,6 @@ import { z } from "zod";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
-	MessageWebSearchUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";

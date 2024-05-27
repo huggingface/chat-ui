@@ -1,4 +1,4 @@
-import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
+import type { WebSearchSource } from "$lib/types/WebSearch";
 import {
 	MessageUpdateType,
 	MessageWebSearchUpdateType,
