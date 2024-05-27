@@ -13,8 +13,12 @@ service:
   annotations: { }
 
 ingress:
+  enabled: true
   path: "/"
   annotations: { }
+  # className: "nginx"
+  tls: { }
+    # secretName: XXX
 
 resources:
   requests:
@@ -32,6 +36,9 @@ externalSecrets:
   secretStoreName: ""
   secretName: ""
   parameters: { }
+# Allow to environment injections on top or instead of externalSecrets
+extraEnvFrom: []
+extraEnv: []
 
 autoscaling:
   enabled: false

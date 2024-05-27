@@ -51,12 +51,19 @@ spec:
               protocol: TCP
             {{- end }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
+          {{- with $.Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 14 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "name" . }}
           {{- if $.Values.externalSecrets.enabled }}
             - secretRef:
                 name: {{ $.Values.externalSecrets.secretName }}
+          {{- end }}
+          {{- with $.Values.extraEnvFrom }}
+            {{- toYaml . | nindent 14 }}
           {{- end }}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
