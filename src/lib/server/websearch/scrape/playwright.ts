@@ -48,6 +48,7 @@ async function initPlaywrightService() {
 		playwrightService = undefined;
 	});
 
+	ctx.close();
 	return Object.freeze({ ctx, blocker });
 }
 
