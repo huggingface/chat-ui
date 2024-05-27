@@ -379,6 +379,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					webSearch: webSearch ?? false,
 					toolsPreference: toolsPreferences ?? {},
 					promptedAt,
+					userId: userId.toString(),
+					ip: getClientAddress(),
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);

@@ -44,8 +44,8 @@ const imageGeneration: BackendTool = {
 			default: 1024,
 		},
 	},
-	async *call({ prompt, numberOfImages }, { conv }) {
-		const ipToken = await getIpToken(conv.sessionId);
+	async *call({ prompt, numberOfImages }, { conv, userId, ip }) {
+		const ipToken = await getIpToken(userId, ip);
 
 		const outputs = await callSpace<ImageGenerationInput, ImageGenerationOutput>(
 			"ByteDance/Hyper-SDXL-1Step-T2I",
