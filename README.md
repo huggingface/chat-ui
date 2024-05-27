@@ -16,23 +16,15 @@ load_balancing_strategy: random
 
 ![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chatui-websearch.png)
 
-A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
+Open source chat interface with support for tools, web search, multimodal and many API providers. The app uses MongoDB and SvelteKit behind the scenes. Try the live version of the app called [HuggingChat on hf.co/chat](https://huggingface.co/chat) or [setup your own instance](https://huggingface.co/docs/chat-ui/installation/spaces).
 
-0. [No Setup Deploy](#no-setup-deploy)
-1. [Setup](#setup)
-2. [Launch](#launch)
-3. [Web Search](#web-search)
-4. [Text Embedding Models](#text-embedding-models)
-5. [Extra parameters](#extra-parameters)
-6. [Common issues](#common-issues)
-7. [Deploying to a HF Space](#deploying-to-a-hf-space)
-8. [Building](#building)
+🔧 **Tools**: Function calling with custom tools and support for [Zero GPU spaces](https://huggingface.co/spaces/enzostvs/zero-gpu-spaces)
 
-## No Setup Deploy
+🔍 **Web Search**: Automated web search, scraping and RAG for all models
 
-If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
+🐙 **Multimodal**: Accepts image file uploads on supported providers
 
-You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
+👤 **OpenID**: Optionally setup OpenID for user authentication
 
 Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
