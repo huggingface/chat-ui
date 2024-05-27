@@ -48,7 +48,6 @@ async function initPlaywrightService() {
 		playwrightService = undefined;
 	});
 
-	ctx.close();
 	return Object.freeze({ ctx, blocker });
 }
 
@@ -61,7 +60,9 @@ export async function loadPage(url: string): Promise<{ res?: Response; page: Pag
 
 	const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
 		console.warn(`Failed to load page within 2s: ${url}`);
-	});
+	})
+
+	ctx.close();
 
 	return { res: res ?? undefined, page };
 }
