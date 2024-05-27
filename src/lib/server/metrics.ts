@@ -58,7 +58,6 @@ export class MetricsServer {
 					name: "model_messages_total",
 					help: "Total number of messages",
 					labelNames: ["model"],
-
 					registers: [register],
 				}),
 				tokenCountTotal: new Counter({
@@ -141,7 +140,7 @@ export class MetricsServer {
 					help: "Tool use duration",
 					labelNames: ["tool"],
 					registers: [register],
-					maxAgeSeconds: 5 * 60,
+					maxAgeSeconds: 30 * 60, // longer duration since we use this to give feedback to the user
 					ageBuckets: 5,
 				}),
 				timeToChooseTools: new Summary({
