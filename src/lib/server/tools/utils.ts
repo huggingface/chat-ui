@@ -1,8 +1,6 @@
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
-import { collections } from "../database";
 import { SignJWT } from "jose";
-import type { Conversation } from "$lib/types/Conversation";
 
 export type GradioImage = {
 	path: string;

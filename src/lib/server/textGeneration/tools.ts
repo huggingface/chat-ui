@@ -52,7 +52,6 @@ async function* runTool(
 	tools: BackendTool[],
 	call: ToolCall
 ): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
-	const { conv, messages, preprompt, assistant } = ctx;
 	const uuid = uuidV4();
 
 	const tool = tools.find((el) => toolHasName(call.name, el));
