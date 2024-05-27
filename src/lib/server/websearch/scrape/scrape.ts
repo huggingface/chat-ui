@@ -1,6 +1,6 @@
 import type { WebSearchScrapedSource, WebSearchSource } from "$lib/types/WebSearch";
 import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
-import { loadPage, withPage } from "./playwright";
+import { withPage } from "./playwright";
 
 import { spatialParser } from "./parser";
 import { htmlToMarkdownTree } from "../markdown/tree";
