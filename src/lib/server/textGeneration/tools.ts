@@ -92,19 +92,19 @@ async function* callTool(
 		return { ...toolResult, call } as ToolResult;
 	} catch (error) {
 		MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
-		logger.error(error, `Failed while running tool ${call.name}`);
+		logger.error(error, `Failed while running tool ${call.name}. ${stringifyError(error)}`);
 
 		yield {
 			type: MessageUpdateType.Tool,
 			subtype: MessageToolUpdateType.Error,
 			uuid,
-			message: stringifyError(error),
+			message: "Error occurred",
 		};
 
 		return {
 			call,
 			status: ToolResultStatus.Error,
-			message: stringifyError(error),
+			message: "Error occurred",
 		};
 	}
 }
