@@ -22,17 +22,19 @@
 	const availableTools: ToolFront[] = $page.data.tools;
 
 	let loadingBarEl: HTMLDivElement;
+	let animation: Animation | undefined = undefined;
 
 	let isShowingLoadingBar = false;
 	onMount(() => {
 		if (!toolDone && loading) {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
-			loadingBarEl.animate([{ width: "0%" }, { width: "100%" }], {
+			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
 				duration: availableTools.find((tool) => tool.name === toolName)?.timeToUseMS,
 				fill: "forwards",
 			});
 		}
+		return () => animation?.cancel();
 	});
 
 	// go to 100% quickly if loading is done
@@ -43,10 +45,14 @@
 
 			loadingBarEl.classList.remove("hidden");
 
-			loadingBarEl.animate([{ width: loadingBarEl.style.width }, { width: "100%" }], {
-				duration: 300,
-				fill: "forwards",
-			});
+			animation?.cancel();
+			animation = loadingBarEl.animate(
+				[{ width: loadingBarEl.style.width }, { width: "calc(100%+1rem)" }],
+				{
+					duration: 300,
+					fill: "forwards",
+				}
+			);
 
 			setTimeout(() => {
 				loadingBarEl.classList.add("hidden");
@@ -64,7 +70,7 @@
 		>
 			<div
 				bind:this={loadingBarEl}
-				class="absolute -m-1 hidden h-full w-full rounded-l-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
+				class="absolute -m-1 hidden h-full w-[calc(100%+1rem)] rounded-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
 			/>
 
 			<div
