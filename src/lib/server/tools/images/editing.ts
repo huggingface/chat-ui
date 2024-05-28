@@ -2,7 +2,7 @@ import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
 import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import { callSpace, type GradioImage } from "../utils";
+import { callSpace, getIpToken, type GradioImage } from "../utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
 
 type ImageEditingInput = [
@@ -37,7 +37,7 @@ const imageEditing: BackendTool = {
 			required: true,
 		},
 	},
-	async *call({ prompt, fileMessageIndex, fileIndex }, { conv, messages }) {
+	async *call({ prompt, fileMessageIndex, fileIndex }, { conv, messages, ip, username }) {
 		prompt = String(prompt);
 		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
@@ -68,6 +68,8 @@ const imageEditing: BackendTool = {
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
+		const ipToken = await getIpToken(ip, username);
+
 		const outputs = await callSpace<ImageEditingInput, ImageEditingOutput>(
 			"multimodalart/cosxl",
 			"run_edit",
@@ -77,7 +79,8 @@ const imageEditing: BackendTool = {
 				"", // negative prompt
 				7, // guidance scale
 				20, // steps
-			]
+			],
+			ipToken
 		);
 
 		const outputImage = await fetch(outputs[0].url)

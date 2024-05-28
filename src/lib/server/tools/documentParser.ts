@@ -1,6 +1,6 @@
 import type { BackendTool } from ".";
 import { ToolResultStatus } from "$lib/types/Tool";
-import { callSpace } from "./utils";
+import { callSpace, getIpToken } from "./utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
 
 type PdfParserInput = [Blob /* pdf */, string /* filename */];
@@ -23,7 +23,7 @@ const documentParser: BackendTool = {
 			required: true,
 		},
 	},
-	async *call({ fileMessageIndex, fileIndex }, { conv, messages }) {
+	async *call({ fileMessageIndex, fileIndex }, { conv, messages, ip, username }) {
 		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
 
@@ -47,10 +47,13 @@ const documentParser: BackendTool = {
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
+		const ipToken = await getIpToken(ip, username);
+
 		const outputs = await callSpace<PdfParserInput, PdfParserOutput>(
 			"huggingchat/document-parser",
 			"predict",
-			[fileBlob, file.name]
+			[fileBlob, file.name],
+			ipToken
 		);
 
 		let documentMarkdown = outputs[0];
