@@ -120,6 +120,80 @@
 			{/if}
 		</div>
 		<h3 class="text-gray-500">Popular assistants made by the community</h3>
+
+<!-- Assistants of the week -->
+<div>
+<div class="inline-flex items-center bg-gradient-to-br px-3 font-mono text-base md:text-lg from-indigo-100 dark:from-indigo-800 rounded-full to-white dark:to-black text-indigo-700 dark:text-indigo-200 mb-4 "><svg class="md:text-lg mr-2 relative" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" fill="none" focusable="false" role="img" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 32 32"><path d="M16 6.52l2.76 5.58l.46 1l1 .15l6.16.89l-4.38 4.3l-.75.73l.18 1l1.05 6.13l-5.51-2.89L16 23l-.93.49l-5.51 2.85l1-6.13l.18-1l-.74-.77l-4.42-4.35l6.16-.89l1-.15l.46-1L16 6.52M16 2l-4.55 9.22l-10.17 1.47l7.36 7.18L6.9 30l9.1-4.78L25.1 30l-1.74-10.13l7.36-7.17l-10.17-1.48z" fill="currentColor"></path></svg> Assistants of the week 🔥</div>
+
+<!-- @nsarrazin Here top 6-8 Assistant of the week is placed. Make sure assistant are not older than 10 days.  -->
+<div class="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-3 xl:grid-cols-4">
+
+<button
+					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					on:click={() => {
+						if (data.settings.assistants.includes(assistant._id.toString())) {
+							settings.instantSet({ activeModel: assistant._id.toString() });
+							goto(`${base}` || "/");
+						} else {
+							goto(`${base}/assistant/${assistant._id}`);
+						}
+					}}
+				>
+					{#if assistant.userCount && assistant.userCount > 1}
+						<div
+							class="absolute right-3 top-3 flex items-center gap-1 text-xs text-gray-400"
+							title="Number of users"
+						>
+							<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)}
+						</div>
+					{/if}
+
+					{#if hasRag}
+						<div
+							class="absolute left-3 top-3 grid size-5 place-items-center rounded-full bg-blue-500/10"
+							title="This assistant uses the websearch."
+						>
+							<IconInternet classNames="text-sm text-blue-600" />
+						</div>
+					{/if}
+
+					{#if assistant.avatar}
+						<img
+							src="{base}/settings/assistants/{assistant._id}/avatar.jpg"
+							alt="Avatar"
+							class="mb-2 aspect-square size-12 flex-none rounded-full object-cover sm:mb-6 sm:size-20"
+						/>
+					{:else}
+						<div
+							class="mb-2 flex aspect-square size-12 flex-none items-center justify-center rounded-full bg-gray-300 text-2xl font-bold uppercase text-gray-500 sm:mb-6 sm:size-20 dark:bg-gray-800"
+						>
+							{assistant.name[0]}
+						</div>
+					{/if}
+					<h3
+						class="mb-2 line-clamp-2 max-w-full break-words text-center text-[.8rem] font-semibold leading-snug sm:text-sm"
+					>
+						{assistant.name}
+					</h3>
+					<p class="line-clamp-4 text-xs text-gray-700 sm:line-clamp-2 dark:text-gray-400">
+						{assistant.description}
+					</p>
+					{#if assistant.createdByName}
+						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
+							Created by <a
+								class="hover:underline"
+								href="{base}/assistants?user={assistant.createdByName}"
+							>
+								{assistant.createdByName}
+							</a>
+						</p>
+					{/if}
+				</button>
+			{:else}
+				No assistants found
+			{/each}
+		</div>
+</div>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
