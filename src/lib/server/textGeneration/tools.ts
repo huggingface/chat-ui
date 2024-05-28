@@ -49,7 +49,7 @@ export function pickTools(
 }
 
 async function* runTool(
-	{ conv, messages, preprompt, assistant }: BackendToolContext,
+	ctx: BackendToolContext,
 	tools: BackendTool[],
 	call: ToolCall
 ): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
@@ -74,12 +74,7 @@ async function* runTool(
 	};
 	try {
 		try {
-			const toolResult = yield* tool.call(call.parameters, {
-				conv,
-				messages,
-				preprompt,
-				assistant,
-			});
+			const toolResult = yield* tool.call(call.parameters, ctx);
 			if (toolResult.status === ToolResultStatus.Error) {
 				yield {
 					type: MessageUpdateType.Tool,
@@ -123,10 +118,11 @@ async function* runTool(
 }
 
 export async function* runTools(
-	{ endpoint, conv, messages, assistant }: TextGenerationContext,
+	ctx: TextGenerationContext,
 	tools: BackendTool[],
 	preprompt?: string
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
+	const { endpoint, conv, messages, assistant, ip, username } = ctx;
 	const calls: ToolCall[] = [];
 
 	const messagesWithFilesPrompt = messages.map((message, idx) => {
@@ -181,7 +177,7 @@ export async function* runTools(
 		Date.now() - pickToolStartTime
 	);
 
-	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant };
+	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant, ip, username };
 	const toolResults: (ToolResult | undefined)[] = yield* mergeAsyncGenerators(
 		calls.map((call) => runTool(toolContext, tools, call))
 	);
