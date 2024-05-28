@@ -319,7 +319,7 @@
 										loginModalOpen = true;
 									}
 								}}
-								maxRows={6}
+								maxRows={16}
 								disabled={isReadOnly || lastIsError}
 							/>
 						{/if}
