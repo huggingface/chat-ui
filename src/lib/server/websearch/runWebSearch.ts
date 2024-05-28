@@ -82,7 +82,7 @@ export async function* runWebSearch(
 			createdAt,
 			updatedAt,
 		};
-		yield makeFinalAnswerUpdate(webSearch);
+		yield makeFinalAnswerUpdate();
 		return webSearch;
 	} catch (searchError) {
 		const message = searchError instanceof Error ? searchError.message : String(searchError);
@@ -97,7 +97,7 @@ export async function* runWebSearch(
 			createdAt,
 			updatedAt,
 		};
-		yield makeFinalAnswerUpdate(webSearch);
+		yield makeFinalAnswerUpdate();
 		return webSearch;
 	}
 }

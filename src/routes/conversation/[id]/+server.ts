@@ -11,7 +11,6 @@ import { z } from "zod";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
-	MessageWebSearchUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
@@ -357,14 +356,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
 					];
-				}
-
-				// Set web search
-				else if (
-					event.type === MessageUpdateType.WebSearch &&
-					event.subtype === MessageWebSearchUpdateType.Finished
-				) {
-					messageToWriteTo.webSearch = event.webSearch;
 				}
 
 				// Append to the persistent message updates if it's not a stream update

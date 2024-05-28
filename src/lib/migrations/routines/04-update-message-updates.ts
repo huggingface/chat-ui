@@ -171,7 +171,6 @@ const updateMessageUpdates: Migration = {
 					const webSearchFinishedUpdate: MessageWebSearchFinishedUpdate = {
 						type: MessageUpdateType.WebSearch,
 						subtype: MessageWebSearchUpdateType.Finished,
-						webSearch: message.webSearch,
 					};
 					updates.splice(webSearchSourcesUpdateIndex + 1, 0, webSearchFinishedUpdate);
 				}

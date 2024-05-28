@@ -6,6 +6,7 @@ import type { Database } from "$lib/server/database";
 import addToolsToSettings from "./03-add-tools-in-settings";
 import updateMessageUpdates from "./04-update-message-updates";
 import updateMessageFiles from "./05-update-message-files";
+import trimMessageUpdates from "./06-trim-message-updates";
 
 export interface Migration {
 	_id: ObjectId;
@@ -23,4 +24,5 @@ export const migrations: Migration[] = [
 	addToolsToSettings,
 	updateMessageUpdates,
 	updateMessageFiles,
+	trimMessageUpdates,
 ];
