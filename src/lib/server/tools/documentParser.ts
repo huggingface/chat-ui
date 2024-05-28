@@ -1,5 +1,4 @@
 import type { BackendTool } from ".";
-import { ToolResultStatus } from "$lib/types/Tool";
 import { callSpace, getIpToken } from "./utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
 

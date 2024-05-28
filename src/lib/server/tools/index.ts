@@ -1,5 +1,5 @@
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import type { Tool, ToolResultError, ToolResultSuccess } from "$lib/types/Tool";
+import type { Tool, ToolResultSuccess } from "$lib/types/Tool";
 
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
@@ -19,7 +19,7 @@ export interface BackendTool extends Tool {
 	call(
 		params: Record<string, string | number | boolean>,
 		context: BackendToolContext
-	): AsyncGenerator<MessageUpdate, Omit<ToolResultSuccess, "call" | "type">, undefined>;
+	): AsyncGenerator<MessageUpdate, Omit<ToolResultSuccess, "status" | "call" | "type">, undefined>;
 }
 
 export const allTools: BackendTool[] = [

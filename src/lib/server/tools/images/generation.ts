@@ -1,6 +1,5 @@
 import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
-import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { callSpace, getIpToken, type GradioImage } from "../utils";
 

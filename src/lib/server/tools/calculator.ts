@@ -1,4 +1,3 @@
-import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from ".";
 import vm from "node:vm";
 
