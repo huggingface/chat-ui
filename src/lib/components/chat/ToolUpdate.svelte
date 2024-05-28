@@ -17,7 +17,7 @@
 	export let loading: boolean = false;
 
 	const toolName = tool.find(isMessageToolCallUpdate)?.call.name;
-	const toolError = tool.some(isMessageToolErrorUpdate);
+	$: toolError = tool.some(isMessageToolErrorUpdate);
 	$: toolDone = tool.some(isMessageToolResultUpdate);
 
 	const availableTools: ToolFront[] = $page.data.tools;
@@ -27,7 +27,7 @@
 
 	let isShowingLoadingBar = false;
 	onMount(() => {
-		if (!toolDone && loading && loadingBarEl) {
+		if (!toolError && !toolDone && loading && loadingBarEl) {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
@@ -39,7 +39,7 @@
 	});
 
 	// go to 100% quickly if loading is done
-	$: (!loading || toolDone) &&
+	$: (!loading || toolDone || toolError) &&
 		browser &&
 		loadingBarEl &&
 		isShowingLoadingBar &&
