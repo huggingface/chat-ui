@@ -58,9 +58,8 @@ export interface MessageWebSearchSourcesUpdate
 	message: string;
 	sources: WebSearchSource[];
 }
-export interface MessageWebSearchFinishedUpdate
-	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Finished> {}
-
+export type MessageWebSearchFinishedUpdate =
+	BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Finished>;
 export type MessageWebSearchUpdate =
 	| MessageWebSearchErrorUpdate
 	| MessageWebSearchGeneralUpdate
