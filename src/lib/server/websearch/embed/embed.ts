@@ -1,3 +1,4 @@
+import { MetricsServer } from "$lib/server/metrics";
 import type { WebSearchScrapedSource, WebSearchUsedSource } from "$lib/types/WebSearch";
 import type { EmbeddingBackendModel } from "../../embeddingModels";
 import { getSentenceSimilarity, innerProduct } from "../../sentenceSimilarity";
@@ -14,6 +15,8 @@ export async function findContextSources(
 	prompt: string,
 	embeddingModel: EmbeddingBackendModel
 ) {
+	const startTime = Date.now();
+
 	const sourcesMarkdownElems = sources.map((source) => flattenTree(source.page.markdownTree));
 	const markdownElems = sourcesMarkdownElems.flat();
 
@@ -75,6 +78,8 @@ export async function findContextSources(
 			return { ...source, context };
 		})
 		.filter((contextSource) => contextSource.context.length > 0);
+
+	MetricsServer.getMetrics().webSearch.embeddingDuration.observe(Date.now() - startTime);
 
 	return contextSources;
 }
