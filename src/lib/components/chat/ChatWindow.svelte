@@ -33,6 +33,8 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -125,6 +127,17 @@
 	$: if (lastMessage && lastMessage.from === "user") {
 		scrollToBottom();
 	}
+
+	const settings = useSettingsStore();
+
+	// active tools are all the checked tools, either from settings or on by default
+	$: activeTools = $page.data.tools.filter(
+		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+	);
+	$: activeMimeTypes = [
+		...activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []),
+		...(currentModel.multimodal ? ["image/*"] : []),
+	];
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -273,8 +286,8 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal || currentModel.tools}
-							<UploadBtn bind:files classNames="ml-auto" />
+						{#if currentModel.multimodal || activeMimeTypes.length > 0}
+							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn

@@ -18,6 +18,7 @@ const imageEditing: BackendTool = {
 	displayName: "Image Editing",
 	description: "Use this tool to edit an image from a prompt.",
 	isOnByDefault: true,
+	mimeTypes: ["image/*"],
 	parameterDefinitions: {
 		prompt: {
 			description:

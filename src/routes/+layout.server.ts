@@ -172,6 +172,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				name: tool.name,
 				displayName: tool.displayName,
 				description: tool.description,
+				mimeTypes: tool.mimeTypes,
 				isOnByDefault: tool.isOnByDefault,
 				isLocked: tool.isLocked,
 				timeToUseMS:
