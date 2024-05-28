@@ -192,13 +192,13 @@
 	}
 
 	$: editMode = $convTreeStore.editing === message.id;
-	let editContentEl: HTMLTextAreaElement;
+	let editContentEl: HTMLSpanElement;
 	let editFormEl: HTMLFormElement;
 
 	$: if (editMode) {
 		tick();
 		if (editContentEl) {
-			editContentEl.value = message.content;
+			editContentEl.innerText = message.content;
 			editContentEl?.focus();
 		}
 	}
@@ -485,29 +485,25 @@
 			{/if}
 
 			<div class="flex w-full flex-row flex-nowrap">
-				{#if !editMode}
-					<p
-						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
+				<form
+					class="flex w-full flex-col"
+					bind:this={editFormEl}
+					on:submit|preventDefault={() => {
+						dispatch("retry", { content: editContentEl.innerText, id: message.id });
+						$convTreeStore.editing = null;
+					}}
+				>
+					<span
+						role="textbox"
+						tabindex={1}
+						class="w-full whitespace-break-spaces text-wrap break-words break-words rounded-xl px-5 py-3.5 text-gray-500 outline-none *:h-max dark:text-gray-400"
+						class:bg-gray-100={editMode}
+						class:dark:bg-gray-800={editMode}
+						bind:this={editContentEl}
+						on:keydown={handleKeyDown}
+						contenteditable={editMode}>{message.content.trim()}</span
 					>
-						{message.content.trim()}
-					</p>
-				{:else}
-					<form
-						class="flex w-full flex-col"
-						bind:this={editFormEl}
-						on:submit|preventDefault={() => {
-							dispatch("retry", { content: editContentEl.value, id: message.id });
-							$convTreeStore.editing = null;
-						}}
-					>
-						<textarea
-							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max dark:bg-gray-800 dark:text-gray-400"
-							rows="5"
-							bind:this={editContentEl}
-							value={message.content.trim()}
-							on:keydown={handleKeyDown}
-							required
-						/>
+					{#if editMode}
 						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
 								type="submit"
@@ -530,8 +526,8 @@
 								Cancel
 							</button>
 						</div>
-					</form>
-				{/if}
+					{/if}
+				</form>
 				{#if !loading && !editMode}
 					<div
 						class="
