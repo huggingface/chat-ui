@@ -25,7 +25,7 @@ export interface Tool {
 export type ToolFront = Pick<
 	Tool,
 	"name" | "displayName" | "description" | "isOnByDefault" | "isLocked"
->;
+> & { timeToUseMS?: number };
 
 export enum ToolResultStatus {
 	Success = "success",
