@@ -1,23 +1,35 @@
 import {
-	type BrowserContext,
 	chromium,
 	devices,
 	type Page,
 	type BrowserContextOptions,
 	type Response,
+	type Browser,
 } from "playwright";
 import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
 import { env } from "$env/dynamic/private";
+import { logger } from "$lib/server/logger";
 
-// Singleton initialized by initPlaywrightService
-let playwrightService: Promise<{ ctx: BrowserContext; blocker: PlaywrightBlocker }> | undefined;
+const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch).then((blker) => {
+	const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
+	if (env.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
+	return mostBlocked;
+});
 
-async function initPlaywrightService() {
-	if (playwrightService) return playwrightService;
-
+let browserSingleton: Promise<Browser> | undefined;
+async function getBrowser() {
 	const browser = await chromium.launch({ headless: true });
-
 	process.on("SIGINT", () => browser.close());
+	browser.on("disconnected", () => {
+		logger.warn("Browser closed");
+		browserSingleton = undefined;
+	});
+	return browser;
+}
+
+async function getPlaywrightCtx() {
+	if (!browserSingleton) browserSingleton = getBrowser();
+	const browser = await browserSingleton;
 
 	const device = devices["Desktop Chrome"];
 	const options: BrowserContextOptions = {
@@ -36,31 +48,26 @@ async function initPlaywrightService() {
 		timezoneId: "America/New_York",
 		locale: "en-US",
 	};
-	const ctx = await browser.newContext(options);
-	const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch).then((blker) => {
-		const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
-		if (env.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
-		return mostBlocked;
-	});
-
-	// Clear the singleton when the context closes
-	ctx.on("close", () => {
-		playwrightService = undefined;
-	});
-
-	return Object.freeze({ ctx, blocker });
+	return browser.newContext(options);
 }
 
-export async function loadPage(url: string): Promise<{ res?: Response; page: Page }> {
-	if (!playwrightService) playwrightService = initPlaywrightService();
-	const { ctx, blocker } = await playwrightService;
+export async function withPage<T>(
+	url: string,
+	callback: (page: Page, response?: Response) => Promise<T>
+): Promise<T> {
+	const ctx = await getPlaywrightCtx();
 
-	const page = await ctx.newPage();
-	await blocker.enableBlockingInPage(page);
+	try {
+		const page = await ctx.newPage();
+		await blocker.enableBlockingInPage(page);
 
-	const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
-		console.warn(`Failed to load page within 2s: ${url}`);
-	});
+		const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
+			console.warn(`Failed to load page within 2s: ${url}`);
+		});
 
-	return { res: res ?? undefined, page };
+		// await needed here so that we don't close the context before the callback is done
+		return await callback(page, res ?? undefined);
+	} finally {
+		ctx.close();
+	}
 }
