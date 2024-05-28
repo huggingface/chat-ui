@@ -198,7 +198,7 @@
 	$: if (editMode) {
 		tick();
 		if (editContentEl) {
-			editContentEl.innerText = message.content;
+			editContentEl.textContent = message.content;
 			editContentEl?.focus();
 		}
 	}
