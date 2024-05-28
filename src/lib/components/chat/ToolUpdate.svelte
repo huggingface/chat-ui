@@ -11,6 +11,7 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
 	import { onMount } from "svelte";
+	import { browser } from "$app/environment";
 
 	export let tool: MessageToolUpdate[];
 	export let loading: boolean = false;
@@ -26,7 +27,7 @@
 
 	let isShowingLoadingBar = false;
 	onMount(() => {
-		if (!toolDone && loading) {
+		if (!toolDone && loading && loadingBarEl) {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
@@ -39,6 +40,8 @@
 
 	// go to 100% quickly if loading is done
 	$: (!loading || toolDone) &&
+		browser &&
+		loadingBarEl &&
 		isShowingLoadingBar &&
 		(() => {
 			isShowingLoadingBar = false;
