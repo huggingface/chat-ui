@@ -1,4 +1,3 @@
-import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from ".";
 import vm from "node:vm";
 
@@ -22,14 +21,10 @@ const calculator: BackendTool = {
 			const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
 
 			return {
-				status: ToolResultStatus.Success,
 				outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
 			};
-		} catch (e) {
-			return {
-				status: ToolResultStatus.Error,
-				message: "Invalid expression",
-			};
+		} catch (cause) {
+			throw Error("Invalid expression", { cause });
 		}
 	},
 };

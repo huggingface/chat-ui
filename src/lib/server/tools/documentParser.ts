@@ -1,5 +1,4 @@
 import type { BackendTool } from ".";
-import { ToolResultStatus } from "$lib/types/Tool";
 import { callSpace, getIpToken } from "./utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
 
@@ -29,18 +28,8 @@ const documentParser: BackendTool = {
 
 		const message = messages[fileMessageIndex];
 		const files = message?.files ?? [];
-		if (!files || files.length === 0) {
-			return {
-				status: ToolResultStatus.Error,
-				message: "User did not provide a pdf to parse",
-			};
-		}
-		if (fileIndex >= files.length) {
-			return {
-				status: ToolResultStatus.Error,
-				message: "Model provided an invalid file index",
-			};
-		}
+		if (!files || files.length === 0) throw Error("User did not provide a pdf to parse");
+		if (fileIndex >= files.length) throw Error("Model provided an invalid file index");
 
 		const file = files[fileIndex];
 		const fileBlob = await downloadFile(files[fileIndex].value, conv._id)
@@ -62,7 +51,6 @@ const documentParser: BackendTool = {
 			documentMarkdown = documentMarkdown.slice(0, 30_000) + "\n\n... (truncated)";
 		}
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [{ [file.name]: documentMarkdown }],
 			display: false,
 		};

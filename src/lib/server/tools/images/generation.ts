@@ -1,6 +1,5 @@
 import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
-import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { callSpace, getIpToken, type GradioImage } from "../utils";
 
@@ -81,7 +80,6 @@ const imageGeneration: BackendTool = {
 		}
 
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [
 				{
 					imageGeneration: `An image has been generated for the following prompt: "${prompt}". Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,

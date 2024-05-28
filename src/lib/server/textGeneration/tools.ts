@@ -19,6 +19,7 @@ import { toolHasName } from "../tools/utils";
 import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import { MetricsServer } from "../metrics";
+import { stringifyError } from "$lib/utils/stringifyError";
 
 function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string {
 	if (files.length === 0) {
@@ -48,7 +49,7 @@ export function pickTools(
 	});
 }
 
-async function* runTool(
+async function* callTool(
 	ctx: BackendToolContext,
 	tools: BackendTool[],
 	call: ToolCall
@@ -72,47 +73,38 @@ async function* runTool(
 		uuid,
 		call,
 	};
+
 	try {
-		try {
-			const toolResult = yield* tool.call(call.parameters, ctx);
-			if (toolResult.status === ToolResultStatus.Error) {
-				yield {
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Error,
-					uuid,
-					message: toolResult.message,
-				};
-			} else {
-				yield {
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Result,
-					uuid,
-					result: { ...toolResult, call } as ToolResult,
-				};
-			}
+		const toolResult = yield* tool.call(call.parameters, ctx);
 
-			MetricsServer.getMetrics().tool.toolUseDuration.observe(
-				{ tool: call.name },
-				Date.now() - startTime
-			);
+		yield {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid,
+			result: { ...toolResult, call } as ToolResult,
+		};
 
-			return { ...toolResult, call } as ToolResult;
-		} catch (e) {
-			MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
-			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Error,
-				uuid,
-				message: e instanceof Error ? e.message : String(e),
-			};
-		}
-	} catch (cause) {
+		MetricsServer.getMetrics().tool.toolUseDuration.observe(
+			{ tool: call.name },
+			Date.now() - startTime
+		);
+
+		return { ...toolResult, call } as ToolResult;
+	} catch (error) {
 		MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
-		console.error(Error(`Failed while running tool ${call.name}`), { cause });
+		logger.error(error, `Failed while running tool ${call.name}`);
+
+		yield {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Error,
+			uuid,
+			message: stringifyError(error),
+		};
+
 		return {
 			call,
 			status: ToolResultStatus.Error,
-			message: cause instanceof Error ? cause.message : String(cause),
+			message: stringifyError(error),
 		};
 	}
 }
@@ -160,12 +152,12 @@ export async function* runTools(
 					calls.push(
 						...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall).filter(Boolean)
 					);
-				} catch (cause) {
+				} catch (e) {
 					// error parsing the calls
 					yield {
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
-						message: cause instanceof Error ? cause.message : String(cause),
+						message: stringifyError(e),
 					};
 				}
 			}
@@ -179,7 +171,7 @@ export async function* runTools(
 
 	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant, ip, username };
 	const toolResults: (ToolResult | undefined)[] = yield* mergeAsyncGenerators(
-		calls.map((call) => runTool(toolContext, tools, call))
+		calls.map((call) => callTool(toolContext, tools, call))
 	);
 	return toolResults.filter((result): result is ToolResult => result !== undefined);
 }
