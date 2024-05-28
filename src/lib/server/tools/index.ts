@@ -12,7 +12,7 @@ import type { TextGenerationContext } from "../textGeneration/types";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
-	"conv" | "messages" | "assistant" | "ip" | "userName"
+	"conv" | "messages" | "assistant" | "ip" | "username"
 > & { preprompt?: string };
 
 // typescript can't narrow a discriminated union after applying a generic like Omit to it

@@ -15,5 +15,5 @@ export interface TextGenerationContext {
 	toolsPreference: Record<string, boolean>;
 	promptedAt: Date;
 	ip: string;
-	userName?: string;
+	username?: string;
 }

@@ -23,7 +23,7 @@ const documentParser: BackendTool = {
 			required: true,
 		},
 	},
-	async *call({ fileMessageIndex, fileIndex }, { conv, messages, ip, userName }) {
+	async *call({ fileMessageIndex, fileIndex }, { conv, messages, ip, username }) {
 		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
 
@@ -47,7 +47,7 @@ const documentParser: BackendTool = {
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
 			.then((res) => res.blob());
 
-		const ipToken = await getIpToken(ip, userName);
+		const ipToken = await getIpToken(ip, username);
 
 		const outputs = await callSpace<PdfParserInput, PdfParserOutput>(
 			"huggingchat/document-parser",

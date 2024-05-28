@@ -122,7 +122,7 @@ export async function* runTools(
 	tools: BackendTool[],
 	preprompt?: string
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
-	const { endpoint, conv, messages, assistant, ip, userName } = ctx;
+	const { endpoint, conv, messages, assistant, ip, username } = ctx;
 	const calls: ToolCall[] = [];
 
 	const messagesWithFilesPrompt = messages.map((message, idx) => {
@@ -177,7 +177,7 @@ export async function* runTools(
 		Date.now() - pickToolStartTime
 	);
 
-	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant, ip, userName };
+	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant, ip, username };
 	const toolResults: (ToolResult | undefined)[] = yield* mergeAsyncGenerators(
 		calls.map((call) => runTool(toolContext, tools, call))
 	);

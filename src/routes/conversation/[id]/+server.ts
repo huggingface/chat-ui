@@ -380,7 +380,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					toolsPreference: toolsPreferences ?? {},
 					promptedAt,
 					ip: getClientAddress(),
-					userName: locals.user?.username,
+					username: locals.user?.username,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
