@@ -7,6 +7,7 @@
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
+	export let files: File[] = [];
 
 	let textareaElement: HTMLTextAreaElement;
 	let isCompositionOn = false;
@@ -34,6 +35,23 @@
 		if (isDesktop(window)) {
 			textareaElement.focus();
 		}
+	});
+
+	$: onMount(() => {
+		const handlePaste = (event: ClipboardEvent) => {
+			if (!textareaElement.contains(document.activeElement)) return;
+
+			const items = event.clipboardData?.items;
+			if (!items) return;
+
+			for (const item of items) {
+				if (item.kind !== "file") continue;
+				const file = item.getAsFile();
+				if (file) files = [...files, file];
+			}
+		};
+		document.addEventListener("paste", handlePaste);
+		return () => document.removeEventListener("paste", handlePaste);
 	});
 </script>
 

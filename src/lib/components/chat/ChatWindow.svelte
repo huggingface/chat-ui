@@ -312,6 +312,7 @@
 									? "This conversation is read-only. Start a new one to continue!"
 									: "Ask anything"}
 								bind:value={message}
+								bind:files
 								on:submit={handleSubmit}
 								on:beforeinput={(ev) => {
 									if ($page.data.loginRequired) {
