@@ -44,30 +44,30 @@ export class MetricsServer {
 		});
 
 		const register = new Registry();
-		collectDefaultMetrics({ register });
+		collectDefaultMetrics({ register, prefix: "huggingchat_" });
 
 		this.metrics = {
 			model: {
 				conversationsTotal: new Counter({
-					name: "model_conversations_total",
+					name: "huggingchat_model_conversations_total",
 					help: "Total number of conversations",
 					labelNames: ["model"],
 					registers: [register],
 				}),
 				messagesTotal: new Counter({
-					name: "model_messages_total",
+					name: "huggingchat_model_messages_total",
 					help: "Total number of messages",
 					labelNames: ["model"],
 					registers: [register],
 				}),
 				tokenCountTotal: new Counter({
-					name: "model_token_count_total",
+					name: "huggingchat_model_token_count_total",
 					help: "Total number of tokens",
 					labelNames: ["model"],
 					registers: [register],
 				}),
 				timePerOutputToken: new Summary({
-					name: "model_time_per_output_token_ms",
+					name: "huggingchat_model_time_per_output_token_ms",
 					help: "Time per output token in ms",
 					labelNames: ["model"],
 					registers: [register],
@@ -75,7 +75,7 @@ export class MetricsServer {
 					ageBuckets: 5,
 				}),
 				timeToFirstToken: new Summary({
-					name: "model_time_to_first_token_ms",
+					name: "huggingchat_model_time_to_first_token_ms",
 					help: "Time to first token",
 					labelNames: ["model"],
 					registers: [register],
@@ -83,7 +83,7 @@ export class MetricsServer {
 					ageBuckets: 5,
 				}),
 				latency: new Summary({
-					name: "model_latency_ms",
+					name: "huggingchat_model_latency_ms",
 					help: "Total latency until end of answer",
 					labelNames: ["model"],
 					registers: [register],
@@ -93,29 +93,29 @@ export class MetricsServer {
 			},
 			webSearch: {
 				requestCount: new Counter({
-					name: "web_search_request_count",
+					name: "huggingchat_web_search_request_count",
 					help: "Total number of web search requests",
 					registers: [register],
 				}),
 				pageFetchCount: new Counter({
-					name: "web_search_page_fetch_count",
+					name: "huggingchat_web_search_page_fetch_count",
 					help: "Total number of web search page fetches",
 					registers: [register],
 				}),
 				pageFetchCountError: new Counter({
-					name: "web_search_page_fetch_count_error",
+					name: "huggingchat_web_search_page_fetch_count_error",
 					help: "Total number of web search page fetch errors",
 					registers: [register],
 				}),
 				pageFetchDuration: new Summary({
-					name: "web_search_page_fetch_duration_ms",
+					name: "huggingchat_web_search_page_fetch_duration_ms",
 					help: "Web search page fetch duration",
 					registers: [register],
 					maxAgeSeconds: 5 * 60,
 					ageBuckets: 5,
 				}),
 				embeddingDuration: new Summary({
-					name: "web_search_embedding_duration_ms",
+					name: "huggingchat_web_search_embedding_duration_ms",
 					help: "Web search embedding duration",
 					registers: [register],
 					maxAgeSeconds: 5 * 60,
@@ -124,19 +124,19 @@ export class MetricsServer {
 			},
 			tool: {
 				toolUseCount: new Counter({
-					name: "tool_use_count",
+					name: "huggingchat_tool_use_count",
 					help: "Total number of tool uses",
 					labelNames: ["tool"],
 					registers: [register],
 				}),
 				toolUseCountError: new Counter({
-					name: "tool_use_count_error",
+					name: "huggingchat_tool_use_count_error",
 					help: "Total number of tool use errors",
 					labelNames: ["tool"],
 					registers: [register],
 				}),
 				toolUseDuration: new Summary({
-					name: "tool_use_duration_ms",
+					name: "huggingchat_tool_use_duration_ms",
 					help: "Tool use duration",
 					labelNames: ["tool"],
 					registers: [register],
@@ -144,7 +144,7 @@ export class MetricsServer {
 					ageBuckets: 5,
 				}),
 				timeToChooseTools: new Summary({
-					name: "time_to_choose_tools_ms",
+					name: "huggingchat_time_to_choose_tools_ms",
 					help: "Time to choose tools",
 					labelNames: ["model"],
 					registers: [register],
