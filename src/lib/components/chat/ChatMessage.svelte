@@ -277,14 +277,14 @@
 								<img
 									src={urlNotTrailing + "/output/" + file.value}
 									alt="output from assistant"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
+									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg xl:max-h-56"
 								/>
 							{:else}
 								<!-- handle the case where this is a base64 encoded image -->
 								<img
 									src={`data:${file.mime};base64,${file.value}`}
 									alt="output from assistant"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg"
+									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg xl:max-h-56"
 								/>
 							{/if}
 						</button>
