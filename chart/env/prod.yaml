@@ -34,7 +34,7 @@ envVars:
     [
       {
         "name" : "CohereForAI/c4ai-command-r-plus",
-        "tokenizer": "Xenova/c4ai-command-r-v01-tokenizer",
+        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
         "description": "Command R+ is Cohere's latest LLM and is the first open weight model to beat GPT4 in the Chatbot Arena!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
