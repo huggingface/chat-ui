@@ -1,6 +1,5 @@
 import { stringifyMarkdownElementTree } from "$lib/server/websearch/markdown/utils/stringify";
 import { scrapeUrl } from "$lib/server/websearch/scrape/scrape";
-import { ToolResultStatus } from "$lib/types/Tool";
 import type { BackendTool } from "..";
 
 const fetchUrl: BackendTool = {
@@ -22,7 +21,6 @@ const fetchUrl: BackendTool = {
 		const { title, markdownTree } = await scrapeUrl(url, Infinity);
 
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [{ title, text: stringifyMarkdownElementTree(markdownTree) }],
 			display: false,
 		};

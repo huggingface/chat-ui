@@ -18,6 +18,8 @@ import { logger } from "../logger";
 import { toolHasName } from "../tools/utils";
 import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
+import { MetricsServer } from "../metrics";
+import { stringifyError } from "$lib/utils/stringifyError";
 
 function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string {
 	if (files.length === 0) {
@@ -47,8 +49,8 @@ export function pickTools(
 	});
 }
 
-async function* runTool(
-	{ conv, messages, preprompt, assistant }: BackendToolContext,
+async function* callTool(
+	ctx: BackendToolContext,
 	tools: BackendTool[],
 	call: ToolCall
 ): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
@@ -62,60 +64,57 @@ async function* runTool(
 	// Special case for directly_answer tool where we ignore
 	if (toolHasName(directlyAnswer.name, tool)) return;
 
+	const startTime = Date.now();
+	MetricsServer.getMetrics().tool.toolUseCount.inc({ tool: call.name });
+
 	yield {
 		type: MessageUpdateType.Tool,
 		subtype: MessageToolUpdateType.Call,
 		uuid,
 		call,
 	};
-	try {
-		try {
-			const toolResult = yield* tool.call(call.parameters, {
-				conv,
-				messages,
-				preprompt,
-				assistant,
-			});
-			if (toolResult.status === ToolResultStatus.Error) {
-				yield {
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Error,
-					uuid,
-					message: toolResult.message,
-				};
-			} else {
-				yield {
-					type: MessageUpdateType.Tool,
-					subtype: MessageToolUpdateType.Result,
-					uuid,
-					result: { ...toolResult, call } as ToolResult,
-				};
-			}
 
-			return { ...toolResult, call } as ToolResult;
-		} catch (e) {
-			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Error,
-				uuid,
-				message: e instanceof Error ? e.message : String(e),
-			};
-		}
-	} catch (cause) {
-		console.error(Error(`Failed while running tool ${call.name}`), { cause });
+	try {
+		const toolResult = yield* tool.call(call.parameters, ctx);
+
+		yield {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid,
+			result: { ...toolResult, call } as ToolResult,
+		};
+
+		MetricsServer.getMetrics().tool.toolUseDuration.observe(
+			{ tool: call.name },
+			Date.now() - startTime
+		);
+
+		return { ...toolResult, call } as ToolResult;
+	} catch (error) {
+		MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
+		logger.error(error, `Failed while running tool ${call.name}. ${stringifyError(error)}`);
+
+		yield {
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Error,
+			uuid,
+			message: "Error occurred",
+		};
+
 		return {
 			call,
 			status: ToolResultStatus.Error,
-			message: cause instanceof Error ? cause.message : String(cause),
+			message: "Error occurred",
 		};
 	}
 }
 
 export async function* runTools(
-	{ endpoint, conv, messages, assistant }: TextGenerationContext,
+	ctx: TextGenerationContext,
 	tools: BackendTool[],
 	preprompt?: string
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
+	const { endpoint, conv, messages, assistant, ip, username } = ctx;
 	const calls: ToolCall[] = [];
 
 	const messagesWithFilesPrompt = messages.map((message, idx) => {
@@ -125,6 +124,8 @@ export async function* runTools(
 			content: `${message.content}\n${makeFilesPrompt(message.files, idx)}`,
 		};
 	});
+
+	const pickToolStartTime = Date.now();
 
 	// do the function calling bits here
 	for await (const output of await endpoint({
@@ -151,21 +152,26 @@ export async function* runTools(
 					calls.push(
 						...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall).filter(Boolean)
 					);
-				} catch (cause) {
+				} catch (e) {
 					// error parsing the calls
 					yield {
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
-						message: cause instanceof Error ? cause.message : String(cause),
+						message: stringifyError(e),
 					};
 				}
 			}
 		}
 	}
 
-	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant };
+	MetricsServer.getMetrics().tool.timeToChooseTools.observe(
+		{ model: conv.model },
+		Date.now() - pickToolStartTime
+	);
+
+	const toolContext: BackendToolContext = { conv, messages, preprompt, assistant, ip, username };
 	const toolResults: (ToolResult | undefined)[] = yield* mergeAsyncGenerators(
-		calls.map((call) => runTool(toolContext, tools, call))
+		calls.map((call) => callTool(toolContext, tools, call))
 	);
 	return toolResults.filter((result): result is ToolResult => result !== undefined);
 }

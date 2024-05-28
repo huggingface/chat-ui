@@ -8,6 +8,18 @@
 	export let file: MessageFile;
 	export let canClose = true;
 	const dispatch = createEventDispatcher<{ close: void }>();
+
+	function truncateMiddle(text: string, maxLength: number): string {
+		if (text.length <= maxLength) {
+			return text;
+		}
+
+		const halfLength = Math.floor((maxLength - 1) / 2);
+		const start = text.substring(0, halfLength);
+		const end = text.substring(text.length - halfLength);
+
+		return `${start}…${end}`;
+	}
 </script>
 
 <div
@@ -36,7 +48,7 @@
 			</div>
 			<dl class="flex flex-col truncate leading-tight">
 				<dd class="text-sm">
-					{file.name}
+					{truncateMiddle(file.name, 28)}
 				</dd>
 				<dt class="text-xs text-gray-400">{file.mime.split("/")[1].toUpperCase()}</dt>
 			</dl>

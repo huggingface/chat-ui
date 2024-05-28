@@ -1,8 +1,7 @@
 import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
-import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import { callSpace, type GradioImage } from "../utils";
+import { callSpace, getIpToken, type GradioImage } from "../utils";
 
 type ImageGenerationInput = [
 	number /* number (numeric value between 1 and 8) in 'Number of Images' Slider component */,
@@ -44,7 +43,9 @@ const imageGeneration: BackendTool = {
 			default: 1024,
 		},
 	},
-	async *call({ prompt, numberOfImages }, { conv }) {
+	async *call({ prompt, numberOfImages }, { conv, ip, username }) {
+		const ipToken = await getIpToken(ip, username);
+
 		const outputs = await callSpace<ImageGenerationInput, ImageGenerationOutput>(
 			"ByteDance/Hyper-SDXL-1Step-T2I",
 			"/process_image",
@@ -54,7 +55,8 @@ const imageGeneration: BackendTool = {
 				512, // number in 'Image Width' Number component
 				String(prompt), // prompt
 				Math.floor(Math.random() * 1000), // seed random
-			]
+			],
+			ipToken
 		);
 		const imageBlobs = await Promise.all(
 			outputs[0].map((output) =>
@@ -78,7 +80,6 @@ const imageGeneration: BackendTool = {
 		}
 
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [
 				{
 					imageGeneration: `An image has been generated for the following prompt: "${prompt}". Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,
