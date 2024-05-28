@@ -64,7 +64,7 @@
 		>
 			<div
 				bind:this={loadingBarEl}
-				class="absolute -m-1 hidden h-full w-full rounded-lg bg-purple-500/20 transition-all"
+				class="absolute -m-1 hidden h-full w-full rounded-l-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
 			/>
 
 			<div
