@@ -13,12 +13,12 @@ import type { Message } from "$lib/types/Message";
 
 // -----------
 
-export interface MessageWebSearchSourcesUpdate
+interface MessageWebSearchSourcesUpdate
 	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Sources> {
 	message: string;
 	sources: WebSearchSource[];
 }
-export interface MessageWebSearchFinishedUpdate
+interface MessageWebSearchFinishedUpdate
 	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Finished> {
 	webSearch: WebSearch;
 }
