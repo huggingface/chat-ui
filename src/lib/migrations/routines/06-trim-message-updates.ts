@@ -2,26 +2,14 @@ import type { Migration } from ".";
 import { collections } from "$lib/server/database";
 import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
-import type { WebSearch, WebSearchSource } from "$lib/types/WebSearch";
 import {
 	MessageUpdateType,
 	MessageWebSearchUpdateType,
-	type BaseMessageWebSearchUpdate,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
 
 // -----------
-
-interface MessageWebSearchSourcesUpdate
-	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Sources> {
-	message: string;
-	sources: WebSearchSource[];
-}
-interface MessageWebSearchFinishedUpdate
-	extends BaseMessageWebSearchUpdate<MessageWebSearchUpdateType.Finished> {
-	webSearch: WebSearch;
-}
 
 /** Converts the old message update to the new schema */
 function convertMessageUpdate(message: Message, update: MessageUpdate): MessageUpdate | null {
