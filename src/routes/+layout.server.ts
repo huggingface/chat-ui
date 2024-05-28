@@ -176,7 +176,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				isLocked: tool.isLocked,
 				timeToUseMS:
 					toolUseDuration.find((el) => el.labels.tool === tool.name && el.labels.quantile === 0.9)
-						?.value ?? 15000,
+						?.value ?? 15_000,
 			})),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
