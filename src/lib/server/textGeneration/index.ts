@@ -61,7 +61,7 @@ async function* textGenerationWithoutTitle(
 
 	if (model.tools && !conv.assistantId) {
 		const tools = pickTools(toolsPreference, Boolean(assistant));
-		toolResults = yield* runTools(ctx, tools, preprompt);
+		if (tools.length > 0) toolResults = yield* runTools(ctx, tools, preprompt);
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
