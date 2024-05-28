@@ -1,6 +1,5 @@
 import type { BackendTool } from "..";
 import { uploadFile } from "../../files/uploadFile";
-import { ToolResultStatus } from "$lib/types/Tool";
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
 import { callSpace, getIpToken, type GradioImage } from "../utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
@@ -44,23 +43,10 @@ const imageEditing: BackendTool = {
 
 		const message = messages[fileMessageIndex];
 		const images = message?.files ?? [];
-		if (!images || images.length === 0) {
-			return {
-				status: ToolResultStatus.Error,
-				message: "User did not provide an image to edit.",
-			};
-		}
-		if (fileIndex >= images.length) {
-			return {
-				status: ToolResultStatus.Error,
-				message: "Model provided an invalid file index",
-			};
-		}
+		if (!images || images.length === 0) throw Error("User did not provide an image to edit");
+		if (fileIndex >= images.length) throw Error("Model provided an invalid file index");
 		if (!images[fileIndex].mime.startsWith("image/")) {
-			return {
-				status: ToolResultStatus.Error,
-				message: "Model provided a file indx which is not an image",
-			};
+			throw Error("Model provided a file idex which is not an image");
 		}
 
 		// todo: should handle multiple images
@@ -96,7 +82,6 @@ const imageEditing: BackendTool = {
 		};
 
 		return {
-			status: ToolResultStatus.Success,
 			outputs: [
 				{
 					imageEditing: `An image has been generated for the following prompt: "${prompt}". Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,
