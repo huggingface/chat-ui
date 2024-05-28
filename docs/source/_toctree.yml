@@ -20,6 +20,8 @@
       title: OpenID
     - local: configuration/web-search
       title: Web Search
+    - local: configuration/metrics
+      title: Metrics
     - local: configuration/embeddings
       title: Text Embedding Models
     - title: Models
