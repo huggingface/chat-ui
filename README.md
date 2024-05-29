@@ -20,7 +20,7 @@ load_balancing_strategy: random
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
-0. [Quickstart Locally](#quickstart-locally)
+0. [Quickstart](#quickstart)
 1. [No Setup Deploy](#no-setup-deploy)
 2. [Setup](#setup)
 3. [Launch](#launch)
