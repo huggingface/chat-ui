@@ -29,7 +29,7 @@
 						files = [];
 						return;
 					}
-					// if image is bigger than 2MB abort
+					// if file is bigger than 10MB abort
 					if (file.size > 10 * 1024 * 1024) {
 						setErrorMsg("Image is too big. (2MB max)");
 						files = [];
