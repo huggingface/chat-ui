@@ -214,6 +214,7 @@
 				/>
 			{:else}
 				<AssistantIntroduction
+					{models}
 					{assistant}
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
