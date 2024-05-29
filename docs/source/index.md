@@ -10,7 +10,7 @@ Open source chat interface with support for tools, web search, multimodal and ma
 
 👤 **OpenID**: Optionally setup OpenID for user authentication
 
-## Quickstart Locally
+## Quickstart
 
 You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
@@ -69,7 +69,7 @@ npm install
 npm run dev -- --open
 ```
 
-read more [here](https://github.com/huggingface/chat-ui?tab=readme-ov-file#launch).
+Read more [here](https://github.com/huggingface/chat-ui?tab=readme-ov-file#launch).
 
 <div class="flex justify-center">
 <img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/llamacpp-light.png" height="auto"/>
