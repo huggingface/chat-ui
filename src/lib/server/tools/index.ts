@@ -1,8 +1,5 @@
-import type { Assistant } from "$lib/types/Assistant";
-import type { Conversation } from "$lib/types/Conversation";
-import type { Message } from "$lib/types/Message";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
-import type { Tool, ToolResultError, ToolResultSuccess } from "$lib/types/Tool";
+import type { Tool, ToolResultSuccess } from "$lib/types/Tool";
 
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
@@ -11,25 +8,18 @@ import imageGeneration from "./images/generation";
 import documentParser from "./documentParser";
 import fetchUrl from "./web/url";
 import websearch from "./web/search";
+import type { TextGenerationContext } from "../textGeneration/types";
 
-export interface BackendToolContext {
-	conv: Conversation;
-	messages: Message[];
-	preprompt?: string;
-	assistant?: Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">;
-}
-
-// typescript can't narrow a discriminated union after applying a generic like Omit to it
-// so we have to define the omitted types and create a new union
-type ToolResultSuccessOmitted = Omit<ToolResultSuccess, "call">;
-type ToolResultErrorOmitted = Omit<ToolResultError, "call">;
-type ToolResultOmitted = ToolResultSuccessOmitted | ToolResultErrorOmitted;
+export type BackendToolContext = Pick<
+	TextGenerationContext,
+	"conv" | "messages" | "assistant" | "ip" | "username"
+> & { preprompt?: string };
 
 export interface BackendTool extends Tool {
 	call(
 		params: Record<string, string | number | boolean>,
 		context: BackendToolContext
-	): AsyncGenerator<MessageUpdate, ToolResultOmitted, undefined>;
+	): AsyncGenerator<MessageUpdate, Omit<ToolResultSuccess, "status" | "call" | "type">, undefined>;
 }
 
 export const allTools: BackendTool[] = [

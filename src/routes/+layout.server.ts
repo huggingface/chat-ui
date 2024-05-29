@@ -9,6 +9,7 @@ import { env } from "$env/dynamic/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { allTools } from "$lib/server/tools";
+import { MetricsServer } from "$lib/server/metrics";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -105,6 +106,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		}
 	}
 
+	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
 	return {
 		conversations: conversations.map((conv) => {
 			if (settings?.hideEmojiOnSidebar) {
@@ -172,6 +174,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				description: tool.description,
 				isOnByDefault: tool.isOnByDefault,
 				isLocked: tool.isLocked,
+				timeToUseMS:
+					toolUseDuration.find((el) => el.labels.tool === tool.name && el.labels.quantile === 0.9)
+						?.value ?? 15_000,
 			})),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))

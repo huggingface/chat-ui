@@ -83,7 +83,7 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}
@@ -99,7 +99,7 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}

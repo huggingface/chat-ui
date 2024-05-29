@@ -11,7 +11,6 @@ import { z } from "zod";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
-	MessageWebSearchUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
@@ -359,14 +358,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					];
 				}
 
-				// Set web search
-				else if (
-					event.type === MessageUpdateType.WebSearch &&
-					event.subtype === MessageWebSearchUpdateType.Finished
-				) {
-					messageToWriteTo.webSearch = event.webSearch;
-				}
-
 				// Append to the persistent message updates if it's not a stream update
 				if (event.type !== "stream") {
 					messageToWriteTo?.updates?.push(event);
@@ -407,6 +398,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					webSearch: webSearch ?? false,
 					toolsPreference: toolsPreferences ?? {},
 					promptedAt,
+					ip: getClientAddress(),
+					username: locals.user?.username,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);

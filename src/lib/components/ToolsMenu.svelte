@@ -43,7 +43,7 @@
 				Available tools
 				{#if isHuggingChat}
 					<a
-						href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/454"
+						href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/470"
 						target="_blank"
 						class="hover:brightness-0 dark:hover:brightness-200"
 						><CarbonInformation class="text-xs" /></a
@@ -73,3 +73,9 @@
 		</div>
 	</div>
 </details>
+
+<style>
+	details summary::-webkit-details-marker {
+		display: none;
+	}
+</style>
