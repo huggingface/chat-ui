@@ -192,6 +192,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			username: locals.user.username,
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
+			logoutDisabled: locals.user.logoutDisabled,
 		},
 		assistant,
 		enableAssistants,
