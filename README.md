@@ -93,6 +93,8 @@ npm run dev -- --open
 
 read more [here](#launch).
 
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/llamacpp-dark.png" height="auto"/>
+
 ## No Setup Deploy
 
 If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
