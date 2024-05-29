@@ -22,6 +22,8 @@
 			tools: Object.fromEntries($page.data.tools.map((tool: ToolFront) => [tool.name, value])),
 		});
 	}
+	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
+	$: allToolsDisabled = activeToolCount === 0;
 </script>
 
 <details
@@ -57,8 +59,16 @@
 				{/if}
 			</div>
 			<div class="flex space-x-4 text-sm text-gray-500">
-				<button on:click={() => setAllTools(true)}>Enable all</button>
-				<button on:click={() => setAllTools(false)}>Disable all</button>
+				<button
+					disabled={allToolsEnabled}
+					class:opacity-50={allToolsEnabled}
+					on:click={() => setAllTools(true)}>Enable all</button
+				>
+				<button
+					disabled={allToolsDisabled}
+					class:opacity-50={allToolsDisabled}
+					on:click={() => setAllTools(false)}>Disable all</button
+				>
 			</div>
 			{#each $page.data.tools as tool}
 				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}

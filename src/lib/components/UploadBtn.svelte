@@ -3,7 +3,7 @@
 
 	export let classNames = "";
 	export let files: File[];
-	export let mimeTypes: string[] = ["*/*"];
+	export let mimeTypes: string[];
 
 	/**
 	 * Due to a bug with Svelte, we cannot use bind:files with multiple
