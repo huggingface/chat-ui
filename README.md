@@ -33,7 +33,7 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 
 ## Quickstart
 
-You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+You can quickly start a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 1 (Start llama.cpp server):**
 
