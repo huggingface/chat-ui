@@ -31,7 +31,7 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 8. [Deploying to a HF Space](#deploying-to-a-hf-space)
 9. [Building](#building)
 
-## Quickstart Locally
+## Quickstart
 
 You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
