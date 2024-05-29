@@ -16,7 +16,7 @@ brew install llama.cpp
 llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
 ```
 
-A LLaMA.cpp HTTP Server will start on `http://localhost:8080` (to change the port or any other default options, please find [LLaMA.cpp HTTP Server readme](https://github.com/ggerganov/llama.cpp/tree/master/examples/server)).
+A local LLaMA.cpp HTTP Server will start on `http://localhost:8080` (to change the port or any other default options, please find [LLaMA.cpp HTTP Server readme](https://github.com/ggerganov/llama.cpp/tree/master/examples/server)).
 
 Add the following to your `.env.local`:
 
