@@ -1,6 +1,5 @@
 import { env } from "$env/dynamic/private";
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { isURL } from "$lib/utils/isUrl";
 
 export default async function search(query: string): Promise<WebSearchSource[]> {
 	const response = await fetch(
