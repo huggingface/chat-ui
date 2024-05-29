@@ -89,7 +89,7 @@
 			class="mb-3 mt-1.5 text-sm text-gray-500 dark:text-gray-400"
 			class:opacity-0={file_error_message}
 		>
-			Drag and drop <span class="font-semibold">one image</span> here
+			Drag and drop <span class="font-semibold">one {onlyImages ? "image" : "file"}</span> here
 		</p>
 	</div>
 </div>
