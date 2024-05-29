@@ -20,15 +20,16 @@ load_balancing_strategy: random
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
-0. [No Setup Deploy](#no-setup-deploy)
-1. [Setup](#setup)
-2. [Launch](#launch)
-3. [Web Search](#web-search)
-4. [Text Embedding Models](#text-embedding-models)
-5. [Extra parameters](#extra-parameters)
-6. [Common issues](#common-issues)
-7. [Deploying to a HF Space](#deploying-to-a-hf-space)
-8. [Building](#building)
+0. [Quickstart Locally](#quickstart-locally)
+1. [No Setup Deploy](#no-setup-deploy)
+2. [Setup](#setup)
+3. [Launch](#launch)
+4. [Web Search](#web-search)
+5. [Text Embedding Models](#text-embedding-models)
+6. [Extra parameters](#extra-parameters)
+7. [Common issues](#common-issues)
+8. [Deploying to a HF Space](#deploying-to-a-hf-space)
+9. [Building](#building)
 
 ## Quickstart Locally
 
@@ -43,9 +44,7 @@ brew install llama.cpp
 llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
 ```
 
-A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`
-
-read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`. Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 2 (tell chat-ui to use local llama.cpp server):**
 
@@ -72,7 +71,7 @@ MODELS=`[
 ]`
 ```
 
-read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 3 (make sure you have MongoDb running locally):**
 
@@ -80,7 +79,7 @@ read more [here](https://huggingface.co/docs/chat-ui/configuration/models/provid
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
-read more [here](#database).
+Read more [here](#database).
 
 **Step 4 (start chat-ui):**
 
@@ -91,7 +90,7 @@ npm install
 npm run dev -- --open
 ```
 
-read more [here](#launch).
+Read more [here](#launch).
 
 <img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/llamacpp-dark.png" height="auto"/>
 

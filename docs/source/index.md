@@ -23,9 +23,7 @@ brew install llama.cpp
 llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
 ```
 
-A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`
-
-read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`. Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 2 (tell chat-ui to use local llama.cpp server):**
 
@@ -52,7 +50,7 @@ MODELS=`[
 ]`
 ```
 
-read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 3 (make sure you have MongoDb running locally):**
 
@@ -60,7 +58,7 @@ read more [here](https://huggingface.co/docs/chat-ui/configuration/models/provid
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
-read more [here](https://github.com/huggingface/chat-ui?tab=readme-ov-file#database).
+Read more [here](https://github.com/huggingface/chat-ui?tab=Readme-ov-file#database).
 
 **Step 4 (start chat-ui):**
 
