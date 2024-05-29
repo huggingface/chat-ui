@@ -300,8 +300,12 @@
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 			>
-				{#if onDrag && currentModel.multimodal}
-					<FileDropzone bind:files bind:onDrag />
+				{#if onDrag && (currentModel.multimodal || currentModel.tools)}
+					<FileDropzone
+						bind:files
+						bind:onDrag
+						onlyImages={currentModel.multimodal && !currentModel.tools}
+					/>
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
 						{#if lastIsError}
@@ -394,7 +398,7 @@
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
 							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
 						{:else}
-							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 							<div class="max-sm:hidden">Share this conversation</div>
 						{/if}
 					</button>
