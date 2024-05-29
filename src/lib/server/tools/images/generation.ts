@@ -43,7 +43,7 @@ const imageGeneration: BackendTool = {
 			default: 1024,
 		},
 	},
-	async *call({ prompt, numberOfImages }, { conv, ip, username }) {
+	async *call({ prompt, numberOfImages, width, height }, { conv, ip, username }) {
 		const ipToken = await getIpToken(ip, username);
 
 		const outputs = await callSpace<ImageGenerationInput, ImageGenerationOutput>(
@@ -51,8 +51,8 @@ const imageGeneration: BackendTool = {
 			"/process_image",
 			[
 				Number(numberOfImages), // number (numeric value between 1 and 8) in 'Number of Images' Slider component
-				512, // number in 'Image Height' Number component
-				512, // number in 'Image Width' Number component
+				Number(height), // number in 'Image Height' Number component
+				Number(width), // number in 'Image Width' Number component
 				String(prompt), // prompt
 				Math.floor(Math.random() * 1000), // seed random
 			],
@@ -82,7 +82,7 @@ const imageGeneration: BackendTool = {
 		return {
 			outputs: [
 				{
-					imageGeneration: `An image has been generated for the following prompt: "${prompt}". Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it.`,
+					imageGeneration: `An image has been generated for the following prompt: "${prompt}". Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it. Be concise.`,
 				},
 			],
 			display: false,
