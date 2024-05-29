@@ -13,6 +13,7 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
+import { ObjectId } from "mongodb";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -96,10 +97,29 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const token = event.cookies.get(env.COOKIE_NAME);
 
+	// if the trusted email header is set we use it to get the user email
+	const email = env.TRUSTED_EMAIL_HEADER
+		? event.request.headers.get(env.TRUSTED_EMAIL_HEADER)
+		: null;
+
 	let secretSessionId: string;
 	let sessionId: string;
 
-	if (token) {
+	if (email) {
+		secretSessionId = sessionId = await sha256(email);
+
+		event.locals.user = {
+			// generate id based on email
+			_id: new ObjectId(sessionId.slice(0, 24)),
+			name: email,
+			email,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			hfUserId: email,
+			avatarUrl: "",
+			logoutDisabled: true,
+		};
+	} else if (token) {
 		secretSessionId = token;
 		sessionId = await sha256(token);
 
