@@ -20,15 +20,79 @@ load_balancing_strategy: random
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
-0. [No Setup Deploy](#no-setup-deploy)
-1. [Setup](#setup)
-2. [Launch](#launch)
-3. [Web Search](#web-search)
-4. [Text Embedding Models](#text-embedding-models)
-5. [Extra parameters](#extra-parameters)
-6. [Common issues](#common-issues)
-7. [Deploying to a HF Space](#deploying-to-a-hf-space)
-8. [Building](#building)
+0. [Quickstart](#quickstart)
+1. [No Setup Deploy](#no-setup-deploy)
+2. [Setup](#setup)
+3. [Launch](#launch)
+4. [Web Search](#web-search)
+5. [Text Embedding Models](#text-embedding-models)
+6. [Extra parameters](#extra-parameters)
+7. [Common issues](#common-issues)
+8. [Deploying to a HF Space](#deploying-to-a-hf-space)
+9. [Building](#building)
+
+## Quickstart
+
+You can quickly start a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+
+**Step 1 (Start llama.cpp server):**
+
+```bash
+# install llama.cpp
+brew install llama.cpp
+# start llama.cpp server (using hf.co/microsoft/Phi-3-mini-4k-instruct-gguf as an example)
+llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
+```
+
+A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`. Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+
+**Step 2 (tell chat-ui to use local llama.cpp server):**
+
+Add the following to your `.env.local`:
+
+```ini
+MODELS=`[
+  {
+    "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
+    "tokenizer": "microsoft/Phi-3-mini-4k-instruct-gguf",
+    "preprompt": "",
+    "chatPromptTemplate": "<s>{{preprompt}}{{#each messages}}{{#ifUser}}<|user|>\n{{content}}<|end|>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}<|end|>\n{{/ifAssistant}}{{/each}}",
+    "parameters": {
+      "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
+      "temperature": 0.7,
+      "max_new_tokens": 1024,
+      "truncate": 3071
+    },
+    "endpoints": [{
+      "type" : "llamacpp",
+      "baseURL": "http://localhost:8080"
+    }],
+  },
+]`
+```
+
+Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+
+**Step 3 (make sure you have MongoDb running locally):**
+
+```bash
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+```
+
+Read more [here](#database).
+
+**Step 4 (start chat-ui):**
+
+```bash
+git clone https://github.com/huggingface/chat-ui
+cd chat-ui
+npm install
+npm run dev -- --open
+```
+
+Read more [here](#launch).
+
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/llamacpp-dark.png" height="auto"/>
 
 ## No Setup Deploy
 
@@ -415,11 +479,14 @@ MODELS=`[{
 
 chat-ui also supports the llama.cpp API server directly without the need for an adapter. You can do this using the `llamacpp` endpoint type.
 
-If you want to run chat-ui with llama.cpp, you can do the following, using Zephyr as an example model:
+If you want to run Chat UI with llama.cpp, you can do the following, using [microsoft/Phi-3-mini-4k-instruct-gguf](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf) as an example model:
 
-1. Get [the weights](https://huggingface.co/TheBloke/zephyr-7B-beta-GGUF/tree/main) from the hub
-2. Run the server with the following command: `./server -m models/zephyr-7b-beta.Q4_K_M.gguf -c 2048 -np 3`
-3. Add the following to your `.env.local`:
+```bash
+# install llama.cpp
+brew install llama.cpp
+# start llama.cpp server
+llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
+```
 
 ```env
 MODELS=`[
