@@ -9,3 +9,69 @@ Open source chat interface with support for tools, web search, multimodal and ma
 🐙 **Multimodal**: Accepts image file uploads on supported providers
 
 👤 **OpenID**: Optionally setup OpenID for user authentication
+
+## Quickstart Locally
+
+You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+
+**Step 1 (Start llama.cpp server):**
+
+```bash
+# install llama.cpp
+brew install llama.cpp
+# start llama.cpp server (using hf.co/microsoft/Phi-3-mini-4k-instruct-gguf as an example)
+llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
+```
+
+A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`. Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+
+**Step 2 (tell chat-ui to use local llama.cpp server):**
+
+Add the following to your `.env.local`:
+
+```ini
+MODELS=`[
+  {
+    "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
+    "tokenizer": "microsoft/Phi-3-mini-4k-instruct-gguf",
+    "preprompt": "",
+    "chatPromptTemplate": "<s>{{preprompt}}{{#each messages}}{{#ifUser}}<|user|>\n{{content}}<|end|>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}<|end|>\n{{/ifAssistant}}{{/each}}",
+    "parameters": {
+      "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
+      "temperature": 0.7,
+      "max_new_tokens": 1024,
+      "truncate": 3071
+    },
+    "endpoints": [{
+      "type" : "llamacpp",
+      "baseURL": "http://localhost:8080"
+    }],
+  },
+]`
+```
+
+Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+
+**Step 3 (make sure you have MongoDb running locally):**
+
+```bash
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+```
+
+Read more [here](https://github.com/huggingface/chat-ui?tab=Readme-ov-file#database).
+
+**Step 4 (start chat-ui):**
+
+```bash
+git clone https://github.com/huggingface/chat-ui
+cd chat-ui
+npm install
+npm run dev -- --open
+```
+
+read more [here](https://github.com/huggingface/chat-ui?tab=readme-ov-file#launch).
+
+<div class="flex justify-center">
+<img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/llamacpp-light.png" height="auto"/>
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/llamacpp-dark.png" height="auto"/>
+</div>
