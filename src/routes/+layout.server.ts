@@ -132,6 +132,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				env.SERPAPI_KEY ||
 				env.SERPER_API_KEY ||
 				env.SERPSTACK_API_KEY ||
+				env.SEARCHAPI_KEY ||
 				env.YDC_API_KEY ||
 				env.USE_LOCAL_WEBSEARCH ||
 				env.SEARXNG_QUERY_URL
