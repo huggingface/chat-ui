@@ -36,6 +36,7 @@ YDC_API_KEY=docs.you.com api key here
 SERPER_API_KEY=serper.dev api key here
 SERPAPI_KEY=serpapi key here
 SERPSTACK_API_KEY=serpstack api key here
+SEARCHAPI_KEY=searchapi api key here
 ```
 
 ## Block/Allow List
