@@ -310,7 +310,7 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal || activeMimeTypes.length > 0}
+						{#if activeMimeTypes.length > 0}
 							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
