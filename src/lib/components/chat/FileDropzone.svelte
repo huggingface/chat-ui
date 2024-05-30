@@ -32,7 +32,7 @@
 							return type === fileType && (subtype === "*" || fileSubtype === subtype);
 						})
 					) {
-						setErrorMsg(`File type not supported. Only ${mimeTypes.join(", ")} allowed`);
+						setErrorMsg(`File type not supported. Only allowed: ${mimeTypes.join(", ")}`);
 						files = [];
 						return;
 					}
