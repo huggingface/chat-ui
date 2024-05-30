@@ -23,7 +23,6 @@
 		});
 	}
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
-	$: allToolsDisabled = activeToolCount === 0;
 </script>
 
 <details
