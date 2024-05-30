@@ -84,6 +84,19 @@
 		e.preventDefault();
 	};
 
+	const onPaste = (e: ClipboardEvent) => {
+		if (!e.clipboardData) {
+			return;
+		}
+
+		// paste of files
+		const pastedFiles = Array.from(e.clipboardData.files);
+		if (pastedFiles.length !== 0) {
+			e.preventDefault();
+			files = [...files, ...pastedFiles];
+		}
+	};
+
 	const convTreeStore = useConvTreeStore();
 
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
@@ -324,6 +337,7 @@
 										loginModalOpen = true;
 									}
 								}}
+								on:paste={onPaste}
 								maxRows={6}
 								disabled={isReadOnly || lastIsError}
 							/>
