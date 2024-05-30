@@ -15,6 +15,8 @@ export interface Tool {
 	name: string;
 	displayName?: string;
 	description: string;
+	/** List of mime types that tool accepts */
+	mimeTypes?: string[];
 	parameterDefinitions: Record<string, ToolInput>;
 	spec?: string;
 	isOnByDefault?: true; // will it be toggled if the user hasn't tweaked it in settings ?
@@ -24,7 +26,7 @@ export interface Tool {
 
 export type ToolFront = Pick<
 	Tool,
-	"name" | "displayName" | "description" | "isOnByDefault" | "isLocked"
+	"name" | "displayName" | "description" | "isOnByDefault" | "isLocked" | "mimeTypes"
 > & { timeToUseMS?: number };
 
 export enum ToolResultStatus {
