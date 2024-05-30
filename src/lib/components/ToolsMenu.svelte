@@ -16,6 +16,13 @@
 	$: activeToolCount = $page.data.tools.filter(
 		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
 	).length;
+
+	function setAllTools(value: boolean) {
+		settings.instantSet({
+			tools: Object.fromEntries($page.data.tools.map((tool: ToolFront) => [tool.name, value])),
+		});
+	}
+	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
 </script>
 
 <details
@@ -39,7 +46,7 @@
 		class="absolute bottom-10 h-max w-max select-none items-center gap-1 rounded-lg border bg-white p-0.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 	>
 		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
-			<div class="col-span-2 mb-1 flex items-center gap-1.5 text-sm text-gray-500">
+			<div class="col-span-2 flex items-center gap-1.5 text-sm text-gray-500">
 				Available tools
 				{#if isHuggingChat}
 					<a
@@ -49,6 +56,16 @@
 						><CarbonInformation class="text-xs" /></a
 					>
 				{/if}
+				<button
+					class="ml-auto text-xs underline"
+					on:click|stopPropagation={() => setAllTools(!allToolsEnabled)}
+				>
+					{#if allToolsEnabled}
+						Disable all
+					{:else}
+						Enable all
+					{/if}
+				</button>
 			</div>
 			{#each $page.data.tools as tool}
 				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}
