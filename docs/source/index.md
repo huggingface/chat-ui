@@ -10,18 +10,22 @@ Open source chat interface with support for tools, web search, multimodal and ma
 
 👤 **[OpenID](./configuration/open-id)**: Optionally setup OpenID for user authentication
 
-<div class="flex flex-wrap">
+<div class="flex gap-x-4">
 
-<div class="flex justify-center">
+<div>
 Tools
+<div class="flex justify-center">
 <img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-light.png" height="auto"/>
 <img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-dark.png" height="auto"/>
 </div>
+</div>
 
-<div class="flex justify-center">
+<div>
 Web Search
+<div class="flex justify-center">
 <img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-light.png" height="auto"/>
 <img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-dark.png" height="auto"/>
+</div>
 </div>
 
 </div>
