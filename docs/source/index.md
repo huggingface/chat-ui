@@ -10,6 +10,22 @@ Open source chat interface with support for tools, web search, multimodal and ma
 
 👤 **[OpenID](./configuration/open-id)**: Optionally setup OpenID for user authentication
 
+<div class="flex flex-wrap">
+
+<div class="flex justify-center">
+Tools
+<img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-light.png" height="auto"/>
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-dark.png" height="auto"/>
+</div>
+
+<div class="flex justify-center">
+Web Search
+<img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-light.png" height="auto"/>
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-dark.png" height="auto"/>
+</div>
+
+</div>
+
 ## Quickstart
 
 You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
