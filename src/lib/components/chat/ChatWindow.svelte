@@ -86,6 +86,19 @@
 		e.preventDefault();
 	};
 
+	const onPaste = (e: ClipboardEvent) => {
+		if (!e.clipboardData) {
+			return;
+		}
+
+		// paste of files
+		const pastedFiles = Array.from(e.clipboardData.files);
+		if (pastedFiles.length !== 0) {
+			e.preventDefault();
+			files = [...files, ...pastedFiles];
+		}
+	};
+
 	const convTreeStore = useConvTreeStore();
 
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
@@ -227,6 +240,7 @@
 				/>
 			{:else}
 				<AssistantIntroduction
+					{models}
 					{assistant}
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
@@ -313,8 +327,12 @@
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 			>
-				{#if onDrag && currentModel.multimodal}
-					<FileDropzone bind:files bind:onDrag />
+				{#if onDrag && (currentModel.multimodal || currentModel.tools)}
+					<FileDropzone
+						bind:files
+						bind:onDrag
+						onlyImages={currentModel.multimodal && !currentModel.tools}
+					/>
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
 						{#if lastIsError}
@@ -332,6 +350,7 @@
 										loginModalOpen = true;
 									}
 								}}
+								on:paste={onPaste}
 								maxRows={6}
 								disabled={isReadOnly || lastIsError}
 							/>

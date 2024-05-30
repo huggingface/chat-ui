@@ -8,6 +8,7 @@ import { env } from "$env/dynamic/private";
 import { z } from "zod";
 import type { Assistant } from "$lib/types/Assistant";
 import { logger } from "$lib/server/logger";
+
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
@@ -15,7 +16,10 @@ async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 		throw Error("Assistant not found");
 	}
 
-	if (assistant.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString()) {
+	if (
+		assistant.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString() &&
+		!locals.user?.isAdmin
+	) {
 		throw Error("You are not the author of this assistant");
 	}
 
@@ -165,5 +169,30 @@ export const actions: Actions = {
 		}
 
 		throw redirect(302, `${base}/settings`);
+	},
+
+	unfeature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const assistant = await collections.assistants.findOne({
+			_id: new ObjectId(params.assistantId),
+		});
+
+		if (!assistant) {
+			return fail(404, { error: true, message: "Assistant not found" });
+		}
+
+		const result = await collections.assistants.updateOne(
+			{ _id: assistant._id },
+			{ $set: { featured: false } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to unfeature assistant" });
+		}
+
+		return { from: "unfeature", ok: true, message: "Assistant unfeatured" };
 	},
 };
