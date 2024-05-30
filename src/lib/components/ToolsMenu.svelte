@@ -47,7 +47,7 @@
 		class="absolute bottom-10 h-max w-max select-none items-center gap-1 rounded-lg border bg-white p-0.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 	>
 		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
-			<div class="flex items-center gap-1.5 text-sm text-gray-500">
+			<div class="col-span-2 flex items-center gap-1.5 text-sm text-gray-500">
 				Available tools
 				{#if isHuggingChat}
 					<a
@@ -57,18 +57,14 @@
 						><CarbonInformation class="text-xs" /></a
 					>
 				{/if}
-			</div>
-			<div class="flex space-x-4 text-sm text-gray-500">
 				<button
-					disabled={allToolsEnabled}
-					class:opacity-50={allToolsEnabled}
-					on:click={() => setAllTools(true)}>Enable all</button
-				>
-				<button
-					disabled={allToolsDisabled}
-					class:opacity-50={allToolsDisabled}
-					on:click={() => setAllTools(false)}>Disable all</button
-				>
+					class="ml-auto text-xs underline"
+					on:click|stopPropagation={() => setAllTools(!allToolsEnabled)}
+					>{#if allToolsEnabled}
+						Disable all
+					{:else}
+						Enable all{/if}
+				</button>
 			</div>
 			{#each $page.data.tools as tool}
 				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}
