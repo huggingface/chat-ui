@@ -60,10 +60,12 @@
 				<button
 					class="ml-auto text-xs underline"
 					on:click|stopPropagation={() => setAllTools(!allToolsEnabled)}
-					>{#if allToolsEnabled}
+				>
+					{#if allToolsEnabled}
 						Disable all
 					{:else}
-						Enable all{/if}
+						Enable all
+					{/if}
 				</button>
 			</div>
 			{#each $page.data.tools as tool}
