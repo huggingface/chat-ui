@@ -95,7 +95,17 @@
 		const pastedFiles = Array.from(e.clipboardData.files);
 		if (pastedFiles.length !== 0) {
 			e.preventDefault();
-			files = [...files, ...pastedFiles];
+
+			// filter based on activeMimeTypes, including wildcards
+			const filteredFiles = pastedFiles.filter((file) => {
+				return activeMimeTypes.some((mimeType: string) => {
+					const [type, subtype] = mimeType.split("/");
+					const [fileType, fileSubtype] = file.type.split("/");
+					return type === fileType && (subtype === "*" || fileSubtype === subtype);
+				});
+			});
+
+			files = [...files, ...filteredFiles];
 		}
 	};
 
@@ -426,7 +436,7 @@
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
 							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
 						{:else}
-							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 							<div class="max-sm:hidden">Share this conversation</div>
 						{/if}
 					</button>
