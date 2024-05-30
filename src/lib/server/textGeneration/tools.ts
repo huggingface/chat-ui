@@ -160,7 +160,7 @@ export async function* runTools(
 					yield {
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
-						message: stringifyError(e),
+						message: "Error while parsing tool calls, please retry",
 					};
 				}
 			}
