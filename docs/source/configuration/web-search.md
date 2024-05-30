@@ -11,6 +11,11 @@ Chat UI features a powerful Web Search feature. A high level overview of how it 
 7. Get the corresponding Markdown elements and their parent, up to 8000 characters
 8. Supply the information as context to the model
 
+<div class="flex justify-center">
+<img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-light.png" height="auto"/>
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-dark.png" height="auto"/>
+</div>
+
 ## Providers
 
 Many providers are supported for the web search, or you can use locally scraped Google results.
