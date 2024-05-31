@@ -100,7 +100,7 @@ export function endpointLangserve(
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
-							logger.error("Failed to parse JSON", e);
+							logger.error(e, "Failed to parse JSON");
 							logger.error("Problematic JSON string:", jsonString);
 							continue; // Skip this iteration and try the next chunk
 						}

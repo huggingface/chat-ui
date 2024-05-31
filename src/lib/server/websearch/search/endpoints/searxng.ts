@@ -21,7 +21,7 @@ export default async function searchSearxng(query: string): Promise<WebSearchSou
 	})
 		.then((response) => response.json() as Promise<{ results: { url: string }[] }>)
 		.catch((error) => {
-			logger.error("Failed to fetch or parse JSON", error);
+			logger.error(error, "Failed to fetch or parse JSON");
 			throw new Error("Failed to fetch or parse JSON", { cause: error });
 		});
 
