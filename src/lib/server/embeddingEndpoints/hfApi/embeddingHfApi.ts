@@ -42,7 +42,7 @@ export async function embeddingEndpointHfApi(
 
 				if (!response.ok) {
 					logger.error(await response.text());
-					logger.error("Failed to get embeddings from Hugging Face API", response);
+					logger.error(response, "Failed to get embeddings from Hugging Face API");
 					return [];
 				}
 
