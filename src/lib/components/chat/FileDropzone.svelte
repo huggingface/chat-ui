@@ -4,7 +4,7 @@
 	// import EosIconsLoading from "~icons/eos-icons/loading";
 
 	export let files: File[];
-	export let onlyImages: boolean = false;
+	export let mimeTypes: string[] = [];
 
 	let file_error_message = "";
 	let errorTimeout: ReturnType<typeof setTimeout>;
@@ -24,11 +24,19 @@
 			if (event.dataTransfer.items[0].kind === "file") {
 				const file = event.dataTransfer.items[0].getAsFile();
 				if (file) {
-					if (!event.dataTransfer.items[0].type.startsWith("image") && onlyImages) {
-						setErrorMsg("Only images are supported");
+					// check if the file matches the mimeTypes
+					if (
+						!mimeTypes.some((mimeType: string) => {
+							const [type, subtype] = mimeType.split("/");
+							const [fileType, fileSubtype] = file.type.split("/");
+							return type === fileType && (subtype === "*" || fileSubtype === subtype);
+						})
+					) {
+						setErrorMsg(`File type not supported. Only allowed: ${mimeTypes.join(", ")}`);
 						files = [];
 						return;
 					}
+
 					// if file is bigger than 10MB abort
 					if (file.size > 10 * 1024 * 1024) {
 						setErrorMsg("Image is too big. (2MB max)");
@@ -89,7 +97,7 @@
 			class="mb-3 mt-1.5 text-sm text-gray-500 dark:text-gray-400"
 			class:opacity-0={file_error_message}
 		>
-			Drag and drop <span class="font-semibold">one {onlyImages ? "image" : "file"}</span> here
+			Drag and drop <span class="font-semibold">one file</span> here
 		</p>
 	</div>
 </div>

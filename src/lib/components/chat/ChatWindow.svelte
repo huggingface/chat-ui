@@ -33,6 +33,8 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -93,7 +95,17 @@
 		const pastedFiles = Array.from(e.clipboardData.files);
 		if (pastedFiles.length !== 0) {
 			e.preventDefault();
-			files = [...files, ...pastedFiles];
+
+			// filter based on activeMimeTypes, including wildcards
+			const filteredFiles = pastedFiles.filter((file) => {
+				return activeMimeTypes.some((mimeType: string) => {
+					const [type, subtype] = mimeType.split("/");
+					const [fileType, fileSubtype] = file.type.split("/");
+					return type === fileType && (subtype === "*" || fileSubtype === subtype);
+				});
+			});
+
+			files = [...files, ...filteredFiles];
 		}
 	};
 
@@ -138,6 +150,17 @@
 	$: if (lastMessage && lastMessage.from === "user") {
 		scrollToBottom();
 	}
+
+	const settings = useSettingsStore();
+
+	// active tools are all the checked tools, either from settings or on by default
+	$: activeTools = $page.data.tools.filter(
+		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+	);
+	$: activeMimeTypes = [
+		...activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []),
+		...(currentModel.multimodal ? ["image/*"] : []),
+	];
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -287,8 +310,8 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal || currentModel.tools}
-							<UploadBtn bind:files classNames="ml-auto" />
+						{#if activeMimeTypes.length > 0}
+							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
@@ -314,12 +337,8 @@
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 			>
-				{#if onDrag && (currentModel.multimodal || currentModel.tools)}
-					<FileDropzone
-						bind:files
-						bind:onDrag
-						onlyImages={currentModel.multimodal && !currentModel.tools}
-					/>
+				{#if onDrag && activeMimeTypes.length > 0}
+					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
 						{#if lastIsError}
