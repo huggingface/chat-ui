@@ -771,6 +771,7 @@ MODELS=`[
           // Optional
           "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
           "apiEndpoint": "", // alternative api endpoint url,
+          // Optional
           "tools": [{
             "googleSearchRetrieval": {
               "disableAttribution": true
