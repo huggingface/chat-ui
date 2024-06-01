@@ -68,5 +68,30 @@ export const load = async ({ params, depends, locals }) => {
 };
 
 export const actions = {
-	deleteBranch: async () => {},
+	deleteBranch: async ({ request }) => {
+		const body = await request.formData();
+		const messageId = await body.get("messageId");
+		await collections.conversations.updateMany(
+			{},
+			{
+				$pull: {
+					messages: {
+						id: messageId,
+					},
+				},
+			}
+		);
+		await collections.conversations.updateMany(
+			{},
+			{
+				$pull: {
+					messages: {
+						ancestors: {
+							id: messageId,
+						},
+					},
+				},
+			}
+		);
+	},
 };
