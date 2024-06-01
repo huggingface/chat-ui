@@ -66,3 +66,7 @@ export const load = async ({ params, depends, locals }) => {
 		shared,
 	};
 };
+
+export const actions = {
+	deleteBranch: async () => {},
+};
