@@ -94,7 +94,7 @@ async function prepareMessage(
 	message: EndpointMessage,
 	imageProcessor: ImageProcessor
 ): Promise<EndpointMessage> {
-	if (!isMultimodal) return message;
+	// if (!isMultimodal) return message;
 
 	const files = await Promise.all(message.files?.map(imageProcessor) ?? [whiteImage]);
 	const markdowns = files.map(
