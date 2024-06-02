@@ -24,6 +24,7 @@
 		type="file"
 		on:change={onFileChange}
 		accept={mimeTypes.join(",")}
+		multiple
 	/>
 	<CarbonUpload class="mr-2 text-xxs" /> Upload file
 </button>
