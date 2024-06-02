@@ -21,7 +21,7 @@
 	</svg>
 {:else}
 	<img
-		class={classNames}
+		class={classNames + " dark:invert"}
 		alt="{envPublic.PUBLIC_APP_NAME} logo"
 		src="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/logo.svg"
 	/>
