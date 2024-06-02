@@ -66,3 +66,43 @@ export const load = async ({ params, depends, locals }) => {
 		shared,
 	};
 };
+
+export const actions = {
+	deleteBranch: async ({ request }) => {
+		const data = await request.formData();
+		const messageId = await data.get("messageId");
+
+		const conversationsWithAncestors = await collections.conversations
+			.find({
+				"messages.ancestors": messageId,
+			})
+			.toArray();
+
+		for (const conversation of conversationsWithAncestors) {
+			const filteredMessages = conversation.messages.filter(
+				(message) => message.ancestors && !message.ancestors.includes(messageId)
+			);
+			await collections.conversations.updateOne(
+				{ _id: conversation._id },
+				{ $set: { messages: filteredMessages } }
+			);
+		}
+
+		await collections.conversations.updateMany(
+			{ "messages.id": messageId },
+			{
+				$pull: {
+					messages: { id: messageId },
+				},
+			}
+		);
+		await collections.conversations.updateMany(
+			{ "messages.children": messageId },
+			{
+				$pull: {
+					"messages.$.children": messageId,
+				},
+			}
+		);
+	},
+};
