@@ -158,7 +158,9 @@
 		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
 	);
 	$: activeMimeTypes = [
-		...activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []),
+		...(!$page.data?.assistant && currentModel.tools
+			? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
+			: []),
 		...(currentModel.multimodal ? ["image/*"] : []),
 	];
 </script>
@@ -432,7 +434,7 @@
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
 							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
 						{:else}
-							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 							<div class="max-sm:hidden">Share this conversation</div>
 						{/if}
 					</button>
