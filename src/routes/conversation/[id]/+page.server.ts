@@ -68,7 +68,7 @@ export const load = async ({ params, depends, locals }) => {
 };
 
 export const actions = {
-	deleteBranch: async ({ request }) => {
+	deleteBranch: async ({ request, locals, params }) => {
 		const data = await request.formData();
 		const messageId = data.get("messageId");
 
@@ -76,37 +76,34 @@ export const actions = {
 			throw error(400, "Invalid message id");
 		}
 
-		const conversationsWithAncestors = await collections.conversations
-			.find({
-				"messages.ancestors": messageId,
-			})
-			.toArray();
+		const conversation = await collections.conversations.findOne({
+			...authCondition(locals),
+			_id: new ObjectId(params.id),
+		});
 
-		for (const conversation of conversationsWithAncestors) {
-			const filteredMessages = conversation.messages.filter(
-				(message) => message.ancestors && !message.ancestors.includes(messageId)
-			);
-			await collections.conversations.updateOne(
-				{ _id: conversation._id },
-				{ $set: { messages: filteredMessages } }
-			);
+		if (!conversation) {
+			throw error(404, "Conversation not found");
 		}
 
-		await collections.conversations.updateMany(
-			{ "messages.id": messageId },
-			{
-				$pull: {
-					messages: { id: messageId },
-				},
-			}
+		const filteredMessages = conversation.messages
+			.filter(
+				(message) =>
+					// not the message AND the message is not in ancestors
+					!(message.id === messageId) && message.ancestors && !message.ancestors.includes(messageId)
+			)
+			.map((message) => {
+				// remove the message from children if it's there
+				if (message.children && message.children.includes(messageId)) {
+					message.children = message.children.filter((child) => child !== messageId);
+				}
+				return message;
+			});
+
+		await collections.conversations.updateOne(
+			{ _id: conversation._id, ...authCondition(locals) },
+			{ $set: { messages: filteredMessages } }
 		);
-		await collections.conversations.updateMany(
-			{ "messages.children": messageId },
-			{
-				$pull: {
-					"messages.$.children": messageId,
-				},
-			}
-		);
+
+		return { from: "deleteBranch", ok: true };
 	},
 };
