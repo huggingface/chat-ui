@@ -13,7 +13,6 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest",
 		"updateLocalEnv": "node --loader ts-node/esm scripts/updateLocalEnv.ts",
-		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts",
 		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts"
 	},
 	"devDependencies": {
