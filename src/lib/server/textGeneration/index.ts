@@ -41,14 +41,15 @@ async function* textGenerationWithoutTitle(
 	const { model, conv, messages, assistant, isContinue, webSearch, toolsPreference } = ctx;
 	const convId = conv._id;
 
-	// perform websearch if requested
-	// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
-	// if tools are enabled, we don't perform it here since we will add the websearch as a tool
 	let webSearchResult: WebSearch | undefined;
+
+	// run websearch if:
+	// - it's not continuing a previous message
+	// - AND the model doesn't support tools and websearch is selected
+	// - OR the assistant has websearch enabled (no tools for assistants for now)
 	if (
 		!isContinue &&
-		!model.tools &&
-		((webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
+		((!model.tools && webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
 	) {
 		webSearchResult = yield* runWebSearch(conv, messages, assistant?.rag);
 	}
