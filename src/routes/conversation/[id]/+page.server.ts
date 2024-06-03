@@ -70,7 +70,11 @@ export const load = async ({ params, depends, locals }) => {
 export const actions = {
 	deleteBranch: async ({ request }) => {
 		const data = await request.formData();
-		const messageId = await data.get("messageId");
+		const messageId = data.get("messageId");
+
+		if (!messageId || typeof messageId !== "string") {
+			throw error(400, "Invalid message id");
+		}
 
 		const conversationsWithAncestors = await collections.conversations
 			.find({
