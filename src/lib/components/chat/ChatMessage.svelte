@@ -538,7 +538,9 @@
 					</button>
 					{#if !loading && message.children}<form method="POST" action="?/deleteBranch">
 							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
-							<button class="flex items-center justify-center text-sm" type="submit"
+							<button
+								class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
+								type="submit"
 								><CarbonTrashCan />
 							</button>
 						</form>
