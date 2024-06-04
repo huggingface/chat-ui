@@ -181,7 +181,6 @@ envVars:
           "modelUrl": "https://huggingface.co/01-ai/Yi-1.5-34B-Chat",
           "websiteUrl": "https://www.01.ai",
           "preprompt": "",
-          "chatPromptTemplate": "{{preprompt}}{{#each messages}}{{#ifUser}}<|im_start|>user\\n{{content}}<|im_end|>\\n<|im_start|>assistant\\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>{{/ifAssistant}}{{/each}}",
           "parameters": {
             "stop": ["<|im_end|>"],
             "temperature": 0.3,
