@@ -41,7 +41,7 @@
 			.replaceAll(PUBLIC_SEP_TOKEN, " ")
 			.replaceAll(/<\|[a-z]+\|>/g, " ")
 			.replaceAll(/<br\s?\/?>/gi, "\n")
-			.replaceAll("<", "&lt;")
+			// .replaceAll("<", "&lt;")
 			.trim();
 
 		for (const stop of [...(model.parameters?.stop ?? []), "<|endoftext|>"]) {
