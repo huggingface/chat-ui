@@ -342,7 +342,10 @@ envVars:
     }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   XFF_DEPTH: '2'
-
+  TOOLS: >
+    [
+      
+    ]
 externalSecrets:
   enabled: true
   secretStoreName: "chat-ui-prod-secretstore"

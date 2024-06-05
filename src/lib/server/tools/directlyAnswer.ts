@@ -1,18 +1,33 @@
-import type { BackendTool } from ".";
+import type { ConfigTool } from "$lib/types/Tool";
 
-const directlyAnswer: BackendTool = {
-	name: "directly_answer",
+const directlyAnswer: ConfigTool = {
+	type: "config",
+	description: "Answer the user's query directly",
+	color: "blue",
+	icon: "bubble",
+	displayName: "Directly Answer",
 	isOnByDefault: true,
-	isHidden: true,
 	isLocked: true,
-	description: "Use this tool to let the user know you wish to answer directly",
-	parameterDefinitions: {},
-	async *call() {
-		return {
-			outputs: [],
-			display: false,
-		};
-	},
+	isHidden: true,
+	functions: [
+		{
+			name: "directlyAnswer",
+			displayName: "Directly Answer",
+			description:
+				"Use this tool to answer the user's query directly. Only use this tool if you need to answer the user's query directly.",
+			endpoint: null,
+			inputs: {},
+			outputPath: null,
+			outputType: "str",
+			showOutput: false,
+			async *call() {
+				return {
+					outputs: [],
+					display: false,
+				};
+			},
+		},
+	],
 };
 
 export default directlyAnswer;

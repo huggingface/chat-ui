@@ -1,32 +1,45 @@
-import type { BackendTool } from ".";
+import type { ConfigTool } from "$lib/types/Tool";
 import vm from "node:vm";
 
-const calculator: BackendTool = {
-	name: "query_calculator",
+const calculator: ConfigTool = {
+	type: "config",
+	description: "Calculate the result of a mathematical expression",
+	color: "blue",
+	icon: "math",
 	displayName: "Calculator",
-	description:
-		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, ** (power) and /, as well as parenthesis ().",
 	isOnByDefault: true,
-	parameterDefinitions: {
-		equation: {
+	functions: [
+		{
+			name: "calculator",
+			displayName: "Calculator",
 			description:
-				"The formula to evaluate. EXACTLY as you would plug into a calculator. No words, no letters, only numbers and operators. Letters will make the tool crash.",
-			type: "formula",
-			required: true,
-		},
-	},
-	async *call(params) {
-		try {
-			const blocks = String(params.equation).split("\n");
-			const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
+				"Use this tool to calculate the result of a mathematical expression. Only use this tool if you need to perform calculations.",
+			endpoint: null,
+			inputs: {
+				equation: {
+					type: "str",
+					description:
+						"A mathematical expression to be evaluated. The result of the expression will be returned.",
+					required: true,
+				},
+			},
+			outputPath: null,
+			outputType: "str",
+			showOutput: false,
+			async *call({ equation }) {
+				try {
+					const blocks = String(equation).split("\n");
+					const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
 
-			return {
-				outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
-			};
-		} catch (cause) {
-			throw Error("Invalid expression", { cause });
-		}
-	},
+					return {
+						outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
+					};
+				} catch (cause) {
+					throw Error("Invalid expression", { cause });
+				}
+			},
+		},
+	],
 };
 
 export default calculator;

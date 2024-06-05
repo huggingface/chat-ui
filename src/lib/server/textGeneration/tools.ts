@@ -1,7 +1,7 @@
 import { ToolResultStatus, type ToolCall, type ToolResult } from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
 import JSON5 from "json5";
-import type { BackendTool, BackendToolContext } from "../tools";
+import type { BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
 	MessageUpdateStatus,
@@ -10,7 +10,6 @@ import {
 } from "$lib/types/MessageUpdate";
 import type { TextGenerationContext } from "./types";
 
-import { allTools } from "../tools";
 import directlyAnswer from "../tools/directlyAnswer";
 import websearch from "../tools/web/search";
 import { z } from "zod";

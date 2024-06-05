@@ -20,7 +20,6 @@ import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import type { ToolResult } from "$lib/types/Tool";
 import { toolHasName } from "../tools/utils";
-import directlyAnswer from "../tools/directlyAnswer";
 
 export async function* textGeneration(ctx: TextGenerationContext) {
 	yield* mergeAsyncGenerators([
@@ -63,7 +62,7 @@ async function* textGenerationWithoutTitle(
 
 	if (model.tools && !conv.assistantId) {
 		const tools = pickTools(toolsPreference, Boolean(assistant));
-		const toolCallsRequired = tools.some((tool) => !toolHasName(directlyAnswer.name, tool));
+		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
 		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}
 
