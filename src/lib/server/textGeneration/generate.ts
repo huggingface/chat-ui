@@ -7,7 +7,7 @@ import type { EndpointMessage } from "../endpoints/endpoints";
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
 export async function* generate(
-	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
+	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt, userId }: GenerateContext,
 	toolResults: ToolResult[],
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
@@ -17,6 +17,7 @@ export async function* generate(
 		continueMessage: isContinue,
 		generateSettings: assistant?.generateSettings,
 		toolResults,
+		userId,
 	})) {
 		// text generation completed
 		if (output.generated_text) {

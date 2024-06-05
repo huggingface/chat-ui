@@ -28,6 +28,7 @@ export const endpointTgiParametersSchema = z.object({
 			}),
 		})
 		.default({}),
+	userId: z.string().optional(),
 });
 
 export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>): Endpoint {
@@ -43,6 +44,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 		tools,
 		toolResults,
 		isMultimodal,
+		userId,
 	}) => {
 		const messagesWithResizedFiles = await Promise.all(
 			messages.map((message) => prepareMessage(Boolean(isMultimodal), message, imageProcessor))
@@ -63,6 +65,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 				model: url,
 				inputs: prompt,
 				accessToken,
+				userId,
 			},
 			{
 				use_cache: false,

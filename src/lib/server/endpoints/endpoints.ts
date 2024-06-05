@@ -39,6 +39,7 @@ export interface EndpointParameters {
 	tools?: Tool[];
 	toolResults?: ToolResult[];
 	isMultimodal?: boolean;
+	userId?: string;
 }
 
 interface CommonEndpoint {

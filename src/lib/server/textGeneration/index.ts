@@ -38,7 +38,7 @@ async function* textGenerationWithoutTitle(
 	};
 
 	ctx.assistant ??= await getAssistantById(ctx.conv.assistantId);
-	const { model, conv, messages, assistant, isContinue, webSearch, toolsPreference } = ctx;
+	const { model, conv, messages, assistant, isContinue, webSearch, toolsPreference, userId } = ctx;
 	const convId = conv._id;
 
 	// perform websearch if requested

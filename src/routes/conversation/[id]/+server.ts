@@ -35,6 +35,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (!userId) {
 		throw error(401, "Unauthorized");
 	}
+	console.log;
 
 	// check if the user has access to the conversation
 	const convBeforeCheck = await collections.conversations.findOne({
@@ -400,6 +401,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
+					userId: String(locals.user?._id ?? locals.sessionId),
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);

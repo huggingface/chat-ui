@@ -16,4 +16,5 @@ export interface TextGenerationContext {
 	promptedAt: Date;
 	ip: string;
 	username?: string;
+	userId?: string;
 }
