@@ -60,6 +60,7 @@
 		"@iconify-json/bi": "^1.1.21",
 		"@playwright/browser-chromium": "^1.43.1",
 		"@resvg/resvg-js": "^2.6.2",
+		"@types/d3": "^7.4.3",
 		"@xenova/transformers": "^2.16.1",
 		"autoprefixer": "^10.4.14",
 		"browser-image-resizer": "^2.4.1",

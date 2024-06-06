@@ -15,6 +15,7 @@
 	// Axis labels
 	export let xAxisLabel = "Reasons";
 	export let yAxisLabel = "Attributes";
+	export let title = "Bar Chart";
 
 	let id = "-" + uuid();
 	let windowWidth = 0;
@@ -185,6 +186,9 @@
 <div class="w-full" bind:this={element}>
 	<div id={"bar-chart" + id} />
 	<div id={"bar-chart-tooltip" + id} class="tooltip" style="opacity: 0;" />
+	<div class="flex w-full items-center justify-center">
+		<h4>{title}</h4>
+	</div>
 </div>
 
 <style>

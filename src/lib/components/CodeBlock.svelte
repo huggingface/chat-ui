@@ -2,12 +2,13 @@
 	import { afterUpdate } from "svelte";
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
 	import HorizontalBarCharts from "./d3figure/HorizontalBarCharts.svelte";
+	import DecisionTree from "./d3figure/DecisionTree.svelte";
 	function zip(arr1, arr2) {
 		let length = Math.min(arr1.length, arr2.length);
 		let result = [];
 
 		for (let i = 0; i < length; i++) {
-			result.push([arr1[i], arr2[i]]);
+			result.push({ name: arr1[i], value: arr2[i] });
 		}
 
 		return result;
@@ -15,33 +16,40 @@
 	export let code = "";
 	export let lang = "";
 	export let parsedParams = {};
+	const exceptionLangs = ["barchart", "decision-tree"];
 
 	$: highlightedCode = "";
 
 	afterUpdate(async () => {
 		const { default: hljs } = await import("highlight.js");
-		if (lang === "barchart") {
-			parsedParams = JSON.parse(code);
-			console.log("barchart", parsedParams);
-			return;
-		}
+		if (exceptionLangs.includes(lang)) return;
 		const language = hljs.getLanguage(lang);
 
 		highlightedCode = hljs.highlightAuto(code, language?.aliases).value;
 	});
+	$: if (exceptionLangs.includes(lang)) {
+		// parsedParams = JSON.parse(code);
+		console.log(lang, code.replaceAll("'", '"'));
+		parsedParams = JSON.parse(code.replaceAll("'", '"'));
+	}
 </script>
 
-{#if lang == "barchart"}
-	<div class="group relative my-4 rounded-lg">
+{#if lang == "barchart" && parsedParams["x"] && parsedParams["y"]}
+	<div class="group max-w-[500px]">
 		<HorizontalBarCharts
 			data={zip(parsedParams["y"], parsedParams["x"])}
 			xAxisLabel={parsedParams["x_label"]}
 			yAxisLabel={parsedParams["y_label"]}
+			title={parsedParams["title"]}
 		/>
 		<CopyToClipBoardBtn
 			classNames="absolute top-2 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100"
 			value={code}
 		/>
+	</div>
+{:else if lang == "decision-tree"}
+	<div class="group w-[500px]">
+		<DecisionTree data={parsedParams} />
 	</div>
 {:else}
 	<div class="group relative my-4 rounded-lg">
