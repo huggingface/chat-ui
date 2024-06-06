@@ -3,6 +3,7 @@
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
 	import HorizontalBarCharts from "./d3figure/HorizontalBarCharts.svelte";
 	import DecisionTree from "./d3figure/DecisionTree.svelte";
+	import ImagesBlock from "./ImagesBlock.svelte";
 	function zip(arr1, arr2) {
 		let length = Math.min(arr1.length, arr2.length);
 		let result = [];
@@ -16,7 +17,7 @@
 	export let code = "";
 	export let lang = "";
 	export let parsedParams = {};
-	const exceptionLangs = ["barchart", "decision-tree", "collapsible-div"];
+	const exceptionLangs = ["barchart", "decision-tree", "collapsible-div", "images"];
 
 	$: highlightedCode = "";
 
@@ -28,9 +29,12 @@
 		highlightedCode = hljs.highlightAuto(code, language?.aliases).value;
 	});
 	$: if (exceptionLangs.includes(lang)) {
-		// parsedParams = JSON.parse(code);
-		// console.log(lang, code.replaceAll("'", '"'));
-		parsedParams = JSON.parse(code.replaceAll("'", '"'));
+		try {
+			parsedParams = JSON.parse(code.replaceAll("'", '"'));
+		} catch (e) {
+			console.log("Error parsing JSON", code.replaceAll("'", '"'));
+			console.error(e);
+		}
 	}
 </script>
 
@@ -50,6 +54,10 @@
 {:else if lang == "decision-tree"}
 	<div class="group w-[500px]">
 		<DecisionTree data={parsedParams} />
+	</div>
+{:else if lang == "images"}
+	<div class="w-min-[500px] group w-full">
+		<ImagesBlock json_data={parsedParams} />
 	</div>
 {:else}
 	<div class="group relative my-4 rounded-lg">
