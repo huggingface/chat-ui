@@ -36,7 +36,7 @@
 
 		const root = d3.hierarchy(rootData, (d) => d.children).sum((d) => d.data.score);
 
-		const treeLayout = d3.tree().size([height, width]); // Note the swapped dimensions
+		const treeLayout = d3.tree().size([height, width - 200]); // Note the swapped dimensions
 
 		treeLayout(root);
 
@@ -45,11 +45,10 @@
 			.attr("viewBox", `0 0 ${width} ${height}`)
 			.style("width", "100%")
 			.style("height", "auto");
-
 		// Links
 		svgElement
 			.selectAll(".link")
-			.data(root.links())
+			.data(root.links().filter((d) => d.source.parent !== null))
 			.enter()
 			.append("path")
 			.attr("class", "link")
@@ -67,19 +66,24 @@
 		// Nodes
 		const node = svgElement
 			.selectAll(".node")
-			.data(root.descendants())
+			.data(root.descendants().filter((d) => d.parent !== null))
 			.enter()
 			.append("g")
 			.attr("class", "node")
 			.attr("transform", (d) => `translate(${d.y},${d.x})`);
 
-		node.append("circle").attr("r", 5).attr("fill", "blue");
+		node
+			.append("circle")
+			.attr("r", (d) => Math.max(d.value * 10, 2))
+			.attr("fill", "#69b3a2");
 
 		node
 			.append("text")
-			.attr("dx", -20)
-			.attr("dy", 10)
-			.text((d) => `${d.data.data.concept_name} (${d.data.data.score.toFixed(2)})`);
+			.attr("dx", 0)
+			.attr("dy", 40)
+			.attr("text-anchor", "middle")
+			.attr("text-align", "center")
+			.text((d) => `${d.data.data.concept_name}\n(${d.data.data.score.toFixed(2)})`);
 
 		node
 			.append("title")

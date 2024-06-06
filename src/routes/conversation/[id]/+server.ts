@@ -35,7 +35,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (!userId) {
 		throw error(401, "Unauthorized");
 	}
-	console.log;
 
 	// check if the user has access to the conversation
 	const convBeforeCheck = await collections.conversations.findOne({

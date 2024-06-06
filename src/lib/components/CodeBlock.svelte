@@ -16,7 +16,7 @@
 	export let code = "";
 	export let lang = "";
 	export let parsedParams = {};
-	const exceptionLangs = ["barchart", "decision-tree"];
+	const exceptionLangs = ["barchart", "decision-tree", "collapsible-div"];
 
 	$: highlightedCode = "";
 
@@ -29,7 +29,7 @@
 	});
 	$: if (exceptionLangs.includes(lang)) {
 		// parsedParams = JSON.parse(code);
-		console.log(lang, code.replaceAll("'", '"'));
+		// console.log(lang, code.replaceAll("'", '"'));
 		parsedParams = JSON.parse(code.replaceAll("'", '"'));
 	}
 </script>
