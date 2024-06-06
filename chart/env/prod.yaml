@@ -8,7 +8,12 @@ nodeSelector:
 tolerations:
   - key: CriticalAddonsOnly
     operator: Equal
-    
+
+serviceAccount:
+  enabled: true
+  create: true
+  name: huggingchat-prod
+
 ingress:
   path: "/chat"
   annotations:
