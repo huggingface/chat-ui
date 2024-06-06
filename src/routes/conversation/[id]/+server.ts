@@ -125,7 +125,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	}
 
 	// finally parse the content of the request
-	const json = await request.json();
+	const form = await request.formData();
+
+	const json = form.get("data");
+
+	if (!json || typeof json !== "string") {
+		throw error(400, "Invalid request");
+	}
 
 	const {
 		inputs: newPrompt,
@@ -134,7 +140,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		is_continue: isContinue,
 		web_search: webSearch,
 		tools: toolsPreferences,
-		files: inputFiles,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -148,18 +153,24 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
 			tools: z.record(z.boolean()).optional(),
-			files: z.optional(
-				z.array(
-					z.object({
-						type: z.literal("base64").or(z.literal("hash")),
-						name: z.string(),
-						value: z.string(),
-						mime: z.string(),
-					})
-				)
-			),
 		})
-		.parse(json);
+		.parse(JSON.parse(json));
+
+	const inputFiles = await Promise.all(
+		form
+			.getAll("files")
+			.filter((entry): entry is File => entry instanceof File && entry.size > 0)
+			.map(async (file) => {
+				const [type, ...name] = file.name.split(";");
+
+				return {
+					type: z.literal("base64").or(z.literal("hash")).parse(type),
+					value: await file.text(),
+					mime: file.type,
+					name: name.join(";"),
+				};
+			})
+	);
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		throw error(400, "Message too long.");
