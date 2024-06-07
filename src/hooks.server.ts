@@ -67,6 +67,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		request: event.request,
 	});
 
+	if (building) {
+		return await resolve(event);
+	}
+
 	if (event.url.pathname.startsWith(`${base}/api/`) && env.EXPOSE_API !== "true") {
 		return new Response("API is disabled", { status: 403 });
 	}

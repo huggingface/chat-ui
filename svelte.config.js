@@ -1,5 +1,5 @@
-import adapter from "@sveltejs/adapter-node";
-import { vitePreprocess } from "@sveltejs/kit/vite";
+import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import dotenv from "dotenv";
 
 dotenv.config({ path: "./.env.local" });
@@ -14,8 +14,9 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		adapter: adapter(),
-
+		adapter: adapter({
+			fallback: "200.html", // may differ from host to host
+		}),
 		paths: {
 			base: process.env.APP_BASE || "",
 		},

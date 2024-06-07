@@ -57,7 +57,7 @@
 {#if numTotalPages > 1}
 	<nav>
 		<ul
-			class="flex select-none items-center justify-between space-x-2 text-gray-700 sm:justify-center dark:text-gray-300 {classNames}"
+			class="flex select-none items-center justify-between space-x-2 text-gray-700 dark:text-gray-300 sm:justify-center {classNames}"
 		>
 			<li>
 				<PaginationArrow
