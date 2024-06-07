@@ -52,6 +52,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@aws-sdk/credential-providers": "^3.592.0",
 		"@cliqz/adblocker-playwright": "^1.27.2",
 		"@gradio/client": "^0.19.4",
 		"@huggingface/hub": "^0.5.1",
