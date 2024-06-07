@@ -22,7 +22,6 @@
 		const x = Math.floor((event.clientX - rect.left) / scale); // x position within the element.
 		const y = Math.floor((event.clientY - rect.top) / scale); // y position within the element.
 		hoverMaskIndexes = checkPointInMask(maskTensor, shape, x, y);
-		console.log("hoverMaskIndexes", hoverMaskIndexes);
 	}
 	function handleMouseClick(event: MouseEvent) {
 		if (!event.target) return;
@@ -109,38 +108,26 @@
 					<div class="w-full text-center">
 						<h1>Selected Regions</h1>
 					</div>
-					{#each selectedMaskIndexes as index}
-						<div
-							class="
-            flex
-            flex-col items-center
-            justify-center border-gray-300 shadow-lg"
-						>
-							<img src={maskingImage(imgElement, maskURLs[index])} class="w-[400px]" />
-							<!-- <h3>Region Matching Score: {render_data["region_scores"][index]}</h3> -->
-						</div>
-						<div class="relative flex w-full w-full flex-row py-2" />
-					{/each}
 				{:else}
 					<div class="w-full text-center">
 						<h4>Hover over the image to see the regions</h4>
-						{#if json_data.general_attributes_for_image}
+						{#if hoverMaskIndexes.length > 0}
+							<HorizontalBarChartsExplain
+								name="General Attributes: Image"
+								data={Object.keys(json_data["general_attributes"][hoverMaskIndexes[0]])
+									.map((key) => ({
+										name: key,
+										value: json_data["general_attributes"][hoverMaskIndexes[0]][key],
+									}))
+									.filter((attr) => !["purple", "pink"].includes(attr.name))}
+							/>
+						{:else if json_data.general_attributes_for_image}
 							<HorizontalBarChartsExplain
 								name="General Attributes: Image"
 								data={Object.keys(json_data.general_attributes_for_image)
 									.map((key) => ({
 										name: key,
 										value: json_data.general_attributes_for_image[key],
-									}))
-									.filter((attr) => !["purple", "pink"].includes(attr.name))}
-							/>
-						{:else if selectedMaskIndexes.length > 0}
-							<HorizontalBarChartsExplain
-								name="General Attributes: Image"
-								data={Object.keys(render_data["general_attributes"][selectedMaskIndexes[0]])
-									.map((key) => ({
-										name: key,
-										value: render_data["general_attributes"][selectedMaskIndexes[0]][key],
 									}))
 									.filter((attr) => !["purple", "pink"].includes(attr.name))}
 							/>
