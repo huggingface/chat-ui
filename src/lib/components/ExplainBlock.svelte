@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import { checkPointInMask, tensorToMasksCanvas, maskingImage } from "$lib/utils/tensor";
+	import {
+		checkPointInMask,
+		tensorToMasksCanvas,
+		maskingImage,
+		encodedTensorToTensor,
+	} from "$lib/utils/tensor";
 	import { onMount } from "svelte";
 	import HorizontalBarChartsExplain from "./d3figure/HorizontalBarChartsExplain.svelte";
 
@@ -49,18 +54,12 @@
 				if (!res.ok) {
 					throw new Error("HTTP error, status = " + res.status);
 				}
-
-				const arrayBuffer = await res.body
-					.getReader()
-					.read()
-					.then((data) => data.value.buffer);
-				const uint8Array = new Uint8Array(arrayBuffer);
-				return uint8Array;
+				return res.json();
 			})
 			.then((data) => {
-				maskTensor = data;
-				maskURLs = tensorToMasksCanvas(maskTensor, json_data.shape);
-				shape = json_data.shape;
+				console.log("data", data);
+				[maskTensor, shape] = encodedTensorToTensor(data);
+				maskURLs = tensorToMasksCanvas(maskTensor, shape);
 			});
 	});
 </script>

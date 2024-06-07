@@ -83,10 +83,12 @@
 			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 		// X axis: scale and draw
-		const x = d3
-			.scaleLinear()
-			.domain([0, d3.max(data, (d) => d.value)])
-			.range([0, width]);
+		// const x = d3
+		// 	.scaleLinear()
+		// 	.domain([0, d3.max(data, (d) => d.value)])
+		// 	.range([0, width]);
+
+		const x = d3.scaleLinear().domain([0, 1]).range([0, width]);
 
 		svg
 			.append("g")

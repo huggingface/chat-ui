@@ -22,9 +22,9 @@ export const endpointTgiParametersSchema = z.object({
 			image: createImageProcessorOptionsValidator({
 				supportedMimeTypes: ["image/jpeg", "image/webp"],
 				preferredMimeType: "image/webp",
-				maxSizeInMB: 5,
-				maxWidth: 224,
-				maxHeight: 224,
+				maxSizeInMB: 10,
+				maxWidth: 576,
+				maxHeight: 576,
 			}),
 		})
 		.default({}),

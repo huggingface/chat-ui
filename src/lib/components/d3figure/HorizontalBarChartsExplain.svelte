@@ -86,16 +86,17 @@
 		const allPositive = dataSpliced.every((d) => d.value >= 0);
 
 		// X axis: scale and draw
-		const x = d3
-			.scaleLinear()
-			.domain(
-				fixedXAxis
-					? xFixedValues
-					: allPositive
-					? [0, d3.max(dataSpliced, (d) => d.value)]
-					: [d3.min(dataSpliced, (d) => d.value), d3.max(dataSpliced, (d) => d.value)]
-			)
-			.range([0, width]);
+		// const x = d3
+		// 	.scaleLinear()
+		// 	.domain(
+		// 		fixedXAxis
+		// 			? xFixedValues
+		// 			: allPositive
+		// 			? [0, d3.max(dataSpliced, (d) => d.value)]
+		// 			: [d3.min(dataSpliced, (d) => d.value), d3.max(dataSpliced, (d) => d.value)]
+		// 	)
+		// 	.range([0, width]);
+		const x = d3.scaleLinear().domain([0, 1]).range([0, width]);
 
 		svg
 			.append("g")
