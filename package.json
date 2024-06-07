@@ -20,6 +20,7 @@
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^5.0.1",
+		"@sveltejs/adapter-static": "^3.0.1",
 		"@sveltejs/kit": "^2.5.10",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/express": "^4.17.21",
