@@ -4,6 +4,7 @@
 	import HorizontalBarCharts from "./d3figure/HorizontalBarCharts.svelte";
 	import DecisionTree from "./d3figure/DecisionTree.svelte";
 	import ImagesBlock from "./ImagesBlock.svelte";
+	import ExplainBlock from "./ExplainBlock.svelte";
 	function zip(arr1, arr2) {
 		let length = Math.min(arr1.length, arr2.length);
 		let result = [];
@@ -17,7 +18,13 @@
 	export let code = "";
 	export let lang = "";
 	export let parsedParams = {};
-	const exceptionLangs = ["barchart", "decision-tree", "collapsible-div", "images"];
+	const exceptionLangs = [
+		"barchart",
+		"decision-tree",
+		"collapsible-div",
+		"images",
+		"image-with-mask",
+	];
 
 	$: highlightedCode = "";
 
@@ -59,6 +66,8 @@
 	<div class="w-min-[500px] group w-full">
 		<ImagesBlock json_data={parsedParams} />
 	</div>
+{:else if lang == "image-with-mask"}
+	<ExplainBlock json_data={parsedParams} />
 {:else}
 	<div class="group relative my-4 rounded-lg">
 		<!-- eslint-disable svelte/no-at-html-tags -->

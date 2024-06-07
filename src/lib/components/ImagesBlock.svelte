@@ -9,7 +9,7 @@
 
 <div class="grid grid-cols-{json_data['images'].length} gap-4">
 	{#each json_data.images as image, index}
-		<div class="text-center">
+		<div class="flex flex-col items-center justify-center text-center">
 			<img
 				src={`${base}/images/${image}`}
 				alt={json_data.names[index]}
