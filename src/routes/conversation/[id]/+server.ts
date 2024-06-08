@@ -102,8 +102,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	if (usageLimits?.messagesPerMinute) {
 		// check if the user is rate limited
 		const nEvents = Math.max(
-			await collections.messageEvents.countDocuments({ userId }),
-			await collections.messageEvents.countDocuments({ ip: getClientAddress() })
+			await collections.messageEvents.countDocuments({
+				userId,
+				createdAt: { $gte: new Date(Date.now() - 60_000) },
+			}),
+			await collections.messageEvents.countDocuments({
+				ip: getClientAddress(),
+				createdAt: { $gte: new Date(Date.now() - 60_000) },
+			})
 		);
 		if (nEvents > usageLimits.messagesPerMinute) {
 			throw error(429, ERROR_MESSAGES.rateLimited);
