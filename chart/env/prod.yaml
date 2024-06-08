@@ -345,12 +345,12 @@ envVars:
   TOOLS: >
     [
       {
-        "name": "Image Generation",
+        "displayName": "Image Generation",
         "description" : "Use this tool to generate images based on a prompt.",
         "color" : "yellow",
         "icon" : "image",
         "isOnByDefault" : true,
-        "baseUrl" : "ByteDance/Hyper-SDXL-1Step-T2I" 
+        "baseUrl" : "ByteDance/Hyper-SDXL-1Step-T2I" ,
         "functions" : [
           {
             "name" : "image_generation",
@@ -359,17 +359,18 @@ envVars:
             "endpoint" : "/process_image",
             "inputs" : [
               {
-                name: "prompt",
-                type: "str",
-                
+                "name": "prompt",
+                "description": "A prompt to generate an image from",
+                "required": true,
+                "type": "str"
               }
-            ]
-
-
+            ],
+            "outputPath": "",
+            "outputType": "file",
+            "outputMimeType": "image/png",
+            "showOutput": true
           }
         ]
-        
-
       }
     ]
 externalSecrets:

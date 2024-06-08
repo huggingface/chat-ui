@@ -184,12 +184,16 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 									.flat()
 							)
 							.flat(),
-						isOnByDefault: tool.isOnByDefault,
-						isLocked: tool.isLocked,
-						timeToUseMS:
-							toolUseDuration.find(
-								(el) => el.labels.tool === tool.displayName && el.labels.quantile === 0.9
-							)?.value ?? 15_000,
+						isOnByDefault: tool.isOnByDefault ?? true,
+						isLocked: tool.isLocked ?? true,
+						functions: tool.functions.map((fn) => ({
+							name: fn.name,
+							displayName: fn.displayName,
+							timeToUseMS:
+								toolUseDuration.find(
+									(el) => el.labels.tool === fn.displayName && el.labels.quantile === 0.9
+								)?.value ?? 15_000,
+						})),
 					} satisfies ToolFront)
 			),
 		assistants: assistants

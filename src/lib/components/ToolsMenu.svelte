@@ -72,23 +72,23 @@
 				</button>
 			</div>
 			{#each $page.data.tools as tool}
-				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}
+				{@const isChecked = $settings?.tools?.[tool.displayName] ?? tool.isOnByDefault}
 				<div class="flex items-center gap-1.5">
 					<input
 						type="checkbox"
-						id={tool.name}
+						id={tool.displayName}
 						checked={isChecked}
 						disabled={loading}
 						on:click={async () => {
 							await settings.instantSet({
 								tools: {
 									...$settings.tools,
-									[tool.name]: !isChecked,
+									[tool.displayName]: !isChecked,
 								},
 							});
 						}}
 					/>
-					<label class="cursor-pointer" for={tool.name}>{tool.displayName ?? tool.name} </label>
+					<label class="cursor-pointer" for={tool.displayName}>{tool.displayName} </label>
 				</div>
 			{/each}
 		</div>

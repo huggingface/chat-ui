@@ -75,9 +75,11 @@ export interface CommunityTool extends BaseTool, Timestamps {
 export type Tool = ConfigTool | CommunityTool;
 
 export type ToolFront = (
-	| Pick<ConfigTool, "type" | "displayName" | "description" | "isOnByDefault" | "isLocked">
+	| Pick<ConfigTool, "type" | "displayName" | "description">
 	| Pick<CommunityTool, "type" | "displayName" | "description">
 ) & {
+	isOnByDefault: boolean;
+	isLocked: boolean;
 	mimeTypes: string[];
 	functions: Array<Pick<ToolFunction, "name" | "displayName"> & { timeToUseMS?: number }>;
 };

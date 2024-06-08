@@ -58,7 +58,7 @@ export const configTools = z
 									)
 							),
 							outputPath: z.union([z.string(), z.null()]),
-							outputType: IOType,
+							outputType: IOType.or(z.literal("file")),
 							outputMimeType: z.string().optional(), // only required for file outputs
 							showOutput: z.boolean(),
 						})
