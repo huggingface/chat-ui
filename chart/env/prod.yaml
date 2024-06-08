@@ -344,7 +344,33 @@ envVars:
   XFF_DEPTH: '2'
   TOOLS: >
     [
-      
+      {
+        "name": "Image Generation",
+        "description" : "Use this tool to generate images based on a prompt.",
+        "color" : "yellow",
+        "icon" : "image",
+        "isOnByDefault" : true,
+        "baseUrl" : "ByteDance/Hyper-SDXL-1Step-T2I" 
+        "functions" : [
+          {
+            "name" : "image_generation",
+            "displayName" : "Image Generation",
+            "description" : "Generate an image based on a prompt.",
+            "endpoint" : "/process_image",
+            "inputs" : [
+              {
+                name: "prompt",
+                type: "str",
+                
+              }
+            ]
+
+
+          }
+        ]
+        
+
+      }
     ]
 externalSecrets:
   enabled: true

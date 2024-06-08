@@ -15,14 +15,15 @@ const websearch: ConfigTool = {
 			description:
 				"Use this tool to search web pages for answers that will help answer the user's query. Only use this tool if you need specific resources from the internet.",
 			endpoint: null,
-			inputs: {
-				query: {
+			inputs: [
+				{
+					name: "query",
 					type: "str",
 					description:
 						"A search query which will be used to fetch the most relevant snippets regarding the user's query",
 					required: true,
 				},
-			},
+			],
 			outputPath: null,
 			outputType: "str",
 			showOutput: false,

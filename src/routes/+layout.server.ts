@@ -8,8 +8,9 @@ import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { env } from "$env/dynamic/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
-import { allTools } from "$lib/server/tools";
+import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
+import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -167,19 +168,30 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
-		tools: allTools
+		tools: toolFromConfigs
 			.filter((tool) => !tool.isHidden)
-			.map((tool) => ({
-				name: tool.name,
-				displayName: tool.displayName,
-				description: tool.description,
-				mimeTypes: tool.mimeTypes,
-				isOnByDefault: tool.isOnByDefault,
-				isLocked: tool.isLocked,
-				timeToUseMS:
-					toolUseDuration.find((el) => el.labels.tool === tool.name && el.labels.quantile === 0.9)
-						?.value ?? 15_000,
-			})),
+			.map(
+				(tool) =>
+					({
+						type: tool.type,
+						displayName: tool.displayName,
+						description: tool.description,
+						mimeTypes: tool.functions
+							.map((fn) =>
+								fn.inputs
+									.filter((input): input is ToolInputFile => input.type === "file")
+									.map((input) => (input as ToolInputFile).mimeTypes)
+									.flat()
+							)
+							.flat(),
+						isOnByDefault: tool.isOnByDefault,
+						isLocked: tool.isLocked,
+						timeToUseMS:
+							toolUseDuration.find(
+								(el) => el.labels.tool === tool.displayName && el.labels.quantile === 0.9
+							)?.value ?? 15_000,
+					} satisfies ToolFront)
+			),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
 			.map((el) => ({

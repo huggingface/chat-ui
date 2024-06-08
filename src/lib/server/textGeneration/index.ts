@@ -8,7 +8,7 @@ import {
 	getAssistantById,
 	processPreprompt,
 } from "./assistant";
-import { pickTools, runTools } from "./tools";
+import { filterToolsOnPreferences, runTools } from "./tools";
 import type { WebSearch } from "$lib/types/WebSearch";
 import {
 	type MessageUpdate,
@@ -61,7 +61,7 @@ async function* textGenerationWithoutTitle(
 	let toolResults: ToolResult[] = [];
 
 	if (model.tools && !conv.assistantId) {
-		const tools = pickTools(toolsPreference, Boolean(assistant));
+		const tools = filterToolsOnPreferences(toolsPreference, Boolean(assistant));
 		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
 		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}

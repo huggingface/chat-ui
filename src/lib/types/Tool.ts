@@ -7,19 +7,22 @@ import type { MessageUpdate } from "./MessageUpdate";
 export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
 
 type ToolInputBase = {
+	name: string; // name of the input
 	description: string; // description of the input, shown to the AI
 	required: boolean; // is the input required
 	default?: string | number | boolean; // default value if not provided
 };
 
-export type ToolInput =
-	| (ToolInputBase & {
-			type: Exclude<ToolIOType, "file">;
-	  })
-	| (ToolInputBase & {
-			type: "file";
-			mimeTypes: string[];
-	  });
+export type ToolInputFile = ToolInputBase & {
+	type: "file";
+	mimeTypes: string[];
+};
+
+export type ToolInputSimple = ToolInputBase & {
+	type: Exclude<ToolIOType, "file">;
+};
+
+export type ToolInput = ToolInputFile | ToolInputSimple;
 
 export interface ToolFunction {
 	name: string; // name that will be shown to the AI
@@ -28,7 +31,7 @@ export interface ToolFunction {
 	description: string;
 	endpoint: string | null; // endpoint to call in gradio, if null we expect to override this function in code
 
-	inputs: Record<string, ToolInput>;
+	inputs: Array<ToolInput>;
 
 	outputPath: string | null; // JSONPath to the output in the response, if null we expect the function to be overriden in the code somewhere
 	outputType: ToolIOType; // type of the output
@@ -41,6 +44,7 @@ export interface ToolFunction {
 export interface BaseTool {
 	// tool can have multiple functions that get added/removed as a group
 	functions: ToolFunction[];
+	baseUrl?: string; // namespace for the tool, used to group tools together
 
 	// for displaying in the UI
 	displayName: string;
@@ -73,7 +77,10 @@ export type Tool = ConfigTool | CommunityTool;
 export type ToolFront = (
 	| Pick<ConfigTool, "type" | "displayName" | "description" | "isOnByDefault" | "isLocked">
 	| Pick<CommunityTool, "type" | "displayName" | "description">
-) & { timeToUseMS?: number };
+) & {
+	mimeTypes: string[];
+	functions: Array<Pick<ToolFunction, "name" | "displayName"> & { timeToUseMS?: number }>;
+};
 
 export enum ToolResultStatus {
 	Success = "success",

@@ -15,14 +15,15 @@ const calculator: ConfigTool = {
 			description:
 				"Use this tool to calculate the result of a mathematical expression. Only use this tool if you need to perform calculations.",
 			endpoint: null,
-			inputs: {
-				equation: {
+			inputs: [
+				{
+					name: "equation",
 					type: "str",
 					description:
 						"A mathematical expression to be evaluated. The result of the expression will be returned.",
 					required: true,
 				},
-			},
+			],
 			outputPath: null,
 			outputType: "str",
 			showOutput: false,

@@ -16,7 +16,7 @@ const directlyAnswer: ConfigTool = {
 			description:
 				"Use this tool to answer the user's query directly. Only use this tool if you need to answer the user's query directly.",
 			endpoint: null,
-			inputs: {},
+			inputs: [],
 			outputPath: null,
 			outputType: "str",
 			showOutput: false,

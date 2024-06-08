@@ -1,5 +1,5 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type { BackendCall, ToolFunction } from "$lib/types/Tool";
+import type { BackendCall, ConfigTool, ToolFunction } from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -7,12 +7,10 @@ import JSON5 from "json5";
 import { env } from "$env/dynamic/private";
 
 import jp from "jsonpath";
-
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
 import fetchUrl from "./web/url";
 import websearch from "./web/search";
-import { logger } from "../logger";
 import { callSpace, getIpToken } from "./utils";
 import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
@@ -33,48 +31,50 @@ export const configTools = z
 	.array(
 		z
 			.object({
-				functions: z.array(
-					z.object({
-						name: z.string(),
-						displayName: z.string(),
-						description: z.string(),
-						endpoint: z.union([z.string(), z.null()]),
-						inputs: z.record(
-							z.string(),
-							z
-								.object({
-									description: z.string(),
-									required: z.boolean(),
-									default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-									type: IOType,
-								})
-								.or(
-									z.object({
+				functions: z
+					.array(
+						z.object({
+							name: z.string(),
+							displayName: z.string(),
+							description: z.string(),
+							endpoint: z.union([z.string(), z.null()]),
+							inputs: z.array(
+								z
+									.object({
+										name: z.string(),
 										description: z.string(),
 										required: z.boolean(),
-										type: z.literal("file"),
-										mimeTypes: z.array(z.string()),
+										default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+										type: IOType,
 									})
-								)
-						),
-						outputPath: z.union([z.string(), z.null()]),
-						outputType: IOType,
-						outputMimeType: z.string().optional(), // only required for file outputs
-						showOutput: z.boolean(),
-					})
-				),
+									.or(
+										z.object({
+											name: z.string(),
+											description: z.string(),
+											required: z.boolean(),
+											type: z.literal("file"),
+											mimeTypes: z.array(z.string()),
+										})
+									)
+							),
+							outputPath: z.union([z.string(), z.null()]),
+							outputType: IOType,
+							outputMimeType: z.string().optional(), // only required for file outputs
+							showOutput: z.boolean(),
+						})
+					)
+					.transform((val) => val.map((fn) => ({ ...fn, call: getCallMethod(fn) }))),
 				displayName: z.string(),
 				color: z.string(),
 				icon: z.string(),
 				description: z.string(),
-				isOnByDefault: z.optional(z.boolean()),
-				isLocked: z.optional(z.boolean()),
-				isHidden: z.optional(z.boolean()),
+				isOnByDefault: z.optional(z.literal(true)),
+				isLocked: z.optional(z.literal(true)),
+				isHidden: z.optional(z.literal(true)),
 			})
 			.transform((val) => ({
+				type: "config" as const,
 				...val,
-				type: "config",
-				call: val.functions.map((fn) => getCallMethod(fn)),
 			}))
 	)
 	// add the extra hardcoded tools
@@ -159,6 +159,4 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">): BackendCall {
 	};
 }
 
-export const toolFromConfigs = configTools.parse(JSON5.parse(env.TOOLS));
-
-logger.info({ toolFromConfigs });
+export const toolFromConfigs = configTools.parse(JSON5.parse(env.TOOLS)) satisfies ConfigTool[];

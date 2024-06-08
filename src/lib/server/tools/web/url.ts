@@ -16,13 +16,14 @@ const fetchUrl: ConfigTool = {
 			description:
 				"Use this tool to fetch the contents of a URL. Only use this tool if you need to fetch the contents of a URL.",
 			endpoint: null,
-			inputs: {
-				url: {
+			inputs: [
+				{
+					name: "url",
 					type: "str",
 					description: "The URL of the webpage to fetch",
 					required: true,
 				},
-			},
+			],
 			outputPath: null,
 			outputType: "str",
 			showOutput: false,

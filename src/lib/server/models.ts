@@ -165,8 +165,8 @@ async function getChatPromptRender(
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
 			tools:
-				tools?.map(({ parameterDefinitions, ...tool }) => ({
-					parameter_definitions: parameterDefinitions,
+				tools?.map(({ inputs, ...tool }) => ({
+					parameter_definitions: inputs,
 					...tool,
 				})) ?? [],
 			documents,

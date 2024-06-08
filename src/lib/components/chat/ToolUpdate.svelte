@@ -7,7 +7,6 @@
 	} from "$lib/utils/messageUpdates";
 
 	import CarbonTools from "~icons/carbon/tools";
-	import { toolHasName } from "$lib/utils/tools";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
 	import { onMount } from "svelte";
@@ -26,12 +25,13 @@
 	let animation: Animation | undefined = undefined;
 
 	let isShowingLoadingBar = false;
+
 	onMount(() => {
 		if (!toolError && !toolDone && loading && loadingBarEl) {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: availableTools.find((tool) => tool.name === toolName)?.timeToUseMS,
+				duration: availableTools.find((tool) => tool.displayName === toolName)?.timeToUseMS,
 				fill: "forwards",
 			});
 		}
@@ -102,9 +102,7 @@
 
 			<span>
 				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-				<span class="font-semibold"
-					>{availableTools.find((el) => toolHasName(toolName, el))?.displayName}</span
-				>
+				<span class="font-semibold">{tool.displayName}</span>
 			</span>
 		</summary>
 		{#each tool as toolUpdate}

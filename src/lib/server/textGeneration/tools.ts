@@ -1,7 +1,12 @@
-import { ToolResultStatus, type ToolCall, type ToolResult } from "$lib/types/Tool";
+import {
+	ToolResultStatus,
+	type ToolCall,
+	type ToolFunction,
+	type ToolResult,
+} from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
 import JSON5 from "json5";
-import type { BackendToolContext } from "../tools";
+import { toolFromConfigs, type BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
 	MessageUpdateStatus,
@@ -34,23 +39,26 @@ function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string
 	return `Attached ${files.length} file${files.length === 1 ? "" : "s"}:\n${stringifiedFiles}`;
 }
 
-export function pickTools(
+export function filterToolsOnPreferences(
 	toolsPreference: Record<string, boolean>,
 	isAssistant: boolean
-): BackendTool[] {
+): ToolFunction[] {
 	// if it's an assistant, only support websearch for now
-	if (isAssistant) return [directlyAnswer, websearch];
+	if (isAssistant) return [...directlyAnswer.functions, ...websearch.functions];
 
 	// filter based on tool preferences, add the tools that are on by default
-	return allTools.filter((el) => {
-		if (el.isLocked && el.isOnByDefault) return true;
-		return toolsPreference?.[el.name] ?? el.isOnByDefault;
-	});
+	return toolFromConfigs
+		.filter((el) => {
+			if (el.isLocked && el.isOnByDefault) return true;
+			return toolsPreference?.[el.displayName] ?? el.isOnByDefault;
+		})
+		.map((el) => el.functions)
+		.flat();
 }
 
 async function* callTool(
 	ctx: BackendToolContext,
-	tools: BackendTool[],
+	tools: ToolFunction[],
 	call: ToolCall
 ): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
 	const uuid = uuidV4();
@@ -61,7 +69,7 @@ async function* callTool(
 	}
 
 	// Special case for directly_answer tool where we ignore
-	if (toolHasName(directlyAnswer.name, tool)) return;
+	if (toolHasName(directlyAnswer.functions[0].name, tool)) return;
 
 	const startTime = Date.now();
 	MetricsServer.getMetrics().tool.toolUseCount.inc({ tool: call.name });
@@ -110,7 +118,7 @@ async function* callTool(
 
 export async function* runTools(
 	ctx: TextGenerationContext,
-	tools: BackendTool[],
+	tools: ToolFunction[],
 	preprompt?: string
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
 	const { endpoint, conv, messages, assistant, ip, username } = ctx;
@@ -189,9 +197,12 @@ function isExternalToolCall(call: unknown): call is ExternalToolCall {
 	return externalToolCall.safeParse(call).success;
 }
 
-function externalToToolCall(call: ExternalToolCall): ToolCall | undefined {
+function externalToToolCall(
+	call: ExternalToolCall,
+	toolFunctions: ToolFunction[]
+): ToolCall | undefined {
 	// Convert - to _ since some models insist on using _ instead of -
-	const tool = allTools.find((tool) => toolHasName(call.tool_name, tool));
+	const tool = toolFunctions.find((tool) => toolHasName(call.tool_name, tool));
 	if (!tool) {
 		logger.debug(`Model requested tool that does not exist: "${call.tool_name}". Skipping tool...`);
 		return;
@@ -199,23 +210,23 @@ function externalToToolCall(call: ExternalToolCall): ToolCall | undefined {
 
 	const parametersWithDefaults: Record<string, string> = {};
 
-	for (const [key, definition] of Object.entries(tool.parameterDefinitions)) {
-		const value = call.parameters[key];
+	for (const input of tool.inputs) {
+		const value = call.parameters[input.name];
 
 		// Required so ensure it's there, otherwise return undefined
-		if (definition.required) {
+		if (input.required) {
 			if (value === undefined) {
 				logger.debug(
-					`Model requested tool "${call.tool_name}" but was missing required parameter "${key}". Skipping tool...`
+					`Model requested tool "${call.tool_name}" but was missing required parameter "${input.name}". Skipping tool...`
 				);
 				return;
 			}
-			parametersWithDefaults[key] = value;
+			parametersWithDefaults[input.name] = value;
 			continue;
 		}
 
 		// Optional so use default if not there
-		parametersWithDefaults[key] = value ?? definition.default;
+		parametersWithDefaults[input.name] = value ?? input.default;
 	}
 
 	return {

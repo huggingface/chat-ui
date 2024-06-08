@@ -14,12 +14,16 @@
 
 	// active tools are all the checked tools, either from settings or on by default
 	$: activeToolCount = $page.data.tools.filter(
-		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+		(tool: ToolFront) =>
+			// community tools are always on by default
+			tool.type === "community" || ($settings?.tools?.[tool.displayName] ?? tool.isOnByDefault)
 	).length;
 
 	function setAllTools(value: boolean) {
 		settings.instantSet({
-			tools: Object.fromEntries($page.data.tools.map((tool: ToolFront) => [tool.name, value])),
+			tools: Object.fromEntries(
+				$page.data.tools.map((tool: ToolFront) => [tool.displayName, value])
+			),
 		});
 	}
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
