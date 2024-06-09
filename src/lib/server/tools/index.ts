@@ -14,6 +14,7 @@ import websearch from "./web/search";
 import { callSpace, getIpToken } from "./utils";
 import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
+import { sha256 } from "$lib/utils/sha256";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -128,7 +129,9 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 							.then((res) => res.blob())
 							.then((blob) => {
 								const fileType = blob.type.split("/")[1] ?? toolFn.outputMimeType?.split("/")[1];
-								return new File([blob], `${prompt}.${fileType}`, { type: fileType });
+								return new File([blob], `${sha256(JSON.stringify(params))}.${fileType}`, {
+									type: fileType,
+								});
 							})
 							.then((file) => uploadFile(file, ctx.conv))
 							.then((file) => files.push(file));

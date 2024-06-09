@@ -367,16 +367,16 @@ envVars:
               },
               {
                 "name": "width",
-                "description": "Width of the generated image, between 1 and 1024",
+                "description": "Width of the generated image",
                 "required": false,
-                "default": 1024,
+                "default": 512,
                 "type": "int"
               },
               {
                 "name": "height",
-                "description": "Height of the generated image, between 1 and 1024",
+                "description": "Height of the generated image",
                 "required": false,
-                "default": 1024,
+                "default": 512,
                 "type": "int"
               },
               {
@@ -386,9 +386,9 @@ envVars:
                 "type": "str"
               },
             ],
-            "outputPath": "",
+            "outputPath": "$[*][*].image.url",
             "outputType": "file",
-            "outputMimeType": "image/png",
+            "outputMimeType": "image/webp", 
             "showOutput": true
           }
         ]
