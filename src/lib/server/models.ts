@@ -12,7 +12,7 @@ import type { PreTrainedTokenizer } from "@xenova/transformers";
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { ToolResultStatus } from "$lib/types/Tool";
+import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -158,17 +158,30 @@ async function getChatPromptRender(
 			);
 		});
 
+		const mappedTools =
+			tools?.map((tool) => {
+				const inputs: Record<string, Omit<ToolInput, "name">> = {};
+				for (const value of tool.inputs) {
+					inputs[value.name] = {
+						type: value.type,
+						description: value.description,
+						required: value.required,
+					};
+				}
+				return {
+					name: tool.name,
+					description: tool.description,
+					parameter_definitions: inputs,
+				};
+			}) ?? [];
+
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
 			add_generation_prompt: true,
 			chat_template: chatTemplate,
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
-			tools:
-				tools?.map(({ inputs, ...tool }) => ({
-					parameter_definitions: inputs,
-					...tool,
-				})) ?? [],
+			tools: mappedTools,
 			documents,
 		});
 

@@ -160,9 +160,13 @@ export async function* runTools(
 			for (const block of codeBlocks) {
 				try {
 					calls.push(
-						...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall).filter(Boolean)
+						...JSON5.parse(block)
+							.filter(isExternalToolCall)
+							.map((toolCall: ExternalToolCall) => externalToToolCall(toolCall, tools))
+							.filter(Boolean)
 					);
 				} catch (e) {
+					logger.error(e, "Failed to parse tool call");
 					// error parsing the calls
 					yield {
 						type: MessageUpdateType.Status,
