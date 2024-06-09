@@ -363,6 +363,27 @@ envVars:
                 "description": "A prompt to generate an image from",
                 "required": true,
                 "type": "str"
+              },
+              {
+              "name" : "numberOfImages", 
+              "description" : "Number of images to generate, between 1 and 8",
+              "required" : false,
+              "default" : 1,
+              "type" : "int"
+              },
+              {
+                "name": "width",
+                "description": "Width of the generated image, between 1 and 1024",
+                "required": false,
+                "default": 1024,
+                "type": "int"
+              },
+              {
+                "name": "height",
+                "description": "Height of the generated image, between 1 and 1024",
+                "required": false,
+                "default": 1024,
+                "type": "int"
               }
             ],
             "outputPath": "",
