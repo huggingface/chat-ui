@@ -359,12 +359,6 @@ envVars:
             "endpoint" : "/process_image",
             "inputs" : [
               {
-                "name": "prompt",
-                "description": "A prompt to generate an image from",
-                "required": true,
-                "type": "str"
-              },
-              {
               "name" : "numberOfImages", 
               "description" : "Number of images to generate, between 1 and 8",
               "required" : false,
@@ -384,7 +378,13 @@ envVars:
                 "required": false,
                 "default": 1024,
                 "type": "int"
-              }
+              },
+              {
+                "name": "prompt",
+                "description": "A prompt to generate an image from",
+                "required": true,
+                "type": "str"
+              },
             ],
             "outputPath": "",
             "outputType": "file",

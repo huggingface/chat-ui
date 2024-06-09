@@ -31,39 +31,38 @@ export const configTools = z
 	.array(
 		z
 			.object({
-				functions: z
-					.array(
-						z.object({
-							name: z.string(),
-							displayName: z.string(),
-							description: z.string(),
-							endpoint: z.union([z.string(), z.null()]),
-							inputs: z.array(
-								z
-									.object({
+				functions: z.array(
+					z.object({
+						name: z.string(),
+						displayName: z.string(),
+						description: z.string(),
+						endpoint: z.union([z.string(), z.null()]),
+						inputs: z.array(
+							z
+								.object({
+									name: z.string(),
+									description: z.string(),
+									required: z.boolean(),
+									default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+									type: IOType,
+								})
+								.or(
+									z.object({
 										name: z.string(),
 										description: z.string(),
 										required: z.boolean(),
-										default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-										type: IOType,
+										type: z.literal("file"),
+										mimeTypes: z.array(z.string()),
 									})
-									.or(
-										z.object({
-											name: z.string(),
-											description: z.string(),
-											required: z.boolean(),
-											type: z.literal("file"),
-											mimeTypes: z.array(z.string()),
-										})
-									)
-							),
-							outputPath: z.union([z.string(), z.null()]),
-							outputType: IOType.or(z.literal("file")),
-							outputMimeType: z.string().optional(), // only required for file outputs
-							showOutput: z.boolean(),
-						})
-					)
-					.transform((val) => val.map((fn) => ({ ...fn, call: getCallMethod(fn) }))),
+								)
+						),
+						outputPath: z.union([z.string(), z.null()]),
+						outputType: IOType.or(z.literal("file")),
+						outputMimeType: z.string().optional(), // only required for file outputs
+						showOutput: z.boolean(),
+					})
+				),
+				baseUrl: z.string().optional(),
 				displayName: z.string(),
 				color: z.string(),
 				icon: z.string(),
@@ -75,21 +74,22 @@ export const configTools = z
 			.transform((val) => ({
 				type: "config" as const,
 				...val,
+				functions: val.functions.map((fn) => ({ ...fn, call: getCallMethod(fn, val.baseUrl) })),
 			}))
 	)
 	// add the extra hardcoded tools
 	.transform((val) => [...val, calculator, directlyAnswer, fetchUrl, websearch]);
 
-function getCallMethod(toolFn: Omit<ToolFunction, "call">): BackendCall {
+function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): BackendCall {
 	return async function* (params, ctx) {
-		if (toolFn.endpoint === null) {
+		if (toolFn.endpoint === null || !baseUrl) {
 			throw new Error(`Tool function ${toolFn.name} has no endpoint`);
 		}
 
 		const ipToken = await getIpToken(ctx.ip, ctx.username);
 
 		const outputs = await callSpace(
-			toolFn.name,
+			baseUrl,
 			toolFn.endpoint,
 			toolFn.inputs.map((input) => {
 				if (input.type === "file") {
