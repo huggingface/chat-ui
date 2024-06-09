@@ -91,15 +91,15 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">): BackendCall {
 		const outputs = await callSpace(
 			toolFn.name,
 			toolFn.endpoint,
-			Object.entries(toolFn.inputs).map(([name, input]) => {
+			toolFn.inputs.map((input) => {
 				if (input.type === "file") {
 					throw new Error("File inputs are not supported");
 				}
 
-				const value = params[name];
+				const value = params[input.name];
 				if (value === undefined) {
 					if (input.required) {
-						throw new Error(`Missing required input ${name}`);
+						throw new Error(`Missing required input ${input.name}`);
 					}
 
 					return input.default;
