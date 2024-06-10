@@ -293,6 +293,8 @@ async function seed() {
 						last24HoursUseCount: faker.number.int({ min: 0, max: 1000 }),
 						createdAt: faker.date.recent({ days: 30 }),
 						updatedAt: faker.date.recent({ days: 30 }),
+						searchTokens: generateSearchTokens(displayName),
+						featured: faker.datatype.boolean(),
 					};
 				},
 				{ count: faker.number.int({ min: 10, max: 200 }) }

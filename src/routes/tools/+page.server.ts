@@ -27,10 +27,8 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
-	const shouldBeFeatured = !!(!createdByCurrentUser && user?._id);
-
 	const filter: Filter<CommunityToolDB> = {
-		...(shouldBeFeatured && { featured: true }),
+		...(!createdByCurrentUser && { featured: true }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 	};

@@ -201,6 +201,13 @@
 						{tool.displayName}
 					</span>
 					{tool.useCount} - {tool.last24HoursUseCount}
+					{#if tool.createdByName}
+						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
+							Created by <a class="hover:underline" href="{base}/tools?user={tool.createdByName}">
+								{tool.createdByName}
+							</a>
+						</p>
+					{/if}
 				</button>
 			{:else}
 				No tools found
