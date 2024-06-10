@@ -20,6 +20,7 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
@@ -68,6 +69,8 @@
 		});
 		goto(newUrl);
 	};
+
+	const settings = useSettingsStore();
 </script>
 
 <svelte:head>
@@ -196,20 +199,54 @@
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 md:grid-cols-2">
 			{#each data.tools as tool (tool._id)}
 				<button
-					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-24 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					on:click={() => {
+						if ($settings?.tools?.[tool.displayName] ?? false) {
+							// remove from settings
+							const tools = Object.fromEntries(
+								Object.entries($settings?.tools ?? {}).filter(([key]) => key !== tool.displayName)
+							);
+
+							settings.instantSet({
+								tools,
+							});
+						} else {
+							// add to settings
+							settings.instantSet({
+								tools: { ...$settings.tools, [tool.displayName]: true },
+							});
+						}
+					}}
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
-					<span class="font-bold">
-						{tool.displayName}
-					</span>
-					{tool.useCount} - {tool.last24HoursUseCount}
-					{#if tool.createdByName}
-						<p class="mt-auto pt-2 text-xs text-gray-400 dark:text-gray-500">
-							Created by <a class="hover:underline" href="{base}/tools?user={tool.createdByName}">
-								{tool.createdByName}
-							</a>
-						</p>
-					{/if}
+					<div class="flex w-full flex-col items-start">
+						<span class="font-bold">
+							<span class="w-fit overflow-clip">
+								{tool.displayName}
+							</span>
+							{#if Object.keys($settings?.tools ?? {}).includes(tool.displayName) && $settings?.tools?.[tool.displayName] === true}
+								<!-- active badge -->
+								<span
+									class="ml-auto inline-flex items-center rounded-full bg-blue-500 px-2 py-0.5 text-xs font-semibold text-white"
+									>Active</span
+								>
+							{/if}
+						</span>
+						<span class="text-xs text-gray-400">
+							{tool.baseUrl ?? "Internal tool"}
+						</span>
+						{#if tool.createdByName}
+							<p class=" pt-2 text-xs text-gray-400 dark:text-gray-500">
+								Added by <a
+									class="hover:underline"
+									href="{base}/tools?user={tool.createdByName}"
+									on:click|stopPropagation
+								>
+									{tool.createdByName}
+								</a>
+							</p>
+						{/if}
+					</div>
 				</button>
 			{:else}
 				No tools found

@@ -75,8 +75,8 @@
 	}
 </script>
 
-<div class="flex h-14 w-14 items-center justify-center">
-	<svg xmlns="http://www.w3.org/2000/svg" class="absolute size-14" viewBox="0 0 52 58">
+<div class="flex size-14 items-center justify-center">
+	<svg xmlns="http://www.w3.org/2000/svg" class="absolute h-14" viewBox="0 0 52 58">
 		<defs>
 			<linearGradient id="gradient-{gradientColor}" gradientTransform="rotate(90)">
 				<stop offset="0%" stop-color="#0E1523" />
@@ -91,5 +91,5 @@
 		</defs>
 		<rect width="100%" height="100%" fill="url(#gradient-{gradientColor})" mask="url(#mask)" />
 	</svg>
-	<svelte:component this={iconEl} class="relative size-6 text-clip" />
+	<svelte:component this={iconEl} class="relative size-7 text-clip" />
 </div>

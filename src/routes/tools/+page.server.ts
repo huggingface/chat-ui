@@ -6,7 +6,7 @@ import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import { error } from "@sveltejs/kit";
 import type { Filter } from "mongodb";
 
-const NUM_PER_PAGE = 24;
+const NUM_PER_PAGE = 16;
 
 export const load = async ({ url, locals }) => {
 	const username = url.searchParams.get("user");
