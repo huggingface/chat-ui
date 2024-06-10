@@ -124,19 +124,25 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 				const outputs = Array.isArray(output) ? output : [output];
 
 				await Promise.all(
-					outputs.map(async (output) => {
+					outputs.map(async (output, idx) => {
 						await fetch(output)
 							.then((res) => res.blob())
-							.then((blob) => {
+							.then(async (blob) => {
 								const fileType = blob.type.split("/")[1] ?? toolFn.outputMimeType?.split("/")[1];
-								return new File([blob], `${sha256(JSON.stringify(params))}.${fileType}`, {
-									type: fileType,
-								});
+								return new File(
+									[blob],
+									`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
+									{
+										type: fileType,
+									}
+								);
 							})
 							.then((file) => uploadFile(file, ctx.conv))
 							.then((file) => files.push(file));
 					})
 				);
+
+				console.log({ files });
 
 				toolOutputs.push({
 					[toolFn.name + "-" + idx.toString()]:
@@ -149,6 +155,7 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 			}
 		});
 
+		console.log({ files });
 		for (const file of files) {
 			yield {
 				type: MessageUpdateType.File,
