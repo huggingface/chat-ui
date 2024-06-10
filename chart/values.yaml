@@ -12,6 +12,13 @@ service:
   type: NodePort
   annotations: { }
 
+serviceAccount:
+  enabled: false
+  create: false
+  name: ""
+  automountServiceAccountToken: true
+  annotations: { }
+
 ingress:
   enabled: true
   path: "/"

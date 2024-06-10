@@ -95,7 +95,7 @@ export function endpointLlamacpp(
 							data = JSON.parse(jsonString);
 						} catch (e) {
 							logger.error(e, "Failed to parse JSON");
-							logger.error("Problematic JSON string:", jsonString);
+							logger.error(jsonString, "Problematic JSON string:");
 							continue; // Skip this iteration and try the next chunk
 						}
 
