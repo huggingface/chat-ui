@@ -19,6 +19,7 @@
 	import { debounce } from "$lib/utils/debounce";
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
+	import ToolLogo from "$lib/components/ToolLogo.svelte";
 
 	export let data: PageData;
 
@@ -192,11 +193,12 @@
 			</select>
 		</div>
 
-		<div class="mt-8 grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 md:grid-cols-2">
 			{#each data.tools as tool (tool._id)}
 				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
+					<ToolLogo color={tool.color} icon={tool.icon} />
 					<span class="font-bold">
 						{tool.displayName}
 					</span>
