@@ -4,6 +4,20 @@ import type { Timestamps } from "./Timestamps";
 import type { BackendToolContext } from "$lib/server/tools";
 import type { MessageUpdate } from "./MessageUpdate";
 
+export type ToolLogoColor = "purple" | "blue" | "green" | "yellow" | "red";
+export type ToolLogoIcon =
+	| "wikis"
+	| "tools"
+	| "camera"
+	| "code"
+	| "email"
+	| "cloud"
+	| "terminal"
+	| "game"
+	| "chat"
+	| "speaker"
+	| "video";
+
 export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
 
 type ToolInputBase = {
@@ -48,8 +62,8 @@ export interface BaseTool {
 
 	// for displaying in the UI
 	displayName: string;
-	color: string;
-	icon: string;
+	color: ToolLogoColor;
+	icon: ToolLogoIcon;
 	description: string;
 }
 
@@ -70,7 +84,13 @@ export interface CommunityTool extends BaseTool, Timestamps {
 	// used to compute popular & trending
 	useCount: number;
 	last24HoursUseCount: number;
+
+	featured: boolean;
+	searchTokens: string[];
 }
+
+// no call function in db
+export type CommunityToolDB = CommunityTool & { functions: Omit<ToolFunction, "call">[] };
 
 export type Tool = ConfigTool | CommunityTool;
 
