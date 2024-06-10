@@ -17,7 +17,7 @@ const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)
 		return mostBlocked;
 	})
 	.catch((err) => {
-		logger.error("Failed to initialize PlaywrightBlocker from prebuilt lists", err);
+		logger.error(err, "Failed to initialize PlaywrightBlocker from prebuilt lists");
 		return PlaywrightBlocker.empty();
 	});
 
