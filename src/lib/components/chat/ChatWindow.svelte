@@ -35,6 +35,7 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
+	import ShareChatModal from "./ShareChatModal.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -52,6 +53,7 @@
 	let loginModalOpen = false;
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
+	let displayShareChatModal = false;
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
 
@@ -122,7 +124,8 @@
 		file2base64(file).then((value) => ({ type: "base64", value, mime: file.type, name: file.name }))
 	);
 
-	function onShare() {
+	function onShareConfirm() {
+		displayShareChatModal = false;
 		dispatch("share");
 		isSharedRecently = true;
 		if (timeout) {
@@ -165,6 +168,9 @@
 	];
 </script>
 
+{#if displayShareChatModal}
+	<ShareChatModal on:close={() => (displayShareChatModal = false)} on:confirm={onShareConfirm} />
+{/if}
 <div class="relative min-h-0 min-w-0">
 	{#if loginModalOpen}
 		<LoginModal
@@ -427,7 +433,7 @@
 						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
 						class:hover:underline={!isSharedRecently}
-						on:click={onShare}
+						on:click={() => (displayShareChatModal = true)}
 						disabled={isSharedRecently}
 					>
 						{#if isSharedRecently}
