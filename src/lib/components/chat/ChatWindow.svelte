@@ -20,6 +20,7 @@
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import UploadBtn from "../UploadBtn.svelte";
+	import HelpBtn from "../HelpBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import type { Assistant } from "$lib/types/Assistant";
 	import { base } from "$app/paths";
@@ -35,6 +36,7 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
+	import HelpBlock from "../HelpBlock.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -50,6 +52,7 @@
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
 	let loginModalOpen = false;
+	let helpBoxModalOpen = false;
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
@@ -310,6 +313,12 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
+						<HelpBtn
+							classNames="ml-auto"
+							onclick={() => {
+								helpBoxModalOpen = !helpBoxModalOpen;
+							}}
+						/>
 						{#if activeMimeTypes.length > 0}
 							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
@@ -417,8 +426,6 @@
 							</span>
 						{/if}
 					{/if}
-					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
-					or false.
 				</p>
 				{#if messages.length}
 					<button
@@ -438,6 +445,13 @@
 					</button>
 				{/if}
 			</div>
+			{#if helpBoxModalOpen}
+				<div
+					class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
+				>
+					<HelpBlock bind:message />
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

@@ -5,6 +5,7 @@
 	import DecisionTree from "./d3figure/DecisionTree.svelte";
 	import ImagesBlock from "./ImagesBlock.svelte";
 	import ExplainBlock from "./ExplainBlock.svelte";
+	import ConceptGraphBlock from "./ConceptGraphBlock.svelte";
 	function zip(arr1, arr2) {
 		let length = Math.min(arr1.length, arr2.length);
 		let result = [];
@@ -24,6 +25,7 @@
 		"collapsible-div",
 		"images",
 		"image-with-mask",
+		// "concept-graph",
 	];
 
 	$: highlightedCode = "";
@@ -68,6 +70,8 @@
 	</div>
 {:else if lang == "image-with-mask"}
 	<ExplainBlock json_data={parsedParams} />
+{:else if lang == "concept-graph"}
+	<ConceptGraphBlock graph={parsedParams} />
 {:else}
 	<div class="group relative my-4 rounded-lg">
 		<!-- eslint-disable svelte/no-at-html-tags -->
