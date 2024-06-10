@@ -118,44 +118,43 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 
 		const toolOutputs: Array<Record<string, string>> = [];
 
-		jp.query(outputs, toolFn.outputPath).map(async (output: string | string[], idx) => {
-			if (toolFn.outputType === "file") {
-				// output files are actually URLs
-				const outputs = Array.isArray(output) ? output : [output];
+		await Promise.all(
+			jp.query(outputs, toolFn.outputPath).map(async (output: string | string[], idx) => {
+				if (toolFn.outputType === "file") {
+					// output files are actually URLs
+					const outputs = Array.isArray(output) ? output : [output];
 
-				await Promise.all(
-					outputs.map(async (output, idx) => {
-						await fetch(output)
-							.then((res) => res.blob())
-							.then(async (blob) => {
-								const fileType = blob.type.split("/")[1] ?? toolFn.outputMimeType?.split("/")[1];
-								return new File(
-									[blob],
-									`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
-									{
-										type: fileType,
-									}
-								);
-							})
-							.then((file) => uploadFile(file, ctx.conv))
-							.then((file) => files.push(file));
-					})
-				);
+					await Promise.all(
+						outputs.map(async (output, idx) => {
+							await fetch(output)
+								.then((res) => res.blob())
+								.then(async (blob) => {
+									const fileType = blob.type.split("/")[1] ?? toolFn.outputMimeType?.split("/")[1];
+									return new File(
+										[blob],
+										`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
+										{
+											type: fileType,
+										}
+									);
+								})
+								.then((file) => uploadFile(file, ctx.conv))
+								.then((file) => files.push(file));
+						})
+					);
 
-				console.log({ files });
+					toolOutputs.push({
+						[toolFn.name + "-" + idx.toString()]:
+							"A file has been generated. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it. Be concise.",
+					});
+				} else {
+					outputs.push({
+						[toolFn.name + "-" + idx.toString()]: output,
+					});
+				}
+			})
+		);
 
-				toolOutputs.push({
-					[toolFn.name + "-" + idx.toString()]:
-						"A file has been generated. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it. Be concise.",
-				});
-			} else {
-				outputs.push({
-					[toolFn.name + "-" + idx.toString()]: output,
-				});
-			}
-		});
-
-		console.log({ files });
 		for (const file of files) {
 			yield {
 				type: MessageUpdateType.File,
