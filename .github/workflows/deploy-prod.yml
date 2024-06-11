@@ -51,7 +51,6 @@ jobs:
             INCLUDE_DB=false
             APP_BASE=/chat
             PUBLIC_APP_COLOR=yellow
-
   deploy:
     name: Deploy on prod
     runs-on: ubuntu-latest

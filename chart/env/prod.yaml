@@ -99,8 +99,8 @@ envVars:
         "websiteUrl": "https://huggingface.co/HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/zephyr-logo.png",
         "parameters": {
-          "truncate" : 24576,
-          "max_new_tokens" : 8192,
+          "truncate" : 6146,
+          "max_new_tokens" : 2044,
           "temperature": 0.6
         },
         "preprompt" : "You are Zephyr, an assistant developed by KAIST AI, Argilla, and Hugging Face. You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. You are happy to help with writing, analysis, question answering, math, coding, and all sorts of other tasks.",
