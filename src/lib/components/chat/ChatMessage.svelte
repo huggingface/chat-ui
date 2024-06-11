@@ -19,6 +19,7 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import { PUBLIC_SEP_TOKEN } from "$lib/constants/publicSepToken";
 	import type { Model } from "$lib/types/Model";
+	import { enhance } from "$app/forms";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
@@ -78,6 +79,7 @@
 	let loadingEl: IconLoading;
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 	let isCopied = false;
+	let isConfirmingBranchDeletion = false;
 
 	let initialized = false;
 
@@ -536,18 +538,53 @@
 					>
 						<CarbonChevronRight class="text-sm" />
 					</button>
-					{#if !loading && message.children}<form
-							method="POST"
-							action="?/deleteBranch"
-							class="hidden group-hover/navbranch:block"
+					{#if !loading && message.children}
+						<button
+							class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
+							type="submit"
+							on:click={() => (isConfirmingBranchDeletion = true)}><CarbonTrashCan /></button
 						>
-							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
-							<button
-								class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
-								type="submit"
-								><CarbonTrashCan />
-							</button>
-						</form>
+					{/if}
+					{#if message.children && isConfirmingBranchDeletion}
+						<Modal on:close={() => (isConfirmingBranchDeletion = false)}>
+							<div class="w-full min-w-64 p-4">
+								<span class="mb-1 text-sm font-semibold"
+									>Are you sure you want to delete this branch?</span
+								>
+
+								<p class="text-sm text-gray-500">
+									Deleting this branch will permanently delete this message and all subsequent
+									messages.
+								</p>
+
+								<div class="flex w-full flex-row justify-between px-2 pt-4">
+									<button
+										type="button"
+										class="text-sm text-gray-700 hover:underline"
+										on:click={() => (isConfirmingBranchDeletion = false)}>Cancel</button
+									>
+
+									<form
+										method="POST"
+										action="?/deleteBranch"
+										use:enhance={() => {
+											isConfirmingBranchDeletion = false;
+										}}
+									>
+										<input
+											name="messageId"
+											value={message.children[childrenToRender]}
+											type="hidden"
+										/>
+										<button
+											class="flex items-center gap-2 rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white md:px-8"
+											type="submit"
+											><CarbonTrashCan /> Delete Branch
+										</button>
+									</form>
+								</div>
+							</div>
+						</Modal>
 					{/if}
 				</div>
 			{/if}
