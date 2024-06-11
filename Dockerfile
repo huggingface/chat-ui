@@ -55,6 +55,7 @@ ENV INCLUDE_DB=${INCLUDE_DB}
 ARG APP_BASE=
 # tailwind requires the primary theme to be known at build time so it must be passed as a build arg
 ARG PUBLIC_APP_COLOR=blue
+ARG BODY_SIZE_LIMIT=12582912
 
 # install dotenv-cli
 RUN npm install -g dotenv-cli
