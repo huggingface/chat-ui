@@ -51,7 +51,7 @@ jobs:
             INCLUDE_DB=false
             APP_BASE=/chat
             PUBLIC_APP_COLOR=yellow
-            BODY_SIZE_LIMIT=12288
+            BODY_SIZE_LIMIT=12582912
 
   deploy:
     name: Deploy on prod
