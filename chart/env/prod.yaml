@@ -99,7 +99,7 @@ envVars:
         "websiteUrl": "https://huggingface.co/HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/zephyr-logo.png",
         "parameters": {
-          "truncate" : 24576,
+          "truncate" : 8190,
           "max_new_tokens" : 8192,
           "temperature": 0.6
         },
