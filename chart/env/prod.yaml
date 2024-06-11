@@ -30,7 +30,6 @@ envVars:
   ADDRESS_HEADER: 'X-Forwarded-For'
   ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   APP_BASE: "/chat"
-  BODY_SIZE_LIMIT: 12582912
   ENABLE_ASSISTANTS: "true"
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
