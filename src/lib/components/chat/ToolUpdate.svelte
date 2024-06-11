@@ -7,7 +7,6 @@
 	} from "$lib/utils/messageUpdates";
 
 	import CarbonTools from "~icons/carbon/tools";
-	import { toolHasName } from "$lib/utils/tools";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
 	import { onMount } from "svelte";
@@ -16,7 +15,7 @@
 	export let tool: MessageToolUpdate[];
 	export let loading: boolean = false;
 
-	const toolName = tool.find(isMessageToolCallUpdate)?.call.name;
+	const toolFnName = tool.find(isMessageToolCallUpdate)?.call.name;
 	$: toolError = tool.some(isMessageToolErrorUpdate);
 	$: toolDone = tool.some(isMessageToolResultUpdate);
 
@@ -26,12 +25,15 @@
 	let animation: Animation | undefined = undefined;
 
 	let isShowingLoadingBar = false;
+
 	onMount(() => {
 		if (!toolError && !toolDone && loading && loadingBarEl) {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: availableTools.find((tool) => tool.name === toolName)?.timeToUseMS,
+				duration: availableTools
+					.flatMap((tool) => tool.functions)
+					.find((fn) => fn.name === toolFnName)?.timeToUseMS,
 				fill: "forwards",
 			});
 		}
@@ -63,7 +65,7 @@
 		})();
 </script>
 
-{#if toolName && toolName !== "websearch"}
+{#if toolFnName && toolFnName !== "websearch"}
 	<details
 		class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm transition-all open:mb-3
         open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10"
@@ -102,9 +104,7 @@
 
 			<span>
 				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-				<span class="font-semibold"
-					>{availableTools.find((el) => toolHasName(toolName, el))?.displayName}</span
-				>
+				<span class="font-semibold">{toolFnName}</span>
 			</span>
 		</summary>
 		{#each tool as toolUpdate}

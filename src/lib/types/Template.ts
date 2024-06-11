@@ -1,9 +1,9 @@
 import type { Message } from "./Message";
-import type { Tool, ToolResult } from "./Tool";
+import type { ToolFunction, ToolResult } from "./Tool";
 
 export type ChatTemplateInput = {
 	messages: Pick<Message, "from" | "content">[];
 	preprompt?: string;
-	tools?: Tool[];
+	tools?: ToolFunction[];
 	toolResults?: ToolResult[];
 };

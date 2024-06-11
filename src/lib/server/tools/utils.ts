@@ -1,6 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
 import { SignJWT } from "jose";
+import { logger } from "../logger";
 
 export type GradioImage = {
 	path: string;
@@ -34,8 +35,11 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 	const client = await CustomClient.connect(name, {
 		hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
 	});
+
+	logger.info({ name, func, parameters });
+
 	return await client
-		.predict(func, parameters)
+		.predict(func, [...parameters, 0]) // XXX: fix this
 		.then((res) => (res as unknown as GradioResponse).data as TOutput);
 }
 
