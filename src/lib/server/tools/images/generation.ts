@@ -46,13 +46,13 @@ const imageGeneration: BackendTool = {
 			"/infer",
 			[
 				String(prompt), // prompt
-				String(negativePrompt),
+				String(negativePrompt), // negative prompt
 				Math.floor(Math.random() * 1000), // seed random
 				true, // randomize seed
 				Number(width), // number in 'Image Width' Number component
 				Number(height), // number in 'Image Height' Number component
-				5,
-				28,
+				5, // guidance scale
+				28, // steps
 			],
 			ipToken
 		);
