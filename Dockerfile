@@ -17,6 +17,7 @@ FROM builder-production as builder
 
 ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=blue
+ARG BODY_SIZE_LIMIT=12582912
 
 RUN --mount=type=cache,target=/app/.npm \
         npm set cache /app/.npm && \
