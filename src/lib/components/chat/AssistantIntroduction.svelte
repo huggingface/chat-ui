@@ -67,7 +67,7 @@
 				/>
 			{:else}
 				<div
-					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 dark:bg-gray-600 max-sm:self-start sm:text-4xl md:size-32"
+					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 max-sm:self-start sm:text-4xl md:size-32 dark:bg-gray-600"
 				>
 					{assistant?.name[0]}
 				</div>
@@ -116,7 +116,7 @@
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<div class="flex flex-row items-center gap-1">
 				<button
-					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 max-sm:px-1.5 md:text-sm"
+					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner max-sm:px-1.5 md:text-sm dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
 					on:click={() => {
 						if (!isCopied) {
 							share(shareUrl, assistant.name);
@@ -137,7 +137,7 @@
 				</button>
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
-					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 md:text-sm"
+					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner md:text-sm dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
 					><IconGear class="text-xxs" />Settings</a
 				>
 			</div>
