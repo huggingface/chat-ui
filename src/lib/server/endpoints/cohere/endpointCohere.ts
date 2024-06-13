@@ -74,7 +74,7 @@ export async function endpointCohere(
 				const formattedMessages = messages
 					.filter((message) => message.from !== "system")
 					.map((message) => ({
-						role: (message.from === "user" ? "USER" : "CHATBOT") as "USER" | "CHATBOT",
+						role: message.from === "user" ? "USER" : "CHATBOT",
 						message: message.content,
 					})) satisfies Cohere.ChatMessage[];
 

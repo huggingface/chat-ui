@@ -1,4 +1,4 @@
-import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
+import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources";
 import { makeImageProcessor, type ImageProcessorOptions } from "../images";
 import type { EndpointMessage } from "../endpoints";
 import type { MessageFile } from "$lib/types/Message";
