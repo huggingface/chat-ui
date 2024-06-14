@@ -91,5 +91,5 @@
 		</defs>
 		<rect width="100%" height="100%" fill="url(#gradient-{gradientColor})" mask="url(#mask)" />
 	</svg>
-	<svelte:component this={iconEl} class="relative size-7 text-clip" />
+	<svelte:component this={iconEl} class="relative size-7 text-clip text-gray-200" />
 </div>

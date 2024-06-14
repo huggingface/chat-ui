@@ -24,8 +24,15 @@
 
 	export let data: PageData;
 
+	$: tools = data.tools.filter((t) =>
+		activeOnly
+			? Object.entries(data.settings.tools).some(([k, v]) => v && k === t._id.toString())
+			: true
+	);
+
 	$: toolsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === toolsCreator;
+	$: activeOnly = $page.url.searchParams.get("active") === "true";
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement;
@@ -70,6 +77,19 @@
 		goto(newUrl);
 	};
 
+	const goToActiveUrl = () => {
+		return getHref($page.url, {
+			newKeys: { active: "true" },
+			existingKeys: { behaviour: "delete_except", keys: ["active", "sort"] },
+		});
+	};
+
+	const goToCommunity = () => {
+		return getHref($page.url, {
+			existingKeys: { behaviour: "delete_except", keys: ["sort", "q", "user"] },
+		});
+	};
+
 	const settings = useSettingsStore();
 </script>
 
@@ -109,9 +129,9 @@
 			{/if}
 		</div>
 		<h3 class="text-gray-500">Popular assistants made by the community</h3>
-		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
+		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<a
-				href={`${base}/settings/assistants/new`}
+				href={`${base}/tools/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
 				<CarbonAdd />Create new tool
@@ -146,11 +166,20 @@
 				{/if}
 			{:else}
 				<a
-					href={getHref($page.url, {
-						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
-					})}
-					on:click={resetFilter}
-					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!toolsCreator
+					href={goToActiveUrl()}
+					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {activeOnly
+						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
+				>
+					<CarbonEarthAmerica class="text-xs" />
+					Active ({Object.entries($settings?.tools ?? {}).filter(
+						([key]) => $settings?.tools?.[key] === true
+					).length})
+				</a>
+				<a
+					href={goToCommunity()}
+					class="flex items-center gap-1.5 rounded-full border px-3 py-1 {!activeOnly &&
+					!toolsCreator
 						? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
 				>
@@ -161,7 +190,7 @@
 					<a
 						href={getHref($page.url, {
 							newKeys: { user: data.user.username },
-							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q"] },
+							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q", "active"] },
 						})}
 						on:click={resetFilter}
 						class="flex items-center gap-1.5 truncate rounded-full border px-3 py-1 {toolsCreator &&
@@ -197,14 +226,16 @@
 		</div>
 
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 md:grid-cols-2">
-			{#each data.tools as tool (tool._id)}
+			{#each tools as tool (tool._id)}
 				<button
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-24 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 					on:click={() => {
-						if ($settings?.tools?.[tool.displayName] ?? false) {
+						if ($settings?.tools?.[tool._id.toString()] ?? false) {
 							// remove from settings
 							const tools = Object.fromEntries(
-								Object.entries($settings?.tools ?? {}).filter(([key]) => key !== tool.displayName)
+								Object.entries($settings?.tools ?? {}).filter(
+									([key]) => key !== tool._id.toString()
+								)
 							);
 
 							settings.instantSet({
@@ -213,7 +244,7 @@
 						} else {
 							// add to settings
 							settings.instantSet({
-								tools: { ...$settings.tools, [tool.displayName]: true },
+								tools: { ...$settings.tools, [tool._id.toString()]: true },
 							});
 						}
 					}}
@@ -224,15 +255,15 @@
 							<span class="w-fit overflow-clip">
 								{tool.displayName}
 							</span>
-							{#if Object.keys($settings?.tools ?? {}).includes(tool.displayName) && $settings?.tools?.[tool.displayName] === true}
+							{#if Object.keys($settings?.tools ?? {}).includes(tool._id.toString()) && $settings?.tools?.[tool._id.toString()] === true}
 								<!-- active badge -->
 								<span
-									class="ml-auto inline-flex items-center rounded-full bg-blue-500 px-2 py-0.5 text-xs font-semibold text-white"
+									class="ml-auto inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
 									>Active</span
 								>
 							{/if}
 						</span>
-						<span class="text-xs text-gray-400">
+						<span class="font-mono text-xs text-gray-400">
 							{tool.baseUrl ?? "Internal tool"}
 						</span>
 						{#if tool.createdByName}

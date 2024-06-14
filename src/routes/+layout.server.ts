@@ -108,6 +108,27 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	}
 
 	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
+
+	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
+	const activeCommunityToolIds = Object.keys(settings?.tools ?? {})
+		.filter((key) => !configToolIds.includes(key))
+		.map((key) => {
+			console.log(key);
+			return new ObjectId(key);
+		});
+
+	const communityTools = await collections.tools
+		.find({ _id: { $in: activeCommunityToolIds } })
+		.toArray()
+		.then((tools) =>
+			tools.map((tool) => ({
+				...tool,
+				isHidden: false,
+				isOnByDefault: true,
+				isLocked: true,
+			}))
+		);
+
 	return {
 		conversations: conversations.map((conv) => {
 			if (settings?.hideEmojiOnSidebar) {
@@ -168,8 +189,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
-		tools: toolFromConfigs
-			.filter((tool) => !tool.isHidden)
+		tools: [...toolFromConfigs, ...communityTools]
+			.filter((tool) => !tool?.isHidden)
 			.map(
 				(tool) =>
 					({

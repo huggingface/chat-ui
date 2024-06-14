@@ -1,10 +1,11 @@
+import { authCondition } from "$lib/server/auth.js";
 import { Database, collections } from "$lib/server/database.js";
 import { SortKey } from "$lib/types/Assistant.js";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import type { User } from "$lib/types/User.js";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import { error } from "@sveltejs/kit";
-import type { Filter } from "mongodb";
+import { ObjectId, type Filter } from "mongodb";
 
 const NUM_PER_PAGE = 16;
 
@@ -15,6 +16,7 @@ export const load = async ({ url, locals }) => {
 	const pageIndex = parseInt(url.searchParams.get("p") ?? "0");
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
+	const activeOnly = url.searchParams.get("active") === "true";
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
@@ -27,10 +29,19 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
+	const settings = await collections.settings.findOne(authCondition(locals));
+
+	if (!settings && activeOnly) {
+		throw error(404, "No user settings found");
+	}
+
 	const filter: Filter<CommunityToolDB> = {
 		...(!createdByCurrentUser && { featured: true }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...(activeOnly && {
+			_id: { $in: Object.keys(settings?.tools ?? {}).map((key) => new ObjectId(key)) },
+		}),
 	};
 
 	const tools = await Database.getInstance()
