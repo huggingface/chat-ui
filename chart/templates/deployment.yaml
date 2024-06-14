@@ -4,6 +4,10 @@ metadata:
   labels: {{ include "labels.standard" . | nindent 4 }}
   name: {{ include "name" . }}
   namespace: {{ .Release.Namespace }}
+  {{- if .Values.infisical.enabled }}
+  annotations:
+    secrets.infisical.com/auto-reload: "true"
+  {{- end }}
 spec:
   progressDeadlineSeconds: 600
   {{- if not $.Values.autoscaling.enabled }}
@@ -61,9 +65,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "name" . }}
-          {{- if $.Values.externalSecrets.enabled }}
+          {{- if $.Values.infisical.enabled }}
             - secretRef:
-                name: {{ $.Values.externalSecrets.secretName }}
+                name: {{ include "name" $ }}-secs
           {{- end }}
           {{- with $.Values.extraEnvFrom }}
             {{- toYaml . | nindent 14 }}
