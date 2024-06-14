@@ -347,20 +347,9 @@ envVars:
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   XFF_DEPTH: '2'
 
-externalSecrets:
+infisical:
   enabled: true
-  secretStoreName: "chat-ui-prod-secretstore"
-  secretName: "chat-ui-prod-secrets"
-  parameters:
-    MONGODB_URL: "hub-prod-chat-ui-mongodb-url"
-    OPENID_CONFIG: "hub-prod-chat-ui-openid-config"
-    SERPER_API_KEY: "hub-prod-chat-ui-serper-api-key"
-    HF_TOKEN: "hub-prod-chat-ui-hf-token"
-    WEBHOOK_URL_REPORT_ASSISTANT: "hub-prod-chat-ui-webhook-report-assistant"
-    ADMIN_API_SECRET: "hub-prod-chat-ui-admin-api-secret"
-    USAGE_LIMITS: "hub-prod-chat-ui-usage-limits"
-    MESSAGES_BEFORE_LOGIN: "hub-prod-chat-ui-messages-before-login"
-    IP_TOKEN_SECRET: "hub-prod-chat-ui-ip-token-secret"
+  env: "prod-us-east-1"
 
 autoscaling:
   enabled: true
