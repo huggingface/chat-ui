@@ -56,9 +56,10 @@ export interface ToolFunction {
 }
 
 export interface BaseTool {
+	_id: ObjectId;
 	// tool can have multiple functions that get added/removed as a group
 	functions: ToolFunction[];
-	baseUrl?: string; // namespace for the tool, used to group tools together
+	baseUrl?: string; // namespace for the tool
 
 	// for displaying in the UI
 	displayName: string;
@@ -77,7 +78,6 @@ export interface ConfigTool extends BaseTool {
 export interface CommunityTool extends BaseTool, Timestamps {
 	type: "community";
 
-	_id: ObjectId;
 	createdById: User["_id"] | string; // user id or session
 	createdByName?: User["username"];
 
@@ -98,6 +98,7 @@ export type ToolFront = (
 	| Pick<ConfigTool, "type" | "displayName" | "description">
 	| Pick<CommunityTool, "type" | "displayName" | "description">
 ) & {
+	_id: string;
 	isOnByDefault: boolean;
 	isLocked: boolean;
 	mimeTypes: string[];

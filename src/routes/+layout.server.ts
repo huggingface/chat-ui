@@ -173,6 +173,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			.map(
 				(tool) =>
 					({
+						_id: tool._id.toString(),
 						type: tool.type,
 						displayName: tool.displayName,
 						description: tool.description,

@@ -15,6 +15,7 @@ import { callSpace, getIpToken } from "./utils";
 import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
 import { sha256 } from "$lib/utils/sha256";
+import { ObjectId } from "mongodb";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -63,6 +64,11 @@ export const configTools = z
 						showOutput: z.boolean(),
 					})
 				),
+				_id: z
+					.string()
+					.length(24)
+					.regex(/^[0-9a-fA-F]{24}$/)
+					.transform((val) => new ObjectId(val)),
 				baseUrl: z.string().optional(),
 				displayName: z.string(),
 				color: z.string(),

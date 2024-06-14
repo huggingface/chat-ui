@@ -114,6 +114,7 @@ async function seed() {
 		await collections.settings.deleteMany({});
 		await collections.assistants.deleteMany({});
 		await collections.conversations.deleteMany({});
+		await collections.tools.deleteMany({});
 		console.log("Reset done");
 	}
 

@@ -46,11 +46,12 @@ export function filterToolsOnPreferences(
 	// if it's an assistant, only support websearch for now
 	if (isAssistant) return [...directlyAnswer.functions, ...websearch.functions];
 
+	logger.info({ toolsPreference });
 	// filter based on tool preferences, add the tools that are on by default
 	return toolFromConfigs
 		.filter((el) => {
 			if (el.isLocked && el.isOnByDefault) return true;
-			return toolsPreference?.[el.displayName] ?? el.isOnByDefault;
+			return toolsPreference?.[el._id.toString()] ?? el.isOnByDefault;
 		})
 		.map((el) => el.functions)
 		.flat();

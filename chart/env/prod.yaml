@@ -345,6 +345,7 @@ envVars:
   TOOLS: >
     [
       {
+        "_id": "000000000000000000000001",
         "displayName": "Image Generation",
         "description" : "Use this tool to generate images based on a prompt.",
         "color" : "yellow",

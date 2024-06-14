@@ -16,14 +16,12 @@
 	$: activeToolCount = $page.data.tools.filter(
 		(tool: ToolFront) =>
 			// community tools are always on by default
-			tool.type === "community" || ($settings?.tools?.[tool.displayName] ?? tool.isOnByDefault)
+			tool.type === "community" || ($settings?.tools?.[tool._id] ?? tool.isOnByDefault)
 	).length;
 
 	function setAllTools(value: boolean) {
 		settings.instantSet({
-			tools: Object.fromEntries(
-				$page.data.tools.map((tool: ToolFront) => [tool.displayName, value])
-			),
+			tools: Object.fromEntries($page.data.tools.map((tool: ToolFront) => [tool._id, value])),
 		});
 	}
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
@@ -72,23 +70,23 @@
 				</button>
 			</div>
 			{#each $page.data.tools as tool}
-				{@const isChecked = $settings?.tools?.[tool.displayName] ?? tool.isOnByDefault}
+				{@const isChecked = $settings?.tools?.[tool._id] ?? tool.isOnByDefault}
 				<div class="flex items-center gap-1.5">
 					<input
 						type="checkbox"
-						id={tool.displayName}
+						id={tool._id}
 						checked={isChecked}
 						disabled={loading}
 						on:click={async () => {
 							await settings.instantSet({
 								tools: {
 									...$settings.tools,
-									[tool.displayName]: !isChecked,
+									[tool._id]: !isChecked,
 								},
 							});
 						}}
 					/>
-					<label class="cursor-pointer" for={tool.displayName}>{tool.displayName} </label>
+					<label class="cursor-pointer" for={tool._id}>{tool.displayName} </label>
 				</div>
 			{/each}
 		</div>

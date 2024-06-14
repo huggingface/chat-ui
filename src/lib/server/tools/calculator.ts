@@ -1,11 +1,13 @@
 import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 import vm from "node:vm";
 
 const calculator: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000C"),
 	type: "config",
 	description: "Calculate the result of a mathematical expression",
 	color: "blue",
-	icon: "math",
+	icon: "code",
 	displayName: "Calculator",
 	isOnByDefault: true,
 	functions: [

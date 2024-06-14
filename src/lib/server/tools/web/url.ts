@@ -1,12 +1,14 @@
 import { stringifyMarkdownElementTree } from "$lib/server/websearch/markdown/utils/stringify";
 import { scrapeUrl } from "$lib/server/websearch/scrape/scrape";
 import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 
 const fetchUrl: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000B"),
 	type: "config",
 	description: "Fetch the contents of a URL",
 	color: "blue",
-	icon: "web",
+	icon: "cloud",
 	displayName: "Fetch URL",
 	isOnByDefault: true,
 	functions: [

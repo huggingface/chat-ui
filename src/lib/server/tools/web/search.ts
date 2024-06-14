@@ -1,11 +1,13 @@
 import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 import { runWebSearch } from "../../websearch/runWebSearch";
 
 const websearch: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000A"),
 	type: "config",
 	description: "Search the web for answers to the user's query",
 	color: "blue",
-	icon: "web",
+	icon: "wikis",
 	displayName: "Web Search",
 	isOnByDefault: true,
 	functions: [

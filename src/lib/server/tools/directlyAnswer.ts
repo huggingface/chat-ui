@@ -1,10 +1,12 @@
 import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 
 const directlyAnswer: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000D"),
 	type: "config",
 	description: "Answer the user's query directly",
 	color: "blue",
-	icon: "bubble",
+	icon: "chat",
 	displayName: "Directly Answer",
 	isOnByDefault: true,
 	isLocked: true,
