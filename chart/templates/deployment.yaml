@@ -61,9 +61,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "name" . }}
-          {{- if $.Values.externalSecrets.enabled }}
+          {{- if $.Values.infisical.enabled }}
             - secretRef:
-                name: {{ $.Values.externalSecrets.secretName }}
+                name: {{ include "name" $ }}-infisical-secret
           {{- end }}
           {{- with $.Values.extraEnvFrom }}
             {{- toYaml . | nindent 14 }}

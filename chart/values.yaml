@@ -38,12 +38,17 @@ nodeSelector: {}
 tolerations: []
 
 envVars: { }
-externalSecrets:
+
+infisical:
   enabled: false
-  secretStoreName: ""
-  secretName: ""
-  parameters: { }
-# Allow to environment injections on top or instead of externalSecrets
+  env: ""
+  project: "huggingchat-v2-a1"
+  url: ""
+  resyncInterval: 60
+  operatorSecretName: "huggingchat-operator-secrets"
+  operatorSecretNamespace: "hub-utils"
+
+# Allow to environment injections on top or instead of infisical
 extraEnvFrom: []
 extraEnv: []
 
