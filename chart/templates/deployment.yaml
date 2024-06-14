@@ -63,7 +63,7 @@ spec:
                 name: {{ include "name" . }}
           {{- if $.Values.infisical.enabled }}
             - secretRef:
-                name: {{ include "name" $ }}-infisical-secret
+                name: {{ include "name" $ }}-secs
           {{- end }}
           {{- with $.Values.extraEnvFrom }}
             {{- toYaml . | nindent 14 }}
