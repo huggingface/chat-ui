@@ -110,15 +110,13 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
 
 	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
-	const activeCommunityToolIds = Object.keys(settings?.tools ?? {})
-		.filter((key) => !configToolIds.includes(key))
-		.map((key) => {
-			console.log(key);
-			return new ObjectId(key);
-		});
+
+	const activeCommunityToolIds = (settings?.tools ?? []).filter(
+		(key) => !configToolIds.includes(key)
+	);
 
 	const communityTools = await collections.tools
-		.find({ _id: { $in: activeCommunityToolIds } })
+		.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
 		.toArray()
 		.then((tools) =>
 			tools.map((tool) => ({
@@ -168,7 +166,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
-			tools: settings?.tools ?? {},
+			tools: settings?.tools ?? [],
 		},
 		models: models.map((model) => ({
 			id: model.id,

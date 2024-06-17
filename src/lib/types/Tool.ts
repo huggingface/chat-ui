@@ -92,12 +92,11 @@ export interface CommunityTool extends BaseTool, Timestamps {
 // no call function in db
 export type CommunityToolDB = CommunityTool & { functions: Omit<ToolFunction, "call">[] };
 
+export type CommunityToolEditable = Omit<CommunityToolDB, "_id"> & { _id: string };
+
 export type Tool = ConfigTool | CommunityTool;
 
-export type ToolFront = (
-	| Pick<ConfigTool, "type" | "displayName" | "description">
-	| Pick<CommunityTool, "type" | "displayName" | "description">
-) & {
+export type ToolFront = Pick<Tool, "type" | "displayName" | "description"> & {
 	_id: string;
 	isOnByDefault: boolean;
 	isLocked: boolean;

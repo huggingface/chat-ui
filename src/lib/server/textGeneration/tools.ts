@@ -40,18 +40,17 @@ function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string
 }
 
 export function filterToolsOnPreferences(
-	toolsPreference: Record<string, boolean>,
+	toolsPreference: Array<string>,
 	isAssistant: boolean
 ): ToolFunction[] {
 	// if it's an assistant, only support websearch for now
 	if (isAssistant) return [...directlyAnswer.functions, ...websearch.functions];
 
-	logger.info({ toolsPreference });
 	// filter based on tool preferences, add the tools that are on by default
 	return toolFromConfigs
 		.filter((el) => {
 			if (el.isLocked && el.isOnByDefault) return true;
-			return toolsPreference?.[el._id.toString()] ?? el.isOnByDefault;
+			return toolsPreference?.includes(el._id.toString()) ?? el.isOnByDefault;
 		})
 		.map((el) => el.functions)
 		.flat();

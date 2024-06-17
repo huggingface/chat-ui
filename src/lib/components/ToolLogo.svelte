@@ -16,27 +16,25 @@
 	export let color: ToolLogoColor;
 	export let icon: ToolLogoIcon;
 
-	let gradientColor = "#0E1523";
+	$: gradientColor = (() => {
+		switch (color) {
+			case "purple":
+				return "#653789";
+			case "blue":
+				return "#375889";
+			case "green":
+				return "#37894E";
+			case "yellow":
+				return "#897C37";
+			case "red":
+				return "#893737";
+			default:
+				console.log("Unknown color", color);
+				return "#FFF";
+		}
+	})();
 
 	let iconEl = CarbonWikis;
-
-	switch (color) {
-		case "purple":
-			gradientColor = "#653789";
-			break;
-		case "blue":
-			gradientColor = "#375889";
-			break;
-		case "green":
-			gradientColor = "#37894E";
-			break;
-		case "yellow":
-			gradientColor = "#897C37";
-			break;
-		case "red":
-			gradientColor = "#893737";
-			break;
-	}
 
 	switch (icon) {
 		case "wikis":

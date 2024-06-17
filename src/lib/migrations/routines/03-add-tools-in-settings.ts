@@ -14,7 +14,7 @@ const addToolsToSettings: Migration = {
 			{
 				tools: { $exists: false },
 			},
-			{ $set: { tools: {} } }
+			{ $set: { tools: [] } }
 		);
 
 		settings

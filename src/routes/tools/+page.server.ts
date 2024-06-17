@@ -1,5 +1,6 @@
 import { authCondition } from "$lib/server/auth.js";
 import { Database, collections } from "$lib/server/database.js";
+import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { SortKey } from "$lib/types/Assistant.js";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import type { User } from "$lib/types/User.js";
@@ -40,11 +41,15 @@ export const load = async ({ url, locals }) => {
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 		...(activeOnly && {
-			_id: { $in: Object.keys(settings?.tools ?? {}).map((key) => new ObjectId(key)) },
+			_id: {
+				$in: (settings?.tools ?? []).map((key) => {
+					return new ObjectId(key);
+				}),
+			},
 		}),
 	};
 
-	const tools = await Database.getInstance()
+	const communityTools = await Database.getInstance()
 		.getCollections()
 		.tools.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
@@ -55,7 +60,11 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await Database.getInstance().getCollections().tools.countDocuments(filter);
+	const tools = [...toolFromConfigs.filter((tool) => !tool?.isHidden), ...communityTools];
+
+	const numTotalItems =
+		(await Database.getInstance().getCollections().tools.countDocuments(filter)) +
+		toolFromConfigs.length;
 
 	return {
 		tools: JSON.parse(JSON.stringify(tools)) as CommunityToolDB[],

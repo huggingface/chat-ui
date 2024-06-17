@@ -172,9 +172,7 @@
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
 				>
 					<CarbonEarthAmerica class="text-xs" />
-					Active ({Object.entries($settings?.tools ?? {}).filter(
-						([key]) => $settings?.tools?.[key] === true
-					).length})
+					Active ({$settings?.tools?.length})
 				</a>
 				<a
 					href={goToCommunity()}
@@ -226,28 +224,10 @@
 		</div>
 
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 md:grid-cols-2">
-			{#each tools as tool (tool._id)}
-				<button
+			{#each tools as tool}
+				<a
+					href="{base}/tools/{tool._id.toString()}"
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-24 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
-					on:click={() => {
-						if ($settings?.tools?.[tool._id.toString()] ?? false) {
-							// remove from settings
-							const tools = Object.fromEntries(
-								Object.entries($settings?.tools ?? {}).filter(
-									([key]) => key !== tool._id.toString()
-								)
-							);
-
-							settings.instantSet({
-								tools,
-							});
-						} else {
-							// add to settings
-							settings.instantSet({
-								tools: { ...$settings.tools, [tool._id.toString()]: true },
-							});
-						}
-					}}
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
 					<div class="flex w-full flex-col items-start">
@@ -255,7 +235,7 @@
 							<span class="w-fit overflow-clip">
 								{tool.displayName}
 							</span>
-							{#if Object.keys($settings?.tools ?? {}).includes(tool._id.toString()) && $settings?.tools?.[tool._id.toString()] === true}
+							{#if Object.keys($settings?.tools ?? {}).includes(tool._id.toString())}
 								<!-- active badge -->
 								<span
 									class="ml-auto inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
@@ -278,11 +258,12 @@
 							</p>
 						{/if}
 					</div>
-				</button>
+				</a>
 			{:else}
 				No tools found
 			{/each}
 		</div>
+
 		<Pagination
 			classNames="w-full flex justify-center mt-14 mb-4"
 			numItemsPerPage={data.numItemsPerPage}

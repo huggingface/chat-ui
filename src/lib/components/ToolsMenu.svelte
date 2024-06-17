@@ -16,13 +16,23 @@
 	$: activeToolCount = $page.data.tools.filter(
 		(tool: ToolFront) =>
 			// community tools are always on by default
-			tool.type === "community" || ($settings?.tools?.[tool._id] ?? tool.isOnByDefault)
+			tool.type === "community" || ($settings?.tools?.includes(tool._id) ?? tool.isOnByDefault)
 	).length;
 
-	function setAllTools(value: boolean) {
-		settings.instantSet({
-			tools: Object.fromEntries($page.data.tools.map((tool: ToolFront) => [tool._id, value])),
-		});
+	async function setAllTools(value: boolean) {
+		const configToolsIds = $page.data.tools
+			.filter((t: ToolFront) => t.type === "config")
+			.map((t: ToolFront) => t._id);
+
+		if (value) {
+			await settings.instantSet({
+				tools: Array.from(new Set([...configToolsIds, ...($settings?.tools ?? [])])),
+			});
+		} else {
+			await settings.instantSet({
+				tools: [],
+			});
+		}
 	}
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
 
@@ -75,7 +85,7 @@
 				</button>
 			</div>
 			{#each tools as tool}
-				{@const isChecked = $settings?.tools?.[tool._id] ?? tool.isOnByDefault}
+				{@const isChecked = $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault}
 				<div class="flex items-center gap-1.5">
 					{#if tool.type === "community"}
 						<input
@@ -84,14 +94,8 @@
 							checked={true}
 							class="rounded-xs font-semibold accent-purple-500 hover:accent-purple-600"
 							on:click|stopPropagation|preventDefault={async () => {
-								const tools = Object.fromEntries(
-									Object.entries($settings?.tools ?? {}).filter(
-										([key]) => key !== tool._id.toString()
-									)
-								);
-
 								await settings.instantSet({
-									tools,
+									tools: $settings?.tools?.filter((t) => t !== tool._id) ?? [],
 								});
 							}}
 						/>
@@ -103,10 +107,7 @@
 							disabled={loading}
 							on:click|stopPropagation={async () => {
 								await settings.instantSet({
-									tools: {
-										...$settings.tools,
-										[tool._id]: !isChecked,
-									},
+									tools: [...($settings?.tools ?? []), tool._id],
 								});
 							}}
 						/>

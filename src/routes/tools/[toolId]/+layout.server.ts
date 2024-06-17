@@ -1,0 +1,29 @@
+import { collections } from "$lib/server/database.js";
+import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { ObjectId } from "mongodb";
+
+export const load = async ({ params }) => {
+	const tool = await collections.tools.findOne({ _id: new ObjectId(params.toolId) });
+
+	if (!tool) {
+		const tool = toolFromConfigs.find((el) => el._id.toString() === params.toolId);
+		if (!tool) {
+			throw new Error("Tool not found");
+		}
+		return {
+			tool: {
+				...tool,
+				_id: tool._id.toString(),
+				functions: tool.functions.map((f) => ({ ...f, call: undefined })),
+			},
+		};
+	}
+
+	return {
+		tool: {
+			...tool,
+			_id: tool._id.toString(),
+			createdById: tool.createdById.toString(),
+		},
+	};
+};
