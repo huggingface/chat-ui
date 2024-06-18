@@ -131,7 +131,7 @@ export async function* runTools(
 	for await (const output of await endpoint({
 		messages: messagesWithFilesPrompt,
 		preprompt,
-		generateSettings: assistant?.generateSettings,
+		generateSettings: { ...assistant?.generateSettings, max_new_tokens: 512 },
 		tools,
 	})) {
 		// model natively supports tool calls
