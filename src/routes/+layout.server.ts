@@ -197,7 +197,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 						displayName: tool.displayName,
 						name: tool.name,
 						description: tool.description,
-						mimeTypes: tool.inputs
+						mimeTypes: (tool.inputs ?? [])
 							.filter((input): input is ToolInputFile => input.type === "file")
 							.map((input) => (input as ToolInputFile).mimeTypes)
 							.flat(),

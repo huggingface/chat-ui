@@ -33,15 +33,11 @@
 				tools: [],
 			});
 		}
-
-		console.log($settings.tools);
 	}
+
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
 
-	$: tools = $page.data.tools.filter(
-		(tool: ToolFront) =>
-			Object.keys($settings?.tools ?? {}).includes(tool._id) || tool.type === "config"
-	);
+	$: tools = $page.data.tools;
 </script>
 
 <details

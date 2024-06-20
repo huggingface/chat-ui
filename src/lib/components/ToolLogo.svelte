@@ -15,6 +15,7 @@
 
 	export let color: ToolLogoColor;
 	export let icon: ToolLogoIcon;
+	export let size: "md" | "lg" = "md";
 
 	$: gradientColor = (() => {
 		switch (color) {
@@ -71,10 +72,19 @@
 			iconEl = CarbonVideo;
 			break;
 	}
+
+	$: sizeClass = (() => {
+		switch (size) {
+			case "md":
+				return "size-14";
+			case "lg":
+				return "size-24";
+		}
+	})();
 </script>
 
-<div class="flex size-14 items-center justify-center">
-	<svg xmlns="http://www.w3.org/2000/svg" class="absolute h-14" viewBox="0 0 52 58">
+<div class="flex {sizeClass} items-center justify-center">
+	<svg xmlns="http://www.w3.org/2000/svg" class="absolute {sizeClass} h-full" viewBox="0 0 52 58">
 		<defs>
 			<linearGradient id="gradient-{gradientColor}" gradientTransform="rotate(90)">
 				<stop offset="0%" stop-color="#0E1523" />
@@ -89,5 +99,5 @@
 		</defs>
 		<rect width="100%" height="100%" fill="url(#gradient-{gradientColor})" mask="url(#mask)" />
 	</svg>
-	<svelte:component this={iconEl} class="relative size-7 text-clip text-gray-200" />
+	<svelte:component this={iconEl} class="relative {sizeClass} scale-50 text-clip text-gray-200" />
 </div>

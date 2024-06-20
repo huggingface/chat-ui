@@ -1,8 +1,9 @@
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { create } from "handlebars";
 import { ObjectId } from "mongodb";
 
-export const load = async ({ params }) => {
+export const load = async ({ params, locals }) => {
 	const tool = await collections.tools.findOne({ _id: new ObjectId(params.toolId) });
 
 	if (!tool) {
@@ -14,6 +15,11 @@ export const load = async ({ params }) => {
 			tool: {
 				...tool,
 				_id: tool._id.toString(),
+				call: undefined,
+				createdById: null,
+				createdByName: null,
+				createdByMe: false,
+				reported: false,
 			},
 		};
 	}
@@ -22,7 +28,11 @@ export const load = async ({ params }) => {
 		tool: {
 			...tool,
 			_id: tool._id.toString(),
+			call: undefined,
 			createdById: tool.createdById.toString(),
+			createdByMe:
+				tool.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+			reported: false,
 		},
 	};
 };

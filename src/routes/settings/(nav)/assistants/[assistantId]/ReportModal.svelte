@@ -22,10 +22,10 @@
 		}}
 		class="w-full min-w-64 p-4"
 	>
-		<span class="mb-1 text-sm font-semibold">Report an assistant</span>
+		<span class="mb-1 text-sm font-semibold">Report content</span>
 
 		<p class="text-sm text-gray-500">
-			Please provide a brief description of why you are reporting this assistant.
+			Please provide a brief description of why you are reporting this content.
 		</p>
 
 		<textarea
