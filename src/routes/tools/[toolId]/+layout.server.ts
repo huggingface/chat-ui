@@ -1,6 +1,5 @@
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
-import { create } from "handlebars";
 import { ObjectId } from "mongodb";
 
 export const load = async ({ params, locals }) => {

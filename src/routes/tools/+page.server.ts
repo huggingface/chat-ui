@@ -60,7 +60,8 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const tools = [...toolFromConfigs.filter((tool) => !tool?.isHidden), ...communityTools];
+	const configTools = toolFromConfigs.filter((tool) => !tool?.isHidden);
+	const tools = [...(pageIndex == 0 && !username ? configTools : []), ...communityTools];
 
 	const numTotalItems =
 		(await Database.getInstance().getCollections().tools.countDocuments(filter)) +

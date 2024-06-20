@@ -3,7 +3,6 @@ import express from "express";
 import { logger } from "$lib/server/logger";
 import { env } from "$env/dynamic/private";
 import type { Model } from "$lib/types/Model";
-import type { Tool } from "$lib/types/Tool";
 
 interface Metrics {
 	model: {

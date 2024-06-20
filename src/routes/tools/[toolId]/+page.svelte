@@ -146,13 +146,13 @@
 				</div>
 			</div>
 
-			<p>
+			<p class="text-sm">
 				Tools are applications that the model can choose to call while you are chatting with it.
 			</p>
 			{#if data.tool.description}
 				<div>
 					<h2 class="text-lg font-semibold">Description</h2>
-					<p class="pb-2 text-sm text-gray-500">{data.tool.description}</p>
+					<p class="pb-2">{data.tool.description}</p>
 				</div>
 			{/if}
 

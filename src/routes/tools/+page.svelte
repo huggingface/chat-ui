@@ -25,9 +25,7 @@
 	export let data: PageData;
 
 	$: tools = data.tools.filter((t) =>
-		activeOnly
-			? Object.entries(data.settings.tools).some(([k, v]) => v && k === t._id.toString())
-			: true
+		activeOnly ? data.settings.tools.some((toolId) => toolId === t._id.toString()) : true
 	);
 
 	$: toolsCreator = $page.url.searchParams.get("user");
@@ -235,7 +233,7 @@
 							<span class="w-fit overflow-clip">
 								{tool.displayName}
 							</span>
-							{#if Object.keys($settings?.tools ?? {}).includes(tool._id.toString())}
+							{#if ($settings?.tools ?? []).includes(tool._id.toString())}
 								<!-- active badge -->
 								<span
 									class="ml-auto inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
