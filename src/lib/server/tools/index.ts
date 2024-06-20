@@ -1,5 +1,5 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type { BackendCall, ConfigTool, ToolFunction } from "$lib/types/Tool";
+import type { BackendCall, BaseTool, ConfigTool } from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -33,37 +33,32 @@ export const configTools = z
 	.array(
 		z
 			.object({
-				functions: z.array(
-					z.object({
-						name: z.string(),
-						displayName: z.string(),
-						description: z.string(),
-						endpoint: z.union([z.string(), z.null()]),
-						inputs: z.array(
-							z
-								.object({
-									name: z.string(),
-									description: z.string(),
-									required: z.boolean(),
-									default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-									type: IOType,
-								})
-								.or(
-									z.object({
-										name: z.string(),
-										description: z.string(),
-										required: z.boolean(),
-										type: z.literal("file"),
-										mimeTypes: z.array(z.string()),
-									})
-								)
-						),
-						outputPath: z.union([z.string(), z.null()]),
-						outputType: IOType.or(z.literal("file")),
-						outputMimeType: z.string().optional(), // only required for file outputs
-						showOutput: z.boolean(),
-					})
+				name: z.string(),
+				description: z.string(),
+				endpoint: z.union([z.string(), z.null()]),
+				inputs: z.array(
+					z
+						.object({
+							name: z.string(),
+							description: z.string(),
+							required: z.boolean(),
+							default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+							type: IOType,
+						})
+						.or(
+							z.object({
+								name: z.string(),
+								description: z.string(),
+								required: z.boolean(),
+								type: z.literal("file"),
+								mimeTypes: z.array(z.string()),
+							})
+						)
 				),
+				outputPath: z.union([z.string(), z.null()]),
+				outputType: IOType.or(z.literal("file")),
+				outputMimeType: z.string().optional(), // only required for file outputs
+				showOutput: z.boolean(),
 				_id: z
 					.string()
 					.length(24)
@@ -91,7 +86,6 @@ export const configTools = z
 					z.literal("speaker"),
 					z.literal("video"),
 				]),
-				description: z.string(),
 				isOnByDefault: z.optional(z.literal(true)),
 				isLocked: z.optional(z.literal(true)),
 				isHidden: z.optional(z.literal(true)),
@@ -99,24 +93,24 @@ export const configTools = z
 			.transform((val) => ({
 				type: "config" as const,
 				...val,
-				functions: val.functions.map((fn) => ({ ...fn, call: getCallMethod(fn, val.baseUrl) })),
+				call: getCallMethod(val),
 			}))
 	)
 	// add the extra hardcoded tools
 	.transform((val) => [...val, calculator, directlyAnswer, fetchUrl, websearch]);
 
-function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): BackendCall {
+function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	return async function* (params, ctx) {
-		if (toolFn.endpoint === null || !baseUrl) {
-			throw new Error(`Tool function ${toolFn.name} has no endpoint`);
+		if (tool.endpoint === null || !tool.baseUrl) {
+			throw new Error(`Tool function ${tool.name} has no endpoint`);
 		}
 
 		const ipToken = await getIpToken(ctx.ip, ctx.username);
 
 		const outputs = await callSpace(
-			baseUrl,
-			toolFn.endpoint,
-			toolFn.inputs.map((input) => {
+			tool.baseUrl,
+			tool.endpoint,
+			tool.inputs.map((input) => {
 				if (input.type === "file") {
 					throw new Error("File inputs are not supported");
 				}
@@ -135,16 +129,16 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 			ipToken
 		);
 
-		if (toolFn.outputPath === null) {
-			throw new Error(`Tool function ${toolFn.name} has no output path`);
+		if (tool.outputPath === null) {
+			throw new Error(`Tool function ${tool.name} has no output path`);
 		}
 		const files: MessageFile[] = [];
 
 		const toolOutputs: Array<Record<string, string>> = [];
 
 		await Promise.all(
-			jp.query(outputs, toolFn.outputPath).map(async (output: string | string[], idx) => {
-				if (toolFn.outputType === "file") {
+			jp.query(outputs, tool.outputPath).map(async (output: string | string[], idx) => {
+				if (tool.outputType === "file") {
 					// output files are actually URLs
 					const outputs = Array.isArray(output) ? output : [output];
 
@@ -153,7 +147,7 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 							await fetch(output)
 								.then((res) => res.blob())
 								.then(async (blob) => {
-									const fileType = blob.type.split("/")[1] ?? toolFn.outputMimeType?.split("/")[1];
+									const fileType = blob.type.split("/")[1] ?? tool.outputMimeType?.split("/")[1];
 									return new File(
 										[blob],
 										`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
@@ -168,12 +162,12 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 					);
 
 					toolOutputs.push({
-						[toolFn.name + "-" + idx.toString()]:
+						[tool.name + "-" + idx.toString()]:
 							"A file has been generated. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it. Be concise.",
 					});
 				} else {
 					outputs.push({
-						[toolFn.name + "-" + idx.toString()]: output,
+						[tool.name + "-" + idx.toString()]: output,
 					});
 				}
 			})
@@ -188,7 +182,7 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 			};
 		}
 
-		return { outputs: toolOutputs, display: toolFn.showOutput };
+		return { outputs: toolOutputs, display: tool.showOutput };
 	};
 }
 

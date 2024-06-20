@@ -352,47 +352,41 @@ envVars:
         "icon" : "camera",
         "isOnByDefault" : true,
         "baseUrl" : "ByteDance/Hyper-SDXL-1Step-T2I" ,
-        "functions" : [
+        "name" : "image_generation",
+        "endpoint" : "/process_image",
+        "inputs" : [
           {
-            "name" : "image_generation",
-            "displayName" : "Image Generation",
-            "description" : "Generate an image based on a prompt.",
-            "endpoint" : "/process_image",
-            "inputs" : [
-              {
-              "name" : "numberOfImages", 
-              "description" : "Number of images to generate, between 1 and 8",
-              "required" : false,
-              "default" : 1,
-              "type" : "int"
-              },
-              {
-                "name": "width",
-                "description": "Width of the generated image",
-                "required": false,
-                "default": 512,
-                "type": "int"
-              },
-              {
-                "name": "height",
-                "description": "Height of the generated image",
-                "required": false,
-                "default": 512,
-                "type": "int"
-              },
-              {
-                "name": "prompt",
-                "description": "A prompt to generate an image from",
-                "required": true,
-                "type": "str"
-              },
-            ],
-            "outputPath": "$[*][*].image.url",
-            "outputType": "file",
-            "outputMimeType": "image/webp", 
-            "showOutput": true
-          }
-        ]
+          "name" : "numberOfImages", 
+          "description" : "Number of images to generate, between 1 and 8",
+          "required" : false,
+          "default" : 1,
+          "type" : "int"
+          },
+          {
+            "name": "width",
+            "description": "Width of the generated image",
+            "required": false,
+            "default": 512,
+            "type": "int"
+          },
+          {
+            "name": "height",
+            "description": "Height of the generated image",
+            "required": false,
+            "default": 512,
+            "type": "int"
+          },
+          {
+            "name": "prompt",
+            "description": "A prompt to generate an image from",
+            "required": true,
+            "type": "str"
+          },
+        ],
+        "outputPath": "$[*][*].image.url",
+        "outputType": "file",
+        "outputMimeType": "image/webp", 
+        "showOutput": true
       }
     ]
 externalSecrets:

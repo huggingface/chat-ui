@@ -11,25 +11,18 @@ const directlyAnswer: ConfigTool = {
 	isOnByDefault: true,
 	isLocked: true,
 	isHidden: true,
-	functions: [
-		{
-			name: "directlyAnswer",
-			displayName: "Directly Answer",
-			description:
-				"Use this tool to answer the user's query directly. Only use this tool if you need to answer the user's query directly.",
-			endpoint: null,
-			inputs: [],
-			outputPath: null,
-			outputType: "str",
-			showOutput: false,
-			async *call() {
-				return {
-					outputs: [],
-					display: false,
-				};
-			},
-		},
-	],
+	name: "directlyAnswer",
+	endpoint: null,
+	inputs: [],
+	outputPath: null,
+	outputType: "str",
+	showOutput: false,
+	async *call() {
+		return {
+			outputs: [],
+			display: false,
+		};
+	},
 };
 
 export default directlyAnswer;

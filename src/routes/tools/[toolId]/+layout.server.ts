@@ -14,7 +14,6 @@ export const load = async ({ params }) => {
 			tool: {
 				...tool,
 				_id: tool._id.toString(),
-				functions: tool.functions.map((f) => ({ ...f, call: undefined })),
 			},
 		};
 	}

@@ -195,25 +195,18 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 						_id: tool._id.toString(),
 						type: tool.type,
 						displayName: tool.displayName,
+						name: tool.name,
 						description: tool.description,
-						mimeTypes: tool.functions
-							.map((fn) =>
-								fn.inputs
-									.filter((input): input is ToolInputFile => input.type === "file")
-									.map((input) => (input as ToolInputFile).mimeTypes)
-									.flat()
-							)
+						mimeTypes: tool.inputs
+							.filter((input): input is ToolInputFile => input.type === "file")
+							.map((input) => (input as ToolInputFile).mimeTypes)
 							.flat(),
 						isOnByDefault: tool.isOnByDefault ?? true,
 						isLocked: tool.isLocked ?? true,
-						functions: tool.functions.map((fn) => ({
-							name: fn.name,
-							displayName: fn.displayName,
-							timeToUseMS:
-								toolUseDuration.find(
-									(el) => el.labels.tool === fn.displayName && el.labels.quantile === 0.9
-								)?.value ?? 15_000,
-						})),
+						timeToUseMS:
+							toolUseDuration.find(
+								(el) => el.labels.tool === tool._id.toString() && el.labels.quantile === 0.9
+							)?.value ?? 15_000,
 					} satisfies ToolFront)
 			),
 		assistants: assistants

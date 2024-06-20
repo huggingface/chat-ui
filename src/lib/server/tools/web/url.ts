@@ -11,37 +11,30 @@ const fetchUrl: ConfigTool = {
 	icon: "cloud",
 	displayName: "Fetch URL",
 	isOnByDefault: true,
-	functions: [
+	name: "fetchUrl",
+	endpoint: null,
+	inputs: [
 		{
-			name: "fetchUrl",
-			displayName: "Fetch URL",
-			description:
-				"Use this tool to fetch the contents of a URL. Only use this tool if you need to fetch the contents of a URL.",
-			endpoint: null,
-			inputs: [
-				{
-					name: "url",
-					type: "str",
-					description: "The URL of the webpage to fetch",
-					required: true,
-				},
-			],
-			outputPath: null,
-			outputType: "str",
-			showOutput: false,
-			async *call({ url }) {
-				const blocks = String(url).split("\n");
-				const urlStr = blocks[blocks.length - 1];
-
-				const { title, markdownTree } = await scrapeUrl(urlStr, Infinity);
-
-				return {
-					outputs: [{ title, text: stringifyMarkdownElementTree(markdownTree) }],
-					display: false,
-				};
-			},
+			name: "url",
+			type: "str",
+			description: "The URL of the webpage to fetch",
+			required: true,
 		},
 	],
+	outputPath: null,
+	outputType: "str",
+	showOutput: false,
+	async *call({ url }) {
+		const blocks = String(url).split("\n");
+		const urlStr = blocks[blocks.length - 1];
+
+		const { title, markdownTree } = await scrapeUrl(urlStr, Infinity);
+
+		return {
+			outputs: [{ title, text: stringifyMarkdownElementTree(markdownTree) }],
+			display: false,
+		};
+	},
 };
 
 export default fetchUrl;

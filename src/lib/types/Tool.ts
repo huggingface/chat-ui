@@ -38,28 +38,21 @@ export type ToolInputSimple = ToolInputBase & {
 
 export type ToolInput = ToolInputFile | ToolInputSimple;
 
-export interface ToolFunction {
-	name: string; // name that will be shown to the AI
-	displayName: string; // name that will be shown to the user
+export interface BaseTool {
+	_id: ObjectId;
 
-	description: string;
+	name: string; // name that will be shown to the AI
+
+	baseUrl?: string; // namespace for the tool
 	endpoint: string | null; // endpoint to call in gradio, if null we expect to override this function in code
+	outputPath: string | null; // JSONPath to the output in the response, if null we expect the function to be overriden in the code somewhere
 
 	inputs: Array<ToolInput>;
-
-	outputPath: string | null; // JSONPath to the output in the response, if null we expect the function to be overriden in the code somewhere
 	outputType: ToolIOType; // type of the output
 	outputMimeType?: string; // mime type of the output
 	showOutput: boolean; // show output in chat or not
 
 	call: BackendCall;
-}
-
-export interface BaseTool {
-	_id: ObjectId;
-	// tool can have multiple functions that get added/removed as a group
-	functions: ToolFunction[];
-	baseUrl?: string; // namespace for the tool
 
 	// for displaying in the UI
 	displayName: string;
@@ -90,18 +83,18 @@ export interface CommunityTool extends BaseTool, Timestamps {
 }
 
 // no call function in db
-export type CommunityToolDB = CommunityTool & { functions: Omit<ToolFunction, "call">[] };
+export type CommunityToolDB = Omit<CommunityTool, "call">;
 
 export type CommunityToolEditable = Omit<CommunityToolDB, "_id"> & { _id: string };
 
 export type Tool = ConfigTool | CommunityTool;
 
-export type ToolFront = Pick<Tool, "type" | "displayName" | "description"> & {
+export type ToolFront = Pick<Tool, "type" | "name" | "displayName" | "description"> & {
 	_id: string;
 	isOnByDefault: boolean;
 	isLocked: boolean;
 	mimeTypes: string[];
-	functions: Array<Pick<ToolFunction, "name" | "displayName"> & { timeToUseMS?: number }>;
+	timeToUseMS?: number;
 };
 
 export enum ToolResultStatus {

@@ -29,8 +29,12 @@
 	let spaceUrl = tool?.baseUrl ?? "multimodalart/cosxl";
 	let icon = tool?.icon ?? "wikis";
 	let color = tool?.color ?? "blue";
-	let functions: string[] = tool?.functions?.map((f) => f.name) ?? [];
+	let endpointName = tool?.endpoint ?? "";
+	let inputs: CommunityToolEditable["inputs"] = tool?.inputs ?? [];
 
+	$: if (endpointName !== tool?.endpoint) {
+		inputs = [];
+	}
 	$: client = browser && !!spaceUrl && !!ClientCreator && ClientCreator.connect(spaceUrl);
 </script>
 
@@ -134,27 +138,28 @@
 						<div class="flex flex-row gap-4">
 							{#each Object.keys(api["named_endpoints"] ?? {}) as name}
 								<label>
-									<input type="checkbox" bind:group={functions} value={name} />
-									<span
-										class="font-mono text-gray-800"
-										class:font-semibold={functions.includes(name)}>{name}</span
+									<input type="radio" bind:group={endpointName} value={name} {name} />
+									<span class="font-mono text-gray-800" class:font-semibold={endpointName === name}
+										>{name}</span
 									>
 								</label>
 							{/each}
 						</div>
 
-						<div class="flex flex-col gap-2">
-							{#each Object.entries(api["named_endpoints"] ?? {}).filter( ([k, _]) => functions.includes(k) ) as [name, endpoint]}
+						{#if endpointName && api["named_endpoints"][endpointName]}
+							<!-- grab endpoint from api["named_endpoints"] which is record<string, object> by matching the key to Endpoint name -->
+							{@const endpoint = api["named_endpoints"][endpointName]}
+							<div class="flex flex-col gap-2">
 								<div class="flex flex-col gap-2 border border-gray-200 p-2">
 									<div class="flex items-center gap-1 border-b border-gray-200 p-1 pb-2">
-										<span class="flex-grow font-mono text-smd font-semibold">{name}</span>
+										<span class="flex-grow font-mono text-smd font-semibold">{endpointName}</span>
 
 										<label class="ml-auto">
 											<span class="text-sm text-gray-500">AI Name</span>
 											<input
 												class="h-fit rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 												type="text"
-												value={name.replace(/\//g, "")}
+												value={endpointName.replace(/\//g, "")}
 											/>
 										</label>
 									</div>
@@ -167,6 +172,7 @@
 									</div>
 
 									{#each endpoint.parameters as parameter}
+										{@const input = inputs.find((input) => input.name === parameter.parameter_name)}
 										<div class="flex items-center gap-1">
 											<div class="inline w-full">
 												<span class="font-mono text-sm">{parameter.parameter_name}</span>
@@ -177,11 +183,39 @@
 												{#if parameter.description}
 													<p class="text-sm text-gray-500">{parameter.description}</p>
 												{/if}
+												<div class="flex w-fit justify-start gap-2">
+													<label class="ml-auto">
+														<input
+															type="radio"
+															name="{parameter.parameter_name}-parameter-type"
+															value="required"
+														/>
+														<span class="text-sm text-gray-500">Required</span>
+													</label>
+													<label class="ml-auto">
+														<input
+															type="radio"
+															name="{parameter.parameter_name}-parameter-type"
+															value="optional"
+														/>
+														<span class="text-sm text-gray-500">Optional</span>
+													</label>
+													<label class="ml-auto">
+														<input
+															type="radio"
+															name="{parameter.parameter_name}-parameter-type"
+															value="fixed"
+														/>
+														<span class="text-sm text-gray-500">Fixed</span>
+													</label>
+												</div>
 											</div>
 											<input
 												class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 												type="text"
-												value={parameter.parameter_has_default
+												value={input?.default
+													? input.default
+													: parameter.parameter_has_default
 													? parameter.parameter_default
 													: parameter.example_input}
 											/>
@@ -195,8 +229,8 @@
 										</p>
 									</div>
 								</div>
-							{/each}
-						</div>
+							</div>
+						{/if}
 					{:catch error}
 						<p class="text-sm text-gray-500">{error}</p>
 					{/await}

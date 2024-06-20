@@ -33,6 +33,8 @@
 				tools: [],
 			});
 		}
+
+		console.log($settings.tools);
 	}
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
 
