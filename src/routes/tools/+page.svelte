@@ -228,15 +228,15 @@
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-24 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
-					<div class="flex w-full flex-col items-start">
+					<div class="flex w-full flex-col items-start text-left">
 						<span class="font-bold">
-							<span class="w-fit overflow-clip">
+							<span class="w-full overflow-clip">
 								{tool.displayName}
 							</span>
 							{#if ($settings?.tools ?? []).includes(tool._id.toString())}
 								<!-- active badge -->
 								<span
-									class="ml-auto inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
+									class="inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
 									>Active</span
 								>
 							{/if}
