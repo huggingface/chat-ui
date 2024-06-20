@@ -270,10 +270,14 @@ async function seed() {
 						"speaker",
 						"video",
 					]) satisfies ToolLogoIcon;
-					const baseUrl = faker.internet.url();
+					const baseUrl = faker.helpers.arrayElement([
+						"stabilityai/stable-diffusion-3-medium",
+						"multimodalart/cosxl",
+						"gokaygokay/SD3-Long-Captioner",
+						"xichenhku/MimicBrush",
+					]);
 
 					// keep empty for populate for now
-					const functions = [];
 
 					const user: User = faker.helpers.arrayElement(users);
 					const createdById = user._id;
@@ -285,11 +289,16 @@ async function seed() {
 						createdById,
 						createdByName,
 						displayName,
+						name: displayName.toLowerCase().replace(" ", "_"),
+						endpoint: "/test",
 						description,
 						color,
 						icon,
 						baseUrl,
-						functions,
+						inputs: [],
+						outputPath: null,
+						outputType: "str" as const,
+						showOutput: false,
 						useCount: faker.number.int({ min: 0, max: 100000 }),
 						last24HoursUseCount: faker.number.int({ min: 0, max: 1000 }),
 						createdAt: faker.date.recent({ days: 30 }),
