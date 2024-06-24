@@ -27,6 +27,7 @@ export async function GET({ locals, params }) {
 					createdAt: message.createdAt,
 					updatedAt: message.updatedAt,
 					webSearch: message.webSearch,
+					files: message.files,
 				})),
 			};
 			return Response.json(res);
