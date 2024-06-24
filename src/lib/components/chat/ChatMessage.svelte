@@ -2,7 +2,7 @@
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -10,6 +10,7 @@
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
+	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonDownload from "~icons/carbon/download";
 	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
 	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
@@ -29,9 +30,9 @@
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
-	import { isReducedMotion } from "$lib/utils/isReduceMotion";
 	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -79,9 +80,6 @@
 	let isCopied = false;
 
 	let initialized = false;
-
-	let reducedMotionMode = false;
-
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
@@ -117,12 +115,10 @@
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
 
-	onMount(() => {
-		reducedMotionMode = isReducedMotion(window);
-	});
+	const settings = useSettingsStore();
 
 	afterUpdate(() => {
-		if (reducedMotionMode) {
+		if ($settings.disableStream) {
 			return;
 		}
 
@@ -300,7 +296,7 @@
 				class="prose max-w-none max-sm:prose-sm dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}
 			>
-				{#if isLast && loading && reducedMotionMode}
+				{#if isLast && loading && $settings.disableStream}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#each tokens as token}
@@ -512,7 +508,7 @@
 		<svelte:fragment slot="childrenNav">
 			{#if nChildren > 1 && $convTreeStore.editing === null}
 				<div
-					class="font-white z-10 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
+					class="font-white group/navbranch z-10 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
 				>
 					<button
 						class="inline text-lg font-thin text-gray-400 disabled:pointer-events-none disabled:opacity-25 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
@@ -535,6 +531,19 @@
 					>
 						<CarbonChevronRight class="text-sm" />
 					</button>
+					{#if !loading && message.children}<form
+							method="POST"
+							action="?/deleteBranch"
+							class="hidden group-hover/navbranch:block"
+						>
+							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
+							<button
+								class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
+								type="submit"
+								><CarbonTrashCan />
+							</button>
+						</form>
+					{/if}
 				</div>
 			{/if}
 		</svelte:fragment>

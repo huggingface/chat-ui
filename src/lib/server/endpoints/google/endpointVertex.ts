@@ -26,7 +26,7 @@ export const endpointVertexParametersSchema = z.object({
 			HarmBlockThreshold.BLOCK_ONLY_HIGH,
 		])
 		.optional(),
-	tools: z.array(z.any()),
+	tools: z.array(z.any()).optional(),
 });
 
 export function endpointVertex(input: z.input<typeof endpointVertexParametersSchema>): Endpoint {
