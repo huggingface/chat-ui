@@ -46,6 +46,14 @@
 			</div>
 		</label>
 
+		<!-- svelte-ignore a11y-label-has-associated-control -->
+		<label class="mt-6 flex items-center">
+			<Switch name="disableStream" bind:checked={$settings.disableStream} />
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+				Disable streaming tokens
+			</div>
+		</label>
+
 		<div class="mt-12 flex flex-col gap-3">
 			<a
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
