@@ -1,10 +1,12 @@
 name: Build documentation
 
 on:
-  push:
-    branches:
-      - main
-      - v*-release
+#  push:
+#    branches:
+#      - main
+#      - v*-release
+  # making all actions so they only run manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build:

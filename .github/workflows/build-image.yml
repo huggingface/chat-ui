@@ -1,15 +1,15 @@
 name: Build and Publish Image
 
 on:
-  push:
-    branches:
-      - "main"
-  pull_request:
-    branches:
-      - "*"
-    paths:
-      - "Dockerfile"
-      - "entrypoint.sh"
+#  push:
+#    branches:
+#      - "main"
+#  pull_request:
+#    branches:
+#      - "*"
+#    paths:
+#      - "Dockerfile"
+#      - "entrypoint.sh"
   workflow_dispatch:
   release:
     types: [published, edited]
@@ -36,7 +36,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/huggingface/chat-ui-db
+            ghcr.io/duckyfoo/chat-ui-db
           tags: |
             type=raw,value=${{ steps.package-version.outputs.VERSION }},enable=${{github.event_name == 'release'}}
             type=raw,value=${{ steps.package-version.outputs.MAJOR }},enable=${{github.event_name == 'release'}}
@@ -90,7 +90,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/huggingface/chat-ui
+            ghcr.io/duckyfoo/chat-ui
           tags: |
             type=raw,value=${{ steps.package-version.outputs.VERSION }},enable=${{github.event_name == 'release'}}
             type=raw,value=${{ steps.package-version.outputs.MAJOR }},enable=${{github.event_name == 'release'}}

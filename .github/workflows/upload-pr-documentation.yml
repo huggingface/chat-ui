@@ -1,10 +1,12 @@
 name: Upload PR Documentation
 
 on:
-  workflow_run:
-    workflows: ["Build PR Documentation"]
-    types:
-      - completed
+#  workflow_run:
+#    workflows: ["Build PR Documentation"]
+#    types:
+#      - completed
+  # making all actions so they only run manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build:

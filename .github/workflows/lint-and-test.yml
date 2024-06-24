@@ -1,9 +1,11 @@
 name: Lint and test
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+#  pull_request:
+#  push:
+#    branches:
+#      - main
+  # making all actions so they only run manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   lint:
