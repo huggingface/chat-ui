@@ -20,12 +20,26 @@ export type ToolLogoIcon =
 
 export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
 
-type ToolInputBase = {
-	name: string; // name of the input
-	description: string; // description of the input, shown to the AI
-	required: boolean; // is the input required
-	default?: string | number | boolean; // default value if not provided
+type ToolInputRequired = {
+	paramType: "required";
+	name: string;
+	description: string;
 };
+
+type ToolInputOptional = {
+	paramType: "optional";
+	name: string;
+	description: string;
+	default: string | number | boolean;
+};
+
+type ToolInputFixed = {
+	paramType: "fixed";
+	name: string;
+	value: string | number | boolean;
+};
+
+type ToolInputBase = ToolInputRequired | ToolInputOptional | ToolInputFixed;
 
 export type ToolInputFile = ToolInputBase & {
 	type: "file";
@@ -85,7 +99,19 @@ export interface CommunityTool extends BaseTool, Timestamps {
 // no call function in db
 export type CommunityToolDB = Omit<CommunityTool, "call">;
 
-export type CommunityToolEditable = Omit<CommunityToolDB, "_id"> & { _id: string };
+export type CommunityToolEditable = Omit<
+	CommunityToolDB,
+	| "_id"
+	| "useCount"
+	| "last24HoursUseCount"
+	| "createdById"
+	| "createdByName"
+	| "featured"
+	| "searchTokens"
+	| "type"
+	| "createdAt"
+	| "updatedAt"
+> & { _id: string };
 
 export type Tool = ConfigTool | CommunityTool;
 

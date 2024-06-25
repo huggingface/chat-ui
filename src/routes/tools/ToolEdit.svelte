@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CommunityToolEditable } from "$lib/types/Tool";
+	import type { CommunityToolEditable, ToolInput } from "$lib/types/Tool";
 	import { onMount } from "svelte";
 	import type { Client } from "@gradio/client";
 	import { browser } from "$app/environment";
@@ -15,6 +15,7 @@
 	} | null;
 
 	export let tool: CommunityToolEditable | undefined = undefined;
+	export let readonly = false;
 	export let form: ActionData;
 
 	function getError(field: string, returnForm: ActionData) {
@@ -27,25 +28,77 @@
 	});
 
 	let spaceUrl = tool?.baseUrl ?? "multimodalart/cosxl";
-	let icon = tool?.icon ?? "wikis";
-	let color = tool?.color ?? "blue";
-	let endpointName = tool?.endpoint ?? "";
-	let inputs: CommunityToolEditable["inputs"] = tool?.inputs ?? [];
 
-	$: if (endpointName !== tool?.endpoint) {
-		inputs = [];
-	}
+	let editableTool = (tool ?? {
+		_id: "",
+		displayName: "",
+		description: "",
+		color: "blue",
+		icon: "wikis",
+		baseUrl: "multimodalart/cosxl",
+		endpoint: "/process_image",
+		name: "process_image",
+		inputs: [],
+		outputPath: "",
+		outputType: "file",
+		outputMimeType: "image/webp",
+		showOutput: false,
+	}) satisfies CommunityToolEditable;
+
+	$: editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
+
 	$: client = browser && !!spaceUrl && !!ClientCreator && ClientCreator.connect(spaceUrl);
+
+	async function onEndpointChange(e: Event) {
+		const target = e.target as HTMLInputElement;
+		editableTool.endpoint = target.value;
+		editableTool.name = target.value.replace(/\//g, "");
+
+		if (client) {
+			const newInputs = (await (await client).view_api()).named_endpoints[
+				target.value
+			].parameters.map((param) => {
+				// let type: ToolInput["type"] = "str";
+				// let mimeType: string = undefined;
+
+				// if (param.python_type.type === "filepath") {
+				// 	type = "file";
+				// 	mimeType = param.;
+				// }
+				if (param.parameter_has_default && param.python_type.type !== "filepath") {
+					// optional if it has a default
+					return {
+						name: param.parameter_name,
+						description: param.description,
+						paramType: "optional",
+						type: "str",
+						default: param.parameter_default,
+					} satisfies ToolInput;
+				} else {
+					// required if it doesn't have a default
+					return {
+						name: param.parameter_name,
+						description: param.description,
+						paramType: "required",
+						type: "str",
+					} satisfies ToolInput;
+				}
+			});
+			editableTool.inputs = newInputs;
+		}
+	}
 </script>
 
 <form method="POST" class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8">
 	{#if tool}
 		<h2 class="text-xl font-semibold">
-			Edit Tool: {tool.displayName}
+			{readonly ? "View" : "Edit"} Tool: {tool.displayName}
 		</h2>
-		<p class="mb-6 text-sm text-gray-500">
-			Modifying an existing tool will propagate the changes to all users.
-		</p>
+		{#if !readonly}
+			<p class="mb-6 text-sm text-gray-500">
+				Modifying an existing tool will propagate the changes to all users.
+			</p>
+		{/if}
 	{:else}
 		<h2 class="text-xl font-semibold">Create new tool</h2>
 		<p class="mb-6 text-sm text-gray-500">
@@ -63,17 +116,18 @@
 					<input
 						type="text"
 						name="displayName"
+						disabled={readonly}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						placeholder="Image generator"
-						value={tool?.displayName ?? ""}
+						bind:value={editableTool.displayName}
 					/>
 					<p class="text-xs text-red-500">{getError("displayName", form)}</p>
 				</label>
 
 				<div class="flex flex-row gap-4">
 					<div>
-						{#key color + icon}
-							<ToolLogo {color} {icon} />
+						{#key editableTool.color + editableTool.icon}
+							<ToolLogo color={editableTool.color} icon={editableTool.icon} />
 						{/key}
 					</div>
 
@@ -82,8 +136,9 @@
 
 						<select
 							name="icon"
+							disabled={readonly}
 							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-							bind:value={icon}
+							bind:value={editableTool.icon}
 						>
 							{#each icons as icon}
 								<option value={icon}>{icon}</option>
@@ -96,8 +151,9 @@
 						<div class="mb-1 font-semibold">Color scheme</div>
 						<select
 							name="color"
+							disabled={readonly}
 							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-							bind:value={color}
+							bind:value={editableTool.color}
 						>
 							{#each colors as color}
 								<option value={color}>{color}</option>
@@ -106,14 +162,28 @@
 						</select>
 					</label>
 				</div>
+
+				<label>
+					<div class="mb-1 font-semibold">Tool Description</div>
+					<textarea
+						name="description"
+						disabled={readonly}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						placeholder="This tool lets you generate images using SDXL."
+						bind:value={editableTool.description}
+					/>
+					<p class="text-xs text-red-500">{getError("description", form)}</p>
+				</label>
+
 				<label>
 					<div class="mb-1 font-semibold">Hugging Face Space URL</div>
 					<input
 						type="text"
 						name="spaceUrl"
+						disabled={readonly}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						placeholder="ByteDance/Hyper-SDXL-1Step-T2I"
-						bind:value={spaceUrl}
+						bind:value={editableTool.baseUrl}
 					/>
 					<p class="text-xs text-red-500">{getError("spaceUrl", form)}</p>
 				</label>
@@ -138,28 +208,39 @@
 						<div class="flex flex-row gap-4">
 							{#each Object.keys(api["named_endpoints"] ?? {}) as name}
 								<label>
-									<input type="radio" bind:group={endpointName} value={name} {name} />
-									<span class="font-mono text-gray-800" class:font-semibold={endpointName === name}
-										>{name}</span
+									<input
+										type="radio"
+										disabled={readonly}
+										on:input={onEndpointChange}
+										bind:group={editableTool.endpoint}
+										value={name}
+										{name}
+									/>
+									<span
+										class="font-mono text-gray-800"
+										class:font-semibold={editableTool.endpoint === name}>{name}</span
 									>
 								</label>
 							{/each}
 						</div>
 
-						{#if endpointName && api["named_endpoints"][endpointName]}
+						{#if editableTool.endpoint && api["named_endpoints"][editableTool.endpoint]}
 							<!-- grab endpoint from api["named_endpoints"] which is record<string, object> by matching the key to Endpoint name -->
-							{@const endpoint = api["named_endpoints"][endpointName]}
+							{@const endpoint = api["named_endpoints"][editableTool.endpoint]}
 							<div class="flex flex-col gap-2">
 								<div class="flex flex-col gap-2 border border-gray-200 p-2">
 									<div class="flex items-center gap-1 border-b border-gray-200 p-1 pb-2">
-										<span class="flex-grow font-mono text-smd font-semibold">{endpointName}</span>
+										<span class="flex-grow font-mono text-smd font-semibold"
+											>{editableTool.endpoint}</span
+										>
 
 										<label class="ml-auto">
 											<span class="text-sm text-gray-500">AI Name</span>
 											<input
 												class="h-fit rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 												type="text"
-												value={endpointName.replace(/\//g, "")}
+												disabled={readonly}
+												value={editableTool.name}
 											/>
 										</label>
 									</div>
@@ -171,55 +252,124 @@
 										</p>
 									</div>
 
-									{#each endpoint.parameters as parameter}
-										{@const input = inputs.find((input) => input.name === parameter.parameter_name)}
+									{#each editableTool.inputs as input, inputIdx}
+										{@const parameter = endpoint.parameters.find(
+											(parameter) => parameter.parameter_name === input.name
+										)}
+
 										<div class="flex items-center gap-1">
 											<div class="inline w-full">
-												<span class="font-mono text-sm">{parameter.parameter_name}</span>
+												<span class="font-mono text-sm">{input.name}</span>
 												<span
 													class="inline-block rounded-lg bg-orange-50 p-1 text-sm text-orange-800"
-													>{parameter.python_type.type}</span
+													>{parameter?.python_type.type}</span
 												>
-												{#if parameter.description}
-													<p class="text-sm text-gray-500">{parameter.description}</p>
+												{#if parameter?.description}
+													<p class="text-sm text-gray-500">
+														{editableTool.inputs[inputIdx].paramType} -
+														{parameter.description}
+													</p>
 												{/if}
 												<div class="flex w-fit justify-start gap-2">
 													<label class="ml-auto">
 														<input
 															type="radio"
-															name="{parameter.parameter_name}-parameter-type"
+															name="{input.name}-parameter-type"
 															value="required"
+															disabled={readonly}
+															bind:group={editableTool.inputs[inputIdx].paramType}
 														/>
 														<span class="text-sm text-gray-500">Required</span>
 													</label>
 													<label class="ml-auto">
 														<input
 															type="radio"
-															name="{parameter.parameter_name}-parameter-type"
+															name="{input.name}-parameter-type"
 															value="optional"
+															disabled={readonly || parameter?.python_type.type === "filepath"}
+															bind:group={editableTool.inputs[inputIdx].paramType}
 														/>
 														<span class="text-sm text-gray-500">Optional</span>
 													</label>
 													<label class="ml-auto">
 														<input
 															type="radio"
-															name="{parameter.parameter_name}-parameter-type"
+															name="{input.name}-parameter-type"
 															value="fixed"
+															disabled={readonly || parameter?.python_type.type === "filepath"}
+															bind:group={editableTool.inputs[inputIdx].paramType}
 														/>
 														<span class="text-sm text-gray-500">Fixed</span>
 													</label>
 												</div>
 											</div>
-											<input
-												class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-												type="text"
-												value={input?.default
-													? input.default
-													: parameter.parameter_has_default
-													? parameter.parameter_default
-													: parameter.example_input}
-											/>
 										</div>
+										<!-- for required we need a description, for optional we need a default value and for fixed we need a value -->
+										{#if input.paramType === "required" || input.paramType === "optional"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 font-semibold">
+													Description
+													<p class="text-xs font-normal text-gray-500">
+														Will be passed in the model prompt, make it as clear and concise as
+														possible
+													</p>
+												</div>
+												<textarea
+													name="{input.name}-description"
+													class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+													placeholder="This is the description of the input."
+													bind:value={editableTool.inputs[inputIdx].description}
+													disabled={readonly}
+												/>
+												<p class="text-xs text-red-500">
+													{getError(`${input.name}-description`, form)}
+												</p>
+											</label>
+										{/if}
+										{#if input.paramType === "optional" || input.paramType === "fixed"}
+											{@const isOptional = input.paramType === "optional"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 flex-grow font-semibold">
+													{isOptional ? "Default value" : "Value"}
+													<p class="text-xs font-normal text-gray-500">
+														{#if isOptional}
+															The tool will use this value by default but the model can specify a
+															different one.
+														{:else}
+															The tool will use this value and it cannot be changed.
+														{/if}
+													</p>
+												</div>
+												{#if input.paramType === "optional"}
+													<input
+														name="{input.name}-default"
+														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+														placeholder="This is the value of the input. Must be of type {parameter
+															?.python_type.type}"
+														bind:value={editableTool.inputs[inputIdx].default}
+														disabled={readonly}
+													/>
+												{:else}
+													<input
+														name="{input.name}-value"
+														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+														placeholder="This is the value of the input. Must be of type {parameter
+															?.python_type.type}"
+														bind:value={editableTool.inputs[inputIdx].value}
+														disabled={readonly}
+													/>
+												{/if}
+
+												<p class="text-xs text-red-500">
+													{getError(`${input.name}-${isOptional ? "default" : "value"}`, form)}
+												</p>
+											</label>
+										{/if}
+
+										<!-- divider -->
+										<div
+											class="flex w-full flex-row flex-nowrap gap-2 border-b border-gray-200 pt-2"
+										/>
 									{/each}
 
 									<div>
@@ -227,6 +377,73 @@
 										<p class="mb-2 text-sm text-gray-500">
 											Choose what value your tool will use as return value
 										</p>
+
+										<!-- output path in JSONPath format -->
+										<label class="flex flex-row gap-2">
+											<div class="mb-1 font-semibold">
+												Output path
+												<p class="text-xs font-normal text-gray-500">
+													The path of the output of the tool. Uses <a
+														href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html"
+														target="_blank"
+														class="underline"
+														rel="noreferrer">JSONPath queries</a
+													>.
+												</p>
+											</div>
+											<input
+												name="outputPath"
+												class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+												placeholder="This is the path of the output of the tool"
+												bind:value={editableTool.outputPath}
+												disabled={readonly}
+											/>
+										</label>
+										<!-- select the output type -->
+										<label class="flex flex-row gap-2">
+											<div class="mb-1 font-semibold">
+												Output type
+												<p class="text-xs font-normal text-gray-500">
+													The type of the output of the tool
+												</p>
+											</div>
+											<select
+												name="outputType"
+												class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+												bind:value={editableTool.outputType}
+												disabled={readonly}
+											>
+												<option value="str">str</option>
+												<option value="int">int</option>
+												<option value="float">float</option>
+												<option value="boolean">boolean</option>
+												<option value="file">file</option>
+											</select>
+										</label>
+
+										<!-- select the output mime type -->
+										{#if editableTool.outputType === "file"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 font-semibold">
+													Output mime type
+													<p class="text-xs font-normal text-gray-500">
+														The mime type of the output of the tool
+													</p>
+												</div>
+												<select
+													name="outputMimeType"
+													class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+													bind:value={editableTool.outputMimeType}
+													disabled={readonly}
+												>
+													<option value="image/jpeg">image/*</option>
+													<option value="image/webp">document/*</option>
+													<option value="image/avif">video/*</option>
+													<option value="image/tiff">audio/*</option>
+													<option value="image/gif">application/*</option>
+												</select>
+											</label>
+										{/if}
 									</div>
 								</div>
 							</div>

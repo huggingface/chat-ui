@@ -1,6 +1,4 @@
 <script lang="ts">
-	import type { ToolLogoColor, ToolLogoIcon } from "$lib/types/Tool";
-
 	import CarbonWikis from "~icons/carbon/wikis";
 	import CarbonTools from "~icons/carbon/tools";
 	import CarbonCamera from "~icons/carbon/camera";
@@ -13,8 +11,8 @@
 	import CarbonSpeaker from "~icons/carbon/volume-up";
 	import CarbonVideo from "~icons/carbon/video";
 
-	export let color: ToolLogoColor;
-	export let icon: ToolLogoIcon;
+	export let color: string;
+	export let icon: string;
 	export let size: "md" | "lg" = "md";
 
 	$: gradientColor = (() => {
