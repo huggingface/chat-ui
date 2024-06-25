@@ -44,6 +44,8 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 	return new Response(Buffer.from(value, "base64"), {
 		headers: {
 			"Content-Type": mime ?? "application/octet-stream",
+			"Content-Security-Policy":
+				"default-src 'none'; script-src 'none'; style-src 'none'; sandbox;",
 		},
 	});
 };
