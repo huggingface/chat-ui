@@ -100,7 +100,7 @@
 							{isActive ? "Deactivate" : "Activate"}
 						</button>
 						{#if data.tool?.createdByMe}
-							<a href="{base}/settings/assistants/{data.tool?._id}/edit" class="underline"
+							<a href="{base}/tools/{data.tool?._id}/edit" class="underline"
 								><CarbonPen class="mr-1.5 inline text-xs" />Edit
 							</a>
 							<form method="POST" action="?/delete" use:enhance>
@@ -109,11 +109,9 @@
 								>
 							</form>
 						{:else}
-							<form method="POST" action="?/unsubscribe" use:enhance>
-								<button type="submit" class="underline">
-									<CarbonPen class="mr-1.5 inline text-xs" />View spec
-								</button>
-							</form>
+							<a href="{base}/tools/{data.tool?._id}/edit" class="underline">
+								<CarbonPen class="mr-1.5 inline text-xs" />View spec
+							</a>
 							<form method="POST" action="?/edit" use:enhance class="hidden">
 								<button type="submit" class="underline">
 									<CarbonCopy class="mr-1.5 inline text-xs" />Duplicate</button

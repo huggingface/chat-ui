@@ -356,30 +356,30 @@ envVars:
         "endpoint" : "/process_image",
         "inputs" : [
           {
-          "name" : "numberOfImages", 
+          "name" : "num_images", 
           "description" : "Number of images to generate, between 1 and 8",
-          "required" : false,
+          "paramType" : "optional",
           "default" : 1,
           "type" : "int"
           },
           {
-            "name": "width",
-            "description": "Width of the generated image",
-            "required": false,
+            "name": "height",
+            "description": "Height of the generated image",
+            "paramType": "optional",
             "default": 512,
             "type": "int"
           },
-          {
-            "name": "height",
-            "description": "Height of the generated image",
-            "required": false,
+                    {
+            "name": "width",
+            "description": "Width of the generated image",
+            "paramType": "optional",
             "default": 512,
             "type": "int"
           },
           {
             "name": "prompt",
             "description": "A prompt to generate an image from",
-            "required": true,
+            "paramType": "required",
             "type": "str"
           },
         ],

@@ -29,6 +29,34 @@ const IOType = z.union([
 	z.literal("boolean"),
 ]);
 
+const toolInputBaseSchema = z.union([
+	z.object({
+		name: z.string().min(1),
+		description: z.string().min(1),
+		paramType: z.literal("required"),
+	}),
+	z.object({
+		name: z.string().min(1),
+		description: z.string().min(1),
+		paramType: z.literal("optional"),
+		default: z.union([z.string(), z.number(), z.boolean()]),
+	}),
+	z.object({
+		name: z.string().min(1),
+		paramType: z.literal("fixed"),
+		value: z.union([z.string(), z.number(), z.boolean()]),
+	}),
+]);
+
+const toolInputSchema = toolInputBaseSchema.and(
+	z.object({ type: IOType }).or(
+		z.object({
+			type: z.literal("file"),
+			mimeTypes: z.array(z.string()).nonempty(),
+		})
+	)
+);
+
 export const configTools = z
 	.array(
 		z
@@ -36,25 +64,7 @@ export const configTools = z
 				name: z.string(),
 				description: z.string(),
 				endpoint: z.union([z.string(), z.null()]),
-				inputs: z.array(
-					z
-						.object({
-							name: z.string(),
-							description: z.string(),
-							required: z.boolean(),
-							default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-							type: IOType,
-						})
-						.or(
-							z.object({
-								name: z.string(),
-								description: z.string(),
-								required: z.boolean(),
-								type: z.literal("file"),
-								mimeTypes: z.array(z.string()),
-							})
-						)
-				),
+				inputs: z.array(toolInputSchema),
 				outputPath: z.union([z.string(), z.null()]),
 				outputType: IOType.or(z.literal("file")),
 				outputMimeType: z.string().optional(), // only required for file outputs

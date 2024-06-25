@@ -18,7 +18,7 @@ const calculator: ConfigTool = {
 			type: "str",
 			description:
 				"A mathematical expression to be evaluated. The result of the expression will be returned.",
-			required: true,
+			paramType: "required",
 		},
 	],
 	outputPath: null,

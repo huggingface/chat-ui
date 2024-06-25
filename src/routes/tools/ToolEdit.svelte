@@ -23,8 +23,10 @@
 	}
 
 	let ClientCreator: { connect: (nameSpace: string) => Promise<Client> };
+
 	onMount(async () => {
 		ClientCreator = (await import("@gradio/client")).Client;
+		await updateConfig();
 	});
 
 	let spaceUrl = tool?.baseUrl ?? "multimodalart/cosxl";
@@ -49,43 +51,65 @@
 
 	$: client = browser && !!spaceUrl && !!ClientCreator && ClientCreator.connect(spaceUrl);
 
+	async function updateConfig() {
+		if (!client) {
+			if (editableTool.baseUrl) {
+				client = ClientCreator.connect(editableTool.baseUrl);
+			} else {
+				return;
+			}
+		}
+
+		const api = await (await client).view_api();
+		const firstNamedEndpoint = Object.keys(api.named_endpoints)[0];
+
+		const newInputs = api.named_endpoints[
+			editableTool.endpoint ?? firstNamedEndpoint
+		].parameters.map((param, idx) => {
+			// let type: ToolInput["type"] = "str";
+			// let mimeType: string = undefined;
+
+			// if (param.python_type.type === "filepath") {
+			// 	type = "file";
+			// 	mimeType = param.;
+			// }
+
+			if (tool?.inputs[idx]?.name === param.parameter_name) {
+				console.log(`tool ${idx} has the same name`);
+				// if the tool has the same name, we use the tool's type
+				return {
+					...tool?.inputs[idx],
+				} satisfies ToolInput;
+			}
+
+			if (param.parameter_has_default && param.python_type.type !== "filepath") {
+				// optional if it has a default
+				return {
+					name: param.parameter_name,
+					description: param.description,
+					paramType: "optional",
+					type: "str",
+					default: param.parameter_default,
+				} satisfies ToolInput;
+			} else {
+				// required if it doesn't have a default
+				return {
+					name: param.parameter_name,
+					description: param.description,
+					paramType: "required",
+					type: "str",
+				} satisfies ToolInput;
+			}
+		});
+		editableTool.inputs = newInputs;
+	}
+
 	async function onEndpointChange(e: Event) {
 		const target = e.target as HTMLInputElement;
 		editableTool.endpoint = target.value;
 		editableTool.name = target.value.replace(/\//g, "");
 
-		if (client) {
-			const newInputs = (await (await client).view_api()).named_endpoints[
-				target.value
-			].parameters.map((param) => {
-				// let type: ToolInput["type"] = "str";
-				// let mimeType: string = undefined;
-
-				// if (param.python_type.type === "filepath") {
-				// 	type = "file";
-				// 	mimeType = param.;
-				// }
-				if (param.parameter_has_default && param.python_type.type !== "filepath") {
-					// optional if it has a default
-					return {
-						name: param.parameter_name,
-						description: param.description,
-						paramType: "optional",
-						type: "str",
-						default: param.parameter_default,
-					} satisfies ToolInput;
-				} else {
-					// required if it doesn't have a default
-					return {
-						name: param.parameter_name,
-						description: param.description,
-						paramType: "required",
-						type: "str",
-					} satisfies ToolInput;
-				}
-			});
-			editableTool.inputs = newInputs;
-		}
+		await updateConfig();
 	}
 </script>
 
@@ -266,7 +290,6 @@
 												>
 												{#if parameter?.description}
 													<p class="text-sm text-gray-500">
-														{editableTool.inputs[inputIdx].paramType} -
 														{parameter.description}
 													</p>
 												{/if}

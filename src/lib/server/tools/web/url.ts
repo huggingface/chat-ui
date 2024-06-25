@@ -18,7 +18,7 @@ const fetchUrl: ConfigTool = {
 			name: "url",
 			type: "str",
 			description: "The URL of the webpage to fetch",
-			required: true,
+			paramType: "required",
 		},
 	],
 	outputPath: null,

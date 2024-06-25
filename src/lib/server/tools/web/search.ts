@@ -18,7 +18,7 @@ const websearch: ConfigTool = {
 			type: "str",
 			description:
 				"A search query which will be used to fetch the most relevant snippets regarding the user's query",
-			required: true,
+			paramType: "required",
 		},
 	],
 	outputPath: null,
