@@ -3,5 +3,6 @@ export async function share(url: string, title: string) {
 		navigator.share({ url, title });
 	} else {
 		await navigator.clipboard.writeText(url);
+		window.location.href = url; // Redirect to the new URL
 	}
 }
