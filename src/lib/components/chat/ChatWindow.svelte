@@ -167,7 +167,20 @@
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
 
-<div class="relative min-h-0 min-w-0">
+<!-- If shared is true, include the hypothes.is client sidebar-->
+{#if shared}
+	<script type="application/json" class="js-hypothesis-config">
+		{
+			"openSidebar": true
+		}
+		</script>
+	<script src="https://hypothes.is/embed.js" async></script>
+{/if}
+
+
+	<div class="relative min-h-0 min-w-0"
+		class:max-w-[calc(68vw)]={shared}>
+
 	{#if loginModalOpen}
 		<LoginModal
 			on:close={() => {
@@ -268,7 +281,7 @@
 			{/if}
 		</div>
 		<ScrollToBottomBtn
-			class="bottom-36 right-4 max-md:hidden lg:right-10"
+			class="bottom-36 left-4 max-md:hidden lg:left-10"
 			scrollNode={chatContainer}
 		/>
 	</div>
@@ -424,6 +437,7 @@
 					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 					or false.
 				</p>
+				<p>Shared: {shared}</p>
 				{#if messages.length}
 					<button
 						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
