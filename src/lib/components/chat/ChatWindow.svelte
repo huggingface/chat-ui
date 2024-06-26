@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
@@ -165,21 +166,32 @@
 	];
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
+	
+	let sidebar: HTMLElement | null = null
+
+	onMount(() => {
+		sidebar = document.querySelector('hypothesis-sidebar') as HTMLElement;
+	});
+
+	
+
+	$: if (sidebar) {
+		if (shared) {
+			sidebar.style.visibility = 'visible';
+		} else {
+			sidebar.style.visibility = 'hidden';
+		}
+	}
+
 </script>
 
-<!-- If shared is true, include the hypothes.is client sidebar-->
-{#if shared}
-	<script type="application/json" class="js-hypothesis-config">
-		{
-			"openSidebar": true
-		}
-		</script>
-	<script src="https://hypothes.is/embed.js" async></script>
-{/if}
 
 
-	<div class="relative min-h-0 min-w-0"
-		class:max-w-[calc(68vw)]={shared}>
+
+
+
+<div class="relative min-h-0 min-w-0"
+	class:max-w-[calc(68vw)]={shared}>
 
 	{#if loginModalOpen}
 		<LoginModal

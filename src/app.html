@@ -19,6 +19,12 @@
 			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
 			window.gaId = "%gaId%";
 		</script>
+		<script type="application/json" class="js-hypothesis-config">
+			{
+				"openSidebar": true
+			}
+		</script>
+		<script src="https://hypothes.is/embed.js" async></script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">
