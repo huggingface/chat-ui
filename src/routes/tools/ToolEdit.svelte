@@ -41,7 +41,7 @@
 		color: "blue",
 		icon: "wikis",
 		baseUrl: "multimodalart/cosxl",
-		endpoint: "/process_image",
+		endpoint: "",
 		name: "process_image",
 		inputs: [],
 		outputPath: "",
@@ -64,11 +64,12 @@
 		}
 
 		const api = await (await client).view_api();
-		const firstNamedEndpoint = Object.keys(api.named_endpoints)[0];
 
-		const newInputs = api.named_endpoints[
-			editableTool.endpoint ?? firstNamedEndpoint
-		].parameters.map((param, idx) => {
+		if (!editableTool.endpoint) {
+			return;
+		}
+
+		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
 			// let type: ToolInput["type"] = "str";
 			// let mimeType: string = undefined;
 
@@ -265,10 +266,9 @@
 						</div>
 
 						{#if editableTool.endpoint && api["named_endpoints"][editableTool.endpoint]}
-							<!-- grab endpoint from api["named_endpoints"] which is record<string, object> by matching the key to Endpoint name -->
 							{@const endpoint = api["named_endpoints"][editableTool.endpoint]}
 							<div class="flex flex-col gap-2">
-								<div class="flex flex-col gap-2 border border-gray-200 p-2">
+								<div class="flex flex-col gap-2 rounded-lg border border-gray-200 p-2">
 									<div class="flex items-center gap-1 border-b border-gray-200 p-1 pb-2">
 										<span class="flex-grow font-mono text-smd font-semibold"
 											>{editableTool.endpoint}</span
@@ -505,26 +505,26 @@
 					{/await}
 				{/if}
 			</div>
+			<div class="relative bottom-0 mb-4 mt-auto flex w-full flex-row justify-end gap-2">
+				<button
+					type="button"
+					class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
+					on:click={() => dispatch("close")}
+				>
+					Cancel
+				</button>
+				{#if !readonly}
+					<button
+						type="submit"
+						disabled={loading}
+						class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold text-white"
+						class:text-gray-300={loading}
+						class:bg-gray-500={loading}
+					>
+						{loading ? "Saving..." : "Save"}
+					</button>
+				{/if}
+			</div>
 		</div>
-	</div>
-	<div class="relative bottom-0 flex w-full flex-row justify-end gap-2 pt-2">
-		<button
-			type="button"
-			class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
-			on:click={() => dispatch("close")}
-		>
-			Cancel
-		</button>
-		{#if !readonly}
-			<button
-				type="submit"
-				disabled={loading}
-				class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold text-white"
-				class:text-gray-300={loading}
-				class:bg-gray-500={loading}
-			>
-				{loading ? "Saving..." : "Save"}
-			</button>
-		{/if}
 	</div>
 </form>
