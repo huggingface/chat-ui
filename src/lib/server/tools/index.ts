@@ -1,5 +1,11 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type { BackendCall, BaseTool, ConfigTool } from "$lib/types/Tool";
+import type {
+	BackendCall,
+	BaseTool,
+	ConfigTool,
+	ToolInput,
+	ToolInputRequired,
+} from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -124,17 +130,17 @@ function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 				if (input.type === "file") {
 					throw new Error("File inputs are not supported");
 				}
-
-				const value = params[input.name];
-				if (value === undefined) {
-					if (input.required) {
+				if (input.paramType === "fixed") {
+					return input.value;
+				} else if (input.paramType === "optional") {
+					return params[input.name] ?? input.default;
+				} else if (input.paramType === "required") {
+					const value = params[input.name];
+					if (value === undefined) {
 						throw new Error(`Missing required input ${input.name}`);
 					}
-
-					return input.default;
+					return value;
 				}
-
-				return value;
 			}),
 			ipToken
 		);

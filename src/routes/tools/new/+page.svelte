@@ -9,9 +9,7 @@
 	export let form;
 
 	afterNavigate(({ from }) => {
-		if (!from?.url.pathname.includes("settings")) {
-			previousPage = from?.url.toString() || previousPage;
-		}
+		previousPage = from?.url.toString() || previousPage;
 	});
 </script>
 

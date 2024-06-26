@@ -23,6 +23,11 @@ export const load = async ({ params, locals }) => {
 		};
 	}
 
+	const reported = await collections.reports.findOne({
+		contentId: tool._id,
+		object: "tool",
+	});
+
 	return {
 		tool: {
 			...tool,
@@ -31,7 +36,7 @@ export const load = async ({ params, locals }) => {
 			createdById: tool.createdById.toString(),
 			createdByMe:
 				tool.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-			reported: false,
+			reported: !!reported,
 		},
 	};
 };

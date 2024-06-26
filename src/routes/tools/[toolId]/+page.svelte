@@ -108,7 +108,7 @@
 									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
 								>
 							</form>
-						{:else}
+						{:else if !!data.tool?.baseUrl}
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline">
 								<CarbonPen class="mr-1.5 inline text-xs" />View spec
 							</a>

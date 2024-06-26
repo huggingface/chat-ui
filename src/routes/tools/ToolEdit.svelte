@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { CommunityToolEditable, ToolInput } from "$lib/types/Tool";
-	import { onMount } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 	import type { Client } from "@gradio/client";
 	import { browser } from "$app/environment";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { colors, icons } from "$lib/utils/tools";
+	import { applyAction, enhance } from "$app/forms";
 
 	type ActionData = {
 		error: boolean;
@@ -24,6 +25,9 @@
 
 	let ClientCreator: { connect: (nameSpace: string) => Promise<Client> };
 
+	let loading = false;
+	const dispatch = createEventDispatcher<{ close: void }>();
+
 	onMount(async () => {
 		ClientCreator = (await import("@gradio/client")).Client;
 		await updateConfig();
@@ -31,8 +35,7 @@
 
 	let spaceUrl = tool?.baseUrl ?? "multimodalart/cosxl";
 
-	let editableTool = (tool ?? {
-		_id: "",
+	let editableTool: CommunityToolEditable = tool ?? {
 		displayName: "",
 		description: "",
 		color: "blue",
@@ -43,9 +46,9 @@
 		inputs: [],
 		outputPath: "",
 		outputType: "file",
-		outputMimeType: "image/webp",
-		showOutput: false,
-	}) satisfies CommunityToolEditable;
+		outputMimeType: "",
+		showOutput: true,
+	};
 
 	$: editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
 
@@ -113,7 +116,20 @@
 	}
 </script>
 
-<form method="POST" class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8">
+<form
+	method="POST"
+	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
+	use:enhance={async ({ formData }) => {
+		console.log({ formData });
+		console.log({ editableTool });
+		loading = true;
+
+		return async ({ result }) => {
+			loading = false;
+			await applyAction(result);
+		};
+	}}
+>
 	{#if tool}
 		<h2 class="text-xl font-semibold">
 			{readonly ? "View" : "Edit"} Tool: {tool.displayName}
@@ -238,7 +254,7 @@
 										on:input={onEndpointChange}
 										bind:group={editableTool.endpoint}
 										value={name}
-										{name}
+										name="endpoint"
 									/>
 									<span
 										class="font-mono text-gray-800"
@@ -263,6 +279,7 @@
 											<input
 												class="h-fit rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 												type="text"
+												name="name"
 												disabled={readonly}
 												value={editableTool.name}
 											/>
@@ -270,7 +287,7 @@
 									</div>
 
 									<div>
-										<h3 class="font-semibold">Arguments</h3>
+										<h3 class="text-lg font-semibold">Arguments</h3>
 										<p class="mb-2 text-sm text-gray-500">
 											Choose parameters that can be passed to your tool.
 										</p>
@@ -395,12 +412,13 @@
 										/>
 									{/each}
 
-									<div>
-										<h3 class="font-semibold">Return value</h3>
-										<p class="mb-2 text-sm text-gray-500">
-											Choose what value your tool will use as return value
-										</p>
-
+									<div class="flex flex-col gap-4">
+										<div>
+											<h3 class="text-lg font-semibold">Return value</h3>
+											<p class="mb-2 text-sm text-gray-500">
+												Choose what value your tool will use as return value
+											</p>
+										</div>
 										<!-- output path in JSONPath format -->
 										<label class="flex flex-row gap-2">
 											<div class="mb-1 font-semibold">
@@ -448,25 +466,36 @@
 										{#if editableTool.outputType === "file"}
 											<label class="flex flex-row gap-2">
 												<div class="mb-1 font-semibold">
-													Output mime type
+													Output MIME type
 													<p class="text-xs font-normal text-gray-500">
-														The mime type of the output of the tool
+														The MIME type of the output of the tool is used to determine how to
+														display it to the user.
 													</p>
 												</div>
-												<select
-													name="outputMimeType"
+												<input
+													name="outputPath"
 													class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+													placeholder="image/jpeg"
 													bind:value={editableTool.outputMimeType}
 													disabled={readonly}
-												>
-													<option value="image/jpeg">image/*</option>
-													<option value="image/webp">document/*</option>
-													<option value="image/avif">video/*</option>
-													<option value="image/tiff">audio/*</option>
-													<option value="image/gif">application/*</option>
-												</select>
+												/>
 											</label>
 										{/if}
+										<label class="flex flex-row gap-2" for="showOutput">
+											<div class="mb-1 font-semibold">
+												Show output to user directly
+												<p class="text-xs font-normal text-gray-500">
+													Some tools return long context that should not be shown to the user
+													directly.
+												</p>
+											</div>
+											<input
+												type="checkbox"
+												name="showOutput"
+												bind:checked={editableTool.showOutput}
+												class="peer rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
+											/>
+										</label>
 									</div>
 								</div>
 							</div>
@@ -477,5 +506,25 @@
 				{/if}
 			</div>
 		</div>
+	</div>
+	<div class="relative bottom-0 flex w-full flex-row justify-end gap-2 pt-2">
+		<button
+			type="button"
+			class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
+			on:click={() => dispatch("close")}
+		>
+			Cancel
+		</button>
+		{#if !readonly}
+			<button
+				type="submit"
+				disabled={loading}
+				class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold text-white"
+				class:text-gray-300={loading}
+				class:bg-gray-500={loading}
+			>
+				{loading ? "Saving..." : "Save"}
+			</button>
+		{/if}
 	</div>
 </form>

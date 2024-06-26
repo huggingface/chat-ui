@@ -10,9 +10,7 @@
 	export let form;
 
 	afterNavigate(({ from }) => {
-		if (!from?.url.pathname.includes("settings")) {
-			previousPage = from?.url.toString() || previousPage;
-		}
+		previousPage = from?.url.toString() || previousPage;
 	});
 </script>
 
@@ -20,5 +18,5 @@
 	on:close={() => goto(previousPage)}
 	width="h-[95dvh] w-[90dvw] overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[85dvh] xl:w-[1200px] 2xl:h-[75dvh]"
 >
-	<ToolEdit bind:form tool={data.tool} readonly={!data.tool.createdByMe}/>
+	<ToolEdit bind:form tool={data.tool} readonly={!data.tool.createdByMe} />
 </Modal>

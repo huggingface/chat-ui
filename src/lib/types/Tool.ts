@@ -20,20 +20,20 @@ export type ToolLogoIcon =
 
 export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
 
-type ToolInputRequired = {
+export type ToolInputRequired = {
 	paramType: "required";
 	name: string;
 	description: string;
 };
 
-type ToolInputOptional = {
+export type ToolInputOptional = {
 	paramType: "optional";
 	name: string;
 	description: string;
 	default: string | number | boolean;
 };
 
-type ToolInputFixed = {
+export type ToolInputFixed = {
 	paramType: "fixed";
 	name: string;
 	value: string | number | boolean;
@@ -111,7 +111,7 @@ export type CommunityToolEditable = Omit<
 	| "type"
 	| "createdAt"
 	| "updatedAt"
-> & { _id: string };
+>;
 
 export type Tool = ConfigTool | CommunityTool;
 

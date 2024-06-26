@@ -196,6 +196,7 @@ function isExternalToolCall(call: unknown): call is ExternalToolCall {
 function externalToToolCall(call: ExternalToolCall, tools: Tool[]): ToolCall | undefined {
 	// Convert - to _ since some models insist on using _ instead of -
 	const tool = tools.find((tool) => toolHasName(call.tool_name, tool));
+
 	if (!tool) {
 		logger.debug(`Model requested tool that does not exist: "${call.tool_name}". Skipping tool...`);
 		return;
@@ -207,7 +208,7 @@ function externalToToolCall(call: ExternalToolCall, tools: Tool[]): ToolCall | u
 		const value = call.parameters[input.name];
 
 		// Required so ensure it's there, otherwise return undefined
-		if (input.required) {
+		if (input.paramType === "required") {
 			if (value === undefined) {
 				logger.debug(
 					`Model requested tool "${call.tool_name}" but was missing required parameter "${input.name}". Skipping tool...`
@@ -219,7 +220,11 @@ function externalToToolCall(call: ExternalToolCall, tools: Tool[]): ToolCall | u
 		}
 
 		// Optional so use default if not there
-		parametersWithDefaults[input.name] = value ?? input.default;
+		parametersWithDefaults[input.name] = value;
+
+		if (input.paramType === "optional") {
+			parametersWithDefaults[input.name] ??= input.default.toString();
+		}
 	}
 
 	return {
