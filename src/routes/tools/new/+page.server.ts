@@ -19,7 +19,6 @@ export const actions = {
 		const parse = editableToolSchema.safeParse(JSON.parse(toolStringified));
 
 		if (!parse.success) {
-			console.log({ errors: parse.error.errors });
 			// Loop through the errors array and create a custom errors array
 			const errors = parse.error.errors.map((error) => {
 				return {

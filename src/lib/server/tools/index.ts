@@ -85,8 +85,8 @@ const toolInputSchema = toolInputBaseSchema.and(
 
 export const editableToolSchema = z.object({
 	name: z.string().min(1),
-	baseUrl: z.string(),
-	endpoint: z.string(),
+	baseUrl: z.string().min(1),
+	endpoint: z.string().min(1),
 	inputs: z.array(toolInputSchema),
 	outputPath: z.string(),
 	outputType: IOType.or(z.literal("file")),
