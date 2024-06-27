@@ -185,6 +185,14 @@
 
 </script>
 
+{#if shared}
+<script type="application/json" class="js-hypothesis-config">
+	{
+		"openSidebar": true
+	}
+</script>
+<script src="https://hypothes.is/embed.js" async></script>
+{/if}
 
 
 
