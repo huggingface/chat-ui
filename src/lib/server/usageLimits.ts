@@ -17,6 +17,7 @@ export const usageLimitsSchema = z
 				return val;
 			}, z.coerce.number().optional())
 			.optional(), // how many messages per minute
+		tools: z.coerce.number().optional(), // how many tools
 	})
 	.optional();
 

@@ -23,13 +23,13 @@ export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
 export type ToolInputRequired = {
 	paramType: "required";
 	name: string;
-	description: string;
+	description?: string;
 };
 
 export type ToolInputOptional = {
 	paramType: "optional";
 	name: string;
-	description: string;
+	description?: string;
 	default: string | number | boolean;
 };
 

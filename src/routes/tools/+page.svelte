@@ -93,13 +93,10 @@
 
 <svelte:head>
 	{#if isHuggingChat}
-		<title>HuggingChat - Assistants</title>
-		<meta property="og:title" content="HuggingChat - Assistants" />
+		<title>HuggingChat - Tools</title>
+		<meta property="og:title" content="HuggingChat - Tools" />
 		<meta property="og:type" content="link" />
-		<meta
-			property="og:description"
-			content="Browse HuggingChat assistants made by the community."
-		/>
+		<meta property="og:description" content="Browse HuggingChat tools made by the community." />
 		<meta
 			property="og:image"
 			content="{envPublic.PUBLIC_ORIGIN ||

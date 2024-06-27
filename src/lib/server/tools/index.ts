@@ -1,11 +1,5 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type {
-	BackendCall,
-	BaseTool,
-	ConfigTool,
-	ToolInput,
-	ToolInputRequired,
-} from "$lib/types/Tool";
+import type { BackendCall, BaseTool, ConfigTool } from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -35,22 +29,48 @@ const IOType = z.union([
 	z.literal("boolean"),
 ]);
 
+const ToolColor = z.union([
+	z.literal("purple"),
+	z.literal("blue"),
+	z.literal("green"),
+	z.literal("yellow"),
+	z.literal("red"),
+]);
+
+const ToolIcon = z.union([
+	z.literal("wikis"),
+	z.literal("tools"),
+	z.literal("camera"),
+	z.literal("code"),
+	z.literal("email"),
+	z.literal("cloud"),
+	z.literal("terminal"),
+	z.literal("game"),
+	z.literal("chat"),
+	z.literal("speaker"),
+	z.literal("video"),
+]);
+
 const toolInputBaseSchema = z.union([
 	z.object({
 		name: z.string().min(1),
-		description: z.string().min(1),
+		description: z.string().optional(),
 		paramType: z.literal("required"),
 	}),
 	z.object({
 		name: z.string().min(1),
-		description: z.string().min(1),
+		description: z.string().optional(),
 		paramType: z.literal("optional"),
-		default: z.union([z.string(), z.number(), z.boolean()]),
+		default: z
+			.union([z.string(), z.number(), z.boolean(), z.undefined()])
+			.transform((val) => (val === undefined ? "" : val)),
 	}),
 	z.object({
 		name: z.string().min(1),
 		paramType: z.literal("fixed"),
-		value: z.union([z.string(), z.number(), z.boolean()]),
+		value: z
+			.union([z.string(), z.number(), z.boolean(), z.undefined()])
+			.transform((val) => (val === undefined ? "" : val)),
 	}),
 ]);
 
@@ -62,6 +82,22 @@ const toolInputSchema = toolInputBaseSchema.and(
 		})
 	)
 );
+
+export const editableToolSchema = z.object({
+	name: z.string().min(1),
+	baseUrl: z.string(),
+	endpoint: z.string(),
+	inputs: z.array(toolInputSchema),
+	outputPath: z.string(),
+	outputType: IOType.or(z.literal("file")),
+	outputMimeType: z.string().optional(),
+	showOutput: z.boolean(),
+
+	displayName: z.string().min(1),
+	color: ToolColor,
+	icon: ToolIcon,
+	description: z.string().min(1),
+});
 
 export const configTools = z
 	.array(
@@ -82,26 +118,8 @@ export const configTools = z
 					.transform((val) => new ObjectId(val)),
 				baseUrl: z.string().optional(),
 				displayName: z.string(),
-				color: z.union([
-					z.literal("purple"),
-					z.literal("blue"),
-					z.literal("green"),
-					z.literal("yellow"),
-					z.literal("red"),
-				]),
-				icon: z.union([
-					z.literal("wikis"),
-					z.literal("tools"),
-					z.literal("camera"),
-					z.literal("code"),
-					z.literal("email"),
-					z.literal("cloud"),
-					z.literal("terminal"),
-					z.literal("game"),
-					z.literal("chat"),
-					z.literal("speaker"),
-					z.literal("video"),
-				]),
+				color: ToolColor,
+				icon: ToolIcon,
 				isOnByDefault: z.optional(z.literal(true)),
 				isLocked: z.optional(z.literal(true)),
 				isHidden: z.optional(z.literal(true)),

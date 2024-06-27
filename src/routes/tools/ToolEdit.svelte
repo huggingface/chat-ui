@@ -121,9 +121,7 @@
 	method="POST"
 	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
 	use:enhance={async ({ formData }) => {
-		console.log({ formData });
-		console.log({ editableTool });
-		loading = true;
+		formData.append("tool", JSON.stringify(editableTool));
 
 		return async ({ result }) => {
 			loading = false;
