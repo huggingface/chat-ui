@@ -101,8 +101,9 @@ envVars:
         "parameters": {
           "truncate" : 6146,
           "max_new_tokens" : 2044,
-          "temperature": 0.1,
-          "stop" : ["<end_of_turn>"]
+          "temperature": 0.95,
+          "top_k": 100,
+          "stop" : ["<end_of_turn>", "<eos>", "<end_of_turn><eos>"]
         },
         "preprompt" : "",
         "promptExamples" : [
