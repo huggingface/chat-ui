@@ -15,6 +15,7 @@ import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
+import type { TokenCache } from "$lib/types/TokenCache";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -89,6 +90,7 @@ export class Database {
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
+		const tokenCaches = db.collection<TokenCache>("tokens");
 
 		return {
 			conversations,
@@ -105,6 +107,7 @@ export class Database {
 			bucket,
 			migrationResults,
 			semaphores,
+			tokenCaches,
 		};
 	}
 
@@ -126,6 +129,7 @@ export class Database {
 			sessions,
 			messageEvents,
 			semaphores,
+			tokenCaches,
 		} = this.getCollections();
 
 		conversations
@@ -215,6 +219,11 @@ export class Database {
 		semaphores
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
 			.catch((e) => logger.error(e));
+
+		tokenCaches
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
+			.catch((e) => logger.error(e));
+		tokenCaches.createIndex({ tokenHash: 1 }).catch((e) => logger.error(e));
 	}
 }
 
