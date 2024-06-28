@@ -17,6 +17,12 @@ export async function POST({ params, url, locals }) {
 		throw error(404, "Conversation not found");
 	}
 
+	// Update the conversation to set shared to true
+	await collections.conversations.updateOne(
+		{ _id: new ObjectId(params.id) },
+		{ $set: { shared: true } }
+	);
+
 	const hash = await hashConv(conversation);
 
 	const existingShare = await collections.sharedConversations.findOne({ hash });

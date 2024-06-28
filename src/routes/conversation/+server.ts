@@ -23,6 +23,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			model: validateModel(models),
 			assistantId: z.string().optional(),
 			preprompt: z.string().optional(),
+			shared: z.boolean().optional().default(false),
 		})
 		.safeParse(JSON.parse(body));
 
@@ -112,6 +113,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		updatedAt: new Date(),
 		userAgent: request.headers.get("User-Agent") ?? undefined,
 		embeddingModel,
+		shared: values.shared,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});

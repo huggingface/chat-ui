@@ -57,7 +57,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		.find(authCondition(locals))
 		.sort({ updatedAt: -1 })
 		.project<
-			Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId">
+			Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId" | "shared">
 		>({
 			title: 1,
 			model: 1,
@@ -65,6 +65,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			updatedAt: 1,
 			createdAt: 1,
 			assistantId: 1,
+			shared: 1,
 		})
 		.limit(300)
 		.toArray();

@@ -48,7 +48,7 @@
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
 
-	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
+	$: isReadOnly = !models.some((model) => model.id === currentModel.id) || shared;
 
 	let loginModalOpen = false;
 	let message: string;
@@ -174,11 +174,15 @@
 	});
 
 	
-
-	$: if (sidebar) {
-		if (shared) {
+	
+	$: if (shared) {
+		console.log("shared update");
+		if (sidebar) {
 			sidebar.style.visibility = 'visible';
-		} else {
+		}
+	} else {
+		console.log("not shared update");
+		if (sidebar) {
 			sidebar.style.visibility = 'hidden';
 		}
 	}
@@ -198,8 +202,7 @@
 
 
 
-<div class="relative min-h-0 min-w-0"
-	class:max-w-[calc(68vw)]={shared}>
+<div class="relative min-h-0 min-w-0">
 
 	{#if loginModalOpen}
 		<LoginModal
@@ -478,4 +481,17 @@
 			</div>
 		</div>
 	</div>
+</div>
+<div class="col-start-3 col-end-4 flex flex-col justify-start items-center pt-[33.33%] h-full">
+	<button
+		class="flex items-center justify-center p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow duration-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-300"
+		type="button"
+		on:click={onShare}
+	>
+		<img src="/chatui/lifesaver-500x500.png" alt="Ask for Help" class="w-20 h-20" />
+		<span class="ml-4 mr-4 text-xl font-semibold text-gray-800">Get Help</span>
+	</button>
+	<p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
+		Click to comment on this chat and get help from the community.
+	</p>
 </div>
