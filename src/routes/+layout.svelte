@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy } from "svelte";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto, invalidate, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { browser } from "$app/environment";
@@ -13,6 +13,7 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 
 	import { shareConversation } from "$lib/shareConversation";
+	import { unshareConversation } from "$lib/shareConversation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	import Toast from "$lib/components/Toast.svelte";
@@ -204,19 +205,21 @@
 			conversations={data.conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
+			on:shareConversation={(ev) => shareConversation(ev.detail, "Shared Item").then(() => invalidateAll())}
+			on:unshareConversation={(ev) => unshareConversation(ev.detail).then(() => invalidateAll())}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
 	</MobileNav>
 	<nav
-		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
 	>
 		<NavMenu
 			conversations={data.conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
+			on:shareConversation={(ev) => shareConversation(ev.detail, "Shared Item").then(() => invalidateAll())}
+			on:unshareConversation={(ev) => unshareConversation(ev.detail).then(() => invalidateAll())}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>

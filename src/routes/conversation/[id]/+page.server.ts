@@ -27,6 +27,7 @@ export const load = async ({ params, depends, locals }) => {
 			...authCondition(locals),
 		});
 
+
 		depends(UrlDependency.Conversation);
 
 		if (!conversation) {
@@ -38,11 +39,13 @@ export const load = async ({ params, depends, locals }) => {
 			if (conversationExists) {
 				throw error(
 					403,
-					"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' feature instead."
+					"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' feature first."
 				);
 			}
 
 			throw error(404, "Conversation not found.");
+		} else {
+			shared = conversation?.shared;
 		}
 	}
 

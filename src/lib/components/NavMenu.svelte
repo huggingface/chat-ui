@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 
+	import { writable } from 'svelte/store'; 
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
@@ -25,16 +26,6 @@
 		new Date().setMonth(new Date().getMonth() - 1),
 	];
 
-	$: groupedConversations = {
-		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
-		week: conversations.filter(
-			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
-		),
-		month: conversations.filter(
-			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
-		),
-		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
-	};
 
 	const titles: { [key: string]: string } = {
 		today: "Today",
@@ -42,8 +33,25 @@
 		month: "This month",
 		older: "Older",
 	} as const;
-
+	
 	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
+	
+	const activeTab = writable('private');
+	
+	$: filteredConversations = $activeTab === 'private'
+    ? conversations.filter(({ shared }) => !shared)
+    : conversations.filter(({ shared }) => shared);
+	
+	$: groupedConversations = {
+		today: filteredConversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
+		week: filteredConversations.filter(
+		({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
+		),
+		month: filteredConversations.filter(
+		({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
+		),
+		older: filteredConversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+	};
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -62,6 +70,23 @@
 		New Chat
 	</a>
 </div>
+<!-- Tab switcher -->
+<div class="flex justify-center h-8 mb-2">
+    <div class="inline-flex rounded-md border border-gray-200 dark:border-gray-700 h-full">
+        <button
+            class="px-3 h-full text-sm font-medium rounded-l-md {$activeTab === 'private' ? 'bg-gray-100 dark:bg-gray-700' : ''}"
+            on:click={() => activeTab.set('private')}
+        >
+            Private
+        </button>
+        <button
+            class="px-3 h-full text-sm font-medium rounded-r-md {$activeTab === 'shared' ? 'bg-gray-100 dark:bg-gray-700' : ''}"
+            on:click={() => activeTab.set('shared')}
+        >
+            Shared
+        </button>
+    </div>
+</div>
 <div
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 max-sm:bg-gradient-to-t md:bg-gradient-to-l dark:from-gray-800/30"
 >
@@ -71,7 +96,7 @@
 				{titles[group]}
 			</h4>
 			{#each convs as conv}
-				<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
+				<NavConversationItem on:editConversationTitle on:deleteConversation on:shareConversation on:unshareConversation {conv} />
 			{/each}
 		{/if}
 	{/each}

@@ -7,7 +7,10 @@
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
+	import CarbonShare from "~icons/carbon/share";
+	import CarbonVirtualPrivateCloud from "~icons/carbon/virtual-private-cloud";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
+	import { share } from "$lib/utils/share";
 
 	export let conv: ConvSidebar;
 
@@ -16,6 +19,8 @@
 	const dispatch = createEventDispatcher<{
 		deleteConversation: string;
 		editConversationTitle: { id: string; title: string };
+		shareConversation: string;
+		unshareConversation: string;
 	}>();
 </script>
 
@@ -50,7 +55,30 @@
 			{conv.title}
 		{/if}
 	</div>
+	{#if conv.shared}
+		<button
+		type="button"
+		class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+		title="Make Private"
+		on:click|preventDefault={(event) => {
+			dispatch("unshareConversation", conv.id);
+		}}
 
+		>
+		<CarbonVirtualPrivateCloud class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+		</button>		
+	{:else}
+		<button
+			type="button"
+			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+			title="Share"
+			on:click|preventDefault={(event) => {
+				dispatch("shareConversation",  conv.id);
+			}}
+		>
+			<CarbonShare class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+		</button>
+	{/if}
 	{#if confirmDelete}
 		<button
 			type="button"

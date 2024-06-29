@@ -126,6 +126,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				avatarHash:
 					conv.assistantId &&
 					assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
+				shared: conv.shared,
 			};
 		}) satisfies ConvSidebar[],
 		settings: {

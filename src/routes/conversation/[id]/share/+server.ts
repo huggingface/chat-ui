@@ -8,6 +8,7 @@ import { ObjectId } from "mongodb";
 import { nanoid } from "nanoid";
 
 export async function POST({ params, url, locals }) {
+	// TODO: seems like this should be a PUT rather than a POST since it's an update
 	const conversation = await collections.conversations.findOne({
 		_id: new ObjectId(params.id),
 		...authCondition(locals),
@@ -19,7 +20,7 @@ export async function POST({ params, url, locals }) {
 
 	// Update the conversation to set shared to true
 	await collections.conversations.updateOne(
-		{ _id: new ObjectId(params.id) },
+		{ _id: new ObjectId(params.id), ...authCondition(locals) },
 		{ $set: { shared: true } }
 	);
 

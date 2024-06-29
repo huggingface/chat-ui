@@ -406,7 +406,7 @@
 	on:retry={onRetry}
 	on:continue={onContinue}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation($page.params.id, data.title)}
+	on:share={() => shareConversation($page.params.id, data.title).then(() => invalidateAll())}
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}

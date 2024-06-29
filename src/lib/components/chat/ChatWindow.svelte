@@ -41,7 +41,7 @@
 	export let loading = false;
 	export let pending = false;
 
-	export let shared = false;
+	$: shared = $page.data.shared ?? false;
 	export let currentModel: Model;
 	export let models: Model[];
 	export let assistant: Assistant | undefined = undefined;
@@ -461,37 +461,23 @@
 					or false.
 				</p>
 				<p>Shared: {shared}</p>
-				{#if messages.length}
-					<button
-						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
-						type="button"
-						class:hover:underline={!isSharedRecently}
-						on:click={onShare}
-						disabled={isSharedRecently}
-					>
-						{#if isSharedRecently}
-							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
-							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
-						{:else}
-							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
-							<div class="max-sm:hidden">Share this conversation</div>
-						{/if}
-					</button>
-				{/if}
+
 			</div>
 		</div>
 	</div>
 </div>
 <div class="col-start-3 col-end-4 flex flex-col justify-start items-center pt-[33.33%] h-full">
+	{#if messages.length}
 	<button
 		class="flex items-center justify-center p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow duration-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-300"
 		type="button"
 		on:click={onShare}
 	>
 		<img src="/chatui/lifesaver-500x500.png" alt="Ask for Help" class="w-20 h-20" />
-		<span class="ml-4 mr-4 text-xl font-semibold text-gray-800">Get Help</span>
+		<span class="ml-4 mr-4 text-xl font-semibold text-gray-800">Share & Get Help</span>
 	</button>
 	<p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
 		Click to comment on this chat and get help from the community.
 	</p>
+	{/if}
 </div>
