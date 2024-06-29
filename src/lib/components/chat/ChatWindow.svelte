@@ -176,12 +176,10 @@
 	
 	
 	$: if (shared) {
-		console.log("shared update");
 		if (sidebar) {
 			sidebar.style.visibility = 'visible';
 		}
 	} else {
-		console.log("not shared update");
 		if (sidebar) {
 			sidebar.style.visibility = 'hidden';
 		}
