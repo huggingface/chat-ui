@@ -93,34 +93,6 @@ envVars:
         }
       },
       {
-        "name" : "google/gemma-2-27b-it",
-        "tokenizer": "google/gemma-2-27b-it",
-        "description": "Gemma 2 27B is the latest release in the Gemma family of models built by Google, with performance on par with Llama 3 70B. ",
-        "modelUrl": "https://huggingface.co/google/gemma-2-27b-it",
-        "websiteUrl": "https://huggingface.co/google/gemma-2-27b-it",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
-        "parameters": {
-          "truncate" : 6146,
-          "max_new_tokens" : 2044,
-          "temperature": 0.95,
-          "top_k": 100,
-          "stop" : ["<end_of_turn>", "<eos>", "<end_of_turn><eos>"]
-        },
-        "preprompt" : "",
-        "promptExamples" : [
-          {
-            "title": "Write a poem",
-            "prompt": "Write a poem to help me remember the first 10 elements on the periodic table, giving each element its own line."
-          }, {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
-      },
-      {
         "name" : "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "description" : "The latest MoE model from Mistral AI! 8x7B and outperforms Llama 2 70B in most benchmarks.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
