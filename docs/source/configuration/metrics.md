@@ -1,6 +1,6 @@
 # Metrics
 
-The server exposes prometheus metrics on port `5565` by default. You may disable the metrics server with `METRICS_ENABLED=false` and change the port with `METRICS_PORT=1234`.
+The server can expose prometheus metrics on port `5565` but is off by default. You may enable the metrics server with `METRICS_ENABLED=true` and change the port with `METRICS_PORT=1234`.
 
 <Tip>
 

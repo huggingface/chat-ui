@@ -35,6 +35,7 @@ envVars:
   EXPOSE_API: "true"
   METRICS_PORT: 5565
   LOG_LEVEL: "debug"
+  METRICS_ENABLED: "true"
   MODELS: >
     [
       {
