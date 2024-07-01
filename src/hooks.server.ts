@@ -13,10 +13,13 @@ import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
+import { initExitHandler } from "$lib/server/exitHandler";
 import { ObjectId } from "mongodb";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
+	initExitHandler();
+
 	await checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
