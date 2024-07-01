@@ -158,14 +158,25 @@ async function getChatPromptRender(
 
 		const mappedTools =
 			tools?.map((tool) => {
-				const inputs: Record<string, Omit<ToolInput, "name">> = {};
+				const inputs: Record<
+					string,
+					{
+						type: ToolInput["type"];
+						description: string;
+						required: boolean;
+					}
+				> = {};
+
 				for (const value of tool.inputs) {
-					inputs[value.name] = {
-						type: value.type,
-						description: value.description,
-						required: value.required,
-					};
+					if (value.paramType !== "fixed") {
+						inputs[value.name] = {
+							type: value.type,
+							description: value.description ?? "",
+							required: value.paramType === "required",
+						};
+					}
 				}
+
 				return {
 					name: tool.name,
 					description: tool.description,

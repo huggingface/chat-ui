@@ -1,9 +1,4 @@
-import {
-	ToolResultStatus,
-	type ToolCall,
-	type ToolFunction,
-	type ToolResult,
-} from "$lib/types/Tool";
+import { ToolResultStatus, type ToolCall, type Tool, type ToolResult } from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
 import JSON5 from "json5";
 import { toolFromConfigs, type BackendToolContext } from "../tools";
@@ -40,25 +35,22 @@ function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string
 }
 
 export function filterToolsOnPreferences(
-	toolsPreference: Record<string, boolean>,
+	toolsPreference: Array<string>,
 	isAssistant: boolean
-): ToolFunction[] {
+): Tool[] {
 	// if it's an assistant, only support websearch for now
-	if (isAssistant) return [...directlyAnswer.functions, ...websearch.functions];
+	if (isAssistant) return [directlyAnswer, websearch];
 
 	// filter based on tool preferences, add the tools that are on by default
-	return toolFromConfigs
-		.filter((el) => {
-			if (el.isLocked && el.isOnByDefault) return true;
-			return toolsPreference?.[el.displayName] ?? el.isOnByDefault;
-		})
-		.map((el) => el.functions)
-		.flat();
+	return toolFromConfigs.filter((el) => {
+		if (el.isLocked && el.isOnByDefault) return true;
+		return toolsPreference?.includes(el._id.toString()) ?? el.isOnByDefault;
+	});
 }
 
 async function* callTool(
 	ctx: BackendToolContext,
-	tools: ToolFunction[],
+	tools: Tool[],
 	call: ToolCall
 ): AsyncGenerator<MessageUpdate, ToolResult | undefined, undefined> {
 	const uuid = uuidV4();
@@ -69,7 +61,7 @@ async function* callTool(
 	}
 
 	// Special case for directly_answer tool where we ignore
-	if (toolHasName(directlyAnswer.functions[0].name, tool)) return;
+	if (toolHasName(directlyAnswer.name, tool)) return;
 
 	const startTime = Date.now();
 	MetricsServer.getMetrics().tool.toolUseCount.inc({ tool: call.name });
@@ -118,7 +110,7 @@ async function* callTool(
 
 export async function* runTools(
 	ctx: TextGenerationContext,
-	tools: ToolFunction[],
+	tools: Tool[],
 	preprompt?: string
 ): AsyncGenerator<MessageUpdate, ToolResult[], undefined> {
 	const { endpoint, conv, messages, assistant, ip, username } = ctx;
@@ -201,12 +193,10 @@ function isExternalToolCall(call: unknown): call is ExternalToolCall {
 	return externalToolCall.safeParse(call).success;
 }
 
-function externalToToolCall(
-	call: ExternalToolCall,
-	toolFunctions: ToolFunction[]
-): ToolCall | undefined {
+function externalToToolCall(call: ExternalToolCall, tools: Tool[]): ToolCall | undefined {
 	// Convert - to _ since some models insist on using _ instead of -
-	const tool = toolFunctions.find((tool) => toolHasName(call.tool_name, tool));
+	const tool = tools.find((tool) => toolHasName(call.tool_name, tool));
+
 	if (!tool) {
 		logger.debug(`Model requested tool that does not exist: "${call.tool_name}". Skipping tool...`);
 		return;
@@ -218,7 +208,7 @@ function externalToToolCall(
 		const value = call.parameters[input.name];
 
 		// Required so ensure it's there, otherwise return undefined
-		if (input.required) {
+		if (input.paramType === "required") {
 			if (value === undefined) {
 				logger.debug(
 					`Model requested tool "${call.tool_name}" but was missing required parameter "${input.name}". Skipping tool...`
@@ -230,7 +220,11 @@ function externalToToolCall(
 		}
 
 		// Optional so use default if not there
-		parametersWithDefaults[input.name] = value ?? input.default;
+		parametersWithDefaults[input.name] = value;
+
+		if (input.paramType === "optional") {
+			parametersWithDefaults[input.name] ??= input.default.toString();
+		}
 	}
 
 	return {

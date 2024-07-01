@@ -26,7 +26,7 @@ import endpointLangserve, {
 	endpointLangserveParametersSchema,
 } from "./langserve/endpointLangserve";
 
-import type { ToolCall, ToolFunction, ToolResult } from "$lib/types/Tool";
+import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -36,7 +36,7 @@ export interface EndpointParameters {
 	preprompt?: Conversation["preprompt"];
 	continueMessage?: boolean; // used to signal that the last message will be extended
 	generateSettings?: Partial<Model["parameters"]>;
-	tools?: ToolFunction[];
+	tools?: Tool[];
 	toolResults?: ToolResult[];
 	isMultimodal?: boolean;
 }

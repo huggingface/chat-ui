@@ -31,9 +31,7 @@
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: availableTools
-					.flatMap((tool) => tool.functions)
-					.find((fn) => fn.name === toolFnName)?.timeToUseMS,
+				duration: availableTools.find((tool) => tool.name === toolFnName)?.timeToUseMS,
 				fill: "forwards",
 			});
 		}
@@ -104,7 +102,10 @@
 
 			<span>
 				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-				<span class="font-semibold">{toolFnName}</span>
+				<span class="font-semibold"
+					>{availableTools.find((tool) => tool.name === toolFnName)?.displayName ??
+						toolFnName}</span
+				>
 			</span>
 		</summary>
 		{#each tool as toolUpdate}

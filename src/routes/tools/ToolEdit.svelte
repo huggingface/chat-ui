@@ -1,0 +1,528 @@
+<script lang="ts">
+	import type { CommunityToolEditable, ToolInput } from "$lib/types/Tool";
+	import { createEventDispatcher, onMount } from "svelte";
+	import type { Client } from "@gradio/client";
+	import { browser } from "$app/environment";
+	import ToolLogo from "$lib/components/ToolLogo.svelte";
+	import { colors, icons } from "$lib/utils/tools";
+	import { applyAction, enhance } from "$app/forms";
+
+	type ActionData = {
+		error: boolean;
+		errors: {
+			field: string | number;
+			message: string;
+		}[];
+	} | null;
+
+	export let tool: CommunityToolEditable | undefined = undefined;
+	export let readonly = false;
+	export let form: ActionData;
+
+	function getError(field: string, returnForm: ActionData) {
+		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
+	}
+
+	let ClientCreator: { connect: (nameSpace: string) => Promise<Client> };
+
+	let loading = false;
+	const dispatch = createEventDispatcher<{ close: void }>();
+
+	onMount(async () => {
+		ClientCreator = (await import("@gradio/client")).Client;
+		await updateConfig();
+	});
+
+	let spaceUrl = tool?.baseUrl ?? "multimodalart/cosxl";
+
+	let editableTool: CommunityToolEditable = tool ?? {
+		displayName: "",
+		description: "",
+		color: "blue",
+		icon: "wikis",
+		baseUrl: "multimodalart/cosxl",
+		endpoint: "",
+		name: "process_image",
+		inputs: [],
+		outputPath: "",
+		outputType: "file",
+		outputMimeType: "",
+		showOutput: true,
+	};
+
+	$: editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
+
+	$: client = browser && !!spaceUrl && !!ClientCreator && ClientCreator.connect(spaceUrl);
+
+	async function updateConfig() {
+		if (!client) {
+			if (editableTool.baseUrl) {
+				client = ClientCreator.connect(editableTool.baseUrl);
+			} else {
+				return;
+			}
+		}
+
+		const api = await (await client).view_api();
+
+		if (!editableTool.endpoint) {
+			return;
+		}
+
+		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
+			// let type: ToolInput["type"] = "str";
+			// let mimeType: string = undefined;
+
+			// if (param.python_type.type === "filepath") {
+			// 	type = "file";
+			// 	mimeType = param.;
+			// }
+
+			if (tool?.inputs[idx]?.name === param.parameter_name) {
+				console.log(`tool ${idx} has the same name`);
+				// if the tool has the same name, we use the tool's type
+				return {
+					...tool?.inputs[idx],
+				} satisfies ToolInput;
+			}
+
+			if (param.parameter_has_default && param.python_type.type !== "filepath") {
+				// optional if it has a default
+				return {
+					name: param.parameter_name,
+					description: param.description,
+					paramType: "optional",
+					type: "str",
+					default: param.parameter_default,
+				} satisfies ToolInput;
+			} else {
+				// required if it doesn't have a default
+				return {
+					name: param.parameter_name,
+					description: param.description,
+					paramType: "required",
+					type: "str",
+				} satisfies ToolInput;
+			}
+		});
+		editableTool.inputs = newInputs;
+	}
+
+	async function onEndpointChange(e: Event) {
+		const target = e.target as HTMLInputElement;
+		editableTool.endpoint = target.value;
+		editableTool.name = target.value.replace(/\//g, "");
+
+		await updateConfig();
+	}
+</script>
+
+<form
+	method="POST"
+	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
+	use:enhance={async ({ formData }) => {
+		formData.append("tool", JSON.stringify(editableTool));
+
+		return async ({ result }) => {
+			loading = false;
+			await applyAction(result);
+		};
+	}}
+>
+	{#if tool}
+		<h2 class="text-xl font-semibold">
+			{readonly ? "View" : "Edit"} Tool: {tool.displayName}
+		</h2>
+		{#if !readonly}
+			<p class="mb-6 text-sm text-gray-500">
+				Modifying an existing tool will propagate the changes to all users.
+			</p>
+		{/if}
+	{:else}
+		<h2 class="text-xl font-semibold">Create new tool</h2>
+		<p class="mb-6 text-sm text-gray-500">
+			Create and share your own tools. All tools are <span
+				class="rounded-full border px-2 py-0.5 leading-none">public</span
+			>
+		</p>
+	{/if}
+
+	<div class="grid h-full w-full flex-1 grid-cols-2 gap-6 text-sm max-sm:grid-cols-1">
+		<div class="col-span-1 flex flex-col gap-4">
+			<div class="flex flex-col gap-4">
+				<label>
+					<div class="mb-1 font-semibold">Tool Display Name</div>
+					<input
+						type="text"
+						name="displayName"
+						disabled={readonly}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						placeholder="Image generator"
+						bind:value={editableTool.displayName}
+					/>
+					<p class="text-xs text-red-500">{getError("displayName", form)}</p>
+				</label>
+
+				<div class="flex flex-row gap-4">
+					<div>
+						{#key editableTool.color + editableTool.icon}
+							<ToolLogo color={editableTool.color} icon={editableTool.icon} />
+						{/key}
+					</div>
+
+					<label class="flex-grow">
+						<div class="mb-1 font-semibold">Icon</div>
+
+						<select
+							name="icon"
+							disabled={readonly}
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							bind:value={editableTool.icon}
+						>
+							{#each icons as icon}
+								<option value={icon}>{icon}</option>
+							{/each}
+							<p class="text-xs text-red-500">{getError("icon", form)}</p>
+						</select>
+					</label>
+
+					<label class="flex-grow">
+						<div class="mb-1 font-semibold">Color scheme</div>
+						<select
+							name="color"
+							disabled={readonly}
+							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+							bind:value={editableTool.color}
+						>
+							{#each colors as color}
+								<option value={color}>{color}</option>
+							{/each}
+							<p class="text-xs text-red-500">{getError("color", form)}</p>
+						</select>
+					</label>
+				</div>
+
+				<label>
+					<div class="mb-1 font-semibold">Tool Description</div>
+					<textarea
+						name="description"
+						disabled={readonly}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						placeholder="This tool lets you generate images using SDXL."
+						bind:value={editableTool.description}
+					/>
+					<p class="text-xs text-red-500">{getError("description", form)}</p>
+				</label>
+
+				<label>
+					<div class="mb-1 font-semibold">Hugging Face Space URL</div>
+					<input
+						type="text"
+						name="spaceUrl"
+						disabled={readonly}
+						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						placeholder="ByteDance/Hyper-SDXL-1Step-T2I"
+						bind:value={editableTool.baseUrl}
+					/>
+					<p class="text-xs text-red-500">{getError("spaceUrl", form)}</p>
+				</label>
+				<p class="text-justify text-gray-800">
+					Tools allows models that support them to use external application directly via function
+					calling. Tools must use Hugging Face Gradio Spaces as we detect the input and output types
+					automatically from the <a
+						class="underline"
+						href="https://www.gradio.app/guides/sharing-your-app#api-page">Gradio API</a
+					>. For GPU intensive tool consider using a ZeroGPU Space.
+				</p>
+			</div>
+		</div>
+		<div class="col-span-1 flex flex-col gap-4">
+			<div class="flex flex-col gap-2">
+				<h3 class="mb-1 font-semibold">Functions</h3>
+				<p class="text-sm text-gray-500">Choose functions that can be called in your tool.</p>
+				{#if client}
+					{#await client.then((c) => c.view_api())}
+						<p class="text-sm text-gray-500">Loading...</p>
+					{:then api}
+						<div class="flex flex-row gap-4">
+							{#each Object.keys(api["named_endpoints"] ?? {}) as name}
+								<label>
+									<input
+										type="radio"
+										disabled={readonly}
+										on:input={onEndpointChange}
+										bind:group={editableTool.endpoint}
+										value={name}
+										name="endpoint"
+									/>
+									<span
+										class="font-mono text-gray-800"
+										class:font-semibold={editableTool.endpoint === name}>{name}</span
+									>
+								</label>
+							{/each}
+						</div>
+
+						{#if editableTool.endpoint && api["named_endpoints"][editableTool.endpoint]}
+							{@const endpoint = api["named_endpoints"][editableTool.endpoint]}
+							<div class="flex flex-col gap-2">
+								<div class="flex flex-col gap-2 rounded-lg border border-gray-200 p-2">
+									<div class="flex items-center gap-1 border-b border-gray-200 p-1 pb-2">
+										<span class="flex-grow font-mono text-smd font-semibold"
+											>{editableTool.endpoint}</span
+										>
+
+										<label class="ml-auto">
+											<span class="text-sm text-gray-500">AI Name</span>
+											<input
+												class="h-fit rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
+												type="text"
+												name="name"
+												disabled={readonly}
+												value={editableTool.name}
+											/>
+										</label>
+									</div>
+
+									<div>
+										<h3 class="text-lg font-semibold">Arguments</h3>
+										<p class="mb-2 text-sm text-gray-500">
+											Choose parameters that can be passed to your tool.
+										</p>
+									</div>
+
+									{#each editableTool.inputs as input, inputIdx}
+										{@const parameter = endpoint.parameters.find(
+											(parameter) => parameter.parameter_name === input.name
+										)}
+
+										<div class="flex items-center gap-1">
+											<div class="inline w-full">
+												<span class="font-mono text-sm">{input.name}</span>
+												<span
+													class="inline-block rounded-lg bg-orange-50 p-1 text-sm text-orange-800"
+													>{parameter?.python_type.type}</span
+												>
+												{#if parameter?.description}
+													<p class="text-sm text-gray-500">
+														{parameter.description}
+													</p>
+												{/if}
+												<div class="flex w-fit justify-start gap-2">
+													<label class="ml-auto">
+														<input
+															type="radio"
+															name="{input.name}-parameter-type"
+															value="required"
+															disabled={readonly}
+															bind:group={editableTool.inputs[inputIdx].paramType}
+														/>
+														<span class="text-sm text-gray-500">Required</span>
+													</label>
+													<label class="ml-auto">
+														<input
+															type="radio"
+															name="{input.name}-parameter-type"
+															value="optional"
+															disabled={readonly || parameter?.python_type.type === "filepath"}
+															bind:group={editableTool.inputs[inputIdx].paramType}
+														/>
+														<span class="text-sm text-gray-500">Optional</span>
+													</label>
+													<label class="ml-auto">
+														<input
+															type="radio"
+															name="{input.name}-parameter-type"
+															value="fixed"
+															disabled={readonly || parameter?.python_type.type === "filepath"}
+															bind:group={editableTool.inputs[inputIdx].paramType}
+														/>
+														<span class="text-sm text-gray-500">Fixed</span>
+													</label>
+												</div>
+											</div>
+										</div>
+										<!-- for required we need a description, for optional we need a default value and for fixed we need a value -->
+										{#if input.paramType === "required" || input.paramType === "optional"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 font-semibold">
+													Description
+													<p class="text-xs font-normal text-gray-500">
+														Will be passed in the model prompt, make it as clear and concise as
+														possible
+													</p>
+												</div>
+												<textarea
+													name="{input.name}-description"
+													class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+													placeholder="This is the description of the input."
+													bind:value={editableTool.inputs[inputIdx].description}
+													disabled={readonly}
+												/>
+												<p class="text-xs text-red-500">
+													{getError(`${input.name}-description`, form)}
+												</p>
+											</label>
+										{/if}
+										{#if input.paramType === "optional" || input.paramType === "fixed"}
+											{@const isOptional = input.paramType === "optional"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 flex-grow font-semibold">
+													{isOptional ? "Default value" : "Value"}
+													<p class="text-xs font-normal text-gray-500">
+														{#if isOptional}
+															The tool will use this value by default but the model can specify a
+															different one.
+														{:else}
+															The tool will use this value and it cannot be changed.
+														{/if}
+													</p>
+												</div>
+												{#if input.paramType === "optional"}
+													<input
+														name="{input.name}-default"
+														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+														placeholder="This is the value of the input. Must be of type {parameter
+															?.python_type.type}"
+														bind:value={editableTool.inputs[inputIdx].default}
+														disabled={readonly}
+													/>
+												{:else}
+													<input
+														name="{input.name}-value"
+														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+														placeholder="This is the value of the input. Must be of type {parameter
+															?.python_type.type}"
+														bind:value={editableTool.inputs[inputIdx].value}
+														disabled={readonly}
+													/>
+												{/if}
+
+												<p class="text-xs text-red-500">
+													{getError(`${input.name}-${isOptional ? "default" : "value"}`, form)}
+												</p>
+											</label>
+										{/if}
+
+										<!-- divider -->
+										<div
+											class="flex w-full flex-row flex-nowrap gap-2 border-b border-gray-200 pt-2"
+										/>
+									{/each}
+
+									<div class="flex flex-col gap-4">
+										<div>
+											<h3 class="text-lg font-semibold">Return value</h3>
+											<p class="mb-2 text-sm text-gray-500">
+												Choose what value your tool will use as return value
+											</p>
+										</div>
+										<!-- output path in JSONPath format -->
+										<label class="flex flex-row gap-2">
+											<div class="mb-1 font-semibold">
+												Output path
+												<p class="text-xs font-normal text-gray-500">
+													The path of the output of the tool. Uses <a
+														href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html"
+														target="_blank"
+														class="underline"
+														rel="noreferrer">JSONPath queries</a
+													>.
+												</p>
+											</div>
+											<input
+												name="outputPath"
+												class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+												placeholder="This is the path of the output of the tool"
+												bind:value={editableTool.outputPath}
+												disabled={readonly}
+											/>
+										</label>
+										<!-- select the output type -->
+										<label class="flex flex-row gap-2">
+											<div class="mb-1 font-semibold">
+												Output type
+												<p class="text-xs font-normal text-gray-500">
+													The type of the output of the tool
+												</p>
+											</div>
+											<select
+												name="outputType"
+												class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+												bind:value={editableTool.outputType}
+												disabled={readonly}
+											>
+												<option value="str">str</option>
+												<option value="int">int</option>
+												<option value="float">float</option>
+												<option value="boolean">boolean</option>
+												<option value="file">file</option>
+											</select>
+										</label>
+
+										<!-- select the output mime type -->
+										{#if editableTool.outputType === "file"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 font-semibold">
+													Output MIME type
+													<p class="text-xs font-normal text-gray-500">
+														The MIME type of the output of the tool is used to determine how to
+														display it to the user.
+													</p>
+												</div>
+												<input
+													name="outputPath"
+													class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
+													placeholder="image/jpeg"
+													bind:value={editableTool.outputMimeType}
+													disabled={readonly}
+												/>
+											</label>
+										{/if}
+										<label class="flex flex-row gap-2" for="showOutput">
+											<div class="mb-1 font-semibold">
+												Show output to user directly
+												<p class="text-xs font-normal text-gray-500">
+													Some tools return long context that should not be shown to the user
+													directly.
+												</p>
+											</div>
+											<input
+												type="checkbox"
+												name="showOutput"
+												bind:checked={editableTool.showOutput}
+												class="peer rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
+											/>
+										</label>
+									</div>
+								</div>
+							</div>
+						{/if}
+					{:catch error}
+						<p class="text-sm text-gray-500">{error}</p>
+					{/await}
+				{/if}
+			</div>
+			<div class="relative bottom-0 mb-4 mt-auto flex w-full flex-row justify-end gap-2">
+				<button
+					type="button"
+					class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
+					on:click={() => dispatch("close")}
+				>
+					Cancel
+				</button>
+				{#if !readonly}
+					<button
+						type="submit"
+						disabled={loading}
+						class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold text-white"
+						class:text-gray-300={loading}
+						class:bg-gray-500={loading}
+					>
+						{loading ? "Saving..." : "Save"}
+					</button>
+				{/if}
+			</div>
+		</div>
+	</div>
+</form>

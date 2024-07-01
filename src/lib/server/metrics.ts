@@ -3,7 +3,6 @@ import express from "express";
 import { logger } from "$lib/server/logger";
 import { env } from "$env/dynamic/private";
 import type { Model } from "$lib/types/Model";
-import type { ToolFunction } from "$lib/types/Tool";
 
 interface Metrics {
 	model: {
@@ -24,9 +23,9 @@ interface Metrics {
 	};
 
 	tool: {
-		toolUseCount: Counter<ToolFunction["name"]>;
-		toolUseCountError: Counter<ToolFunction["name"]>;
-		toolUseDuration: Summary<ToolFunction["name"]>;
+		toolUseCount: Counter<string>;
+		toolUseCountError: Counter<string>;
+		toolUseDuration: Summary<string>;
 		timeToChooseTools: Summary;
 	};
 }

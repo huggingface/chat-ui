@@ -1,10 +1,10 @@
 import type { EndpointParameters } from "./server/endpoints/endpoints";
 import type { BackendModel } from "./server/models";
-import type { ToolFunction, ToolResult } from "./types/Tool";
+import type { Tool, ToolResult } from "./types/Tool";
 
 type buildPromptOptions = Pick<EndpointParameters, "messages" | "preprompt" | "continueMessage"> & {
 	model: BackendModel;
-	tools?: ToolFunction[];
+	tools?: Tool[];
 	toolResults?: ToolResult[];
 };
 

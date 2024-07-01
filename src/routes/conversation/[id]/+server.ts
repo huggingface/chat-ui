@@ -158,7 +158,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			tools: z.record(z.boolean()).optional(),
+			tools: z.array(z.string()).optional(),
+			files: z.optional(
+				z.array(
+					z.object({
+						type: z.literal("base64").or(z.literal("hash")),
+						name: z.string(),
+						value: z.string(),
+						mime: z.string(),
+					})
+				)
+			),
 		})
 		.parse(JSON.parse(json));
 
@@ -413,7 +423,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					assistant: undefined,
 					isContinue: isContinue ?? false,
 					webSearch: webSearch ?? false,
-					toolsPreference: toolsPreferences ?? {},
+					toolsPreference: toolsPreferences ?? [],
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,

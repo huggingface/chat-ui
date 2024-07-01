@@ -1,46 +1,41 @@
 import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 import vm from "node:vm";
 
 const calculator: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000C"),
 	type: "config",
 	description: "Calculate the result of a mathematical expression",
 	color: "blue",
-	icon: "math",
+	icon: "code",
 	displayName: "Calculator",
 	isOnByDefault: true,
-	functions: [
+	name: "calculator",
+	endpoint: null,
+	inputs: [
 		{
-			name: "calculator",
-			displayName: "Calculator",
+			name: "equation",
+			type: "str",
 			description:
-				"Use this tool to calculate the result of a mathematical expression. Only use this tool if you need to perform calculations.",
-			endpoint: null,
-			inputs: [
-				{
-					name: "equation",
-					type: "str",
-					description:
-						"A mathematical expression to be evaluated. The result of the expression will be returned.",
-					required: true,
-				},
-			],
-			outputPath: null,
-			outputType: "str",
-			showOutput: false,
-			async *call({ equation }) {
-				try {
-					const blocks = String(equation).split("\n");
-					const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
-
-					return {
-						outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
-					};
-				} catch (cause) {
-					throw Error("Invalid expression", { cause });
-				}
-			},
+				"A mathematical expression to be evaluated. The result of the expression will be returned.",
+			paramType: "required",
 		},
 	],
+	outputPath: null,
+	outputType: "str",
+	showOutput: false,
+	async *call({ equation }) {
+		try {
+			const blocks = String(equation).split("\n");
+			const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
+
+			return {
+				outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
+			};
+		} catch (cause) {
+			throw new Error("Invalid expression", { cause });
+		}
+	},
 };
 
 export default calculator;

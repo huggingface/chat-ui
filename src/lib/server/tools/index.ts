@@ -1,5 +1,5 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type { BackendCall, ConfigTool, ToolFunction } from "$lib/types/Tool";
+import type { BackendCall, BaseTool, ConfigTool } from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -15,6 +15,7 @@ import { callSpace, getIpToken } from "./utils";
 import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
 import { sha256 } from "$lib/utils/sha256";
+import { ObjectId } from "mongodb";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -28,46 +29,97 @@ const IOType = z.union([
 	z.literal("boolean"),
 ]);
 
+const ToolColor = z.union([
+	z.literal("purple"),
+	z.literal("blue"),
+	z.literal("green"),
+	z.literal("yellow"),
+	z.literal("red"),
+]);
+
+const ToolIcon = z.union([
+	z.literal("wikis"),
+	z.literal("tools"),
+	z.literal("camera"),
+	z.literal("code"),
+	z.literal("email"),
+	z.literal("cloud"),
+	z.literal("terminal"),
+	z.literal("game"),
+	z.literal("chat"),
+	z.literal("speaker"),
+	z.literal("video"),
+]);
+
+const toolInputBaseSchema = z.union([
+	z.object({
+		name: z.string().min(1),
+		description: z.string().optional(),
+		paramType: z.literal("required"),
+	}),
+	z.object({
+		name: z.string().min(1),
+		description: z.string().optional(),
+		paramType: z.literal("optional"),
+		default: z
+			.union([z.string(), z.number(), z.boolean(), z.undefined()])
+			.transform((val) => (val === undefined ? "" : val)),
+	}),
+	z.object({
+		name: z.string().min(1),
+		paramType: z.literal("fixed"),
+		value: z
+			.union([z.string(), z.number(), z.boolean(), z.undefined()])
+			.transform((val) => (val === undefined ? "" : val)),
+	}),
+]);
+
+const toolInputSchema = toolInputBaseSchema.and(
+	z.object({ type: IOType }).or(
+		z.object({
+			type: z.literal("file"),
+			mimeTypes: z.array(z.string()).nonempty(),
+		})
+	)
+);
+
+export const editableToolSchema = z.object({
+	name: z.string().min(1),
+	baseUrl: z.string().min(1),
+	endpoint: z.string().min(1),
+	inputs: z.array(toolInputSchema),
+	outputPath: z.string(),
+	outputType: IOType.or(z.literal("file")),
+	outputMimeType: z.string().optional(),
+	showOutput: z.boolean(),
+
+	displayName: z.string().min(1),
+	color: ToolColor,
+	icon: ToolIcon,
+	description: z.string().min(1),
+});
+
 export const configTools = z
 	.array(
 		z
 			.object({
-				functions: z.array(
-					z.object({
-						name: z.string(),
-						displayName: z.string(),
-						description: z.string(),
-						endpoint: z.union([z.string(), z.null()]),
-						inputs: z.array(
-							z
-								.object({
-									name: z.string(),
-									description: z.string(),
-									required: z.boolean(),
-									default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-									type: IOType,
-								})
-								.or(
-									z.object({
-										name: z.string(),
-										description: z.string(),
-										required: z.boolean(),
-										type: z.literal("file"),
-										mimeTypes: z.array(z.string()),
-									})
-								)
-						),
-						outputPath: z.union([z.string(), z.null()]),
-						outputType: IOType.or(z.literal("file")),
-						outputMimeType: z.string().optional(), // only required for file outputs
-						showOutput: z.boolean(),
-					})
-				),
+				name: z.string(),
+				description: z.string(),
+				endpoint: z.union([z.string(), z.null()]),
+				inputs: z.array(toolInputSchema),
+				outputPath: z.union([z.string(), z.null()]),
+				outputType: IOType.or(z.literal("file")),
+				outputMimeType: z.string().optional(), // only required for file outputs
+				showOutput: z.boolean(),
+				_id: z
+					.string()
+					.length(24)
+					.regex(/^[0-9a-fA-F]{24}$/)
+					.transform((val) => new ObjectId(val)),
 				baseUrl: z.string().optional(),
 				displayName: z.string(),
-				color: z.string(),
-				icon: z.string(),
-				description: z.string(),
+				color: ToolColor,
+				icon: ToolIcon,
 				isOnByDefault: z.optional(z.literal(true)),
 				isLocked: z.optional(z.literal(true)),
 				isHidden: z.optional(z.literal(true)),
@@ -75,52 +127,52 @@ export const configTools = z
 			.transform((val) => ({
 				type: "config" as const,
 				...val,
-				functions: val.functions.map((fn) => ({ ...fn, call: getCallMethod(fn, val.baseUrl) })),
+				call: getCallMethod(val),
 			}))
 	)
 	// add the extra hardcoded tools
 	.transform((val) => [...val, calculator, directlyAnswer, fetchUrl, websearch]);
 
-function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): BackendCall {
+function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	return async function* (params, ctx) {
-		if (toolFn.endpoint === null || !baseUrl) {
-			throw new Error(`Tool function ${toolFn.name} has no endpoint`);
+		if (tool.endpoint === null || !tool.baseUrl) {
+			throw new Error(`Tool function ${tool.name} has no endpoint`);
 		}
 
 		const ipToken = await getIpToken(ctx.ip, ctx.username);
 
 		const outputs = await callSpace(
-			baseUrl,
-			toolFn.endpoint,
-			toolFn.inputs.map((input) => {
+			tool.baseUrl,
+			tool.endpoint,
+			tool.inputs.map((input) => {
 				if (input.type === "file") {
 					throw new Error("File inputs are not supported");
 				}
-
-				const value = params[input.name];
-				if (value === undefined) {
-					if (input.required) {
+				if (input.paramType === "fixed") {
+					return input.value;
+				} else if (input.paramType === "optional") {
+					return params[input.name] ?? input.default;
+				} else if (input.paramType === "required") {
+					const value = params[input.name];
+					if (value === undefined) {
 						throw new Error(`Missing required input ${input.name}`);
 					}
-
-					return input.default;
+					return value;
 				}
-
-				return value;
 			}),
 			ipToken
 		);
 
-		if (toolFn.outputPath === null) {
-			throw new Error(`Tool function ${toolFn.name} has no output path`);
+		if (tool.outputPath === null) {
+			throw new Error(`Tool function ${tool.name} has no output path`);
 		}
 		const files: MessageFile[] = [];
 
 		const toolOutputs: Array<Record<string, string>> = [];
 
 		await Promise.all(
-			jp.query(outputs, toolFn.outputPath).map(async (output: string | string[], idx) => {
-				if (toolFn.outputType === "file") {
+			jp.query(outputs, tool.outputPath).map(async (output: string | string[], idx) => {
+				if (tool.outputType === "file") {
 					// output files are actually URLs
 					const outputs = Array.isArray(output) ? output : [output];
 
@@ -129,7 +181,7 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 							await fetch(output)
 								.then((res) => res.blob())
 								.then(async (blob) => {
-									const fileType = blob.type.split("/")[1] ?? toolFn.outputMimeType?.split("/")[1];
+									const fileType = blob.type.split("/")[1] ?? tool.outputMimeType?.split("/")[1];
 									return new File(
 										[blob],
 										`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
@@ -144,12 +196,12 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 					);
 
 					toolOutputs.push({
-						[toolFn.name + "-" + idx.toString()]:
+						[tool.name + "-" + idx.toString()]:
 							"A file has been generated. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it. Be concise.",
 					});
 				} else {
 					outputs.push({
-						[toolFn.name + "-" + idx.toString()]: output,
+						[tool.name + "-" + idx.toString()]: output,
 					});
 				}
 			})
@@ -164,7 +216,7 @@ function getCallMethod(toolFn: Omit<ToolFunction, "call">, baseUrl?: string): Ba
 			};
 		}
 
-		return { outputs: toolOutputs, display: toolFn.showOutput };
+		return { outputs: toolOutputs, display: tool.showOutput };
 	};
 }
 

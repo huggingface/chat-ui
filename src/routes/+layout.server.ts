@@ -108,6 +108,25 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	}
 
 	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
+
+	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
+
+	const activeCommunityToolIds = (settings?.tools ?? []).filter(
+		(key) => !configToolIds.includes(key)
+	);
+
+	const communityTools = await collections.tools
+		.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
+		.toArray()
+		.then((tools) =>
+			tools.map((tool) => ({
+				...tool,
+				isHidden: false,
+				isOnByDefault: true,
+				isLocked: true,
+			}))
+		);
+
 	return {
 		conversations: conversations.map((conv) => {
 			if (settings?.hideEmojiOnSidebar) {
@@ -147,7 +166,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
-			tools: settings?.tools ?? {},
+			tools: settings?.tools ?? [],
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -168,32 +187,26 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			unlisted: model.unlisted,
 		})),
 		oldModels,
-		tools: toolFromConfigs
-			.filter((tool) => !tool.isHidden)
+		tools: [...toolFromConfigs, ...communityTools]
+			.filter((tool) => !tool?.isHidden)
 			.map(
 				(tool) =>
 					({
+						_id: tool._id.toString(),
 						type: tool.type,
 						displayName: tool.displayName,
+						name: tool.name,
 						description: tool.description,
-						mimeTypes: tool.functions
-							.map((fn) =>
-								fn.inputs
-									.filter((input): input is ToolInputFile => input.type === "file")
-									.map((input) => (input as ToolInputFile).mimeTypes)
-									.flat()
-							)
+						mimeTypes: (tool.inputs ?? [])
+							.filter((input): input is ToolInputFile => input.type === "file")
+							.map((input) => (input as ToolInputFile).mimeTypes)
 							.flat(),
 						isOnByDefault: tool.isOnByDefault ?? true,
 						isLocked: tool.isLocked ?? true,
-						functions: tool.functions.map((fn) => ({
-							name: fn.name,
-							displayName: fn.displayName,
-							timeToUseMS:
-								toolUseDuration.find(
-									(el) => el.labels.tool === fn.displayName && el.labels.quantile === 0.9
-								)?.value ?? 15_000,
-						})),
+						timeToUseMS:
+							toolUseDuration.find(
+								(el) => el.labels.tool === tool._id.toString() && el.labels.quantile === 0.9
+							)?.value ?? 15_000,
 					} satisfies ToolFront)
 			),
 		assistants: assistants

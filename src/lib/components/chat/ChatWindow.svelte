@@ -155,7 +155,7 @@
 
 	// active tools are all the checked tools, either from settings or on by default
 	$: activeTools = $page.data.tools.filter(
-		(tool: ToolFront) => $settings?.tools?.[tool.displayName] ?? tool.isOnByDefault
+		(tool: ToolFront) => $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault
 	);
 	$: activeMimeTypes = [
 		...(!$page.data?.assistant && currentModel.tools
