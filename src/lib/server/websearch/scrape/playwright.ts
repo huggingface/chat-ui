@@ -64,7 +64,7 @@ export async function withPage<T>(
 
 	try {
 		const page = await ctx.newPage();
-		process.env.PLAYWRIGHT_ADBLOCKER && (await blocker.enableBlockingInPage(page));
+		(/true/i).test(process.env.PLAYWRIGHT_ADBLOCKER) && (await blocker.enableBlockingInPage(page));
 
 		const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
 			console.warn(`Failed to load page within 2s: ${url}`);
