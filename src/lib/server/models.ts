@@ -171,7 +171,7 @@ async function getChatPromptRender(
 					if (value.paramType !== "fixed") {
 						inputs[value.name] = {
 							type: value.type,
-							description: value.description,
+							description: value.description ?? "",
 							required: value.paramType === "required",
 						};
 					}
