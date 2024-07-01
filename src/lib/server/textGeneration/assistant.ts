@@ -4,7 +4,7 @@ import { collections } from "$lib/server/database";
 import type { Assistant } from "$lib/types/Assistant";
 import type { ObjectId } from "mongodb";
 
-export async function processPreprompt(preprompt: string) {
+export async function processPreprompt(preprompt: string, user_message: string | undefined) {
 	const urlRegex = /{{\s?url=(.*?)\s?}}/g;
 
 	for (const match of preprompt.matchAll(urlRegex)) {
@@ -13,8 +13,19 @@ export async function processPreprompt(preprompt: string) {
 			if ((await isURLLocal(url)) && env.ENABLE_LOCAL_FETCH !== "true") {
 				throw new Error("URL couldn't be fetched, it resolved to a local address.");
 			}
-
-			const res = await fetch(url.href);
+			
+			let res;
+			if (env.ENABLE_ASSISTANTS_POST === "true") {
+				res = await fetch(url.href, {
+					method: 'POST',
+					body: user_message,
+					headers: {
+					  'Content-Type': 'text/plain'
+					}
+				  });
+			} else {
+				res = await fetch(url.href);
+			}
 
 			if (!res.ok) {
 				throw new Error("URL couldn't be fetched, error " + res.status);
