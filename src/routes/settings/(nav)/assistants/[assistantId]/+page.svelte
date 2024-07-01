@@ -142,6 +142,20 @@
 						>
 					{/if}
 				{/if}
+				{#if data?.user?.isAdmin}
+					<form method="POST" action="?/delete" use:enhance>
+						<button type="submit" class="flex items-center text-red-600 underline">
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+						>
+					</form>
+					{#if assistant?.featured}
+						<form method="POST" action="?/unfeature" use:enhance>
+							<button type="submit" class="flex items-center text-red-600 underline">
+								<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
+							>
+						</form>
+					{/if}
+				{/if}
 			</div>
 		</div>
 	</div>

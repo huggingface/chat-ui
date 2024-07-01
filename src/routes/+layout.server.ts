@@ -132,6 +132,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				env.SERPAPI_KEY ||
 				env.SERPER_API_KEY ||
 				env.SERPSTACK_API_KEY ||
+				env.SEARCHAPI_KEY ||
 				env.YDC_API_KEY ||
 				env.USE_LOCAL_WEBSEARCH ||
 				env.SEARXNG_QUERY_URL
@@ -146,6 +147,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
 			tools: settings?.tools ?? {},
+			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -172,6 +174,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				name: tool.name,
 				displayName: tool.displayName,
 				description: tool.description,
+				mimeTypes: tool.mimeTypes,
 				isOnByDefault: tool.isOnByDefault,
 				isLocked: tool.isLocked,
 				timeToUseMS:
@@ -192,6 +195,8 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			username: locals.user.username,
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
+			logoutDisabled: locals.user.logoutDisabled,
+			isAdmin: locals.user.isAdmin ?? false,
 		},
 		assistant,
 		enableAssistants,

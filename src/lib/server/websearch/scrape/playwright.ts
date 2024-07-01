@@ -11,11 +11,16 @@ import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
 import { onExit } from "$lib/server/exitHandler";
 
-const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch).then((blker) => {
-	const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
-	if (env.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
-	return mostBlocked;
-});
+const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)
+	.then((blker) => {
+		const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
+		if (env.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
+		return mostBlocked;
+	})
+	.catch((err) => {
+		logger.error(err, "Failed to initialize PlaywrightBlocker from prebuilt lists");
+		return PlaywrightBlocker.empty();
+	});
 
 let browserSingleton: Promise<Browser> | undefined;
 async function getBrowser() {

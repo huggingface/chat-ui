@@ -2,6 +2,11 @@
 
 Tool calling instructs the model to generate an output matching a user-defined schema, which may be parsed for invoking external tools. The model simply chooses the tools and their parameters. Currently, only `TGI` and `Cohere` with `Command R+` are supported.
 
+<div class="flex justify-center">
+<img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-light.png" height="auto"/>
+<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-dark.png" height="auto"/>
+</div>
+
 ## TGI Configuration
 
 A custom tokenizer is required for prompting the model for generating tool calls, as well as prompting with the results. The expected format for these tools and the resulting tool calls are hard coded for TGI, so it's likely that only the following configuration will work:

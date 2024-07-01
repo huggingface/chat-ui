@@ -19,6 +19,8 @@ import { generate } from "./generate";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import type { ToolResult } from "$lib/types/Tool";
+import { toolHasName } from "../tools/utils";
+import directlyAnswer from "../tools/directlyAnswer";
 
 export async function* textGeneration(ctx: TextGenerationContext) {
 	yield* mergeAsyncGenerators([
@@ -39,14 +41,15 @@ async function* textGenerationWithoutTitle(
 	const { model, conv, messages, assistant, isContinue, webSearch, toolsPreference } = ctx;
 	const convId = conv._id;
 
-	// perform websearch if requested
-	// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
-	// if tools are enabled, we don't perform it here since we will add the websearch as a tool
 	let webSearchResult: WebSearch | undefined;
+
+	// run websearch if:
+	// - it's not continuing a previous message
+	// - AND the model doesn't support tools and websearch is selected
+	// - OR the assistant has websearch enabled (no tools for assistants for now)
 	if (
 		!isContinue &&
-		!model.tools &&
-		((webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
+		((!model.tools && webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
 	) {
 		webSearchResult = yield* runWebSearch(conv, messages, assistant?.rag);
 	}
@@ -61,7 +64,8 @@ async function* textGenerationWithoutTitle(
 
 	if (model.tools && !conv.assistantId) {
 		const tools = pickTools(toolsPreference, Boolean(assistant));
-		toolResults = yield* runTools(ctx, tools, preprompt);
+		const toolCallsRequired = tools.some((tool) => !toolHasName(directlyAnswer.name, tool));
+		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);

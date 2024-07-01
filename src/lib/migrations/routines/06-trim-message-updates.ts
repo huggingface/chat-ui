@@ -40,7 +40,7 @@ function convertMessageUpdate(message: Message, update: MessageUpdate): MessageU
 }
 
 const trimMessageUpdates: Migration = {
-	_id: new ObjectId(6),
+	_id: new ObjectId("000000000006"),
 	name: "Trim message updates to reduce stored size",
 	up: async () => {
 		const allConversations = collections.conversations.find({});

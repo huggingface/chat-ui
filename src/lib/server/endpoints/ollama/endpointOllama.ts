@@ -24,6 +24,31 @@ export function endpointOllama(input: z.input<typeof endpointOllamaParametersSch
 
 		const parameters = { ...model.parameters, ...generateSettings };
 
+		const requestInfo = await fetch(`${url}/api/tags`, {
+			method: "GET",
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+
+		const tags = await requestInfo.json();
+
+		if (!tags.models.some((m: { name: string }) => m.name === ollamaName)) {
+			// if its not in the tags, pull but dont wait for the answer
+			fetch(`${url}/api/pull`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					name: ollamaName ?? model.name,
+					stream: false,
+				}),
+			});
+
+			throw new Error("Currently pulling model from Ollama, please try again later.");
+		}
+
 		const r = await fetch(`${url}/api/generate`, {
 			method: "POST",
 			headers: {

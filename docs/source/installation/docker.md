@@ -1,6 +1,6 @@
 # Running on Docker
 
-Pre-built docker images are provided with and without MongoDB built in. Refer to the [configuration section](/configuration/overview) for env variables that must be provided. We recommend using the `--env-file` option to avoid leaking secrets into your shell history.
+Pre-built docker images are provided with and without MongoDB built in. Refer to the [configuration section](../configuration/overview) for env variables that must be provided. We recommend using the `--env-file` option to avoid leaking secrets into your shell history.
 
 ```bash
 # Without built-in DB

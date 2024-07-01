@@ -33,6 +33,8 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -84,6 +86,29 @@
 		e.preventDefault();
 	};
 
+	const onPaste = (e: ClipboardEvent) => {
+		if (!e.clipboardData) {
+			return;
+		}
+
+		// paste of files
+		const pastedFiles = Array.from(e.clipboardData.files);
+		if (pastedFiles.length !== 0) {
+			e.preventDefault();
+
+			// filter based on activeMimeTypes, including wildcards
+			const filteredFiles = pastedFiles.filter((file) => {
+				return activeMimeTypes.some((mimeType: string) => {
+					const [type, subtype] = mimeType.split("/");
+					const [fileType, fileSubtype] = file.type.split("/");
+					return type === fileType && (subtype === "*" || fileSubtype === subtype);
+				});
+			});
+
+			files = [...files, ...filteredFiles];
+		}
+	};
+
 	const convTreeStore = useConvTreeStore();
 
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
@@ -125,6 +150,21 @@
 	$: if (lastMessage && lastMessage.from === "user") {
 		scrollToBottom();
 	}
+
+	const settings = useSettingsStore();
+
+	// active tools are all the checked tools, either from settings or on by default
+	$: activeTools = $page.data.tools.filter(
+		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+	);
+	$: activeMimeTypes = [
+		...(!$page.data?.assistant && currentModel.tools
+			? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
+			: []),
+		...(currentModel.multimodal ? ["image/*"] : []),
+	];
+
+	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -214,6 +254,7 @@
 				/>
 			{:else}
 				<AssistantIntroduction
+					{models}
 					{assistant}
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
@@ -273,8 +314,8 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal || currentModel.tools}
-							<UploadBtn bind:files classNames="ml-auto" />
+						{#if isFileUploadEnabled}
+							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
@@ -295,13 +336,13 @@
 				on:dragenter={onDragEnter}
 				on:dragleave={onDragLeave}
 				tabindex="-1"
-				aria-label="file dropzone"
+				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 			>
-				{#if onDrag && currentModel.multimodal}
-					<FileDropzone bind:files bind:onDrag />
+				{#if onDrag && isFileUploadEnabled}
+					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
 						{#if lastIsError}
@@ -319,6 +360,7 @@
 										loginModalOpen = true;
 									}
 								}}
+								on:paste={onPaste}
 								maxRows={6}
 								disabled={isReadOnly || lastIsError}
 							/>

@@ -8,7 +8,12 @@ nodeSelector:
 tolerations:
   - key: CriticalAddonsOnly
     operator: Equal
-    
+
+serviceAccount:
+  enabled: true
+  create: true
+  name: huggingchat-prod
+
 ingress:
   path: "/chat"
   annotations:
@@ -34,7 +39,7 @@ envVars:
     [
       {
         "name" : "CohereForAI/c4ai-command-r-plus",
-        "tokenizer": "Xenova/c4ai-command-r-v01-tokenizer",
+        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
         "description": "Command R+ is Cohere's latest LLM and is the first open weight model to beat GPT4 in the Chatbot Arena!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
@@ -87,18 +92,20 @@ envVars:
         }
       },
       {
-        "name" : "HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
-        "tokenizer": "HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
-        "description": "Zephyr 141B-A35B is a fine-tuned version of Mistral 8x22B, trained using ORPO, a novel alignment algorithm.",
-        "modelUrl": "https://huggingface.co/HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
-        "websiteUrl": "https://huggingface.co/HuggingFaceH4/zephyr-orpo-141b-A35b-v0.1",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/zephyr-logo.png",
+        "name" : "google/gemma-2-27b-it",
+        "tokenizer": "google/gemma-2-27b-it",
+        "description": "Gemma 2 27B is the latest release in the Gemma family of models built by Google, with performance on par with Llama 3 70B. ",
+        "modelUrl": "https://huggingface.co/google/gemma-2-27b-it",
+        "websiteUrl": "https://huggingface.co/google/gemma-2-27b-it",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
         "parameters": {
-          "truncate" : 24576,
-          "max_new_tokens" : 8192,
-          "temperature": 0.6
+          "truncate" : 6146,
+          "max_new_tokens" : 2044,
+          "temperature": 0.95,
+          "top_k": 100,
+          "stop" : ["<end_of_turn>", "<eos>", "<end_of_turn><eos>"]
         },
-        "preprompt" : "You are Zephyr, an assistant developed by KAIST AI, Argilla, and Hugging Face. You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. You are happy to help with writing, analysis, question answering, math, coding, and all sorts of other tasks.",
+        "preprompt" : "",
         "promptExamples" : [
           {
             "title": "Write a poem",
@@ -181,7 +188,6 @@ envVars:
           "modelUrl": "https://huggingface.co/01-ai/Yi-1.5-34B-Chat",
           "websiteUrl": "https://www.01.ai",
           "preprompt": "",
-          "chatPromptTemplate": "{{preprompt}}{{#each messages}}{{#ifUser}}<|im_start|>user\\n{{content}}<|im_end|>\\n<|im_start|>assistant\\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>{{/ifAssistant}}{{/each}}",
           "parameters": {
             "stop": ["<|im_end|>"],
             "temperature": 0.3,
@@ -203,34 +209,6 @@ envVars:
           ]
         },
         {
-        "name" : "google/gemma-1.1-7b-it",
-        "description": "Gemma 7B 1.1 is the latest release in the Gemma family of lightweight models built by Google, trained using a novel RLHF method.",
-        "websiteUrl" : "https://blog.google/technology/developers/gemma-open-models/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
-        "modelUrl": "https://huggingface.co/google/gemma-1.1-7b-it",
-        "preprompt": "",
-        "chatPromptTemplate" : "{{#each messages}}{{#ifUser}}<start_of_turn>user\n{{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}}<end_of_turn>\n<start_of_turn>model\n{{/ifUser}}{{#ifAssistant}}{{content}}<end_of_turn>\n{{/ifAssistant}}{{/each}}",
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          }, {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ],
-        "parameters": {
-            "do_sample": true,
-            "truncate": 7168,
-            "max_new_tokens": 1024,
-            "stop" : ["<end_of_turn>"]
-          }
-      },
-
-            {
           "name": "mistralai/Mistral-7B-Instruct-v0.2",
           "displayName": "mistralai/Mistral-7B-Instruct-v0.2",
           "description": "Mistral 7B is a new Apache 2.0 model, released by Mistral AI that outperforms Llama2 13B in benchmarks.",
@@ -343,20 +321,9 @@ envVars:
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   XFF_DEPTH: '2'
 
-externalSecrets:
+infisical:
   enabled: true
-  secretStoreName: "chat-ui-prod-secretstore"
-  secretName: "chat-ui-prod-secrets"
-  parameters:
-    MONGODB_URL: "hub-prod-chat-ui-mongodb-url"
-    OPENID_CONFIG: "hub-prod-chat-ui-openid-config"
-    SERPER_API_KEY: "hub-prod-chat-ui-serper-api-key"
-    HF_TOKEN: "hub-prod-chat-ui-hf-token"
-    WEBHOOK_URL_REPORT_ASSISTANT: "hub-prod-chat-ui-webhook-report-assistant"
-    ADMIN_API_SECRET: "hub-prod-chat-ui-admin-api-secret"
-    USAGE_LIMITS: "hub-prod-chat-ui-usage-limits"
-    MESSAGES_BEFORE_LOGIN: "hub-prod-chat-ui-messages-before-login"
-    IP_TOKEN_SECRET: "hub-prod-chat-ui-ip-token-secret"
+  env: "prod-us-east-1"
 
 autoscaling:
   enabled: true

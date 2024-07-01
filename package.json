@@ -1,6 +1,6 @@
 {
 	"name": "chat-ui",
-	"version": "0.8.4",
+	"version": "0.9.1",
 	"private": true,
 	"packageManager": "npm@9.5.0",
 	"scripts": {
@@ -13,7 +13,6 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"test": "MONGODB_URL=mongodb://127.0.0.1:27017/ vitest",
 		"updateLocalEnv": "node --loader ts-node/esm scripts/updateLocalEnv.ts",
-		"updateProdEnv": "node --loader ts-node/esm scripts/updateProdEnv.ts",
 		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts"
 	},
 	"devDependencies": {
@@ -53,6 +52,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@aws-sdk/credential-providers": "^3.592.0",
 		"@cliqz/adblocker-playwright": "^1.27.2",
 		"@gradio/client": "^0.19.4",
 		"@huggingface/hub": "^0.5.1",
@@ -62,6 +62,7 @@
 		"@resvg/resvg-js": "^2.6.2",
 		"@xenova/transformers": "^2.16.1",
 		"autoprefixer": "^10.4.14",
+		"aws4": "^1.13.0",
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",

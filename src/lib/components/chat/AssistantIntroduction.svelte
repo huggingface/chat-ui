@@ -1,18 +1,23 @@
 <script lang="ts">
 	import { createEventDispatcher } from "svelte";
-	import IconGear from "~icons/bi/gear-fill";
 	import { base } from "$app/paths";
+	import { goto } from "$app/navigation";
+	import type { Model } from "$lib/types/Model";
 	import type { Assistant } from "$lib/types/Assistant";
+	import { useSettingsStore } from "$lib/stores/settings";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
+	import IconGear from "~icons/bi/gear-fill";
 	import IconInternet from "../icons/IconInternet.svelte";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
 
 	import { share } from "$lib/utils/share";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/stores";
 
+	export let models: Model[];
 	export let assistant: Pick<
 		Assistant,
 		| "avatar"
@@ -41,6 +46,8 @@
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
 
 	let isCopied = false;
+
+	const settings = useSettingsStore();
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
@@ -135,6 +142,17 @@
 				>
 			</div>
 		</div>
+		<button
+			on:click={() => {
+				settings.instantSet({
+					activeModel: models[0].name,
+				});
+				goto(`${base}/`);
+			}}
+			class="absolute -bottom-6 right-2 inline-flex items-center justify-center text-xs text-gray-600 underline hover:brightness-50 dark:text-gray-400 dark:hover:brightness-110"
+		>
+			<CarbonRenew class="mr-1.5 text-xxs" /> Reset to default model
+		</button>
 	</div>
 	{#if assistant.exampleInputs}
 		<div class="mx-auto mt-auto w-full gap-8 sm:-mb-8">

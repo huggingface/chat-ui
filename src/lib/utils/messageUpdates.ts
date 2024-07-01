@@ -59,18 +59,28 @@ export async function fetchMessageUpdates(
 	const abortController = new AbortController();
 	abortSignal.addEventListener("abort", () => abortController.abort());
 
+	const form = new FormData();
+
+	const optsJSON = JSON.stringify({
+		inputs: opts.inputs,
+		id: opts.messageId,
+		is_retry: opts.isRetry,
+		is_continue: opts.isContinue,
+		web_search: opts.webSearch,
+		tools: opts.tools,
+	});
+
+	opts.files?.forEach((file) => {
+		const name = file.type + ";" + file.name;
+
+		form.append("files", new File([file.value], name, { type: file.mime }));
+	});
+
+	form.append("data", optsJSON);
+
 	const response = await fetch(`${opts.base}/conversation/${conversationId}`, {
 		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			inputs: opts.inputs,
-			id: opts.messageId,
-			is_retry: opts.isRetry,
-			is_continue: opts.isContinue,
-			web_search: opts.webSearch,
-			tools: opts.tools,
-			files: opts.files,
-		}),
+		body: form,
 		signal: abortController.signal,
 	});
 

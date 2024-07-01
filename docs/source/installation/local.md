@@ -4,7 +4,7 @@ You may start an instance locally for non-production use cases. For production u
 
 ## Configuration
 
-The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. Start by creating a `.env.local` file in the root of the repository as per the [configuration section](/configuration/overview). The bare minimum config you need to get Chat UI to run locally is the following:
+The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. Start by creating a `.env.local` file in the root of the repository as per the [configuration section](../configuration/overview). The bare minimum config you need to get Chat UI to run locally is the following:
 
 ```ini
 MONGODB_URL=<the URL to your MongoDB instance>

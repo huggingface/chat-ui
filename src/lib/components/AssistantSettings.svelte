@@ -245,7 +245,7 @@
 				<textarea
 					name="description"
 					class="h-15 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					placeholder="He knows everything about python"
+					placeholder="It knows everything about python"
 					value={assistant?.description ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("description", form)}</p>

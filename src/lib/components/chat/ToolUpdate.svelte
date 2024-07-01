@@ -11,12 +11,13 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
 	import { onMount } from "svelte";
+	import { browser } from "$app/environment";
 
 	export let tool: MessageToolUpdate[];
 	export let loading: boolean = false;
 
 	const toolName = tool.find(isMessageToolCallUpdate)?.call.name;
-	const toolError = tool.some(isMessageToolErrorUpdate);
+	$: toolError = tool.some(isMessageToolErrorUpdate);
 	$: toolDone = tool.some(isMessageToolResultUpdate);
 
 	const availableTools: ToolFront[] = $page.data.tools;
@@ -26,7 +27,7 @@
 
 	let isShowingLoadingBar = false;
 	onMount(() => {
-		if (!toolDone && loading) {
+		if (!toolError && !toolDone && loading && loadingBarEl) {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
@@ -38,7 +39,9 @@
 	});
 
 	// go to 100% quickly if loading is done
-	$: (!loading || toolDone) &&
+	$: (!loading || toolDone || toolError) &&
+		browser &&
+		loadingBarEl &&
 		isShowingLoadingBar &&
 		(() => {
 			isShowingLoadingBar = false;

@@ -19,7 +19,7 @@ const addToolsToSettings: Migration = {
 
 		settings
 			.createIndex({ tools: 1 })
-			.catch((e) => logger.error("Error creating index during tools migration", e));
+			.catch((e) => logger.error(e, "Error creating index during tools migration"));
 
 		return true;
 	},
