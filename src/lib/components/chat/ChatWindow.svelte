@@ -158,7 +158,9 @@
 		(tool: ToolFront) => $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault
 	);
 	$: activeMimeTypes = [
-		...activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []),
+		...(!$page.data?.assistant && currentModel.tools
+			? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
+			: []),
 		...(currentModel.multimodal ? ["image/*"] : []),
 	];
 </script>

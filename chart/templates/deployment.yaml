@@ -25,6 +25,9 @@ spec:
         co.elastic.logs/json.expand_keys: "true"
       {{- end }}
     spec:
+      {{- if .Values.serviceAccount.enabled }}
+      serviceAccountName: "{{ .Values.serviceAccount.name | default (include "name" .) }}"
+      {{- end }}
       containers:
         - name: chat-ui
           image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"

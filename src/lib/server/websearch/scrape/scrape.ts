@@ -28,7 +28,7 @@ export const scrape = (maxCharsPerElem: number) =>
 			return { ...source, page };
 		} catch (e) {
 			MetricsServer.getMetrics().webSearch.pageFetchCountError.inc();
-			logger.debug(`Error scraping webpage: ${source.link}`, { error: e });
+			logger.error(e, `Error scraping webpage: ${source.link}`);
 		}
 	};
 
