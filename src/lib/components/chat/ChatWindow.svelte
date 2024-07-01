@@ -3,6 +3,9 @@
 	import type { Message, MessageFile } from "$lib/types/Message";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
+	import {fromRange, toRange} from 'dom-anchor-text-quote';
+	import wrapRangeText from 'wrap-range-text';
+
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
@@ -182,6 +185,46 @@
 	} else {
 		if (sidebar) {
 			sidebar.style.visibility = 'hidden';
+		}
+	}
+
+	function addComment() {
+		console.log("Comment button clicked - addComment function called");
+		
+		const selection = window.getSelection();
+		
+		if (!selection || selection.rangeCount === 0) {
+			alert("No Selection");
+			return;
+		}
+		
+		const range = selection.getRangeAt(0);
+		const selectedText = range.toString().trim();
+		
+		if (selectedText === "") {
+			alert("No Selection");
+		} else {
+			let quoteSelector = fromRange(document.body, range);
+			
+			// Create a new range from the quoteSelector
+			const newRange = toRange(document.body, {
+				exact: quoteSelector.exact,
+				prefix: quoteSelector.prefix,
+				suffix: quoteSelector.suffix
+			});
+
+			if (newRange) {
+				console.log("New range created successfully");
+				// Optionally, you can do something with the new range here
+				// For example, wrapping it with a span:
+				const wrapper = document.createElement('mark');
+				const wrappedRange = wrapRangeText(wrapper, newRange);
+				console.log('Wrapped nodes:', wrappedRange.nodes);
+			} else {
+				console.log("Failed to create new range");
+			}
+			
+			alert(`Selected Text: "${quoteSelector.exact}"\n\nContext:\nPrefix: "${quoteSelector.prefix}"\nSuffix: "${quoteSelector.suffix}"`);
 		}
 	}
 
@@ -477,5 +520,11 @@
 	<p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
 		Click to comment on this chat and get help from the community.
 	</p>
+	<button
+	class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+	on:click={addComment}
+	>
+		Comment
+	</button>
 	{/if}
 </div>

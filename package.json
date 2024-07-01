@@ -65,6 +65,8 @@
 		"aws4": "^1.13.0",
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
+		"dom-anchor-text-position": "^5.0.0",
+		"dom-anchor-text-quote": "^4.0.2",
 		"dotenv": "^16.0.3",
 		"express": "^4.19.2",
 		"file-type": "^19.0.0",
@@ -94,6 +96,7 @@
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.4.0",
 		"uuid": "^9.0.1",
+		"wrap-range-text": "^1.0.1",
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
