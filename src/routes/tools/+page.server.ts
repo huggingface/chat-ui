@@ -37,7 +37,7 @@ export const load = async ({ url, locals }) => {
 	}
 
 	const filter: Filter<CommunityToolDB> = {
-		...(!createdByCurrentUser && { featured: true }),
+		...(!createdByCurrentUser && !activeOnly && { featured: true }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 		...(activeOnly && {
