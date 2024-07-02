@@ -2,6 +2,7 @@ import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Tool, ToolResultSuccess } from "$lib/types/Tool";
 
 import calculator from "./calculator";
+import hfDocs from "./hfDocs";
 import directlyAnswer from "./directlyAnswer";
 import imageEditing from "./images/editing";
 import imageGeneration from "./images/generation";
@@ -30,4 +31,5 @@ export const allTools: BackendTool[] = [
 	imageEditing,
 	documentParser,
 	calculator,
+	hfDocs,
 ];
