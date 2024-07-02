@@ -9,6 +9,7 @@ import {
 import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
 import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
+import { onExit } from "$lib/server/exitHandler";
 
 const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)
 	.then((blker) => {
@@ -24,7 +25,7 @@ const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)
 let browserSingleton: Promise<Browser> | undefined;
 async function getBrowser() {
 	const browser = await chromium.launch({ headless: true });
-	process.on("SIGINT", () => browser.close());
+	onExit(() => browser.close());
 	browser.on("disconnected", () => {
 		logger.warn("Browser closed");
 		browserSingleton = undefined;
