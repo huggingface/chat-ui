@@ -70,14 +70,6 @@
 		}
 
 		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
-			// let type: ToolInput["type"] = "str";
-			// let mimeType: string = undefined;
-
-			// if (param.python_type.type === "filepath") {
-			// 	type = "file";
-			// 	mimeType = param.;
-			// }
-
 			if (tool?.inputs[idx]?.name === param.parameter_name) {
 				console.log(`tool ${idx} has the same name`);
 				// if the tool has the same name, we use the tool's type
@@ -92,7 +84,7 @@
 					name: param.parameter_name,
 					description: param.description,
 					paramType: "optional",
-					type: "str",
+					type: parseValidInputType(param.python_type.type),
 					default: param.parameter_default,
 				} satisfies ToolInput;
 			} else {
@@ -101,7 +93,7 @@
 					name: param.parameter_name,
 					description: param.description,
 					paramType: "required",
-					type: "str",
+					type: parseValidInputType(param.python_type.type),
 				} satisfies ToolInput;
 			}
 		});
@@ -114,6 +106,20 @@
 		editableTool.name = target.value.replace(/\//g, "");
 
 		await updateConfig();
+	}
+
+	function parseValidInputType(type: string) {
+		switch (type) {
+			case "str":
+			case "int":
+			case "float":
+			case "boolean":
+				return type;
+			case "file":
+				throw new Error("File inputs are not supported");
+			default:
+				throw new Error(`Unsupported type ${type}`);
+		}
 	}
 </script>
 

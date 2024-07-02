@@ -62,7 +62,7 @@ async function* textGenerationWithoutTitle(
 	let toolResults: ToolResult[] = [];
 
 	if (model.tools && !conv.assistantId) {
-		const tools = filterToolsOnPreferences(toolsPreference, Boolean(assistant));
+		const tools = await filterToolsOnPreferences(toolsPreference, Boolean(assistant));
 		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
 		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}

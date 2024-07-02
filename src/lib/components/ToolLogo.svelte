@@ -28,7 +28,6 @@
 			case "red":
 				return "#893737";
 			default:
-				console.log("Unknown color", color);
 				return "#FFF";
 		}
 	})();

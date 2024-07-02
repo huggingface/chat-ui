@@ -31,16 +31,17 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 			return super.fetch(input, init);
 		}
 	}
-
 	const client = await CustomClient.connect(name, {
 		hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
 	});
 
-	logger.info({ name, func, parameters });
-
 	return await client
-		.predict(func, [...parameters, 0]) // XXX: fix this
-		.then((res) => (res as unknown as GradioResponse).data as TOutput);
+		.predict(func, parameters)
+		.then((res) => (res as unknown as GradioResponse).data as TOutput)
+		.catch((e) => {
+			logger.error(e);
+			throw e;
+		});
 }
 
 export async function getIpToken(ip: string, username?: string) {

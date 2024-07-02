@@ -1,5 +1,5 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type { BackendCall, BaseTool, ConfigTool } from "$lib/types/Tool";
+import type { BackendCall, BaseTool, ConfigTool, ToolInput } from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -133,7 +133,7 @@ export const configTools = z
 	// add the extra hardcoded tools
 	.transform((val) => [...val, calculator, directlyAnswer, fetchUrl, websearch]);
 
-function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
+export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	return async function* (params, ctx) {
 		if (tool.endpoint === null || !tool.baseUrl) {
 			throw new Error(`Tool function ${tool.name} has no endpoint`);
@@ -141,28 +141,39 @@ function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 		const ipToken = await getIpToken(ctx.ip, ctx.username);
 
-		const outputs = await callSpace(
-			tool.baseUrl,
-			tool.endpoint,
-			tool.inputs.map((input) => {
-				if (input.type === "file") {
-					throw new Error("File inputs are not supported");
-				}
-				if (input.paramType === "fixed") {
-					return input.value;
-				} else if (input.paramType === "optional") {
-					return params[input.name] ?? input.default;
-				} else if (input.paramType === "required") {
-					const value = params[input.name];
-					if (value === undefined) {
-						throw new Error(`Missing required input ${input.name}`);
-					}
-					return value;
-				}
-			}),
-			ipToken
-		);
+		function coerceInput(value: unknown, type: ToolInput["type"]) {
+			const valueStr = String(value);
+			switch (type) {
+				case "str":
+					return valueStr;
+				case "int":
+					return parseInt(valueStr);
+				case "float":
+					return parseFloat(valueStr);
+				case "boolean":
+					return valueStr === "true";
+				default:
+					throw new Error(`Unsupported type ${type}`);
+			}
+		}
+		const inputs = tool.inputs.map((input) => {
+			if (input.type === "file") {
+				throw new Error("File inputs are not supported");
+			}
 
+			if (input.paramType === "fixed") {
+				return coerceInput(input.value, input.type);
+			} else if (input.paramType === "optional") {
+				return coerceInput(params[input.name] ?? input.default, input.type);
+			} else if (input.paramType === "required") {
+				if (params[input.name] === undefined) {
+					throw new Error(`Missing required input ${input.name}`);
+				}
+				return coerceInput(params[input.name], input.type);
+			}
+		});
+
+		const outputs = await callSpace(tool.baseUrl, tool.endpoint, inputs, ipToken);
 		if (tool.outputPath === null) {
 			throw new Error(`Tool function ${tool.name} has no output path`);
 		}

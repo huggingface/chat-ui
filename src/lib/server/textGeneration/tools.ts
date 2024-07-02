@@ -1,7 +1,7 @@
 import { ToolResultStatus, type ToolCall, type Tool, type ToolResult } from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
 import JSON5 from "json5";
-import { toolFromConfigs, type BackendToolContext } from "../tools";
+import { getCallMethod, toolFromConfigs, type BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
 	MessageUpdateStatus,
@@ -19,6 +19,8 @@ import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import { MetricsServer } from "../metrics";
 import { stringifyError } from "$lib/utils/stringifyError";
+import { collections } from "../database";
+import { ObjectId } from "mongodb";
 
 function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string {
 	if (files.length === 0) {
@@ -34,18 +36,27 @@ function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string
 	return `Attached ${files.length} file${files.length === 1 ? "" : "s"}:\n${stringifiedFiles}`;
 }
 
-export function filterToolsOnPreferences(
+export async function filterToolsOnPreferences(
 	toolsPreference: Array<string>,
 	isAssistant: boolean
-): Tool[] {
+): Promise<Tool[]> {
 	// if it's an assistant, only support websearch for now
 	if (isAssistant) return [directlyAnswer, websearch];
 
 	// filter based on tool preferences, add the tools that are on by default
-	return toolFromConfigs.filter((el) => {
+	const activeConfigTools = toolFromConfigs.filter((el) => {
 		if (el.isLocked && el.isOnByDefault) return true;
 		return toolsPreference?.includes(el._id.toString()) ?? el.isOnByDefault;
 	});
+
+	// find tool where the id is in toolsPreference
+	const activeCommunityTools = await collections.tools
+		.find({
+			_id: { $in: toolsPreference.map((el) => new ObjectId(el)) },
+		})
+		.toArray()
+		.then((el) => el.map((el) => ({ ...el, call: getCallMethod(el) })));
+	return [...activeConfigTools, ...activeCommunityTools];
 }
 
 async function* callTool(
