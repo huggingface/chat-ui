@@ -1,9 +1,12 @@
 <script lang="ts">
+	let tempIdCounter = 0;
 	import { onMount } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
+	import type { Comment } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
-	import {fromRange, toRange} from 'dom-anchor-text-quote';
+	import * as TextQuote from 'dom-anchor-text-quote';
+  	import * as TextPosition from 'dom-anchor-text-position';
 	import wrapRangeText from 'wrap-range-text';
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
@@ -58,6 +61,7 @@
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
+	let comments: Comment[] = [];
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -204,10 +208,12 @@
 		if (selectedText === "") {
 			alert("No Selection");
 		} else {
-			let quoteSelector = fromRange(document.body, range);
+			let quoteSelector = TextQuote.fromRange(document.body, range);
+			let positionSelector = TextPosition.fromRange(document.body, range);
+
 			
 			// Create a new range from the quoteSelector
-			const newRange = toRange(document.body, {
+			const newRange = TextQuote.toRange(document.body, {
 				exact: quoteSelector.exact,
 				prefix: quoteSelector.prefix,
 				suffix: quoteSelector.suffix
@@ -215,21 +221,47 @@
 
 			if (newRange) {
 				console.log("New range created successfully");
-				// Optionally, you can do something with the new range here
-				// For example, wrapping it with a span:
 				const wrapper = document.createElement('mark');
 				const wrappedRange = wrapRangeText(wrapper, newRange);
 				console.log('Wrapped nodes:', wrappedRange.nodes);
+			// Create a new Comment object
+			const newComment: Comment = {
+				//need to temporarily create an id. In the future, this will come from the MongoDB
+				_id: `temp_${tempIdCounter++}` as any, // Cast to any to satisfy TypeScript
+
+				content: "This is comment: " + tempIdCounter.toString(),
+
+				textQuoteSelector: {
+					exact: quoteSelector.exact,
+					prefix: quoteSelector.prefix,
+					suffix: quoteSelector.suffix
+				},
+				textPositionSelector: {
+					start: positionSelector.start,
+					end: positionSelector.end
+				},
+				createdAt: new Date(),
+				updatedAt: new Date()
+
+				//TODO: add userId/SessionId
+			};
+
+			// Add the new comment to the comments array
+			comments = [...comments, newComment];
+
+			console.log("New comment added:", newComment);
+
 			} else {
 				console.log("Failed to create new range");
 			}
 			
-			alert(`Selected Text: "${quoteSelector.exact}"\n\nContext:\nPrefix: "${quoteSelector.prefix}"\nSuffix: "${quoteSelector.suffix}"`);
+			alert(comments);
 		}
 	}
 
 </script>
 
+<!--
 {#if shared}
 <script type="application/json" class="js-hypothesis-config">
 	{
@@ -238,7 +270,7 @@
 </script>
 <script src="https://hypothes.is/embed.js" async></script>
 {/if}
-
+-->
 
 
 
@@ -508,7 +540,7 @@
 	</div>
 </div>
 <div class="col-start-3 col-end-4 flex flex-col justify-start items-center pt-[33.33%] h-full">
-	{#if messages.length}
+	{#if messages.length && !shared}
 	<button
 		class="flex items-center justify-center p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow duration-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-300"
 		type="button"
@@ -520,6 +552,25 @@
 	<p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
 		Click to comment on this chat and get help from the community.
 	</p>
+	{:else if messages.length}
+	<!--Display the list of Comments, showing their _id, content, and starting position-->
+	<!-- Add this section to display the list of comments -->
+	<div class="mt-4 w-full max-w-md">
+		<h3 class="text-lg font-semibold mb-2">Comments</h3>
+		{#if comments.length > 0}
+			<ul class="space-y-2">
+				{#each comments as comment}
+					<li class="bg-gray-100 p-3 rounded-lg">
+						<p class="font-medium">ID: {comment._id}</p>
+						<p>{comment.content}</p>
+						<p class="text-sm text-gray-600">Start: {comment.textPositionSelector?.start ?? 'N/A'}</p>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="text-gray-600">No comments yet.</p>
+		{/if}
+	</div>
 	<button
 	class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
 	on:click={addComment}
