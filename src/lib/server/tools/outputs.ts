@@ -9,11 +9,11 @@ export const ToolOutputPaths: Record<
 > = {
 	textbox: {
 		type: "str",
-		path: "$[0]",
+		path: "$[*]",
 	},
 	markdown: {
 		type: "str",
-		path: "$[0]",
+		path: "$[*]",
 	},
 	image: {
 		type: "file",

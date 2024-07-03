@@ -172,13 +172,12 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 		await Promise.all(
 			jp.query(outputs, path).map(async (output: string | string[], idx) => {
-				console.log({ output });
+				const arrayedOutput = Array.isArray(output) ? output : [output];
 				if (type === "file") {
 					// output files are actually URLs
-					const outputs = Array.isArray(output) ? output : [output];
 
 					await Promise.all(
-						outputs.map(async (output, idx) => {
+						arrayedOutput.map(async (output, idx) => {
 							await fetch(output)
 								.then((res) => res.blob())
 								.then(async (blob) => {
@@ -202,9 +201,11 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 							"A file has been generated. Answer as if the user can already see the file. Do not try to insert the file. The user can already see the file. Do not try to describe the file as the model cannot interact with it. Be concise.",
 					});
 				} else {
-					outputs.push({
-						[tool.name + "-" + idx.toString()]: output,
-					});
+					for (const output of arrayedOutput) {
+						toolOutputs.push({
+							[tool.name + "-" + idx.toString()]: output,
+						});
+					}
 				}
 			})
 		);
