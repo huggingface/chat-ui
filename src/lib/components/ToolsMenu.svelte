@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -82,6 +83,16 @@
 					{/if}
 				</button>
 			</div>
+
+			<a
+				href="{base}/tools"
+				class="col-span-2 w-fit items-center justify-center gap-1.5 rounded-full bg-purple-500/20 p-1 px-2.5 text-sm hover:bg-purple-500/30"
+			>
+				<span class="mr-1 rounded-full bg-purple-700 px-1.5 py-0.5 text-xs font-bold uppercase">
+					new
+				</span>
+				Browse community tools ({$page.data.communityToolCount ?? 0})
+			</a>
 			{#each tools as tool}
 				{@const isChecked = $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault}
 				<div class="flex items-center gap-1.5">

@@ -209,6 +209,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 							)?.value ?? 15_000,
 					} satisfies ToolFront)
 			),
+		communityToolCount: await collections.tools.countDocuments({ type: "community" }),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
 			.map((el) => ({
