@@ -112,3 +112,25 @@ export async function PUT({ request, params, locals }) {
 
     return json({ success: true });
 }
+
+export async function GET({ params, locals }) {
+    const conversationId = new ObjectId(params.id);
+
+    // Check if the user has access to the conversation
+    const conversation = await collections.conversations.findOne({
+        _id: conversationId,
+        ...authCondition(locals),
+    });
+
+    if (!conversation) {
+        throw error(404, 'Conversation not found');
+    }
+
+    // Fetch all comments for the conversation
+    const comments = await collections.comments
+        .find({ conversationId })
+        .sort({ createdAt: 1 })
+        .toArray();
+
+    return json(comments);
+}

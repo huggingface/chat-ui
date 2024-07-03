@@ -1,6 +1,5 @@
 <script lang="ts">
-	let tempIdCounter = 0;
-	import { onMount } from 'svelte';
+	import { onMount, afterUpdate } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
 	import type { Comment, DisplayComment } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
@@ -64,6 +63,61 @@
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
 	let displayComments: DisplayComment[] = [];
+	let currentConversationId: string | null = null;
+
+	$: {
+		if ($page.params.id !== currentConversationId) {
+		currentConversationId = $page.params.id;
+		fetchComments();
+		}
+	}
+
+
+	async function fetchComments() {
+		if (shared && currentConversationId) {
+		try {
+			const response = await fetch(`/conversation/${currentConversationId}/comments`);
+			if (!response.ok) {
+			throw new Error('Failed to fetch comments');
+			}
+			const comments = await response.json();
+			
+			displayComments = comments.map((comment: Comment) => ({
+			...comment,
+			isPending: false,
+			wrapperObject: null,
+			originalContent: comment.content
+			}));
+
+			// Schedule highlighting after the DOM has updated
+			afterUpdate(() => {
+			highlightComments();
+			});
+		} catch (error) {
+			console.error("Error fetching comments:", error);
+		}
+		} else {
+		// Clear comments if not shared or no conversation ID
+		displayComments = [];
+		}
+	}
+
+	onMount(() => {
+		fetchComments();
+	});
+
+	function highlightComments() {
+		displayComments.forEach(comment => {
+		if (comment.textQuoteSelector) {
+			const range = TextQuote.toRange(document.body, comment.textQuoteSelector);
+			if (range) {
+			const wrapper = document.createElement('mark');
+			const wrappedRange = wrapRangeText(wrapper, range);
+			comment.wrapperObject = wrappedRange;
+			}
+		}
+		});
+	}	
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -178,21 +232,7 @@
 	
 	let sidebar: HTMLElement | null = null
 
-	onMount(() => {
-		sidebar = document.querySelector('hypothesis-sidebar') as HTMLElement;
-	});
 
-	
-	
-	$: if (shared) {
-		if (sidebar) {
-			sidebar.style.visibility = 'visible';
-		}
-	} else {
-		if (sidebar) {
-			sidebar.style.visibility = 'hidden';
-		}
-	}
 
 	// Adds a new DisplayComment to the array, ready for authoring, but doesn't persist it yet
 	function addComment() {
