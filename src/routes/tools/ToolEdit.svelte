@@ -5,11 +5,11 @@
 		type ToolInput,
 	} from "$lib/types/Tool";
 	import { createEventDispatcher, onMount } from "svelte";
-	import type { Client } from "@gradio/client";
 	import { browser } from "$app/environment";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { colors, icons } from "$lib/utils/tools";
 	import { applyAction, enhance } from "$app/forms";
+	import { getGradioApi } from "$lib/utils/getGradioApi";
 
 	type ActionData = {
 		error: boolean;
@@ -27,24 +27,21 @@
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
 
-	let ClientCreator: { connect: (nameSpace: string) => Promise<Client> };
-
 	let loading = false;
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	onMount(async () => {
-		ClientCreator = (await import("@gradio/client")).Client;
 		await updateConfig();
 	});
 
-	let spaceUrl = tool?.baseUrl ?? "multimodalart/cosxl";
+	let spaceUrl = tool?.baseUrl ?? "";
 
 	let editableTool: CommunityToolEditable = tool ?? {
 		displayName: "",
 		description: "",
 		color: "blue",
 		icon: "wikis",
-		baseUrl: "multimodalart/cosxl",
+		baseUrl: "",
 		endpoint: "",
 		name: "process_image",
 		inputs: [],
@@ -54,22 +51,12 @@
 
 	$: editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
 
-	$: client = browser && !!spaceUrl && !!ClientCreator && ClientCreator.connect(spaceUrl);
-
 	async function updateConfig() {
-		if (!client) {
-			if (editableTool.baseUrl) {
-				client = ClientCreator.connect(editableTool.baseUrl);
-			} else {
-				return;
-			}
-		}
-
-		const api = await (await client).view_api();
-
-		if (!editableTool.endpoint) {
+		if (!browser || !editableTool.baseUrl || !editableTool.endpoint) {
 			return;
 		}
+
+		const api = await getGradioApi(editableTool.baseUrl);
 
 		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
 			if (tool?.inputs[idx]?.name === param.parameter_name) {
@@ -251,8 +238,8 @@
 			<div class="flex flex-col gap-2">
 				<h3 class="mb-1 font-semibold">Functions</h3>
 				<p class="text-sm text-gray-500">Choose functions that can be called in your tool.</p>
-				{#if client}
-					{#await client.then((c) => c.view_api())}
+				{#if editableTool.baseUrl}
+					{#await getGradioApi(spaceUrl)}
 						<p class="text-sm text-gray-500">Loading...</p>
 					{:then api}
 						<div class="flex flex-row gap-4">
