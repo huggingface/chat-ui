@@ -1,13 +1,20 @@
 <script lang="ts">
+	let tempIdCounter = 0;
 	import { onMount } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
+	import type { AnyComment, Comment, UnsavedComment } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
+	import * as TextQuote from 'dom-anchor-text-quote';
+  	import * as TextPosition from 'dom-anchor-text-position';
+	import wrapRangeText, { WrapperObject } from 'wrap-range-text';
+
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
-	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonEdit from "~icons/carbon/edit";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonTrashCan from  "~icons/carbon/trash-can";
+	import CarbonSend from "~icons/carbon/send";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -55,6 +62,7 @@
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
+	let commentPairs: Array<{ comment: AnyComment; wrapper: WrapperObject }> = [];
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -185,8 +193,131 @@
 		}
 	}
 
+	function addComment() {
+		console.log("Comment button clicked - addComment function called");
+		
+		const selection = window.getSelection();
+		
+		if (!selection || selection.rangeCount === 0) {
+			alert("No Selection");
+			return;
+		}
+		
+		const range = selection.getRangeAt(0);
+		const selectedText = range.toString().trim();
+		
+		if (selectedText === "") {
+			alert("No Selection");
+		} else {
+			let quoteSelector = TextQuote.fromRange(document.body, range);
+			let positionSelector = TextPosition.fromRange(document.body, range);
+
+			
+			// Create a new range from the quoteSelector
+			const newRange = TextQuote.toRange(document.body, {
+				exact: quoteSelector.exact,
+				prefix: quoteSelector.prefix,
+				suffix: quoteSelector.suffix
+			});
+
+			if (newRange) {
+				console.log("New range created successfully");
+				const wrapper = document.createElement('mark');
+				const wrappedRange = wrapRangeText(wrapper, newRange);
+				console.log('Wrapped nodes:', wrappedRange.nodes);
+			// Create a new Comment object
+			const newComment: UnsavedComment = {
+				
+
+				content: "",
+
+				textQuoteSelector: {
+					exact: quoteSelector.exact,
+					prefix: quoteSelector.prefix,
+					suffix: quoteSelector.suffix
+				},
+				textPositionSelector: {
+					start: positionSelector.start,
+					end: positionSelector.end
+				},
+				isUnsaved: true,
+				
+			};
+
+			// Add the new comment and wrapper to the commentPairs array and sort
+			commentPairs = [...commentPairs, { comment: newComment, wrapper: wrappedRange }]
+            .sort((a, b) => {
+                const aStart = a.comment.textPositionSelector?.start ?? 0;
+                const bStart = b.comment.textPositionSelector?.start ?? 0;
+                return aStart - bStart;
+            });
+
+			console.log("New comment added:", newComment);
+
+			} else {
+				console.log("Failed to create new range");
+			}
+			
+
+		}
+	}
+
+	function handlePostComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
+		const savedComment: Comment = {
+			// Use existing _id if available, otherwise create a new temporary one
+			_id: ('_id' in commentPair.comment) ? commentPair.comment._id : `temp-${tempIdCounter++}` as any,
+			// Use existing createdAt if available, otherwise use current date
+			createdAt: ('createdAt' in commentPair.comment) ? commentPair.comment.createdAt ?? new Date() : new Date(),
+			// Always update the updatedAt date
+			updatedAt: new Date(),
+			// Copy over all relevant properties from AnyComment
+			content: commentPair.comment.content,
+			textQuoteSelector: commentPair.comment.textQuoteSelector,
+			textPositionSelector: commentPair.comment.textPositionSelector,
+		};
+
+		// Update the comments array with the new saved comment
+		commentPairs = commentPairs.map(pair => 
+			pair.comment === commentPair.comment ? { ...pair, comment: savedComment } : pair
+		);
+
+		// Here you would typically make an API call to save the comment
+		// For now, we'll just log it
+		console.log("Saved comment:", savedComment);
+	}
+
+	function handleDeleteComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
+		// Unwrap the highlighted text associated with this comment
+		commentPair.wrapper.unwrap();
+		
+		// Remove the unsaved comment from the commentPairs array
+		commentPairs = commentPairs.filter(pair => pair.comment !== commentPair.comment);
+
+		//TODO: if the comment was saved, delete it from the database
+	}	
+
+	function handleEditComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
+		// Change the Comment into an UnsavedComment
+		const unsavedComment: UnsavedComment = {
+			...(('_id' in commentPair.comment) && { _id: commentPair.comment._id }),
+			...(('createdAt' in commentPair.comment) && { createdAt: commentPair.comment.createdAt }),
+			content: commentPair.comment.content,
+			textQuoteSelector: commentPair.comment.textQuoteSelector,
+			textPositionSelector: commentPair.comment.textPositionSelector,
+			isUnsaved: true,
+		};
+
+		// Update the commentPairs array
+		commentPairs = commentPairs.map(pair => 
+			pair.comment === commentPair.comment 
+				? { ...pair, comment: unsavedComment }
+				: pair
+		);
+	}	
+
 </script>
 
+<!--
 {#if shared}
 <script type="application/json" class="js-hypothesis-config">
 	{
@@ -195,7 +326,7 @@
 </script>
 <script src="https://hypothes.is/embed.js" async></script>
 {/if}
-
+-->
 
 
 
@@ -465,7 +596,7 @@
 	</div>
 </div>
 <div class="col-start-3 col-end-4 flex flex-col justify-start items-center pt-[33.33%] h-full">
-	{#if messages.length}
+	{#if messages.length && !shared}
 	<button
 		class="flex items-center justify-center p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow duration-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-300"
 		type="button"
@@ -477,5 +608,74 @@
 	<p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
 		Click to comment on this chat and get help from the community.
 	</p>
+	{:else if messages.length}
+	<!--Display the list of Comments, showing their _id, content, and starting position-->
+	<!-- Add this section to display the list of comments -->
+	<div class="mt-4 w-full max-w-md">
+		<h3 class="text-lg font-semibold mb-2">Comments</h3>
+		{#if commentPairs.length > 0}
+			<ul class="space-y-2">
+			{#each commentPairs as { comment, wrapper }, index}
+				<li class="bg-gray-100 p-3 rounded-lg">
+					<p>{"> " + comment.textQuoteSelector?.exact}</p>
+					{#if !('isUnsaved' in comment) || comment.isUnsaved === false}
+						<p>{comment.content}</p>
+						<div class="flex justify-end mt-2">
+							<button
+							class="mr-2 p-1 bg-green-500 text-white rounded-full"
+							on:click={() => handleEditComment({ comment, wrapper })}
+							>
+								<CarbonEdit />
+							</button>
+							<button
+								class="p-1 bg-red-500 text-white rounded-full"
+								on:click={() => handleDeleteComment({ comment, wrapper })}
+							>
+								<CarbonTrashCan />
+							</button>
+						</div>
+					{:else}
+						<textarea
+							bind:value={comment.content}
+							class="w-full p-2 border rounded-md"
+							rows="3"
+						></textarea>
+						<div class="flex justify-end mt-2">
+							<button
+								class="mr-2 p-1 bg-green-500 text-white rounded-full"
+								on:click={() => handlePostComment({ comment, wrapper })}
+							>
+								<CarbonSend />
+							</button>
+							<button
+								class="p-1 bg-red-500 text-white rounded-full"
+								on:click={() => handleDeleteComment({ comment, wrapper })}
+							>
+								<CarbonTrashCan />
+							</button>
+						</div>
+					{/if}
+					<p class="text-sm text-gray-600">
+						Start: {comment.textPositionSelector?.start ?? 'N/A'}
+						{#if 'createdAt' in comment && comment.createdAt}
+						· Created: {new Date(comment.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+						{/if}
+						{#if 'updatedAt' in comment && comment.updatedAt}
+						· Updated: {new Date(comment.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+						{/if}
+					</p>
+				</li>
+			{/each}
+			</ul>
+		{:else}
+			<p class="text-gray-600">No comments yet.</p>
+		{/if}
+	</div>
+	<button
+	class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+	on:click={addComment}
+	>
+		Comment
+	</button>
 	{/if}
 </div>
