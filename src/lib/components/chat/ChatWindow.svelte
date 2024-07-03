@@ -660,7 +660,11 @@
 							</button>
 							<button
 								class="p-1 bg-red-500 text-white rounded-full"
-								on:click={() => handleDeleteComment(dc)}
+								on:click={() => {
+									if (confirm('Are you sure you want to delete this comment?')) {
+										handleDeleteComment(dc);
+									}
+								}}
 								aria-label="Delete Comment"
 							>
 								<CarbonTrashCan />
