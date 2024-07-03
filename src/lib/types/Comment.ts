@@ -26,3 +26,7 @@ export interface Comment extends Timestamps {
         end: number;
     };
 }
+
+export type UnsavedComment = Omit<Comment, '_id' | keyof Timestamps>;
+
+export type AnyComment = Comment | UnsavedComment;

@@ -2,18 +2,20 @@
 	let tempIdCounter = 0;
 	import { onMount } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import type { Comment } from "$lib/types/Comment";
+	import type { AnyComment, Comment, UnsavedComment } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import * as TextQuote from 'dom-anchor-text-quote';
   	import * as TextPosition from 'dom-anchor-text-position';
-	import wrapRangeText from 'wrap-range-text';
+	import wrapRangeText, { WrapperObject } from 'wrap-range-text';
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonTrashCan from  "~icons/carbon/trash-can";
+	import CarbonSend from "~icons/carbon/send";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -61,7 +63,7 @@
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
-	let comments: Comment[] = [];
+	let commentPairs: Array<{ comment: AnyComment; wrapper: WrapperObject }> = [];
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -225,11 +227,10 @@
 				const wrappedRange = wrapRangeText(wrapper, newRange);
 				console.log('Wrapped nodes:', wrappedRange.nodes);
 			// Create a new Comment object
-			const newComment: Comment = {
-				//need to temporarily create an id. In the future, this will come from the MongoDB
-				_id: `temp_${tempIdCounter++}` as any, // Cast to any to satisfy TypeScript
+			const newComment: UnsavedComment = {
+				
 
-				content: "This is comment: " + tempIdCounter.toString(),
+				content: "",
 
 				textQuoteSelector: {
 					exact: quoteSelector.exact,
@@ -240,14 +241,16 @@
 					start: positionSelector.start,
 					end: positionSelector.end
 				},
-				createdAt: new Date(),
-				updatedAt: new Date()
-
-				//TODO: add userId/SessionId
+				
 			};
 
-			// Add the new comment to the comments array
-			comments = [...comments, newComment];
+			// Add the new comment and wrapper to the commentPairs array and sort
+			commentPairs = [...commentPairs, { comment: newComment, wrapper: wrappedRange }]
+            .sort((a, b) => {
+                const aStart = a.comment.textPositionSelector?.start ?? 0;
+                const bStart = b.comment.textPositionSelector?.start ?? 0;
+                return aStart - bStart;
+            });
 
 			console.log("New comment added:", newComment);
 
@@ -255,9 +258,36 @@
 				console.log("Failed to create new range");
 			}
 			
-			alert(comments);
+
 		}
 	}
+
+	function handlePostComment(commentPair: { comment: UnsavedComment; wrapper: WrapperObject }) {
+		// Add a temporary _id to the comment
+		const savedComment: Comment = {
+			...commentPair.comment,
+			_id: `temp-${tempIdCounter++}` as any,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+   		 };
+
+		// Update the comments array with the new saved comment
+		commentPairs = commentPairs.map(pair => 
+        	pair.comment === commentPair.comment ? { ...pair, comment: savedComment } : pair
+   		);
+
+		// Here you would typically make an API call to save the comment
+		// For now, we'll just log it
+		console.log("Saved comment:", savedComment);
+	}
+
+	function handleCancelComment(commentPair: { comment: UnsavedComment; wrapper: WrapperObject }) {
+		// Unwrap the highlighted text associated with this comment
+		commentPair.wrapper.unwrap();
+		
+		// Remove the unsaved comment from the commentPairs array
+		commentPairs = commentPairs.filter(pair => pair.comment !== commentPair.comment);
+	}	
 
 </script>
 
@@ -557,15 +587,37 @@
 	<!-- Add this section to display the list of comments -->
 	<div class="mt-4 w-full max-w-md">
 		<h3 class="text-lg font-semibold mb-2">Comments</h3>
-		{#if comments.length > 0}
+		{#if commentPairs.length > 0}
 			<ul class="space-y-2">
-				{#each comments as comment}
-					<li class="bg-gray-100 p-3 rounded-lg">
-						<p class="font-medium">ID: {comment._id}</p>
-						<p>{comment.content}</p>
-						<p class="text-sm text-gray-600">Start: {comment.textPositionSelector?.start ?? 'N/A'}</p>
-					</li>
-				{/each}
+			{#each commentPairs as { comment, wrapper }, index}
+				<li class="bg-gray-100 p-3 rounded-lg">
+					<p>{"> " + comment.textQuoteSelector?.exact}</p>
+					{#if '_id' in comment}
+            			<p>{comment.content}</p>
+					{:else}
+						<textarea
+							bind:value={comment.content}
+							class="w-full p-2 border rounded-md"
+							rows="3"
+						></textarea>
+						<div class="flex justify-end mt-2">
+							<button
+								class="mr-2 p-1 bg-green-500 text-white rounded-full"
+								on:click={() => handlePostComment({ comment, wrapper })}
+							>
+								<CarbonSend />
+							</button>
+							<button
+								class="p-1 bg-red-500 text-white rounded-full"
+								on:click={() => handleCancelComment({ comment, wrapper })}
+							>
+								<CarbonTrashCan />
+							</button>
+						</div>
+					{/if}
+					<p class="text-sm text-gray-600">Start: {comment.textPositionSelector?.start ?? 'N/A'}</p>
+				</li>
+			{/each}
 			</ul>
 		{:else}
 			<p class="text-gray-600">No comments yet.</p>

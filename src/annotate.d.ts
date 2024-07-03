@@ -35,7 +35,7 @@ declare module 'dom-anchor-text-quote' {
   }
 
   declare module 'wrap-range-text' {
-    interface WrapperObject {
+    export interface WrapperObject {
       nodes: Node[];
       unwrap: () => void;
     }
