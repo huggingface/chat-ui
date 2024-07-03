@@ -71,9 +71,7 @@
 								{data.tool?.createdByName}
 							</a>
 							<span class="text-gray-300">•</span>
-							text -> image
-							<span class="text-gray-300">•</span>
-							1.2M runs
+							{data.tool.useCount} runs
 						</p>
 					{/if}
 

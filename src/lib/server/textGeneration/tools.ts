@@ -99,6 +99,8 @@ async function* callTool(
 			Date.now() - startTime
 		);
 
+		await collections.tools.findOneAndUpdate({ _id: tool._id }, { $inc: { useCount: 1 } });
+
 		return { ...toolResult, call } as ToolResult;
 	} catch (error) {
 		MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
