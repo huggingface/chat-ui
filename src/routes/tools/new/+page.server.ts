@@ -65,12 +65,7 @@ export const actions = {
 			featured: false,
 			searchTokens: generateSearchTokens(parse.data.name),
 		});
-		// add insertedId to user settings
 
-		await collections.settings.updateOne(authCondition(locals), {
-			$addToSet: { tools: insertedId.toString() },
-		});
-
-		throw redirect(302, `${base}/tools`);
+		return { toolId: insertedId.toString() };
 	},
 };

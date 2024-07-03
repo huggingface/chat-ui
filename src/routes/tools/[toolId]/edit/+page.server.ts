@@ -59,6 +59,6 @@ export const actions = {
 			}
 		);
 
-		throw redirect(302, `${base}/tools`);
+		throw redirect(302, `${base}/tools/${tool._id.toString()}`);
 	},
 };

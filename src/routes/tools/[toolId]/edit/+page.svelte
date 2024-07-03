@@ -10,7 +10,9 @@
 	export let form;
 
 	afterNavigate(({ from }) => {
-		previousPage = from?.url.toString() || previousPage;
+		if (!from?.url.pathname.includes("tools/")) {
+			previousPage = from?.url.toString() || previousPage;
+		}
 	});
 </script>
 

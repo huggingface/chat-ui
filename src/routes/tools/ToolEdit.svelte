@@ -10,6 +10,9 @@
 	import { colors, icons } from "$lib/utils/tools";
 	import { applyAction, enhance } from "$app/forms";
 	import { getGradioApi } from "$lib/utils/getGradioApi";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import { goto } from "$app/navigation";
+	import { base } from "$app/paths";
 
 	type ActionData = {
 		error: boolean;
@@ -40,8 +43,9 @@
 	let editableTool: CommunityToolEditable = tool ?? {
 		displayName: "",
 		description: "",
-		color: "blue",
-		icon: "wikis",
+		// random color & icon for new tools
+		color: colors[Math.floor(Math.random() * colors.length)],
+		icon: icons[Math.floor(Math.random() * icons.length)],
 		baseUrl: "",
 		endpoint: "",
 		name: "process_image",
@@ -136,6 +140,8 @@
 				return "str";
 		}
 	}
+
+	const settings = useSettingsStore();
 </script>
 
 <form
@@ -147,7 +153,13 @@
 
 		return async ({ result }) => {
 			formLoading = false;
-			await applyAction(result);
+
+			if (result.type === "success" && result.data && typeof result.data.toolId === "string") {
+				$settings.tools = [...($settings.tools ?? []), result.data.toolId];
+				goto(`${base}/tools/${result.data.toolId}`, { invalidateAll: true });
+			} else {
+				await applyAction(result);
+			}
 		};
 	}}
 >
