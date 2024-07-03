@@ -27,7 +27,8 @@
 		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
 	}
 
-	let loading = false;
+	let APIloading = false;
+	let formLoading = false;
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	onMount(async () => {
@@ -55,6 +56,9 @@
 		if (!browser || !editableTool.baseUrl || !editableTool.endpoint) {
 			return;
 		}
+
+		form = { error: false, errors: [] };
+		APIloading = true;
 
 		const api = await getGradioApi(editableTool.baseUrl);
 
@@ -87,9 +91,28 @@
 		});
 		editableTool.inputs = newInputs;
 
-		editableTool.outputComponent = ToolOutputComponents.parse(
-			api.named_endpoints[editableTool.endpoint].returns[0].component
+		const parsedOutputComponent = ToolOutputComponents.safeParse(
+			api.named_endpoints[editableTool.endpoint].returns?.[0]?.component ?? null
 		);
+
+		if (parsedOutputComponent.success) {
+			editableTool.outputComponent = parsedOutputComponent.data;
+		} else {
+			form = {
+				error: true,
+				errors: [
+					{
+						field: "outputComponent",
+						message: `Invalid output component. Type ${
+							api.named_endpoints[editableTool.endpoint].returns?.[0]?.component
+						} is not yet supported. Feel free to report this issue so we can add support for it.`,
+					},
+				],
+			};
+			editableTool.outputComponent = null;
+		}
+
+		APIloading = false;
 	}
 
 	async function onEndpointChange(e: Event) {
@@ -119,10 +142,11 @@
 	method="POST"
 	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
 	use:enhance={async ({ formData }) => {
+		formLoading = true;
 		formData.append("tool", JSON.stringify(editableTool));
 
 		return async ({ result }) => {
-			loading = false;
+			formLoading = false;
 			await applyAction(result);
 		};
 	}}
@@ -242,9 +266,9 @@
 					{#await getGradioApi(spaceUrl)}
 						<p class="text-sm text-gray-500">Loading...</p>
 					{:then api}
-						<div class="flex flex-row gap-4">
+						<div class="flex flex-row flex-wrap gap-4">
 							{#each Object.keys(api["named_endpoints"] ?? {}) as name}
-								<label>
+								<label class="rounded-lg bg-gray-200 p-2">
 									<input
 										type="radio"
 										disabled={readonly}
@@ -261,7 +285,7 @@
 							{/each}
 						</div>
 
-						{#if editableTool.endpoint && api["named_endpoints"][editableTool.endpoint]}
+						{#if editableTool.endpoint && api["named_endpoints"][editableTool.endpoint] && !APIloading}
 							{@const endpoint = api["named_endpoints"][editableTool.endpoint]}
 							<div class="flex flex-col gap-2">
 								<div class="flex flex-col gap-2 rounded-lg border border-gray-200 p-2">
@@ -423,32 +447,38 @@
 													Pick the gradio output component whose output will be used in the tool.
 												</p>
 											</div>
-											{#if api.named_endpoints[editableTool.endpoint].returns.length > 1}
-												<div class="flex flex-row gap-4">
-													{#each api.named_endpoints[editableTool.endpoint].returns as { component }}
-														<label>
-															<input
-																type="radio"
-																disabled={readonly}
-																bind:group={editableTool.outputComponent}
-																value={component.toLowerCase()}
-																name="endpoint"
-															/>
-															<span
-																class="font-mono text-gray-800"
-																class:font-semibold={editableTool.outputComponent === component}
-																>{component.toLowerCase()}</span
-															>
-														</label>
-													{/each}
-												</div>
-											{:else}
-												<div>
-													<input disabled checked type="radio" />
-													<span class="font-mono text-gray-800">{editableTool.outputComponent}</span
-													>
-												</div>
+											{#if editableTool.outputComponent}
+												{#if api.named_endpoints[editableTool.endpoint].returns.length > 1}
+													<div class="flex flex-row gap-4">
+														{#each api.named_endpoints[editableTool.endpoint].returns as { component }, idx}
+															<label>
+																<input
+																	type="radio"
+																	disabled={readonly}
+																	bind:group={editableTool.outputComponent}
+																	value={component.toLowerCase()}
+																	name="outputComponent"
+																/>
+																<span
+																	class="font-mono text-gray-800"
+																	class:font-semibold={editableTool.outputComponent === component}
+																	>{component.toLowerCase()}-{idx}</span
+																>
+															</label>
+														{/each}
+													</div>
+												{:else}
+													<div>
+														<input disabled checked type="radio" />
+														<span class="font-mono text-gray-800"
+															>{editableTool.outputComponent}</span
+														>
+													</div>
+												{/if}
 											{/if}
+											<p class="text-xs text-red-500">
+												{getError("outputComponent", form)}
+											</p>
 										</label>
 
 										<label class="flex flex-row gap-2" for="showOutput">
@@ -465,10 +495,15 @@
 												bind:checked={editableTool.showOutput}
 												class="peer rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 											/>
+											<p class="text-xs text-red-500">
+												{getError("showOutput", form)}
+											</p>
 										</label>
 									</div>
 								</div>
 							</div>
+						{:else if APIloading}
+							<p class="text-sm text-gray-500">Loading API...</p>
 						{/if}
 					{:catch error}
 						<p class="text-sm text-gray-500">{error}</p>
@@ -486,12 +521,12 @@
 				{#if !readonly}
 					<button
 						type="submit"
-						disabled={loading}
+						disabled={formLoading}
 						class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold text-white"
-						class:text-gray-300={loading}
-						class:bg-gray-500={loading}
+						class:text-gray-300={formLoading}
+						class:bg-gray-500={formLoading}
 					>
-						{loading ? "Saving..." : "Save"}
+						{formLoading ? "Saving..." : "Save"}
 					</button>
 				{/if}
 			</div>
