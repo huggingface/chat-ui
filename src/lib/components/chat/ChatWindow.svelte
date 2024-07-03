@@ -267,41 +267,67 @@
 	}
 
 	// Handles posting a newly created comment or an update to an existing comment
-	function handlePostComment(displayComment: DisplayComment) {
-		const savedComment: Comment = {
-			// Use existing _id if available, otherwise create a new temporary one
-			_id: ('_id' in displayComment) ? displayComment._id : `temp-${tempIdCounter++}` as any,
+	async function handlePostComment(displayComment: DisplayComment) {
+		try {
+			let response;
+			const commentData = {
+				content: displayComment.content,
+				textQuoteSelector: displayComment.textQuoteSelector,
+				textPositionSelector: displayComment.textPositionSelector,
+			};
 
-			// TODO: add the userId or sessionId for the current user
+			if ('_id' in displayComment && displayComment._id) {
+				// Update existing comment
+				response = await fetch(`/conversation/${$page.params.id}/comments`, {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						...commentData,
+						commentId: displayComment._id,
+					}),
+				});
+			} else {
+				// Create new comment
+				response = await fetch(`/conversation/${$page.params.id}/comments`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify(commentData),
+				});
+			}
 
-			// Use existing createdAt if available (updating comment), otherwise use current date (creating new comment)
-			createdAt: ('createdAt' in displayComment) ? displayComment.createdAt ?? new Date() : new Date(),
-			// Always update the updatedAt date when posting a new or updated comment
-			updatedAt: new Date(),
+			if (!response.ok) {
+				throw new Error('Failed to save comment');
+			}
 
-			// Update to the new content, loosing the originalContent if it was there, which is what we want when posting a new or updated comment
-			content: displayComment.content,
+			const result = await response.json();
 
-			// Use existing text selectors
-			textQuoteSelector: displayComment.textQuoteSelector,
-			textPositionSelector: displayComment.textPositionSelector,
-		};
+			// Update the displayComments array
+			displayComments = displayComments.map(comment => 
+				comment === displayComment 
+					? { 
+						...comment, 
+						...commentData, 
+						_id: result.id || displayComment._id, 
+						isPending: false,
+						updatedAt: new Date(),
+						createdAt: comment.createdAt || new Date(),
+					} 
+					: comment
+			);
 
-
-		// TODO: Here you would typically make an API call to save the comment
-		// For now, we'll just log it
-		console.log("Saved comment:", savedComment);
-		
-		// Update the displayComments array with the new saved comment
-		displayComments = displayComments.map(comment => 
-			comment === displayComment ? { ...comment, ...savedComment, isPending: false } : comment
-		);
+			console.log("Comment saved successfully:", result);
+		} catch (error) {
+			console.error("Error saving comment:", error);
+			alert("Failed to save comment. Please try again.");
+		}
 	}
 
 	// Handles deleting a comment. Should only be called on a persisted comment, but just returns if it is.
-	function handleDeleteComment(displayComment: DisplayComment) {
-
-
+	async function handleDeleteComment(displayComment: DisplayComment) {
 		// Unwrap the highlighted text associated with this comment
 		if (displayComment.wrapperObject) {
 			displayComment.wrapperObject.unwrap();
@@ -311,9 +337,22 @@
 		displayComments = displayComments.filter(comment => comment !== displayComment);
 
 		// Check if the comment is persisted (has a non-empty _id), and if so delete it from the DB
-		if (!('_id' in displayComment) || !displayComment._id) {
-			// TODO: Delete the comment from the database
-			console.log("TODO: Delete comment with ID", displayComment._id, "from the database");
+		if ('_id' in displayComment && displayComment._id) {
+			try {
+				const response = await fetch(`/conversation/${$page.params.id}/comments/${displayComment._id}`, {
+					method: 'DELETE',
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to delete comment');
+				}
+
+				console.log("Comment deleted successfully from the database");
+			} catch (error) {
+				console.error("Error deleting comment:", error);
+				alert("Failed to delete comment. Please try again.");
+				// Optionally, you could add the comment back to the displayComments array here
+			}
 		}
 	}
 

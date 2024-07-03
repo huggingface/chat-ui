@@ -3,3 +3,4 @@
 
 - In auth.ts, break authCondition into two: readAuthCondition and writeAuthCondition 
 - After hitting Share, navigate the left pane to the new conversation.
+- Only logged in users should be able to create, update, or delete comments
