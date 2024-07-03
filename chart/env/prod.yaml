@@ -387,9 +387,7 @@ envVars:
             "type": "str"
           },
         ],
-        "outputPath": "$[*][*].image.url",
-        "outputType": "file",
-        "outputMimeType": "image/webp", 
+        "outputComponent": "gallery",
         "showOutput": true
       }
     ]

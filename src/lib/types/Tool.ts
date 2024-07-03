@@ -3,20 +3,41 @@ import type { User } from "./User";
 import type { Timestamps } from "./Timestamps";
 import type { BackendToolContext } from "$lib/server/tools";
 import type { MessageUpdate } from "./MessageUpdate";
+import { z } from "zod";
 
-export type ToolLogoColor = "purple" | "blue" | "green" | "yellow" | "red";
-export type ToolLogoIcon =
-	| "wikis"
-	| "tools"
-	| "camera"
-	| "code"
-	| "email"
-	| "cloud"
-	| "terminal"
-	| "game"
-	| "chat"
-	| "speaker"
-	| "video";
+export const ToolColor = z.union([
+	z.literal("purple"),
+	z.literal("blue"),
+	z.literal("green"),
+	z.literal("yellow"),
+	z.literal("red"),
+]);
+
+export const ToolIcon = z.union([
+	z.literal("wikis"),
+	z.literal("tools"),
+	z.literal("camera"),
+	z.literal("code"),
+	z.literal("email"),
+	z.literal("cloud"),
+	z.literal("terminal"),
+	z.literal("game"),
+	z.literal("chat"),
+	z.literal("speaker"),
+	z.literal("video"),
+]);
+
+export const ToolOutputComponents = z
+	.string()
+	.toLowerCase()
+	.pipe(
+		z.union([z.literal("textbox"), z.literal("markdown"), z.literal("image"), z.literal("gallery")])
+	);
+
+export type ToolOutputComponents = z.infer<typeof ToolOutputComponents>;
+
+export type ToolLogoColor = z.infer<typeof ToolColor>;
+export type ToolLogoIcon = z.infer<typeof ToolIcon>;
 
 export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
 
@@ -59,11 +80,9 @@ export interface BaseTool {
 
 	baseUrl?: string; // namespace for the tool
 	endpoint: string | null; // endpoint to call in gradio, if null we expect to override this function in code
-	outputPath: string | null; // JSONPath to the output in the response, if null we expect the function to be overriden in the code somewhere
+	outputComponent: ToolOutputComponents | null; // Gradio component type to use for the output
 
 	inputs: Array<ToolInput>;
-	outputType: ToolIOType; // type of the output
-	outputMimeType?: string; // mime type of the output
 	showOutput: boolean; // show output in chat or not
 
 	call: BackendCall;

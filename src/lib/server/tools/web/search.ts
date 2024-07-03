@@ -21,8 +21,7 @@ const websearch: ConfigTool = {
 			paramType: "required",
 		},
 	],
-	outputPath: null,
-	outputType: "str",
+	outputComponent: null,
 	showOutput: false,
 	async *call({ query }, { conv, assistant, messages }) {
 		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, String(query));

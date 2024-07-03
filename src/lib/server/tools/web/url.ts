@@ -21,8 +21,7 @@ const fetchUrl: ConfigTool = {
 			paramType: "required",
 		},
 	],
-	outputPath: null,
-	outputType: "str",
+	outputComponent: null,
 	showOutput: false,
 	async *call({ url }) {
 		const blocks = String(url).split("\n");

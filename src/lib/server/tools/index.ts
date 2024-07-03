@@ -1,5 +1,13 @@
 import { MessageUpdateType } from "$lib/types/MessageUpdate";
-import type { BackendCall, BaseTool, ConfigTool, ToolInput } from "$lib/types/Tool";
+import {
+	ToolColor,
+	ToolIcon,
+	ToolOutputComponents,
+	type BackendCall,
+	type BaseTool,
+	type ConfigTool,
+	type ToolInput,
+} from "$lib/types/Tool";
 import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
@@ -16,6 +24,7 @@ import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
 import { sha256 } from "$lib/utils/sha256";
 import { ObjectId } from "mongodb";
+import { ToolOutputPaths } from "./outputs";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -27,28 +36,6 @@ const IOType = z.union([
 	z.literal("int"),
 	z.literal("float"),
 	z.literal("boolean"),
-]);
-
-const ToolColor = z.union([
-	z.literal("purple"),
-	z.literal("blue"),
-	z.literal("green"),
-	z.literal("yellow"),
-	z.literal("red"),
-]);
-
-const ToolIcon = z.union([
-	z.literal("wikis"),
-	z.literal("tools"),
-	z.literal("camera"),
-	z.literal("code"),
-	z.literal("email"),
-	z.literal("cloud"),
-	z.literal("terminal"),
-	z.literal("game"),
-	z.literal("chat"),
-	z.literal("speaker"),
-	z.literal("video"),
 ]);
 
 const toolInputBaseSchema = z.union([
@@ -88,9 +75,7 @@ export const editableToolSchema = z.object({
 	baseUrl: z.string().min(1),
 	endpoint: z.string().min(1),
 	inputs: z.array(toolInputSchema),
-	outputPath: z.string(),
-	outputType: IOType.or(z.literal("file")),
-	outputMimeType: z.string().optional(),
+	outputComponent: ToolOutputComponents,
 	showOutput: z.boolean(),
 
 	displayName: z.string().min(1),
@@ -107,9 +92,7 @@ export const configTools = z
 				description: z.string(),
 				endpoint: z.union([z.string(), z.null()]),
 				inputs: z.array(toolInputSchema),
-				outputPath: z.union([z.string(), z.null()]),
-				outputType: IOType.or(z.literal("file")),
-				outputMimeType: z.string().optional(), // only required for file outputs
+				outputComponent: ToolOutputComponents.or(z.null()),
 				showOutput: z.boolean(),
 				_id: z
 					.string()
@@ -135,7 +118,7 @@ export const configTools = z
 
 export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	return async function* (params, ctx) {
-		if (tool.endpoint === null || !tool.baseUrl) {
+		if (tool.endpoint === null || !tool.baseUrl || !tool.outputComponent) {
 			throw new Error(`Tool function ${tool.name} has no endpoint`);
 		}
 
@@ -174,16 +157,23 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 		});
 
 		const outputs = await callSpace(tool.baseUrl, tool.endpoint, inputs, ipToken);
-		if (tool.outputPath === null) {
-			throw new Error(`Tool function ${tool.name} has no output path`);
+
+		console.log({ outputs: JSON.stringify(outputs) });
+
+		const { type, path } = ToolOutputPaths[tool.outputComponent];
+
+		if (!path || !type) {
+			throw new Error(`Tool output type ${tool.outputComponent} is not supported`);
 		}
+
 		const files: MessageFile[] = [];
 
 		const toolOutputs: Array<Record<string, string>> = [];
 
 		await Promise.all(
-			jp.query(outputs, tool.outputPath).map(async (output: string | string[], idx) => {
-				if (tool.outputType === "file") {
+			jp.query(outputs, path).map(async (output: string | string[], idx) => {
+				console.log({ output });
+				if (type === "file") {
 					// output files are actually URLs
 					const outputs = Array.isArray(output) ? output : [output];
 
@@ -192,7 +182,8 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 							await fetch(output)
 								.then((res) => res.blob())
 								.then(async (blob) => {
-									const fileType = blob.type.split("/")[1] ?? tool.outputMimeType?.split("/")[1];
+									const mimeType = blob.type;
+									const fileType = blob.type.split("/")[1] ?? mimeType?.split("/")[1];
 									return new File(
 										[blob],
 										`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
@@ -208,7 +199,7 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 					toolOutputs.push({
 						[tool.name + "-" + idx.toString()]:
-							"A file has been generated. Answer as if the user can already see the image. Do not try to insert the image or to add space for it. The user can already see the image. Do not try to describe the image as you the model cannot see it. Be concise.",
+							"A file has been generated. Answer as if the user can already see the file. Do not try to insert the file. The user can already see the file. Do not try to describe the file as the model cannot interact with it. Be concise.",
 					});
 				} else {
 					outputs.push({

@@ -14,8 +14,7 @@ const directlyAnswer: ConfigTool = {
 	name: "directlyAnswer",
 	endpoint: null,
 	inputs: [],
-	outputPath: null,
-	outputType: "str",
+	outputComponent: null,
 	showOutput: false,
 	async *call() {
 		return {

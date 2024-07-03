@@ -21,8 +21,7 @@ const calculator: ConfigTool = {
 			paramType: "required",
 		},
 	],
-	outputPath: null,
-	outputType: "str",
+	outputComponent: null,
 	showOutput: false,
 	async *call({ equation }) {
 		try {

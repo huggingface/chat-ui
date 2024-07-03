@@ -1,5 +1,9 @@
 <script lang="ts">
-	import type { CommunityToolEditable, ToolInput } from "$lib/types/Tool";
+	import {
+		ToolOutputComponents,
+		type CommunityToolEditable,
+		type ToolInput,
+	} from "$lib/types/Tool";
 	import { createEventDispatcher, onMount } from "svelte";
 	import type { Client } from "@gradio/client";
 	import { browser } from "$app/environment";
@@ -44,9 +48,7 @@
 		endpoint: "",
 		name: "process_image",
 		inputs: [],
-		outputPath: "",
-		outputType: "file",
-		outputMimeType: "",
+		outputComponent: null,
 		showOutput: true,
 	};
 
@@ -71,7 +73,6 @@
 
 		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
 			if (tool?.inputs[idx]?.name === param.parameter_name) {
-				console.log(`tool ${idx} has the same name`);
 				// if the tool has the same name, we use the tool's type
 				return {
 					...tool?.inputs[idx],
@@ -98,6 +99,10 @@
 			}
 		});
 		editableTool.inputs = newInputs;
+
+		editableTool.outputComponent = ToolOutputComponents.parse(
+			api.named_endpoints[editableTool.endpoint].returns[0].component
+		);
 	}
 
 	async function onEndpointChange(e: Event) {
@@ -118,7 +123,7 @@
 			case "file":
 				throw new Error("File inputs are not supported");
 			default:
-				throw new Error(`Unsupported type ${type}`);
+				return "str";
 		}
 	}
 </script>
@@ -418,73 +423,47 @@
 
 									<div class="flex flex-col gap-4">
 										<div>
-											<h3 class="text-lg font-semibold">Return value</h3>
+											<h3 class="text-lg font-semibold">Output options</h3>
 											<p class="mb-2 text-sm text-gray-500">
-												Choose what value your tool will use as return value
+												Choose what value your tool will return and how
 											</p>
 										</div>
-										<!-- output path in JSONPath format -->
-										<label class="flex flex-row gap-2">
+
+										<label class="flex flex-col gap-2" for="showOutput">
 											<div class="mb-1 font-semibold">
-												Output path
+												Output component
 												<p class="text-xs font-normal text-gray-500">
-													The path of the output of the tool. Uses <a
-														href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html"
-														target="_blank"
-														class="underline"
-														rel="noreferrer">JSONPath queries</a
-													>.
+													Pick the gradio output component whose output will be used in the tool.
 												</p>
 											</div>
-											<input
-												name="outputPath"
-												class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
-												placeholder="This is the path of the output of the tool"
-												bind:value={editableTool.outputPath}
-												disabled={readonly}
-											/>
-										</label>
-										<!-- select the output type -->
-										<label class="flex flex-row gap-2">
-											<div class="mb-1 font-semibold">
-												Output type
-												<p class="text-xs font-normal text-gray-500">
-													The type of the output of the tool
-												</p>
-											</div>
-											<select
-												name="outputType"
-												class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
-												bind:value={editableTool.outputType}
-												disabled={readonly}
-											>
-												<option value="str">str</option>
-												<option value="int">int</option>
-												<option value="float">float</option>
-												<option value="boolean">boolean</option>
-												<option value="file">file</option>
-											</select>
+											{#if api.named_endpoints[editableTool.endpoint].returns.length > 1}
+												<div class="flex flex-row gap-4">
+													{#each api.named_endpoints[editableTool.endpoint].returns as { component }}
+														<label>
+															<input
+																type="radio"
+																disabled={readonly}
+																bind:group={editableTool.outputComponent}
+																value={component.toLowerCase()}
+																name="endpoint"
+															/>
+															<span
+																class="font-mono text-gray-800"
+																class:font-semibold={editableTool.outputComponent === component}
+																>{component.toLowerCase()}</span
+															>
+														</label>
+													{/each}
+												</div>
+											{:else}
+												<div>
+													<input disabled checked type="radio" />
+													<span class="font-mono text-gray-800">{editableTool.outputComponent}</span
+													>
+												</div>
+											{/if}
 										</label>
 
-										<!-- select the output mime type -->
-										{#if editableTool.outputType === "file"}
-											<label class="flex flex-row gap-2">
-												<div class="mb-1 font-semibold">
-													Output MIME type
-													<p class="text-xs font-normal text-gray-500">
-														The MIME type of the output of the tool is used to determine how to
-														display it to the user.
-													</p>
-												</div>
-												<input
-													name="outputPath"
-													class="h-10 w-full rounded-lg border-2 border-gray-200 bg-gray-100 px-2"
-													placeholder="image/jpeg"
-													bind:value={editableTool.outputMimeType}
-													disabled={readonly}
-												/>
-											</label>
-										{/if}
 										<label class="flex flex-row gap-2" for="showOutput">
 											<div class="mb-1 font-semibold">
 												Show output to user directly
