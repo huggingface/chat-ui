@@ -10,9 +10,8 @@
 	import wrapRangeText, { WrapperObject } from 'wrap-range-text';
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
-	import CarbonExport from "~icons/carbon/export";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
+	import CarbonEdit from "~icons/carbon/edit";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import CarbonTrashCan from  "~icons/carbon/trash-can";
 	import CarbonSend from "~icons/carbon/send";
@@ -241,6 +240,7 @@
 					start: positionSelector.start,
 					end: positionSelector.end
 				},
+				isUnsaved: true,
 				
 			};
 
@@ -262,31 +262,57 @@
 		}
 	}
 
-	function handlePostComment(commentPair: { comment: UnsavedComment; wrapper: WrapperObject }) {
-		// Add a temporary _id to the comment
+	function handlePostComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
 		const savedComment: Comment = {
-			...commentPair.comment,
-			_id: `temp-${tempIdCounter++}` as any,
-			createdAt: new Date(),
+			// Use existing _id if available, otherwise create a new temporary one
+			_id: ('_id' in commentPair.comment) ? commentPair.comment._id : `temp-${tempIdCounter++}` as any,
+			// Use existing createdAt if available, otherwise use current date
+			createdAt: ('createdAt' in commentPair.comment) ? commentPair.comment.createdAt ?? new Date() : new Date(),
+			// Always update the updatedAt date
 			updatedAt: new Date(),
-   		 };
+			// Copy over all relevant properties from AnyComment
+			content: commentPair.comment.content,
+			textQuoteSelector: commentPair.comment.textQuoteSelector,
+			textPositionSelector: commentPair.comment.textPositionSelector,
+		};
 
 		// Update the comments array with the new saved comment
 		commentPairs = commentPairs.map(pair => 
-        	pair.comment === commentPair.comment ? { ...pair, comment: savedComment } : pair
-   		);
+			pair.comment === commentPair.comment ? { ...pair, comment: savedComment } : pair
+		);
 
 		// Here you would typically make an API call to save the comment
 		// For now, we'll just log it
 		console.log("Saved comment:", savedComment);
 	}
 
-	function handleCancelComment(commentPair: { comment: UnsavedComment; wrapper: WrapperObject }) {
+	function handleDeleteComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
 		// Unwrap the highlighted text associated with this comment
 		commentPair.wrapper.unwrap();
 		
 		// Remove the unsaved comment from the commentPairs array
 		commentPairs = commentPairs.filter(pair => pair.comment !== commentPair.comment);
+
+		//TODO: if the comment was saved, delete it from the database
+	}	
+
+	function handleEditComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
+		// Change the Comment into an UnsavedComment
+		const unsavedComment: UnsavedComment = {
+			...(('_id' in commentPair.comment) && { _id: commentPair.comment._id }),
+			...(('createdAt' in commentPair.comment) && { createdAt: commentPair.comment.createdAt }),
+			content: commentPair.comment.content,
+			textQuoteSelector: commentPair.comment.textQuoteSelector,
+			textPositionSelector: commentPair.comment.textPositionSelector,
+			isUnsaved: true,
+		};
+
+		// Update the commentPairs array
+		commentPairs = commentPairs.map(pair => 
+			pair.comment === commentPair.comment 
+				? { ...pair, comment: unsavedComment }
+				: pair
+		);
 	}	
 
 </script>
@@ -592,8 +618,22 @@
 			{#each commentPairs as { comment, wrapper }, index}
 				<li class="bg-gray-100 p-3 rounded-lg">
 					<p>{"> " + comment.textQuoteSelector?.exact}</p>
-					{#if '_id' in comment}
-            			<p>{comment.content}</p>
+					{#if !('isUnsaved' in comment) || comment.isUnsaved === false}
+						<p>{comment.content}</p>
+						<div class="flex justify-end mt-2">
+							<button
+							class="mr-2 p-1 bg-green-500 text-white rounded-full"
+							on:click={() => handleEditComment({ comment, wrapper })}
+							>
+								<CarbonEdit />
+							</button>
+							<button
+								class="p-1 bg-red-500 text-white rounded-full"
+								on:click={() => handleDeleteComment({ comment, wrapper })}
+							>
+								<CarbonTrashCan />
+							</button>
+						</div>
 					{:else}
 						<textarea
 							bind:value={comment.content}
@@ -609,13 +649,21 @@
 							</button>
 							<button
 								class="p-1 bg-red-500 text-white rounded-full"
-								on:click={() => handleCancelComment({ comment, wrapper })}
+								on:click={() => handleDeleteComment({ comment, wrapper })}
 							>
 								<CarbonTrashCan />
 							</button>
 						</div>
 					{/if}
-					<p class="text-sm text-gray-600">Start: {comment.textPositionSelector?.start ?? 'N/A'}</p>
+					<p class="text-sm text-gray-600">
+						Start: {comment.textPositionSelector?.start ?? 'N/A'}
+						{#if 'createdAt' in comment && comment.createdAt}
+						· Created: {new Date(comment.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+						{/if}
+						{#if 'updatedAt' in comment && comment.updatedAt}
+						· Updated: {new Date(comment.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+						{/if}
+					</p>
 				</li>
 			{/each}
 			</ul>
