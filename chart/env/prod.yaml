@@ -386,6 +386,12 @@ envVars:
             "paramType": "required",
             "type": "str"
           },
+          {
+          "name": "seed",
+          "paramType": "fixed",
+          "value": 1234,
+          "type": "int"
+          }
         ],
         "outputComponent": "gallery",
         "showOutput": true
