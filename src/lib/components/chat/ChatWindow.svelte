@@ -2,7 +2,7 @@
 	let tempIdCounter = 0;
 	import { onMount } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import type { AnyComment, Comment, UnsavedComment } from "$lib/types/Comment";
+	import type { Comment, DisplayComment } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import * as TextQuote from 'dom-anchor-text-quote';
@@ -13,7 +13,8 @@
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonEdit from "~icons/carbon/edit";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
-	import CarbonTrashCan from  "~icons/carbon/trash-can";
+	import CarbonTrashCan from "~icons/carbon/trash-can";
+	import CarbonClose from "~icons/carbon/close";
 	import CarbonSend from "~icons/carbon/send";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -62,7 +63,7 @@
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
-	let commentPairs: Array<{ comment: AnyComment; wrapper: WrapperObject }> = [];
+	let displayComments: DisplayComment[] = [];
 
 	const dispatch = createEventDispatcher<{
 		message: string;
@@ -193,6 +194,7 @@
 		}
 	}
 
+	// Adds a new DisplayComment to the array, ready for authoring, but doesn't persist it yet
 	function addComment() {
 		console.log("Comment button clicked - addComment function called");
 		
@@ -225,8 +227,8 @@
 				const wrapper = document.createElement('mark');
 				const wrappedRange = wrapRangeText(wrapper, newRange);
 				console.log('Wrapped nodes:', wrappedRange.nodes);
-			// Create a new Comment object
-			const newComment: UnsavedComment = {
+			// Create a new DisplayComment object
+			const newDisplayComment: DisplayComment = {
 				
 
 				content: "",
@@ -240,19 +242,21 @@
 					start: positionSelector.start,
 					end: positionSelector.end
 				},
-				isUnsaved: true,
+				isPending: true,
+				wrapperObject: wrappedRange,
+				originalContent: "",
 				
 			};
 
-			// Add the new comment and wrapper to the commentPairs array and sort
-			commentPairs = [...commentPairs, { comment: newComment, wrapper: wrappedRange }]
+			// Add the newDisplayComment to the array and sort
+			displayComments = [...displayComments, newDisplayComment]
             .sort((a, b) => {
-                const aStart = a.comment.textPositionSelector?.start ?? 0;
-                const bStart = b.comment.textPositionSelector?.start ?? 0;
+                const aStart = a.textPositionSelector?.start ?? 0;
+                const bStart = b.textPositionSelector?.start ?? 0;
                 return aStart - bStart;
             });
 
-			console.log("New comment added:", newComment);
+			console.log("New comment added:", newDisplayComment);
 
 			} else {
 				console.log("Failed to create new range");
@@ -262,58 +266,94 @@
 		}
 	}
 
-	function handlePostComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
+	// Handles posting a newly created comment or an update to an existing comment
+	function handlePostComment(displayComment: DisplayComment) {
 		const savedComment: Comment = {
 			// Use existing _id if available, otherwise create a new temporary one
-			_id: ('_id' in commentPair.comment) ? commentPair.comment._id : `temp-${tempIdCounter++}` as any,
-			// Use existing createdAt if available, otherwise use current date
-			createdAt: ('createdAt' in commentPair.comment) ? commentPair.comment.createdAt ?? new Date() : new Date(),
-			// Always update the updatedAt date
+			_id: ('_id' in displayComment) ? displayComment._id : `temp-${tempIdCounter++}` as any,
+
+			// TODO: add the userId or sessionId for the current user
+
+			// Use existing createdAt if available (updating comment), otherwise use current date (creating new comment)
+			createdAt: ('createdAt' in displayComment) ? displayComment.createdAt ?? new Date() : new Date(),
+			// Always update the updatedAt date when posting a new or updated comment
 			updatedAt: new Date(),
-			// Copy over all relevant properties from AnyComment
-			content: commentPair.comment.content,
-			textQuoteSelector: commentPair.comment.textQuoteSelector,
-			textPositionSelector: commentPair.comment.textPositionSelector,
+
+			// Update to the new content, loosing the originalContent if it was there, which is what we want when posting a new or updated comment
+			content: displayComment.content,
+
+			// Use existing text selectors
+			textQuoteSelector: displayComment.textQuoteSelector,
+			textPositionSelector: displayComment.textPositionSelector,
 		};
 
-		// Update the comments array with the new saved comment
-		commentPairs = commentPairs.map(pair => 
-			pair.comment === commentPair.comment ? { ...pair, comment: savedComment } : pair
-		);
 
-		// Here you would typically make an API call to save the comment
+		// TODO: Here you would typically make an API call to save the comment
 		// For now, we'll just log it
 		console.log("Saved comment:", savedComment);
+		
+		// Update the displayComments array with the new saved comment
+		displayComments = displayComments.map(comment => 
+			comment === displayComment ? { ...comment, ...savedComment, isPending: false } : comment
+		);
 	}
 
-	function handleDeleteComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
+	// Handles deleting a comment. Should only be called on a persisted comment, but just returns if it is.
+	function handleDeleteComment(displayComment: DisplayComment) {
+
+
 		// Unwrap the highlighted text associated with this comment
-		commentPair.wrapper.unwrap();
+		if (displayComment.wrapperObject) {
+			displayComment.wrapperObject.unwrap();
+		}
 		
-		// Remove the unsaved comment from the commentPairs array
-		commentPairs = commentPairs.filter(pair => pair.comment !== commentPair.comment);
+		// Remove the comment from the displayComments array
+		displayComments = displayComments.filter(comment => comment !== displayComment);
 
-		//TODO: if the comment was saved, delete it from the database
-	}	
+		// Check if the comment is persisted (has a non-empty _id), and if so delete it from the DB
+		if (!('_id' in displayComment) || !displayComment._id) {
+			// TODO: Delete the comment from the database
+			console.log("TODO: Delete comment with ID", displayComment._id, "from the database");
+		}
+	}
 
-	function handleEditComment(commentPair: { comment: AnyComment; wrapper: WrapperObject }) {
-		// Change the Comment into an UnsavedComment
-		const unsavedComment: UnsavedComment = {
-			...(('_id' in commentPair.comment) && { _id: commentPair.comment._id }),
-			...(('createdAt' in commentPair.comment) && { createdAt: commentPair.comment.createdAt }),
-			content: commentPair.comment.content,
-			textQuoteSelector: commentPair.comment.textQuoteSelector,
-			textPositionSelector: commentPair.comment.textPositionSelector,
-			isUnsaved: true,
-		};
+	// Handles editing an existing DisplayComment. 
+	function handleEditComment(displayComment: DisplayComment) {
+		// Sets isPending to true
+		// Sets originalContent to the content
+		displayComments = displayComments.map(dc => {
+			if (dc === displayComment) {
+				return {
+					...dc,
+					isPending: true,
+					originalContent: dc.content
+				};
+			}
+			return dc;
+		});
 
-		// Update the commentPairs array
-		commentPairs = commentPairs.map(pair => 
-			pair.comment === commentPair.comment 
-				? { ...pair, comment: unsavedComment }
-				: pair
-		);
-	}	
+		// No database update needed. That will happen when the comment is posted (handlePostComment)
+	}
+
+	function handleCancelEditComment(displayComment: DisplayComment) {
+		if (!('_id' in displayComment) || !displayComment._id) {
+			// If the DisplayComment was never persisted, delete it
+			handleDeleteComment(displayComment);
+		} else {
+			// Revert the pending edit
+			displayComments = displayComments.map(dc => {
+				if (dc === displayComment) {
+					return {
+						...dc,
+						isPending: false,
+						content: dc.originalContent || ""
+					};
+				}
+				return dc;
+			});
+		}
+		// No database updates needed
+	}
 
 </script>
 
@@ -613,55 +653,59 @@
 	<!-- Add this section to display the list of comments -->
 	<div class="mt-4 w-full max-w-md">
 		<h3 class="text-lg font-semibold mb-2">Comments</h3>
-		{#if commentPairs.length > 0}
+		{#if displayComments.length > 0}
 			<ul class="space-y-2">
-			{#each commentPairs as { comment, wrapper }, index}
+			{#each displayComments as dc, index}
 				<li class="bg-gray-100 p-3 rounded-lg">
-					<p>{"> " + comment.textQuoteSelector?.exact}</p>
-					{#if !('isUnsaved' in comment) || comment.isUnsaved === false}
-						<p>{comment.content}</p>
+					<p>{"> " + dc.textQuoteSelector?.exact}</p>
+					{#if !dc.isPending}
+						<p>{dc.content}</p>
 						<div class="flex justify-end mt-2">
 							<button
 							class="mr-2 p-1 bg-green-500 text-white rounded-full"
-							on:click={() => handleEditComment({ comment, wrapper })}
+							on:click={() => handleEditComment(dc)}
+							aria-label="Edit Comment"
 							>
 								<CarbonEdit />
 							</button>
 							<button
 								class="p-1 bg-red-500 text-white rounded-full"
-								on:click={() => handleDeleteComment({ comment, wrapper })}
+								on:click={() => handleDeleteComment(dc)}
+								aria-label="Delete Comment"
 							>
 								<CarbonTrashCan />
 							</button>
 						</div>
 					{:else}
 						<textarea
-							bind:value={comment.content}
+							bind:value={dc.content}
 							class="w-full p-2 border rounded-md"
 							rows="3"
 						></textarea>
 						<div class="flex justify-end mt-2">
 							<button
 								class="mr-2 p-1 bg-green-500 text-white rounded-full"
-								on:click={() => handlePostComment({ comment, wrapper })}
+								on:click={() => handlePostComment(dc)}
+								aria-label="Save Comment"
 							>
 								<CarbonSend />
 							</button>
 							<button
 								class="p-1 bg-red-500 text-white rounded-full"
-								on:click={() => handleDeleteComment({ comment, wrapper })}
+								on:click={() => handleCancelEditComment(dc)}
+								aria-label="Cancel"
 							>
-								<CarbonTrashCan />
+								<CarbonClose />
 							</button>
 						</div>
 					{/if}
 					<p class="text-sm text-gray-600">
-						Start: {comment.textPositionSelector?.start ?? 'N/A'}
-						{#if 'createdAt' in comment && comment.createdAt}
-						· Created: {new Date(comment.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+						Start: {dc.textPositionSelector?.start ?? 'N/A'}
+						{#if 'createdAt' in dc && dc.createdAt}
+						· Created: {new Date(dc.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
 						{/if}
-						{#if 'updatedAt' in comment && comment.updatedAt}
-						· Updated: {new Date(comment.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+						{#if 'updatedAt' in dc && dc.updatedAt}
+						· Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
 						{/if}
 					</p>
 				</li>
