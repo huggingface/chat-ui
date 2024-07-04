@@ -1,4 +1,5 @@
 import { collections } from "$lib/server/database";
+import { models } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 
@@ -29,6 +30,7 @@ export async function GET({ locals, url }) {
 			updatedAt: conv.updatedAt,
 			modelId: conv.model,
 			assistantId: conv.assistantId,
+			modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 		}));
 
 		return Response.json(res);
