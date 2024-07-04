@@ -8,7 +8,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 
 	import ReportModal from "../../settings/(nav)/assistants/[assistantId]/ReportModal.svelte";
-	import { enhance } from "$app/forms";
+	import { applyAction, enhance } from "$app/forms";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 
 	import CarbonPen from "~icons/carbon/pen";
@@ -101,7 +101,20 @@
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline"
 								><CarbonPen class="mr-1.5 inline text-xs" />Edit
 							</a>
-							<form method="POST" action="?/delete" use:enhance>
+							<form
+								method="POST"
+								action="?/delete"
+								use:enhance={async () => {
+									return async ({ result }) => {
+										if (result.type === "success") {
+											$settings.tools = ($settings?.tools ?? []).filter((t) => t !== data.tool._id);
+											goto(`${base}/tools`, { invalidateAll: true });
+										} else {
+											await applyAction(result);
+										}
+									};
+								}}
+							>
 								<button type="submit" class="flex items-center underline">
 									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
 								>

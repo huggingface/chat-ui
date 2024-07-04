@@ -42,7 +42,7 @@ export const actions: Actions = {
 				tools: { $in: [tool._id.toString()] },
 			},
 			{
-				$pull: { assistants: tool._id.toString() },
+				$pull: { tools: tool._id.toString() },
 			}
 		);
 

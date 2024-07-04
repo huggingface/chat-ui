@@ -95,6 +95,7 @@
 		});
 		editableTool.inputs = newInputs;
 
+		// outout components
 		const parsedOutputComponent = ToolOutputComponents.safeParse(
 			api.named_endpoints[editableTool.endpoint].returns?.[0]?.component ?? null
 		);

@@ -20,7 +20,6 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
-	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
@@ -84,11 +83,9 @@
 
 	const goToCommunity = () => {
 		return getHref($page.url, {
-			existingKeys: { behaviour: "delete_except", keys: ["sort", "q", "user"] },
+			existingKeys: { behaviour: "delete_except", keys: ["sort", "q"] },
 		});
 	};
-
-	const settings = useSettingsStore();
 </script>
 
 <svelte:head>
@@ -167,7 +164,7 @@
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
 				>
 					<CarbonEarthAmerica class="text-xs" />
-					Active ({$settings?.tools?.length})
+					Active ({$page.data.settings?.tools?.length})
 				</a>
 				<a
 					href={goToCommunity()}
@@ -230,7 +227,7 @@
 							<span class="w-full overflow-clip">
 								{tool.displayName}
 							</span>
-							{#if ($settings?.tools ?? []).includes(tool._id.toString())}
+							{#if ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 								<!-- active badge -->
 								<span
 									class="inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"

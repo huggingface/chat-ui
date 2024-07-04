@@ -1,5 +1,7 @@
+import { base } from "$app/paths";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export const load = async ({ params, locals }) => {
@@ -8,7 +10,7 @@ export const load = async ({ params, locals }) => {
 	if (!tool) {
 		const tool = toolFromConfigs.find((el) => el._id.toString() === params.toolId);
 		if (!tool) {
-			throw new Error("Tool not found");
+			throw redirect(302, `${base}/tools`);
 		}
 		return {
 			tool: {

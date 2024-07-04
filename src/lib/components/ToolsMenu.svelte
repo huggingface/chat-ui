@@ -86,9 +86,9 @@
 
 			<a
 				href="{base}/tools"
-				class="col-span-2 w-fit items-center justify-center gap-1.5 rounded-full bg-purple-500/20 p-1 px-2.5 text-sm hover:bg-purple-500/30"
+				class="col-span-2 my-1 h-fit w-fit items-center justify-center rounded-full bg-purple-500/20 px-2.5 py-1.5 text-sm hover:bg-purple-500/30"
 			>
-				<span class="mr-1 rounded-full bg-purple-700 px-1.5 py-0.5 text-xs font-bold uppercase">
+				<span class="mr-1 rounded-full bg-purple-700 px-1.5 py-1 text-xs font-bold uppercase">
 					new
 				</span>
 				Browse community tools ({$page.data.communityToolCount ?? 0})
