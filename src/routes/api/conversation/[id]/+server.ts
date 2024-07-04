@@ -30,7 +30,7 @@ export async function GET({ locals, params }) {
 					webSearch: message.webSearch,
 					files: message.files,
 				})),
-				modelTools: models.filter((m) => m.id == conv.model)[0].tools ?? false,
+				modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 			};
 			return Response.json(res);
 		} else {
