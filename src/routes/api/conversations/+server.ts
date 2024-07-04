@@ -30,7 +30,7 @@ export async function GET({ locals, url }) {
 			updatedAt: conv.updatedAt,
 			modelId: conv.model,
 			assistantId: conv.assistantId,
-			modelTools: models.filter((m) => m.id == conv.model)[0].tools ?? false,
+			modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 		}));
 
 		return Response.json(res);
