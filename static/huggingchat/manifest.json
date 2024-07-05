@@ -51,7 +51,7 @@
 			"type": "image/png"
 		}
 	],
-	"prefer_related_applications": true
+	"prefer_related_applications": true,
 	"related_applications": [
 		{
 			"platform": "play",
