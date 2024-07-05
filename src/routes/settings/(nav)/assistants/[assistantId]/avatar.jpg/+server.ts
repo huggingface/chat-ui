@@ -37,6 +37,8 @@ export const GET: RequestHandler = async ({ params }) => {
 	return new Response(content, {
 		headers: {
 			"Content-Type": "image/jpeg",
+			"Content-Security-Policy":
+				"default-src 'none'; script-src 'none'; style-src 'none'; sandbox;",
 		},
 	});
 };

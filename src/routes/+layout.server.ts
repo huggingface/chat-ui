@@ -147,6 +147,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
 			tools: settings?.tools ?? {},
+			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 		},
 		models: models.map((model) => ({
 			id: model.id,
