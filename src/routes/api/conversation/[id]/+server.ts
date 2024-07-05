@@ -29,6 +29,7 @@ export async function GET({ locals, params }) {
 					updatedAt: message.updatedAt,
 					webSearch: message.webSearch,
 					files: message.files,
+					updates: message.updates,
 				})),
 				modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 			};
