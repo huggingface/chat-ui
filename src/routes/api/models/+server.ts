@@ -18,6 +18,7 @@ export async function GET() {
 			preprompt: model.preprompt ?? "",
 			multimodal: model.multimodal ?? false,
 			unlisted: model.unlisted ?? false,
+			tools: model.tools ?? false,
 		}));
 	return Response.json(res);
 }
