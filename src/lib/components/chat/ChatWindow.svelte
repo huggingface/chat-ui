@@ -80,18 +80,17 @@
 			if (!response.ok) {
 			throw new Error('Failed to fetch comments');
 			}
-			const comments = await response.json();
+			const comments: DisplayComment[] = await response.json();
 			
-			displayComments = comments.map((comment: Comment) => ({
-			...comment,
-			isPending: false,
-			wrapperObject: null,
-			originalContent: comment.content
+			displayComments = comments.map((comment) => ({
+				...comment,
+				originalContent: comment.content,
+				isPending: false
 			}));
 
 			// Schedule highlighting after the DOM has updated
 			afterUpdate(() => {
-			highlightComments();
+				highlightComments();
 			});
 		} catch (error) {
 			console.error("Error fetching comments:", error);
@@ -267,26 +266,27 @@
 				const wrapper = document.createElement('mark');
 				const wrappedRange = wrapRangeText(wrapper, newRange);
 				console.log('Wrapped nodes:', wrappedRange.nodes);
-			// Create a new DisplayComment object
-			const newDisplayComment: DisplayComment = {
-				
 
-				content: "",
-
-				textQuoteSelector: {
-					exact: quoteSelector.exact,
-					prefix: quoteSelector.prefix,
-					suffix: quoteSelector.suffix
-				},
-				textPositionSelector: {
-					start: positionSelector.start,
-					end: positionSelector.end
-				},
-				isPending: true,
-				wrapperObject: wrappedRange,
-				originalContent: "",
 				
-			};
+				// Create a new DisplayComment object
+				const newDisplayComment: DisplayComment = {
+
+					content: "",
+
+					textQuoteSelector: {
+						exact: quoteSelector.exact,
+						prefix: quoteSelector.prefix,
+						suffix: quoteSelector.suffix
+					},
+					textPositionSelector: {
+						start: positionSelector.start,
+						end: positionSelector.end
+					},
+					isPending: true,
+					wrapperObject: wrappedRange,
+					originalContent: "",
+				
+				};
 
 			// Add the newDisplayComment to the array and sort
 			displayComments = [...displayComments, newDisplayComment]
@@ -726,8 +726,17 @@
 			<ul class="space-y-2">
 			{#each displayComments as dc, index}
 				<li class="bg-gray-100 p-3 rounded-lg">
-					<p>{"> " + dc.textQuoteSelector?.exact}</p>
 					{#if !dc.isPending}
+						<p class="text-sm text-gray-600">
+							{#if dc.username}
+								<span class="font-semibold">{dc.username}</span><br/>
+							{/if}
+							{#if 'updatedAt' in dc && dc.updatedAt}
+							Last Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+							<br/><br/>
+							{/if}
+						</p>
+						<p>{"> " + dc.textQuoteSelector?.exact}</p>
 						<p>{dc.content}</p>
 						<div class="flex justify-end mt-2">
 							<button
@@ -750,6 +759,7 @@
 							</button>
 						</div>
 					{:else}
+						<p>{"> " + dc.textQuoteSelector?.exact}</p>
 						<textarea
 							bind:value={dc.content}
 							class="w-full p-2 border rounded-md"
@@ -772,15 +782,7 @@
 							</button>
 						</div>
 					{/if}
-					<p class="text-sm text-gray-600">
-						Start: {dc.textPositionSelector?.start ?? 'N/A'}
-						{#if 'createdAt' in dc && dc.createdAt}
-						· Created: {new Date(dc.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-						{/if}
-						{#if 'updatedAt' in dc && dc.updatedAt}
-						· Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-						{/if}
-					</p>
+
 				</li>
 			{/each}
 			</ul>

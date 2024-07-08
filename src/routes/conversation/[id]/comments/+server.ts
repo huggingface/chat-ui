@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { collections } from '$lib/server/database';
 import { authCondition } from '$lib/server/auth';
 import { ObjectId } from 'mongodb';
-import type { Comment } from '$lib/types/Comment';
+import type { Comment, DisplayComment } from '$lib/types/Comment';
 import { z } from 'zod';
 
 export async function POST({ request, params, locals }) {
@@ -126,11 +126,35 @@ export async function GET({ params, locals }) {
         throw error(404, 'Conversation not found');
     }
 
-    // Fetch all comments for the conversation
-    const comments = await collections.comments
-        .find({ conversationId })
-        .sort({ createdAt: 1 })
-        .toArray();
+    // Fetch all comments for the conversation and join with users table
+    const comments = await collections.comments.aggregate([
+        { $match: { conversationId } },
+        { $sort: { createdAt: 1 } },
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'userId',
+                foreignField: '_id',
+                as: 'user'
+            }
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+            $project: {
+                _id: 1,
+                sessionId: 1,
+                userId: 1,
+                conversationId: 1,
+                content: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                textQuoteSelector: 1,
+                textPositionSelector: 1,
+                username: '$user.name',
+                isPending: { $literal: false }
+            }
+        }
+    ]).toArray() as DisplayComment[];
 
     return json(comments);
 }

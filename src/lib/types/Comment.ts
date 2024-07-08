@@ -27,6 +27,7 @@ export interface DisplayComment {
     _id?: ObjectId;
     sessionId?: string;
     userId?: User["_id"];
+    username?: string;
     conversationId?: Conversation["_id"];
     content: string;
     createdAt?: Date;
