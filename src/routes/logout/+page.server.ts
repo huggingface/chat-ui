@@ -15,6 +15,13 @@ export const actions = {
 			secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
 			httpOnly: true,
 		});
+		
+		cookies.delete('CF_Authorization', { path: '/' });
+	  
+		if (env.CF_ACCESS_LOGOUT_URL) {
+			throw redirect(302, env.CF_ACCESS_LOGOUT_URL);
+		  }
+
 		throw redirect(303, `${base}/`);
 	},
 };

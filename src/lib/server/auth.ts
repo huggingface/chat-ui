@@ -37,9 +37,9 @@ export const OIDConfig = z
 		TOLERANCE: stringWithDefault(env.OPENID_TOLERANCE),
 		RESOURCE: stringWithDefault(env.OPENID_RESOURCE),
 	})
-	.parse(JSON5.parse(env.OPENID_CONFIG));
+	.parse(JSON5.parse(env.OPENID_CONFIG) || "{}");
 
-export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
+export const requiresUser = (!!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET) || (!!env.CF_ACCESS_AUD && !!env.CF_ACCESS_TEAM_DOMAIN);
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(env.COOKIE_NAME, sessionId, {

@@ -16,6 +16,11 @@ export const actions = {
 				redirectURI = callback;
 			}
 		}
+		// Check if Cloudflare Access is configured
+		if (env.CF_ACCESS_AUD && env.CF_ACCESS_TEAM_DOMAIN) {
+		console.log("Cloudflare Access is configured, redirecting to home");
+		throw redirect(303, '/');
+		}
 
 		const authorizationUrl = await getOIDCAuthorizationUrl(
 			{ redirectURI },

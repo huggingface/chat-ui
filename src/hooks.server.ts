@@ -16,6 +16,10 @@ import { initExitHandler } from "$lib/server/exitHandler";
 import { ObjectId } from "mongodb";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
+import { verifyCloudflareAccessJWT } from "$lib/server/cloudflareAuth";
+import { createHash } from "crypto";
+import { __CONDA_OPENSLL_CERT_FILE_SET } from "$env/static/private";
+import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -145,6 +149,68 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	event.locals.sessionId = sessionId;
 
+  // If no user is found via OIDC session or email, try Cloudflare Access
+  if (!event.locals.user && env.CF_ACCESS_AUD && env.CF_ACCESS_TEAM_DOMAIN) {
+    const cfToken = event.cookies.get('CF_Authorization');
+    if (cfToken) {
+      try {
+        const payload = await verifyCloudflareAccessJWT(cfToken);
+        const hash = createHash('md5').update(payload.sub).digest('hex').substring(0, 24);
+        const objectId = new ObjectId(hash);
+
+        const user = {
+          _id: objectId,
+		  username: payload.email,
+          name: payload.name || payload.email,
+          email: payload.email,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          hfUserId: payload.sub,
+          avatarUrl: payload.picture || "",
+        };
+        
+        // Create or update the user
+        await collections.users.updateOne(
+          { _id: user._id },
+          { $set: user },
+          { upsert: true }
+        );
+		console.log('Cloudflare Access authentication successful:', user);
+        event.locals.user = user;
+
+        // Use the generated sessionId for Cloudflare Access users
+        await collections.sessions.updateOne(
+          { sessionId },
+          { 
+            $set: { 
+              userId: user._id, 
+              updatedAt: new Date(), 
+              expiresAt: addWeeks(new Date(), 2) 
+            } 
+          },
+          { upsert: true }
+        );
+
+		const existingSettings = await collections.settings.findOne({ userId: user._id });
+		if (!existingSettings) {
+		  await collections.settings.insertOne({
+			userId: user._id,
+			ethicsModalAcceptedAt: new Date(),
+			updatedAt: new Date(),
+			createdAt: new Date(),
+			...DEFAULT_SETTINGS,
+		  });
+		}
+
+        refreshSessionCookie(event.cookies, secretSessionId);
+      } catch (error) {
+        console.error('Cloudflare Access authentication failed:', error);
+      }
+    } else {
+		console.log('No CF_Authorization cookie found');	
+	}
+  }
+
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
 	/** https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#attr-enctype */
@@ -209,7 +275,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 				sessionId: event.locals.sessionId,
 				ethicsModalAcceptedAt: { $exists: true },
 			});
-
+			
+			console.log("ETHICS MODAL ACCEPTED?" + hasAcceptedEthicsModal);
 			if (!hasAcceptedEthicsModal) {
 				return errorResponse(405, "You need to accept the welcome modal first");
 			}

@@ -83,6 +83,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	let loginRequired = false;
 
+
 	if (requiresUser && !locals.user && messagesBeforeLogin) {
 		if (conversations.length > messagesBeforeLogin) {
 			loginRequired = true;
