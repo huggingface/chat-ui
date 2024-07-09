@@ -13,8 +13,8 @@ jobs:
       - name: Login to Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_PASSWORD }}
-          password: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Docker metadata
         id: meta
