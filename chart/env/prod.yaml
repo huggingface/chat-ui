@@ -1,5 +1,5 @@
 image:
-  repository: registry.internal.huggingface.tech/chat-ui
+  repository: huggingface/chat-ui
   name: chat-ui
 
 nodeSelector:
@@ -286,7 +286,7 @@ envVars:
       "name": "bge-base-en-v1-5-sxa",
       "displayName": "bge-base-en-v1-5-sxa",
       "chunkCharLength": 512,
-      "endpoints": [{ 
+      "endpoints": [{
         "type": "tei",
         "url": "https://huggingchat-tei.hf.space/"
       }]
