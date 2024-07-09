@@ -1,20 +1,11 @@
-import {
-	Content,
-	GoogleGenerativeAI,
-	HarmBlockThreshold,
-	HarmCategory,
-	Part,
-	TextPart,
-} from "@google/generative-ai";
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
+import type { Content, Part, TextPart } from "@google/generative-ai";
 import { z } from "zod";
-import { Message, MessageFile } from "$lib/types/Message";
-import { TextGenerationStreamOutput } from "@huggingface/inference";
+import type { Message, MessageFile } from "$lib/types/Message";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
-import {
-	createImageProcessorOptionsValidator,
-	ImageProcessorOptions,
-	makeImageProcessor,
-} from "../images";
+import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
+import type { ImageProcessorOptions } from "../images";
 
 export const endpointGenAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
