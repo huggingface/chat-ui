@@ -45,5 +45,14 @@ MODELS=`[
       }]
     }]
   },
+  {
+    "name": "gemini-1.5-flash",
+    "displayName": "Gemini Flash 1.5",
+    "multimodal": true,
+    "endpoints" : [{
+      "type": "genai",
+      "apiKey": "",
+    }]
+  },
 ]`
 ```
