@@ -72,7 +72,7 @@ jobs:
         uses: aurelien-baudet/workflow-dispatch@v2
         with:
           workflow: Update application values
-          repo: huggingface/infra-deployments
+          repo: huggingface-internal/infra-deployments
           wait-for-completion: true
           wait-for-completion-interval: 10s
           display-workflow-run-url-interval: 10s
