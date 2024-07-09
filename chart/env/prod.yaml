@@ -300,15 +300,15 @@ infisical:
 
 autoscaling:
   enabled: true
-  minReplicas: 6
+  minReplicas: 12
   maxReplicas: 30
   targetMemoryUtilizationPercentage: "50"
   targetCPUUtilizationPercentage: "50"
 
 resources:
   requests:
-    cpu: 4
-    memory: 8Gi
+    cpu: 2
+    memory: 4Gi
   limits:
     cpu: 4
     memory: 8Gi
