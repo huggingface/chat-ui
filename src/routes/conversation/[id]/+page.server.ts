@@ -1,7 +1,7 @@
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { error } from "@sveltejs/kit";
-import { authCondition } from "$lib/server/auth";
+import { authCondition, viewConversationAuthCondition } from "$lib/server/auth";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation.js";
 
@@ -24,7 +24,7 @@ export const load = async ({ params, depends, locals }) => {
 		// todo: add validation on params.id
 		conversation = await collections.conversations.findOne({
 			_id: new ObjectId(params.id),
-			...authCondition(locals),
+			...viewConversationAuthCondition(locals),
 		});
 
 

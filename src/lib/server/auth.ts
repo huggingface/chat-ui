@@ -62,14 +62,18 @@ export async function findUser(sessionId: string) {
 	return await collections.users.findOne({ _id: session.userId });
 }
 
-// Anyone has access to a shared conversation. For unshared conversations only user or session owner
+// 
 export const authCondition = (locals: App.Locals) => {
+    return locals.user
+        ? { userId: locals.user._id }
+        : { sessionId: locals.sessionId, userId: { $exists: false } };
+};
+
+export const viewConversationAuthCondition = (locals: App.Locals) => {
     return {
         $or: [
             { shared: true },
-            locals.user
-                ? { userId: locals.user._id }
-                : { sessionId: locals.sessionId, userId: { $exists: false } }
+            authCondition(locals)
         ]
     };
 };

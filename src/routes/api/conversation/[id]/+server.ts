@@ -1,5 +1,5 @@
 import { collections } from "$lib/server/database";
-import { authCondition } from "$lib/server/auth";
+import { viewConversationAuthCondition } from "$lib/server/auth";
 import { z } from "zod";
 import { models } from "$lib/server/models";
 import { ObjectId } from "mongodb";
@@ -11,7 +11,7 @@ export async function GET({ locals, params }) {
 	if (locals.user?._id || locals.sessionId) {
 		const conv = await collections.conversations.findOne({
 			_id: convId,
-			...authCondition(locals),
+			...viewConversationAuthCondition(locals),
 		});
 
 		if (conv) {
