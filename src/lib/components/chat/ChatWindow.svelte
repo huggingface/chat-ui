@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount, afterUpdate } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import type { Comment, DisplayComment } from "$lib/types/Comment";
+	import type { DisplayComment } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import * as TextQuote from 'dom-anchor-text-quote';
   	import * as TextPosition from 'dom-anchor-text-position';
-	import wrapRangeText, { WrapperObject } from 'wrap-range-text';
+	import wrapRangeText from 'wrap-range-text';
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
@@ -47,6 +47,7 @@
 	export let messages: Message[] = [];
 	export let loading = false;
 	export let pending = false;
+	export let shared = false;
 
 	$: shared = $page.data.shared ?? false;
 	export let currentModel: Model;
@@ -55,13 +56,14 @@
 	export let preprompt: string | undefined = undefined;
 	export let files: File[] = [];
 
+	// isReadOnly if the model used for this conversation is no longer available or
+	// TODO: if the conversation is shared and the current user/session is not the author of the conversation
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id) || shared;
 
 	let loginModalOpen = false;
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
-	let isSharedRecently = false;
-	$: $page.params.id && (isSharedRecently = false);
+
 	let displayComments: DisplayComment[] = [];
 	let currentConversationId: string | null = null;
 
@@ -188,13 +190,6 @@
 
 	function onShare() {
 		dispatch("share");
-		isSharedRecently = true;
-		if (timeout) {
-			clearTimeout(timeout);
-		}
-		timeout = setTimeout(() => {
-			isSharedRecently = false;
-		}, 2000);
 	}
 
 	onDestroy(() => {
