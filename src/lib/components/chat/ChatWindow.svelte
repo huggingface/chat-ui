@@ -727,9 +727,12 @@
 							{#if dc.username}
 								<span class="font-semibold">{dc.username}</span><br/>
 							{/if}
+							{#if dc.textPositionSelector && dc.textPositionSelector.start !== undefined}
+								Position: {dc.textPositionSelector.start}<br/>
+							{/if}
 							{#if 'updatedAt' in dc && dc.updatedAt}
-							Last Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-							<br/><br/>
+								Last Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+								<br/>
 							{/if}
 						</p>
 						<p>{"> " + dc.textQuoteSelector?.exact}</p>

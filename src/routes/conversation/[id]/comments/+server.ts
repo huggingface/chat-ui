@@ -129,7 +129,7 @@ export async function GET({ params, locals }) {
     // Fetch all comments for the conversation and join with users table
     const comments = await collections.comments.aggregate([
         { $match: { conversationId } },
-        { $sort: { createdAt: 1 } },
+        { $sort: { 'textPositionSelector.start': 1 } },
         {
             $lookup: {
                 from: 'users',
