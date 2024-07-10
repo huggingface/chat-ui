@@ -68,10 +68,8 @@
 	$: {
 		if ($page.params.id !== currentConversationId) {
 		currentConversationId = $page.params.id;
-		fetchComments();
 		}
 	}
-
 
 	async function fetchComments() {
 		if (shared && currentConversationId) {
@@ -87,11 +85,6 @@
 				originalContent: comment.content,
 				isPending: false
 			}));
-
-			// Schedule highlighting after the DOM has updated
-			afterUpdate(() => {
-				highlightComments();
-			});
 		} catch (error) {
 			console.error("Error fetching comments:", error);
 		}
@@ -101,8 +94,16 @@
 		}
 	}
 
+	$: if (displayComments.length > 0) {
+		afterUpdate(() => {
+			highlightComments();
+		});
+	}
+
 	onMount(() => {
-		fetchComments();
+		if (shared && currentConversationId) {
+			fetchComments();
+		}
 	});
 
 	function highlightComments() {
