@@ -66,10 +66,16 @@
 
 	let displayComments: DisplayComment[] = [];
 	let currentConversationId: string | null = null;
+	let pageLoaded = false;
 
 	$: {
-		if ($page.params.id !== currentConversationId) {
-		currentConversationId = $page.params.id;
+		if (pageLoaded && $page.params.id !== currentConversationId) {
+			currentConversationId = $page.params.id;
+			if (shared && currentConversationId) {
+				fetchComments().then(() => {
+					highlightComments();
+				});
+			}
 		}
 	}
 
@@ -78,7 +84,7 @@
 		try {
 			const response = await fetch(`/conversation/${currentConversationId}/comments`);
 			if (!response.ok) {
-			throw new Error('Failed to fetch comments');
+				throw new Error('Failed to fetch comments');
 			}
 			const comments: DisplayComment[] = await response.json();
 			
@@ -91,21 +97,15 @@
 			console.error("Error fetching comments:", error);
 		}
 		} else {
-		// Clear comments if not shared or no conversation ID
-		displayComments = [];
+			// Clear comments if not shared or no conversation ID
+			displayComments = [];
 		}
 	}
 
-	$: if (displayComments.length > 0) {
-		afterUpdate(() => {
-			highlightComments();
-		});
-	}
+
 
 	onMount(() => {
-		if (shared && currentConversationId) {
-			fetchComments();
-		}
+		pageLoaded = true;
 	});
 
 	function highlightComments() {
