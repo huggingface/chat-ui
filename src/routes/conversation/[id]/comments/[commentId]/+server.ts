@@ -7,7 +7,7 @@ export async function DELETE({ params, locals }) {
     const conversationId = new ObjectId(params.id);
     const commentId = new ObjectId(params.commentId);
 
-    // Check if the user has access to the conversation
+    // Check if the user has owner access to the conversation
     const conversation = await collections.conversations.findOne({
         _id: conversationId,
         ...authCondition(locals),

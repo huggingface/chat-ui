@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { collections } from '$lib/server/database';
-import { authCondition } from '$lib/server/auth';
+import { authCondition, viewConversationAuthCondition } from '$lib/server/auth';
 import { ObjectId } from 'mongodb';
 import type { Comment, DisplayComment } from '$lib/types/Comment';
 import { z } from 'zod';
@@ -8,14 +8,19 @@ import { z } from 'zod';
 export async function POST({ request, params, locals }) {
     const conversationId = new ObjectId(params.id);
 
-    // Check if the user has access to the conversation
+    // Check if the user has read access to the conversation
     const conversation = await collections.conversations.findOne({
         _id: conversationId,
-        ...authCondition(locals),
+        ...viewConversationAuthCondition(locals),
     });
 
     if (!conversation) {
         throw error(404, 'Conversation not found');
+    }
+
+    // Check if the user is logged in. Only logged in users can create a comment.
+    if (!locals.user) {
+        throw error(401, 'You must be logged in to create a comment');
     }
 
     const commentSchema = z.object({
@@ -58,10 +63,10 @@ export async function POST({ request, params, locals }) {
 export async function PUT({ request, params, locals }) {
     const conversationId = new ObjectId(params.id);
 
-    // Check if the user has access to the conversation
+    // Check if the user has read access to the conversation
     const conversation = await collections.conversations.findOne({
         _id: conversationId,
-        ...authCondition(locals),
+        ...viewConversationAuthCondition(locals),
     });
     if (!conversation) {
         throw error(404, 'Conversation not found');
@@ -86,6 +91,7 @@ export async function PUT({ request, params, locals }) {
 
     const commentId = new ObjectId(validatedData.commentId);
 
+    // Check if the user has write access to the comment
     const updateResult = await collections.comments.updateOne(
         { 
             _id: commentId, 
@@ -116,10 +122,10 @@ export async function PUT({ request, params, locals }) {
 export async function GET({ params, locals }) {
     const conversationId = new ObjectId(params.id);
 
-    // Check if the user has access to the conversation
+    // Check if the user has read access to the conversation
     const conversation = await collections.conversations.findOne({
         _id: conversationId,
-        ...authCondition(locals),
+        ...viewConversationAuthCondition(locals),
     });
 
     if (!conversation) {
