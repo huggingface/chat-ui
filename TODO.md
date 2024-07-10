@@ -9,3 +9,4 @@
 
 - Allow comments to have newlines that display
 - TODO: if the conversation is shared and the current user/session is not the author of the conversation
+- For conversations with trees (i.e. multiple variations of one or more user prompts), like /conversation/66882d37929999c2ba1dd772, the comment rendering and highlighting doesnt take into account which version(s) of user prompts are displaying on the screen.
