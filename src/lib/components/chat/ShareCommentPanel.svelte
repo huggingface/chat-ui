@@ -100,12 +100,12 @@
 		if (selectedText === "") {
 			alert("No Selection");
 		} else {
-			let quoteSelector = TextQuote.fromRange(document.body, range);
-			let positionSelector = TextPosition.fromRange(document.body, range);
+			let quoteSelector = TextQuote.fromRange(chatContainer, range);
+			let positionSelector = TextPosition.fromRange(chatContainer, range);
 
 			
 			// Create a new range from the quoteSelector
-			const newRange = TextQuote.toRange(document.body, {
+			const newRange = TextQuote.toRange(chatContainer, {
 				exact: quoteSelector.exact,
 				prefix: quoteSelector.prefix,
 				suffix: quoteSelector.suffix
