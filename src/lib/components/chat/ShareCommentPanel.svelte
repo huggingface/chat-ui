@@ -20,6 +20,7 @@
 	export let currentConversationId: string | null = null;
     export let chatContainer: HTMLElement;
     export let dispatch: ReturnType<typeof createEventDispatcher>;
+    export let loginModalOpen: boolean;
 	
 
     // Should cause a re-render if the conversation gets shared or if the user navs to a new conversation
@@ -72,6 +73,15 @@
 		});
 	}	
 
+
+    function handleCommentClick() {
+        if (!$page.data.user) {
+            loginModalOpen = true;
+            $page.data.loginRequired = true;
+        } else {
+            addComment();
+        }
+    }
 
 	// Adds a new DisplayComment to the array, ready for authoring, but doesn't persist it yet
 	function addComment() {
@@ -367,7 +377,7 @@
 </div>
 <button
 class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
-on:click={addComment}
+on:click={handleCommentClick}
 >
 	Comment
 </button>

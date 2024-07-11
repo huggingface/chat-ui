@@ -465,5 +465,6 @@
 		{currentConversationId} 
 		{chatContainer}
 		{dispatch}
+		bind:loginModalOpen
 	/>
 </div>
