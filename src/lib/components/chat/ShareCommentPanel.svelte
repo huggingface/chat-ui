@@ -323,26 +323,28 @@
 					</p>
 					<p>{"> " + dc.textQuoteSelector?.exact}</p>
 					<p>{dc.content}</p>
-					<div class="flex justify-end mt-2">
-						<button
-						class="mr-2 p-1 bg-green-500 text-white rounded-full"
-						on:click={() => handleEditComment(dc)}
-						aria-label="Edit Comment"
-						>
-							<CarbonEdit />
-						</button>
-						<button
-							class="p-1 bg-red-500 text-white rounded-full"
-							on:click={() => {
-								if (confirm('Are you sure you want to delete this comment?')) {
-									handleDeleteComment(dc);
-								}
-							}}
-							aria-label="Delete Comment"
-						>
-							<CarbonTrashCan />
-						</button>
-					</div>
+                    {#if $page.data.user && dc.userId === $page.data.user.id}
+                        <div class="flex justify-end mt-2">
+                            <button
+                            class="mr-2 p-1 bg-green-500 text-white rounded-full"
+                            on:click={() => handleEditComment(dc)}
+                            aria-label="Edit Comment"
+                            >
+                                <CarbonEdit />
+                            </button>
+                            <button
+                                class="p-1 bg-red-500 text-white rounded-full"
+                                on:click={() => {
+                                    if (confirm('Are you sure you want to delete this comment?')) {
+                                        handleDeleteComment(dc);
+                                    }
+                                }}
+                                aria-label="Delete Comment"
+                            >
+                                <CarbonTrashCan />
+                            </button>
+                        </div>
+                    {/if}
 				{:else}
 					<p>{"> " + dc.textQuoteSelector?.exact}</p>
 					<textarea
