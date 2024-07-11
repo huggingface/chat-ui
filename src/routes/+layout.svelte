@@ -22,6 +22,8 @@
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import Logo from "$lib/components/icons/Logo.svelte";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import CarbonClose from "~icons/carbon/close";
 
 	export let data;
 
@@ -127,8 +129,16 @@
 		? ""
 		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
 
-	// eslint-disable-next-line no-undef
-	let installEvent: BeforeInstallPromptEvent | undefined;
+	let showAndroidModal =
+		browser && // only show on browser
+		isHuggingChat && // only show on huggingchat
+		navigator.userAgent.toLowerCase().includes("android") && // if it's android
+		!navigator.userAgent.includes("co.huggingface.chat_ui_android") && // but not the android app
+		(!localStorage.getItem("huggingChatLastSeenAndroidModal") || //and the user hasn't seen it yet
+			new Date().getTime() -
+				new Date(localStorage.getItem("huggingChatLastSeenAndroidModal") ?? "").getTime() >
+				// 1000 * 60 * 60 * 72); // or it's been more than 72 hours
+				1000 * 10);
 </script>
 
 <svelte:head>
@@ -231,40 +241,35 @@
 	<slot />
 </div>
 
-<svelte:window
-	on:beforeinstallprompt|preventDefault={(event) => {
-		// @ts-expect-error -> chrome only event
-		installEvent = event;
-	}}
-/>
-
-{#if browser && installEvent}
-	<button
-		class="fixed bottom-48 left-0 right-0 m-4 mx-auto w-fit min-w-32 flex-nowrap rounded-full bg-gray-800 p-2 px-4 font-bold text-white shadow-lg hover:bg-gray-700"
-		on:click={async () => {
-			if (!installEvent) {
-				return;
-			}
-			installEvent.prompt();
-
-			await installEvent.userChoice.then((choiceResult) => {
-				if (choiceResult.outcome === "accepted") {
-					console.log("User accepted the A2HS prompt");
-				} else {
-					console.log("User dismissed the A2HS prompt");
-				}
-				installEvent = undefined;
-			});
-		}}
+{#if showAndroidModal}
+	<a
+		href="https://play.google.com/store/apps/details?id=co.huggingface.chat_ui_android"
+		class="fixed left-0 right-0 top-0 mx-auto flex h-fit min-h-12 w-screen flex-nowrap items-center justify-evenly gap-4 bg-gray-200 px-4 py-4 text-gray-900 shadow-lg backdrop-blur-md
+		hover:bg-gray-100
+		sm:top-5 sm:max-w-fit sm:gap-4 sm:rounded-lg
+		dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 	>
-		<Logo classNames="mr-1.5 inline text-xl" />
-		Install app
-		<span class="mx-4 h-full w-1 border-l-2 border-white" />
 		<button
-			class="my-auto mr-2 text-center font-mono"
+			class="border-r-2 border-black/20 pr-4 text-2xl"
 			on:click|stopPropagation|preventDefault={() => {
-				installEvent = undefined;
-			}}>X</button
+				showAndroidModal = false;
+				localStorage.setItem("huggingChatLastSeenAndroidModal", new Date().toISOString());
+			}}
 		>
-	</button>
+			<CarbonClose />
+		</button>
+
+		<Logo classNames="mx-2.5 scale-150" />
+
+		<div class="flex flex-col sm:mr-4">
+			<span class="text-lg font-semibold">HuggingChat</span>
+			<span class="text-sm">View on Google Play</span>
+		</div>
+
+		<span
+			class="ml-auto mr-2 text-center text-lg font-medium text-gray-700 underline underline-offset-4 dark:text-gray-300"
+		>
+			Open
+		</span>
+	</a>
 {/if}
