@@ -1,5 +1,5 @@
 image:
-  repository: huggingface/chat-ui
+  repository: huggingface
   name: chat-ui
 
 nodeSelector:
