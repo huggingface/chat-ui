@@ -457,14 +457,13 @@
 		</div>
 	</div>
 </div>
-<div class="col-start-3 col-end-4 flex flex-col justify-start items-center pt-[33.33%] h-full">
-	<ShareCommentPanel 
-		{shared} 
-		{displayComments} 
-		{conversationStarted} 
-		{currentConversationId} 
-		{chatContainer}
-		{dispatch}
-		bind:loginModalOpen
-	/>
-</div>
+
+<ShareCommentPanel 
+	{shared} 
+	{displayComments} 
+	{conversationStarted} 
+	{currentConversationId} 
+	{chatContainer}
+	{dispatch}
+	bind:loginModalOpen
+/>

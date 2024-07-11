@@ -287,100 +287,103 @@
 
 </script>
 
+<div class="col-start-3 col-end-4 flex flex-col h-full overflow-y-auto">
+    <div class="flex flex-col items-center p-4">
+        {#if conversationStarted && !shared}
+        <button
+            class="flex items-center justify-center p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow duration-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            type="button"
+            on:click={onShare}
+        >
+            <img src="/chatui/lifesaver-500x500.png" alt="Ask for Help" class="w-20 h-20" />
+            <span class="ml-4 mr-4 text-xl font-semibold text-gray-800">Share & Get Help</span>
+        </button>
+        <p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
+            Click to comment on this chat and get help from the community.
+        </p>
+        {:else if conversationStarted}
+        <!--Display the list of Comments-->
+        <div class="mt-4 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-2">Comments</h3>
+            {#if displayComments.length > 0}
+                <ul class="space-y-2">
+                {#each displayComments as dc, index}
+                    <li class="bg-gray-100 p-3 rounded-lg">
+                        {#if !dc.isPending}
+                            <p class="text-sm text-gray-600">
+                                {#if dc.username}
+                                    <span class="font-semibold">{dc.username}</span><br/>
+                                {/if}
+                                {#if dc.textPositionSelector && dc.textPositionSelector.start !== undefined}
+                                    Position: {dc.textPositionSelector.start}<br/>
+                                {/if}
+                                {#if 'updatedAt' in dc && dc.updatedAt}
+                                    Last Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                                    <br/>
+                                {/if}
+                            </p>
+                            <p>{"> " + dc.textQuoteSelector?.exact}</p>
+                            <p>{dc.content}</p>
+                            {#if $page.data.user && dc.userId === $page.data.user.id}
+                                <div class="flex justify-end mt-2">
+                                    <button
+                                    class="mr-2 p-1 bg-green-500 text-white rounded-full"
+                                    on:click={() => handleEditComment(dc)}
+                                    aria-label="Edit Comment"
+                                    >
+                                        <CarbonEdit />
+                                    </button>
+                                    <button
+                                        class="p-1 bg-red-500 text-white rounded-full"
+                                        on:click={() => {
+                                            if (confirm('Are you sure you want to delete this comment?')) {
+                                                handleDeleteComment(dc);
+                                            }
+                                        }}
+                                        aria-label="Delete Comment"
+                                    >
+                                        <CarbonTrashCan />
+                                    </button>
+                                </div>
+                            {/if}
+                        {:else}
+                            <p>{"> " + dc.textQuoteSelector?.exact}</p>
+                            <textarea
+                                bind:value={dc.content}
+                                class="w-full p-2 border rounded-md"
+                                rows="3"
+                            ></textarea>
+                            <div class="flex justify-end mt-2">
+                                <button
+                                    class="mr-2 p-1 bg-green-500 text-white rounded-full"
+                                    on:click={() => handlePostComment(dc)}
+                                    aria-label="Save Comment"
+                                >
+                                    <CarbonSend />
+                                </button>
+                                <button
+                                    class="p-1 bg-red-500 text-white rounded-full"
+                                    on:click={() => handleCancelEditComment(dc)}
+                                    aria-label="Cancel"
+                                >
+                                    <CarbonClose />
+                                </button>
+                            </div>
+                        {/if}
 
-{#if conversationStarted && !shared}
-<button
-    class="flex items-center justify-center p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow duration-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-300"
-    type="button"
-    on:click={onShare}
->
-    <img src="/chatui/lifesaver-500x500.png" alt="Ask for Help" class="w-20 h-20" />
-    <span class="ml-4 mr-4 text-xl font-semibold text-gray-800">Share & Get Help</span>
-</button>
-<p class="mt-4 text-sm text-gray-600 text-center max-w-xs">
-    Click to comment on this chat and get help from the community.
-</p>
-{:else if conversationStarted}
-<!--Display the list of Comments-->
-<div class="mt-4 w-full max-w-md">
-	<h3 class="text-lg font-semibold mb-2">Comments</h3>
-	{#if displayComments.length > 0}
-		<ul class="space-y-2">
-		{#each displayComments as dc, index}
-			<li class="bg-gray-100 p-3 rounded-lg">
-				{#if !dc.isPending}
-					<p class="text-sm text-gray-600">
-						{#if dc.username}
-							<span class="font-semibold">{dc.username}</span><br/>
-						{/if}
-						{#if dc.textPositionSelector && dc.textPositionSelector.start !== undefined}
-							Position: {dc.textPositionSelector.start}<br/>
-						{/if}
-						{#if 'updatedAt' in dc && dc.updatedAt}
-							Last Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-							<br/>
-						{/if}
-					</p>
-					<p>{"> " + dc.textQuoteSelector?.exact}</p>
-					<p>{dc.content}</p>
-                    {#if $page.data.user && dc.userId === $page.data.user.id}
-                        <div class="flex justify-end mt-2">
-                            <button
-                            class="mr-2 p-1 bg-green-500 text-white rounded-full"
-                            on:click={() => handleEditComment(dc)}
-                            aria-label="Edit Comment"
-                            >
-                                <CarbonEdit />
-                            </button>
-                            <button
-                                class="p-1 bg-red-500 text-white rounded-full"
-                                on:click={() => {
-                                    if (confirm('Are you sure you want to delete this comment?')) {
-                                        handleDeleteComment(dc);
-                                    }
-                                }}
-                                aria-label="Delete Comment"
-                            >
-                                <CarbonTrashCan />
-                            </button>
-                        </div>
-                    {/if}
-				{:else}
-					<p>{"> " + dc.textQuoteSelector?.exact}</p>
-					<textarea
-						bind:value={dc.content}
-						class="w-full p-2 border rounded-md"
-						rows="3"
-					></textarea>
-					<div class="flex justify-end mt-2">
-						<button
-							class="mr-2 p-1 bg-green-500 text-white rounded-full"
-							on:click={() => handlePostComment(dc)}
-							aria-label="Save Comment"
-						>
-							<CarbonSend />
-						</button>
-						<button
-							class="p-1 bg-red-500 text-white rounded-full"
-							on:click={() => handleCancelEditComment(dc)}
-							aria-label="Cancel"
-						>
-							<CarbonClose />
-						</button>
-					</div>
-				{/if}
-
-			</li>
-		{/each}
-		</ul>
-	{:else}
-		<p class="text-gray-600">No comments yet.</p>
-	{/if}
+                    </li>
+                {/each}
+                </ul>
+            {:else}
+                <p class="text-gray-600">No comments yet.</p>
+            {/if}
+        </div>
+        <button
+        class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+        on:click={handleCommentClick}
+        >
+            Comment
+        </button>
+        {/if}
+    </div>
 </div>
-<button
-class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
-on:click={handleCommentClick}
->
-	Comment
-</button>
-{/if}
