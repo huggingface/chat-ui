@@ -137,8 +137,7 @@
 		(!localStorage.getItem("huggingChatLastSeenAndroidModal") || //and the user hasn't seen it yet
 			new Date().getTime() -
 				new Date(localStorage.getItem("huggingChatLastSeenAndroidModal") ?? "").getTime() >
-				// 1000 * 60 * 60 * 72); // or it's been more than 72 hours
-				1000 * 10);
+				1000 * 60 * 60 * 72); // or it's been more than 72 hours
 </script>
 
 <svelte:head>
