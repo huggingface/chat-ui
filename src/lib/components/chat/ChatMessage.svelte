@@ -33,7 +33,7 @@
 	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import DOMPurify from "dompurify";
+	import DOMPurify from "isomorphic-dompurify";
 
 	function sanitizeMd(md: string) {
 		let ret = md

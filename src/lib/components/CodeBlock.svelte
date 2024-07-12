@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { afterUpdate } from "svelte";
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
-	import DOMPurify from "dompurify";
+	import DOMPurify from "isomorphic-dompurify";
 
 	export let code = "";
 	export let lang = "";
