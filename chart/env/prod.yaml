@@ -1,5 +1,5 @@
 image:
-  repository: registry.internal.huggingface.tech/chat-ui
+  repository: huggingface
   name: chat-ui
 
 nodeSelector:
@@ -40,7 +40,7 @@ envVars:
     [
       {
         "name" : "CohereForAI/c4ai-command-r-plus",
-        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"},
         "description": "Command R+ is Cohere's latest LLM and is the first open weight model to beat GPT4 in the Chatbot Arena!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
@@ -286,7 +286,7 @@ envVars:
       "name": "bge-base-en-v1-5-sxa",
       "displayName": "bge-base-en-v1-5-sxa",
       "chunkCharLength": 512,
-      "endpoints": [{ 
+      "endpoints": [{
         "type": "tei",
         "url": "https://huggingchat-tei.hf.space/"
       }]
@@ -300,15 +300,15 @@ infisical:
 
 autoscaling:
   enabled: true
-  minReplicas: 6
+  minReplicas: 12
   maxReplicas: 30
   targetMemoryUtilizationPercentage: "50"
   targetCPUUtilizationPercentage: "50"
 
 resources:
   requests:
-    cpu: 4
-    memory: 8Gi
+    cpu: 2
+    memory: 4Gi
   limits:
     cpu: 4
     memory: 8Gi

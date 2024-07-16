@@ -9,12 +9,13 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
-import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
 import { initExitHandler } from "$lib/server/exitHandler";
 import { ObjectId } from "mongodb";
+import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
+import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -24,6 +25,7 @@ if (!building) {
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
+	refreshConversationStats();
 
 	// Init metrics server
 	MetricsServer.getInstance();
