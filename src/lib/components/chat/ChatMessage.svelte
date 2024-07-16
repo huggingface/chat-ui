@@ -55,6 +55,10 @@
 		return ret;
 	}
 
+	function unsanitizeMd(md: string) {
+		return md.replaceAll("&lt;", "<");
+	}
+
 	export let model: Model;
 	export let id: Message["id"];
 	export let messages: Message[];
@@ -107,7 +111,7 @@
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
@@ -298,7 +302,7 @@
 				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
-						<CodeBlock lang={token.lang} code={token.text} />
+						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
 						{#await marked.parse(token.raw, options) then parsed}
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
