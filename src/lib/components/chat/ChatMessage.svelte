@@ -33,6 +33,7 @@
 	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import DOMPurify from "isomorphic-dompurify";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -53,6 +54,7 @@
 
 		return ret;
 	}
+
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<");
 	}
@@ -106,11 +108,10 @@
 	marked.use(
 		markedKatex({
 			throwOnError: false,
-			// output: "html",
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
@@ -303,8 +304,10 @@
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(token.raw, options)}
+						{#await marked.parse(token.raw, options) then parsed}
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html DOMPurify.sanitize(parsed)}
+						{/await}
 					{/if}
 				{/each}
 			</div>
