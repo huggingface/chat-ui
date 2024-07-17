@@ -107,31 +107,25 @@ export function endpointGenAI(input: z.input<typeof endpointGenAIParametersSchem
 					: undefined,
 		});
 
+		let tokenId = 0;
 		return (async function* () {
-			let tokenId = 0;
 			let generatedText = "";
 
 			for await (const data of result.stream) {
-				if (!data.candidates || data.candidates.length === 0) {
-					break;
-				}
+				if (!data?.candidates?.length) break; // Handle case where no candidates are present
 
 				const candidate = data.candidates[0];
-				if (!candidate.content.parts || candidate.content.parts.length === 0) {
-					continue;
-				}
+				if (!candidate.content?.parts?.length) continue; // Skip if no parts are present
 
 				const firstPart = candidate.content.parts.find((part) => "text" in part) as
 					| TextPart
 					| undefined;
-				if (!firstPart) {
-					continue;
-				}
+				if (!firstPart) continue; // Skip if no text part is found
 
 				const content = firstPart.text;
 				generatedText += content;
 
-				yield {
+				const output: TextGenerationStreamOutput = {
 					token: {
 						id: tokenId++,
 						text: content,
@@ -140,10 +134,11 @@ export function endpointGenAI(input: z.input<typeof endpointGenAIParametersSchem
 					},
 					generated_text: null,
 					details: null,
-				} as TextGenerationStreamOutput;
+				};
+				yield output;
 			}
 
-			yield {
+			const output: TextGenerationStreamOutput = {
 				token: {
 					id: tokenId++,
 					text: "",
@@ -152,7 +147,8 @@ export function endpointGenAI(input: z.input<typeof endpointGenAIParametersSchem
 				},
 				generated_text: generatedText,
 				details: null,
-			} as TextGenerationStreamOutput;
+			};
+			yield output;
 		})();
 	};
 }

@@ -54,7 +54,6 @@
 	"dependencies": {
 		"@aws-sdk/credential-providers": "^3.592.0",
 		"@cliqz/adblocker-playwright": "^1.27.2",
-		"@google/generative-ai": "^0.14.1",
 		"@gradio/client": "^0.19.4",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.7.0",
@@ -101,6 +100,7 @@
 		"@anthropic-ai/sdk": "^0.17.1",
 		"@anthropic-ai/vertex-sdk": "^0.3.0",
 		"@google-cloud/vertexai": "^1.1.0",
+		"@google/generative-ai": "^0.14.1",
 		"aws4fetch": "^1.0.17",
 		"cohere-ai": "^7.9.0",
 		"openai": "^4.44.0"
