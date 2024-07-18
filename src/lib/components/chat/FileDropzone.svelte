@@ -60,7 +60,7 @@
 	on:dragenter={() => (onDragInner = true)}
 	on:dragleave={() => (onDragInner = false)}
 	on:dragover|preventDefault
-	class="relative flex h-28 w-full max-w-4xl flex-col items-center justify-center gap-1 rounded-xl border-4 border-dotted {onDragInner
+	class="relative flex h-28 w-full max-w-4xl flex-col items-center justify-center gap-1 rounded-xl border-2 border-dotted {onDragInner
 		? 'border-blue-200 !bg-blue-500/10 text-blue-600 *:pointer-events-none dark:border-blue-600 dark:bg-blue-500/20 dark:text-blue-500'
 		: 'bg-gray-100 text-gray-500 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-400'}"
 >
