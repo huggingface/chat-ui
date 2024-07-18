@@ -15,34 +15,37 @@
 			if (files.length > 0) {
 				files = [];
 			}
-			// get only the first file
-			// optionally: we need to handle multiple files, if we want to support document upload for example
-			// for multimodal we only support one image at a time but we could support multiple PDFs
 			if (event.dataTransfer.items[0].kind === "file") {
-				const file = event.dataTransfer.items[0].getAsFile();
-				if (file) {
-					// check if the file matches the mimeTypes
-					if (
-						!mimeTypes.some((mimeType: string) => {
-							const [type, subtype] = mimeType.split("/");
-							const [fileType, fileSubtype] = file.type.split("/");
-							return type === fileType && (subtype === "*" || fileSubtype === subtype);
-						})
-					) {
-						setErrorMsg(`File type not supported. Only allowed: ${mimeTypes.join(", ")}`);
-						files = [];
-						return;
-					}
+				for (let i = 0; i < event.dataTransfer.items.length; i++) {
+					const file = event.dataTransfer.items[i].getAsFile();
 
-					// if file is bigger than 10MB abort
-					if (file.size > 10 * 1024 * 1024) {
-						setErrorMsg("Image is too big. (2MB max)");
-						files = [];
-						return;
+					if (file) {
+						// check if the file matches the mimeTypes
+						// else abort
+						if (
+							!mimeTypes.some((mimeType: string) => {
+								const [type, subtype] = mimeType.split("/");
+								const [fileType, fileSubtype] = file.type.split("/");
+								return type === fileType && (subtype === "*" || fileSubtype === subtype);
+							})
+						) {
+							setErrorMsg(`Some file type not supported. Only allowed: ${mimeTypes.join(", ")}`);
+							files = [];
+							return;
+						}
+
+						// if file is bigger than 10MB abort
+						if (file.size > 10 * 1024 * 1024) {
+							setErrorMsg("Some file is too big. (10MB max)");
+							files = [];
+							return;
+						}
+
+						// add the file to the files array
+						files = [...files, file];
 					}
-					files = [file];
-					onDrag = false;
 				}
+				onDrag = false;
 			}
 		}
 	}
