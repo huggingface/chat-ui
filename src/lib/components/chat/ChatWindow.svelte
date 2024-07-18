@@ -82,9 +82,6 @@
 			onDrag = false;
 		}
 	};
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
-	};
 
 	const onPaste = (e: ClipboardEvent) => {
 		if (!e.clipboardData) {
@@ -166,6 +163,13 @@
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
+
+<svelte:window
+	on:dragenter={onDragEnter}
+	on:dragleave={onDragLeave}
+	on:dragover|preventDefault
+	on:drop|preventDefault={() => (onDrag = false)}
+/>
 
 <div class="relative min-h-0 min-w-0">
 	{#if loginModalOpen}
@@ -332,9 +336,6 @@
 				{/if}
 			</div>
 			<form
-				on:dragover={onDragOver}
-				on:dragenter={onDragEnter}
-				on:dragleave={onDragLeave}
 				tabindex="-1"
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
