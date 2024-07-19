@@ -11,7 +11,7 @@
 
 	export let onDrag = false;
 
-	async function dropHandle(event: DragEvent) {
+	export async function dropHandle(event: DragEvent) {
 		event.preventDefault();
 		if (event.dataTransfer && event.dataTransfer.items) {
 			// Use DataTransferItemList interface to access the file(s)
@@ -21,29 +21,34 @@
 			// get only the first file
 			// optionally: we need to handle multiple files, if we want to support document upload for example
 			// for multimodal we only support one image at a time but we could support multiple PDFs
-			if (event.dataTransfer.items[0].kind === "file") {
-				const file = event.dataTransfer.items[0].getAsFile();
-				if (file) {
-					// check if the file matches the mimeTypes
-					if (
-						!mimeTypes.some((mimeType: string) => {
-							const [type, subtype] = mimeType.split("/");
-							const [fileType, fileSubtype] = file.type.split("/");
-							return type === fileType && (subtype === "*" || fileSubtype === subtype);
-						})
-					) {
-						setErrorMsg(`File type not supported. Only allowed: ${mimeTypes.join(", ")}`);
-						files = [];
-						return;
-					}
+			const tempFiles = [];
+			for (let item of event.dataTransfer.items) {
+					// If dropped items aren't files, reject them
+				if (item.kind === "file") {
+					const file = item.getAsFile();
+					if (file) {
+						// check if the file matches the mimeTypes
+						if (
+							!mimeTypes.some((mimeType: string) => {
+								const [type, subtype] = mimeType.split("/");
+								const [fileType, fileSubtype] = file.type.split("/");
+								return type === fileType && (subtype === "*" || fileSubtype === subtype);
+							})
+						) {
+							setErrorMsg(`File type not supported. Only allowed: ${mimeTypes.join(", ")}`);
+							files = [];
+							return;
+						}
 
-					// if file is bigger than 10MB abort
-					if (file.size > 10 * 1024 * 1024) {
-						setErrorMsg("Image is too big. (2MB max)");
-						files = [];
-						return;
+						// if file is bigger than 10MB abort
+						if (file.size > 10 * 1024 * 1024) {
+							setErrorMsg("Image is too big. (2MB max)");
+							files = [];
+							return;
+						}
+					tempFiles.push(file);
 					}
-					files = [file];
+					files = tempFiles;
 					onDrag = false;
 				}
 			}

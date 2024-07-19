@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick } from "svelte";
+	import { createEventDispatcher, onDestroy, onMount, SvelteComponent, tick } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
@@ -9,7 +9,8 @@
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
-
+	
+	import { fade } from "svelte/transition";
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
@@ -50,7 +51,7 @@
 	export let files: File[] = [];
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
-
+	
 	let loginModalOpen = false;
 	let helpBoxModalOpen = false;
 	let message: string;
@@ -72,23 +73,8 @@
 		message = "";
 	};
 
-	let lastTarget: EventTarget | null = null;
-
 	let onDrag = false;
-
-	const onDragEnter = (e: DragEvent) => {
-		lastTarget = e.target;
-		onDrag = true;
-	};
-	const onDragLeave = (e: DragEvent) => {
-		if (e.target === lastTarget) {
-			onDrag = false;
-		}
-	};
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
-	};
-
+	let lastTarget: EventTarget | null = null;
 	const onPaste = (e: ClipboardEvent) => {
 		if (!e.clipboardData) {
 			return;
@@ -164,6 +150,53 @@
 		...activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []),
 		...(currentModel.multimodal ? ["image/*"] : []),
 	];
+
+
+	const onDragEnter = (e: DragEvent) => {
+		console.log("enter");
+		lastTarget = e.target;
+		onDrag = true;
+	};
+
+	const onDragDrop = (e: DragEvent) => {
+		console.log("drop");
+		if (DropZone){
+			console.log("dropzone");
+			DropZone.dropHandle(e);
+		}
+	}
+
+	const onDragLeave = (e: DragEvent) => {
+		if (e.target === lastTarget) {
+			onDrag = false;
+		}
+	};
+
+	const onDragOver = (e: DragEvent) => {
+		e.preventDefault();
+	}
+
+	onMount(()=>{
+	if (typeof window !== 'undefined') {
+		window.addEventListener('dragenter', onDragEnter);
+		window.addEventListener('drop', onDragDrop);
+		window.addEventListener('dragover', onDragOver);
+		window.addEventListener('dragleave', onDragLeave);
+	}
+	})
+
+
+	// Clean up event listeners on component destroy
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.addEventListener('dragenter', onDragEnter);
+			window.addEventListener('drop', onDragDrop);
+			window.addEventListener('dragover', onDragOver);
+			window.addEventListener('dragleave', onDragLeave);
+		}
+	});
+
+	let DropZone: SvelteComponent;
 </script>
 
 <div class="relative min-h-0 min-w-0">
@@ -174,6 +207,14 @@
 			}}
 		/>
 	{/if}
+
+	{#if onDrag}
+    <div
+		in:fade={{duration: 200}}
+		out:fade={{duration: 200}}
+		class="fixed inset-0 w-100 h-100 bg-white bg-opacity-10 z-50"></div>
+	{/if}
+
 	<div
 		class="scrollbar-custom mr-1 h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.length ? [...messages] : false}
@@ -337,9 +378,6 @@
 				{/if}
 			</div>
 			<form
-				on:dragover={onDragOver}
-				on:dragenter={onDragEnter}
-				on:dragleave={onDragLeave}
 				tabindex="-1"
 				aria-label="file dropzone"
 				on:submit|preventDefault={handleSubmit}
@@ -347,7 +385,7 @@
 			{isReadOnly ? 'opacity-30' : ''}"
 			>
 				{#if onDrag && activeMimeTypes.length > 0}
-					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+					<FileDropzone bind:this={DropZone} bind:onDrag bind:files mimeTypes={activeMimeTypes} />
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
 						{#if lastIsError}
