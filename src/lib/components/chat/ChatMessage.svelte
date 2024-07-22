@@ -2,7 +2,7 @@
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -198,7 +198,8 @@
 
 	$: {
 		if (initialized) {
-			childrenToRender = Math.max(0, nChildren - 1);
+			// childrenToRender = Math.max(0, nChildren - 1);
+			if (message.currentIndex) childrenToRender = message.currentIndex;
 		} else {
 			childrenToRender = 0;
 			initialized = true;
@@ -206,7 +207,19 @@
 	}
 	const convTreeStore = useConvTreeStore();
 
-	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
+	onMount(() => {
+		// if message has currentIndex, set childrenToRender to currentIndex
+		if (message.currentIndex) {
+			childrenToRender = message.currentIndex;
+		}
+	});
+
+	$: if (message.children?.length === 0) {
+		$convTreeStore.leaf = message.id;
+		if (typeof window !== "undefined") {
+			localStorage.setItem("leaf", message.id);
+		}
+	}
 
 	$: modalImageToShow = null as MessageFile | null;
 </script>

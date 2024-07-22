@@ -23,6 +23,9 @@ export type Message = Partial<Timestamps> & {
 
 	// goes one level deep
 	children?: Message["id"][];
+
+	// index of the current child of a message if the message has more than one child
+	currentIndex?: number;
 };
 
 export type MessageFile = {

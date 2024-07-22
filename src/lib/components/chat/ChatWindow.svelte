@@ -110,6 +110,37 @@
 	};
 
 	const convTreeStore = useConvTreeStore();
+	const updateCurrentIndex = () => {
+		if (typeof window === "undefined") return;
+		let leafId = localStorage.getItem("leaf");
+		console.log("leafId", leafId);
+		if (leafId) {
+			let leafMessage = messages.find((m) => m.id == leafId);
+			// console.log("leafMessage", leafMessage);
+			if (!leafMessage?.ancestors) return;
+			let ancestors = leafMessage.ancestors;
+			for (let i = 0; i < ancestors.length; i++) {
+				let curMessage = messages.find((m) => m.id == ancestors[i]);
+				if (curMessage?.children) {
+					for (let j = 0; j < curMessage.children.length; j++) {
+						if (i + 1 < ancestors.length) {
+							if (curMessage.children[j] == ancestors[i + 1]) {
+								curMessage.currentIndex = j;
+								break;
+							}
+						} else {
+							if (curMessage.children[j] == leafId) {
+								curMessage.currentIndex = j;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	};
+	updateCurrentIndex();
+	console.log("messages", messages);
 
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
 	$: lastIsError =
