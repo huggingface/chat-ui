@@ -150,7 +150,7 @@ export async function* runTools(
 					.map(externalToToolCall)
 					.filter((call) => call !== undefined) as ToolCall[];
 
-        calls.push(...newCalls);
+				calls.push(...newCalls);
 			} catch (e) {
 				logger.error(e, "Error while parsing tool calls, please retry");
 				// error parsing the calls
