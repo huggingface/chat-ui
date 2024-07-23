@@ -279,11 +279,14 @@ envVars:
           ]
         },
         {
-          "name": "meta-llama/Meta-Llama-3-8B-Instruct",
-          "tokenizer" : "philschmid/meta-llama-3-tokenizer",
+          "name" : "llhf/Meta-Llama-3.1-8B-Instruct",
+        "tokenizer": {
+        "tokenizerUrl": "http://localhost:5173/chat/config/tokenizer.json", 
+        "tokenizerConfigUrl": "http://localhost:5173/chat/config/tokenizer_config.json"
+        },
           "parameters": {
             "temperature": 0.1,
-            "stop": ["<|eot_id|>"],
+            "stop": ["<|endoftext|>", "<|eot_id|>"],
           },
           "unlisted": true
         }
@@ -318,7 +321,7 @@ envVars:
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   PUBLIC_APPLE_APP_ID: "6476778843"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  TASK_MODEL: "meta-llama/Meta-Llama-3-8B-Instruct"
+  TASK_MODEL: "llhf/Meta-Llama-3.1-8B-Instruct"
   TEXT_EMBEDDING_MODELS: >
     [{
       "name": "bge-base-en-v1-5-sxa",
