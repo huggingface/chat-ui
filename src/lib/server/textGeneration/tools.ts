@@ -143,19 +143,26 @@ export async function* runTools(
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
+			if (!output.generated_text.endsWith("```")) {
+				output.generated_text = output.generated_text + "```";
+			}
 			const codeBlocks = Array.from(output.generated_text.matchAll(/```json\n(.*?)```/gs))
 				.map(([, block]) => block)
 				// remove trailing comma
 				.map((block) => block.trim().replace(/,$/, ""));
 			if (codeBlocks.length === 0) continue;
-
 			// grab only the capture group from the regex match
 			for (const block of codeBlocks) {
+				// make it an array if it's not already
+				let call = JSON5.parse(block);
+				if (!Array.isArray(call)) {
+					call = [call];
+				}
+
 				try {
-					calls.push(
-						...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall).filter(Boolean)
-					);
+					calls.push(...call.filter(isExternalToolCall).map(externalToToolCall).filter(Boolean));
 				} catch (e) {
+					logger.error(e, "Error while parsing tool calls, please retry");
 					// error parsing the calls
 					yield {
 						type: MessageUpdateType.Status,
