@@ -230,6 +230,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.ollama(args);
 					case "vertex":
 						return await endpoints.vertex(args);
+					case "genai":
+						return await endpoints.genai(args);
 					case "cloudflare":
 						return await endpoints.cloudflare(args);
 					case "cohere":

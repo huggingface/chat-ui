@@ -1,15 +1,12 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import CarbonImage from "~icons/carbon/image";
 	// import EosIconsLoading from "~icons/eos-icons/loading";
 
 	export let files: File[];
 	export let mimeTypes: string[] = [];
 
-	let file_error_message = "";
-	let errorTimeout: ReturnType<typeof setTimeout>;
-
 	export let onDrag = false;
+	export let onDragInner = false;
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
@@ -18,102 +15,58 @@
 			if (files.length > 0) {
 				files = [];
 			}
-			// get only the first file
-			// optionally: we need to handle multiple files, if we want to support document upload for example
-			// for multimodal we only support one image at a time but we could support multiple PDFs
 			if (event.dataTransfer.items[0].kind === "file") {
-				const file = event.dataTransfer.items[0].getAsFile();
-				if (file) {
-					// check if the file matches the mimeTypes
-					if (
-						!mimeTypes.some((mimeType: string) => {
-							const [type, subtype] = mimeType.split("/");
-							const [fileType, fileSubtype] = file.type.split("/");
-							return type === fileType && (subtype === "*" || fileSubtype === subtype);
-						})
-					) {
-						setErrorMsg(`File type not supported. Only allowed: ${mimeTypes.join(", ")}`);
-						files = [];
-						return;
-					}
+				for (let i = 0; i < event.dataTransfer.items.length; i++) {
+					const file = event.dataTransfer.items[i].getAsFile();
 
-					// if file is bigger than 10MB abort
-					if (file.size > 10 * 1024 * 1024) {
-						setErrorMsg("Image is too big. (2MB max)");
-						files = [];
-						return;
+					if (file) {
+						// check if the file matches the mimeTypes
+						// else abort
+						if (
+							!mimeTypes.some((mimeType: string) => {
+								const [type, subtype] = mimeType.split("/");
+								const [fileType, fileSubtype] = file.type.split("/");
+								return type === fileType && (subtype === "*" || fileSubtype === subtype);
+							})
+						) {
+							setErrorMsg(`Some file type not supported. Only allowed: ${mimeTypes.join(", ")}`);
+							files = [];
+							return;
+						}
+
+						// if file is bigger than 10MB abort
+						if (file.size > 10 * 1024 * 1024) {
+							setErrorMsg("Some file is too big. (10MB max)");
+							files = [];
+							return;
+						}
+
+						// add the file to the files array
+						files = [...files, file];
 					}
-					files = [file];
-					onDrag = false;
 				}
+				onDrag = false;
 			}
 		}
 	}
 
 	function setErrorMsg(errorMsg: string) {
-		if (errorTimeout) {
-			clearTimeout(errorTimeout);
-		}
-		file_error_message = errorMsg;
-		errorTimeout = setTimeout(() => {
-			file_error_message = "";
-			onDrag = false;
-		}, 2000);
+		onDrag = false;
+		alert(errorMsg);
 	}
-
-	onDestroy(() => {
-		if (errorTimeout) {
-			clearTimeout(errorTimeout);
-		}
-	});
 </script>
 
 <div
 	id="dropzone"
 	role="form"
 	on:drop={dropHandle}
-	class="relative flex w-full max-w-4xl flex-col items-center rounded-xl border border-dashed bg-gray-100 focus-within:border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:focus-within:border-gray-500"
+	on:dragenter={() => (onDragInner = true)}
+	on:dragleave={() => (onDragInner = false)}
+	on:dragover|preventDefault
+	class="relative flex h-28 w-full max-w-4xl flex-col items-center justify-center gap-1 rounded-xl border-2 border-dotted {onDragInner
+		? 'border-blue-200 !bg-blue-500/10 text-blue-600 *:pointer-events-none dark:border-blue-600 dark:bg-blue-500/20 dark:text-blue-500'
+		: 'bg-gray-100 text-gray-500 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-400'}"
 >
-	<div class="object-center">
-		{#if file_error_message}
-			<div
-				class="absolute bottom-0 left-0 right-0 top-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-gray-100 bg-opacity-50 dark:bg-gray-700 dark:bg-opacity-50"
-			>
-				<p class="text-red-500 dark:text-red-400">{file_error_message}</p>
-				<div class="h-2.5 w-1/2 rounded-full bg-gray-200 dark:bg-gray-700">
-					<div
-						class="animate-progress-bar h-2.5
-						rounded-full bg-red-500
-						dark:text-red-400
-					"
-					/>
-				</div>
-			</div>
-		{/if}
-		<div class="mt-3 flex justify-center" class:opacity-0={file_error_message}>
-			<CarbonImage class="text-xl text-gray-500 dark:text-gray-400" />
-		</div>
-		<p
-			class="mb-3 mt-1.5 text-sm text-gray-500 dark:text-gray-400"
-			class:opacity-0={file_error_message}
-		>
-			Drag and drop <span class="font-semibold">one file</span> here
-		</p>
-	</div>
+	<CarbonImage class="text-xl" />
+	<p>Drop File to add to chat</p>
 </div>
-
-<style>
-	@keyframes slideInFromLeft {
-		0% {
-			width: 0;
-		}
-		100% {
-			width: 100%;
-		}
-	}
-
-	.animate-progress-bar {
-		/* This section calls the slideInFromLeft animation we defined above */
-		animation: 2s linear 0s 1 slideInFromLeft;
-	}
-</style>

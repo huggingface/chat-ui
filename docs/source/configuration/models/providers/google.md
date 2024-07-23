@@ -44,6 +44,42 @@ MODELS=`[
         }
       }]
     }]
+  }
+]`
+```
+
+## GenAI
+
+Or use the Gemini API API provider [from](https://github.com/google-gemini/generative-ai-js#readme):
+
+> Make sure that you have an API key from Google Cloud Platform. To get an API key, follow the instructions [here](https://cloud.google.com/docs/authentication/api-keys).
+
+```ini
+MODELS=`[
+  {
+    "name": "gemini-1.5-flash",
+    "displayName": "Gemini Flash 1.5",
+    "multimodal": true,
+    "endpoints": [
+      {
+        "type": "genai",
+        "apiKey": "abc...xyz"
+      }
+    ]
+
+    // Optional
+    "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
   },
+  {
+    "name": "gemini-1.5-pro",
+    "displayName": "Gemini Pro 1.5",
+    "multimodal": false,
+    "endpoints": [
+      {
+        "type": "genai",
+        "apiKey": "abc...xyz"
+      }
+    ]
+  }
 ]`
 ```
