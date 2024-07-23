@@ -145,7 +145,7 @@ async function getChatPromptRender(
 					},
 					...formattedMessages,
 				];
-			} else if (id.startsWith("sllhf") || id.startsWith("llhf")) {
+			} else if (id.startsWith("meta-llama")) {
 				const results = toolResults.flatMap((result) => {
 					if (result.status === ToolResultStatus.Error) {
 						return [

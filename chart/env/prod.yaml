@@ -39,15 +39,12 @@ envVars:
   MODELS: >
     [
       { 
-        "name" : "llhf/Meta-Llama-3.1-70B-Instruct",
-        "id": "llhf/Meta-Llama-3.1-70B-Instruct",
-        "tokenizer": {
-        "tokenizerUrl": "http://localhost:5173/chat/config/tokenizer.json", 
-        "tokenizerConfigUrl": "http://localhost:5173/chat/config/tokenizer_config.json"
-        },
+        "name" : "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
         "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
-        "modelUrl": "https://huggingface.co/llhf/Meta-Llama-3.1-70B-Instruct",
-        "websiteUrl": "https://huggingface.co/llhf/Meta-Llama-3.1-70B-Instruct",
+        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "websiteUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
         "preprompt" : "You are a helpful assistant with tool calling capabilities. The user has access to the tool's outputs that you as a model cannot see. This could include text, images and more.",
@@ -71,15 +68,12 @@ envVars:
         ]
       }, 
       {
-        "name" : "sllhf/Meta-Llama-3.1-405B-Instruct-FP8",
-        "id": "sllhf/Meta-Llama-3.1-405B-Instruct-FP8",
-        "tokenizer": {
-        "tokenizerUrl": "http://localhost:5173/chat/config/tokenizer.json", 
-        "tokenizerConfigUrl": "http://localhost:5173/chat/config/tokenizer_config.json"
-        },
+        "name" : "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+        "id": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
         "description": "The most intelligent open-source model, showing exceptional capabilities for complex tasks.",
-        "modelUrl": "https://huggingface.co/sllhf/Meta-Llama-3.1-405B-Instruct-FP8",
-        "websiteUrl": "https://huggingface.co/sllhf/Meta-Llama-3.1-405B-Instruct-FP8",
+        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+        "websiteUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
         "preprompt" : "You are a helpful assistant with tool calling capabilities. The user has access to the tool's outputs that you as a model cannot see. This could include text, images and more.",
@@ -280,10 +274,7 @@ envVars:
         },
         {
           "name" : "llhf/Meta-Llama-3.1-8B-Instruct",
-        "tokenizer": {
-        "tokenizerUrl": "http://localhost:5173/chat/config/tokenizer.json", 
-        "tokenizerConfigUrl": "http://localhost:5173/chat/config/tokenizer_config.json"
-        },
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
           "parameters": {
             "temperature": 0.1,
             "stop": ["<|endoftext|>", "<|eot_id|>"],
