@@ -45,7 +45,7 @@ envVars:
         "tokenizerUrl": "http://localhost:5173/chat/config/tokenizer.json", 
         "tokenizerConfigUrl": "http://localhost:5173/chat/config/tokenizer_config.json"
         },
-        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models’ capabilities.",
+        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
         "modelUrl": "https://huggingface.co/llhf/Meta-Llama-3.1-70B-Instruct",
         "websiteUrl": "https://huggingface.co/llhf/Meta-Llama-3.1-70B-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
