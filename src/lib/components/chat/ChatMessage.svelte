@@ -2,7 +2,7 @@
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -198,7 +198,8 @@
 
 	$: {
 		if (initialized) {
-			childrenToRender = Math.max(0, nChildren - 1);
+			// childrenToRender = Math.max(0, nChildren - 1);
+			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
 		} else {
 			childrenToRender = 0;
 			initialized = true;
@@ -206,7 +207,21 @@
 	}
 	const convTreeStore = useConvTreeStore();
 
-	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
+	onMount(() => {
+		// if message has currentChildIndex, set childrenToRender to currentChildIndex
+		if (message.currentChildIndex) {
+			childrenToRender = message.currentChildIndex;
+		}
+	});
+
+	$: if (message.children?.length === 0) {
+		$convTreeStore.leaf = message.id;
+		// Check if the code is running in a browser
+		if (typeof window !== "undefined") {
+			// Remember the last message viewed or interacted by the user
+			localStorage.setItem("leafId", message.id);
+		}
+	}
 
 	$: modalImageToShow = null as MessageFile | null;
 </script>
@@ -367,7 +382,18 @@
 					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
 					type="button"
-					on:click={() => dispatch("retry", { id: message.id })}
+					on:click={() => {
+						// Move to the last branch when retrying an assistant message
+						let ancestors = message.ancestors;
+						if (ancestors) {
+							let parentMessage = messages.find((m) => m.id === ancestors[ancestors.length - 1]);
+							if (parentMessage) {
+								parentMessage.currentChildIndex = parentMessage?.children?.length;
+							}
+						}
+
+						dispatch("retry", { id: message.id });
+					}}
 				>
 					<CarbonRotate360 />
 				</button>
@@ -417,6 +443,16 @@
 						class="flex w-full flex-col"
 						bind:this={editFormEl}
 						on:submit|preventDefault={() => {
+							// Move to the last branch when editing a user message
+							let ancestors = message.ancestors;
+							if (ancestors) {
+								let parentMessage = messages.find((m) => m.id === ancestors[ancestors.length - 1]);
+								if (parentMessage) {
+									parentMessage.currentChildIndex = parentMessage?.children?.length;
+									console.log("parentMessage", parentMessage);
+								}
+							}
+
 							dispatch("retry", { content: editContentEl.value, id: message.id });
 							$convTreeStore.editing = null;
 						}}
