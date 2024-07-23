@@ -49,8 +49,9 @@ envVars:
         "tools": true,
         "preprompt" : "You are a helpful assistant with tool calling capabilities. The user has access to the tool's outputs that you as a model cannot see. This could include text, images and more.",
         "parameters": {
-          "temperature": 0.1,
-          "stop": ["<|endoftext|>", "<|eot_id|>"],
+            "temperature": 0.6,
+            "top_p": 0.9,
+            "stop": ["<|endoftext|>", "<|eot_id|>"],
           "max_new_tokens": 1024,
           "truncate": 7167
         },
@@ -78,7 +79,8 @@ envVars:
         "tools": true,
         "preprompt" : "You are a helpful assistant with tool calling capabilities. The user has access to the tool's outputs that you as a model cannot see. This could include text, images and more.",
         "parameters": {
-          "temperature": 0.1,
+          "temperature": 0.6,
+          "top_p": 0.9,
           "stop": ["<|endoftext|>", "<|eot_id|>"],
           "max_new_tokens": 2048,
           "truncate": 14337
@@ -276,7 +278,8 @@ envVars:
           "name" : "llhf/Meta-Llama-3.1-8B-Instruct",
         "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
           "parameters": {
-            "temperature": 0.1,
+            "temperature": 0.6,
+            "top_p": 0.9,
             "stop": ["<|endoftext|>", "<|eot_id|>"],
           },
           "unlisted": true
