@@ -4,7 +4,6 @@ import { runWebSearch } from "../../websearch/runWebSearch";
 const websearch: BackendTool = {
 	name: "websearch",
 	displayName: "Web Search",
-	isOnByDefault: true,
 	description:
 		"Use this tool to search web pages for answers that will help answer the user's query. Only use this tool if you need specific resources from the internet.",
 	parameterDefinitions: {
