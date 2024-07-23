@@ -6,7 +6,6 @@ const calculator: BackendTool = {
 	displayName: "Calculator",
 	description:
 		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, ** (power) and /, as well as parenthesis ().",
-	isOnByDefault: true,
 	parameterDefinitions: {
 		equation: {
 			description:
