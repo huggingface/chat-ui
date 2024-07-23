@@ -148,8 +148,9 @@ export async function* runTools(
 				const newCalls = rawCalls
 					.filter(isExternalToolCall)
 					.map(externalToToolCall)
-					.filter((call) => call !== undefined);
-				calls.push(...newCalls);
+					.filter((call) => call !== undefined) as ToolCall[];
+
+        calls.push(...newCalls);
 			} catch (e) {
 				logger.error(e, "Error while parsing tool calls, please retry");
 				// error parsing the calls
