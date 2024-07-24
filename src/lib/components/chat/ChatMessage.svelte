@@ -2,7 +2,7 @@
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -30,9 +30,10 @@
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
-	import { isReducedMotion } from "$lib/utils/isReduceMotion";
 	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import DOMPurify from "isomorphic-dompurify";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -53,6 +54,7 @@
 
 		return ret;
 	}
+
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<");
 	}
@@ -80,9 +82,6 @@
 	let isCopied = false;
 
 	let initialized = false;
-
-	let reducedMotionMode = false;
-
 	const renderer = new marked.Renderer();
 	// For code blocks with simple backticks
 	renderer.codespan = (code) => {
@@ -109,21 +108,18 @@
 	marked.use(
 		markedKatex({
 			throwOnError: false,
-			// output: "html",
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
 
-	onMount(() => {
-		reducedMotionMode = isReducedMotion(window);
-	});
+	const settings = useSettingsStore();
 
 	afterUpdate(() => {
-		if (reducedMotionMode) {
+		if ($settings.disableStream) {
 			return;
 		}
 
@@ -301,15 +297,17 @@
 				class="prose max-w-none max-sm:prose-sm dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}
 			>
-				{#if isLast && loading && reducedMotionMode}
+				{#if isLast && loading && $settings.disableStream}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(token.raw, options)}
+						{#await marked.parse(token.raw, options) then parsed}
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html DOMPurify.sanitize(parsed)}
+						{/await}
 					{/if}
 				{/each}
 			</div>

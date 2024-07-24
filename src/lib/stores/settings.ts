@@ -16,6 +16,7 @@ type SettingsStore = {
 	recentlySaved: boolean;
 	assistants: Array<ObjectId | string>;
 	tools?: Array<string>;
+	disableStream: boolean;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {

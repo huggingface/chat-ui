@@ -17,6 +17,7 @@ import type { CommunityToolDB } from "$lib/types/Tool";
 
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
+import { onExit } from "./exitHandler";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -43,15 +44,8 @@ export class Database {
 		this.client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 		this.client.on("open", () => this.initDatabase());
 
-		// Disconnect DB on process kill
-		process.on("SIGINT", async () => {
-			await this.client.close(true);
-
-			// https://github.com/sveltejs/kit/issues/9540
-			setTimeout(() => {
-				process.exit(0);
-			}, 100);
-		});
+		// Disconnect DB on exit
+		onExit(() => this.client.close(true));
 	}
 
 	public static getInstance(): Database {

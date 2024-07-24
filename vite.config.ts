@@ -28,4 +28,7 @@ export default defineConfig({
 	optimizeDeps: {
 		include: ["browser-image-resizer", "uuid", "@xenova/transformers", "sharp", "@gradio/client"],
 	},
+	server: {
+		open: "/",
+	},
 });

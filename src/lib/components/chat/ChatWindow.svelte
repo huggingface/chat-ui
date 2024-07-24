@@ -82,9 +82,6 @@
 			onDrag = false;
 		}
 	};
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
-	};
 
 	const onPaste = (e: ClipboardEvent) => {
 		if (!e.clipboardData) {
@@ -163,7 +160,16 @@
 			: []),
 		...(currentModel.multimodal ? ["image/*"] : []),
 	];
+
+	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
+
+<svelte:window
+	on:dragenter={onDragEnter}
+	on:dragleave={onDragLeave}
+	on:dragover|preventDefault
+	on:drop|preventDefault={() => (onDrag = false)}
+/>
 
 <div class="relative min-h-0 min-w-0">
 	{#if loginModalOpen}
@@ -312,7 +318,7 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if activeMimeTypes.length > 0}
+						{#if isFileUploadEnabled}
 							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
@@ -330,16 +336,13 @@
 				{/if}
 			</div>
 			<form
-				on:dragover={onDragOver}
-				on:dragenter={onDragEnter}
-				on:dragleave={onDragLeave}
 				tabindex="-1"
-				aria-label="file dropzone"
+				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
 			{isReadOnly ? 'opacity-30' : ''}"
 			>
-				{#if onDrag && activeMimeTypes.length > 0}
+				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
