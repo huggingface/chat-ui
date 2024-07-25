@@ -159,7 +159,7 @@ export async function* runTools(
 				const rawCalls = await extractJson(output.generated_text);
 				const newCalls = rawCalls
 					.filter(isExternalToolCall)
-					.map(externalToToolCall)
+					.map((call) => externalToToolCall(call, tools))
 					.filter((call) => call !== undefined) as ToolCall[];
 
 				calls.push(...newCalls);

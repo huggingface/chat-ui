@@ -1,10 +1,9 @@
-import { base } from "$app/paths";
 import { authCondition, requiresUser } from "$lib/server/auth.js";
 import { collections } from "$lib/server/database.js";
 import { editableToolSchema } from "$lib/server/tools/index.js";
 import { usageLimits } from "$lib/server/usageLimits.js";
 import { generateSearchTokens } from "$lib/utils/searchTokens.js";
-import { error, fail, redirect } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export const actions = {
@@ -48,7 +47,7 @@ export const actions = {
 			return fail(400, { error: true, errors });
 		}
 
-		if (!locals.user) {
+		if (!locals.user || !authCondition(locals)) {
 			throw error(401, "Unauthorized");
 		}
 
