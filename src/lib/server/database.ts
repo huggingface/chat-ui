@@ -16,6 +16,7 @@ import type { AssistantStats } from "$lib/types/AssistantStats";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import { onExit } from "./exitHandler";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -83,6 +84,7 @@ export class Database {
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
+		const embeddingModels = db.collection<EmbeddingModel>("embeddingModels");
 
 		return {
 			conversations,
@@ -99,6 +101,7 @@ export class Database {
 			bucket,
 			migrationResults,
 			semaphores,
+			embeddingModels,
 		};
 	}
 
@@ -120,6 +123,7 @@ export class Database {
 			sessions,
 			messageEvents,
 			semaphores,
+			embeddingModels,
 		} = this.getCollections();
 
 		conversations
@@ -209,6 +213,8 @@ export class Database {
 		semaphores
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
 			.catch((e) => logger.error(e));
+
+		embeddingModels.createIndex({ name: 1 }, { unique: true }).catch((e) => logger.error(e));
 	}
 }
 
