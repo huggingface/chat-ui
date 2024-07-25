@@ -2,10 +2,10 @@ import { z } from "zod";
 import type { EmbeddingEndpoint } from "../embeddingEndpoints";
 import type { Tensor, FeatureExtractionPipeline } from "@huggingface/transformers";
 import { pipeline } from "@huggingface/transformers";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 
 export const embeddingEndpointTransformersJSParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
-	model: z.any(),
 	type: z.literal("transformersjs"),
 });
 
@@ -36,10 +36,16 @@ export async function calculateEmbedding(modelName: string, inputs: string[]) {
 	return output.tolist();
 }
 
+type EmbeddingEndpointTransformersJSInput = z.input<
+	typeof embeddingEndpointTransformersJSParametersSchema
+> & {
+	model: EmbeddingModel;
+};
+
 export function embeddingEndpointTransformersJS(
-	input: z.input<typeof embeddingEndpointTransformersJSParametersSchema>
+	input: EmbeddingEndpointTransformersJSInput
 ): EmbeddingEndpoint {
-	const { model } = embeddingEndpointTransformersJSParametersSchema.parse(input);
+	const { model } = input;
 
 	return async ({ inputs }) => {
 		return calculateEmbedding(model.name, inputs);

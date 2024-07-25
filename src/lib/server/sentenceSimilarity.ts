@@ -1,6 +1,7 @@
 import { dot } from "@huggingface/transformers";
-import type { EmbeddingBackendModel } from "$lib/server/embeddingModels";
 import type { Embedding } from "$lib/server/embeddingEndpoints/embeddingEndpoints";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
+import { getEmbeddingEndpoint } from "./embeddingModels";
 
 // see here: https://github.com/nmslib/hnswlib/blob/359b2ba87358224963986f709e593d799064ace6/README.md?plain=1#L34
 export function innerProduct(embeddingA: Embedding, embeddingB: Embedding) {
@@ -8,7 +9,7 @@ export function innerProduct(embeddingA: Embedding, embeddingB: Embedding) {
 }
 
 export async function getSentenceSimilarity(
-	embeddingModel: EmbeddingBackendModel,
+	embeddingModel: EmbeddingModel,
 	query: string,
 	sentences: string[]
 ): Promise<{ distance: number; embedding: Embedding; idx: number }[]> {
@@ -17,7 +18,7 @@ export async function getSentenceSimilarity(
 		...sentences.map((sentence) => `${embeddingModel.prePassage}${sentence}`),
 	];
 
-	const embeddingEndpoint = await embeddingModel.getEndpoint();
+	const embeddingEndpoint = await getEmbeddingEndpoint(embeddingModel);
 	const output = await embeddingEndpoint({ inputs }).catch((err) => {
 		throw Error("Failed to generate embeddings for sentence similarity", { cause: err });
 	});

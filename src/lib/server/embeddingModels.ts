@@ -5,11 +5,13 @@ import { sum } from "$lib/utils/sum";
 import {
 	embeddingEndpoints,
 	embeddingEndpointSchema,
-	type EmbeddingEndpoint,
 } from "$lib/server/embeddingEndpoints/embeddingEndpoints";
 import { embeddingEndpointTransformersJS } from "$lib/server/embeddingEndpoints/transformersjs/embeddingEndpoints";
 
 import JSON5 from "json5";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
+import { collections } from "./database";
+import { ObjectId } from "mongodb";
 
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
@@ -42,67 +44,77 @@ const rawEmbeddingModelJSON =
 
 const embeddingModelsRaw = z.array(modelConfig).parse(JSON5.parse(rawEmbeddingModelJSON));
 
-const processEmbeddingModel = async (m: z.infer<typeof modelConfig>) => ({
-	...m,
-	id: m.id || m.name,
+const embeddingModels = embeddingModelsRaw.map((rawEmbeddingModel) => {
+	const embeddingModel: EmbeddingModel = {
+		name: rawEmbeddingModel.name,
+		description: rawEmbeddingModel.description,
+		websiteUrl: rawEmbeddingModel.websiteUrl,
+		modelUrl: rawEmbeddingModel.modelUrl,
+		chunkCharLength: rawEmbeddingModel.chunkCharLength,
+		maxBatchSize: rawEmbeddingModel.maxBatchSize,
+		preQuery: rawEmbeddingModel.preQuery,
+		prePassage: rawEmbeddingModel.prePassage,
+		_id: new ObjectId(),
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		endpoints: rawEmbeddingModel.endpoints,
+	};
+
+	return embeddingModel;
 });
 
-const addEndpoint = (m: Awaited<ReturnType<typeof processEmbeddingModel>>) => ({
-	...m,
-	getEndpoint: async (): Promise<EmbeddingEndpoint> => {
-		if (!m.endpoints) {
-			return embeddingEndpointTransformersJS({
-				type: "transformersjs",
-				weight: 1,
-				model: m,
-			});
-		}
+export const getEmbeddingEndpoint = async (embeddingModel: EmbeddingModel) => {
+	if (!embeddingModel.endpoints) {
+		return embeddingEndpointTransformersJS({
+			type: "transformersjs",
+			weight: 1,
+			model: embeddingModel,
+		});
+	}
 
-		const totalWeight = sum(m.endpoints.map((e) => e.weight));
+	const totalWeight = sum(embeddingModel.endpoints.map((e) => e.weight));
 
-		let random = Math.random() * totalWeight;
+	let random = Math.random() * totalWeight;
 
-		for (const endpoint of m.endpoints) {
-			if (random < endpoint.weight) {
-				const args = { ...endpoint, model: m };
+	for (const endpoint of embeddingModel.endpoints) {
+		if (random < endpoint.weight) {
+			const args = { ...endpoint, model: embeddingModel };
+			console.log(args.type);
 
-				switch (args.type) {
-					case "tei":
-						return embeddingEndpoints.tei(args);
-					case "transformersjs":
-						return embeddingEndpoints.transformersjs(args);
-					case "openai":
-						return embeddingEndpoints.openai(args);
-					case "hfapi":
-						return embeddingEndpoints.hfapi(args);
-					default:
-						throw new Error(`Unknown endpoint type: ${args}`);
-				}
+			switch (args.type) {
+				case "tei":
+					return embeddingEndpoints.tei(args);
+				case "transformersjs":
+					return embeddingEndpoints.transformersjs(args);
+				case "openai":
+					return embeddingEndpoints.openai(args);
+				case "hfapi":
+					return embeddingEndpoints.hfapi(args);
+				default:
+					throw new Error(`Unknown endpoint type: ${args}`);
 			}
-
-			random -= endpoint.weight;
 		}
 
-		throw new Error(`Failed to select embedding endpoint`);
-	},
-});
+		random -= endpoint.weight;
+	}
 
-export const embeddingModels = await Promise.all(
-	embeddingModelsRaw.map((e) => processEmbeddingModel(e).then(addEndpoint))
-);
-
-export const defaultEmbeddingModel = embeddingModels[0];
-
-const validateEmbeddingModel = (_models: EmbeddingBackendModel[], key: "id" | "name") => {
-	return z.enum([_models[0][key], ..._models.slice(1).map((m) => m[key])]);
+	throw new Error(`Failed to select embedding endpoint`);
 };
 
-export const validateEmbeddingModelById = (_models: EmbeddingBackendModel[]) => {
-	return validateEmbeddingModel(_models, "id");
+export const getDefaultEmbeddingModel = async (): Promise<EmbeddingModel> => {
+	if (!embeddingModels[0]) {
+		throw new Error(`Failed to find default embedding endpoint`);
+	}
+
+	const defaultModel = await collections.embeddingModels.findOne({
+		_id: embeddingModels[0]._id,
+	});
+
+	return defaultModel ? defaultModel : embeddingModels[0];
 };
 
-export const validateEmbeddingModelByName = (_models: EmbeddingBackendModel[]) => {
-	return validateEmbeddingModel(_models, "name");
-};
-
-export type EmbeddingBackendModel = typeof defaultEmbeddingModel;
+// to mimic current behaivor with creating embedding models from scratch during server start
+export async function pupulateEmbeddingModel() {
+	await collections.embeddingModels.deleteMany({});
+	await collections.embeddingModels.insertMany(embeddingModels);
+}

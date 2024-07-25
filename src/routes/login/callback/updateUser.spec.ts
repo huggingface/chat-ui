@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { defaultModel } from "$lib/server/models";
 import { findUser } from "$lib/server/auth";
-import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
+import { getDefaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 const userData = {
 	preferred_username: "new-username",
@@ -41,13 +41,15 @@ const insertRandomUser = async () => {
 };
 
 const insertRandomConversations = async (count: number) => {
+	const defaultEmbeddingModel = await getDefaultEmbeddingModel();
+
 	const res = await collections.conversations.insertMany(
 		new Array(count).fill(0).map(() => ({
 			_id: new ObjectId(),
 			title: "random title",
 			messages: [],
 			model: defaultModel.id,
-			embeddingModel: defaultEmbeddingModel.id,
+			embeddingModel: defaultEmbeddingModel.name,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			sessionId: locals.sessionId,

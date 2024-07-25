@@ -1,12 +1,12 @@
-import type { EmbeddingBackendModel } from "$lib/server/embeddingModels";
 import { getSentenceSimilarity } from "$lib/server/sentenceSimilarity";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 
 /**
  * Combines sentences together to reach the maximum character limit of the embedding model
  * Improves performance considerably when using CPU embedding
  */
 export async function getCombinedSentenceSimilarity(
-	embeddingModel: EmbeddingBackendModel,
+	embeddingModel: EmbeddingModel,
 	query: string,
 	sentences: string[]
 ): ReturnType<typeof getSentenceSimilarity> {

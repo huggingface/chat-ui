@@ -19,6 +19,7 @@ import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
 import { onExit } from "./exitHandler";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -88,6 +89,7 @@ export class Database {
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const tools = db.collection<CommunityToolDB>("tools");
+		const embeddingModels = db.collection<EmbeddingModel>("embeddingModels");
 
 		return {
 			conversations,
@@ -106,6 +108,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			tools,
+			embeddingModels,
 		};
 	}
 
@@ -129,6 +132,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			tools,
+			embeddingModels,
 		} = this.getCollections();
 
 		conversations
@@ -228,6 +232,8 @@ export class Database {
 		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
 		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
 		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+
+		embeddingModels.createIndex({ name: 1 }, { unique: true }).catch((e) => logger.error(e));
 	}
 }
 

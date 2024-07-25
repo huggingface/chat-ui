@@ -12,6 +12,7 @@ import {
 	embeddingEndpointOpenAIParametersSchema,
 } from "./openai/embeddingEndpoints";
 import { embeddingEndpointHfApi, embeddingEndpointHfApiSchema } from "./hfApi/embeddingHfApi";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 
 // parameters passed when generating text
 interface EmbeddingEndpointParameters {
@@ -33,8 +34,8 @@ export const embeddingEndpointSchema = z.discriminatedUnion("type", [
 type EmbeddingEndpointTypeOptions = z.infer<typeof embeddingEndpointSchema>["type"];
 
 // generator function that takes in type discrimantor value for defining the endpoint and return the endpoint
-export type EmbeddingEndpointGenerator<T extends EmbeddingEndpointTypeOptions> = (
-	inputs: Extract<z.infer<typeof embeddingEndpointSchema>, { type: T }>
+type EmbeddingEndpointGenerator<T extends EmbeddingEndpointTypeOptions> = (
+	inputs: Extract<z.infer<typeof embeddingEndpointSchema>, { type: T }> & { model: EmbeddingModel }
 ) => EmbeddingEndpoint | Promise<EmbeddingEndpoint>;
 
 // list of all endpoint generators

@@ -1,6 +1,6 @@
 import { MetricsServer } from "$lib/server/metrics";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 import type { WebSearchScrapedSource, WebSearchUsedSource } from "$lib/types/WebSearch";
-import type { EmbeddingBackendModel } from "../../embeddingModels";
 import { getSentenceSimilarity, innerProduct } from "../../sentenceSimilarity";
 import { MarkdownElementType, type MarkdownElement } from "../markdown/types";
 import { stringifyMarkdownElement } from "../markdown/utils/stringify";
@@ -13,7 +13,7 @@ const SOFT_MAX_CHARS = 8_000;
 export async function findContextSources(
 	sources: WebSearchScrapedSource[],
 	prompt: string,
-	embeddingModel: EmbeddingBackendModel
+	embeddingModel: EmbeddingModel
 ) {
 	const startTime = Date.now();
 

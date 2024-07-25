@@ -1,4 +1,4 @@
-import { defaultEmbeddingModel, embeddingModels } from "$lib/server/embeddingModels";
+import { getDefaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
@@ -19,6 +19,7 @@ import {
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import { MetricsServer } from "../metrics";
 import { logger } from "$lib/server/logger";
+import { collections } from "../database";
 
 const MAX_N_PAGES_TO_SCRAPE = 8 as const;
 const MAX_N_PAGES_TO_EMBED = 5 as const;
@@ -36,8 +37,11 @@ export async function* runWebSearch(
 	MetricsServer.getMetrics().webSearch.requestCount.inc();
 
 	try {
+		const defaultEmbeddingModel = await getDefaultEmbeddingModel();
 		const embeddingModel =
-			embeddingModels.find((m) => m.id === conv.embeddingModel) ?? defaultEmbeddingModel;
+			(await collections.embeddingModels.findOne({
+				name: conv.embeddingModel,
+			})) ?? defaultEmbeddingModel;
 		if (!embeddingModel) {
 			throw Error(`Embedding model ${conv.embeddingModel} not available anymore`);
 		}

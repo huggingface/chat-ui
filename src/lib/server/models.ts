@@ -5,7 +5,6 @@ import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
 import { endpointTgi } from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
-import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
 import type { PreTrainedTokenizer } from "@huggingface/transformers";
 
@@ -13,6 +12,7 @@ import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
+import { collections } from "./database";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -64,7 +64,7 @@ const modelConfig = z.object({
 	multimodal: z.boolean().default(false),
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
-	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	embeddingModel: z.string().optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -251,6 +251,10 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	displayName: m.displayName || m.name,
 	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
+	embeddingModel:
+		(await collections.embeddingModels
+			.findOne({ name: m.embeddingModel })
+			.then((embeddingModel) => embeddingModel?.name)) ?? undefined,
 });
 
 export type ProcessedModel = Awaited<ReturnType<typeof processModel>> & {
