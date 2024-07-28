@@ -99,6 +99,7 @@
 	});
 
 	$: if ($error) onError();
+	$: currentConversationId = $page.params.id;
 
 	$: if ($titleUpdate) {
 		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
@@ -209,6 +210,7 @@
 			on:unshareConversation={(ev) => unshareConversation(ev.detail).then(() => invalidateAll())}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			{currentConversationId}
 		/>
 	</MobileNav>
 	<nav
@@ -222,6 +224,7 @@
 			on:unshareConversation={(ev) => unshareConversation(ev.detail).then(() => invalidateAll())}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			{currentConversationId}
 		/>
 	</nav>
 	{#if currentError}

@@ -15,6 +15,7 @@
 	export let conversations: ConvSidebar[] = [];
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
+	export let currentConversationId: string | null = null;
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -37,6 +38,10 @@
 	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
 	
 	const activeTab = writable('private');
+	$: currentConversation = conversations.find(conv => conv.id === currentConversationId);
+	$: if (currentConversation) {
+		activeTab.set(currentConversation.shared ? 'shared' : 'private');
+	}
 	
 	$: filteredConversations = $activeTab === 'private'
     ? conversations.filter(({ shared }) => !shared)
