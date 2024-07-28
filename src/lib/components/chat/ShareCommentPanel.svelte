@@ -135,6 +135,8 @@
 					isPending: true,
 					wrapperObject: wrappedRange,
 					originalContent: "",
+                    username: $page.data.user?.username || $page.data.user?.email || 'Anonymous'
+
 				
 				};
 
