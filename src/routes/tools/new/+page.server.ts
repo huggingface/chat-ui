@@ -8,6 +8,11 @@ import { ObjectId } from "mongodb";
 
 export const actions = {
 	default: async ({ request, locals }) => {
+		// XXX: feature_flag_tools
+		if (!locals.user?.isEarlyAccess) {
+			throw error(403, "You need to be an early access user to create tools");
+		}
+
 		const body = await request.formData();
 		const toolStringified = body.get("tool");
 

@@ -11,6 +11,11 @@ import { ObjectId, type Filter } from "mongodb";
 const NUM_PER_PAGE = 16;
 
 export const load = async ({ url, locals }) => {
+	// XXX: feature_flag_tools
+	if (!locals.user?.isEarlyAccess) {
+		throw error(403, "You need to be an early access user to view tools");
+	}
+
 	const username = url.searchParams.get("user");
 	const query = url.searchParams.get("q")?.trim() ?? null;
 

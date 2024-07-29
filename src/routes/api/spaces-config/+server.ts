@@ -1,6 +1,11 @@
 import { Client } from "@gradio/client";
 
-export async function GET({ url }) {
+export async function GET({ url, locals }) {
+	// XXX: feature_flag_tools
+	if (!locals.user?.isEarlyAccess) {
+		return new Response("Not early access", { status: 403 });
+	}
+
 	const space = url.searchParams.get("space");
 
 	if (!space) {
