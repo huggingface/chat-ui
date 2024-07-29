@@ -198,21 +198,13 @@
 
 	$: {
 		if (initialized) {
-			// childrenToRender = Math.max(0, nChildren - 1);
-			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
+			childrenToRender = Math.max(0, nChildren - 1);
 		} else {
 			childrenToRender = 0;
 			initialized = true;
 		}
 	}
 	const convTreeStore = useConvTreeStore();
-
-	onMount(() => {
-		// if message has currentChildIndex, set childrenToRender to currentChildIndex
-		if (message.currentChildIndex) {
-			childrenToRender = message.currentChildIndex;
-		}
-	});
 
 	$: if (message.children?.length === 0) {
 		$convTreeStore.leaf = message.id;
@@ -224,6 +216,14 @@
 	}
 
 	$: modalImageToShow = null as MessageFile | null;
+
+	let isRun = false;
+	$: {
+		if (message.id && !isRun) {
+			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
+			isRun = true;
+		}
+	}
 </script>
 
 {#if modalImageToShow}
