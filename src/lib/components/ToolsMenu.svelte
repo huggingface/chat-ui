@@ -117,9 +117,15 @@
 							checked={isChecked}
 							disabled={loading}
 							on:click|stopPropagation={async () => {
-								await settings.instantSet({
-									tools: [...($settings?.tools ?? []), tool._id],
-								});
+								if (isChecked) {
+									await settings.instantSet({
+										tools: ($settings?.tools ?? []).filter((t) => t !== tool._id),
+									});
+								} else {
+									await settings.instantSet({
+										tools: [...($settings?.tools ?? []), tool._id],
+									});
+								}
 							}}
 						/>
 					{/if}
