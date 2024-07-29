@@ -18,7 +18,7 @@ import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { verifyCloudflareAccessJWT } from "$lib/server/cloudflareAuth";
 import { createHash } from "crypto";
-import { __CONDA_OPENSLL_CERT_FILE_SET } from "$env/static/private";
+
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
