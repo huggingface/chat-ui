@@ -100,7 +100,7 @@ async function getChatPromptRender(
 			role: message.from,
 		}));
 
-		if (preprompt) {
+		if (preprompt && formattedMessages[0].role !== "system") {
 			formattedMessages = [
 				{
 					role: "system",
