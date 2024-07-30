@@ -247,7 +247,11 @@
 								>
 									{tool.createdByName}
 								</a>
+								<span class="text-gray-300">•</span>
+								{tool.useCount} runs
 							</p>
+						{:else}
+							<p class="pt-2 text-xs text-gray-400 dark:text-gray-500">HuggingChat official tool</p>
 						{/if}
 					</div>
 				</a>
