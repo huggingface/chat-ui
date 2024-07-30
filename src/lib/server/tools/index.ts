@@ -25,6 +25,7 @@ import type { MessageFile } from "$lib/types/Message";
 import { sha256 } from "$lib/utils/sha256";
 import { ObjectId } from "mongodb";
 import { isValidOutputComponent, ToolOutputPaths } from "./outputs";
+import { downloadFile } from "../files/downloadFile";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -150,9 +151,9 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 					throw new Error(`Unsupported type ${type}`);
 			}
 		}
-		const inputs = tool.inputs.map((input) => {
-			if (input.type === "file") {
-				throw new Error("File inputs are not supported");
+		const inputs = tool.inputs.map(async (input) => {
+			if (input.type === "file" && input.paramType !== "required") {
+				throw new Error("File inputs are always required and cannot be optional or fixed");
 			}
 
 			if (input.paramType === "fixed") {
@@ -163,11 +164,56 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 				if (params[input.name] === undefined) {
 					throw new Error(`Missing required input ${input.name}`);
 				}
-				return coerceInput(params[input.name], input.type);
+
+				if (input.type === "file") {
+					// todo: parse file here !
+					// structure is {input|output}-{msgIdx}-{fileIdx}-{filename}
+
+					const filename = params[input.name];
+
+					if (!filename || typeof filename !== "string") {
+						throw new Error(`Filename is not a string`);
+					}
+
+					const messages = ctx.messages;
+
+					const msgIdx = parseInt(filename.split("-")[1]);
+					const fileIdx = parseInt(filename.split("-")[2]);
+
+					if (Number.isNaN(msgIdx) || Number.isNaN(fileIdx)) {
+						throw Error(`Message index or file index is missing`);
+					}
+
+					if (msgIdx >= messages.length) {
+						throw Error(`Message index ${msgIdx} is out of bounds`);
+					}
+
+					const file = messages[msgIdx].files?.[fileIdx];
+
+					if (!file) {
+						throw Error(`File index ${fileIdx} is out of bounds`);
+					}
+
+					const blob = await downloadFile(file.value, ctx.conv._id)
+						.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
+						.then((res) => res.blob())
+						.catch((err) => {
+							throw Error("Failed to download file", { cause: err });
+						});
+
+					return blob;
+				} else {
+					return coerceInput(params[input.name], input.type);
+				}
 			}
 		});
 
-		const outputs = await callSpace(tool.baseUrl, tool.endpoint, inputs, ipToken);
+		const outputs = await callSpace(
+			tool.baseUrl,
+			tool.endpoint,
+			await Promise.all(inputs),
+			ipToken
+		);
 
 		console.log({ outputs: JSON.stringify(outputs) });
 
@@ -187,6 +233,14 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 		if (outputs.length <= tool.outputComponentIdx) {
 			throw new Error(`Tool output component index is out of bounds`);
+		}
+
+		// if its not an object, return directly
+		if (
+			outputs[tool.outputComponentIdx] !== undefined &&
+			typeof outputs[tool.outputComponentIdx] !== "object"
+		) {
+			return { outputs: [{ [tool.name + "-0"]: outputs[tool.outputComponentIdx] }] };
 		}
 
 		await Promise.all(
