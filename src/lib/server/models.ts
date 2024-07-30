@@ -96,10 +96,7 @@ async function getChatPromptRender(
 
 	const renderTemplate = ({ messages, preprompt, tools, toolResults }: ChatTemplateInput) => {
 		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
-			content:
-				message.files?.length && !tools?.length
-					? message.content + `\n This message has ${message.files.length} files attached`
-					: message.content,
+			content: message.content,
 			role: message.from,
 		}));
 

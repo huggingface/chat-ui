@@ -14,26 +14,12 @@ import websearch from "../tools/web/search";
 import { z } from "zod";
 import { logger } from "../logger";
 import { extractJson, toolHasName } from "../tools/utils";
-import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import { MetricsServer } from "../metrics";
 import { stringifyError } from "$lib/utils/stringifyError";
 import { collections } from "../database";
 import { ObjectId } from "mongodb";
-
-function makeFilesPrompt(files: MessageFile[], fileMessageIndex: number): string {
-	if (files.length === 0) {
-		return "The user has not uploaded any files. Do not attempt to use any tools that require files";
-	}
-
-	const stringifiedFiles = files
-		.map(
-			(file, fileIndex) =>
-				`  - fileMessageIndex ${fileMessageIndex} | fileIndex ${fileIndex} | ${file.name} (${file.mime})`
-		)
-		.join("\n");
-	return `Attached ${files.length} file${files.length === 1 ? "" : "s"}:\n${stringifiedFiles}`;
-}
+import { Message } from "$lib/types/Message";
 
 export async function filterToolsOnPreferences(
 	toolsPreference: Array<string>,
@@ -128,22 +114,41 @@ export async function* runTools(
 	const { endpoint, conv, messages, assistant, ip, username } = ctx;
 	const calls: ToolCall[] = [];
 
-	const messagesWithFilesPrompt = messages.map((message, idx) => {
-		if (!message.files?.length) return message;
-		return {
-			...message,
-			content: `${message.content}\n${makeFilesPrompt(message.files, idx)}`,
-		};
-	});
-
 	const pickToolStartTime = Date.now();
+	// append a message with the list of all available files
 
+	const files = messages.reduce((acc, curr, idx) => {
+		if (curr.files) {
+			const prefix = (curr.from === "user" ? "input" : "ouput") + "-" + idx;
+			acc.push(...curr.files.map((file, fileIdx) => `${prefix}-${fileIdx}-${file.name}`));
+		}
+		return acc;
+	}, [] as string[]);
+
+	const fileMsg = {
+		id: crypto.randomUUID(),
+		from: "system",
+		content:
+			"Available files that can be used for tools. Do not ask for confirmation: \n - " +
+			files.join("\n - ") +
+			"\n",
+	} satisfies Message;
+
+	const formattedMessages = files.length ? [...messages, fileMsg] : messages;
+
+	console.log(formattedMessages);
 	// do the function calling bits here
 	for await (const output of await endpoint({
-		messages: messagesWithFilesPrompt,
+		messages: formattedMessages,
 		preprompt,
 		generateSettings: assistant?.generateSettings,
-		tools,
+		tools: tools.map((tool) => ({
+			...tool,
+			inputs: tool.inputs.map((input) => ({
+				...input,
+				type: input.type === "file" ? "str" : input.type,
+			})),
+		})),
 	})) {
 		// model natively supports tool calls
 		if (output.token.toolCalls) {
@@ -154,6 +159,7 @@ export async function* runTools(
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
+			console.log(output.generated_text);
 			try {
 				const rawCalls = await extractJson(output.generated_text);
 				const newCalls = rawCalls

@@ -16,7 +16,7 @@ export async function buildPrompt({
 	tools,
 	toolResults,
 }: buildPromptOptions): Promise<string> {
-	const filteredMessages = messages.filter((m) => m.from !== "system");
+	const filteredMessages = messages[0].from === "system" ? messages.slice(1) : messages;
 
 	let prompt = model
 		.chatPromptRender({
@@ -39,5 +39,6 @@ export async function buildPrompt({
 		}, prompt.trimEnd());
 	}
 
+	console.log(prompt);
 	return prompt;
 }
