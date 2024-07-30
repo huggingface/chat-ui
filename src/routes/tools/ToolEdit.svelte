@@ -324,7 +324,7 @@
 												type="text"
 												name="name"
 												disabled={readonly}
-												value={editableTool.name}
+												bind:value={editableTool.name}
 											/>
 										</label>
 									</div>
