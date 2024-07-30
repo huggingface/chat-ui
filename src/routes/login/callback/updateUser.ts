@@ -10,6 +10,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
 import { HF_ORG_ADMIN, HF_ORG_EARLY_ACCESS } from "$env/static/private";
+import { logger } from "$lib/server/logger";
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -78,6 +79,10 @@ export async function updateUser(params: {
 	// Dynamically access user data based on NAME_CLAIM from environment
 	// This approach allows us to adapt to different OIDC providers flexibly.
 
+	// sorry for the ugly debug oof
+	if (username === "nsarrazin") {
+		logger.debug(orgs, "nsarrazin orgs");
+	}
 	// if using huggingface as auth provider, check orgs for earl access and amin rights
 	const isAdmin = (HF_ORG_ADMIN && orgs?.some((org) => org.sub === HF_ORG_ADMIN)) || false;
 	const isEarlyAccess =
