@@ -4,44 +4,44 @@ import type { User } from "./User";
 import type { Conversation } from "./Conversation";
 import type { WrapperObject } from 'wrap-range-text';
 
-// Base Comment type (as stored in MongoDB)
+// Base Comment type as stored in the database
 export interface Comment extends Timestamps {
     _id: ObjectId;
-    sessionId?: string;
     userId?: User["_id"];
-    conversationId?: Conversation["_id"];
     content: string;
-    textQuoteSelector?: {
+    parentCommentId?: ObjectId;
+    childCommentId?: ObjectId;
+}
+
+// DisplayComment type as displayed in the app
+export interface DisplayComment extends Omit<Comment, '_id'> {
+    _id: ObjectId | null;
+    originalContent?: string;
+    username?: string;
+    isPending: boolean;
+}
+
+// CommentThread type (as stored in MongoDB)
+export interface CommentThread extends Timestamps {
+    _id: ObjectId;
+    conversationId: Conversation["_id"];
+    comments: Comment[];
+    textQuoteSelector: {
         exact: string;
         prefix?: string;
         suffix?: string;
     };
-    textPositionSelector?: {
+    textPositionSelector: {
         start: number;
         end: number;
     };
 }
 
-// DisplayComment type for use in the application
-export interface DisplayComment {
-    _id?: ObjectId;
-    sessionId?: string;
-    userId?: User["_id"];
-    username?: string;
+// DisplayCommentThread type for use in the application
+export interface DisplayCommentThread extends Omit<CommentThread, 'comments' | '_id' | 'conversationId'> {
+    _id: ObjectId | null;
     conversationId?: Conversation["_id"];
-    content: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-    textQuoteSelector?: {
-        exact: string;
-        prefix?: string;
-        suffix?: string;
-    };
-    textPositionSelector?: {
-        start: number;
-        end: number;
-    };
+    comments: DisplayComment[];
     wrapperObject?: WrapperObject;
     isPending: boolean;
-    originalContent?: string;
 }

@@ -3,7 +3,7 @@
 	
 	import { onMount } from 'svelte';
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import type { DisplayComment } from "$lib/types/Comment";
+	import type { DisplayCommentThread } from "$lib/types/Comment";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 
@@ -42,7 +42,7 @@
 	export let loading = false;
 	export let pending = false;
 	export let shared = false;
-	export let displayComments: DisplayComment[] = [];
+	export let displayCommentThreads: DisplayCommentThread[] = [];
 	export let conversationStarted = false;
 	export let currentConversationId: string | null = null;
 
@@ -460,7 +460,7 @@
 
 <ShareCommentPanel 
 	{shared} 
-	{displayComments} 
+	{displayCommentThreads} 
 	{conversationStarted} 
 	{currentConversationId} 
 	{chatContainer}

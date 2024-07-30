@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { collections } from '$lib/server/database';
 import { authCondition, viewConversationAuthCondition } from '$lib/server/auth';
 import { ObjectId } from 'mongodb';
-import type { Comment, DisplayComment } from '$lib/types/Comment';
+import type { CommentThread, DisplayCommentThread } from '$lib/types/Comment';
 import { z } from 'zod';
 
 export async function POST({ request, params, locals }) {
@@ -23,41 +23,48 @@ export async function POST({ request, params, locals }) {
         throw error(401, 'You must be logged in to create a comment');
     }
 
-    const commentSchema = z.object({
-        content: z.string().min(1),
+    const commentThreadSchema = z.object({
+        comments: z.array(z.object({
+            content: z.string().min(1),
+        })),
         textQuoteSelector: z.object({
             exact: z.string(),
             prefix: z.string().optional(),
             suffix: z.string().optional(),
-        }).optional(),
+        }),
         textPositionSelector: z.object({
             start: z.number(),
             end: z.number(),
-        }).optional(),
+        }),
     });
 
     const body = await request.json();
-    const validatedData = commentSchema.parse(body);
+    const validatedData = commentThreadSchema.parse(body);
 
-    const newComment: Comment = {
+    const newCommentThread: CommentThread = {
         _id: new ObjectId(),
-        sessionId: locals.sessionId,
-        userId: locals.user?._id,
         conversationId,
-        content: validatedData.content,
+        comments: validatedData.comments.map(comment => ({
+            _id: new ObjectId(),
+            sessionId: locals.sessionId,
+            userId: locals.user?._id,
+            content: comment.content,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        })),
         textQuoteSelector: validatedData.textQuoteSelector,
         textPositionSelector: validatedData.textPositionSelector,
         createdAt: new Date(),
         updatedAt: new Date(),
     };
 
-    const result = await collections.comments.insertOne(newComment);
+    const result = await collections.commentThreads.insertOne(newCommentThread);
 
     if (!result.acknowledged) {
         throw error(500, 'Failed to create comment');
     }
 
-    return json({ id: newComment._id });
+    return json({ id: newCommentThread._id });
 }
 
 export async function PUT({ request, params, locals }) {
@@ -72,35 +79,45 @@ export async function PUT({ request, params, locals }) {
         throw error(404, 'Conversation not found');
     }
 
-    const updateCommentSchema = z.object({
-        commentId: z.string(),
-        content: z.string().min(1),
+    const updateCommentThreadSchema = z.object({
+        commentThreadId: z.string(),
+        comments: z.array(z.object({
+            _id: z.string().optional(),
+            content: z.string().min(1),
+        })),
         textQuoteSelector: z.object({
             exact: z.string(),
             prefix: z.string().optional(),
             suffix: z.string().optional(),
-        }).optional(),
+        }),
         textPositionSelector: z.object({
             start: z.number(),
             end: z.number(),
-        }).optional(),
+        }),
     });
 
     const body = await request.json();
-    const validatedData = updateCommentSchema.parse(body);
+    const validatedData = updateCommentThreadSchema.parse(body);
 
-    const commentId = new ObjectId(validatedData.commentId);
+    const commentThreadId = new ObjectId(validatedData.commentThreadId);
 
     // Check if the user has write access to the comment
-    const updateResult = await collections.comments.updateOne(
+    const updateResult = await collections.commentThreads.updateOne(
         { 
-            _id: commentId, 
+            _id: commentThreadId, 
             conversationId,
-            ...authCondition(locals)
+            'comments.userId': locals.user?._id
         },
         {
             $set: {
-                content: validatedData.content,
+                comments: validatedData.comments.map(comment => ({
+                    _id: comment._id ? new ObjectId(comment._id) : new ObjectId(),
+                    sessionId: locals.sessionId,
+                    userId: locals.user?._id,
+                    content: comment.content,
+                    createdAt: comment._id ? new Date(0) : new Date(), // Use existing date for old comments, new date for new ones
+                    updatedAt: new Date(),
+                })),
                 textQuoteSelector: validatedData.textQuoteSelector,
                 textPositionSelector: validatedData.textPositionSelector,
                 updatedAt: new Date(),
@@ -132,35 +149,62 @@ export async function GET({ params, locals }) {
         throw error(404, 'Conversation not found');
     }
 
-    // Fetch all comments for the conversation and join with users table
-    const comments = await collections.comments.aggregate([
+    // Fetch all comment threads for the conversation and join with users table
+    const commentThreads = await collections.commentThreads.aggregate([
         { $match: { conversationId } },
         { $sort: { 'textPositionSelector.start': 1 } },
         {
             $lookup: {
                 from: 'users',
-                localField: 'userId',
+                localField: 'comments.userId',
                 foreignField: '_id',
-                as: 'user'
+                as: 'users'
             }
         },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
         {
             $project: {
                 _id: 1,
-                sessionId: 1,
-                userId: 1,
                 conversationId: 1,
-                content: 1,
-                createdAt: 1,
-                updatedAt: 1,
+                comments: {
+                    $map: {
+                        input: '$comments',
+                        as: 'comment',
+                        in: {
+                            _id: '$$comment._id',
+                            sessionId: '$$comment.sessionId',
+                            userId: '$$comment.userId',
+                            content: '$$comment.content',
+                            createdAt: '$$comment.createdAt',
+                            updatedAt: '$$comment.updatedAt',
+                            username: {
+                                $let: {
+                                    vars: {
+                                        user: {
+                                            $arrayElemAt: [
+                                                {
+                                                    $filter: {
+                                                        input: '$users',
+                                                        cond: { $eq: ['$$this._id', '$$comment.userId'] }
+                                                    }
+                                                },
+                                                0
+                                            ]
+                                        }
+                                    },
+                                    in: '$$user.name'
+                                }
+                            }
+                        }
+                    }
+                },
                 textQuoteSelector: 1,
                 textPositionSelector: 1,
-                username: '$user.name',
+                createdAt: 1,
+                updatedAt: 1,
                 isPending: { $literal: false }
             }
         }
-    ]).toArray() as DisplayComment[];
+    ]).toArray() as DisplayCommentThread[];
 
-    return json(comments);
+    return json(commentThreads);
 }

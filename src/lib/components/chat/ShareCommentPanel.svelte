@@ -2,7 +2,7 @@
     import { page } from "$app/stores";
     import type { createEventDispatcher } from "svelte";
 
-    import type { DisplayComment } from "$lib/types/Comment";
+    import type { DisplayCommentThread } from "$lib/types/Comment";
 
 	import * as TextQuote from 'dom-anchor-text-quote';
   	import * as TextPosition from 'dom-anchor-text-position';
@@ -15,7 +15,7 @@
 
 
     export let shared: boolean;
-    export let displayComments: DisplayComment[] = [];
+    export let displayCommentThreads: DisplayCommentThread[] = [];
     export let conversationStarted: boolean;
 	export let currentConversationId: string | null = null;
     export let chatContainer: HTMLElement;
@@ -38,36 +38,41 @@
 
 	async function fetchComments() {
 		if (shared && currentConversationId) {
-		try {
-			const response = await fetch(`/conversation/${currentConversationId}/comments`);
-			if (!response.ok) {
-				throw new Error('Failed to fetch comments');
-			}
-			const comments: DisplayComment[] = await response.json();
-			
-			displayComments = comments.map((comment) => ({
-				...comment,
-				originalContent: comment.content,
-				isPending: false
-			}));
-		} catch (error) {
-			console.error("Error fetching comments:", error);
-		}
-		} else {
-			// Clear comments if not shared or no conversation ID
-			displayComments = [];
-		}
+            try {
+                const response = await fetch(`/conversation/${currentConversationId}/comments`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch comments');
+                }
+                const commentThreads: DisplayCommentThread[] = await response.json();
+                
+                displayCommentThreads = commentThreads.map((thread) => ({
+                    ...thread,
+                    comments: thread.comments.map(comment => ({
+                        ...comment,
+                        originalContent: comment.content,
+                        isPending: false
+                    })),
+                    isPending: false,
+                    wrapperObject: undefined
+                }));
+            } catch (error) {
+                console.error("Error fetching comments:", error);
+            }
+        } else {
+            // Clear comment threads if not shared or no conversation ID
+            displayCommentThreads = [];
+        }
 	}
 
 
 	function highlightComments() {
-		displayComments.forEach(comment => {
-		if (comment.textQuoteSelector) {
-			const range = TextQuote.toRange(chatContainer, comment.textQuoteSelector);
+		displayCommentThreads.forEach(commentThread => {
+		if (commentThread.textQuoteSelector) {
+			const range = TextQuote.toRange(chatContainer, commentThread.textQuoteSelector);
 			if (range) {
                 const wrapper = document.createElement('mark');
                 const wrappedRange = wrapRangeText(wrapper, range);
-                comment.wrapperObject = wrappedRange;
+                commentThread.wrapperObject = wrappedRange;
 			}
 		}
 		});
@@ -118,11 +123,18 @@
 				console.log('Wrapped nodes:', wrappedRange.nodes);
 
 				
-				// Create a new DisplayComment object
-				const newDisplayComment: DisplayComment = {
-
-					content: "",
-
+				// Create a new DisplayCommentThead object
+				const newDisplayCommentThread: DisplayCommentThread = {
+                    _id: null,
+                    comments: [{
+                        _id: null,
+                        content: "",
+                        originalContent: "",
+                        username: $page.data.user?.username || $page.data.user?.email || 'Anonymous',
+                        isPending: true,
+                        updatedAt: new Date(),
+						createdAt: new Date(),
+                    }],
 					textQuoteSelector: {
 						exact: quoteSelector.exact,
 						prefix: quoteSelector.prefix,
@@ -134,21 +146,20 @@
 					},
 					isPending: true,
 					wrapperObject: wrappedRange,
-					originalContent: "",
-                    username: $page.data.user?.username || $page.data.user?.email || 'Anonymous'
-
+                    updatedAt: new Date(),
+					createdAt: new Date(),
 				
 				};
 
 			// Add the newDisplayComment to the array and sort
-			displayComments = [...displayComments, newDisplayComment]
+			displayCommentThreads = [...displayCommentThreads, newDisplayCommentThread]
             .sort((a, b) => {
                 const aStart = a.textPositionSelector?.start ?? 0;
                 const bStart = b.textPositionSelector?.start ?? 0;
                 return aStart - bStart;
             });
 
-			console.log("New comment added:", newDisplayComment);
+			console.log("New comment added:", newDisplayCommentThread);
 
 			} else {
 				console.log("Failed to create new range");
@@ -159,16 +170,19 @@
 	}
 
 	// Handles posting a newly created comment or an update to an existing comment
-	async function handlePostComment(displayComment: DisplayComment) {
+	async function handlePostComment(displayCommentThread: DisplayCommentThread) {
 		try {
 			let response;
-			const commentData = {
-				content: displayComment.content,
-				textQuoteSelector: displayComment.textQuoteSelector,
-				textPositionSelector: displayComment.textPositionSelector,
-			};
+            const commentThreadData = {
+                comments: displayCommentThread.comments.map(comment => ({
+                    content: comment.content
+                })),
+                textQuoteSelector: displayCommentThread.textQuoteSelector,
+                textPositionSelector: displayCommentThread.textPositionSelector
+            };
 
-			if ('_id' in displayComment && displayComment._id) {
+			//if ('_id' in displayComment && displayComment._id) {
+            if (false) {
 				// Update existing comment
 				response = await fetch(`/conversation/${$page.params.id}/comments`, {
 					method: 'PUT',
@@ -176,8 +190,8 @@
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({
-						...commentData,
-						commentId: displayComment._id,
+						...commentThreadData,
+						commentId: displayCommentThread._id,
 					}),
 				});
 			} else {
@@ -187,7 +201,7 @@
 					headers: {
 						'Content-Type': 'application/json',
 					},
-					body: JSON.stringify(commentData),
+					body: JSON.stringify(commentThreadData),
 				});
 			}
 
@@ -197,19 +211,27 @@
 
 			const result = await response.json();
 
-			// Update the displayComments array
-			displayComments = displayComments.map(comment => 
-				comment === displayComment 
-					? { 
-						...comment, 
-						...commentData, 
-						_id: result.id || displayComment._id, 
-						isPending: false,
-						updatedAt: new Date(),
-						createdAt: comment.createdAt || new Date(),
-					} 
-					: comment
-			);
+			// Update the displayCommentThreads array
+            displayCommentThreads = displayCommentThreads.map(commentThread => 
+                commentThread === displayCommentThread 
+                    ? { 
+                        ...commentThread,
+                        _id: result.id || commentThread._id,
+                        comments: commentThread.comments.map(comment => ({
+                            ...comment,
+                            content: comment.content,
+                            originalContent: comment.content,
+                            isPending: false,
+                            updatedAt: new Date()
+                        })),
+                        textQuoteSelector: commentThread.textQuoteSelector,
+                        textPositionSelector: commentThread.textPositionSelector,
+                        isPending: false,
+                        updatedAt: new Date(),
+                        createdAt: commentThread.createdAt || new Date(),
+                    } 
+                    : commentThread
+            );
 
 			console.log("Comment saved successfully:", result);
 		} catch (error) {
@@ -219,19 +241,19 @@
 	}
 
 	// Handles deleting a comment. Should only be called on a persisted comment, but just returns if it is.
-	async function handleDeleteComment(displayComment: DisplayComment) {
+	async function handleDeleteComment(displayCommentThread: DisplayCommentThread) {
 		// Unwrap the highlighted text associated with this comment
-		if (displayComment.wrapperObject) {
-			displayComment.wrapperObject.unwrap();
+		if (displayCommentThread.wrapperObject) {
+			displayCommentThread.wrapperObject.unwrap();
 		}
 		
 		// Remove the comment from the displayComments array
-		displayComments = displayComments.filter(comment => comment !== displayComment);
+		displayCommentThreads = displayCommentThreads.filter(commentThread => commentThread !== displayCommentThread);
 
 		// Check if the comment is persisted (has a non-empty _id), and if so delete it from the DB
-		if ('_id' in displayComment && displayComment._id) {
+		if ('_id' in displayCommentThread && displayCommentThread._id) {
 			try {
-				const response = await fetch(`/conversation/${$page.params.id}/comments/${displayComment._id}`, {
+				const response = await fetch(`/conversation/${$page.params.id}/comments/${displayCommentThread._id}`, {
 					method: 'DELETE',
 				});
 
@@ -249,39 +271,47 @@
 	}
 
 	// Handles editing an existing DisplayComment. 
-	function handleEditComment(displayComment: DisplayComment) {
+	function handleEditComment(displayCommentThread: DisplayCommentThread) {
 		// Sets isPending to true
 		// Sets originalContent to the content
-		displayComments = displayComments.map(dc => {
-			if (dc === displayComment) {
-				return {
-					...dc,
-					isPending: true,
-					originalContent: dc.content
-				};
-			}
-			return dc;
-		});
+		displayCommentThreads = displayCommentThreads.map(dct => {
+            if (dct === displayCommentThread) {
+                return {
+                    ...dct,
+                    isPending: true,
+                    comments: dct.comments.map((comment, index) => 
+                        index === 0 
+                            ? { ...comment, originalContent: comment.content }
+                            : comment
+                    )
+                };
+            }
+            return dct;
+        });
 
 		// No database update needed. That will happen when the comment is posted (handlePostComment)
 	}
 
-	function handleCancelEditComment(displayComment: DisplayComment) {
-		if (!('_id' in displayComment) || !displayComment._id) {
+	function handleCancelEditComment(displayCommentThread: DisplayCommentThread) {
+		if (!('_id' in displayCommentThread) || !displayCommentThread._id) {
 			// If the DisplayComment was never persisted, delete it
-			handleDeleteComment(displayComment);
+			handleDeleteComment(displayCommentThread);
 		} else {
 			// Revert the pending edit
-			displayComments = displayComments.map(dc => {
-				if (dc === displayComment) {
-					return {
-						...dc,
-						isPending: false,
-						content: dc.originalContent || ""
-					};
-				}
-				return dc;
-			});
+            displayCommentThreads = displayCommentThreads.map(dct => {
+                if (dct === displayCommentThread) {
+                    return {
+                        ...dct,
+                        isPending: false,
+                        comments: dct.comments.map((comment, index) => 
+                            index === 0 
+                                ? { ...comment, content: comment.originalContent || "" }
+                                : comment
+                        )
+                    };
+                }
+                return dct;
+            });
 		}
 		// No database updates needed
 	}
@@ -307,30 +337,30 @@
         <!--Display the list of Comments-->
         <div class="mt-4 w-full max-w-md">
             <h3 class="text-lg font-semibold mb-2">Comments</h3>
-            {#if displayComments.length > 0}
+            {#if displayCommentThreads.length > 0}
                 <ul class="space-y-2">
-                {#each displayComments as dc, index}
+                {#each displayCommentThreads as dct, index}
                     <li class="bg-gray-100 p-3 rounded-lg">
-                        {#if !dc.isPending}
+                        {#if !dct.isPending}
                             <p class="text-sm text-gray-600">
-                                {#if dc.username}
-                                    <span class="font-semibold">{dc.username}</span><br/>
+                                {#if dct.comments[0].username}
+                                    <span class="font-semibold">{dct.comments[0].username}</span><br/>
                                 {/if}
-                                {#if dc.textPositionSelector && dc.textPositionSelector.start !== undefined}
-                                    Position: {dc.textPositionSelector.start}<br/>
+                                {#if dct.textPositionSelector && dct.textPositionSelector.start !== undefined}
+                                    Position: {dct.textPositionSelector.start}<br/>
                                 {/if}
-                                {#if 'updatedAt' in dc && dc.updatedAt}
-                                    Last Updated: {new Date(dc.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                                {#if 'updatedAt' in dct && dct.updatedAt}
+                                    Last Updated: {new Date(dct.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                                     <br/>
                                 {/if}
                             </p>
-                            <p>{"> " + dc.textQuoteSelector?.exact}</p>
-                            <p>{dc.content}</p>
-                            {#if $page.data.user && dc.userId === $page.data.user.id}
+                            <p>{"> " + dct.textQuoteSelector?.exact}</p>
+                            <p>{dct.comments[0].content}</p>
+                            {#if $page.data.user && dct.comments[0].userId === $page.data.user.id}
                                 <div class="flex justify-end mt-2">
                                     <button
                                     class="mr-2 p-1 bg-green-500 text-white rounded-full"
-                                    on:click={() => handleEditComment(dc)}
+                                    on:click={() => handleEditComment(dct)}
                                     aria-label="Edit Comment"
                                     >
                                         <CarbonEdit />
@@ -339,7 +369,7 @@
                                         class="p-1 bg-red-500 text-white rounded-full"
                                         on:click={() => {
                                             if (confirm('Are you sure you want to delete this comment?')) {
-                                                handleDeleteComment(dc);
+                                                handleDeleteComment(dct);
                                             }
                                         }}
                                         aria-label="Delete Comment"
@@ -349,23 +379,23 @@
                                 </div>
                             {/if}
                         {:else}
-                            <p>{"> " + dc.textQuoteSelector?.exact}</p>
+                            <p>{"> " + dct.textQuoteSelector?.exact}</p>
                             <textarea
-                                bind:value={dc.content}
+                                bind:value={dct.comments[0].content}
                                 class="w-full p-2 border rounded-md"
                                 rows="3"
                             ></textarea>
                             <div class="flex justify-end mt-2">
                                 <button
                                     class="mr-2 p-1 bg-green-500 text-white rounded-full"
-                                    on:click={() => handlePostComment(dc)}
+                                    on:click={() => handlePostComment(dct)}
                                     aria-label="Save Comment"
                                 >
                                     <CarbonSend />
                                 </button>
                                 <button
                                     class="p-1 bg-red-500 text-white rounded-full"
-                                    on:click={() => handleCancelEditComment(dc)}
+                                    on:click={() => handleCancelEditComment(dct)}
                                     aria-label="Cancel"
                                 >
                                     <CarbonClose />

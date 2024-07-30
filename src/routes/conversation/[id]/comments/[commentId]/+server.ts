@@ -5,7 +5,7 @@ import { ObjectId } from 'mongodb';
 
 export async function DELETE({ params, locals }) {
     const conversationId = new ObjectId(params.id);
-    const commentId = new ObjectId(params.commentId);
+    const commentThreadId = new ObjectId(params.commentId);
 
     // Check if the user has owner access to the conversation
     const conversation = await collections.conversations.findOne({
@@ -16,14 +16,14 @@ export async function DELETE({ params, locals }) {
         throw error(404, 'Conversation not found');
     }
 
-    const deleteResult = await collections.comments.deleteOne({
-        _id: commentId,
+    const deleteResult = await collections.commentThreads.deleteOne({
+        _id: commentThreadId,
         conversationId,
         ...authCondition(locals)
     });
 
     if (deleteResult.deletedCount === 0) {
-        throw error(404, 'Comment not found or you do not have permission to delete it');
+        throw error(404, 'Comment thread not found or you do not have permission to delete it');
     }
 
     return json({ success: true });

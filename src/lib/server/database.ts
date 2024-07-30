@@ -13,7 +13,7 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
-import type { Comment } from "$lib/types/Comment";
+import type { CommentThread } from "$lib/types/Comment";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import { onExit } from "./exitHandler";
@@ -84,7 +84,7 @@ export class Database {
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
-		const comments = db.collection<Comment>("comments");
+		const commentThreads = db.collection<CommentThread>("commentThreads");
 
 		return {
 			conversations,
@@ -101,7 +101,7 @@ export class Database {
 			bucket,
 			migrationResults,
 			semaphores,
-			comments,
+			commentThreads,
 		};
 	}
 
@@ -123,7 +123,7 @@ export class Database {
 			sessions,
 			messageEvents,
 			semaphores,
-			comments,
+			commentThreads,
 		} = this.getCollections();
 
 		conversations
@@ -213,18 +213,18 @@ export class Database {
 		semaphores
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
 			.catch((e) => logger.error(e));
-		// Create indexes for comments
-		comments
+		// Create indexes for commentThreads
+		commentThreads
 			.createIndex({ conversationId: 1, updatedAt: 1 })
 			.catch((e) => logger.error(e));
-        // Create indexes for comments
-        comments
+        // Create indexes for commentTheads
+        commentThreads
             .createIndex({ 
                 conversationId: 1, 
                 "textPositionSelector.start": 1 
             })
             .catch((e) => logger.error(e));
-		comments
+		commentThreads
             .createIndex({ updatedAt: -1, conversationId: 1 })
             .catch((e) => logger.error(e));
 	}
