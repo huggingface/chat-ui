@@ -81,7 +81,7 @@ export async function updateUser(params: {
 
 	// sorry for the ugly debug oof
 	if (username === "nsarrazin") {
-		logger.debug(orgs, "nsarrazin orgs");
+		logger.info(orgs, "nsarrazin orgs");
 	}
 	// if using huggingface as auth provider, check orgs for earl access and amin rights
 	const isAdmin = (HF_ORG_ADMIN && orgs?.some((org) => org.sub === HF_ORG_ADMIN)) || false;
