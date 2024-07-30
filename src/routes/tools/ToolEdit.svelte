@@ -248,7 +248,11 @@
 				</div>
 
 				<label>
-					<div class="mb-1 font-semibold">Tool Description</div>
+					<div class=" font-semibold">Tool Description</div>
+					<p class="mb-1 text-sm text-gray-500">
+						This description will be passed to the model when picking tools. Describe what your tool
+						does and when it is appropriate to use.
+					</p>
 					<textarea
 						name="description"
 						disabled={readonly}
@@ -261,6 +265,13 @@
 
 				<label>
 					<div class="mb-1 font-semibold">Hugging Face Space URL</div>
+					<p class="mb-1 text-sm text-gray-500">
+						Specify the Hugging Face Space where your tool is hosted. <a
+							href="https://huggingface.co/spaces"
+							target="_blank"
+							class="underline">See trending spaces here</a
+						>.
+					</p>
 					<input
 						type="text"
 						name="spaceUrl"
@@ -284,7 +295,12 @@
 		<div class="col-span-1 flex flex-col gap-4">
 			<div class="flex flex-col gap-2">
 				<h3 class="mb-1 font-semibold">Functions</h3>
-				<p class="text-sm text-gray-500">Choose functions that can be called in your tool.</p>
+				{#if editableTool.baseUrl}
+					<p class="text-sm text-gray-500">Choose functions that can be called in your tool.</p>
+				{:else}
+					<p class="text-sm text-gray-500">Start by specifying a Hugging Face Space URL.</p>
+				{/if}
+
 				{#if editableTool.baseUrl}
 					{#await getGradioApi(spaceUrl)}
 						<p class="text-sm text-gray-500">Loading...</p>
