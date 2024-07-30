@@ -24,7 +24,7 @@ import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
 import { sha256 } from "$lib/utils/sha256";
 import { ObjectId } from "mongodb";
-import { ToolOutputPaths } from "./outputs";
+import { isValidOutputComponent, ToolOutputPaths } from "./outputs";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -70,19 +70,24 @@ const toolInputSchema = toolInputBaseSchema.and(
 	)
 );
 
-export const editableToolSchema = z.object({
-	name: z.string().min(1),
-	baseUrl: z.string().min(1),
-	endpoint: z.string().min(1),
-	inputs: z.array(toolInputSchema),
-	outputComponent: ToolOutputComponents,
-	showOutput: z.boolean(),
-
-	displayName: z.string().min(1),
-	color: ToolColor,
-	icon: ToolIcon,
-	description: z.string().min(1),
-});
+export const editableToolSchema = z
+	.object({
+		name: z.string().min(1),
+		baseUrl: z.string().min(1),
+		endpoint: z.string().min(1),
+		inputs: z.array(toolInputSchema),
+		outputComponent: z.string().min(1),
+		showOutput: z.boolean(),
+		displayName: z.string().min(1),
+		color: ToolColor,
+		icon: ToolIcon,
+		description: z.string().min(1),
+	})
+	.transform((tool) => ({
+		...tool,
+		outputComponentIdx: parseInt(tool.outputComponent.split(";")[0]),
+		outputComponent: ToolOutputComponents.parse(tool.outputComponent.split(";")[1]),
+	}));
 
 export const configTools = z
 	.array(
@@ -93,6 +98,7 @@ export const configTools = z
 				endpoint: z.union([z.string(), z.null()]),
 				inputs: z.array(toolInputSchema),
 				outputComponent: ToolOutputComponents.or(z.null()),
+				outputComponentIdx: z.number().int().default(0),
 				showOutput: z.boolean(),
 				_id: z
 					.string()
@@ -118,7 +124,12 @@ export const configTools = z
 
 export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	return async function* (params, ctx) {
-		if (tool.endpoint === null || !tool.baseUrl || !tool.outputComponent) {
+		if (
+			tool.endpoint === null ||
+			!tool.baseUrl ||
+			!tool.outputComponent ||
+			!tool.outputComponentIdx
+		) {
 			throw new Error(`Tool function ${tool.name} has no endpoint`);
 		}
 
@@ -160,6 +171,10 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 		console.log({ outputs: JSON.stringify(outputs) });
 
+		if (!isValidOutputComponent(tool.outputComponent)) {
+			throw new Error(`Tool output component is not defined`);
+		}
+
 		const { type, path } = ToolOutputPaths[tool.outputComponent];
 
 		if (!path || !type) {
@@ -170,44 +185,50 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 		const toolOutputs: Array<Record<string, string>> = [];
 
+		if (outputs.length <= tool.outputComponentIdx) {
+			throw new Error(`Tool output component index is out of bounds`);
+		}
+
 		await Promise.all(
-			jp.query(outputs, path).map(async (output: string | string[], idx) => {
-				const arrayedOutput = Array.isArray(output) ? output : [output];
-				if (type === "file") {
-					// output files are actually URLs
+			jp
+				.query(outputs[tool.outputComponentIdx], path)
+				.map(async (output: string | string[], idx) => {
+					const arrayedOutput = Array.isArray(output) ? output : [output];
+					if (type === "file") {
+						// output files are actually URLs
 
-					await Promise.all(
-						arrayedOutput.map(async (output, idx) => {
-							await fetch(output)
-								.then((res) => res.blob())
-								.then(async (blob) => {
-									const mimeType = blob.type;
-									const fileType = blob.type.split("/")[1] ?? mimeType?.split("/")[1];
-									return new File(
-										[blob],
-										`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
-										{
-											type: fileType,
-										}
-									);
-								})
-								.then((file) => uploadFile(file, ctx.conv))
-								.then((file) => files.push(file));
-						})
-					);
+						await Promise.all(
+							arrayedOutput.map(async (output, idx) => {
+								await fetch(output)
+									.then((res) => res.blob())
+									.then(async (blob) => {
+										const mimeType = blob.type;
+										const fileType = blob.type.split("/")[1] ?? mimeType?.split("/")[1];
+										return new File(
+											[blob],
+											`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
+											{
+												type: fileType,
+											}
+										);
+									})
+									.then((file) => uploadFile(file, ctx.conv))
+									.then((file) => files.push(file));
+							})
+						);
 
-					toolOutputs.push({
-						[tool.name + "-" + idx.toString()]:
-							"A file has been generated. Answer as if the user can already see the file. Do not try to insert the file. The user can already see the file. Do not try to describe the file as the model cannot interact with it. Be concise.",
-					});
-				} else {
-					for (const output of arrayedOutput) {
 						toolOutputs.push({
-							[tool.name + "-" + idx.toString()]: output,
+							[tool.name + "-" + idx.toString()]:
+								"A file has been generated. Answer as if the user can already see the file. Do not try to insert the file. The user can already see the file. Do not try to describe the file as the model cannot interact with it. Be concise.",
 						});
+					} else {
+						for (const output of arrayedOutput) {
+							toolOutputs.push({
+								[tool.name + "-" + idx.toString()]: output,
+							});
+						}
 					}
-				}
-			})
+				})
 		);
 
 		for (const file of files) {

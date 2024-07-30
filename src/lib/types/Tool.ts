@@ -80,7 +80,8 @@ export interface BaseTool {
 
 	baseUrl?: string; // namespace for the tool
 	endpoint: string | null; // endpoint to call in gradio, if null we expect to override this function in code
-	outputComponent: ToolOutputComponents | null; // Gradio component type to use for the output
+	outputComponent: string | null; // Gradio component type to use for the output
+	outputComponentIdx: number | null; // index of the output component
 
 	inputs: Array<ToolInput>;
 	showOutput: boolean; // show output in chat or not

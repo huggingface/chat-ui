@@ -15,6 +15,7 @@ const directlyAnswer: ConfigTool = {
 	endpoint: null,
 	inputs: [],
 	outputComponent: null,
+	outputComponentIdx: null,
 	showOutput: false,
 	async *call() {
 		return {

@@ -22,6 +22,7 @@ const calculator: ConfigTool = {
 		},
 	],
 	outputComponent: null,
+	outputComponentIdx: null,
 	showOutput: false,
 	async *call({ equation }) {
 		try {

@@ -48,9 +48,10 @@
 		icon: icons[Math.floor(Math.random() * icons.length)],
 		baseUrl: "",
 		endpoint: "",
-		name: "process_image",
+		name: "",
 		inputs: [],
 		outputComponent: null,
+		outputComponentIdx: 0,
 		showOutput: true,
 	};
 
@@ -101,7 +102,7 @@
 		);
 
 		if (parsedOutputComponent.success) {
-			editableTool.outputComponent = parsedOutputComponent.data;
+			editableTool.outputComponent = "0;" + parsedOutputComponent.data;
 		} else {
 			form = {
 				error: true,
@@ -469,13 +470,14 @@
 																	type="radio"
 																	disabled={readonly}
 																	bind:group={editableTool.outputComponent}
-																	value={component.toLowerCase()}
+																	value={idx + ";" + component.toLowerCase()}
 																	name="outputComponent"
 																/>
 																<span
 																	class="font-mono text-gray-800"
-																	class:font-semibold={editableTool.outputComponent === component}
-																	>{component.toLowerCase()}-{idx}</span
+																	class:font-semibold={editableTool?.outputComponent?.split(
+																		";"
+																	)[1] === component}>{component.toLowerCase()}-{idx}</span
 																>
 															</label>
 														{/each}
@@ -484,7 +486,7 @@
 													<div>
 														<input disabled checked type="radio" />
 														<span class="font-mono text-gray-800"
-															>{editableTool.outputComponent}</span
+															>{editableTool.outputComponent.split(";")[1]}</span
 														>
 													</div>
 												{/if}

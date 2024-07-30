@@ -9,18 +9,24 @@ export const ToolOutputPaths: Record<
 > = {
 	textbox: {
 		type: "str",
-		path: "$[*]",
+		path: "$",
 	},
 	markdown: {
 		type: "str",
-		path: "$[*]",
+		path: "$",
 	},
 	image: {
 		type: "file",
-		path: "$[*].url",
+		path: "$.url",
 	},
 	gallery: {
 		type: "file",
-		path: "$[*][*].image.url",
+		path: "$[*].image.url",
 	},
+};
+
+export const isValidOutputComponent = (
+	outputComponent: string
+): outputComponent is keyof typeof ToolOutputPaths => {
+	return Object.keys(ToolOutputPaths).includes(outputComponent);
 };

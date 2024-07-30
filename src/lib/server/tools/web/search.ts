@@ -22,6 +22,7 @@ const websearch: ConfigTool = {
 		},
 	],
 	outputComponent: null,
+	outputComponentIdx: null,
 	showOutput: false,
 	async *call({ query }, { conv, assistant, messages }) {
 		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, String(query));
