@@ -12,12 +12,20 @@ export async function GET({ url, locals }) {
 		return new Response("Missing space", { status: 400 });
 	}
 
-	const api = await (await Client.connect(space)).view_api();
-
-	return new Response(JSON.stringify(api), {
-		status: 200,
-		headers: {
-			"Content-Type": "application/json",
-		},
-	});
+	try {
+		const api = await (await Client.connect(space)).view_api();
+		return new Response(JSON.stringify(api), {
+			status: 200,
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	} catch (e) {
+		return new Response(JSON.stringify({ error: true, message: "Failed to get space API" }), {
+			status: 400,
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+	}
 }
