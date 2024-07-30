@@ -142,7 +142,6 @@ export async function* runTools(
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
-			logger.info(output.generated_text);
 			try {
 				const rawCalls = await extractJson(output.generated_text);
 				const newCalls = rawCalls
