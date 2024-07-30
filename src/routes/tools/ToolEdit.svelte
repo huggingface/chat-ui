@@ -75,14 +75,16 @@
 				} satisfies ToolInput;
 			}
 
+			const type = parseValidInputType(param.python_type.type);
+
 			if (param.parameter_has_default && param.python_type.type !== "filepath") {
 				// optional if it has a default
 				return {
 					name: param.parameter_name,
 					description: param.description,
 					paramType: "optional",
-					type: parseValidInputType(param.python_type.type),
 					default: param.parameter_default,
+					...(type === "file" ? { mimeTypes: ["*/*"], type } : { type }),
 				} satisfies ToolInput;
 			} else {
 				// required if it doesn't have a default
@@ -90,7 +92,7 @@
 					name: param.parameter_name,
 					description: param.description,
 					paramType: "required",
-					type: parseValidInputType(param.python_type.type),
+					...(type === "file" ? { mimeTypes: ["*/*"], type } : { type }),
 				} satisfies ToolInput;
 			}
 		});
@@ -136,8 +138,8 @@
 			case "float":
 			case "boolean":
 				return type;
-			case "file":
-				throw new Error("File inputs are not supported");
+			case "filepath":
+				return "file";
 			default:
 				return "str";
 		}
@@ -151,6 +153,13 @@
 	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
 	use:enhance={async ({ formData }) => {
 		formLoading = true;
+
+		editableTool.inputs = editableTool.inputs.map((input) => {
+			if (input.type === "file" && !Array.isArray(input.mimeTypes)) {
+				input.mimeTypes = [input.mimeTypes];
+			}
+			return input;
+		});
 		formData.append("tool", JSON.stringify(editableTool));
 
 		return async ({ result }) => {
@@ -433,13 +442,35 @@
 														disabled={readonly}
 													/>
 												{/if}
-
 												<p class="text-xs text-red-500">
 													{getError(`${input.name}-${isOptional ? "default" : "value"}`, form)}
 												</p>
 											</label>
 										{/if}
-
+										{#if input.type === "file"}
+											<label class="flex flex-row gap-2">
+												<div class="mb-1 font-semibold">
+													MIME types
+													<p class="text-xs font-normal text-gray-500">
+														This input is a file. Specify the MIME types that are allowed to be
+														passed to the tool.
+													</p>
+												</div>
+												<select
+													name="{input.name}-mimeTypes"
+													class="h-fit w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+													bind:value={input.mimeTypes}
+													disabled={readonly}
+												>
+													<option value="image/*">image/*</option>
+													<option value="audio/*">audio/*</option>
+													<option value="video/*">video/*</option>
+													<option value="application/pdf">application/pdf</option>
+													<option value="text/csv">text/csv</option>
+													<option value="*/*">*/*</option>
+												</select></label
+											>
+										{/if}
 										<!-- divider -->
 										<div
 											class="flex w-full flex-row flex-nowrap gap-2 border-b border-gray-200 pt-2"
