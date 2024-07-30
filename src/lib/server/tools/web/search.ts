@@ -9,7 +9,6 @@ const websearch: ConfigTool = {
 	color: "blue",
 	icon: "wikis",
 	displayName: "Web Search",
-	isOnByDefault: true,
 	name: "websearch",
 	endpoint: null,
 	inputs: [

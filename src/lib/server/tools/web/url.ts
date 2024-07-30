@@ -10,7 +10,6 @@ const fetchUrl: ConfigTool = {
 	color: "blue",
 	icon: "cloud",
 	displayName: "Fetch URL",
-	isOnByDefault: true,
 	name: "fetchUrl",
 	endpoint: null,
 	inputs: [

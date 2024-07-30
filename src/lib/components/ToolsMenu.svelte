@@ -17,7 +17,7 @@
 	$: activeToolCount = $page.data.tools.filter(
 		(tool: ToolFront) =>
 			// community tools are always on by default
-			tool.type === "community" || ($settings?.tools?.includes(tool._id) ?? tool.isOnByDefault)
+			tool.type === "community" || $settings?.tools?.includes(tool._id)
 	).length;
 
 	async function setAllTools(value: boolean) {
@@ -96,7 +96,7 @@
 				</a>
 			{/if}
 			{#each tools as tool}
-				{@const isChecked = $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault}
+				{@const isChecked = $settings?.tools?.includes(tool._id)}
 				<div class="flex items-center gap-1.5">
 					{#if tool.type === "community"}
 						<input

@@ -9,7 +9,6 @@ const calculator: ConfigTool = {
 	color: "blue",
 	icon: "code",
 	displayName: "Calculator",
-	isOnByDefault: true,
 	name: "calculator",
 	endpoint: null,
 	inputs: [

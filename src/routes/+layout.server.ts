@@ -166,7 +166,11 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
-			tools: settings?.tools ?? [],
+			tools:
+				settings?.tools ??
+				toolFromConfigs
+					.filter((el) => !el.isHidden && el.isOnByDefault)
+					.map((el) => el._id.toString()),
 			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 		},
 		models: models.map((model) => ({

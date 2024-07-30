@@ -336,7 +336,6 @@ envVars:
         "description" : "Use this tool to generate images based on a prompt.",
         "color" : "yellow",
         "icon" : "camera",
-        "isOnByDefault" : true,
         "baseUrl" : "ByteDance/Hyper-SDXL-1Step-T2I" ,
         "name" : "image_generation",
         "endpoint" : "/process_image",
