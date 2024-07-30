@@ -128,7 +128,7 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 			tool.endpoint === null ||
 			!tool.baseUrl ||
 			!tool.outputComponent ||
-			!tool.outputComponentIdx
+			tool.outputComponentIdx === null
 		) {
 			throw new Error(`Tool function ${tool.name} has no endpoint`);
 		}
