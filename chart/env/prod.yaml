@@ -47,7 +47,7 @@ envVars:
         "websiteUrl": "https://llama.meta.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
-        "preprompt" : "You are a helpful assistant with tool calling capabilities. The user has access to the tool's outputs that you as a model cannot see. This could include text, images and more.",
+        "preprompt" : "",
         "parameters": {
             "temperature": 0.6,
             "top_p": 0.9,
@@ -77,7 +77,7 @@ envVars:
         "websiteUrl": "https://llama.meta.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
-        "preprompt" : "You are a helpful assistant with tool calling capabilities. The user has access to the tool's outputs that you as a model cannot see. This could include text, images and more.",
+        "preprompt" : "",
         "parameters": {
           "temperature": 0.6,
           "top_p": 0.9,
