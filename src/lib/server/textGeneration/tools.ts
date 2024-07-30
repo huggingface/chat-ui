@@ -134,9 +134,11 @@ export async function* runTools(
 			"\n",
 	} satisfies Message;
 
-	const formattedMessages = files.length ? [...messages, fileMsg] : messages;
+	// put fileMsg before last if files.length > 0
+	const formattedMessages = files.length
+		? [...messages.slice(0, -1), fileMsg, ...messages.slice(-1)]
+		: messages;
 
-	console.log(formattedMessages);
 	// do the function calling bits here
 	for await (const output of await endpoint({
 		messages: formattedMessages,
