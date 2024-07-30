@@ -119,8 +119,12 @@ export async function* runTools(
 
 	const files = messages.reduce((acc, curr, idx) => {
 		if (curr.files) {
-			const prefix = (curr.from === "user" ? "input" : "ouput") + "-" + idx;
-			acc.push(...curr.files.map((file, fileIdx) => `${prefix}-${fileIdx}-${file.name}`));
+			const prefix = (curr.from === "user" ? "input" : "ouput") + "_" + idx;
+			acc.push(
+				...curr.files.map(
+					(file, fileIdx) => `${prefix}_${fileIdx}.${file?.name?.split(".")?.pop()?.toLowerCase()}`
+				)
+			);
 		}
 		return acc;
 	}, [] as string[]);
@@ -129,7 +133,7 @@ export async function* runTools(
 		id: crypto.randomUUID(),
 		from: "system",
 		content:
-			"Available files that can be used for tools. Do not ask for confirmation: \n - " +
+			"Here is the list of available files that can be used for tools. Only use the filenames that are in this list, do not try to guess the filename. \n - " +
 			files.join("\n - ") +
 			"\n",
 	} satisfies Message;

@@ -177,8 +177,8 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 
 					const messages = ctx.messages;
 
-					const msgIdx = parseInt(filename.split("-")[1]);
-					const fileIdx = parseInt(filename.split("-")[2]);
+					const msgIdx = parseInt(filename.split("_")[1]);
+					const fileIdx = parseInt(filename.split("_")[2]);
 
 					if (Number.isNaN(msgIdx) || Number.isNaN(fileIdx)) {
 						throw Error(`Message index or file index is missing`);
