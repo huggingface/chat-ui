@@ -133,9 +133,9 @@ export async function* runTools(
 		id: crypto.randomUUID(),
 		from: "system",
 		content:
-			"Here is the list of available files that can be used for tools. Only use the filenames that are in this list, do not try to guess the filename. \n - " +
+			"Here is the list of available filenames that can be used as inputs. Only use the filenames that are in this list. \n - " +
 			files.join("\n - ") +
-			"\n",
+			"\n\n\n",
 	} satisfies Message;
 
 	// put fileMsg before last if files.length > 0
