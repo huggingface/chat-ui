@@ -128,30 +128,43 @@
 
     const convTreeStore = useConvTreeStore();
 
+    // Create a map of messages by their IDs for faster lookup
+    const messageMap = new Map();
+    const childIndexMap = new Map(); // Map to store child indexes for faster lookup
+
+    messages.forEach((message) => {
+        messageMap.set(message.id, message);
+        // Create a map entry for each message's children for quick index lookup
+        if (message.children) {
+            const childrenIndexMap = new Map();
+            message.children.forEach((childId, index) => {
+                childrenIndexMap.set(childId, index);
+            });
+            childIndexMap.set(message.id, childrenIndexMap);
+        }
+    });
 
     // Update the current indexes of the messages in the conversation tree
     const updateCurrentIndex = () => {
         if (typeof window === "undefined") return;
-        // Retrieve the leafId from localStorage
-        let leafId = localStorage.getItem("leafId");
+
+        // Retrieve the leafId and currentChildIndex from localStorage once
+        const leafId = localStorage.getItem("leafId");
+
         if (leafId) {
-            let leafMessage = messages.find((m) => m.id == leafId);
+            const leafMessage = messageMap.get(leafId);
             if (!leafMessage?.ancestors) return;
-            let ancestors = leafMessage.ancestors;
+
+            const ancestors = leafMessage.ancestors;
             for (let i = 0; i < ancestors.length - 1; i++) {
-                let curMessage = messages.find((m) => m.id == ancestors[i]);
+                const curMessage = messageMap.get(ancestors[i]);
                 if (curMessage?.children) {
-                    for (let j = 0; j < curMessage.children.length; j++) {
-                        if (i + 1 < ancestors.length) {
-                            if (curMessage.children[j] == ancestors[i + 1]) {
-                                curMessage.currentChildIndex = j;
-                                break;
-                            }
-                        } else {
-                            if (curMessage.children[j] == leafId) {
-                                curMessage.currentChildIndex = j;
-                                break;
-                            }
+                    const nextAncestorId = ancestors[i + 1];
+                    const childrenIndexMap = childIndexMap.get(curMessage.id);
+                    if (childrenIndexMap) {
+                        const childIndex = childrenIndexMap.get(nextAncestorId);
+                        if (childIndex !== undefined) {
+                            curMessage.currentChildIndex = childIndex;
                         }
                     }
                 }
@@ -159,8 +172,72 @@
         }
     };
 
+    updateCurrentIndex();
+
+    // // Create a map of messages by their IDs for faster lookup
+    // const messageMap = new Map();
+    // messages.forEach((message) => {
+    //     messageMap.set(message.id, message);
+    // });
+
+    // // Update the current indexes of the messages in the conversation tree
+    // const updateCurrentIndex = () => {
+    //     if (typeof window === "undefined") return;
+
+    //     // Retrieve the leafId and currentChildIndex from localStorage
+    //     const leafId = localStorage.getItem("leafId");
+
+    //     if (leafId) {
+    //         const leafMessage = messageMap.get(leafId);
+    //         if (!leafMessage?.ancestors) return;
+
+    //         const ancestors = leafMessage.ancestors;
+    //         for (let i = 0; i < ancestors.length - 1; i++) {
+    //             const curMessage = messageMap.get(ancestors[i]);
+    //             if (curMessage?.children) {
+    //                 const nextAncestorId = ancestors[i + 1];
+    //                 const childIndex = curMessage.children.indexOf(nextAncestorId);
+    //                 if (childIndex !== -1) {
+    //                     curMessage.currentChildIndex = childIndex;
+    //                 }
+    //             }
+    //         }
+    //     }
+    // };
 
     updateCurrentIndex();
+
+    // // Update the current indexes of the messages in the conversation tree
+    // const updateCurrentIndex = () => {
+    //     if (typeof window === "undefined") return;
+    //     // Retrieve the leafId from localStorage
+    //     let leafId = localStorage.getItem("leafId");
+    //     if (leafId) {
+    //         let leafMessage = messages.find((m) => m.id == leafId);
+    //         if (!leafMessage?.ancestors) return;
+    //         let ancestors = leafMessage.ancestors;
+    //         for (let i = 0; i < ancestors.length - 1; i++) {
+    //             let curMessage = messages.find((m) => m.id == ancestors[i]);
+    //             if (curMessage?.children) {
+    //                 for (let j = 0; j < curMessage.children.length; j++) {
+    //                     if (i + 1 < ancestors.length) {
+    //                         if (curMessage.children[j] == ancestors[i + 1]) {
+    //                             curMessage.currentChildIndex = j;
+    //                             break;
+    //                         }
+    //                     } else {
+    //                         if (curMessage.children[j] == leafId) {
+    //                             curMessage.currentChildIndex = j;
+    //                             break;
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // };
+    
+    // updateCurrentIndex();
 
 
     $: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);

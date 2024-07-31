@@ -26,7 +26,7 @@ export async function* generateTitleForConversation(
 }
 
 export async function generateTitle(prompt: string) {
-	if (!env.LLM_SUMMARIZATION) {
+	if (env.LLM_SUMMARIZATION !== "true") {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
