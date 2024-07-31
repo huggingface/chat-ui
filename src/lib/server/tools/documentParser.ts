@@ -9,7 +9,6 @@ const documentParser: BackendTool = {
 	name: "document_parser",
 	displayName: "Document Parser",
 	description: "Use this tool to parse any document and get its content in markdown format.",
-	isOnByDefault: true,
 	mimeTypes: ["application/*", "text/*"],
 	parameterDefinitions: {
 		fileMessageIndex: {

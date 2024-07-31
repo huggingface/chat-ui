@@ -7,6 +7,7 @@ import addToolsToSettings from "./03-add-tools-in-settings";
 import updateMessageUpdates from "./04-update-message-updates";
 import updateMessageFiles from "./05-update-message-files";
 import trimMessageUpdates from "./06-trim-message-updates";
+import resetTools from "./07-reset-tools-in-settings";
 
 export interface Migration {
 	_id: ObjectId;
@@ -25,4 +26,5 @@ export const migrations: Migration[] = [
 	updateMessageUpdates,
 	updateMessageFiles,
 	trimMessageUpdates,
+	resetTools,
 ];

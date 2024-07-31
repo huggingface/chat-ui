@@ -6,7 +6,6 @@ const fetchUrl: BackendTool = {
 	name: "fetch_url",
 	displayName: "URL Fetcher",
 	description: "A tool that can be used to fetch an URL and return the content directly.",
-	isOnByDefault: true,
 	parameterDefinitions: {
 		url: {
 			description: "The url that should be fetched.",

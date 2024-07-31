@@ -4,7 +4,7 @@
 ARG INCLUDE_DB=false
 
 # stage that install the dependencies
-FROM node:20 as builder-production
+FROM node:20 AS builder-production
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/app/.npm \
         npm set cache /app/.npm && \
         npm ci --omit=dev
 
-FROM builder-production as builder
+FROM builder-production AS builder
 
 ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=blue
@@ -28,13 +28,13 @@ COPY --link --chown=1000 . .
 RUN npm run build
 
 # mongo image
-FROM mongo:latest as mongo
+FROM mongo:latest AS mongo
 
 # image to be used if INCLUDE_DB is false
-FROM node:20-slim as local_db_false
+FROM node:20-slim AS local_db_false
 
 # image to be used if INCLUDE_DB is true
-FROM node:20-slim as local_db_true
+FROM node:20-slim AS local_db_true
 
 RUN apt-get update
 RUN apt-get install gnupg curl -y
@@ -46,7 +46,7 @@ RUN mkdir -p /data/db
 RUN chown -R 1000:1000 /data/db
 
 # final image
-FROM local_db_${INCLUDE_DB} as final
+FROM local_db_${INCLUDE_DB} AS final
 
 # build arg to determine if the database should be included
 ARG INCLUDE_DB=false
