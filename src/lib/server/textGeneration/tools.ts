@@ -1,6 +1,5 @@
 import { ToolResultStatus, type ToolCall, type ToolResult } from "$lib/types/Tool";
 import { v4 as uuidV4 } from "uuid";
-import JSON5 from "json5";
 import type { BackendTool, BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
@@ -15,7 +14,7 @@ import directlyAnswer from "../tools/directlyAnswer";
 import websearch from "../tools/web/search";
 import { z } from "zod";
 import { logger } from "../logger";
-import { toolHasName } from "../tools/utils";
+import { extractJson, toolHasName } from "../tools/utils";
 import type { MessageFile } from "$lib/types/Message";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import { MetricsServer } from "../metrics";
@@ -143,26 +142,22 @@ export async function* runTools(
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
-			const codeBlocks = Array.from(output.generated_text.matchAll(/```json\n(.*?)```/gs))
-				.map(([, block]) => block)
-				// remove trailing comma
-				.map((block) => block.trim().replace(/,$/, ""));
-			if (codeBlocks.length === 0) continue;
+			try {
+				const rawCalls = await extractJson(output.generated_text);
+				const newCalls = rawCalls
+					.filter(isExternalToolCall)
+					.map(externalToToolCall)
+					.filter((call) => call !== undefined) as ToolCall[];
 
-			// grab only the capture group from the regex match
-			for (const block of codeBlocks) {
-				try {
-					calls.push(
-						...JSON5.parse(block).filter(isExternalToolCall).map(externalToToolCall).filter(Boolean)
-					);
-				} catch (e) {
-					// error parsing the calls
-					yield {
-						type: MessageUpdateType.Status,
-						status: MessageUpdateStatus.Error,
-						message: "Error while parsing tool calls, please retry",
-					};
-				}
+				calls.push(...newCalls);
+			} catch (e) {
+				logger.error(e, "Error while parsing tool calls, please retry");
+				// error parsing the calls
+				yield {
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Error,
+					message: "Error while parsing tool calls, please retry",
+				};
 			}
 		}
 	}
