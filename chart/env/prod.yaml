@@ -333,19 +333,19 @@ envVars:
       {
         "_id": "000000000000000000000001",
         "displayName": "Image Generation",
-        "description" : "Use this tool to generate images based on a prompt.",
-        "color" : "yellow",
-        "icon" : "camera",
-        "baseUrl" : "ByteDance/Hyper-SDXL-1Step-T2I" ,
-        "name" : "image_generation",
-        "endpoint" : "/process_image",
-        "inputs" : [
+        "description": "Use this tool to generate images based on a prompt.",
+        "color": "yellow",
+        "icon": "camera",
+        "baseUrl": "ByteDance/Hyper-SDXL-1Step-T2I",
+        "name": "image_generation",
+        "endpoint": "/process_image",
+        "inputs": [
           {
-          "name" : "num_images", 
-          "description" : "Number of images to generate, between 1 and 8",
-          "paramType" : "optional",
-          "default" : 1,
-          "type" : "int"
+            "name": "num_images",
+            "description": "Number of images to generate, between 1 and 8",
+            "paramType": "optional",
+            "default": 1,
+            "type": "int"
           },
           {
             "name": "height",
@@ -354,7 +354,7 @@ envVars:
             "default": 512,
             "type": "int"
           },
-                    {
+          {
             "name": "width",
             "description": "Width of the generated image",
             "paramType": "optional",
@@ -368,42 +368,88 @@ envVars:
             "type": "str"
           },
           {
-          "name": "seed",
-          "paramType": "fixed",
-          "value": 1234,
-          "type": "int"
+            "name": "seed",
+            "paramType": "fixed",
+            "value": 1234,
+            "type": "int"
           }
         ],
         "outputComponent": "gallery",
         "showOutput": true
-      },     
-       {
-        "_id": "000000000000000000000003",
+      },
+      {
+        "_id": "000000000000000000000002",
         "displayName": "Document parser",
-        "description" : "Use this tool to parse any document and get its content in markdown format.",
-        "color" : "yellow",
-        "icon" : "cloud",
-        "baseUrl" : "huggingchat/document-parser" ,
-        "name" : "document_parser",
-        "endpoint" : "/predict",
-        "inputs" : [
+        "description": "Use this tool to parse any document and get its content in markdown format.",
+        "color": "yellow",
+        "icon": "cloud",
+        "baseUrl": "huggingchat/document-parser",
+        "name": "document_parser",
+        "endpoint": "/predict",
+        "inputs": [
           {
-          "name" : "document", 
-          "description" : "Filename of the document to parse",
-          "paramType" : "required",
-          "type" : "file",
-          "mimeTypes" : ['application/*', 'text/*']
+            "name": "document",
+            "description": "Filename of the document to parse",
+            "paramType": "required",
+            "type": "file",
+            "mimeTypes": ['application/*', 'text/*']
           },
           {
-            "name" : "filename",
-            "paramType" : "fixed", 
-            "value" : "document.pdf",
-            "type" : "str"
+            "name": "filename",
+            "paramType": "fixed",
+            "value": "document.pdf",
+            "type": "str"
           }
         ],
         "outputComponent": "textbox",
         "outputComponentIdx": 0,
         "showOutput": false
+      },
+      {
+        "_id": "000000000000000000000003",
+        "name": "edit_image",
+        "baseUrl": "multimodalart/cosxl",
+        "endpoint": "/run_edit",
+        "inputs": [
+          {
+            "name": "image",
+            "description": "The image path to be edited",
+            "paramType": "required",
+            "type": "file",
+            "mimeTypes": ['image/*']
+          },
+          {
+            "name": "prompt",
+            "description": "The prompt with which to edit the image",
+            "paramType": "required",
+            "type": "str"
+          },
+          {
+            "name": "negative_prompt",
+            "paramType": "fixed",
+            "value": "",
+            "type": "str"
+          },
+          {
+            "name": "guidance_scale",
+            "paramType": "fixed",
+            "value": 6.5,
+            "type": "float"
+          },
+          {
+            "name": "steps",
+            "paramType": "fixed",
+            "value": 30,
+            "type": "float"
+          }
+        ],
+        "outputComponent": "image",
+        "showOutput": true,
+        "displayName": "Image editor",
+        "color": "green",
+        "icon": "camera",
+        "description": "This tool lets you edit images",
+        "outputComponentIdx": 0
       }
     ]
   HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
