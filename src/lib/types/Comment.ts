@@ -24,6 +24,7 @@ export interface DisplayComment extends Omit<Comment, '_id'> {
 // CommentThread type (as stored in MongoDB)
 export interface CommentThread extends Timestamps {
     _id: ObjectId;
+    userId?: User["_id"];
     conversationId: Conversation["_id"];
     comments: Comment[];
     textQuoteSelector: {
@@ -40,6 +41,7 @@ export interface CommentThread extends Timestamps {
 // DisplayCommentThread type for use in the application
 export interface DisplayCommentThread extends Omit<CommentThread, 'comments' | '_id' | 'conversationId'> {
     _id: ObjectId | null;
+    username?: string;
     conversationId?: Conversation["_id"];
     comments: DisplayComment[];
     wrapperObject?: WrapperObject;

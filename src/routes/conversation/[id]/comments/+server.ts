@@ -44,6 +44,7 @@ export async function POST({ request, params, locals }) {
     const newCommentThread: CommentThread = {
         _id: new ObjectId(),
         conversationId,
+        userId: locals.user?._id,
         comments: validatedData.comments.map(comment => ({
             _id: new ObjectId(),
             sessionId: locals.sessionId,
@@ -106,7 +107,7 @@ export async function PUT({ request, params, locals }) {
         { 
             _id: commentThreadId, 
             conversationId,
-            'comments.userId': locals.user?._id
+            userId: locals.user?._id,
         },
         {
             $set: {

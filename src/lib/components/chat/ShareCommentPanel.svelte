@@ -181,8 +181,7 @@
                 textPositionSelector: displayCommentThread.textPositionSelector
             };
 
-			//if ('_id' in displayComment && displayComment._id) {
-            if (false) {
+			if ('_id' in displayCommentThread && displayCommentThread._id) {
 				// Update existing comment
 				response = await fetch(`/conversation/${$page.params.id}/comments`, {
 					method: 'PUT',
@@ -191,7 +190,7 @@
 					},
 					body: JSON.stringify({
 						...commentThreadData,
-						commentId: displayCommentThread._id,
+						commentThreadId: displayCommentThread._id,
 					}),
 				});
 			} else {
