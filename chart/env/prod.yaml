@@ -376,6 +376,34 @@ envVars:
         ],
         "outputComponent": "gallery",
         "showOutput": true
+      },     
+       {
+        "_id": "000000000000000000000003",
+        "displayName": "Document parser",
+        "description" : "Use this tool to parse any document and get its content in markdown format.",
+        "color" : "yellow",
+        "icon" : "cloud",
+        "baseUrl" : "huggingchat/document-parser" ,
+        "name" : "document_parser",
+        "endpoint" : "/predict",
+        "inputs" : [
+          {
+          "name" : "document", 
+          "description" : "Filename of the document to parse",
+          "paramType" : "required",
+          "type" : "file",
+          "mimeTypes" : ['application/*', 'text/*']
+          },
+          {
+            "name" : "filename",
+            "paramType" : "fixed", 
+            "value" : "document.pdf",
+            "type" : "str"
+          }
+        ],
+        "outputComponent": "textbox",
+        "outputComponentIdx": 0,
+        "showOutput": false
       }
     ]
   HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
