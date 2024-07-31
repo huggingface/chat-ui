@@ -19,7 +19,7 @@ import { MetricsServer } from "../metrics";
 import { stringifyError } from "$lib/utils/stringifyError";
 import { collections } from "../database";
 import { ObjectId } from "mongodb";
-import { Message } from "$lib/types/Message";
+import type { Message } from "$lib/types/Message";
 
 export async function filterToolsOnPreferences(
 	toolsPreference: Array<string>,
@@ -129,18 +129,40 @@ export async function* runTools(
 		return acc;
 	}, [] as string[]);
 
+	let formattedMessages = messages.map((message, msgIdx) => {
+		let content = message.content;
+
+		if (message.files && message.files.length > 0) {
+			content +=
+				"\n\nAdded files: \n - " +
+				message.files
+					.map((file, fileIdx) => {
+						const prefix = message.from === "user" ? "input" : "output";
+						const fileName = file.name.split(".").pop()?.toLowerCase();
+
+						return `${prefix}_${msgIdx}_${fileIdx}.${fileName}`;
+					})
+					.join("\n - ");
+		}
+
+		return {
+			...message,
+			content,
+		} satisfies Message;
+	});
+
 	const fileMsg = {
 		id: crypto.randomUUID(),
 		from: "system",
 		content:
-			"Here is the list of available filenames that can be used as inputs. Only use the filenames that are in this list. \n - " +
+			"Here is the list of available filenames that can be used as input for tools. Use the filenames that are in this list. \n The filename structure is as follows : {input for user|output for tool}_{message index in the conversation}_{file index in the list of files}.{file extension} \n - " +
 			files.join("\n - ") +
 			"\n\n\n",
 	} satisfies Message;
 
 	// put fileMsg before last if files.length > 0
-	const formattedMessages = files.length
-		? [...messages.slice(0, -1), fileMsg, ...messages.slice(-1)]
+	formattedMessages = files.length
+		? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
 		: messages;
 
 	// do the function calling bits here
