@@ -216,6 +216,7 @@
                     ? { 
                         ...commentThread,
                         _id: result.id || commentThread._id,
+                        userId: result.userId || commentThread.userId,
                         comments: commentThread.comments.map(comment => ({
                             ...comment,
                             content: comment.content,
@@ -355,7 +356,7 @@
                             </p>
                             <p>{"> " + dct.textQuoteSelector?.exact}</p>
                             <p>{dct.comments[0].content}</p>
-                            {#if $page.data.user && dct.comments[0].userId === $page.data.user.id}
+                            {#if $page.data.user && dct.userId === $page.data.user.id}
                                 <div class="flex justify-end mt-2">
                                     <button
                                     class="mr-2 p-1 bg-green-500 text-white rounded-full"

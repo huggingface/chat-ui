@@ -65,7 +65,7 @@ export async function POST({ request, params, locals }) {
         throw error(500, 'Failed to create comment');
     }
 
-    return json({ id: newCommentThread._id });
+    return json({ id: newCommentThread._id, userId: newCommentThread.userId });
 }
 
 export async function PUT({ request, params, locals }) {
@@ -202,6 +202,8 @@ export async function GET({ params, locals }) {
                 textPositionSelector: 1,
                 createdAt: 1,
                 updatedAt: 1,
+                userId: 1,
+                userName: 1,
                 isPending: { $literal: false }
             }
         }
