@@ -64,7 +64,7 @@ type ToolInputBase = ToolInputRequired | ToolInputOptional | ToolInputFixed;
 
 export type ToolInputFile = ToolInputBase & {
 	type: "file";
-	mimeTypes: string[];
+	mimeTypes: string;
 };
 
 export type ToolInputSimple = ToolInputBase & {

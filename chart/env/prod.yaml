@@ -392,7 +392,7 @@ envVars:
             "description": "Filename of the document to parse",
             "paramType": "required",
             "type": "file",
-            "mimeTypes": ['application/*', 'text/*']
+            "mimeTypes": 'application/*,text/*'
           },
           {
             "name": "filename",
@@ -416,7 +416,7 @@ envVars:
             "description": "The image path to be edited",
             "paramType": "required",
             "type": "file",
-            "mimeTypes": ['image/*']
+            "mimeTypes": 'image/*'
           },
           {
             "name": "prompt",

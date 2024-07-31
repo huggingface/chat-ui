@@ -15,8 +15,8 @@
 	import { base } from "$app/paths";
 
 	type ActionData = {
-		error: boolean;
-		errors: {
+		error?: boolean;
+		errors?: {
 			field: string | number;
 			message: string;
 		}[];
@@ -27,7 +27,7 @@
 	export let form: ActionData;
 
 	function getError(field: string, returnForm: ActionData) {
-		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
+		return returnForm?.errors?.find((error) => error.field === field)?.message ?? "";
 	}
 
 	let APIloading = false;
@@ -82,20 +82,21 @@
 				return {
 					name: param.parameter_name,
 					description: param.description,
-					paramType: "optional",
+					paramType: "optional" as const,
 					default: param.parameter_default,
-					...(type === "file" ? { mimeTypes: ["*/*"], type } : { type }),
-				} satisfies ToolInput;
+					...(type === "file" ? { mimeTypes: "*/*", type } : { type }),
+				};
 			} else {
 				// required if it doesn't have a default
 				return {
 					name: param.parameter_name,
 					description: param.description,
-					paramType: "required",
-					...(type === "file" ? { mimeTypes: ["*/*"], type } : { type }),
-				} satisfies ToolInput;
+					paramType: "required" as const,
+					...(type === "file" ? { mimeTypes: "*/*", type } : { type }),
+				};
 			}
 		});
+
 		editableTool.inputs = newInputs;
 
 		// outout components
@@ -139,7 +140,7 @@
 			case "boolean":
 				return type;
 			case "filepath":
-				return "file";
+				return "file" as const;
 			default:
 				return "str";
 		}
@@ -154,12 +155,6 @@
 	use:enhance={async ({ formData }) => {
 		formLoading = true;
 
-		editableTool.inputs = editableTool.inputs.map((input) => {
-			if (input.type === "file" && !Array.isArray(input.mimeTypes)) {
-				input.mimeTypes = [input.mimeTypes];
-			}
-			return input;
-		});
 		formData.append("tool", JSON.stringify(editableTool));
 
 		return async ({ result }) => {
