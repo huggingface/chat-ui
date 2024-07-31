@@ -215,8 +215,6 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 			ipToken
 		);
 
-		console.log({ outputs: JSON.stringify(outputs) });
-
 		if (!isValidOutputComponent(tool.outputComponent)) {
 			throw new Error(`Tool output component is not defined`);
 		}
