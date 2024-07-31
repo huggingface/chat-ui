@@ -336,31 +336,10 @@ envVars:
         "description": "Use this tool to generate images based on a prompt.",
         "color": "yellow",
         "icon": "camera",
-        "baseUrl": "ByteDance/Hyper-SDXL-1Step-T2I",
+        "baseUrl": "stabilityai/stable-diffusion-3-medium",
         "name": "image_generation",
-        "endpoint": "/process_image",
+        "endpoint": "/infer",
         "inputs": [
-          {
-            "name": "num_images",
-            "description": "Number of images to generate, between 1 and 8",
-            "paramType": "optional",
-            "default": 1,
-            "type": "int"
-          },
-          {
-            "name": "height",
-            "description": "Height of the generated image",
-            "paramType": "optional",
-            "default": 512,
-            "type": "int"
-          },
-          {
-            "name": "width",
-            "description": "Width of the generated image",
-            "paramType": "optional",
-            "default": 512,
-            "type": "int"
-          },
           {
             "name": "prompt",
             "description": "A prompt to generate an image from",
@@ -368,13 +347,55 @@ envVars:
             "type": "str"
           },
           {
+            "name": "negative_prompt",
+            "description": "A prompt for things that should not be in the image.",
+            "paramType": "optional",
+            "default": "",
+            "type": "str"
+          },
+          {
             "name": "seed",
             "paramType": "fixed",
-            "value": 1234,
-            "type": "int"
+            "value": "0",
+            "type": "float"
+          },
+          {
+            "name": "randomize_seed",
+            "paramType": "fixed",
+            "value": "true",
+            "type": "boolean"
+          },
+          {
+            "name": "width",
+            "description": "numeric value between 256 and 1344",
+            "paramType": "optional",
+            "default": 1024,
+            "type": "float"
+          },
+          {
+            "name": "height",
+            "description": "numeric value between 256 and 1344",
+            "paramType": "optional",
+            "default": 1024,
+            "type": "float"
+          },
+          {
+            "name": "guidance_scale",
+            "description": "numeric value between 0.0 and 10.0",
+            "paramType": "optional",
+            "default": 5,
+            "type": "float"
+          },
+          {
+            "name": "num_inference_steps",
+            "description": "numeric value between 1 and 50",
+            "paramType": "optional",
+            "default": 28,
+            "type": "float"
           }
         ],
-        "outputComponent": "gallery",
+        "outputComponent": "image",
+        "outputComponentIdx": 0,
         "showOutput": true
       },
       {
