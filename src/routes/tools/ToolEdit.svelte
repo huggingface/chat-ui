@@ -412,7 +412,7 @@
 													name="{input.name}-description"
 													class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 													placeholder="This is the description of the input."
-													bind:value={editableTool.inputs[inputIdx].description}
+													bind:value={input.description}
 													disabled={readonly}
 												/>
 												<p class="text-xs text-red-500">
@@ -440,7 +440,7 @@
 														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 														placeholder="This is the value of the input. Must be of type {parameter
 															?.python_type.type}"
-														bind:value={editableTool.inputs[inputIdx].default}
+														bind:value={input.default}
 														disabled={readonly}
 													/>
 												{:else}
@@ -449,7 +449,7 @@
 														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 														placeholder="This is the value of the input. Must be of type {parameter
 															?.python_type.type}"
-														bind:value={editableTool.inputs[inputIdx].value}
+														bind:value={input.value}
 														disabled={readonly}
 													/>
 												{/if}
