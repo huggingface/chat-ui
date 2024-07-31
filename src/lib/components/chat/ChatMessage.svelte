@@ -348,14 +348,14 @@
 		{#if !loading && (message.content || toolUpdates)}
 			<div
 				class="absolute bottom-1 right-0 -mb-4 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
-		{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
-		{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
-		"
+        {message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
+        {isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
+        "
 			>
 				{#if isAuthor}
 					<button
 						class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
-					{message.score && message.score > 0
+                    {message.score && message.score > 0
 							? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
 							: ''}"
 						title={message.score === 1 ? "Remove +1" : "+1"}
@@ -367,7 +367,7 @@
 					</button>
 					<button
 						class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
-					{message.score && message.score < 0
+                    {message.score && message.score < 0
 							? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
 							: ''}"
 						title={message.score === -1 ? "Remove -1" : "-1"}
@@ -469,10 +469,10 @@
 							<button
 								type="submit"
 								class="btn rounded-lg px-3 py-1.5 text-sm
-								{loading
+                                {loading
 									? 'bg-gray-300 text-gray-400 dark:bg-gray-700 dark:text-gray-600'
 									: 'bg-gray-200 text-gray-600 focus:ring-0   hover:text-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
-								"
+                                "
 								disabled={loading}
 							>
 								Submit
@@ -492,8 +492,8 @@
 				{#if !loading && !editMode}
 					<div
 						class="
-						max-md:opacity-0' invisible absolute
-						right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
+                        max-md:opacity-0' invisible absolute
+                        right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
 						isCopied
 							? 'max-md:visible max-md:translate-y-0 max-md:opacity-100'
 							: ''}"
