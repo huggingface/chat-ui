@@ -34,6 +34,7 @@
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import DOMPurify from "isomorphic-dompurify";
+	import TokenUsage from "./TokenUsage.svelte";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -210,6 +211,7 @@
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 
 	$: modalImageToShow = null as MessageFile | null;
+
 </script>
 
 {#if modalImageToShow}
@@ -311,6 +313,10 @@
 					{/if}
 				{/each}
 			</div>
+	
+			{#if message.usage}
+				<TokenUsage usage={message.usage} />
+			{/if}
 
 			<!-- Web Search sources -->
 			{#if webSearchSources?.length}

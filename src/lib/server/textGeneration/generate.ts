@@ -1,11 +1,20 @@
 import type { ToolResult } from "$lib/types/Tool";
-import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import {
+	MessageUpdateType,
+	type MessageUpdate,
+	type MessageFinalAnswerUpdate,
+} from "$lib/types/MessageUpdate";
 import { AbortedGenerations } from "../abortedGenerations";
 import type { TextGenerationContext } from "./types";
 import type { EndpointMessage } from "../endpoints/endpoints";
+import type { UsageInfo } from "$lib/types/Message";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
+type OutputWithPossibleUsage = TextGenerationStreamOutput & {
+	usage?: UsageInfo;
+};
 export async function* generate(
 	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
 	toolResults: ToolResult[],
@@ -30,8 +39,14 @@ export async function* generate(
 				interrupted = false;
 				text = text.slice(0, text.length - stopToken.length);
 			}
+			const outputWithUsage = output as OutputWithPossibleUsage;
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text,
+				interrupted,
+				...(outputWithUsage.usage && { usage: outputWithUsage.usage }),
+			} as MessageFinalAnswerUpdate;
 
-			yield { type: MessageUpdateType.FinalAnswer, text, interrupted };
 			continue;
 		}
 

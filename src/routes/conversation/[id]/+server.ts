@@ -360,6 +360,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
 
+					// Add usage information if available
+					if ("usage" in event && event.usage) {
+						messageToWriteTo.usage = event.usage;
+					}
+
 					// add to latency
 					MetricsServer.getMetrics().model.latency.observe(
 						{ model: model?.id },

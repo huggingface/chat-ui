@@ -3,6 +3,12 @@ import type { Timestamps } from "./Timestamps";
 import type { WebSearch } from "./WebSearch";
 import type { v4 } from "uuid";
 
+// Add this type definition
+export interface UsageInfo {
+	input_tokens: number;
+	output_tokens: number;
+}
+
 export type Message = Partial<Timestamps> & {
 	from: "user" | "assistant" | "system";
 	id: ReturnType<typeof v4>;
@@ -23,6 +29,9 @@ export type Message = Partial<Timestamps> & {
 
 	// goes one level deep
 	children?: Message["id"][];
+
+	// Add the optional usage field
+	usage?: UsageInfo;
 };
 
 export type MessageFile = {

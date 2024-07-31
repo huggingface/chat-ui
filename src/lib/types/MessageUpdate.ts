@@ -1,5 +1,6 @@
 import type { WebSearchSource } from "$lib/types/WebSearch";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
+import type { UsageInfo } from "./Message";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -114,4 +115,5 @@ export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
 	text: string;
 	interrupted: boolean;
+	usage?: UsageInfo;
 }

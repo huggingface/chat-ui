@@ -4,6 +4,7 @@ import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator } from "../images";
 import { endpointMessagesToAnthropicMessages } from "./utils";
+import type { UsageInfo } from "$lib/types/Message";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -67,11 +68,13 @@ export async function endpointAnthropic(
 				stop_sequences: parameters?.stop,
 				system,
 			});
+
 			while (true) {
 				const result = await Promise.race([stream.emitted("text"), stream.emitted("end")]);
 
 				// Stream end
 				if (result === undefined) {
+					const finalMessage = await stream.finalMessage();
 					yield {
 						token: {
 							id: tokenId++,
@@ -79,9 +82,10 @@ export async function endpointAnthropic(
 							logprob: 0,
 							special: true,
 						},
-						generated_text: await stream.finalText(),
+						generated_text: await stream.finalText(), // Use finalText() for consistency with original
 						details: null,
-					} satisfies TextGenerationStreamOutput;
+						usage: finalMessage.usage, // Add usage from finalMessage
+					} satisfies TextGenerationStreamOutput & { usage?: UsageInfo };
 					return;
 				}
 
