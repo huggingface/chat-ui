@@ -35,7 +35,8 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import DOMPurify from "isomorphic-dompurify";
 	import TokenUsage from "./TokenUsage.svelte";
-
+	import MermaidDiagram from "./MermaidDiagram.svelte";
+	
 	function sanitizeMd(md: string) {
 		let ret = md
 			.replace(/<\|[a-z]*$/, "")
@@ -304,10 +305,13 @@
 				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
-						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
+						{#if token.lang === 'mermaid'}
+							<MermaidDiagram code={unsanitizeMd(token.text)} />
+						{:else}
+							<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
+						{/if}
 					{:else}
 						{#await marked.parse(token.raw, options) then parsed}
-							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 							{@html DOMPurify.sanitize(parsed)}
 						{/await}
 					{/if}
