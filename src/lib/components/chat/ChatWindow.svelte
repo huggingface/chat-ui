@@ -120,6 +120,10 @@
 	);
 
 	function onShare() {
+		if (!confirm("Are you sure you want to share this conversation? This cannot be undone.")) {
+			return;
+		}
+
 		dispatch("share");
 		isSharedRecently = true;
 		if (timeout) {

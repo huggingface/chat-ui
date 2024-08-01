@@ -34,6 +34,7 @@
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import DOMPurify from "isomorphic-dompurify";
+	import { enhance } from "$app/forms";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -538,6 +539,11 @@
 							method="POST"
 							action="?/deleteBranch"
 							class="hidden group-hover/navbranch:block"
+							use:enhance={({ cancel }) => {
+								if (!confirm("Are you sure you want to delete this branch?")) {
+									cancel();
+								}
+							}}
 						>
 							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
 							<button
