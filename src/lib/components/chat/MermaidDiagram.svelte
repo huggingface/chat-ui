@@ -7,9 +7,15 @@
 
   const DEBOUNCE_DELAY = 500;
   const DEFAULT_MERMAID_THEME = "default";
+  const MERMAID_INIT_OPTIONS = {
+    startOnLoad: false,
+    securityLevel: 'strict',
+    theme: DEFAULT_MERMAID_THEME,
+    logLevel: 'error'
+  };
 
   export let code: string;
-
+  
   let mermaidDiagram: HTMLElement;
   let error: string | null = null;
   let isLoading = false;
@@ -21,11 +27,14 @@
   const codeStore = writable('');
   $: codeStore.set(code);
 
-  function validatePartialMermaidSyntax(code: string): boolean {
-    const validStarts = ['graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram', 'erDiagram', 'journey', 'gantt', 'pie', 'mindmap'];
-    return validStarts.some(start => code.trim().toLowerCase().startsWith(start));
+  function validateMermaidSyntax(code: string): boolean {
+    try {
+      mermaid.parse(code);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
-
 
   function serializeToPako(graphMarkdown: string): string {
     const jGraph = { code: graphMarkdown, mermaid: { theme: DEFAULT_MERMAID_THEME } };
@@ -54,8 +63,8 @@
   }
 
   const renderDiagram = async () => {
-    if (!validatePartialMermaidSyntax($codeStore)) {
-      error = "Invalid or incomplete Mermaid syntax. Please check your diagram code.";
+    if (!validateMermaidSyntax($codeStore)) {
+      error = "Invalid Mermaid syntax.";
       isLoading = false;
       return;
     }
@@ -72,8 +81,7 @@
       }
 
       // Generate the mermaid.live edit link
-      const pakoString = serializeToPako($codeStore);
-      liveEditorUrl = `https://mermaid.live/edit#pako:${pakoString}`;
+      liveEditorUrl = generateMermaidLiveLink($codeStore);
       
     } catch (e) {
       console.error("Mermaid diagram rendering failed:", e);
@@ -83,10 +91,10 @@
     }
   };
 
-  const debouncedRenderDiagram = debounce(renderDiagram, DEBOUNCE_DELAY);  // 500ms debounce
+  const debouncedRenderDiagram = debounce(renderDiagram, DEBOUNCE_DELAY);
 
   $: {
-    if ($codeStore) {
+  if ($codeStore) {
       isLoading = true;
       error = null;
       debouncedRenderDiagram();
@@ -98,7 +106,7 @@
   }
 
   onMount(() => {
-    mermaid.initialize({ startOnLoad: false });
+    mermaid.initialize(MERMAID_INIT_OPTIONS);
     diagramId = `mermaid-diagram-${Math.random().toString(36).slice(2, 11)}`;
   });
 
@@ -106,7 +114,6 @@
     if (debounceTimer) clearTimeout(debounceTimer);
   });
 </script>
-
 
 {#if isLoading}
   <div class="loading" role="status" aria-live="polite">Loading diagram...</div>
@@ -127,7 +134,6 @@
       <span>Edit on mermaid.live</span>
     </a>
   </div>
-  
 {/if}
 
 <style>
@@ -141,5 +147,4 @@
     font-style: italic;
     margin: 10px 0;
   }
-
 </style>
