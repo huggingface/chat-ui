@@ -85,7 +85,7 @@
       liveEditorUrl = generateMermaidLiveLink($codeStore);
       
     } catch (e) {
-        console.warn("Mermaid diagram rendering failed:", e);
+//        console.warn("Mermaid diagram rendering failed:", e);
         // Instead of setting an error, we'll just clear the previous rendering
         renderedMermaidSvg = null;
         if (mermaidDiagram) {
