@@ -5,6 +5,7 @@ import { base } from "$app/paths";
 import { updateUser } from "./updateUser";
 import { env } from "$env/dynamic/private";
 import JSON5 from "json5";
+import { logger } from "$lib/server/logger";
 
 const allowedUserEmails = z
 	.array(z.string().email())
@@ -59,6 +60,8 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 			throw error(403, "User not allowed");
 		}
 	}
+
+	logger.info("updating user");
 
 	await updateUser({
 		userData,
