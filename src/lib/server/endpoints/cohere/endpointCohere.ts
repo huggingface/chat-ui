@@ -91,12 +91,15 @@ export async function endpointCohere(
 						stopSequences: parameters?.stop,
 						frequencyPenalty: parameters?.frequency_penalty,
 						tools,
-						toolResults: toolResults?.map((toolResult) => {
-							if (toolResult.status === ToolResultStatus.Error) {
-								return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
-							}
-							return { call: toolResult.call, outputs: toolResult.outputs };
-						}),
+						toolResults:
+							toolResults?.length && toolResults?.length > 0
+								? toolResults?.map((toolResult) => {
+										if (toolResult.status === ToolResultStatus.Error) {
+											return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
+										}
+										return { call: toolResult.call, outputs: toolResult.outputs };
+								  })
+								: undefined,
 					})
 					.catch(async (err) => {
 						if (!err.body) throw err;
