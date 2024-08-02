@@ -143,12 +143,7 @@
 {/if}
 
 <style>
-  .error-message {
-    color: red;
-    font-style: italic;
-    margin: 10px 0;
-  }
-  .loading {
+.loading {
     color: #888;
     font-style: italic;
     margin: 10px 0;
