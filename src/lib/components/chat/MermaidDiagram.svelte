@@ -11,7 +11,8 @@
     startOnLoad: false,
     securityLevel: 'strict',
     theme: DEFAULT_MERMAID_THEME,
-    logLevel: 'error'
+    logLevel: 'error',
+    suppressErrors: true
   };
 
   export let code: string;
@@ -84,8 +85,12 @@
       liveEditorUrl = generateMermaidLiveLink($codeStore);
       
     } catch (e) {
-      console.error("Mermaid diagram rendering failed:", e);
-      error = "Failed to render Mermaid diagram. Please check your syntax.";
+        console.warn("Mermaid diagram rendering failed:", e);
+        // Instead of setting an error, we'll just clear the previous rendering
+        renderedMermaidSvg = null;
+        if (mermaidDiagram) {
+          mermaidDiagram.innerHTML = '';
+        }
     } finally {
       isLoading = false;
     }
@@ -115,11 +120,10 @@
   });
 </script>
 
+<!-- Update the template section -->
 {#if isLoading}
   <div class="loading" role="status" aria-live="polite">Loading diagram...</div>
-{:else if error}
-  <div class="error-message" role="alert">{error}</div>
-{:else}
+{:else if renderedMermaidSvg}
   <div bind:this={mermaidDiagram} aria-label="Mermaid diagram"></div>
   
   <div class="mt-4 text-sm flex justify-end">
@@ -134,6 +138,8 @@
       <span>Edit on mermaid.live</span>
     </a>
   </div>
+{:else}
+  <div class="info-message" role="status">Unable to render diagram. Please check your Mermaid syntax.</div>
 {/if}
 
 <style>
