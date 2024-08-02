@@ -79,15 +79,11 @@ export async function updateUser(params: {
 	// Dynamically access user data based on NAME_CLAIM from environment
 	// This approach allows us to adapt to different OIDC providers flexibly.
 
+	logger.info({ username, name, email, orgs: orgs?.map((el) => el.sub) }, "user login");
 	// if using huggingface as auth provider, check orgs for earl access and amin rights
 	const isAdmin = (HF_ORG_ADMIN && orgs?.some((org) => org.sub === HF_ORG_ADMIN)) || false;
 	const isEarlyAccess =
 		(HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === HF_ORG_EARLY_ACCESS)) || false;
-
-	logger.info(
-		{ username, name, email, orgs: orgs?.map((el) => el.sub), isAdmin, isEarlyAccess },
-		"user login"
-	);
 
 	// check if user already exists
 	const existingUser = await collections.users.findOne({ hfUserId });
