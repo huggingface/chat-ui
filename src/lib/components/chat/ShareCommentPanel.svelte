@@ -106,7 +106,15 @@
         }
     }
 
+    let hoveredCommentId: string | null = null;
 
+    function handleMouseEnter(id: string | null) {
+        hoveredCommentId = id;
+    }
+
+    function handleMouseLeave() {
+        hoveredCommentId = null;
+    }
 
 
     function handleCommentClick() {
@@ -426,7 +434,12 @@
             {#if displayCommentThreads.length > 0}
                 <ul class="space-y-2">
                     {#each displayCommentThreads as dct, index}
-                    <li class="bg-gray-100 p-3 rounded-lg" data-comment-thread-id={dct._id || ''}>
+                    <li 
+                        class="bg-gray-100 p-3 rounded-lg relative" 
+                        data-comment-thread-id={dct._id || ''}
+                        on:mouseenter={() => handleMouseEnter(dct._id?.toString() || null)}
+                        on:mouseleave={handleMouseLeave}
+                    >
                         {#if !dct.isPending}
                             <p>{"> " + dct.textQuoteSelector?.exact}</p>
                             
@@ -466,7 +479,7 @@
                                     </button>
                                 {/if}
 
-                                {#if $page.data.user && dct.userId === $page.data.user.id}
+                                {#if $page.data.user && dct.userId === $page.data.user.id && hoveredCommentId === dct._id}
                                     <button
                                         class="mr-2 p-1 bg-green-500 text-white rounded-full"
                                         on:click={() => handleEditComment(dct)}
