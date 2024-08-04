@@ -12,6 +12,7 @@
     import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonSend from "~icons/carbon/send";
+    import CarbonReply from "~icons/carbon/reply";
 
 
     export let shared: boolean;
@@ -118,6 +119,7 @@
 
 			if (newRange) {
 				console.log("New range created successfully");
+                console.log($page.data.user);
 				const wrapper = document.createElement('mark');
 				const wrappedRange = wrapRangeText(wrapper, newRange);
 				console.log('Wrapped nodes:', wrappedRange.nodes);
@@ -130,7 +132,7 @@
                         _id: null,
                         content: "",
                         originalContent: "",
-                        username: $page.data.user?.username || $page.data.user?.email || 'Anonymous',
+                        username: $page.data.user?.name || $page.data.user?.email || 'Anonymous',
                         isPending: true,
                         updatedAt: new Date(),
 						createdAt: new Date(),
@@ -334,18 +336,15 @@
             Click to comment on this chat and get help from the community.
         </p>
         {:else if conversationStarted}
-        <!--Display the list of Comments-->
+        <!--Display the list of Comment Threads-->
         <div class="mt-4 w-full max-w-md">
             <h3 class="text-lg font-semibold mb-2">Comments</h3>
             {#if displayCommentThreads.length > 0}
                 <ul class="space-y-2">
-                {#each displayCommentThreads as dct, index}
+                    {#each displayCommentThreads as dct, index}
                     <li class="bg-gray-100 p-3 rounded-lg">
                         {#if !dct.isPending}
                             <p class="text-sm text-gray-600">
-                                {#if dct.comments[0].username}
-                                    <span class="font-semibold">{dct.comments[0].username}</span><br/>
-                                {/if}
                                 {#if dct.textPositionSelector && dct.textPositionSelector.start !== undefined}
                                     Position: {dct.textPositionSelector.start}<br/>
                                 {/if}
@@ -355,13 +354,30 @@
                                 {/if}
                             </p>
                             <p>{"> " + dct.textQuoteSelector?.exact}</p>
-                            <p>{dct.comments[0].content}</p>
-                            {#if $page.data.user && dct.userId === $page.data.user.id}
-                                <div class="flex justify-end mt-2">
+                            
+                            {#each dct.comments as comment}
+                                <div class="mt-2 p-2 bg-white rounded">
+                                    <p class="text-sm text-gray-600 font-semibold">{comment.username || 'Anonymous'}</p>
+                                    <p>{comment.content}</p>
+                                    <p class="text-xs text-gray-500">
+                                        {new Date(comment.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                                    </p>
+                                </div>
+                            {/each}
+                
+                            <div class="flex justify-end mt-2">
+                                <button
+                                    class="mr-2 p-1 bg-blue-500 text-white rounded-full"
+                                    on:click={() => alert("Reply pushed")}
+                                    aria-label="Reply to Comment"
+                                >
+                                    <CarbonReply />
+                                </button>
+                                {#if $page.data.user && dct.userId === $page.data.user.id}
                                     <button
-                                    class="mr-2 p-1 bg-green-500 text-white rounded-full"
-                                    on:click={() => handleEditComment(dct)}
-                                    aria-label="Edit Comment"
+                                        class="mr-2 p-1 bg-green-500 text-white rounded-full"
+                                        on:click={() => handleEditComment(dct)}
+                                        aria-label="Edit Comment"
                                     >
                                         <CarbonEdit />
                                     </button>
@@ -376,8 +392,8 @@
                                     >
                                         <CarbonTrashCan />
                                     </button>
-                                </div>
-                            {/if}
+                                {/if}
+                            </div>
                         {:else}
                             <p>{"> " + dct.textQuoteSelector?.exact}</p>
                             <textarea
