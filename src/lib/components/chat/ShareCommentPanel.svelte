@@ -442,7 +442,29 @@
                     >
                         <p>{"> " + dct.textQuoteSelector?.exact}</p>
                         {#if !dct.isPending}
-                            
+                            {#if $page.data.user && dct.userId === $page.data.user.id && hoveredCommentId === dct._id}
+                                <div class="absolute top-2 right-2 flex">
+                                    <!-- <button
+                                        class="mr-2 p-1 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+                                        on:click={() => handleEditComment(dct)}
+                                        aria-label="Edit Comment"
+                                    >
+                                        <CarbonEdit />
+                                    </button>
+                                    -->
+                                    <button
+                                        class="p-1 rounded-full transition-colors"
+                                        on:click={() => {
+                                            if (confirm('Are you sure you want to delete this comment?')) {
+                                                handleDeleteComment(dct);
+                                            }
+                                        }}
+                                        aria-label="Delete Comment"
+                                    >
+                                        <CarbonTrashCan />
+                                    </button>
+                                </div>
+                            {/if}
                             {#each dct.comments as comment}
                                 <div class="mt-2 p-2 bg-white rounded">
                                     <div class="flex items-center justify-between">
@@ -479,26 +501,7 @@
                                     </button>
                                 {/if}
 
-                                {#if $page.data.user && dct.userId === $page.data.user.id && hoveredCommentId === dct._id}
-                                    <button
-                                        class="mr-2 p-1 bg-green-500 text-white rounded-full"
-                                        on:click={() => handleEditComment(dct)}
-                                        aria-label="Edit Comment"
-                                    >
-                                        <CarbonEdit />
-                                    </button>
-                                    <button
-                                        class="p-1 bg-red-500 text-white rounded-full"
-                                        on:click={() => {
-                                            if (confirm('Are you sure you want to delete this comment?')) {
-                                                handleDeleteComment(dct);
-                                            }
-                                        }}
-                                        aria-label="Delete Comment"
-                                    >
-                                        <CarbonTrashCan />
-                                    </button>
-                                {/if}
+
                             </div>
                         {:else}
                             
