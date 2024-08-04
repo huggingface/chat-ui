@@ -440,8 +440,8 @@
                         on:mouseenter={() => handleMouseEnter(dct._id?.toString() || null)}
                         on:mouseleave={handleMouseLeave}
                     >
+                        <p>{"> " + dct.textQuoteSelector?.exact}</p>
                         {#if !dct.isPending}
-                            <p>{"> " + dct.textQuoteSelector?.exact}</p>
                             
                             {#each dct.comments as comment}
                                 <div class="mt-2 p-2 bg-white rounded">
@@ -501,7 +501,7 @@
                                 {/if}
                             </div>
                         {:else}
-                            <p>{"> " + dct.textQuoteSelector?.exact}</p>
+                            
                             <textarea
                                 bind:value={dct.comments[0].content}
                                 class="w-full p-2 border rounded-md"
