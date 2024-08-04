@@ -93,6 +93,14 @@
                 const commentElement = document.querySelector(`li[data-comment-thread-id="${commentThreadId}"]`);
                 if (commentElement) {
                     commentElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Find the textarea within the comment element
+                    const textarea = commentElement.querySelector('textarea') as HTMLTextAreaElement | null;
+                    if (textarea) {
+                        textarea.focus();
+                        // Optional: Move cursor to the end of the text
+                        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                    }
                 }
             }
         }
@@ -420,24 +428,17 @@
                     {#each displayCommentThreads as dct, index}
                     <li class="bg-gray-100 p-3 rounded-lg" data-comment-thread-id={dct._id || ''}>
                         {#if !dct.isPending}
-                            <p class="text-sm text-gray-600">
-                                {#if dct.textPositionSelector && dct.textPositionSelector.start !== undefined}
-                                    Position: {dct.textPositionSelector.start}<br/>
-                                {/if}
-                                {#if 'updatedAt' in dct && dct.updatedAt}
-                                    Last Updated: {new Date(dct.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-                                    <br/>
-                                {/if}
-                            </p>
                             <p>{"> " + dct.textQuoteSelector?.exact}</p>
                             
                             {#each dct.comments as comment}
                                 <div class="mt-2 p-2 bg-white rounded">
-                                    <p class="text-sm text-gray-600 font-semibold">{comment.username || 'Anonymous'}</p>
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-sm text-gray-600 font-semibold">{comment.username || 'Anonymous'}</p>
+                                        <p class="text-xs text-gray-500">
+                                            {new Date(comment.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                                        </p>
+                                    </div>
                                     <p>{comment.content}</p>
-                                    <p class="text-xs text-gray-500">
-                                        {new Date(comment.updatedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-                                    </p>
                                 </div>
                             {/each}
 
