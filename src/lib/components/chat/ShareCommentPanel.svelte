@@ -66,18 +66,39 @@
 	}
 
 
-	function highlightComments() {
-		displayCommentThreads.forEach(commentThread => {
-		if (commentThread.textQuoteSelector) {
-			const range = TextQuote.toRange(chatContainer, commentThread.textQuoteSelector);
-			if (range) {
-                const wrapper = document.createElement('mark');
-                const wrappedRange = wrapRangeText(wrapper, range);
-                commentThread.wrapperObject = wrappedRange;
-			}
-		}
-		});
-	}	
+    function highlightComments() {
+        displayCommentThreads.forEach(commentThread => {
+            if (commentThread.textQuoteSelector) {
+                const range = TextQuote.toRange(chatContainer, commentThread.textQuoteSelector);
+                if (range) {
+                    console.log(range);
+                    const wrapper = document.createElement('mark');
+                    wrapper.dataset.commentThreadId = commentThread._id?.toString() || '';
+                    const wrappedRange = wrapRangeText(wrapper, range);
+                    commentThread.wrapperObject = wrappedRange;
+                }
+            }
+        });
+
+        // Add a single event listener to the chatContainer
+        chatContainer.addEventListener('click', handleMarkClick);
+    }
+
+    function handleMarkClick(event: MouseEvent) {
+        const target = event.target as HTMLElement;
+        if (target.tagName === 'MARK') {
+            const commentThreadId = target.dataset.commentThreadId;
+            console.log(commentThreadId);
+            if (commentThreadId) {
+                const commentElement = document.querySelector(`li[data-comment-thread-id="${commentThreadId}"]`);
+                if (commentElement) {
+                    commentElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+        }
+    }
+
+
 
 
     function handleCommentClick() {
@@ -235,6 +256,14 @@
                     : commentThread
             );
 
+            // Update the comment wrapper mark with the comment thread id now that we have it
+            if (displayCommentThread.wrapperObject && result.id) {
+                const markElement = displayCommentThread.wrapperObject.nodes[0] as HTMLElement;
+                if (markElement && markElement.tagName === 'MARK') {
+                    markElement.dataset.commentThreadId = result.id.toString();
+                }
+            }
+
 			console.log("Comment saved successfully:", result);
 		} catch (error) {
 			console.error("Error saving comment:", error);
@@ -389,7 +418,7 @@
             {#if displayCommentThreads.length > 0}
                 <ul class="space-y-2">
                     {#each displayCommentThreads as dct, index}
-                    <li class="bg-gray-100 p-3 rounded-lg">
+                    <li class="bg-gray-100 p-3 rounded-lg" data-comment-thread-id={dct._id || ''}>
                         {#if !dct.isPending}
                             <p class="text-sm text-gray-600">
                                 {#if dct.textPositionSelector && dct.textPositionSelector.start !== undefined}
