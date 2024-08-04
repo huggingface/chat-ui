@@ -2,7 +2,7 @@
     import { page } from "$app/stores";
     import type { createEventDispatcher } from "svelte";
 
-    import type { DisplayCommentThread } from "$lib/types/Comment";
+    import type { DisplayCommentThread, DisplayComment } from "$lib/types/Comment";
 
 	import * as TextQuote from 'dom-anchor-text-quote';
   	import * as TextPosition from 'dom-anchor-text-position';
@@ -318,6 +318,53 @@
 		// No database updates needed
 	}
 
+    async function handleReplyComment(displayCommentThread: DisplayCommentThread) {
+        if (!displayCommentThread._id || !displayCommentThread.replyText) return;
+
+        try {
+            const response = await fetch(`/conversation/${$page.params.id}/comments/${displayCommentThread._id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: displayCommentThread.replyText
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to post reply');
+            }
+
+            const result = await response.json();
+
+            // Update the displayCommentThreads array
+            displayCommentThreads = displayCommentThreads.map(thread => 
+                thread === displayCommentThread 
+                    ? {
+                        ...thread,
+                        comments: [...thread.comments, {
+                            _id: result.id,
+                            content: displayCommentThread.replyText || '', // Ensure content is always a string
+                            username: $page.data.user?.name || $page.data.user?.email || 'Anonymous',
+                            isPending: false,
+                            updatedAt: new Date(),
+                            createdAt: new Date(),
+                            originalContent: displayCommentThread.replyText || '', // Add this if it's part of DisplayComment
+                        } as DisplayComment], // Type assertion
+                        replyText: '',
+                        showReplyButton: false
+                    }
+                    : thread
+            ) as DisplayCommentThread[];
+
+            console.log("Reply posted successfully:", result);
+        } catch (error) {
+            console.error("Error posting reply:", error);
+            alert("Failed to post reply. Please try again.");
+        }
+    }
+
 
 </script>
 
@@ -364,15 +411,31 @@
                                     </p>
                                 </div>
                             {/each}
+
+                            <div class="mt-2">
+                                <textarea
+                                    class="w-full p-2 border rounded-md text-sm"
+                                    rows="1"
+                                    placeholder="Reply to this comment..."
+                                    bind:value={dct.replyText}
+                                    on:focus={() => dct.showReplyButton = true}
+                                    on:blur={() => dct.showReplyButton = !!dct.replyText && dct.replyText.trim() !== ''}
+                                ></textarea>
+                            </div>
+
+
                 
                             <div class="flex justify-end mt-2">
-                                <button
-                                    class="mr-2 p-1 bg-blue-500 text-white rounded-full"
-                                    on:click={() => alert("Reply pushed")}
-                                    aria-label="Reply to Comment"
-                                >
-                                    <CarbonReply />
-                                </button>
+                                {#if dct.showReplyButton || (dct.replyText && dct.replyText.trim() !== '')}
+                                    <button
+                                        class="mr-2 p-1 bg-blue-500 text-white rounded-full"
+                                        on:click={() => handleReplyComment(dct)}
+                                        aria-label="Reply to Comment"
+                                    >
+                                        <CarbonReply />
+                                    </button>
+                                {/if}
+
                                 {#if $page.data.user && dct.userId === $page.data.user.id}
                                     <button
                                         class="mr-2 p-1 bg-green-500 text-white rounded-full"

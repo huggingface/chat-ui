@@ -46,4 +46,6 @@ export interface DisplayCommentThread extends Omit<CommentThread, 'comments' | '
     comments: DisplayComment[];
     wrapperObject?: WrapperObject;
     isPending: boolean;
+    replyText?: string;
+    showReplyButton?: boolean;
 }
