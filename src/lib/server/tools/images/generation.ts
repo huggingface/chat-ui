@@ -10,7 +10,6 @@ const imageGeneration: BackendTool = {
 	name: "image_generation",
 	displayName: "Image Generation",
 	description: "Use this tool to generate an image from a prompt.",
-	isOnByDefault: true,
 	parameterDefinitions: {
 		prompt: {
 			description:

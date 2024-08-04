@@ -109,9 +109,6 @@
 			onDrag = false;
 		}
 	};
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
-	};
 
 	const onPaste = (e: ClipboardEvent) => {
 		if (!e.clipboardData) {
@@ -189,9 +186,12 @@
 
 </script>
 
-
-
-
+<svelte:window
+	on:dragenter={onDragEnter}
+	on:dragleave={onDragLeave}
+	on:dragover|preventDefault
+	on:drop|preventDefault={() => (onDrag = false)}
+/>
 
 <div class="relative min-h-0 min-w-0">
 
@@ -237,7 +237,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-6 pb-52 2xl:gap-7">
+				<div class="flex h-max flex-col gap-8 pb-52">
 					<ChatMessage
 						{loading}
 						{messages}
@@ -359,9 +359,6 @@
 				{/if}
 			</div>
 			<form
-				on:dragover={onDragOver}
-				on:dragenter={onDragEnter}
-				on:dragleave={onDragLeave}
 				tabindex="-1"
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}

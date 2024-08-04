@@ -9,6 +9,7 @@ import updateMessageFiles from "./05-update-message-files";
 import trimMessageUpdates from "./06-trim-message-updates";
 import updateConversationsSharedBool from "./91-update-conversations-shared-bool";
 
+import resetTools from "./07-reset-tools-in-settings";
 
 export interface Migration {
 	_id: ObjectId;
@@ -29,4 +30,5 @@ export const migrations: Migration[] = [
 	trimMessageUpdates,
 	updateConversationsSharedBool,
 
+	resetTools,
 ];

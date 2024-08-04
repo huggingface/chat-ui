@@ -1,5 +1,5 @@
 image:
-  repository: huggingface/chat-ui
+  repository: huggingface
   name: chat-ui
 
 nodeSelector:
@@ -38,10 +38,70 @@ envVars:
   METRICS_ENABLED: "true"
   MODELS: >
     [
+      { 
+        "name" : "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
+        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
+        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "websiteUrl": "https://llama.meta.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
+        "tools": true,
+        "preprompt" : "",
+        "parameters": {
+            "temperature": 0.6,
+            "top_p": 0.9,
+            "stop": ["<|endoftext|>", "<|eot_id|>"],
+          "max_new_tokens": 1024,
+          "truncate": 7167
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          }, {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          }, {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      }, 
+      {
+        "name" : "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+        "id": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
+        "description": "The most intelligent open-source model, showing exceptional capabilities for complex tasks.",
+        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+        "websiteUrl": "https://llama.meta.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
+        "tools": true,
+        "preprompt" : "",
+        "parameters": {
+          "temperature": 0.6,
+          "top_p": 0.9,
+          "stop": ["<|endoftext|>", "<|eot_id|>"],
+          "max_new_tokens": 2048,
+          "truncate": 14337
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          }, {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          }, {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      }, 
       {
         "name" : "CohereForAI/c4ai-command-r-plus",
-        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
-        "description": "Command R+ is Cohere's latest LLM and is the first open weight model to beat GPT4 in the Chatbot Arena!",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"},
+        "description": "Cohere's largest language model, optimized for conversational interaction and tool use.",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
@@ -66,35 +126,8 @@ envVars:
         ]
       },
       {
-        "name" : "meta-llama/Meta-Llama-3-70B-Instruct",
-        "description": "Meta Llama 3 delivers top performance on various benchmarks and introduces new features like better reasoning.",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
-        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct",
-        "websiteUrl": "https://llama.meta.com/llama3/",
-        "tokenizer" : "philschmid/meta-llama-3-tokenizer",
-        "promptExamples" : [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          }, {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ],
-        "parameters": {
-          "stop": ["<|eot_id|>"],
-          "truncate": 6144,
-          "max_new_tokens": 2047,
-          "temperature": 0.6,
-          "top_p" : 0.9
-        }
-      },
-      {
         "name" : "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "description" : "The latest MoE model from Mistral AI! 8x7B and outperforms Llama 2 70B in most benchmarks.",
+        "description" : "A high-quality sparse mixture of experts model with open weights.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
         "websiteUrl" : "https://mistral.ai/news/mixtral-of-experts/",
         "modelUrl": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -125,7 +158,7 @@ envVars:
       },
       {
           "name" : "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-          "description" : "Nous Hermes 2 Mixtral 8x7B DPO is the new flagship Nous Research model trained over the Mixtral 8x7B MoE LLM.",
+          "description" : "Nous Hermes' strong flagship model trained on the Mixtral 8x7B.",
           "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
           "websiteUrl" : "https://nousresearch.com/",
           "modelUrl": "https://huggingface.co/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
@@ -156,7 +189,7 @@ envVars:
         {
           "name": "01-ai/Yi-1.5-34B-Chat",
           "tokenizer": "01-ai/Yi-1.5-34B-Chat",
-          "description" : "Yi-1.5 is an upgraded version of Yi. It is continuously pre-trained on Yi with a high-quality corpus of 500B tokens and fine-tuned on 3M diverse fine-tuning samples.",
+          "description" : "Strong performance in reasoning while maintaining excellent capabilities in language understanding.",
           "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/01-ai-logo.png",
           "modelUrl": "https://huggingface.co/01-ai/Yi-1.5-34B-Chat",
           "websiteUrl": "https://www.01.ai",
@@ -182,13 +215,13 @@ envVars:
           ]
         },
         {
-          "name": "mistralai/Mistral-7B-Instruct-v0.2",
-          "displayName": "mistralai/Mistral-7B-Instruct-v0.2",
-          "description": "Mistral 7B is a new Apache 2.0 model, released by Mistral AI that outperforms Llama2 13B in benchmarks.",
+          "name": "mistralai/Mistral-7B-Instruct-v0.3",
+          "displayName": "mistralai/Mistral-7B-Instruct-v0.3",
+          "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
           "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
           "websiteUrl": "https://mistral.ai/news/announcing-mistral-7b/",
-          "modelUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.2",
-          "tokenizer": "mistralai/Mistral-7B-Instruct-v0.2",
+          "modelUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+          "tokenizer": "mistralai/Mistral-7B-Instruct-v0.3",
           "preprompt": "",
           "chatPromptTemplate" : "<s>{{#each messages}}{{#ifUser}}[INST] {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}} [/INST]{{/ifUser}}{{#ifAssistant}}{{content}}</s>{{/ifAssistant}}{{/each}}",
           "parameters": {
@@ -216,7 +249,7 @@ envVars:
         {
           "name": "microsoft/Phi-3-mini-4k-instruct",
           "tokenizer": "microsoft/Phi-3-mini-4k-instruct",
-          "description" : "Phi-3 Mini-4K-Instruct is a 3.8B parameters, lightweight, state-of-the-art open model built upon datasets used for Phi-2.",
+          "description" : "One of the best small models (3.8B parameters), super fast for simple tasks.",
           "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
           "modelUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
           "websiteUrl": "https://azure.microsoft.com/en-us/blog/introducing-phi-3-redefining-whats-possible-with-slms/",
@@ -242,11 +275,12 @@ envVars:
           ]
         },
         {
-          "name": "meta-llama/Meta-Llama-3-8B-Instruct",
-          "tokenizer" : "philschmid/meta-llama-3-tokenizer",
+          "name" : "llhf/Meta-Llama-3.1-8B-Instruct",
+        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
           "parameters": {
-            "temperature": 0.1,
-            "stop": ["<|eot_id|>"],
+            "temperature": 0.6,
+            "top_p": 0.9,
+            "stop": ["<|endoftext|>", "<|eot_id|>"],
           },
           "unlisted": true
         }
@@ -265,7 +299,8 @@ envVars:
       { "name": "google/gemma-7b-it" },
       { "name": "meta-llama/Llama-2-70b-chat-hf" },
       { "name": "codellama/CodeLlama-70b-Instruct-hf" },
-      { "name": "openchat/openchat-3.5-0106" }
+      { "name": "openchat/openchat-3.5-0106" },
+      { "name": "meta-llama/Meta-Llama-3-70B-Instruct"}
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
   PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
@@ -280,7 +315,7 @@ envVars:
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   PUBLIC_APPLE_APP_ID: "6476778843"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  TASK_MODEL: "meta-llama/Meta-Llama-3-8B-Instruct"
+  TASK_MODEL: "llhf/Meta-Llama-3.1-8B-Instruct"
   TEXT_EMBEDDING_MODELS: >
     [{
       "name": "bge-base-en-v1-5-sxa",
@@ -293,6 +328,8 @@ envVars:
     }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   XFF_DEPTH: '2'
+  HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
+  HF_ORG_EARLY_ACCESS: '5e67bd5b1009063689407478'
 
 infisical:
   enabled: true

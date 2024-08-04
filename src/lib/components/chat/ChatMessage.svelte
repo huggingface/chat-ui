@@ -33,6 +33,8 @@
 	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import DOMPurify from "isomorphic-dompurify";
+	import { enhance } from "$app/forms";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -53,6 +55,7 @@
 
 		return ret;
 	}
+
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<");
 	}
@@ -106,11 +109,10 @@
 	marked.use(
 		markedKatex({
 			throwOnError: false,
-			// output: "html",
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
@@ -233,7 +235,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-6 flex items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
@@ -303,8 +305,10 @@
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(token.raw, options)}
+						{#await marked.parse(token.raw, options) then parsed}
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html DOMPurify.sanitize(parsed)}
+						{/await}
 					{/if}
 				{/each}
 			</div>
@@ -332,7 +336,7 @@
 		</div>
 		{#if !loading && (message.content || toolUpdates)}
 			<div
-				class="absolute bottom-1 right-0 -mb-4 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
+				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
 		{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
 		{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 		"
@@ -535,6 +539,11 @@
 							method="POST"
 							action="?/deleteBranch"
 							class="hidden group-hover/navbranch:block"
+							use:enhance={({ cancel }) => {
+								if (!confirm("Are you sure you want to delete this branch?")) {
+									cancel();
+								}
+							}}
 						>
 							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
 							<button

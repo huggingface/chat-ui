@@ -30,7 +30,7 @@
 		confirmDelete = false;
 	}}
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-10 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 {conv.id ===
+	class="group flex h-10 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 sm:h-[2.35rem] dark:text-gray-300 dark:hover:bg-gray-700 {conv.id ===
 	$page.params.id
 		? 'bg-gray-100 dark:bg-gray-700'
 		: ''}"

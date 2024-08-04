@@ -19,6 +19,7 @@ import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
+	logger.info("Starting server...");
 	initExitHandler();
 
 	await checkAndRunMigrations();
@@ -204,7 +205,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!requiresUser &&
 			!event.url.pathname.startsWith(`${base}/settings`) &&
-			!!envPublic.PUBLIC_APP_DISCLAIMER
+			envPublic.PUBLIC_APP_DISCLAIMER === "1"
 		) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,

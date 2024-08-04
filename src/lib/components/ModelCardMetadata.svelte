@@ -42,9 +42,9 @@
 			class="ml-auto flex items-center hover:underline"
 			rel="noreferrer"
 		>
-			{#if model.name === "meta-llama/Meta-Llama-3-70B-Instruct"}
+			{#if model.name.startsWith("meta-llama/Meta-Llama")}
 				<BIMeta class="mr-1.5 shrink-0 text-xs text-gray-400" />
-				Built with Meta Llama 3
+				Built with Llama
 			{:else}
 				<CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
 				Website

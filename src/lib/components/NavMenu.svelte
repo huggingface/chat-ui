@@ -70,7 +70,7 @@
 	<a
 		href={`${base}/`}
 		on:click={handleNewChatClick}
-		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700"
+		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none sm:text-smd dark:border-gray-600 dark:bg-gray-700"
 	>
 		New Chat
 	</a>
@@ -93,7 +93,7 @@
     </div>
 </div>
 <div
-	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 max-sm:bg-gradient-to-t md:bg-gradient-to-l dark:from-gray-800/30"
+	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] max-sm:bg-gradient-to-t md:bg-gradient-to-l dark:from-gray-800/30"
 >
 	{#each Object.entries(groupedConversations) as [group, convs]}
 		{#if convs.length}
