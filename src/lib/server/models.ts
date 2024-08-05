@@ -155,7 +155,6 @@ async function getChatPromptRender(
 							},
 						];
 					} else {
-						logger.info(result.outputs);
 						return result.outputs.map((output) => ({
 							tool_call_id: result.call.name,
 							output: JSON.stringify(output),
