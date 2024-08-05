@@ -314,8 +314,8 @@
 				{/each}
 			</div>
 	
-			{#if message.usage}
-				<TokenUsage usage={message.usage} />
+			{#if message.usage && model.tokenInfo  && model.tokenInfo.contextWindow !== undefined}
+				<TokenUsage usage={message.usage} tokenInfo ={{contextWindow: model.tokenInfo.contextWindow, pricing: model.tokenInfo.pricing} } />
 			{/if}
 
 			<!-- Web Search sources -->

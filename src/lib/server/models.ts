@@ -65,6 +65,15 @@ const modelConfig = z.object({
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	tokenInfo: z
+		.object({
+			contextWindow: z.number().int().positive().optional(),
+			pricing: z.object({
+				input: z.number().nonnegative(),
+				output: z.number().nonnegative(),
+			}),
+		})
+		.optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -226,6 +235,7 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	displayName: m.displayName || m.name,
 	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
+	tokenInfo: m.tokenInfo,
 });
 
 export type ProcessedModel = Awaited<ReturnType<typeof processModel>> & {
@@ -326,5 +336,5 @@ export const smallModel = env.TASK_MODEL
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools"
+	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools" | "tokenInfo"
 >;

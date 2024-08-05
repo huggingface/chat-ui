@@ -175,7 +175,10 @@
 	on:drop|preventDefault={() => (onDrag = false)}
 />
 
+
+
 <div class="relative min-h-0 min-w-0">
+	
 	{#if loginModalOpen}
 		<LoginModal
 			on:close={() => {
@@ -183,6 +186,7 @@
 			}}
 		/>
 	{/if}
+
 	<div
 		class="scrollbar-custom mr-1 h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.length ? [...messages] : false}

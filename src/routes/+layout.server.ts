@@ -166,6 +166,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			multimodal: model.multimodal,
 			tools: model.tools,
 			unlisted: model.unlisted,
+			tokenInfo: model.tokenInfo,
 		})),
 		oldModels,
 		tools: allTools

@@ -361,8 +361,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messageToWriteTo.content = initialMessageContent + event.text;
 
 					// Add usage information if available
-					if ("usage" in event && event.usage) {
+					if ("usage" in event && event.usage && model?.tokenInfo) {
 						messageToWriteTo.usage = event.usage;
+						//						messageToWriteTo.tokenInfo = model?.tokenInfo;
 					}
 
 					// add to latency

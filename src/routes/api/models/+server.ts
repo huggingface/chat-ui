@@ -19,6 +19,7 @@ export async function GET() {
 			multimodal: model.multimodal ?? false,
 			unlisted: model.unlisted ?? false,
 			tools: model.tools ?? false,
+			tokenInfo: model.tokenInfo,
 		}));
 	return Response.json(res);
 }
