@@ -35,6 +35,7 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
+	import { get } from "svelte/store";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -111,44 +112,92 @@
 
 	const convTreeStore = useConvTreeStore();
 
-	// Create a map of messages by their IDs for faster lookup
-	const messageMap = new Map();
-	// Map to store child indexes for faster lookup
-	const childIndexMap = new Map();
+	// // Create a map of messages by their IDs for faster lookup
+	// const messageMap = new Map();
+	// // Map to store child indexes for faster lookup
+	// const childIndexMap = new Map();
 
-	messages.forEach((message) => {
-		messageMap.set(message.id, message);
-		// Create a map entry for each message's children for quick index lookup
-		if (message.children) {
-			const childrenIndexMap = new Map();
-			message.children.forEach((childId, index) => {
-				childrenIndexMap.set(childId, index);
-			});
-			childIndexMap.set(message.id, childrenIndexMap);
-		}
-	});
+	// messages.forEach((message) => {
+	// 	messageMap.set(message.id, message);
+	// 	// Create a map entry for each message's children for quick index lookup
+	// 	if (message.children) {
+	// 		const childrenIndexMap = new Map();
+	// 		message.children.forEach((childId, index) => {
+	// 			childrenIndexMap.set(childId, index);
+	// 		});
+	// 		childIndexMap.set(message.id, childrenIndexMap);
+	// 	}
+	// });
 
-	// Update the current indexes of the messages in the conversation tree
+	// // Update the current indexes of the messages in the conversation tree
+	// const updateCurrentIndex = () => {
+	// 	if (typeof window === "undefined") return;
+
+	// 	// Retrieve the leafId and currentChildIndex from localStorage once
+	// 	const leafId = localStorage.getItem("leafId");
+
+	// 	if (leafId) {
+	// 		const leafMessage = messageMap.get(leafId);
+	// 		if (!leafMessage?.ancestors) return;
+
+	// 		const ancestors = leafMessage.ancestors;
+	// 		for (let i = 0; i < ancestors.length - 1; i++) {
+	// 			const curMessage = messageMap.get(ancestors[i]);
+	// 			if (curMessage?.children) {
+	// 				const nextAncestorId = ancestors[i + 1];
+	// 				const childrenIndexMap = childIndexMap.get(curMessage.id);
+	// 				if (childrenIndexMap) {
+	// 					const childIndex = childrenIndexMap.get(nextAncestorId);
+	// 					if (childIndex !== undefined) {
+	// 						curMessage.currentChildIndex = childIndex;
+	// 					}
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// };
+
+
 	const updateCurrentIndex = () => {
+		const url = new URL(get(page).url);
+		let leafId = url.searchParams.get("leafId");
+
+		// Ensure the function is only run in the browser.
 		if (typeof window === "undefined") return;
 
-		// Retrieve the leafId and currentChildIndex from localStorage once
-		const leafId = localStorage.getItem("leafId");
-
 		if (leafId) {
-			const leafMessage = messageMap.get(leafId);
-			if (!leafMessage?.ancestors) return;
+			// Remove the 'leafId' from the URL to clean up after retrieving it.
+			url.searchParams.delete("leafId");
+			history.replaceState(null, "", url.toString());
+		} else {
+			// Retrieve the 'leafId' from localStorage if it's not in the URL.
+			leafId = localStorage.getItem("leafId");
+		}
 
-			const ancestors = leafMessage.ancestors;
-			for (let i = 0; i < ancestors.length - 1; i++) {
-				const curMessage = messageMap.get(ancestors[i]);
+		// If a 'leafId' exists, find the corresponding message and update indices.
+		if (leafId) {
+			let leafMessage = messages.find((m) => m.id == leafId);
+			if (!leafMessage?.ancestors) return; // Exit if the message has no ancestors.
+
+			let ancestors = leafMessage.ancestors;
+
+			// Loop through all ancestors to update the current child index.
+			for (let i = 0; i < ancestors.length; i++) {
+				let curMessage = messages.find((m) => m.id == ancestors[i]);
 				if (curMessage?.children) {
-					const nextAncestorId = ancestors[i + 1];
-					const childrenIndexMap = childIndexMap.get(curMessage.id);
-					if (childrenIndexMap) {
-						const childIndex = childrenIndexMap.get(nextAncestorId);
-						if (childIndex !== undefined) {
-							curMessage.currentChildIndex = childIndex;
+					for (let j = 0; j < curMessage.children.length; j++) {
+						// Check if the current message's child matches the next ancestor
+                    	// or the leaf itself, and update the currentChildIndex accordingly.
+						if (i + 1 < ancestors.length) {
+							if (curMessage.children[j] == ancestors[i + 1]) {
+								curMessage.currentChildIndex = j;
+								break;
+							}
+						} else {
+							if (curMessage.children[j] == leafId) {
+								curMessage.currentChildIndex = j;
+								break;
+							}
 						}
 					}
 				}
