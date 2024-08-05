@@ -51,7 +51,7 @@
         {/await}
     {:else}
         <pre class="scrollbar-custom overflow-auto px-5 scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20">
-            <code class="language-{lang}">{@html DOMPurify.sanitize(highlightedCode || code.replaceAll("<", "&lt;"))}</code>
+            <code class="language-{lang}">{@html DOMPurify.sanitize(highlightedCode)}</code>
         </pre>
     {/if}
     <CopyToClipBoardBtn
