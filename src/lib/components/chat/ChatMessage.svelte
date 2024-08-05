@@ -35,7 +35,6 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import DOMPurify from "isomorphic-dompurify";
 	import TokenUsage from "./TokenUsage.svelte";
-	import MermaidDiagram from "./MermaidDiagram.svelte";
 	
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -305,11 +304,7 @@
 				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
-						{#if token.lang === 'mermaid'}
-							<MermaidDiagram code={unsanitizeMd(token.text)} />
-						{:else}
-							<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
-						{/if}
+						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} loading={loading} />
 					{:else}
 						{#await marked.parse(token.raw, options) then parsed}
 							{@html DOMPurify.sanitize(parsed)}
