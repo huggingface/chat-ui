@@ -38,20 +38,20 @@
 <div class="group relative my-4 rounded-lg">
     {#if lang === 'mermaid' && !loading}
         {#await renderPromise}
-            <pre>{code}</pre>
+<pre>{code}</pre>
         {:then result}
             {#if result?.svg}
-                {@html result.svg}
+{@html result.svg}
             {:else}
-                <pre>{DOMPurify.sanitize(code)}</pre>
+<pre>{  DOMPurify.sanitize(code) }</pre>
             {/if}
         {:catch error}
-            <pre>{DOMPurify.sanitize(code)}</pre>
+<pre>{DOMPurify.sanitize(code)}</pre>
             <p class="text-red-500">Error rendering diagram: {error.message}</p>
         {/await}
     {:else}
         <pre class="scrollbar-custom overflow-auto px-5 scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20">
-            <code class="language-{lang}">{@html DOMPurify.sanitize(highlightedCode)}</code>
+<code class="language-{lang}">{@html DOMPurify.sanitize(highlightedCode)  || code.replaceAll("<", "&lt;") }</code>
         </pre>
     {/if}
     <CopyToClipBoardBtn
