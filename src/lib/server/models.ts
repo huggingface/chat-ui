@@ -68,10 +68,12 @@ const modelConfig = z.object({
 	tokenInfo: z
 		.object({
 			contextWindow: z.number().int().positive().optional(),
-			pricing: z.object({
-				input: z.number().nonnegative(),
-				output: z.number().nonnegative(),
-			}),
+			pricing: z
+				.object({
+					input: z.number().nonnegative(),
+					output: z.number().nonnegative(),
+				})
+				.optional(),
 		})
 		.optional(),
 });
