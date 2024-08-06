@@ -158,7 +158,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			tools: z.record(z.boolean()).optional(),
+			tools: z
+				.record(z.boolean())
+				.optional()
+				.transform((tools) =>
+					// disable tools on huggingchat android app
+					request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_androids")
+						? {}
+						: tools
+				),
 		})
 		.parse(JSON.parse(json));
 
