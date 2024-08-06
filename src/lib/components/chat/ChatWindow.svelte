@@ -111,53 +111,7 @@
 	};
 
 	const convTreeStore = useConvTreeStore();
-
-	// // Create a map of messages by their IDs for faster lookup
-	// const messageMap = new Map();
-	// // Map to store child indexes for faster lookup
-	// const childIndexMap = new Map();
-
-	// messages.forEach((message) => {
-	// 	messageMap.set(message.id, message);
-	// 	// Create a map entry for each message's children for quick index lookup
-	// 	if (message.children) {
-	// 		const childrenIndexMap = new Map();
-	// 		message.children.forEach((childId, index) => {
-	// 			childrenIndexMap.set(childId, index);
-	// 		});
-	// 		childIndexMap.set(message.id, childrenIndexMap);
-	// 	}
-	// });
-
-	// // Update the current indexes of the messages in the conversation tree
-	// const updateCurrentIndex = () => {
-	// 	if (typeof window === "undefined") return;
-
-	// 	// Retrieve the leafId and currentChildIndex from localStorage once
-	// 	const leafId = localStorage.getItem("leafId");
-
-	// 	if (leafId) {
-	// 		const leafMessage = messageMap.get(leafId);
-	// 		if (!leafMessage?.ancestors) return;
-
-	// 		const ancestors = leafMessage.ancestors;
-	// 		for (let i = 0; i < ancestors.length - 1; i++) {
-	// 			const curMessage = messageMap.get(ancestors[i]);
-	// 			if (curMessage?.children) {
-	// 				const nextAncestorId = ancestors[i + 1];
-	// 				const childrenIndexMap = childIndexMap.get(curMessage.id);
-	// 				if (childrenIndexMap) {
-	// 					const childIndex = childrenIndexMap.get(nextAncestorId);
-	// 					if (childIndex !== undefined) {
-	// 						curMessage.currentChildIndex = childIndex;
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// };
-
-
+	
 	const updateCurrentIndex = () => {
 		const url = new URL(get(page).url);
 		let leafId = url.searchParams.get("leafId");
