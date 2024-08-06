@@ -167,7 +167,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 			tools:
 				model.tools &&
 				// disable tools on huggingchat android app
-				!request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_androids"),
+				!request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_android"),
 			unlisted: model.unlisted,
 		})),
 		oldModels,
