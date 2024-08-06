@@ -134,11 +134,7 @@
 		browser && // only show on browser
 		isHuggingChat && // only show on huggingchat
 		navigator.userAgent.toLowerCase().includes("android") && // if it's android
-		!navigator.userAgent.includes("co.huggingface.chat_ui_android") && // but not the android app
-		(!localStorage.getItem("huggingChatLastSeenAndroidModal") || //and the user hasn't seen it yet
-			new Date().getTime() -
-				new Date(localStorage.getItem("huggingChatLastSeenAndroidModal") ?? "").getTime() >
-				1000 * 60 * 60 * 72); // or it's been more than 72 hours
+		!navigator.userAgent.includes("co.huggingface.chat_ui_android"); // but not the android app
 </script>
 
 <svelte:head>
@@ -253,7 +249,6 @@
 			class="border-r-2 border-black/20 pr-4 text-2xl"
 			on:click|stopPropagation|preventDefault={() => {
 				showAndroidModal = false;
-				localStorage.setItem("huggingChatLastSeenAndroidModal", new Date().toISOString());
 			}}
 		>
 			<CarbonClose />
