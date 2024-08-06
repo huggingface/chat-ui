@@ -13,19 +13,21 @@ export const endpointCohereParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("cohere"),
 	apiKey: z.string().default(env.COHERE_API_TOKEN),
+	clientName: z.string().optional(),
 	raw: z.boolean().default(false),
 });
 
 export async function endpointCohere(
 	input: z.input<typeof endpointCohereParametersSchema>
 ): Promise<Endpoint> {
-	const { apiKey, model, raw } = endpointCohereParametersSchema.parse(input);
+	const { apiKey, clientName, model, raw } = endpointCohereParametersSchema.parse(input);
 
 	let cohere: CohereClient;
 
 	try {
 		cohere = new (await import("cohere-ai")).CohereClient({
 			token: apiKey,
+			clientName,
 		});
 	} catch (e) {
 		throw new Error("Failed to import cohere-ai", { cause: e });
@@ -91,12 +93,15 @@ export async function endpointCohere(
 						stopSequences: parameters?.stop,
 						frequencyPenalty: parameters?.frequency_penalty,
 						tools,
-						toolResults: toolResults?.map((toolResult) => {
-							if (toolResult.status === ToolResultStatus.Error) {
-								return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
-							}
-							return { call: toolResult.call, outputs: toolResult.outputs };
-						}),
+						toolResults:
+							toolResults?.length && toolResults?.length > 0
+								? toolResults?.map((toolResult) => {
+										if (toolResult.status === ToolResultStatus.Error) {
+											return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
+										}
+										return { call: toolResult.call, outputs: toolResult.outputs };
+								  })
+								: undefined,
 					})
 					.catch(async (err) => {
 						if (!err.body) throw err;
