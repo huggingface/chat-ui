@@ -13,6 +13,15 @@ export async function share(url: string, title: string) {
 	if (navigator.share) {
 		navigator.share({ url, title });
 	} else {
-		await navigator.clipboard.writeText(url);
+		alert("Please focus the document within 3 seconds by clicking somewhere or pressing Tab.");
+		// Document Focus Error Handling 
+		setTimeout(async () => {
+			if (document.hasFocus()) {
+				await navigator.clipboard.writeText(url);
+			} else {
+				console.error("Document is not focused. Unable to write to clipboard.");
+				alert("Document is not focused. Please try again.");
+			}
+		}, 3000); // 3-second delay to allow focusing
 	}
 }

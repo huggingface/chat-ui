@@ -5,6 +5,7 @@
 	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
+	import { enhance } from "$app/forms";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
@@ -383,15 +384,6 @@
 					title="Retry"
 					type="button"
 					on:click={() => {
-						// Move to the last branch when retrying an assistant message
-						let ancestors = message.ancestors;
-						if (ancestors) {
-							let parentMessage = messages.find((m) => m.id === ancestors[ancestors.length - 1]);
-							if (parentMessage) {
-								parentMessage.currentChildIndex = parentMessage?.children?.length;
-							}
-						}
-
 						dispatch("retry", { id: message.id });
 					}}
 				>
@@ -443,16 +435,6 @@
 						class="flex w-full flex-col"
 						bind:this={editFormEl}
 						on:submit|preventDefault={() => {
-							// Move to the last branch when editing a user message
-							let ancestors = message.ancestors;
-							if (ancestors) {
-								let parentMessage = messages.find((m) => m.id === ancestors[ancestors.length - 1]);
-								if (parentMessage) {
-									parentMessage.currentChildIndex = parentMessage?.children?.length;
-									console.log("parentMessage", parentMessage);
-								}
-							}
-
 							dispatch("retry", { content: editContentEl.value, id: message.id });
 							$convTreeStore.editing = null;
 						}}
