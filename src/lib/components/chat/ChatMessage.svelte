@@ -571,6 +571,11 @@
 							method="POST"
 							action="?/deleteBranch"
 							class="hidden group-hover/navbranch:block"
+							use:enhance={({ cancel }) => {
+								if (!confirm("Are you sure you want to delete this branch?")) {
+									cancel();
+								}
+							}}
 						>
 							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
 							<button
