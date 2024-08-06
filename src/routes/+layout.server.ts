@@ -11,7 +11,7 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { allTools } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 
-export const load: LayoutServerLoad = async ({ locals, depends }) => {
+export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
@@ -164,7 +164,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
-			tools: model.tools,
+			tools:
+				model.tools &&
+				// disable tools on huggingchat android app
+				!request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_androids"),
 			unlisted: model.unlisted,
 		})),
 		oldModels,
