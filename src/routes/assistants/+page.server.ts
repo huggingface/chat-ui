@@ -11,7 +11,7 @@ const NUM_PER_PAGE = 24;
 
 export const load = async ({ url, locals }) => {
 	if (!env.ENABLE_ASSISTANTS) {
-		throw redirect(302, `${base}/`);
+		redirect(302, `${base}/`);
 	}
 
 	const modelId = url.searchParams.get("modelId");
@@ -28,7 +28,7 @@ export const load = async ({ url, locals }) => {
 			{ projection: { _id: 1 } }
 		);
 		if (!user) {
-			throw error(404, `User "${username}" doesn't exist`);
+			error(404, `User "${username}" doesn't exist`);
 		}
 	}
 

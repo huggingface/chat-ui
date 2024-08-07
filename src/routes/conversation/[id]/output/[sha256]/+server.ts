@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	// check user
 	if (!userId) {
-		throw error(401, "Unauthorized");
+		error(401, "Unauthorized");
 	}
 
 	if (params.id.length !== 7) {
@@ -26,7 +26,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		});
 
 		if (!conv) {
-			throw error(404, "Conversation not found");
+			error(404, "Conversation not found");
 		}
 	} else {
 		// look for the conversation in shared conversations
@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		});
 
 		if (!conv) {
-			throw error(404, "Conversation not found");
+			error(404, "Conversation not found");
 		}
 	}
 

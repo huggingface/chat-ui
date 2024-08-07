@@ -17,7 +17,7 @@ export function onExit(cb: ExitHandler): ExitHandlerUnsubscribe {
 
 async function runExitHandler(handler: ExitHandler): Promise<void> {
 	return timeout(Promise.resolve().then(handler), 30_000).catch((err) => {
-		logger.error("Exit handler failed to run", err);
+		logger.error(err, "Exit handler failed to run");
 	});
 }
 

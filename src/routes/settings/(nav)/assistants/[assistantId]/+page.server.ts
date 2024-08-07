@@ -57,7 +57,7 @@ export const actions: Actions = {
 			fileId = await fileCursor.next();
 		}
 
-		throw redirect(302, `${base}/settings`);
+		redirect(302, `${base}/settings`);
 	},
 	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
@@ -168,7 +168,7 @@ export const actions: Actions = {
 			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
 		}
 
-		throw redirect(302, `${base}/settings`);
+		redirect(302, `${base}/settings`);
 	},
 
 	unfeature: async ({ params, locals }) => {

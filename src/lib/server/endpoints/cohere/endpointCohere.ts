@@ -5,7 +5,7 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
 import { ToolResultStatus, type ToolCall } from "$lib/types/Tool";
-import { pipeline, Writable, Readable } from "node:stream";
+import { pipeline, Writable, type Readable } from "node:stream";
 import { toolHasName } from "$lib/utils/tools";
 
 export const endpointCohereParametersSchema = z.object({
@@ -78,7 +78,7 @@ export async function endpointCohere(
 					.map((message) => ({
 						role: message.from === "user" ? "USER" : "CHATBOT",
 						message: message.content,
-					})) satisfies Cohere.ChatMessage[];
+					})) satisfies Cohere.Message[];
 
 				stream = await cohere
 					.chatStream({
