@@ -168,7 +168,7 @@ export const actions: Actions = {
 		);
 
 		if (acknowledged) {
-			throw redirect(302, `${base}/settings/assistants/${assistant._id}`);
+			redirect(302, `${base}/settings/assistants/${assistant._id}`);
 		} else {
 			throw Error("Update failed");
 		}

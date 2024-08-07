@@ -8,18 +8,18 @@ export const GET: RequestHandler = async ({ params }) => {
 	});
 
 	if (!assistant) {
-		throw error(404, "No assistant found");
+		error(404, "No assistant found");
 	}
 
 	if (!assistant.avatar) {
-		throw error(404, "No avatar found");
+		error(404, "No avatar found");
 	}
 
 	const fileId = collections.bucket.find({ filename: assistant._id.toString() });
 
 	const content = await fileId.next().then(async (file) => {
 		if (!file?._id) {
-			throw error(404, "Avatar not found");
+			error(404, "Avatar not found");
 		}
 
 		const fileStream = collections.bucket.openDownloadStream(file?._id);

@@ -10,11 +10,11 @@ export const load = async ({ params }) => {
 		});
 
 		if (!assistant) {
-			throw redirect(302, `${base}`);
+			redirect(302, `${base}`);
 		}
 
 		return { assistant: JSON.parse(JSON.stringify(assistant)) };
 	} catch {
-		throw redirect(302, `${base}`);
+		redirect(302, `${base}`);
 	}
 };
