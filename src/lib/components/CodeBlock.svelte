@@ -34,7 +34,10 @@
 
 	$: if (lang === "mermaid" && !loading && code) {
 		mermaidError = null;
-		renderPromise = mermaid.render(mermaidId, code);
+		renderPromise = mermaid.render(mermaidId, code).catch((error) => {
+			mermaidError = `Error rendering diagram: ${error.message}`;
+			return null;
+		});
 	} else {
 		renderPromise = null;
 		mermaidError = null;
@@ -56,14 +59,9 @@
 			{:else}
 				<pre>{DOMPurify.sanitize(code)}</pre>
 				<p class="text-red-500">
-					Error rendering diagram: {mermaidError || "Unknown error"}. Please check your syntax.
+					{mermaidError || "Unknown error rendering diagram. Please check your syntax."}
 				</p>
 			{/if}
-		{:catch error}
-			<pre>{DOMPurify.sanitize(code)}</pre>
-			<p class="text-red-500">
-				Error rendering diagram: {mermaidError || error.message}. Please check your syntax.
-			</p>
 		{/await}
 	{:else}
 		<pre
