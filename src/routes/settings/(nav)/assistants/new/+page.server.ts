@@ -154,6 +154,6 @@ export const actions: Actions = {
 			$addToSet: { assistants: insertedId },
 		});
 
-		throw redirect(302, `${base}/settings/assistants/${insertedId}`);
+		redirect(302, `${base}/settings/assistants/${insertedId}`);
 	},
 };

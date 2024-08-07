@@ -18,7 +18,7 @@ export const load = async ({ params, depends, locals }) => {
 		shared = true;
 
 		if (!conversation) {
-			throw error(404, "Conversation not found");
+			error(404, "Conversation not found");
 		}
 	} else {
 		// todo: add validation on params.id
@@ -36,13 +36,13 @@ export const load = async ({ params, depends, locals }) => {
 				})) !== 0;
 
 			if (conversationExists) {
-				throw error(
+				error(
 					403,
 					"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' feature instead."
 				);
 			}
 
-			throw error(404, "Conversation not found.");
+			error(404, "Conversation not found.");
 		}
 	}
 
@@ -73,7 +73,7 @@ export const actions = {
 		const messageId = data.get("messageId");
 
 		if (!messageId || typeof messageId !== "string") {
-			throw error(400, "Invalid message id");
+			error(400, "Invalid message id");
 		}
 
 		const conversation = await collections.conversations.findOne({
@@ -82,7 +82,7 @@ export const actions = {
 		});
 
 		if (!conversation) {
-			throw error(404, "Conversation not found");
+			error(404, "Conversation not found");
 		}
 
 		const filteredMessages = conversation.messages

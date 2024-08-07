@@ -35,7 +35,7 @@ if (!building) {
 	AbortedGenerations.getInstance();
 }
 
-export const handleError: HandleServerError = async ({ error, event }) => {
+export const handleError: HandleServerError = async ({ error, event, status, message }) => {
 	// handle 404
 
 	if (building) {
@@ -55,8 +55,10 @@ export const handleError: HandleServerError = async ({ error, event }) => {
 		url: event.request.url,
 		params: event.params,
 		request: event.request,
+		message,
 		error,
 		errorId,
+		status,
 	});
 
 	return {
