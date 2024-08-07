@@ -73,6 +73,7 @@
 		"dotenv": "^16.0.3",
 		"express": "^4.19.2",
 		"file-type": "^19.0.0",
+		"google-auth-library": "^9.13.0",
 		"handlebars": "^4.7.8",
 		"highlight.js": "^11.7.0",
 		"husky": "^9.0.11",
@@ -100,12 +101,12 @@
 		"sharp": "^0.33.4",
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.4.0",
-		"uuid": "^9.0.1",
+		"uuid": "^10.0.0",
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
 		"@anthropic-ai/sdk": "^0.25.0",
-		"@anthropic-ai/vertex-sdk": "^0.3.0",
+		"@anthropic-ai/vertex-sdk": "^0.4.1",
 		"@google-cloud/vertexai": "^1.1.0",
 		"@google/generative-ai": "^0.14.1",
 		"aws4fetch": "^1.0.17",
