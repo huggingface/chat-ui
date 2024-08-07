@@ -207,7 +207,7 @@
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
 		? 'md:grid-cols-[280px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] md:grid-rows-[1fr] dark:text-gray-300"
+		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
 		<NavMenu
@@ -242,8 +242,8 @@
 		href="https://play.google.com/store/apps/details?id=co.huggingface.chat_ui_android"
 		class="fixed left-0 right-0 top-0 mx-auto flex h-fit min-h-12 w-screen flex-nowrap items-center justify-evenly gap-4 bg-gray-200 px-4 py-4 text-gray-900 shadow-lg backdrop-blur-md
 		hover:bg-gray-100
-		sm:top-5 sm:max-w-fit sm:gap-4 sm:rounded-lg
-		dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+		dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 sm:top-5
+		sm:max-w-fit sm:gap-4 sm:rounded-lg"
 	>
 		<button
 			class="border-r-2 border-black/20 pr-4 text-2xl"

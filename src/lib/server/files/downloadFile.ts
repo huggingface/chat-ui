@@ -12,10 +12,10 @@ export async function downloadFile(
 
 	const file = await fileId.next();
 	if (!file) {
-		throw error(404, "File not found");
+		error(404, "File not found");
 	}
 	if (file.metadata?.conversation !== convId.toString()) {
-		throw error(403, "You don't have access to this file.");
+		error(403, "You don't have access to this file.");
 	}
 
 	const mime = file.metadata?.mime;

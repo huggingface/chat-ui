@@ -15,7 +15,7 @@ export async function POST({ params, locals }) {
 	});
 
 	if (!conversation) {
-		throw error(404, "Conversation not found");
+		error(404, "Conversation not found");
 	}
 
 	await collections.abortedGenerations.updateOne(
