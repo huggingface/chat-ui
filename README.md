@@ -43,6 +43,7 @@ Install llama.cpp w/ brew (for Mac):
 # install llama.cpp
 brew install llama.cpp
 ```
+
 or [build directly from the source](https://github.com/ggerganov/llama.cpp/blob/master/docs/build.md) for your target device:
 
 ```
