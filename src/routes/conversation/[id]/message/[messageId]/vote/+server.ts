@@ -31,7 +31,7 @@ export async function POST({ params, request, locals }) {
 	);
 
 	if (!document.matchedCount) {
-		throw error(404, "Message not found");
+		error(404, "Message not found");
 	}
 
 	return new Response();

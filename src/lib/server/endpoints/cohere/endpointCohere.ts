@@ -78,7 +78,7 @@ export async function endpointCohere(
 					.map((message) => ({
 						role: message.from === "user" ? "USER" : "CHATBOT",
 						message: message.content,
-					})) satisfies Cohere.ChatMessage[];
+					})) satisfies Cohere.Message[];
 
 				stream = await cohere
 					.chatStream({

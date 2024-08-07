@@ -14,7 +14,7 @@ import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request }) {
 	if (!env.PARQUET_EXPORT_DATASET || !env.PARQUET_EXPORT_HF_TOKEN) {
-		throw error(500, "Parquet export is not configured.");
+		error(500, "Parquet export is not configured.");
 	}
 
 	const { model } = z
