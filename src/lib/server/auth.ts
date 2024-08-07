@@ -1,4 +1,10 @@
-import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
+import {
+	Issuer,
+	type BaseClient,
+	type UserinfoResponse,
+	type TokenSet,
+	custom,
+} from "openid-client";
 import { addHours, addWeeks } from "date-fns";
 import { env } from "$env/dynamic/private";
 import { sha256 } from "$lib/utils/sha256";
@@ -39,7 +45,9 @@ export const OIDConfig = z
 	})
 	.parse(JSON5.parse(env.OPENID_CONFIG) || "{}");
 
-export const requiresUser = (!!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET) || (!!env.CF_ACCESS_AUD && !!env.CF_ACCESS_TEAM_DOMAIN);
+export const requiresUser =
+	(!!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET) ||
+	(!!env.CF_ACCESS_AUD && !!env.CF_ACCESS_TEAM_DOMAIN);
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(env.COOKIE_NAME, sessionId, {

@@ -5,7 +5,7 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
 import { ToolResultStatus, type ToolCall } from "$lib/types/Tool";
-import { pipeline, Writable, Readable } from "node:stream";
+import { pipeline, Writable, type Readable } from "node:stream";
 import { toolHasName } from "$lib/utils/tools";
 
 export const endpointCohereParametersSchema = z.object({
@@ -13,19 +13,21 @@ export const endpointCohereParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("cohere"),
 	apiKey: z.string().default(env.COHERE_API_TOKEN),
+	clientName: z.string().optional(),
 	raw: z.boolean().default(false),
 });
 
 export async function endpointCohere(
 	input: z.input<typeof endpointCohereParametersSchema>
 ): Promise<Endpoint> {
-	const { apiKey, model, raw } = endpointCohereParametersSchema.parse(input);
+	const { apiKey, clientName, model, raw } = endpointCohereParametersSchema.parse(input);
 
 	let cohere: CohereClient;
 
 	try {
 		cohere = new (await import("cohere-ai")).CohereClient({
 			token: apiKey,
+			clientName,
 		});
 	} catch (e) {
 		throw new Error("Failed to import cohere-ai", { cause: e });
@@ -76,7 +78,7 @@ export async function endpointCohere(
 					.map((message) => ({
 						role: message.from === "user" ? "USER" : "CHATBOT",
 						message: message.content,
-					})) satisfies Cohere.ChatMessage[];
+					})) satisfies Cohere.Message[];
 
 				stream = await cohere
 					.chatStream({

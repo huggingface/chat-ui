@@ -31,7 +31,7 @@
 </script>
 
 <nav
-	class="flex h-12 items-center justify-between border-b bg-gray-50 px-3 md:hidden dark:border-gray-800 dark:bg-gray-800/70"
+	class="flex h-12 items-center justify-between border-b bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-800/70 md:hidden"
 >
 	<button
 		type="button"
