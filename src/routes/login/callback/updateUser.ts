@@ -103,7 +103,7 @@ export async function updateUser(params: {
 	const sessionId = await sha256(secretSessionId);
 
 	if (await collections.sessions.findOne({ sessionId })) {
-		throw error(500, "Session ID collision");
+		error(500, "Session ID collision");
 	}
 
 	locals.sessionId = sessionId;
