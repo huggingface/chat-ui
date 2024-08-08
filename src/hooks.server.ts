@@ -19,6 +19,7 @@ import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
+	logger.info("Starting server...");
 	initExitHandler();
 
 	await checkAndRunMigrations();
@@ -34,7 +35,7 @@ if (!building) {
 	AbortedGenerations.getInstance();
 }
 
-export const handleError: HandleServerError = async ({ error, event }) => {
+export const handleError: HandleServerError = async ({ error, event, status, message }) => {
 	// handle 404
 
 	if (building) {
@@ -54,8 +55,10 @@ export const handleError: HandleServerError = async ({ error, event }) => {
 		url: event.request.url,
 		params: event.params,
 		request: event.request,
+		message,
 		error,
 		errorId,
+		status,
 	});
 
 	return {

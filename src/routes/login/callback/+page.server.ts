@@ -5,6 +5,7 @@ import { base } from "$app/paths";
 import { updateUser } from "./updateUser";
 import { env } from "$env/dynamic/private";
 import JSON5 from "json5";
+import { logger } from "$lib/server/logger";
 
 const allowedUserEmails = z
 	.array(z.string().email())
@@ -21,7 +22,7 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		.parse(Object.fromEntries(url.searchParams.entries()));
 
 	if (errorName) {
-		throw error(400, errorName + (errorDescription ? ": " + errorDescription : ""));
+		error(400, errorName + (errorDescription ? ": " + errorDescription : ""));
 	}
 
 	const { code, state, iss } = z
@@ -37,7 +38,7 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 	const validatedToken = await validateAndParseCsrfToken(csrfToken, locals.sessionId);
 
 	if (!validatedToken) {
-		throw error(403, "Invalid or expired CSRF token");
+		error(403, "Invalid or expired CSRF token");
 	}
 
 	const { userData } = await getOIDCUserData(
@@ -49,16 +50,18 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 	// Filter by allowed user emails
 	if (allowedUserEmails.length > 0) {
 		if (!userData.email) {
-			throw error(403, "User not allowed: email not returned");
+			error(403, "User not allowed: email not returned");
 		}
 		const emailVerified = userData.email_verified ?? true;
 		if (!emailVerified) {
-			throw error(403, "User not allowed: email not verified");
+			error(403, "User not allowed: email not verified");
 		}
 		if (!allowedUserEmails.includes(userData.email)) {
-			throw error(403, "User not allowed");
+			error(403, "User not allowed");
 		}
 	}
+
+	logger.info("updating user");
 
 	await updateUser({
 		userData,
@@ -68,5 +71,5 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		ip: getClientAddress(),
 	});
 
-	throw redirect(302, `${base}/`);
+	redirect(302, `${base}/`);
 }

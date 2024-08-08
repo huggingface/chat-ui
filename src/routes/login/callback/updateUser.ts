@@ -79,7 +79,15 @@ export async function updateUser(params: {
 	// Dynamically access user data based on NAME_CLAIM from environment
 	// This approach allows us to adapt to different OIDC providers flexibly.
 
-	logger.info({ username, name, email, orgs: orgs?.map((el) => el.sub) }, "user login");
+	logger.info(
+		{
+			login_username: username,
+			login_name: name,
+			login_email: email,
+			login_orgs: orgs?.map((el) => el.sub),
+		},
+		"user login"
+	);
 	// if using huggingface as auth provider, check orgs for earl access and amin rights
 	const isAdmin = (HF_ORG_ADMIN && orgs?.some((org) => org.sub === HF_ORG_ADMIN)) || false;
 	const isEarlyAccess =
@@ -95,7 +103,7 @@ export async function updateUser(params: {
 	const sessionId = await sha256(secretSessionId);
 
 	if (await collections.sessions.findOne({ sessionId })) {
-		throw error(500, "Session ID collision");
+		error(500, "Session ID collision");
 	}
 
 	locals.sessionId = sessionId;
