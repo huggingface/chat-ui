@@ -41,23 +41,23 @@ const IOType = z.union([
 
 const toolInputBaseSchema = z.union([
 	z.object({
-		name: z.string().min(1),
-		description: z.string().optional(),
+		name: z.string().min(1).max(40),
+		description: z.string().max(100).optional(),
 		paramType: z.literal("required"),
 	}),
 	z.object({
-		name: z.string().min(1),
-		description: z.string().optional(),
+		name: z.string().min(1).max(40),
+		description: z.string().max(100).optional(),
 		paramType: z.literal("optional"),
 		default: z
-			.union([z.string(), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(40), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 	z.object({
-		name: z.string().min(1),
+		name: z.string().min(1).max(40),
 		paramType: z.literal("fixed"),
 		value: z
-			.union([z.string(), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(40), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 ]);
@@ -73,16 +73,16 @@ const toolInputSchema = toolInputBaseSchema.and(
 
 export const editableToolSchema = z
 	.object({
-		name: z.string().min(1),
-		baseUrl: z.string().min(1),
-		endpoint: z.string().min(1),
+		name: z.string().min(1).max(40),
+		baseUrl: z.string().min(1).max(100),
+		endpoint: z.string().min(1).max(100),
 		inputs: z.array(toolInputSchema),
-		outputComponent: z.string().min(1),
+		outputComponent: z.string().min(1).max(100),
 		showOutput: z.boolean(),
-		displayName: z.string().min(1),
+		displayName: z.string().min(1).max(40),
 		color: ToolColor,
 		icon: ToolIcon,
-		description: z.string().min(1),
+		description: z.string().min(1).max(100),
 	})
 	.transform((tool) => ({
 		...tool,
