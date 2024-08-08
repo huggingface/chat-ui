@@ -4,7 +4,7 @@ import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { SortKey } from "$lib/types/Assistant.js";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import type { User } from "$lib/types/User.js";
-import { generateQueryTokens } from "$lib/utils/searchTokens.js";
+import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId, type Filter } from "mongodb";
 
@@ -41,10 +41,12 @@ export const load = async ({ url, locals }) => {
 		error(404, "No user settings found");
 	}
 
+	const queryTokens = !!query && generateQueryTokens(query);
+
 	const filter: Filter<CommunityToolDB> = {
 		...(!createdByCurrentUser && !activeOnly && { featured: true }),
 		...(user && { createdById: user._id }),
-		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {
 			_id: {
 				$in: (settings?.tools ?? []).map((key) => {
@@ -65,7 +67,17 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const configTools = toolFromConfigs.filter((tool) => !tool?.isHidden);
+	const configTools = toolFromConfigs
+		.filter((tool) => !tool?.isHidden)
+		.filter((tool) => {
+			if (queryTokens) {
+				return generateSearchTokens(tool.name).some((token) =>
+					queryTokens.some((queryToken) => queryToken.test(token))
+				);
+			}
+			return true;
+		});
+
 	const tools = [...(pageIndex == 0 && !username ? configTools : []), ...communityTools];
 
 	const numTotalItems =
