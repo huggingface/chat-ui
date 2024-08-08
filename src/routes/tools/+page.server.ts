@@ -13,7 +13,7 @@ const NUM_PER_PAGE = 16;
 export const load = async ({ url, locals }) => {
 	// XXX: feature_flag_tools
 	if (!locals.user?.isEarlyAccess) {
-		throw error(403, "You need to be an early access user to view tools");
+		error(403, "You need to be an early access user to view tools");
 	}
 
 	const username = url.searchParams.get("user");
@@ -31,14 +31,14 @@ export const load = async ({ url, locals }) => {
 			{ projection: { _id: 1 } }
 		);
 		if (!user) {
-			throw error(404, `User "${username}" doesn't exist`);
+			error(404, `User "${username}" doesn't exist`);
 		}
 	}
 
 	const settings = await collections.settings.findOne(authCondition(locals));
 
 	if (!settings && activeOnly) {
-		throw error(404, "No user settings found");
+		error(404, "No user settings found");
 	}
 
 	const filter: Filter<CommunityToolDB> = {

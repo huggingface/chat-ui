@@ -10,7 +10,7 @@ export const load = async ({ params, locals }) => {
 	if (!tool) {
 		const tool = toolFromConfigs.find((el) => el._id.toString() === params.toolId);
 		if (!tool) {
-			throw redirect(302, `${base}/tools`);
+			redirect(302, `${base}/tools`);
 		}
 		return {
 			tool: {

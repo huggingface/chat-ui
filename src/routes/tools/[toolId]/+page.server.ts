@@ -46,7 +46,7 @@ export const actions: Actions = {
 			}
 		);
 
-		throw redirect(302, `${base}/tools`);
+		redirect(302, `${base}/tools`);
 	},
 	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?

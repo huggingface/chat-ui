@@ -11,5 +11,5 @@ export async function load({ parent }) {
 		return {};
 	}
 
-	throw redirect(302, `${base}/`);
+	redirect(302, `${base}/`);
 }

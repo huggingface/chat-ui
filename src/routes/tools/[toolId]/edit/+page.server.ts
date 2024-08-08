@@ -30,7 +30,7 @@ export const actions = {
 		const toolStringified = body.get("tool");
 
 		if (!toolStringified || typeof toolStringified !== "string") {
-			throw error(400, "Tool is required");
+			error(400, "Tool is required");
 		}
 
 		const parse = editableToolSchema.safeParse(JSON.parse(toolStringified));
@@ -59,6 +59,6 @@ export const actions = {
 			}
 		);
 
-		throw redirect(302, `${base}/tools/${tool._id.toString()}`);
+		redirect(302, `${base}/tools/${tool._id.toString()}`);
 	},
 };

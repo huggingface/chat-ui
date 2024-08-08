@@ -10,14 +10,14 @@ export const actions = {
 	default: async ({ request, locals }) => {
 		// XXX: feature_flag_tools
 		if (!locals.user?.isEarlyAccess) {
-			throw error(403, "You need to be an early access user to create tools");
+			error(403, "You need to be an early access user to create tools");
 		}
 
 		const body = await request.formData();
 		const toolStringified = body.get("tool");
 
 		if (!toolStringified || typeof toolStringified !== "string") {
-			throw error(400, "Tool is required");
+			error(400, "Tool is required");
 		}
 
 		const parse = editableToolSchema.safeParse(JSON.parse(toolStringified));
@@ -53,7 +53,7 @@ export const actions = {
 		}
 
 		if (!locals.user || !authCondition(locals)) {
-			throw error(401, "Unauthorized");
+			error(401, "Unauthorized");
 		}
 
 		const { insertedId } = await collections.tools.insertOne({

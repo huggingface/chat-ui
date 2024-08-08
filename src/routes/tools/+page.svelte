@@ -192,7 +192,7 @@
 				{/if}
 			{/if}
 			<div
-				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 sm:w-64 dark:border-gray-600"
+				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 dark:border-gray-600 sm:w-64"
 			>
 				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400" />
 				<input
@@ -219,7 +219,7 @@
 			{#each tools as tool}
 				<a
 					href="{base}/tools/{tool._id.toString()}"
-					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-24 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24"
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
 					<div class="flex w-full flex-col items-start text-left">
