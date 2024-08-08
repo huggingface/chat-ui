@@ -124,6 +124,7 @@ export async function endpointOai(
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
+				stream_options: { include_usage: true },
 			};
 
 			const openChatAICompletion = await openai.chat.completions.create(body, {

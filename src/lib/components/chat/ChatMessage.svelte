@@ -36,7 +36,7 @@
 	import DOMPurify from "isomorphic-dompurify";
 	import { enhance } from "$app/forms";
 	import TokenUsage from "./TokenUsage.svelte";
-	
+
 	function sanitizeMd(md: string) {
 		let ret = md
 			.replace(/<\|[a-z]*$/, "")
@@ -212,7 +212,6 @@
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 
 	$: modalImageToShow = null as MessageFile | null;
-
 </script>
 
 {#if modalImageToShow}
@@ -305,7 +304,7 @@
 				{/if}
 				{#each tokens as token}
 					{#if token.type === "code"}
-						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} loading={loading} />
+						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} {loading} />
 					{:else}
 						{#await marked.parse(token.raw, options) then parsed}
 							{@html DOMPurify.sanitize(parsed)}
@@ -313,9 +312,15 @@
 					{/if}
 				{/each}
 			</div>
-	
-			{#if message.usage && model.tokenInfo  && model.tokenInfo.contextWindow !== undefined}
-				<TokenUsage usage={message.usage} tokenInfo ={{contextWindow: model.tokenInfo.contextWindow, pricing: model.tokenInfo.pricing} } />
+
+			{#if message.usage && model.tokenInfo && model.tokenInfo.contextWindow !== undefined}
+				<TokenUsage
+					usage={message.usage}
+					tokenInfo={{
+						contextWindow: model.tokenInfo.contextWindow,
+						pricing: model.tokenInfo.pricing,
+					}}
+				/>
 			{/if}
 
 			<!-- Web Search sources -->
