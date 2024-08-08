@@ -147,6 +147,8 @@
 	}
 
 	const settings = useSettingsStore();
+
+	$: formSubmittable = editableTool.name && editableTool.baseUrl && editableTool.outputComponent;
 </script>
 
 <form
@@ -582,10 +584,11 @@
 				{#if !readonly}
 					<button
 						type="submit"
-						disabled={formLoading}
-						class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold text-white"
-						class:text-gray-300={formLoading}
-						class:bg-gray-500={formLoading}
+						disabled={formLoading || !formSubmittable}
+						class="mt-4 w-fit rounded-full bg-black px-4 py-2 font-semibold"
+						class:text-white={!formLoading && formSubmittable}
+						class:text-gray-300={formLoading || !formSubmittable}
+						class:bg-gray-400={formLoading || !formSubmittable}
 					>
 						{formLoading ? "Saving..." : "Save"}
 					</button>
