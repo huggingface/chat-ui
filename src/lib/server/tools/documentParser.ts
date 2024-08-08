@@ -2,8 +2,13 @@ import type { BackendTool } from ".";
 import { callSpace, getIpToken } from "./utils";
 import { downloadFile } from "$lib/server/files/downloadFile";
 
-type PdfParserInput = [Blob /* pdf */, string /* filename */];
-type PdfParserOutput = [string /* markdown */, Record<string, unknown> /* metadata */];
+type PdfParserInput = [
+	string[] /* queries */,
+	Blob[] /* docs */,
+	string /* doc filenames */,
+	number /* max context length */
+];
+type PdfParserOutput = [string /* text */];
 
 const documentParser: BackendTool = {
 	name: "document_parser",
@@ -21,10 +26,16 @@ const documentParser: BackendTool = {
 			type: "number",
 			required: true,
 		},
+		query: {
+			description: "Query to use for retrieval augmented generation. Be descriptive.",
+			type: "string",
+			required: true,
+		},
 	},
-	async *call({ fileMessageIndex, fileIndex }, { conv, messages, ip, username }) {
+	async *call({ fileMessageIndex, fileIndex, query }, { conv, messages, ip, username }) {
 		fileMessageIndex = Number(fileMessageIndex);
 		fileIndex = Number(fileIndex);
+		query = String(query);
 
 		const message = messages[fileMessageIndex];
 		const files = message?.files ?? [];
@@ -34,14 +45,15 @@ const documentParser: BackendTool = {
 		const file = files[fileIndex];
 		const fileBlob = await downloadFile(files[fileIndex].value, conv._id)
 			.then((file) => fetch(`data:${file.mime};base64,${file.value}`))
-			.then((res) => res.blob());
+			.then((res) => res.blob())
+			.then((blob) => new File([blob], file.name, { type: file.mime }));
 
 		const ipToken = await getIpToken(ip, username);
 
 		const outputs = await callSpace<PdfParserInput, PdfParserOutput>(
-			"huggingchat/document-parser",
+			"huggingchat/document-parser-rag",
 			"predict",
-			[fileBlob, file.name],
+			[[query], [fileBlob], file.name, 16384],
 			ipToken
 		);
 
