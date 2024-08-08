@@ -37,9 +37,22 @@ You can quickly start a locally running chat-ui & LLM text-generation server tha
 
 **Step 1 (Start llama.cpp server):**
 
+Install llama.cpp w/ brew (for Mac):
+
 ```bash
 # install llama.cpp
 brew install llama.cpp
+```
+
+or [build directly from the source](https://github.com/ggerganov/llama.cpp/blob/master/docs/build.md) for your target device:
+
+```
+git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp && make
+```
+
+Next, start the server with the [LLM of your choice](https://huggingface.co/models?library=gguf):
+
+```bash
 # start llama.cpp server (using hf.co/microsoft/Phi-3-mini-4k-instruct-gguf as an example)
 llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-mini-4k-instruct-q4.gguf -c 4096
 ```
