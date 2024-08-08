@@ -561,6 +561,10 @@
 							</div>
 						{:else if APIloading}
 							<p class="text-sm text-gray-500">Loading API...</p>
+						{:else if !api["named_endpoints"]}
+							<p class="font-medium text-red-800">
+								No endpoints found in this space. Try another one.
+							</p>
 						{/if}
 					{:catch error}
 						<p class="text-sm text-gray-500">{error}</p>
