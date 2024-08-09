@@ -32,12 +32,7 @@ export type BackendToolContext = Pick<
 	"conv" | "messages" | "assistant" | "ip" | "username"
 > & { preprompt?: string };
 
-const IOType = z.union([
-	z.literal("str"),
-	z.literal("int"),
-	z.literal("float"),
-	z.literal("boolean"),
-]);
+const IOType = z.union([z.literal("str"), z.literal("int"), z.literal("float"), z.literal("bool")]);
 
 const toolInputBaseSchema = z.union([
 	z.object({
@@ -145,7 +140,7 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 					return parseInt(valueStr);
 				case "float":
 					return parseFloat(valueStr);
-				case "boolean":
+				case "bool":
 					return valueStr === "true";
 				default:
 					throw new Error(`Unsupported type ${type}`);

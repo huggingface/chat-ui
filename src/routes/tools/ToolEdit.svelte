@@ -13,6 +13,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
+	import ToolInputComponent from "./ToolInputComponent.svelte";
 
 	type ActionData = {
 		error?: boolean;
@@ -137,7 +138,7 @@
 			case "str":
 			case "int":
 			case "float":
-			case "boolean":
+			case "bool":
 				return type;
 			case "filepath":
 				return "file" as const;
@@ -424,7 +425,7 @@
 										{/if}
 										{#if input.paramType === "optional" || input.paramType === "fixed"}
 											{@const isOptional = input.paramType === "optional"}
-											<label class="flex flex-row gap-2">
+											<div class="flex flex-row gap-2">
 												<div class="mb-1 flex-grow font-semibold">
 													{isOptional ? "Default value" : "Value"}
 													<p class="text-xs font-normal text-gray-500">
@@ -437,28 +438,22 @@
 													</p>
 												</div>
 												{#if input.paramType === "optional"}
-													<input
-														name="{input.name}-default"
-														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-														placeholder="This is the value of the input. Must be of type {parameter
-															?.python_type.type}"
-														bind:value={input.default}
+													<ToolInputComponent
+														type={parameter?.python_type.type ?? "str"}
 														disabled={readonly}
+														bind:value={input.default}
 													/>
 												{:else}
-													<input
-														name="{input.name}-value"
-														class="my-auto h-10 rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-														placeholder="This is the value of the input. Must be of type {parameter
-															?.python_type.type}"
-														bind:value={input.value}
+													<ToolInputComponent
+														type={parameter?.python_type.type ?? "str"}
 														disabled={readonly}
+														bind:value={input.value}
 													/>
 												{/if}
 												<p class="text-xs text-red-500">
 													{getError(`${input.name}-${isOptional ? "default" : "value"}`, form)}
 												</p>
-											</label>
+											</div>
 										{/if}
 										{#if input.type === "file"}
 											<label class="flex flex-row gap-2">

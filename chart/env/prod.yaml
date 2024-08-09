@@ -363,7 +363,7 @@ envVars:
             "name": "randomize_seed",
             "paramType": "fixed",
             "value": "true",
-            "type": "boolean"
+            "type": "bool"
           },
           {
             "name": "width",

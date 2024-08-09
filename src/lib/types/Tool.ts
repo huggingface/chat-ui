@@ -39,7 +39,7 @@ export type ToolOutputComponents = z.infer<typeof ToolOutputComponents>;
 export type ToolLogoColor = z.infer<typeof ToolColor>;
 export type ToolLogoIcon = z.infer<typeof ToolIcon>;
 
-export type ToolIOType = "str" | "int" | "float" | "boolean" | "file";
+export type ToolIOType = "str" | "int" | "float" | "bool" | "file";
 
 export type ToolInputRequired = {
 	paramType: "required";
