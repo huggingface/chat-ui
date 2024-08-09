@@ -13,6 +13,7 @@ import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus } from "$lib/types/Tool";
+import { collections } from "./database";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -67,7 +68,26 @@ const modelConfig = z.object({
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+export type ModelConfig = z.infer<typeof modelConfig>;
+
+const databaseModelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+
+export async function populateModelConfig() {
+	await collections.modelConfig.deleteMany({});
+	await collections.modelConfig.insertMany(databaseModelsRaw);
+}
+
+async function getModels(): Promise<ModelConfig[]> {
+	try {
+		const databaseModel = await collections.modelConfig.find().toArray();
+		return z.array(modelConfig).parse(databaseModel);
+	} catch (error) {
+		console.error("Error fetching models from database, using default models:", error);
+		return z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+	}
+}
+
+const modelsRaw = await getModels();
 
 async function getChatPromptRender(
 	m: z.infer<typeof modelConfig>
