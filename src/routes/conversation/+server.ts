@@ -6,7 +6,7 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
-import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
+import { getDefaultEmbeddingModel } from "$lib/server/embeddingModels";
 import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
@@ -75,6 +75,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		values.assistantId = conversation.assistantId?.toString();
 		embeddingModel = conversation.embeddingModel;
 	}
+	const defaultEmbeddingModel = await getDefaultEmbeddingModel();
 
 	embeddingModel ??= model.embeddingModel ?? defaultEmbeddingModel.name;
 

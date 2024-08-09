@@ -14,7 +14,7 @@ import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
 import type { Conversation } from "../src/lib/types/Conversation";
 import type { Settings } from "../src/lib/types/Settings";
-import { defaultEmbeddingModel } from "../src/lib/server/embeddingModels.ts";
+import { getDefaultEmbeddingModel } from "../src/lib/server/embeddingModels.ts";
 import { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
@@ -146,6 +146,7 @@ async function seed() {
 				updatedAt: faker.date.recent({ days: 30 }),
 				customPrompts: {},
 				assistants: [],
+				disableStream: false,
 			};
 			await collections.settings.updateOne(
 				{ userId: user._id },
@@ -214,7 +215,7 @@ async function seed() {
 								: faker.helpers.maybe(() => faker.hacker.phrase(), { probability: 0.5 })) ?? "";
 
 						const messages = await generateMessages(preprompt);
-
+						const defaultEmbeddingModel = await getDefaultEmbeddingModel();
 						const conv = {
 							_id: new ObjectId(),
 							userId: user._id,
@@ -224,7 +225,7 @@ async function seed() {
 							updatedAt: faker.date.recent({ days: 145 }),
 							model: faker.helpers.arrayElement(modelIds),
 							title: faker.internet.emoji() + " " + faker.hacker.phrase(),
-							embeddingModel: defaultEmbeddingModel.id,
+							embeddingModel: defaultEmbeddingModel.name,
 							messages,
 							rootMessageId: messages[0].id,
 						} satisfies Conversation;

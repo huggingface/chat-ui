@@ -16,6 +16,7 @@ import { initExitHandler } from "$lib/server/exitHandler";
 import { ObjectId } from "mongodb";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
+import { pupulateEmbeddingModel } from "$lib/server/embeddingModels";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -26,6 +27,9 @@ if (!building) {
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
+
+	await pupulateEmbeddingModel();
+
 	refreshConversationStats();
 
 	// Init metrics server

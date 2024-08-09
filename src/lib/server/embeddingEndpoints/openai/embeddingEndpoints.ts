@@ -2,21 +2,25 @@ import { z } from "zod";
 import type { EmbeddingEndpoint, Embedding } from "../embeddingEndpoints";
 import { chunk } from "$lib/utils/chunk";
 import { env } from "$env/dynamic/private";
+import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 
 export const embeddingEndpointOpenAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
-	model: z.any(),
 	type: z.literal("openai"),
 	url: z.string().url().default("https://api.openai.com/v1/embeddings"),
 	apiKey: z.string().default(env.OPENAI_API_KEY),
 	defaultHeaders: z.record(z.string()).default({}),
 });
 
+type EmbeddingEndpointOpenAIInput = z.input<typeof embeddingEndpointOpenAIParametersSchema> & {
+	model: EmbeddingModel;
+};
+
 export async function embeddingEndpointOpenAI(
-	input: z.input<typeof embeddingEndpointOpenAIParametersSchema>
+	input: EmbeddingEndpointOpenAIInput
 ): Promise<EmbeddingEndpoint> {
-	const { url, model, apiKey, defaultHeaders } =
-		embeddingEndpointOpenAIParametersSchema.parse(input);
+	const { model } = input;
+	const { url, apiKey, defaultHeaders } = embeddingEndpointOpenAIParametersSchema.parse(input);
 
 	const maxBatchSize = model.maxBatchSize || 100;
 
