@@ -1,12 +1,22 @@
-import type { BackendTool } from ".";
+import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 
-const directlyAnswer: BackendTool = {
-	name: "directly_answer",
+const directlyAnswer: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000D"),
+	type: "config",
+	description: "Answer the user's query directly",
+	color: "blue",
+	icon: "chat",
+	displayName: "Directly Answer",
 	isOnByDefault: true,
-	isHidden: true,
 	isLocked: true,
-	description: "Use this tool to let the user know you wish to answer directly",
-	parameterDefinitions: {},
+	isHidden: true,
+	name: "directlyAnswer",
+	endpoint: null,
+	inputs: [],
+	outputComponent: null,
+	outputComponentIdx: null,
+	showOutput: false,
 	async *call() {
 		return {
 			outputs: [],

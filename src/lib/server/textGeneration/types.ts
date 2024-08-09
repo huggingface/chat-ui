@@ -12,7 +12,7 @@ export interface TextGenerationContext {
 	assistant?: Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">;
 	isContinue: boolean;
 	webSearch: boolean;
-	toolsPreference: Record<string, boolean>;
+	toolsPreference: Array<string>;
 	promptedAt: Date;
 	ip: string;
 	username?: string;

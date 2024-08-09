@@ -6,6 +6,7 @@ import type { Timestamps } from "./Timestamps";
 export interface Report extends Timestamps {
 	_id: ObjectId;
 	createdBy: User["_id"] | string;
-	assistantId: Assistant["_id"];
+	object: "assistant" | "tool";
+	contentId: Assistant["_id"];
 	reason?: string;
 }

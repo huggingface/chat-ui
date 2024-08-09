@@ -12,7 +12,7 @@ import type { PreTrainedTokenizer } from "@xenova/transformers";
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { ToolResultStatus } from "$lib/types/Tool";
+import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -96,14 +96,11 @@ async function getChatPromptRender(
 
 	const renderTemplate = ({ messages, preprompt, tools, toolResults }: ChatTemplateInput) => {
 		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
-			content:
-				message.files?.length && !tools?.length
-					? message.content + `\n This message has ${message.files.length} files attached`
-					: message.content,
+			content: message.content,
 			role: message.from,
 		}));
 
-		if (preprompt) {
+		if (preprompt && formattedMessages[0].role !== "system") {
 			formattedMessages = [
 				{
 					role: "system",
@@ -195,17 +192,41 @@ async function getChatPromptRender(
 			);
 		});
 
+		const mappedTools =
+			tools?.map((tool) => {
+				const inputs: Record<
+					string,
+					{
+						type: ToolInput["type"];
+						description: string;
+						required: boolean;
+					}
+				> = {};
+
+				for (const value of tool.inputs) {
+					if (value.paramType !== "fixed") {
+						inputs[value.name] = {
+							type: value.type,
+							description: value.description ?? "",
+							required: value.paramType === "required",
+						};
+					}
+				}
+
+				return {
+					name: tool.name,
+					description: tool.description,
+					parameter_definitions: inputs,
+				};
+			}) ?? [];
+
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
 			add_generation_prompt: true,
 			chat_template: chatTemplate,
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
-			tools:
-				tools?.map(({ parameterDefinitions, ...tool }) => ({
-					parameter_definitions: parameterDefinitions,
-					...tool,
-				})) ?? [],
+			tools: mappedTools,
 			documents,
 		});
 

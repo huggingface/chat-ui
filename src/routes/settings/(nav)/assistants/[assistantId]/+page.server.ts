@@ -63,7 +63,8 @@ export const actions: Actions = {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
 			createdBy: locals.user?._id ?? locals.sessionId,
-			assistantId: new ObjectId(params.assistantId),
+			object: "assistant",
+			contentId: new ObjectId(params.assistantId),
 		});
 
 		if (report) {
@@ -79,7 +80,8 @@ export const actions: Actions = {
 
 		const { acknowledged } = await collections.reports.insertOne({
 			_id: new ObjectId(),
-			assistantId: new ObjectId(params.assistantId),
+			contentId: new ObjectId(params.assistantId),
+			object: "assistant",
 			createdBy: locals.user?._id ?? locals.sessionId,
 			createdAt: new Date(),
 			updatedAt: new Date(),

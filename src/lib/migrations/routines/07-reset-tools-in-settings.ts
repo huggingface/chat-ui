@@ -8,7 +8,7 @@ const resetTools: Migration = {
 	up: async () => {
 		const { settings } = collections;
 
-		await settings.updateMany({}, { $set: { tools: {} } });
+		await settings.updateMany({}, { $set: { tools: [] } });
 
 		return true;
 	},
