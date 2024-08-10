@@ -38,7 +38,6 @@
 	class={classNames}
 	title={"Copy to clipboard"}
 	type="button"
-	on:click
 	on:click={handleClick}
 >
 	<div class="relative">

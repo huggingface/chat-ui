@@ -30,14 +30,14 @@
 </script>
 
 <button
-    class="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:hover:border-gray-500 {classNames}"
-    title="Edit on Mermaid Live"
+    class={classNames}
+    title={"Edit on Mermaid Live"}
     type="button"
     on:click={handleClick}
 >
     <div class="relative">
         <slot>
-            <IconInternet classNames="dark:text-gray-700 text-gray-200" />
+            <IconInternet classNames="h-[1.14em] w-[1.14em]" />
         </slot>
     </div>
 </button>

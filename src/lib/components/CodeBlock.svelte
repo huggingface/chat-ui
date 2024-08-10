@@ -77,7 +77,7 @@
 	/>
 	{#if lang === "mermaid"}
 		<MermaidLiveBtn
-			classNames="absolute top-12 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100"
+			classNames="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:hover:border-gray-500 absolute top-12 right-2 invisible opacity-0 group-hover:visible group-hover:opacity-100 dark:text-gray-700 text-gray-200"
 			value={code}
 		/>
 	{/if}
