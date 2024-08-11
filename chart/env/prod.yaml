@@ -328,8 +328,8 @@ envVars:
     }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   XFF_DEPTH: '2'
-  HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
-  HF_ORG_EARLY_ACCESS: '5e67bd5b1009063689407478'
+  HF_ORG_ADMIN: 'huggingchat'
+  HF_ORG_EARLY_ACCESS: 'huggingface'
 
 infisical:
   enabled: true
