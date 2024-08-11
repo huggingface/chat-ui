@@ -116,10 +116,12 @@
 				</div>
 				<ul class="py-1 text-sm">
 					{#each Object.entries(toolUpdate.call.parameters ?? {}) as [k, v]}
-						<li>
-							<span class="font-semibold">{k}</span>:
-							<span>{v}</span>
-						</li>
+						{#if v !== null}
+							<li>
+								<span class="font-semibold">{k}</span>:
+								<span>{v}</span>
+							</li>
+						{/if}
 					{/each}
 				</ul>
 			{:else if toolUpdate.subtype === MessageToolUpdateType.Error}
