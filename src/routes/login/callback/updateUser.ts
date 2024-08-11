@@ -12,6 +12,26 @@ import { OIDConfig } from "$lib/server/auth";
 import { HF_ORG_ADMIN, HF_ORG_EARLY_ACCESS } from "$env/static/private";
 import { logger } from "$lib/server/logger";
 
+const earlyAccessIds = HF_ORG_EARLY_ACCESS
+	? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_EARLY_ACCESS}/members`)
+			.then((res) => res.json())
+			.then((res: Array<{ _id: string }>) => res.map((user: { _id: string }) => user._id))
+			.catch((err) => {
+				logger.error(err, "Failed to fetch early access members");
+				return null;
+			})
+	: null;
+
+const adminIds = HF_ORG_ADMIN
+	? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_ADMIN}/members`)
+			.then((res) => res.json())
+			.then((res: Array<{ _id: string }>) => res.map((user) => user._id))
+			.catch((err) => {
+				logger.error(err, "Failed to fetch admin members");
+				return null;
+			})
+	: null;
+
 export async function updateUser(params: {
 	userData: UserinfoResponse;
 	locals: App.Locals;
@@ -33,7 +53,6 @@ export async function updateUser(params: {
 		email,
 		picture: avatarUrl,
 		sub: hfUserId,
-		orgs,
 	} = z
 		.object({
 			preferred_username: z.string().optional(),
@@ -79,19 +98,17 @@ export async function updateUser(params: {
 	// Dynamically access user data based on NAME_CLAIM from environment
 	// This approach allows us to adapt to different OIDC providers flexibly.
 
-	logger.info(
-		{
-			login_username: username,
-			login_name: name,
-			login_email: email,
-			login_orgs: orgs?.map((el) => el.sub),
-		},
-		"user login"
-	);
-	// if using huggingface as auth provider, check orgs for earl access and amin rights
-	const isAdmin = (HF_ORG_ADMIN && orgs?.some((org) => org.sub === HF_ORG_ADMIN)) || false;
-	const isEarlyAccess =
-		(HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === HF_ORG_EARLY_ACCESS)) || false;
+	let isAdmin = undefined;
+	let isEarlyAccess = undefined;
+
+	if (hfUserId) {
+		if (adminIds !== null) {
+			isAdmin = adminIds.includes(hfUserId);
+		}
+		if (earlyAccessIds !== null) {
+			isEarlyAccess = earlyAccessIds.includes(hfUserId);
+		}
+	}
 
 	// check if user already exists
 	const existingUser = await collections.users.findOne({ hfUserId });
@@ -112,7 +129,8 @@ export async function updateUser(params: {
 		// update existing user if any
 		await collections.users.updateOne(
 			{ _id: existingUser._id },
-			{ $set: { username, name, avatarUrl, isAdmin, isEarlyAccess } }
+			{ $set: { username, name, avatarUrl, isAdmin, isEarlyAccess } },
+			{ ignoreUndefined: true }
 		);
 
 		// remove previous session if it exists and add new one
@@ -129,18 +147,21 @@ export async function updateUser(params: {
 		});
 	} else {
 		// user doesn't exist yet, create a new one
-		const { insertedId } = await collections.users.insertOne({
-			_id: new ObjectId(),
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			username,
-			name,
-			email,
-			avatarUrl,
-			hfUserId,
-			isAdmin,
-			isEarlyAccess,
-		});
+		const { insertedId } = await collections.users.insertOne(
+			{
+				_id: new ObjectId(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				username,
+				name,
+				email,
+				avatarUrl,
+				hfUserId,
+				isAdmin,
+				isEarlyAccess,
+			},
+			{ ignoreUndefined: true }
+		);
 
 		userId = insertedId;
 
