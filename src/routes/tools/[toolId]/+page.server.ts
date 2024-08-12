@@ -118,23 +118,23 @@ export const actions: Actions = {
 			return fail(403, { error: true, message: "Permission denied" });
 		}
 
-		const assistant = await collections.assistants.findOne({
-			_id: new ObjectId(params.assistantId),
+		const tool = await collections.tools.findOne({
+			_id: new ObjectId(params.toolId),
 		});
 
-		if (!assistant) {
-			return fail(404, { error: true, message: "Assistant not found" });
+		if (!tool) {
+			return fail(404, { error: true, message: "Tool not found" });
 		}
 
-		const result = await collections.assistants.updateOne(
-			{ _id: assistant._id },
+		const result = await collections.tools.updateOne(
+			{ _id: tool._id },
 			{ $set: { featured: false } }
 		);
 
 		if (result.modifiedCount === 0) {
-			return fail(500, { error: true, message: "Failed to unfeature assistant" });
+			return fail(500, { error: true, message: "Failed to unfeature tool" });
 		}
 
-		return { from: "unfeature", ok: true, message: "Assistant unfeatured" };
+		return { from: "unfeature", ok: true, message: "Tool unfeatured" };
 	},
 };
