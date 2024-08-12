@@ -66,7 +66,9 @@ export const actions = {
 			updatedAt: new Date(),
 			last24HoursUseCount: 0,
 			useCount: 0,
-			featured: false,
+			// XXX: feature_flag_tools
+			// since this is scoped to internal team members only, we can assume that they should all be public
+			featured: true,
 			searchTokens: generateSearchTokens(parse.data.displayName),
 		});
 
