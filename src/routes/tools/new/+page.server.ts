@@ -67,7 +67,7 @@ export const actions = {
 			last24HoursUseCount: 0,
 			useCount: 0,
 			featured: false,
-			searchTokens: generateSearchTokens(parse.data.name),
+			searchTokens: generateSearchTokens(parse.data.displayName),
 		});
 
 		return { toolId: insertedId.toString() };
