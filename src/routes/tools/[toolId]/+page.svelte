@@ -67,7 +67,7 @@
 					{#if data.tool.type === "community"}
 						<p class="text-sm text-gray-500">
 							Added by
-							<a class="underline" href="{base}/assistants?user={data.tool?.createdByName}">
+							<a class="underline" href="{base}/tools?user={data.tool?.createdByName}">
 								{data.tool?.createdByName}
 							</a>
 							<span class="text-gray-300">•</span>
@@ -168,7 +168,7 @@
 			<div>
 				<h2 class="text-lg font-semibold">Direct URL</h2>
 
-				<p class="pb-2 text-sm text-gray-500">Share this link for people to use your assistant.</p>
+				<p class="pb-2 text-sm text-gray-500">Share this link with people to use your tool.</p>
 
 				<div
 					class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
