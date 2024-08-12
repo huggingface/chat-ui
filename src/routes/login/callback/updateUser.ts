@@ -11,34 +11,40 @@ import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
 import { HF_ORG_ADMIN, HF_ORG_EARLY_ACCESS } from "$env/static/private";
 import { logger } from "$lib/server/logger";
+import { building } from "$app/environment";
 
-const earlyAccessIds = HF_ORG_EARLY_ACCESS
-	? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_EARLY_ACCESS}/members`)
-			.then((res) => res.json())
-			.then((res: Array<{ _id: string }>) => res.map((user: { _id: string }) => user._id))
-			.then((res) => {
-				logger.debug(`Found ${res.length} early access members`);
-				return res;
-			})
-			.catch((err) => {
-				logger.error(err, "Failed to fetch early access members");
-				return null;
-			})
-	: null;
+let earlyAccessIds: string[] | null = null;
+let adminIds: string[] | null = null;
 
-const adminIds = HF_ORG_ADMIN
-	? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_ADMIN}/members`)
-			.then((res) => res.json())
-			.then((res: Array<{ _id: string }>) => res.map((user) => user._id))
-			.then((res) => {
-				logger.debug(`Found ${res.length} admin members`);
-				return res;
-			})
-			.catch((err) => {
-				logger.error(err, "Failed to fetch admin members");
-				return null;
-			})
-	: null;
+if (!building) {
+	earlyAccessIds = HF_ORG_EARLY_ACCESS
+		? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_EARLY_ACCESS}/members`)
+				.then((res) => res.json())
+				.then((res: Array<{ _id: string }>) => res.map((user: { _id: string }) => user._id))
+				.then((res) => {
+					logger.debug(`Found ${res.length} early access members`);
+					return res;
+				})
+				.catch((err) => {
+					logger.error(err, "Failed to fetch early access members");
+					return null;
+				})
+		: null;
+
+	adminIds = HF_ORG_ADMIN
+		? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_ADMIN}/members`)
+				.then((res) => res.json())
+				.then((res: Array<{ _id: string }>) => res.map((user) => user._id))
+				.then((res) => {
+					logger.debug(`Found ${res.length} admin members`);
+					return res;
+				})
+				.catch((err) => {
+					logger.error(err, "Failed to fetch admin members");
+					return null;
+				})
+		: null;
+}
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -112,9 +118,11 @@ export async function updateUser(params: {
 	if (hfUserId) {
 		if (adminIds !== null) {
 			isAdmin = adminIds.includes(hfUserId);
+			logger.info(`Setting admin to ${isAdmin} for user ${hfUserId}`);
 		}
 		if (earlyAccessIds !== null) {
 			isEarlyAccess = earlyAccessIds.includes(hfUserId);
+			logger.info(`Setting early access to ${isEarlyAccess} for user ${hfUserId}`);
 		}
 	}
 
