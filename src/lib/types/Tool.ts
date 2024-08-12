@@ -1,33 +1,147 @@
-type ToolInput =
-	| {
-			description: string;
-			type: string;
-			required: true;
-	  }
-	| {
-			description: string;
-			type: string;
-			required: false;
-			default: string | number | boolean;
-	  };
+import type { ObjectId } from "mongodb";
+import type { User } from "./User";
+import type { Timestamps } from "./Timestamps";
+import type { BackendToolContext } from "$lib/server/tools";
+import type { MessageUpdate } from "./MessageUpdate";
+import { z } from "zod";
 
-export interface Tool {
+export const ToolColor = z.union([
+	z.literal("purple"),
+	z.literal("blue"),
+	z.literal("green"),
+	z.literal("yellow"),
+	z.literal("red"),
+]);
+
+export const ToolIcon = z.union([
+	z.literal("wikis"),
+	z.literal("tools"),
+	z.literal("camera"),
+	z.literal("code"),
+	z.literal("email"),
+	z.literal("cloud"),
+	z.literal("terminal"),
+	z.literal("game"),
+	z.literal("chat"),
+	z.literal("speaker"),
+	z.literal("video"),
+]);
+
+export const ToolOutputComponents = z
+	.string()
+	.toLowerCase()
+	.pipe(
+		z.union([z.literal("textbox"), z.literal("markdown"), z.literal("image"), z.literal("gallery")])
+	);
+
+export type ToolOutputComponents = z.infer<typeof ToolOutputComponents>;
+
+export type ToolLogoColor = z.infer<typeof ToolColor>;
+export type ToolLogoIcon = z.infer<typeof ToolIcon>;
+
+export type ToolIOType = "str" | "int" | "float" | "bool" | "file";
+
+export type ToolInputRequired = {
+	paramType: "required";
 	name: string;
-	displayName?: string;
+	description?: string;
+};
+
+export type ToolInputOptional = {
+	paramType: "optional";
+	name: string;
+	description?: string;
+	default: string | number | boolean;
+};
+
+export type ToolInputFixed = {
+	paramType: "fixed";
+	name: string;
+	value: string | number | boolean;
+};
+
+type ToolInputBase = ToolInputRequired | ToolInputOptional | ToolInputFixed;
+
+export type ToolInputFile = ToolInputBase & {
+	type: "file";
+	mimeTypes: string;
+};
+
+export type ToolInputSimple = ToolInputBase & {
+	type: Exclude<ToolIOType, "file">;
+};
+
+export type ToolInput = ToolInputFile | ToolInputSimple;
+
+export interface BaseTool {
+	_id: ObjectId;
+
+	name: string; // name that will be shown to the AI
+
+	baseUrl?: string; // namespace for the tool
+	endpoint: string | null; // endpoint to call in gradio, if null we expect to override this function in code
+	outputComponent: string | null; // Gradio component type to use for the output
+	outputComponentIdx: number | null; // index of the output component
+
+	inputs: Array<ToolInput>;
+	showOutput: boolean; // show output in chat or not
+
+	call: BackendCall;
+
+	// for displaying in the UI
+	displayName: string;
+	color: ToolLogoColor;
+	icon: ToolLogoIcon;
 	description: string;
-	/** List of mime types that tool accepts */
-	mimeTypes?: string[];
-	parameterDefinitions: Record<string, ToolInput>;
-	spec?: string;
-	isOnByDefault?: true; // will it be toggled if the user hasn't tweaked it in settings ?
-	isLocked?: true; // can the user enable/disable it ?
-	isHidden?: true; // should it be hidden from the user ?
 }
 
-export type ToolFront = Pick<
-	Tool,
-	"name" | "displayName" | "description" | "isOnByDefault" | "isLocked" | "mimeTypes"
-> & { timeToUseMS?: number };
+export interface ConfigTool extends BaseTool {
+	type: "config";
+	isOnByDefault?: true;
+	isLocked?: true;
+	isHidden?: true;
+}
+
+export interface CommunityTool extends BaseTool, Timestamps {
+	type: "community";
+
+	createdById: User["_id"] | string; // user id or session
+	createdByName?: User["username"];
+
+	// used to compute popular & trending
+	useCount: number;
+	last24HoursUseCount: number;
+
+	featured: boolean;
+	searchTokens: string[];
+}
+
+// no call function in db
+export type CommunityToolDB = Omit<CommunityTool, "call">;
+
+export type CommunityToolEditable = Omit<
+	CommunityToolDB,
+	| "_id"
+	| "useCount"
+	| "last24HoursUseCount"
+	| "createdById"
+	| "createdByName"
+	| "featured"
+	| "searchTokens"
+	| "type"
+	| "createdAt"
+	| "updatedAt"
+>;
+
+export type Tool = ConfigTool | CommunityTool;
+
+export type ToolFront = Pick<Tool, "type" | "name" | "displayName" | "description"> & {
+	_id: string;
+	isOnByDefault: boolean;
+	isLocked: boolean;
+	mimeTypes: string[];
+	timeToUseMS?: number;
+};
 
 export enum ToolResultStatus {
 	Success = "success",
@@ -51,3 +165,8 @@ export interface ToolCall {
 	name: string;
 	parameters: Record<string, string | number | boolean>;
 }
+
+export type BackendCall = (
+	params: Record<string, string | number | boolean>,
+	context: BackendToolContext
+) => AsyncGenerator<MessageUpdate, Omit<ToolResultSuccess, "status" | "call" | "type">, undefined>;

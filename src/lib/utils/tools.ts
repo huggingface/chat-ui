@@ -7,3 +7,19 @@ import type { Tool } from "$lib/types/Tool";
 export function toolHasName(name: string, tool: Pick<Tool, "name">): boolean {
 	return tool.name.replaceAll("-", "_") === name.replaceAll("-", "_");
 }
+
+export const colors = ["purple", "blue", "green", "yellow", "red"] as const;
+
+export const icons = [
+	"wikis",
+	"tools",
+	"camera",
+	"code",
+	"email",
+	"cloud",
+	"terminal",
+	"game",
+	"chat",
+	"speaker",
+	"video",
+] as const;

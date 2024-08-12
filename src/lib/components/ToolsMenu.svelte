@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -14,15 +15,30 @@
 
 	// active tools are all the checked tools, either from settings or on by default
 	$: activeToolCount = $page.data.tools.filter(
-		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+		(tool: ToolFront) =>
+			// community tools are always on by default
+			tool.type === "community" || $settings?.tools?.includes(tool._id)
 	).length;
 
-	function setAllTools(value: boolean) {
-		settings.instantSet({
-			tools: Object.fromEntries($page.data.tools.map((tool: ToolFront) => [tool.name, value])),
-		});
+	async function setAllTools(value: boolean) {
+		const configToolsIds = $page.data.tools
+			.filter((t: ToolFront) => t.type === "config")
+			.map((t: ToolFront) => t._id);
+
+		if (value) {
+			await settings.instantSet({
+				tools: Array.from(new Set([...configToolsIds, ...($settings?.tools ?? [])])),
+			});
+		} else {
+			await settings.instantSet({
+				tools: [],
+			});
+		}
 	}
+
 	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
+
+	$: tools = $page.data.tools;
 </script>
 
 <details
@@ -67,24 +83,53 @@
 					{/if}
 				</button>
 			</div>
-			{#each $page.data.tools as tool}
-				{@const isChecked = $settings?.tools?.[tool.name] ?? tool.isOnByDefault}
+			<!-- XXX: feature_flag_tools -->
+			{#if $page.data.user?.isEarlyAccess}
+				<a
+					href="{base}/tools"
+					class="col-span-2 my-1 h-fit w-fit items-center justify-center rounded-full bg-purple-500/20 px-2.5 py-1.5 text-sm hover:bg-purple-500/30"
+				>
+					<span class="mr-1 rounded-full bg-purple-700 px-1.5 py-1 text-xs font-bold uppercase">
+						new
+					</span>
+					Browse community tools ({$page.data.communityToolCount ?? 0})
+				</a>
+			{/if}
+			{#each tools as tool}
+				{@const isChecked = $settings?.tools?.includes(tool._id)}
 				<div class="flex items-center gap-1.5">
-					<input
-						type="checkbox"
-						id={tool.name}
-						checked={isChecked}
-						disabled={loading}
-						on:click={async () => {
-							await settings.instantSet({
-								tools: {
-									...$settings.tools,
-									[tool.name]: !isChecked,
-								},
-							});
-						}}
-					/>
-					<label class="cursor-pointer" for={tool.name}>{tool.displayName ?? tool.name} </label>
+					{#if tool.type === "community"}
+						<input
+							type="checkbox"
+							id={tool._id}
+							checked={true}
+							class="rounded-xs font-semibold accent-purple-500 hover:accent-purple-600"
+							on:click|stopPropagation|preventDefault={async () => {
+								await settings.instantSet({
+									tools: $settings?.tools?.filter((t) => t !== tool._id) ?? [],
+								});
+							}}
+						/>
+					{:else}
+						<input
+							type="checkbox"
+							id={tool._id}
+							checked={isChecked}
+							disabled={loading}
+							on:click|stopPropagation={async () => {
+								if (isChecked) {
+									await settings.instantSet({
+										tools: ($settings?.tools ?? []).filter((t) => t !== tool._id),
+									});
+								} else {
+									await settings.instantSet({
+										tools: [...($settings?.tools ?? []), tool._id],
+									});
+								}
+							}}
+						/>
+					{/if}
+					<label class="cursor-pointer" for={tool._id}>{tool.displayName} </label>
 				</div>
 			{/each}
 		</div>

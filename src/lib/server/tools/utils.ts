@@ -1,6 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
 import { SignJWT } from "jose";
+import { logger } from "../logger";
 import JSON5 from "json5";
 
 export type GradioImage = {
@@ -31,13 +32,17 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 			return super.fetch(input, init);
 		}
 	}
-
 	const client = await CustomClient.connect(name, {
 		hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
 	});
+
 	return await client
 		.predict(func, parameters)
-		.then((res) => (res as unknown as GradioResponse).data as TOutput);
+		.then((res) => (res as unknown as GradioResponse).data as TOutput)
+		.catch((e) => {
+			logger.error(e);
+			throw e;
+		});
 }
 
 export async function getIpToken(ip: string, username?: string) {
