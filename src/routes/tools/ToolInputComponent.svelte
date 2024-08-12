@@ -12,7 +12,7 @@
 			return value || "";
 		}
 	})();
-	let previousValue: string | boolean | number = "";
+	let previousValue: string | boolean | number = innerValue;
 
 	$: value = typeof innerValue === "string" ? innerValue : innerValue.toString();
 </script>
@@ -65,7 +65,7 @@
 {:else if type === "bool" && typeof innerValue === "boolean"}
 	<input
 		type="checkbox"
-		class="peer rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
+		class="peer my-auto mr-4 size-6 rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 		bind:checked={innerValue}
 	/>
 	<!-- Literal['bigvgan_24khz_100band', 'bigvgan_base_24khz_100band', 'bigvgan_22khz_80band', 'bigvgan_base_22khz_80band', 'bigvgan_v2_22khz_80band_256x', 'bigvgan_v2_22khz_80band_fmax8k_256x', 'bigvgan_v2_24khz_100band_256x', 'bigvgan_v2_44khz_128band_256x', 'bigvgan_v2_44khz_128band_512x'] -->
