@@ -31,7 +31,13 @@ export const ToolOutputComponents = z
 	.string()
 	.toLowerCase()
 	.pipe(
-		z.union([z.literal("textbox"), z.literal("markdown"), z.literal("image"), z.literal("gallery")])
+		z.union([
+			z.literal("textbox"),
+			z.literal("markdown"),
+			z.literal("image"),
+			z.literal("gallery"),
+			z.literal("number"),
+		])
 	);
 
 export type ToolOutputComponents = z.infer<typeof ToolOutputComponents>;

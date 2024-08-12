@@ -15,6 +15,10 @@ export const ToolOutputPaths: Record<
 		type: "str",
 		path: "$",
 	},
+	number: {
+		type: "float",
+		path: "$",
+	},
 	image: {
 		type: "file",
 		path: "$.url",
