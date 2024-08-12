@@ -88,7 +88,7 @@ export const actions: Actions = {
 
 			const tool = await collections.tools.findOne<Pick<Tool, "displayName">>(
 				{ _id: new ObjectId(params.toolId) },
-				{ projection: { name: 1 } }
+				{ projection: { displayName: 1 } }
 			);
 
 			const username = locals.user?.username;
