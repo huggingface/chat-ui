@@ -97,7 +97,7 @@
 		<meta
 			property="og:image"
 			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/tools-thumbnail.png"
 		/>
 		<meta property="og:url" content={$page.url.href} />
 	{/if}
@@ -120,7 +120,7 @@
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular assistants made by the community</h3>
+		<h3 class="text-gray-500">Popular tools made by the community</h3>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<a
 				href={`${base}/tools/new`}
@@ -135,7 +135,7 @@
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 				>
-					{toolsCreator}'s Assistants
+					{toolsCreator}'s tools
 					<a
 						href={getHref($page.url, {
 							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
