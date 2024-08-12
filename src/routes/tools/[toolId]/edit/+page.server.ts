@@ -54,7 +54,7 @@ export const actions = {
 				$set: {
 					...parse.data,
 					updatedAt: new Date(),
-					searchTokens: generateSearchTokens(parse.data.name),
+					searchTokens: generateSearchTokens(parse.data.displayName),
 				},
 			}
 		);

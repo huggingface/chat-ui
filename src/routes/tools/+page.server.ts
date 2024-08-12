@@ -71,7 +71,7 @@ export const load = async ({ url, locals }) => {
 		.filter((tool) => !tool?.isHidden)
 		.filter((tool) => {
 			if (queryTokens) {
-				return generateSearchTokens(tool.name).some((token) =>
+				return generateSearchTokens(tool.displayName).some((token) =>
 					queryTokens.some((queryToken) => queryToken.test(token))
 				);
 			}
