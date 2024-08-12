@@ -36,23 +36,23 @@ const IOType = z.union([z.literal("str"), z.literal("int"), z.literal("float"), 
 
 const toolInputBaseSchema = z.union([
 	z.object({
-		name: z.string().min(1).max(40),
-		description: z.string().max(100).optional(),
+		name: z.string().min(1).max(80),
+		description: z.string().max(200).optional(),
 		paramType: z.literal("required"),
 	}),
 	z.object({
-		name: z.string().min(1).max(40),
-		description: z.string().max(100).optional(),
+		name: z.string().min(1).max(80),
+		description: z.string().max(200).optional(),
 		paramType: z.literal("optional"),
 		default: z
-			.union([z.string().max(40), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(120), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 	z.object({
-		name: z.string().min(1).max(40),
+		name: z.string().min(1).max(80),
 		paramType: z.literal("fixed"),
 		value: z
-			.union([z.string().max(40), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(120), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 ]);
