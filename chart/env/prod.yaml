@@ -413,7 +413,7 @@ envVars:
             "description": "Filename of the document to parse",
             "paramType": "required",
             "type": "file",
-            "mimeTypes": 'application/*,text/*'
+            "mimeTypes": 'application/*'
           },
           {
             "name": "filename",
