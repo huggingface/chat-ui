@@ -328,6 +328,151 @@ envVars:
     }]
   WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
   XFF_DEPTH: '2'
+  TOOLS: >
+    [
+      {
+        "_id": "000000000000000000000001",
+        "displayName": "Image Generation",
+        "description": "Use this tool to generate images based on a prompt.",
+        "color": "yellow",
+        "icon": "camera",
+        "baseUrl": "stabilityai/stable-diffusion-3-medium",
+        "name": "image_generation",
+        "endpoint": "/infer",
+        "inputs": [
+          {
+            "name": "prompt",
+            "description": "A prompt to generate an image from",
+            "paramType": "required",
+            "type": "str"
+          },
+          {
+            "name": "negative_prompt",
+            "description": "A prompt for things that should not be in the image.",
+            "paramType": "optional",
+            "default": "",
+            "type": "str"
+          },
+          {
+            "name": "seed",
+            "paramType": "fixed",
+            "value": "0",
+            "type": "float"
+          },
+          {
+            "name": "randomize_seed",
+            "paramType": "fixed",
+            "value": "true",
+            "type": "bool"
+          },
+          {
+            "name": "width",
+            "description": "numeric value between 256 and 1344",
+            "paramType": "optional",
+            "default": 1024,
+            "type": "float"
+          },
+          {
+            "name": "height",
+            "description": "numeric value between 256 and 1344",
+            "paramType": "optional",
+            "default": 1024,
+            "type": "float"
+          },
+          {
+            "name": "guidance_scale",
+            "description": "numeric value between 0.0 and 10.0",
+            "paramType": "optional",
+            "default": 5,
+            "type": "float"
+          },
+          {
+            "name": "num_inference_steps",
+            "description": "numeric value between 1 and 50",
+            "paramType": "optional",
+            "default": 28,
+            "type": "float"
+          }
+        ],
+        "outputComponent": "image",
+        "outputComponentIdx": 0,
+        "showOutput": true
+      },
+      {
+        "_id": "000000000000000000000002",
+        "displayName": "Document parser",
+        "description": "Use this tool to parse any document and get its content in markdown format.",
+        "color": "yellow",
+        "icon": "cloud",
+        "baseUrl": "huggingchat/document-parser",
+        "name": "document_parser",
+        "endpoint": "/predict",
+        "inputs": [
+          {
+            "name": "document",
+            "description": "Filename of the document to parse",
+            "paramType": "required",
+            "type": "file",
+            "mimeTypes": 'application/*'
+          },
+          {
+            "name": "filename",
+            "paramType": "fixed",
+            "value": "document.pdf",
+            "type": "str"
+          }
+        ],
+        "outputComponent": "textbox",
+        "outputComponentIdx": 0,
+        "showOutput": false
+      },
+      {
+        "_id": "000000000000000000000003",
+        "name": "edit_image",
+        "baseUrl": "multimodalart/cosxl",
+        "endpoint": "/run_edit",
+        "inputs": [
+          {
+            "name": "image",
+            "description": "The image path to be edited",
+            "paramType": "required",
+            "type": "file",
+            "mimeTypes": 'image/*'
+          },
+          {
+            "name": "prompt",
+            "description": "The prompt with which to edit the image",
+            "paramType": "required",
+            "type": "str"
+          },
+          {
+            "name": "negative_prompt",
+            "paramType": "fixed",
+            "value": "",
+            "type": "str"
+          },
+          {
+            "name": "guidance_scale",
+            "paramType": "fixed",
+            "value": 6.5,
+            "type": "float"
+          },
+          {
+            "name": "steps",
+            "paramType": "fixed",
+            "value": 30,
+            "type": "float"
+          }
+        ],
+        "outputComponent": "image",
+        "showOutput": true,
+        "displayName": "Image editor",
+        "color": "green",
+        "icon": "camera",
+        "description": "This tool lets you edit images",
+        "outputComponentIdx": 0
+      }
+    ]
   HF_ORG_ADMIN: 'huggingchat'
   HF_ORG_EARLY_ACCESS: 'huggingface'
 
