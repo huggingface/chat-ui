@@ -9,42 +9,8 @@ import crypto from "crypto";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
-import { HF_ORG_ADMIN, HF_ORG_EARLY_ACCESS } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
-import { building } from "$app/environment";
-
-let earlyAccessIds: string[] | null = null;
-let adminIds: string[] | null = null;
-
-if (!building) {
-	earlyAccessIds = HF_ORG_EARLY_ACCESS
-		? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_EARLY_ACCESS}/members`)
-				.then((res) => res.json())
-				.then((res: Array<{ _id: string }>) => res.map((user: { _id: string }) => user._id))
-				.then((res) => {
-					logger.debug(`Found ${res.length} early access members`);
-					return res;
-				})
-				.catch((err) => {
-					logger.error(err, "Failed to fetch early access members");
-					return null;
-				})
-		: null;
-
-	adminIds = HF_ORG_ADMIN
-		? await fetch(`https://huggingface.co/api/organizations/${HF_ORG_ADMIN}/members`)
-				.then((res) => res.json())
-				.then((res: Array<{ _id: string }>) => res.map((user) => user._id))
-				.then((res) => {
-					logger.debug(`Found ${res.length} admin members`);
-					return res;
-				})
-				.catch((err) => {
-					logger.error(err, "Failed to fetch admin members");
-					return null;
-				})
-		: null;
-}
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -67,6 +33,7 @@ export async function updateUser(params: {
 		email,
 		picture: avatarUrl,
 		sub: hfUserId,
+		orgs,
 	} = z
 		.object({
 			preferred_username: z.string().optional(),
@@ -112,19 +79,19 @@ export async function updateUser(params: {
 	// Dynamically access user data based on NAME_CLAIM from environment
 	// This approach allows us to adapt to different OIDC providers flexibly.
 
-	let isAdmin = undefined;
-	let isEarlyAccess = undefined;
-
-	if (hfUserId) {
-		if (adminIds !== null) {
-			isAdmin = adminIds.includes(hfUserId);
-			logger.info(`Setting admin to ${isAdmin} for user ${hfUserId}`);
-		}
-		if (earlyAccessIds !== null) {
-			isEarlyAccess = earlyAccessIds.includes(hfUserId);
-			logger.info(`Setting early access to ${isEarlyAccess} for user ${hfUserId}`);
-		}
-	}
+	logger.info(
+		{
+			login_username: username,
+			login_name: name,
+			login_email: email,
+			login_orgs: orgs?.map((el) => el.sub),
+		},
+		"user login"
+	);
+	// if using huggingface as auth provider, check orgs for earl access and amin rights
+	const isAdmin = (env.HF_ORG_ADMIN && orgs?.some((org) => org.sub === env.HF_ORG_ADMIN)) || false;
+	const isEarlyAccess =
+		(env.HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === env.HF_ORG_EARLY_ACCESS)) || false;
 
 	logger.debug(
 		{
@@ -154,8 +121,7 @@ export async function updateUser(params: {
 		// update existing user if any
 		await collections.users.updateOne(
 			{ _id: existingUser._id },
-			{ $set: { username, name, avatarUrl, isAdmin, isEarlyAccess } },
-			{ ignoreUndefined: true }
+			{ $set: { username, name, avatarUrl, isAdmin, isEarlyAccess } }
 		);
 
 		// remove previous session if it exists and add new one
@@ -172,21 +138,18 @@ export async function updateUser(params: {
 		});
 	} else {
 		// user doesn't exist yet, create a new one
-		const { insertedId } = await collections.users.insertOne(
-			{
-				_id: new ObjectId(),
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				username,
-				name,
-				email,
-				avatarUrl,
-				hfUserId,
-				isAdmin,
-				isEarlyAccess,
-			},
-			{ ignoreUndefined: true }
-		);
+		const { insertedId } = await collections.users.insertOne({
+			_id: new ObjectId(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			username,
+			name,
+			email,
+			avatarUrl,
+			hfUserId,
+			isAdmin,
+			isEarlyAccess,
+		});
 
 		userId = insertedId;
 
