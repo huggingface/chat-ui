@@ -289,7 +289,9 @@
 			{#if toolUpdates}
 				{#each Object.values(toolUpdates) as tool}
 					{#if tool.length}
-						<ToolUpdate {tool} {loading} />
+						{#key tool[0].uuid}
+							<ToolUpdate {tool} {loading} />
+						{/key}
 					{/if}
 				{/each}
 			{/if}
