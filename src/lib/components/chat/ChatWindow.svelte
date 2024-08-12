@@ -208,8 +208,8 @@
 	const settings = useSettingsStore();
 
 	// active tools are all the checked tools, either from settings or on by default
-	$: activeTools = $page.data.tools.filter(
-		(tool: ToolFront) => $settings?.tools?.[tool.name] ?? tool.isOnByDefault
+	$: activeTools = $page.data.tools.filter((tool: ToolFront) =>
+		$settings?.tools?.includes(tool._id)
 	);
 	$: activeMimeTypes = [
 		...(!$page.data?.assistant && currentModel.tools

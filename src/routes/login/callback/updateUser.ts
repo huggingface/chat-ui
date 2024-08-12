@@ -9,7 +9,7 @@ import crypto from "crypto";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
-import { HF_ORG_ADMIN, HF_ORG_EARLY_ACCESS } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
 
 export async function updateUser(params: {
@@ -89,9 +89,18 @@ export async function updateUser(params: {
 		"user login"
 	);
 	// if using huggingface as auth provider, check orgs for earl access and amin rights
-	const isAdmin = (HF_ORG_ADMIN && orgs?.some((org) => org.sub === HF_ORG_ADMIN)) || false;
+	const isAdmin = (env.HF_ORG_ADMIN && orgs?.some((org) => org.sub === env.HF_ORG_ADMIN)) || false;
 	const isEarlyAccess =
-		(HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === HF_ORG_EARLY_ACCESS)) || false;
+		(env.HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === env.HF_ORG_EARLY_ACCESS)) || false;
+
+	logger.debug(
+		{
+			isAdmin,
+			isEarlyAccess,
+			hfUserId,
+		},
+		`Updating user ${hfUserId}`
+	);
 
 	// check if user already exists
 	const existingUser = await collections.users.findOne({ hfUserId });
