@@ -121,6 +121,13 @@
 			{/if}
 		</div>
 		<h3 class="text-gray-500">Popular tools made by the community</h3>
+		<h4 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
+			This feature is in <span
+				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
+				>early access</span
+			>. Only team members can see it and use it for now. Feel free to share feedback on it
+			internally!
+		</h4>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<a
 				href={`${base}/tools/new`}
