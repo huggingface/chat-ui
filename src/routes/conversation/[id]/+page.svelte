@@ -220,11 +220,6 @@
 					messageUpdatesAbortController.abort();
 					return;
 				}
-				if (update.type === "finalAnswer") {
-					loading = false;
-					pending = false;
-					break;
-				}
 
 				// Remove null characters added due to remote keylogging prevention
 				// See server code for more details

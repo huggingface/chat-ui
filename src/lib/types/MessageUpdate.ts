@@ -25,6 +25,7 @@ export enum MessageUpdateStatus {
 	Started = "started",
 	Error = "error",
 	Finished = "finished",
+	KeepAlive = "keepAlive",
 }
 export interface MessageStatusUpdate {
 	type: MessageUpdateType.Status;
