@@ -409,7 +409,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				controller.enqueue(JSON.stringify(event) + "\n");
 
 				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
-				if (event.type === "finalAnswer") {
+				if (event.type === MessageUpdateType.FinalAnswer) {
 					controller.enqueue(" ".repeat(4096));
 				}
 			}
