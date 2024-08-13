@@ -45,14 +45,14 @@ const toolInputBaseSchema = z.union([
 		description: z.string().max(200).optional(),
 		paramType: z.literal("optional"),
 		default: z
-			.union([z.string().max(120), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(300), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 	z.object({
 		name: z.string().min(1).max(80),
 		paramType: z.literal("fixed"),
 		value: z
-			.union([z.string().max(120), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(300), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 ]);
