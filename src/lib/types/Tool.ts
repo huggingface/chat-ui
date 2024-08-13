@@ -37,6 +37,7 @@ export const ToolOutputComponents = z
 			z.literal("image"),
 			z.literal("gallery"),
 			z.literal("number"),
+			z.literal("audio"),
 		])
 	);
 
