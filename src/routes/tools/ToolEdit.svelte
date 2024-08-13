@@ -361,7 +361,7 @@
 											<div class="inline w-full">
 												<span class="font-mono text-sm">{input.name}</span>
 												<span
-													class="inline-block rounded-lg bg-orange-50 p-1 text-sm text-orange-800"
+													class="inline-block max-w-lg truncate rounded-lg bg-orange-50 p-1 text-sm text-orange-800"
 													>{parameter?.python_type.type}</span
 												>
 												{#if parameter?.description}
