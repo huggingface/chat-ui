@@ -32,7 +32,7 @@
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
-	$: shareUrl = `${prefix}/tool/${data.tool?._id}`;
+	$: shareUrl = `${prefix}/tools/${data.tool?._id}`;
 	$: isActive = $settings.tools?.includes(data.tool?._id.toString());
 
 	let displayReportModal = false;
