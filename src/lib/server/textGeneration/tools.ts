@@ -95,7 +95,8 @@ async function* callTool(
 			type: MessageUpdateType.Tool,
 			subtype: MessageToolUpdateType.Error,
 			uuid,
-			message: "An error occurred while calling the tool " + call.name,
+			message:
+				"An error occurred while calling the tool " + call.name + ": " + stringifyError(error),
 		};
 
 		return {
