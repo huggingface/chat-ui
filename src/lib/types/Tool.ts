@@ -39,6 +39,7 @@ export const ToolOutputComponents = z
 			z.literal("number"),
 			z.literal("audio"),
 			z.literal("video"),
+			z.literal("file"),
 		])
 	);
 
