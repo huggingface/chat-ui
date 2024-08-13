@@ -8,6 +8,7 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
+import { logger } from "$lib/server/logger";
 
 // -----------
 
@@ -34,7 +35,7 @@ function convertMessageUpdate(message: Message, update: MessageUpdate): MessageU
 
 		return update;
 	} catch (error) {
-		console.error("Error converting message update during migration. Skipping it... Error:", error);
+		logger.error(error, "Error converting message update during migration. Skipping it..");
 		return null;
 	}
 }
