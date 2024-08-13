@@ -23,6 +23,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -444,7 +445,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					status: MessageUpdateStatus.Error,
 					message: (e as Error).message,
 				});
-				console.error(e);
+				logger.error(e);
 			} finally {
 				// check if no output was generated
 				if (!hasError && messageToWriteTo.content === initialMessageContent) {
