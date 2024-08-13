@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
-	import type { Message, MessageFile } from "$lib/types/Message";
+	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
@@ -30,7 +30,6 @@
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
-	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import DOMPurify from "isomorphic-dompurify";
@@ -209,29 +208,7 @@
 	const convTreeStore = useConvTreeStore();
 
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
-
-	$: modalImageToShow = null as MessageFile | null;
 </script>
-
-{#if modalImageToShow}
-	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="sm:max-w-[500px]" on:close={() => (modalImageToShow = null)}>
-		{#if modalImageToShow.type === "hash"}
-			<img
-				src={urlNotTrailing + "/output/" + modalImageToShow.value}
-				alt="input from user"
-				class="aspect-auto"
-			/>
-		{:else}
-			<!-- handle the case where this is a base64 encoded image -->
-			<img
-				src={`data:${modalImageToShow.mime};base64,${modalImageToShow.value}`}
-				alt="input from user"
-				class="aspect-auto"
-			/>
-		{/if}
-	</Modal>
-{/if}
 
 {#if message.from === "assistant"}
 	<div
@@ -259,23 +236,7 @@
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
 					{#each message.files as file}
-						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
-						<button on:click={() => (modalImageToShow = file)}>
-							{#if file.type === "hash"}
-								<img
-									src={urlNotTrailing + "/output/" + file.value}
-									alt="output from assistant"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg xl:max-h-56"
-								/>
-							{:else}
-								<!-- handle the case where this is a base64 encoded image -->
-								<img
-									src={`data:${file.mime};base64,${file.value}`}
-									alt="output from assistant"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg xl:max-h-56"
-								/>
-							{/if}
-						</button>
+						<UploadedFile {file} canClose={false} isPreview={false} />
 					{/each}
 				</div>
 			{/if}
@@ -400,13 +361,7 @@
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
-						{#if file.mime.startsWith("image/")}
-							<button on:click={() => (modalImageToShow = file)}>
-								<UploadedFile {file} canClose={false} />
-							</button>
-						{:else}
-							<UploadedFile {file} canClose={false} />
-						{/if}
+						<UploadedFile {file} canClose={false} isPreview={false} />
 					{/each}
 				</div>
 			{/if}
