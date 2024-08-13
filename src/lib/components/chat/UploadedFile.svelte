@@ -5,8 +5,16 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonDocumentBlank from "~icons/carbon/document-blank";
 
+	import Modal from "../Modal.svelte";
+	import AudioPlayer from "../players/AudioPlayer.svelte";
+
 	export let file: MessageFile;
 	export let canClose = true;
+	export let isPreview = false;
+
+	$: showModal = false;
+	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
+
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	function truncateMiddle(text: string, maxLength: number): string {
@@ -20,47 +28,92 @@
 
 		return `${start}…${end}`;
 	}
+
+	const isImage = (mime: string) =>
+		mime.startsWith("image/") || mime === "webp" || mime === "jpeg" || mime === "png";
+
+	const isAudio = (mime: string) => mime.startsWith("audio/");
+	const isVideo = (mime: string) => mime.startsWith("video/");
+
+	$: isClickable = isImage(file.mime) && !isPreview;
 </script>
 
-<div
-	class="group relative flex items-center rounded-xl shadow-sm"
-	class:w-24={file.mime.startsWith("image/")}
-	class:w-72={!file.mime.startsWith("image/")}
->
-	{#if file.mime.startsWith("image/")}
-		<div class="size-24 overflow-hidden rounded-xl">
+{#if showModal && isClickable}
+	<!-- show the image file full screen, click outside to exit -->
+	<Modal width="sm:max-w-[500px]" on:close={() => (showModal = false)}>
+		{#if file.type === "hash"}
 			<img
+				src={urlNotTrailing + "/output/" + file.value}
+				alt="input from user"
+				class="aspect-auto"
+			/>
+		{:else}
+			<!-- handle the case where this is a base64 encoded image -->
+			<img
+				src={`data:${file.mime};base64,${file.value}`}
+				alt="input from user"
+				class="aspect-auto"
+			/>
+		{/if}
+	</Modal>
+{/if}
+
+<button on:click={() => (showModal = true)} disabled={!isClickable}>
+	<div class="group relative flex items-center rounded-xl shadow-sm">
+		{#if isImage(file.mime)}
+			<div class=" overflow-hidden rounded-xl" class:size-24={isPreview} class:size-48={!isPreview}>
+				<img
+					src={file.type === "base64"
+						? `data:${file.mime};base64,${file.value}`
+						: urlNotTrailing + "/output/" + file.value}
+					alt={file.name}
+					class="h-full w-full bg-gray-200 object-cover dark:bg-gray-800"
+				/>
+			</div>
+		{:else if isAudio(file.mime)}
+			<AudioPlayer
 				src={file.type === "base64"
 					? `data:${file.mime};base64,${file.value}`
-					: $page.url.pathname + "/output/" + file.value}
-				alt={file.name}
-				class="h-full w-full bg-gray-200 object-cover dark:bg-gray-800"
+					: urlNotTrailing + "/output/" + file.value}
+				name={truncateMiddle(file.name, 28)}
 			/>
-		</div>
-	{:else}
-		<div
-			class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
-		>
+		{:else if isVideo(file.mime)}
 			<div
-				class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
+				class="border-1 w-72 overflow-clip rounded-xl border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 			>
-				<CarbonDocumentBlank class="text-base text-gray-700 dark:text-gray-300" />
+				<!-- svelte-ignore a11y-media-has-caption -->
+				<video
+					src={file.type === "base64"
+						? `data:${file.mime};base64,${file.value}`
+						: urlNotTrailing + "/output/" + file.value}
+					controls
+				/>
 			</div>
-			<dl class="flex flex-col truncate leading-tight">
-				<dd class="text-sm">
-					{truncateMiddle(file.name, 28)}
-				</dd>
-				<dt class="text-xs text-gray-400">{file.mime.split("/")[1].toUpperCase()}</dt>
-			</dl>
-		</div>
-	{/if}
-	<!-- add a button on top that removes the image -->
-	{#if canClose}
-		<button
-			class="invisible absolute -right-2 -top-2 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
-			on:click={() => dispatch("close")}
-		>
-			<CarbonClose class=" text-xs  text-white" />
-		</button>
-	{/if}
-</div>
+		{:else}
+			<div
+				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
+			>
+				<div
+					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
+				>
+					<CarbonDocumentBlank class="text-base text-gray-700 dark:text-gray-300" />
+				</div>
+				<dl class="flex flex-col truncate leading-tight">
+					<dd class="text-sm">
+						{truncateMiddle(file.name, 28)}
+					</dd>
+					<dt class="text-xs text-gray-400">{file.mime.split("/")[1].toUpperCase()}</dt>
+				</dl>
+			</div>
+		{/if}
+		<!-- add a button on top that removes the image -->
+		{#if canClose}
+			<button
+				class="invisible absolute -right-2 -top-2 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
+				on:click={() => dispatch("close")}
+			>
+				<CarbonClose class=" text-xs  text-white" />
+			</button>
+		{/if}
+	</div>
+</button>
