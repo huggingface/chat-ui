@@ -55,25 +55,25 @@
 			<CarbonPause class="mx-auto my-auto text-gray-600 dark:text-gray-300" />
 		{/if}
 	</button>
-
 	<div class="overflow-hidden">
 		<div class="truncate font-medium">{name}</div>
-
-		<div class="flex items-center gap-2">
-			<span class="text-xs">{format(time)}</span>
-			<div
-				class="relative h-2 flex-1 rounded-full bg-gray-200 dark:bg-gray-700"
-				on:pointerdown={() => {
-					paused = true;
-				}}
-				on:pointerup={seek}
-			>
+		{#if duration !== Infinity}
+			<div class="flex items-center gap-2">
+				<span class="text-xs">{format(time)}</span>
 				<div
-					class="absolute inset-0 h-full bg-gray-400 dark:bg-gray-600"
-					style="width: {(time / duration) * 100}%"
-				/>
+					class="relative h-2 flex-1 rounded-full bg-gray-200 dark:bg-gray-700"
+					on:pointerdown={() => {
+						paused = true;
+					}}
+					on:pointerup={seek}
+				>
+					<div
+						class="absolute inset-0 h-full bg-gray-400 dark:bg-gray-600"
+						style="width: {(time / duration) * 100}%"
+					/>
+				</div>
+				<span class="text-xs">{duration ? format(duration) : "--:--"}</span>
 			</div>
-			<span class="text-xs">{duration ? format(duration) : "--:--"}</span>
-		</div>
+		{/if}
 	</div>
 </div>
