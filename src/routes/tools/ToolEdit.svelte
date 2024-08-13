@@ -161,13 +161,15 @@
 		formData.append("tool", JSON.stringify(editableTool));
 
 		return async ({ result }) => {
-			formLoading = false;
-
 			if (result.type === "success" && result.data && typeof result.data.toolId === "string") {
 				$settings.tools = [...($settings.tools ?? []), result.data.toolId];
-				goto(`${base}/tools/${result.data.toolId}`, { invalidateAll: true });
+				await goto(`${base}/tools/${result.data.toolId}`).then(() => {
+					formLoading = false;
+				});
 			} else {
-				await applyAction(result);
+				await applyAction(result).then(() => {
+					formLoading = false;
+				});
 			}
 		};
 	}}
