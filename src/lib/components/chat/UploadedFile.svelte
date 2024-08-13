@@ -32,7 +32,8 @@
 	const isImage = (mime: string) =>
 		mime.startsWith("image/") || mime === "webp" || mime === "jpeg" || mime === "png";
 
-	const isAudio = (mime: string) => mime.startsWith("audio/");
+	const isAudio = (mime: string) =>
+		mime.startsWith("audio/") || mime === "mp3" || mime === "wav" || mime === "x-wav";
 	const isVideo = (mime: string) => mime.startsWith("video/");
 
 	$: isClickable = isImage(file.mime) && !isPreview;
@@ -102,7 +103,7 @@
 					<dd class="text-sm">
 						{truncateMiddle(file.name, 28)}
 					</dd>
-					<dt class="text-xs text-gray-400">{file.mime.split("/")[1].toUpperCase()}</dt>
+					<dt class="text-xs text-gray-400">{file.mime}</dt>
 				</dl>
 			</div>
 		{/if}
