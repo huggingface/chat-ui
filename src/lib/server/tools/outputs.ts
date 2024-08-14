@@ -33,7 +33,7 @@ export const ToolOutputPaths: Record<
 	},
 	video: {
 		type: "file",
-		path: "$.url",
+		path: "$.video.url",
 	},
 	file: {
 		type: "file",
