@@ -233,7 +233,10 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 			outputs[tool.outputComponentIdx] !== undefined &&
 			typeof outputs[tool.outputComponentIdx] !== "object"
 		) {
-			return { outputs: [{ [tool.name + "-0"]: outputs[tool.outputComponentIdx] }] };
+			return {
+				outputs: [{ [tool.name + "-0"]: outputs[tool.outputComponentIdx] }],
+				display: tool.showOutput,
+			};
 		}
 
 		await Promise.all(
