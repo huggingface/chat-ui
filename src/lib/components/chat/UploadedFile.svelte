@@ -34,7 +34,8 @@
 
 	const isAudio = (mime: string) =>
 		mime.startsWith("audio/") || mime === "mp3" || mime === "wav" || mime === "x-wav";
-	const isVideo = (mime: string) => mime.startsWith("video/");
+	const isVideo = (mime: string) =>
+		mime.startsWith("video/") || mime === "mp4" || mime === "x-mpeg" || mime === "octet-stream";
 
 	$: isClickable = isImage(file.mime) && !isPreview;
 </script>
