@@ -506,16 +506,19 @@
 												{#if api.named_endpoints[editableTool.endpoint].returns.length > 1}
 													<div class="flex flex-row gap-4">
 														{#each api.named_endpoints[editableTool.endpoint].returns as { component }, idx}
-															<label>
+															<label class="text-gray-800">
 																<input
 																	type="radio"
-																	disabled={readonly}
+																	disabled={readonly ||
+																		!ToolOutputComponents.safeParse(component).success}
 																	bind:group={editableTool.outputComponent}
 																	value={idx + ";" + component.toLowerCase()}
 																	name="outputComponent"
 																/>
 																<span
-																	class="font-mono text-gray-800"
+																	class="font-mono"
+																	class:text-gray-400={!ToolOutputComponents.safeParse(component)
+																		.success}
 																	class:font-semibold={editableTool?.outputComponent?.split(
 																		";"
 																	)[1] === component}>{component.toLowerCase()}-{idx}</span
