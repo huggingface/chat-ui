@@ -34,8 +34,6 @@ export async function* callSpace<TInput extends unknown[], TOutput extends unkno
 
 	let data;
 	for await (const output of job) {
-		console.log(JSON.stringify(output));
-
 		if (output.type === "data") {
 			data = output.data as TOutput;
 		}
