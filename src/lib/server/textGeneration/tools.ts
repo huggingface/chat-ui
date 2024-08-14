@@ -76,7 +76,7 @@ async function* callTool(
 			type: MessageUpdateType.Tool,
 			subtype: MessageToolUpdateType.Result,
 			uuid,
-			result: { ...toolResult, call } as ToolResult,
+			result: { ...toolResult, call, status: ToolResultStatus.Success },
 		};
 
 		MetricsServer.getMetrics().tool.toolUseDuration.observe(
@@ -86,7 +86,7 @@ async function* callTool(
 
 		await collections.tools.findOneAndUpdate({ _id: tool._id }, { $inc: { useCount: 1 } });
 
-		return { ...toolResult, call } as ToolResult;
+		return { ...toolResult, call, status: ToolResultStatus.Success };
 	} catch (error) {
 		MetricsServer.getMetrics().tool.toolUseCountError.inc({ tool: call.name });
 		logger.error(error, `Failed while running tool ${call.name}. ${stringifyError(error)}`);
