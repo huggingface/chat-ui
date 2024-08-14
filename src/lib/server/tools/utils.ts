@@ -7,7 +7,7 @@ import {
 	MessageUpdateType,
 	type MessageToolUpdate,
 } from "$lib/types/MessageUpdate";
-
+import { logger } from "$lib/server/logger";
 export async function* callSpace<TInput extends unknown[], TOutput extends unknown[]>(
 	name: string,
 	func: string,
@@ -34,16 +34,24 @@ export async function* callSpace<TInput extends unknown[], TOutput extends unkno
 
 	let data;
 	for await (const output of job) {
+		console.log(JSON.stringify(output));
+
 		if (output.type === "data") {
 			data = output.data as TOutput;
 		}
-		if (output.type === "status" && output.eta) {
-			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.ETA,
-				eta: output.eta,
-				uuid,
-			};
+		if (output.type === "status") {
+			if (output.stage === "error") {
+				logger.error(output.message);
+				throw new Error(output.message);
+			}
+			if (output.eta) {
+				yield {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.ETA,
+					eta: output.eta,
+					uuid,
+				};
+			}
 		}
 	}
 
