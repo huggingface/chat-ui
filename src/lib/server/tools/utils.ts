@@ -1,27 +1,20 @@
 import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
 import { SignJWT } from "jose";
-import { logger } from "../logger";
 import JSON5 from "json5";
+import {
+	MessageToolUpdateType,
+	MessageUpdateType,
+	type MessageToolUpdate,
+} from "$lib/types/MessageUpdate";
 
-export type GradioImage = {
-	path: string;
-	url: string;
-	orig_name: string;
-	is_stream: boolean;
-	meta: Record<string, unknown>;
-};
-
-type GradioResponse = {
-	data: unknown[];
-};
-
-export async function callSpace<TInput extends unknown[], TOutput extends unknown[]>(
+export async function* callSpace<TInput extends unknown[], TOutput extends unknown[]>(
 	name: string,
 	func: string,
 	parameters: TInput,
-	ipToken: string | undefined
-): Promise<TOutput> {
+	ipToken: string | undefined,
+	uuid: string
+): AsyncGenerator<MessageToolUpdate, TOutput, undefined> {
 	class CustomClient extends Client {
 		fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
 			init = init || {};
@@ -34,15 +27,32 @@ export async function callSpace<TInput extends unknown[], TOutput extends unknow
 	}
 	const client = await CustomClient.connect(name, {
 		hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
+		events: ["status", "data"],
 	});
 
-	return await client
-		.predict(func, parameters)
-		.then((res) => (res as unknown as GradioResponse).data as TOutput)
-		.catch((e) => {
-			logger.error(e);
-			throw e;
-		});
+	const job = client.submit(func, parameters);
+
+	let data;
+	for await (const output of job) {
+		console.log({ output });
+		if (output.type === "data") {
+			data = output.data as TOutput;
+		}
+		if (output.type === "status" && output.eta) {
+			yield {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.ETA,
+				eta: output.eta,
+				uuid,
+			};
+		}
+	}
+
+	if (!data) {
+		throw new Error("No data found in tool call");
+	}
+
+	return data;
 }
 
 export async function getIpToken(ip: string, username?: string) {

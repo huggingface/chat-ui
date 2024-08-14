@@ -9,7 +9,7 @@
 	import CarbonTools from "~icons/carbon/tools";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
-	import { onMount } from "svelte";
+	import { onDestroy } from "svelte";
 	import { browser } from "$app/environment";
 
 	export let tool: MessageToolUpdate[];
@@ -19,6 +19,8 @@
 	$: toolError = tool.some(isMessageToolErrorUpdate);
 	$: toolDone = tool.some(isMessageToolResultUpdate);
 
+	$: eta = tool.find((el) => el.subtype === MessageToolUpdateType.ETA)?.eta;
+
 	const availableTools: ToolFront[] = $page.data.tools;
 
 	let loadingBarEl: HTMLDivElement;
@@ -26,16 +28,24 @@
 
 	let isShowingLoadingBar = false;
 
-	onMount(() => {
-		if (!toolError && !toolDone && loading && loadingBarEl) {
+	$: !toolError &&
+		!toolDone &&
+		loading &&
+		loadingBarEl &&
+		eta &&
+		(() => {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: availableTools.find((tool) => tool.name === toolFnName)?.timeToUseMS,
+				duration: eta * 1000,
 				fill: "forwards",
 			});
+		})();
+
+	onDestroy(() => {
+		if (animation) {
+			animation.cancel();
 		}
-		return () => animation?.cancel();
 	});
 
 	// go to 100% quickly if loading is done

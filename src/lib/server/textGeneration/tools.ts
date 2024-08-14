@@ -70,7 +70,7 @@ async function* callTool(
 	};
 
 	try {
-		const toolResult = yield* tool.call(call.parameters, ctx);
+		const toolResult = yield* tool.call(call.parameters, ctx, uuid);
 
 		yield {
 			type: MessageUpdateType.Tool,
