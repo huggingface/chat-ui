@@ -83,7 +83,7 @@ envVars:
           "top_p": 0.9,
           "stop": ["<|endoftext|>", "<|eot_id|>"],
           "max_new_tokens": 2048,
-          "truncate": 14337
+          "truncate": 14335
         },
         "promptExamples": [
           {
