@@ -177,5 +177,6 @@ export interface ToolCall {
 
 export type BackendCall = (
 	params: Record<string, string | number | boolean>,
-	context: BackendToolContext
+	context: BackendToolContext,
+	uuid: string
 ) => AsyncGenerator<MessageUpdate, Omit<ToolResultSuccess, "status" | "call" | "type">, undefined>;
