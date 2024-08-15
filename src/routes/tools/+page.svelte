@@ -225,6 +225,7 @@
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
 				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
+				{@const isOfficial = !tool.createdByName}
 				<a
 					href="{base}/tools/{tool._id.toString()}"
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24"
@@ -251,7 +252,7 @@
 							{tool.description}
 						</p>
 
-						{#if tool.createdByName}
+						{#if !isOfficial}
 							<p class="mt-auto text-xs text-gray-400 dark:text-gray-500">
 								Added by <a
 									class="hover:underline"
@@ -264,7 +265,7 @@
 								{tool.useCount} runs
 							</p>
 						{:else}
-							<p class="mt-auto text-xs text-gray-400 dark:text-gray-500">
+							<p class="mt-auto text-xs text-purple-700 dark:text-purple-400">
 								HuggingChat official tool
 							</p>
 						{/if}
