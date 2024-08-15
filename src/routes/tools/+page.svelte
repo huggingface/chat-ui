@@ -229,7 +229,7 @@
 				<a
 					href="{base}/tools/{tool._id.toString()}"
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24"
-					class:!border-blue-800={isActive}
+					class:!border-blue-600={isActive}
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
 					<div class="flex h-full w-full flex-col items-start py-2 text-left">
@@ -239,7 +239,7 @@
 							</span>
 							{#if isActive}
 								<span
-									class="mx-1.5 inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
+									class="mx-1.5 inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white"
 									>Active</span
 								>
 							{/if}
