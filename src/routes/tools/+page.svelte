@@ -244,7 +244,7 @@
 								>
 							{/if}
 						</span>
-						<span class="font-mono text-xs text-gray-400">
+						<span class="line-clamp-1 font-mono text-xs text-gray-400">
 							{tool.baseUrl ?? "Internal tool"}
 						</span>
 
