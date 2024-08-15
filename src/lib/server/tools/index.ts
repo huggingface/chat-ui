@@ -61,7 +61,7 @@ const toolInputSchema = toolInputBaseSchema.and(
 	z.object({ type: IOType }).or(
 		z.object({
 			type: z.literal("file"),
-			mimeTypes: z.string().nonempty(),
+			mimeTypes: z.string().min(1),
 		})
 	)
 );

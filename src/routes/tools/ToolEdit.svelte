@@ -367,6 +367,10 @@
 										</p>
 									</div>
 
+									<p class="text-xs text-red-500">
+										{getError(`inputs`, form)}
+									</p>
+
 									{#each editableTool.inputs as input, inputIdx}
 										{@const parameter = endpoint.parameters.find(
 											(parameter) => parameter.parameter_name === input.name
@@ -435,9 +439,6 @@
 													bind:value={input.description}
 													disabled={readonly}
 												/>
-												<p class="text-xs text-red-500">
-													{getError(`${input.name}-description`, form)}
-												</p>
 											</label>
 										{/if}
 										{#if input.paramType === "optional" || input.paramType === "fixed"}
@@ -467,9 +468,6 @@
 														bind:value={input.value}
 													/>
 												{/if}
-												<p class="text-xs text-red-500">
-													{getError(`${input.name}-${isOptional ? "default" : "value"}`, form)}
-												</p>
 											</div>
 										{/if}
 										{#if input.type === "file"}
