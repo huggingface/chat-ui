@@ -336,7 +336,7 @@ envVars:
         "description": "Use this tool to generate images based on a prompt.",
         "color": "yellow",
         "icon": "camera",
-        "baseUrl": "stabilityai/stable-diffusion-3-medium",
+        "baseUrl": "black-forest-labs/FLUX.1-schnell",
         "name": "image_generation",
         "endpoint": "/infer",
         "inputs": [
@@ -346,19 +346,7 @@ envVars:
             "paramType": "required",
             "type": "str"
           },
-          {
-            "name": "negative_prompt",
-            "description": "A prompt for things that should not be in the image.",
-            "paramType": "optional",
-            "default": "",
-            "type": "str"
-          },
-          {
-            "name": "seed",
-            "paramType": "fixed",
-            "value": "0",
-            "type": "float"
-          },
+          { "name": "seed", "paramType": "fixed", "value": "0", "type": "float" },
           {
             "name": "randomize_seed",
             "paramType": "fixed",
@@ -367,30 +355,22 @@ envVars:
           },
           {
             "name": "width",
-            "description": "numeric value between 256 and 1344",
+            "description": "numeric value between 256 and 2048",
             "paramType": "optional",
             "default": 1024,
             "type": "float"
           },
           {
             "name": "height",
-            "description": "numeric value between 256 and 1344",
+            "description": "numeric value between 256 and 2048",
             "paramType": "optional",
             "default": 1024,
             "type": "float"
           },
           {
-            "name": "guidance_scale",
-            "description": "numeric value between 0.0 and 10.0",
-            "paramType": "optional",
-            "default": 5,
-            "type": "float"
-          },
-          {
             "name": "num_inference_steps",
-            "description": "numeric value between 1 and 50",
-            "paramType": "optional",
-            "default": 28,
+            "paramType": "fixed",
+            "value": "4",
             "type": "float"
           }
         ],
