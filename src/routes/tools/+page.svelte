@@ -224,20 +224,21 @@
 
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
+				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				<a
 					href="{base}/tools/{tool._id.toString()}"
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24"
+					class:!border-blue-800={isActive}
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
-					<div class="flex w-full flex-col items-start text-left">
+					<div class="flex h-full w-full flex-col items-start py-2 text-left">
 						<span class="font-bold">
 							<span class="w-full overflow-clip">
 								{tool.displayName}
 							</span>
-							{#if ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
-								<!-- active badge -->
+							{#if isActive}
 								<span
-									class="inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
+									class="mx-1.5 inline-flex items-center rounded-full bg-blue-800 px-2 py-0.5 text-xs font-semibold text-white"
 									>Active</span
 								>
 							{/if}
@@ -245,8 +246,13 @@
 						<span class="font-mono text-xs text-gray-400">
 							{tool.baseUrl ?? "Internal tool"}
 						</span>
+
+						<p class=" line-clamp-1 w-full text-sm text-gray-600 dark:text-gray-300">
+							{tool.description}
+						</p>
+
 						{#if tool.createdByName}
-							<p class=" pt-2 text-xs text-gray-400 dark:text-gray-500">
+							<p class="mt-auto text-xs text-gray-400 dark:text-gray-500">
 								Added by <a
 									class="hover:underline"
 									href="{base}/tools?user={tool.createdByName}"
@@ -258,7 +264,9 @@
 								{tool.useCount} runs
 							</p>
 						{:else}
-							<p class="pt-2 text-xs text-gray-400 dark:text-gray-500">HuggingChat official tool</p>
+							<p class="mt-auto text-xs text-gray-400 dark:text-gray-500">
+								HuggingChat official tool
+							</p>
 						{/if}
 					</div>
 				</a>
