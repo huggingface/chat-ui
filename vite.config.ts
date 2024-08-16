@@ -26,7 +26,13 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 	],
 	optimizeDeps: {
-		include: ["browser-image-resizer", "uuid", "@xenova/transformers", "sharp", "@gradio/client"],
+		include: [
+			"browser-image-resizer",
+			"uuid",
+			"@huggingface/transformers",
+			"sharp",
+			"@gradio/client",
+		],
 	},
 	server: {
 		open: "/",

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Model } from "$lib/types/Model";
 	import { getTokenizer } from "$lib/utils/getTokenizer";
-	import type { PreTrainedTokenizer } from "@xenova/transformers";
+	import type { PreTrainedTokenizer } from "@huggingface/transformers";
 
 	export let classNames = "";
 	export let prompt = "";
