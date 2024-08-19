@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authCondition } from "$lib/server/auth";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { ObjectId } from "mongodb";
 
 export async function POST({ request, locals }) {
 	const body = await request.json();
@@ -27,6 +28,15 @@ export async function POST({ request, locals }) {
 		settings.tools = settings.tools?.filter((toolId) => {
 			return toolFromConfigs.some((tool) => tool._id.toString() === toolId);
 		});
+	}
+
+	// make sure all tools exist
+	if (settings.tools) {
+		settings.tools = await collections.tools
+			.find({ _id: { $in: settings.tools.map((toolId) => new ObjectId(toolId)) } })
+			.project({ _id: 1 })
+			.toArray()
+			.then((tools) => tools.map((tool) => tool._id.toString()));
 	}
 
 	await collections.settings.updateOne(
