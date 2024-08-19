@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { goto, invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -117,14 +117,37 @@
 
 	const settings = createSettingsStore(data.settings);
 
-	$: if (browser && $page.url.searchParams.has("model")) {
-		if ($settings.activeModel === $page.url.searchParams.get("model")) {
-			goto(`${base}/?`);
+	onMount(async () => {
+		if ($page.url.searchParams.has("model")) {
+			await settings
+				.instantSet({
+					activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
+				})
+				.then(async () => {
+					const query = new URLSearchParams($page.url.searchParams.toString());
+					query.delete("model");
+					await goto(`${base}/?${query.toString()}`, {
+						invalidateAll: true,
+					});
+				});
 		}
-		settings.instantSet({
-			activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
-		});
-	}
+
+		if ($page.url.searchParams.has("tools")) {
+			const tools = $page.url.searchParams.get("tools")?.split(",");
+
+			await settings
+				.instantSet({
+					tools: [...($settings.tools ?? []), ...(tools ?? [])],
+				})
+				.then(async () => {
+					const query = new URLSearchParams($page.url.searchParams.toString());
+					query.delete("tools");
+					await goto(`${base}/?${query.toString()}`, {
+						invalidateAll: true,
+					});
+				});
+		}
+	});
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
