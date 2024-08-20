@@ -39,6 +39,17 @@ const newAsssistantSchema = z.object({
 	top_k: z
 		.union([z.literal(""), z.coerce.number().min(5).max(100)])
 		.transform((v) => (v === "" ? undefined : v)),
+	tools: z
+		.array(z.string())
+		.transform(
+			async (v) =>
+				await collections.tools
+					.find({ _id: { $in: v.map((toolId) => new ObjectId(toolId)) } })
+					.project({ _id: 1 })
+					.toArray()
+					.then((tools) => tools.map((tool) => tool._id.toString()))
+		)
+		.optional(),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -126,6 +137,8 @@ export const actions: Actions = {
 			createdById,
 			createdByName: locals.user?.username ?? locals.user?.name,
 			...parse.data,
+			// XXX: feature_flag_tools
+			tools: locals.user?.isEarlyAccess ? parse.data.tools : undefined,
 			exampleInputs,
 			avatar: hash,
 			createdAt: new Date(),
