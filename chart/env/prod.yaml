@@ -376,7 +376,7 @@ envVars:
       },
       {
         "_id": "000000000000000000000002",
-        "displayName": "Document parser",
+        "displayName": "Document Parser",
         "description": "Use this tool to parse any document and get its content in markdown format.",
         "color": "yellow",
         "icon": "cloud",
@@ -442,7 +442,7 @@ envVars:
         ],
         "outputComponent": "image",
         "showOutput": true,
-        "displayName": "Image editor",
+        "displayName": "Image Editor",
         "color": "green",
         "icon": "camera",
         "description": "This tool lets you edit images",
