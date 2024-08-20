@@ -31,12 +31,20 @@ export async function POST({ request, locals }) {
 	}
 
 	// make sure all tools exist
+	// either in db or in config
 	if (settings.tools) {
-		settings.tools = await collections.tools
-			.find({ _id: { $in: settings.tools.map((toolId) => new ObjectId(toolId)) } })
-			.project({ _id: 1 })
-			.toArray()
-			.then((tools) => tools.map((tool) => tool._id.toString()));
+		const newTools = [
+			...(await collections.tools
+				.find({ _id: { $in: settings.tools.map((toolId) => new ObjectId(toolId)) } })
+				.project({ _id: 1 })
+				.toArray()
+				.then((tools) => tools.map((tool) => tool._id.toString()))),
+			...toolFromConfigs
+				.filter((el) => (settings?.tools ?? []).includes(el._id.toString()))
+				.map((el) => el._id.toString()),
+		];
+
+		settings.tools = newTools;
 	}
 
 	await collections.settings.updateOne(
