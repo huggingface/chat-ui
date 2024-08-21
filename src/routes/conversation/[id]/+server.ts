@@ -422,6 +422,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
+
 			try {
 				const ctx: TextGenerationContext = {
 					model,
