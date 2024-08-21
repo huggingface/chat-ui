@@ -12,9 +12,11 @@
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonStar from "~icons/carbon/star";
+	import CarbonTools from "~icons/carbon/tools";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
+	import ToolBadge from "$lib/components/ToolBadge.svelte";
 
 	export let data: PageData;
 
@@ -214,6 +216,27 @@
 			{/if}
 		</div>
 
+		{#if assistant?.tools?.length}
+			<div class="mt-4">
+				<div class="mb-1 flex items-center gap-1">
+					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-purple-500/10"
+						title="This assistant uses the websearch."
+					>
+						<CarbonTools class="text-xs text-purple-600" />
+					</span>
+					<h2 class="font-semibold">Tools</h2>
+				</div>
+				<p class="w-full text-sm text-gray-500">
+					This Assistant has access to the following tools:
+				</p>
+				<ul class="mr-2 mt-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
+					{#each assistant.tools as tool}
+						<ToolBadge toolId={tool} />
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		{#if hasRag}
 			<div class="mt-4">
 				<div class="mb-1 flex items-center gap-1">

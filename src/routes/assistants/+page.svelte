@@ -15,6 +15,8 @@
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
 	import CarbonSearch from "~icons/carbon/search";
+	import CarbonTools from "~icons/carbon/tools";
+
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
@@ -246,14 +248,24 @@
 						</div>
 					{/if}
 
-					{#if hasRag}
-						<div
-							class="absolute left-3 top-3 grid size-5 place-items-center rounded-full bg-blue-500/10"
-							title="This assistant uses the websearch."
-						>
-							<IconInternet classNames="text-sm text-blue-600" />
-						</div>
-					{/if}
+					<div class="absolute left-3 top-3 flex items-center gap-1 text-xs text-gray-400">
+						{#if assistant.tools?.length}
+							<div
+								class="grid size-5 place-items-center rounded-full bg-purple-500/10"
+								title="This assistant uses the websearch."
+							>
+								<CarbonTools class="text-xs text-purple-600" />
+							</div>
+						{/if}
+						{#if hasRag}
+							<div
+								class="grid size-5 place-items-center rounded-full bg-blue-500/10"
+								title="This assistant uses the websearch."
+							>
+								<IconInternet classNames="text-sm text-blue-600" />
+							</div>
+						{/if}
+					</div>
 
 					{#if assistant.avatar}
 						<img
