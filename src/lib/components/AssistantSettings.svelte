@@ -95,7 +95,9 @@
 		? "domains"
 		: false;
 
+	let tools = assistant?.tools ?? [];
 	const regex = /{{\s?url=(.+?)\s?}}/g;
+
 	$: templateVariables = [...systemPrompt.matchAll(regex)].map((match) => match[1]);
 	$: selectedModel = models.find((m) => m.id === modelId);
 </script>
@@ -147,6 +149,8 @@
 			formData.set("ragAllowAll", "false");
 			formData.set("ragLinkList", "");
 		}
+
+		formData.set("tools", tools.join(","));
 
 		return async ({ result }) => {
 			loading = false;
@@ -418,7 +422,7 @@
 						Choose up to 3 community tools that will be used with this assistant.
 					</p>
 				</div>
-				<AssistantToolPicker />
+				<AssistantToolPicker bind:toolIds={tools} />
 			{/if}
 			{#if $page.data.enableAssistantsRAG}
 				<div class="flex flex-col flex-nowrap pb-4">
