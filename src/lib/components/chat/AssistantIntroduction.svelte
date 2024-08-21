@@ -12,6 +12,7 @@
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
+	import CarbonTools from "~icons/carbon/tools";
 
 	import { share } from "$lib/utils/share";
 	import { env as envPublic } from "$env/dynamic/public";
@@ -30,6 +31,7 @@
 		| "_id"
 		| "description"
 		| "userCount"
+		| "tools"
 	>;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
@@ -83,6 +85,15 @@
 					</p>
 				{/if}
 
+				{#if assistant?.tools?.length}
+					<div
+						class="flex h-5 w-fit items-center gap-1 rounded-full bg-purple-500/10 pl-1 pr-2 text-xs"
+						title="This assistant uses the websearch."
+					>
+						<CarbonTools class="text-sm text-purple-600" />
+						Has tools
+					</div>
+				{/if}
 				{#if hasRag}
 					<div
 						class="flex h-5 w-fit items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs"
