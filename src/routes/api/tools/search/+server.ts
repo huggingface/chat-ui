@@ -1,6 +1,6 @@
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
-import type { CommunityToolDB } from "$lib/types/Tool.js";
+import type { BaseTool, CommunityToolDB } from "$lib/types/Tool.js";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
 
@@ -20,7 +20,14 @@ export async function GET({ url, locals }) {
 
 	const matchingCommunityTools = await collections.tools
 		.find(filter)
-		.project({ _id: 1, displayName: 1 })
+		.project<Pick<BaseTool, "_id" | "displayName" | "color" | "icon">>({
+			_id: 1,
+			displayName: 1,
+			color: 1,
+			icon: 1,
+			createdByName: 1,
+		})
+		.sort({ useCount: -1 })
 		.limit(5)
 		.toArray();
 
@@ -35,9 +42,16 @@ export async function GET({ url, locals }) {
 			return true;
 		})
 		.map((tool) => ({
-			_id: tool._id.toString(),
+			_id: tool._id,
 			displayName: tool.displayName,
+			color: tool.color,
+			icon: tool.icon,
+			createdByName: undefined,
 		}));
 
-	return Response.json([...matchingConfigTools, ...matchingCommunityTools].slice(0, 5));
+	const tools = [...matchingConfigTools, ...matchingCommunityTools] satisfies Array<
+		Pick<BaseTool, "_id" | "displayName" | "color" | "icon"> & { createdByName?: string }
+	>;
+
+	return Response.json(tools.map((tool) => ({ ...tool, _id: tool._id.toString() })).slice(0, 5));
 }
