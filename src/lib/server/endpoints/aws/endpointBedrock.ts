@@ -6,6 +6,8 @@ import {
 	InvokeModelWithResponseStreamCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
+import type { EndpointMessage } from "../endpoints";
+import type { MessageFile } from "$lib/types/Message";
 
 export const endpointBedrockParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -36,10 +38,12 @@ export const endpointBedrockParametersSchema = z.object({
 export async function endpointBedrock(
 	input: z.input<typeof endpointBedrockParametersSchema>
 ): Promise<Endpoint> {
+	const { region, model, anthropicVersion, multimodal } =
+		endpointBedrockParametersSchema.parse(input);
 	const client = new BedrockRuntimeClient({
-		region: input.region,
+		region,
 	});
-	const imageProcessor = makeImageProcessor(input.multimodal.image);
+	const imageProcessor = makeImageProcessor(multimodal.image);
 
 	return async ({ messages, preprompt, generateSettings }) => {
 		let system = preprompt;
@@ -52,12 +56,12 @@ export async function endpointBedrock(
 		const formattedMessages = await prepareMessages(messages, imageProcessor);
 
 		let tokenId = 0;
-		const parameters = { ...input.model.parameters, ...generateSettings };
+		const parameters = { ...model.parameters, ...generateSettings };
 		return (async function* () {
 			const command = new InvokeModelWithResponseStreamCommand({
 				body: Buffer.from(
 					JSON.stringify({
-						anthropic_version: input.anthropicVersion,
+						anthropic_version: anthropicVersion,
 						max_tokens: parameters.max_new_tokens ? parameters.max_new_tokens : 4096,
 						messages: formattedMessages,
 						system,
@@ -66,7 +70,7 @@ export async function endpointBedrock(
 				),
 				contentType: "application/json",
 				accept: "application/json",
-				modelId: input.model.id,
+				modelId: model.id,
 				trace: "DISABLED",
 			});
 
@@ -108,7 +112,10 @@ export async function endpointBedrock(
 }
 
 // Prepare the messages excluding system prompts
-async function prepareMessages(messages, imageProcessor) {
+async function prepareMessages(
+	messages: EndpointMessage[],
+	imageProcessor: ReturnType<typeof makeImageProcessor>
+) {
 	const formattedMessages = [];
 
 	for (const message of messages) {
@@ -131,7 +138,10 @@ async function prepareMessages(messages, imageProcessor) {
 }
 
 // Process files and convert them to base64 encoded strings
-async function prepareFiles(imageProcessor, files) {
+async function prepareFiles(
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	files: MessageFile[]
+) {
 	const processedFiles = await Promise.all(files.map(imageProcessor));
 	return processedFiles.map((file) => ({
 		type: "image",
