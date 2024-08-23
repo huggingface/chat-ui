@@ -110,7 +110,6 @@ async function getChatPromptRender(
 			];
 		}
 
-		logger.info({ formattedMessages });
 		if (toolResults?.length) {
 			// todo: should update the command r+ tokenizer to support system messages at any location
 			// or use the `rag` mode without the citations

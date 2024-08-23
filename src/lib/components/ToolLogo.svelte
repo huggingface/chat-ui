@@ -13,7 +13,7 @@
 
 	export let color: string;
 	export let icon: string;
-	export let size: "md" | "lg" = "md";
+	export let size: "sm" | "md" | "lg" = "md";
 
 	$: gradientColor = (() => {
 		switch (color) {
@@ -72,6 +72,8 @@
 
 	$: sizeClass = (() => {
 		switch (size) {
+			case "sm":
+				return "size-8";
 			case "md":
 				return "size-14";
 			case "lg":

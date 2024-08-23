@@ -9,7 +9,7 @@ export interface TextGenerationContext {
 	endpoint: Endpoint;
 	conv: Conversation;
 	messages: Message[];
-	assistant?: Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings">;
+	assistant?: Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings" | "tools">;
 	isContinue: boolean;
 	webSearch: boolean;
 	toolsPreference: Array<string>;
