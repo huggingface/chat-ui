@@ -70,9 +70,13 @@ export async function withPage<T>(
 		const page = await ctx.newPage();
 		env.PLAYWRIGHT_ADBLOCKER === "true" && (await blocker.enableBlockingInPage(page));
 
-		const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
-			logger.warn(`Failed to load page within 2s: ${url}`);
-		});
+		const res = await page
+			.goto(url, { waitUntil: "load", timeout: parseInt(env.WEBSEARCH_TIMEOUT) })
+			.catch(() => {
+				console.warn(
+					`Failed to load page within ${parseInt(env.WEBSEARCH_TIMEOUT) / 1000}s: ${url}`
+				);
+			});
 
 		// await needed here so that we don't close the context before the callback is done
 		return await callback(page, res ?? undefined);
