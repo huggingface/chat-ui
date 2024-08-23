@@ -7,13 +7,13 @@ export default async function search(query: string): Promise<WebSearchSource[]> 
 	//     // You can add other parameters if needed, like 'count', 'offset', etc.
 	// };
 
-	const response = await fetch(env.BING_SEARCH_URL + "?q=" + encodeURIComponent(query), {
-		method: "GET",
-		headers: {
-			"Ocp-Apim-Subscription-Key": env.BING_SUBSCRIPTION_KEY,
-			"Content-type": "application/json",
-		},
-	});
+    const response = await fetch("https://api.bing.microsoft.com/v7.0/search" + "?q=" + encodeURIComponent(query), {
+        method: "GET",
+        headers: {
+            "Ocp-Apim-Subscription-Key": env.BING_SUBSCRIPTION_KEY,
+            "Content-type": "application/json",
+        },
+    });
 
 	/* eslint-disable @typescript-eslint/no-explicit-any */
 	const data = (await response.json()) as Record<string, any>;
