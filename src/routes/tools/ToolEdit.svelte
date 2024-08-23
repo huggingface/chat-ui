@@ -15,6 +15,8 @@
 	import { base } from "$app/paths";
 	import ToolInputComponent from "./ToolInputComponent.svelte";
 
+	import CarbonInformation from "~icons/carbon/information";
+
 	type ActionData = {
 		error?: boolean;
 		errors?: {
@@ -161,13 +163,15 @@
 		formData.append("tool", JSON.stringify(editableTool));
 
 		return async ({ result }) => {
-			formLoading = false;
-
 			if (result.type === "success" && result.data && typeof result.data.toolId === "string") {
 				$settings.tools = [...($settings.tools ?? []), result.data.toolId];
-				goto(`${base}/tools/${result.data.toolId}`, { invalidateAll: true });
+				await goto(`${base}/tools/${result.data.toolId}`).then(() => {
+					formLoading = false;
+				});
 			} else {
-				await applyAction(result);
+				await applyAction(result).then(() => {
+					formLoading = false;
+				});
 			}
 		};
 	}}
@@ -332,7 +336,20 @@
 										>
 
 										<label class="ml-auto">
-											<span class="text-sm text-gray-500">AI Name</span>
+											<span
+												class="group relative flex w-max items-center justify-center text-sm font-semibold text-gray-700"
+											>
+												AI Function Name
+												<CarbonInformation class="m-1 align-middle text-xs text-purple-500" />
+												<div
+													class="pointer-events-none absolute -top-16 right-0 w-max rounded-md bg-gray-100 p-2 opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-800"
+												>
+													<p class="max-w-sm text-sm font-normal text-gray-800 dark:text-gray-200">
+														This is the function name that will be used when prompting the model.
+														Make sure it describes your tool well, is short and unique.
+													</p>
+												</div>
+											</span>
 											<input
 												class="h-fit rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 												type="text"
@@ -350,6 +367,10 @@
 										</p>
 									</div>
 
+									<p class="text-xs text-red-500">
+										{getError(`inputs`, form)}
+									</p>
+
 									{#each editableTool.inputs as input, inputIdx}
 										{@const parameter = endpoint.parameters.find(
 											(parameter) => parameter.parameter_name === input.name
@@ -359,7 +380,7 @@
 											<div class="inline w-full">
 												<span class="font-mono text-sm">{input.name}</span>
 												<span
-													class="inline-block rounded-lg bg-orange-50 p-1 text-sm text-orange-800"
+													class="inline-block max-w-lg truncate rounded-lg bg-orange-50 p-1 text-sm text-orange-800"
 													>{parameter?.python_type.type}</span
 												>
 												{#if parameter?.description}
@@ -418,9 +439,6 @@
 													bind:value={input.description}
 													disabled={readonly}
 												/>
-												<p class="text-xs text-red-500">
-													{getError(`${input.name}-description`, form)}
-												</p>
 											</label>
 										{/if}
 										{#if input.paramType === "optional" || input.paramType === "fixed"}
@@ -450,9 +468,6 @@
 														bind:value={input.value}
 													/>
 												{/if}
-												<p class="text-xs text-red-500">
-													{getError(`${input.name}-${isOptional ? "default" : "value"}`, form)}
-												</p>
 											</div>
 										{/if}
 										{#if input.type === "file"}
@@ -504,16 +519,19 @@
 												{#if api.named_endpoints[editableTool.endpoint].returns.length > 1}
 													<div class="flex flex-row gap-4">
 														{#each api.named_endpoints[editableTool.endpoint].returns as { component }, idx}
-															<label>
+															<label class="text-gray-800">
 																<input
 																	type="radio"
-																	disabled={readonly}
+																	disabled={readonly ||
+																		!ToolOutputComponents.safeParse(component).success}
 																	bind:group={editableTool.outputComponent}
 																	value={idx + ";" + component.toLowerCase()}
 																	name="outputComponent"
 																/>
 																<span
-																	class="font-mono text-gray-800"
+																	class="font-mono"
+																	class:text-gray-400={!ToolOutputComponents.safeParse(component)
+																		.success}
 																	class:font-semibold={editableTool?.outputComponent?.split(
 																		";"
 																	)[1] === component}>{component.toLowerCase()}-{idx}</span

@@ -37,6 +37,9 @@ export const ToolOutputComponents = z
 			z.literal("image"),
 			z.literal("gallery"),
 			z.literal("number"),
+			z.literal("audio"),
+			z.literal("video"),
+			z.literal("file"),
 		])
 	);
 
@@ -174,5 +177,6 @@ export interface ToolCall {
 
 export type BackendCall = (
 	params: Record<string, string | number | boolean>,
-	context: BackendToolContext
+	context: BackendToolContext,
+	uuid: string
 ) => AsyncGenerator<MessageUpdate, Omit<ToolResultSuccess, "status" | "call" | "type">, undefined>;

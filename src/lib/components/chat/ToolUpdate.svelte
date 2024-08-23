@@ -7,9 +7,9 @@
 	} from "$lib/utils/messageUpdates";
 
 	import CarbonTools from "~icons/carbon/tools";
-	import type { ToolFront } from "$lib/types/Tool";
+	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
-	import { onMount } from "svelte";
+	import { onDestroy } from "svelte";
 	import { browser } from "$app/environment";
 
 	export let tool: MessageToolUpdate[];
@@ -19,6 +19,8 @@
 	$: toolError = tool.some(isMessageToolErrorUpdate);
 	$: toolDone = tool.some(isMessageToolResultUpdate);
 
+	$: eta = tool.find((el) => el.subtype === MessageToolUpdateType.ETA)?.eta;
+
 	const availableTools: ToolFront[] = $page.data.tools;
 
 	let loadingBarEl: HTMLDivElement;
@@ -26,16 +28,24 @@
 
 	let isShowingLoadingBar = false;
 
-	onMount(() => {
-		if (!toolError && !toolDone && loading && loadingBarEl) {
+	$: !toolError &&
+		!toolDone &&
+		loading &&
+		loadingBarEl &&
+		eta &&
+		(() => {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: availableTools.find((tool) => tool.name === toolFnName)?.timeToUseMS,
+				duration: eta * 1000,
 				fill: "forwards",
 			});
+		})();
+
+	onDestroy(() => {
+		if (animation) {
+			animation.cancel();
 		}
-		return () => animation?.cancel();
 	});
 
 	// go to 100% quickly if loading is done
@@ -130,6 +140,23 @@
 					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
 				</div>
 				<p class="text-sm">{toolUpdate.message}</p>
+			{:else if isMessageToolResultUpdate(toolUpdate) && toolUpdate.result.status === ToolResultStatus.Success && toolUpdate.result.display}
+				<div class="mt-1 flex items-center gap-2 opacity-80">
+					<h3 class="text-sm">Result</h3>
+					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
+				</div>
+				<ul class="py-1 text-sm">
+					{#each toolUpdate.result.outputs as output}
+						{#each Object.entries(output) as [k, v]}
+							{#if v !== null}
+								<li>
+									<span class="font-semibold">{k}</span>:
+									<span>{v}</span>
+								</li>
+							{/if}
+						{/each}
+					{/each}
+				</ul>
 			{/if}
 		{/each}
 	</details>

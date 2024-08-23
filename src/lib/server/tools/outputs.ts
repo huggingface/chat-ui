@@ -27,6 +27,18 @@ export const ToolOutputPaths: Record<
 		type: "file",
 		path: "$[*].image.url",
 	},
+	audio: {
+		type: "file",
+		path: "$.url",
+	},
+	video: {
+		type: "file",
+		path: "$.video.url",
+	},
+	file: {
+		type: "file",
+		path: "$.url",
+	},
 };
 
 export const isValidOutputComponent = (

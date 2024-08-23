@@ -13,7 +13,6 @@ const resetTools: Migration = {
 		return true;
 	},
 	runEveryTime: false,
-	runForHuggingChat: "only",
 };
 
 export default resetTools;

@@ -21,7 +21,7 @@ export async function* generateTitleForConversation(
 			title,
 		};
 	} catch (cause) {
-		console.error(Error("Failed whilte generating title for conversation", { cause }));
+		logger.error(Error("Failed whilte generating title for conversation", { cause }));
 	}
 }
 

@@ -45,14 +45,14 @@ const toolInputBaseSchema = z.union([
 		description: z.string().max(200).optional(),
 		paramType: z.literal("optional"),
 		default: z
-			.union([z.string().max(120), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(300), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 	z.object({
 		name: z.string().min(1).max(80),
 		paramType: z.literal("fixed"),
 		value: z
-			.union([z.string().max(120), z.number(), z.boolean(), z.undefined()])
+			.union([z.string().max(300), z.number(), z.boolean(), z.undefined()])
 			.transform((val) => (val === undefined ? "" : val)),
 	}),
 ]);
@@ -61,7 +61,7 @@ const toolInputSchema = toolInputBaseSchema.and(
 	z.object({ type: IOType }).or(
 		z.object({
 			type: z.literal("file"),
-			mimeTypes: z.string().nonempty(),
+			mimeTypes: z.string().min(1),
 		})
 	)
 );
@@ -119,7 +119,7 @@ export const configTools = z
 	.transform((val) => [...val, calculator, directlyAnswer, fetchUrl, websearch]);
 
 export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
-	return async function* (params, ctx) {
+	return async function* (params, ctx, uuid) {
 		if (
 			tool.endpoint === null ||
 			!tool.baseUrl ||
@@ -203,11 +203,12 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 			}
 		});
 
-		const outputs = await callSpace(
+		const outputs = yield* callSpace(
 			tool.baseUrl,
 			tool.endpoint,
 			await Promise.all(inputs),
-			ipToken
+			ipToken,
+			uuid
 		);
 
 		if (!isValidOutputComponent(tool.outputComponent)) {
@@ -233,7 +234,10 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 			outputs[tool.outputComponentIdx] !== undefined &&
 			typeof outputs[tool.outputComponentIdx] !== "object"
 		) {
-			return { outputs: [{ [tool.name + "-0"]: outputs[tool.outputComponentIdx] }] };
+			return {
+				outputs: [{ [tool.name + "-0"]: outputs[tool.outputComponentIdx] }],
+				display: tool.showOutput,
+			};
 		}
 
 		await Promise.all(

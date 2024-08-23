@@ -69,36 +69,6 @@ envVars:
         ]
       }, 
       {
-        "name" : "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
-        "id": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
-        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
-        "description": "The most intelligent open-source model, showing exceptional capabilities for complex tasks.",
-        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
-        "websiteUrl": "https://llama.meta.com/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
-        "tools": true,
-        "preprompt" : "",
-        "parameters": {
-          "temperature": 0.6,
-          "top_p": 0.9,
-          "stop": ["<|endoftext|>", "<|eot_id|>"],
-          "max_new_tokens": 2048,
-          "truncate": 14337
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          }, {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
-      }, 
-      {
         "name" : "CohereForAI/c4ai-command-r-plus",
         "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"},
         "description": "Cohere's largest language model, optimized for conversational interaction and tool use.",
@@ -133,7 +103,6 @@ envVars:
         "modelUrl": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
         "tokenizer": "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "preprompt" : "",
-        "chatPromptTemplate": "<s> {{#each messages}}{{#ifUser}}[INST]{{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}} {{content}} [/INST]{{/ifUser}}{{#ifAssistant}} {{content}}</s> {{/ifAssistant}}{{/each}}",
         "parameters" : {
           "temperature" : 0.6,
           "top_p" : 0.95,
@@ -163,7 +132,6 @@ envVars:
           "websiteUrl" : "https://nousresearch.com/",
           "modelUrl": "https://huggingface.co/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
           "tokenizer": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-          "chatPromptTemplate" : "{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
           "promptExamples": [
             {
               "title": "Write an email from bullet list",
@@ -223,7 +191,6 @@ envVars:
           "modelUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
           "tokenizer": "mistralai/Mistral-7B-Instruct-v0.3",
           "preprompt": "",
-          "chatPromptTemplate" : "<s>{{#each messages}}{{#ifUser}}[INST] {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}} [/INST]{{/ifUser}}{{#ifAssistant}}{{content}}</s>{{/ifAssistant}}{{/each}}",
           "parameters": {
             "temperature": 0.3,
             "top_p": 0.95,
@@ -254,7 +221,6 @@ envVars:
           "modelUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
           "websiteUrl": "https://azure.microsoft.com/en-us/blog/introducing-phi-3-redefining-whats-possible-with-slms/",
           "preprompt": "",
-          "chatPromptTemplate": "<s>{{preprompt}}{{#each messages}}{{#ifUser}}<|user|>\n{{content}}<|end|>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}<|end|>\n{{/ifAssistant}}{{/each}}",
           "parameters": {
             "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
             "temperature": 0.7,
@@ -300,7 +266,8 @@ envVars:
       { "name": "meta-llama/Llama-2-70b-chat-hf" },
       { "name": "codellama/CodeLlama-70b-Instruct-hf" },
       { "name": "openchat/openchat-3.5-0106" },
-      { "name": "meta-llama/Meta-Llama-3-70B-Instruct"}
+      { "name": "meta-llama/Meta-Llama-3-70B-Instruct"},
+      { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8"}
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
   PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
@@ -313,7 +280,6 @@ envVars:
   PUBLIC_APP_DATA_SHARING: 0
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
-  PUBLIC_APPLE_APP_ID: "6476778843"
   REQUIRE_FEATURED_ASSISTANTS: "true"
   TASK_MODEL: "llhf/Meta-Llama-3.1-8B-Instruct"
   TEXT_EMBEDDING_MODELS: >
@@ -336,7 +302,7 @@ envVars:
         "description": "Use this tool to generate images based on a prompt.",
         "color": "yellow",
         "icon": "camera",
-        "baseUrl": "stabilityai/stable-diffusion-3-medium",
+        "baseUrl": "black-forest-labs/FLUX.1-schnell",
         "name": "image_generation",
         "endpoint": "/infer",
         "inputs": [
@@ -346,19 +312,7 @@ envVars:
             "paramType": "required",
             "type": "str"
           },
-          {
-            "name": "negative_prompt",
-            "description": "A prompt for things that should not be in the image.",
-            "paramType": "optional",
-            "default": "",
-            "type": "str"
-          },
-          {
-            "name": "seed",
-            "paramType": "fixed",
-            "value": "0",
-            "type": "float"
-          },
+          { "name": "seed", "paramType": "fixed", "value": "0", "type": "float" },
           {
             "name": "randomize_seed",
             "paramType": "fixed",
@@ -367,30 +321,22 @@ envVars:
           },
           {
             "name": "width",
-            "description": "numeric value between 256 and 1344",
+            "description": "numeric value between 256 and 2048",
             "paramType": "optional",
             "default": 1024,
             "type": "float"
           },
           {
             "name": "height",
-            "description": "numeric value between 256 and 1344",
+            "description": "numeric value between 256 and 2048",
             "paramType": "optional",
             "default": 1024,
             "type": "float"
           },
           {
-            "name": "guidance_scale",
-            "description": "numeric value between 0.0 and 10.0",
-            "paramType": "optional",
-            "default": 5,
-            "type": "float"
-          },
-          {
             "name": "num_inference_steps",
-            "description": "numeric value between 1 and 50",
-            "paramType": "optional",
-            "default": 28,
+            "paramType": "fixed",
+            "value": "4",
             "type": "float"
           }
         ],
@@ -400,7 +346,7 @@ envVars:
       },
       {
         "_id": "000000000000000000000002",
-        "displayName": "Document parser",
+        "displayName": "Document Parser",
         "description": "Use this tool to parse any document and get its content in markdown format.",
         "color": "yellow",
         "icon": "cloud",
@@ -466,7 +412,7 @@ envVars:
         ],
         "outputComponent": "image",
         "showOutput": true,
-        "displayName": "Image editor",
+        "displayName": "Image Editor",
         "color": "green",
         "icon": "camera",
         "description": "This tool lets you edit images",

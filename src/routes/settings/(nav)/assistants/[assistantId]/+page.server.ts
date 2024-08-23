@@ -197,4 +197,29 @@ export const actions: Actions = {
 
 		return { from: "unfeature", ok: true, message: "Assistant unfeatured" };
 	},
+
+	feature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const assistant = await collections.assistants.findOne({
+			_id: new ObjectId(params.assistantId),
+		});
+
+		if (!assistant) {
+			return fail(404, { error: true, message: "Assistant not found" });
+		}
+
+		const result = await collections.assistants.updateOne(
+			{ _id: assistant._id },
+			{ $set: { featured: true } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to feature assistant" });
+		}
+
+		return { from: "feature", ok: true, message: "Assistant featured" };
+	},
 };

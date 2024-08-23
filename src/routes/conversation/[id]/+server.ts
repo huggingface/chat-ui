@@ -23,6 +23,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -408,7 +409,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				controller.enqueue(JSON.stringify(event) + "\n");
 
 				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
-				if (event.type === "finalAnswer") {
+				if (event.type === MessageUpdateType.FinalAnswer) {
 					controller.enqueue(" ".repeat(4096));
 				}
 			}
@@ -421,6 +422,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
+
 			try {
 				const ctx: TextGenerationContext = {
 					model,
@@ -444,7 +446,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					status: MessageUpdateStatus.Error,
 					message: (e as Error).message,
 				});
-				console.error(e);
+				logger.error(e);
 			} finally {
 				// check if no output was generated
 				if (!hasError && messageToWriteTo.content === initialMessageContent) {

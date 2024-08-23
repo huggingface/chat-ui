@@ -71,7 +71,7 @@ export async function withPage<T>(
 		env.PLAYWRIGHT_ADBLOCKER === "true" && (await blocker.enableBlockingInPage(page));
 
 		const res = await page.goto(url, { waitUntil: "load", timeout: 3500 }).catch(() => {
-			console.warn(`Failed to load page within 2s: ${url}`);
+			logger.warn(`Failed to load page within 2s: ${url}`);
 		});
 
 		// await needed here so that we don't close the context before the callback is done

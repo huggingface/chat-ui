@@ -32,7 +32,7 @@
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
-	$: shareUrl = `${prefix}/tool/${data.tool?._id}`;
+	$: shareUrl = `${prefix}/tools/${data.tool?._id}`;
 	$: isActive = $settings.tools?.includes(data.tool?._id.toString());
 
 	let displayReportModal = false;
@@ -59,9 +59,19 @@
 					</div>
 
 					{#if data.tool?.baseUrl}
-						<p class="mb-2 line-clamp-2 font-mono text-gray-500">
-							{data.tool.baseUrl}
-						</p>
+						{#if data.tool.baseUrl.startsWith("https://")}
+							<p class="mb-2 line-clamp-2 font-mono text-gray-500">
+								{data.tool.baseUrl}
+							</p>
+						{:else}
+							<a
+								href="https://huggingface.co/spaces/{data.tool.baseUrl}"
+								target="_blank"
+								class="mb-2 line-clamp-2 font-mono text-gray-500 hover:underline"
+							>
+								{data.tool.baseUrl}
+							</a>
+						{/if}
 					{/if}
 
 					{#if data.tool.type === "community"}
