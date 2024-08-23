@@ -24,7 +24,7 @@ export const endpointAwsParametersSchema = z.object({
 		.optional(),
 	sessionToken: z.string().optional(),
 	service: z.union([z.literal("sagemaker"), z.literal("lambda")]).default("sagemaker"),
-	region: z.string(),
+	region: z.string().optional(),
 });
 
 export async function endpointAws(
