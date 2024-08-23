@@ -325,7 +325,7 @@
 						{#if isFileUploadEnabled}
 							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
-						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
+						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly && !currentModel.id.includes("claude")}
 							<ContinueBtn
 								on:click={() => {
 									if (lastMessage && lastMessage.ancestors) {
