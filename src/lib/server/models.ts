@@ -7,7 +7,7 @@ import { endpointTgi } from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
 import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
-import type { PreTrainedTokenizer } from "@xenova/transformers";
+import type { PreTrainedTokenizer } from "@huggingface/transformers";
 
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";

@@ -1,11 +1,10 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { goto, invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { browser } from "$app/environment";
 
 	import { env as envPublic } from "$env/dynamic/public";
 
@@ -21,9 +20,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import Logo from "$lib/components/icons/Logo.svelte";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
-	import CarbonClose from "~icons/carbon/close";
 	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
@@ -117,24 +113,41 @@
 
 	const settings = createSettingsStore(data.settings);
 
-	$: if (browser && $page.url.searchParams.has("model")) {
-		if ($settings.activeModel === $page.url.searchParams.get("model")) {
-			goto(`${base}/?`);
+	onMount(async () => {
+		if ($page.url.searchParams.has("model")) {
+			await settings
+				.instantSet({
+					activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
+				})
+				.then(async () => {
+					const query = new URLSearchParams($page.url.searchParams.toString());
+					query.delete("model");
+					await goto(`${base}/?${query.toString()}`, {
+						invalidateAll: true,
+					});
+				});
 		}
-		settings.instantSet({
-			activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
-		});
-	}
+
+		if ($page.url.searchParams.has("tools")) {
+			const tools = $page.url.searchParams.get("tools")?.split(",");
+
+			await settings
+				.instantSet({
+					tools: [...($settings.tools ?? []), ...(tools ?? [])],
+				})
+				.then(async () => {
+					const query = new URLSearchParams($page.url.searchParams.toString());
+					query.delete("tools");
+					await goto(`${base}/?${query.toString()}`, {
+						invalidateAll: true,
+					});
+				});
+		}
+	});
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
 		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
-
-	let showAndroidModal =
-		browser && // only show on browser
-		isHuggingChat && // only show on huggingchat
-		navigator.userAgent.toLowerCase().includes("android") && // if it's android
-		!navigator.userAgent.includes("co.huggingface.chat_ui_android"); // but not the android app
 </script>
 
 <svelte:head>
@@ -236,35 +249,3 @@
 	{/if}
 	<slot />
 </div>
-
-{#if showAndroidModal}
-	<a
-		href="https://play.google.com/store/apps/details?id=co.huggingface.chat_ui_android"
-		class="fixed left-0 right-0 top-0 mx-auto flex h-fit min-h-12 w-screen flex-nowrap items-center justify-evenly gap-4 bg-gray-200 px-4 py-4 text-gray-900 shadow-lg backdrop-blur-md
-		hover:bg-gray-100
-		dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 sm:top-5
-		sm:max-w-fit sm:gap-4 sm:rounded-lg"
-	>
-		<button
-			class="border-r-2 border-black/20 pr-4 text-2xl"
-			on:click|stopPropagation|preventDefault={() => {
-				showAndroidModal = false;
-			}}
-		>
-			<CarbonClose />
-		</button>
-
-		<Logo classNames="mx-2.5 scale-150" />
-
-		<div class="flex flex-col sm:mr-4">
-			<span class="text-lg font-semibold">HuggingChat</span>
-			<span class="text-sm">View on Google Play</span>
-		</div>
-
-		<span
-			class="ml-auto mr-2 text-center text-lg font-medium text-gray-700 underline underline-offset-4 dark:text-gray-300"
-		>
-			Open
-		</span>
-	</a>
-{/if}
