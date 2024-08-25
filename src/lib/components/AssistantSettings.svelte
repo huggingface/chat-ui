@@ -11,6 +11,7 @@
 	import CarbonUpload from "~icons/carbon/upload";
 	import CarbonHelpFilled from "~icons/carbon/help";
 	import CarbonSettingsAdjust from "~icons/carbon/settings-adjust";
+	import CarbonTools from "~icons/carbon/tools";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
@@ -18,6 +19,7 @@
 	import TokensCounter from "./TokensCounter.svelte";
 	import HoverTooltip from "./HoverTooltip.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
+	import AssistantToolPicker from "./AssistantToolPicker.svelte";
 
 	type ActionData = {
 		error: boolean;
@@ -93,7 +95,9 @@
 		? "domains"
 		: false;
 
+	let tools = assistant?.tools ?? [];
 	const regex = /{{\s?url=(.+?)\s?}}/g;
+
 	$: templateVariables = [...systemPrompt.matchAll(regex)].map((match) => match[1]);
 	$: selectedModel = models.find((m) => m.id === modelId);
 </script>
@@ -145,6 +149,8 @@
 			formData.set("ragAllowAll", "false");
 			formData.set("ragLinkList", "");
 		}
+
+		formData.set("tools", tools.join(","));
 
 		return async ({ result }) => {
 			loading = false;
@@ -403,15 +409,26 @@
 				</div>
 				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 			</label>
-			{#if $page.data.enableAssistantsRAG}
-				<div class="mb-4 flex flex-col flex-nowrap">
-					<span class="mt-2 text-smd font-semibold"
-						>Internet access
-						<IconInternet classNames="inline text-sm text-blue-600" />
-
+			{#if $page.data.user?.isEarlyAccess && selectedModel?.tools}
+				<div>
+					<span class="text-smd font-semibold"
+						>Tools
+						<CarbonTools class="inline text-xs text-purple-600" />
 						<span class="ml-1 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
 							>Experimental</span
 						>
+					</span>
+					<p class="text-xs text-gray-500">
+						Choose up to 3 community tools that will be used with this assistant.
+					</p>
+				</div>
+				<AssistantToolPicker bind:toolIds={tools} />
+			{/if}
+			{#if $page.data.enableAssistantsRAG}
+				<div class="flex flex-col flex-nowrap pb-4">
+					<span class="mt-2 text-smd font-semibold"
+						>Internet access
+						<IconInternet classNames="inline text-sm text-blue-600" />
 
 						{#if isHuggingChat}
 							<a
@@ -507,26 +524,13 @@
 						/>
 						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
 					{/if}
-
-					<!-- divider -->
-					<div class="my-3 ml-0 mr-6 w-full border border-gray-200" />
-
-					<label class="text-sm has-[:checked]:font-semibold">
-						<input type="checkbox" name="dynamicPrompt" bind:checked={dynamicPrompt} />
-						Dynamic Prompt
-						<p class="mb-2 text-xs font-normal text-gray-500">
-							Allow the use of template variables {"{{url=https://example.com/path}}"}
-							to insert dynamic content into your prompt by making GET requests to specified URLs on
-							each inference.
-						</p>
-					</label>
 				</div>
 			{/if}
 		</div>
 
 		<div class="relative col-span-1 flex h-full flex-col">
 			<div class="mb-1 flex justify-between text-sm">
-				<span class="font-semibold"> Instructions (System Prompt) </span>
+				<span class="block font-semibold"> Instructions (System Prompt) </span>
 				{#if dynamicPrompt && templateVariables.length}
 					<div class="relative">
 						<button
@@ -549,6 +553,16 @@
 					</div>
 				{/if}
 			</div>
+			<label class="pb-2 text-sm has-[:checked]:font-semibold">
+				<input type="checkbox" name="dynamicPrompt" bind:checked={dynamicPrompt} />
+				Dynamic Prompt
+				<p class="mb-2 text-xs font-normal text-gray-500">
+					Allow the use of template variables {"{{url=https://example.com/path}}"}
+					to insert dynamic content into your prompt by making GET requests to specified URLs on each
+					inference.
+				</p>
+			</label>
+
 			<div class="relative mb-20 flex h-full flex-col gap-2">
 				<textarea
 					name="preprompt"

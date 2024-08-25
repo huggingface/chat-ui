@@ -10,6 +10,7 @@ import sharp from "sharp";
 import { parseStringToList } from "$lib/utils/parseStringToList";
 import { usageLimits } from "$lib/server/usageLimits";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
+import { toolFromConfigs } from "$lib/server/tools";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -39,6 +40,21 @@ const newAsssistantSchema = z.object({
 	top_k: z
 		.union([z.literal(""), z.coerce.number().min(5).max(100)])
 		.transform((v) => (v === "" ? undefined : v)),
+	tools: z
+		.string()
+		.optional()
+		.transform((v) => (v ? v.split(",") : []))
+		.transform(async (v) => [
+			...(await collections.tools
+				.find({ _id: { $in: v.map((toolId) => new ObjectId(toolId)) } })
+				.project({ _id: 1 })
+				.toArray()
+				.then((tools) => tools.map((tool) => tool._id.toString()))),
+			...toolFromConfigs
+				.filter((el) => (v ?? []).includes(el._id.toString()))
+				.map((el) => el._id.toString()),
+		])
+		.optional(),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -62,7 +78,7 @@ export const actions: Actions = {
 	default: async ({ request, locals }) => {
 		const formData = Object.fromEntries(await request.formData());
 
-		const parse = newAsssistantSchema.safeParse(formData);
+		const parse = await newAsssistantSchema.safeParseAsync(formData);
 
 		if (!parse.success) {
 			// Loop through the errors array and create a custom errors array
@@ -126,6 +142,8 @@ export const actions: Actions = {
 			createdById,
 			createdByName: locals.user?.username ?? locals.user?.name,
 			...parse.data,
+			// XXX: feature_flag_tools
+			tools: locals.user?.isEarlyAccess ? parse.data.tools : undefined,
 			exampleInputs,
 			avatar: hash,
 			createdAt: new Date(),

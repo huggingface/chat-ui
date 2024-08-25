@@ -14,6 +14,7 @@ import {
 	type MessageToolErrorUpdate,
 	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
+import { env as envPublic } from "$env/dynamic/public";
 
 export const isMessageWebSearchUpdate = (update: MessageUpdate): update is MessageWebSearchUpdate =>
 	update.type === MessageUpdateType.WebSearch;
@@ -94,6 +95,11 @@ export async function fetchMessageUpdates(
 	if (!response.body) {
 		throw Error("Body not defined");
 	}
+
+	if (!(envPublic.PUBLIC_SMOOTH_UPDATES === "true")) {
+		return endpointStreamToIterator(response, abortController);
+	}
+
 	return smoothAsyncIterator(
 		streamMessageUpdatesToFullWords(endpointStreamToIterator(response, abortController))
 	);
