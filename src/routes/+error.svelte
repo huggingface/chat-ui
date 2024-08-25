@@ -11,5 +11,10 @@
 		<h1 class="mb-2 text-5xl font-semibold">{$page.status}</h1>
 		<div class="-mx-8 my-2 h-px bg-gray-200 dark:bg-gray-700" />
 		<h2 class="max-w-sm text-lg">{$page.error?.message}</h2>
+		{#if $page.error?.errorId}
+			<div class="-mx-8 my-2 h-px bg-gray-200 dark:bg-gray-700" />
+			<pre class="max-w-sm whitespace-pre-wrap text-left font-mono text-xs">{$page.error
+					.errorId}</pre>
+		{/if}
 	</div>
 </div>

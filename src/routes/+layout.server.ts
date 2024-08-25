@@ -5,21 +5,14 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
-import {
-	SERPAPI_KEY,
-	SERPER_API_KEY,
-	SERPSTACK_API_KEY,
-	MESSAGES_BEFORE_LOGIN,
-	YDC_API_KEY,
-	USE_LOCAL_WEBSEARCH,
-	SEARXNG_QUERY_URL,
-	ENABLE_ASSISTANTS,
-	ENABLE_ASSISTANTS_RAG,
-} from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
+import { toolFromConfigs } from "$lib/server/tools";
+import { MetricsServer } from "$lib/server/metrics";
+import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 
-export const load: LayoutServerLoad = async ({ locals, depends }) => {
+export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
@@ -47,7 +40,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		});
 	}
 
-	const enableAssistants = ENABLE_ASSISTANTS === "true";
+	const enableAssistants = env.ENABLE_ASSISTANTS === "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
@@ -87,7 +80,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
 
-	const messagesBeforeLogin = MESSAGES_BEFORE_LOGIN ? parseInt(MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	let loginRequired = false;
 
@@ -114,6 +107,26 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		}
 	}
 
+	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
+
+	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
+
+	const activeCommunityToolIds = (settings?.tools ?? []).filter(
+		(key) => !configToolIds.includes(key)
+	);
+
+	const communityTools = await collections.tools
+		.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
+		.toArray()
+		.then((tools) =>
+			tools.map((tool) => ({
+				...tool,
+				isHidden: false,
+				isOnByDefault: true,
+				isLocked: true,
+			}))
+		);
+
 	return {
 		conversations: conversations.map((conv) => {
 			if (settings?.hideEmojiOnSidebar) {
@@ -136,12 +149,14 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		}) satisfies ConvSidebar[],
 		settings: {
 			searchEnabled: !!(
-				SERPAPI_KEY ||
-				SERPER_API_KEY ||
-				SERPSTACK_API_KEY ||
-				YDC_API_KEY ||
-				USE_LOCAL_WEBSEARCH ||
-				SEARXNG_QUERY_URL
+				env.SERPAPI_KEY ||
+				env.SERPER_API_KEY ||
+				env.SERPSTACK_API_KEY ||
+				env.SEARCHAPI_KEY ||
+				env.YDC_API_KEY ||
+				env.USE_LOCAL_WEBSEARCH ||
+				env.SEARXNG_QUERY_URL ||
+				env.BING_SUBSCRIPTION_KEY
 			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
@@ -152,6 +167,12 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 			customPrompts: settings?.customPrompts ?? {},
 			assistants: userAssistants,
+			tools:
+				settings?.tools ??
+				toolFromConfigs
+					.filter((el) => !el.isHidden && el.isOnByDefault)
+					.map((el) => el._id.toString()),
+			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 		},
 		models: models.map((model) => ({
 			id: model.id,
@@ -168,9 +189,36 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
+			tools:
+				model.tools &&
+				// disable tools on huggingchat android app
+				!request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_android"),
 			unlisted: model.unlisted,
 		})),
 		oldModels,
+		tools: [...toolFromConfigs, ...communityTools]
+			.filter((tool) => !tool?.isHidden)
+			.map(
+				(tool) =>
+					({
+						_id: tool._id.toString(),
+						type: tool.type,
+						displayName: tool.displayName,
+						name: tool.name,
+						description: tool.description,
+						mimeTypes: (tool.inputs ?? [])
+							.filter((input): input is ToolInputFile => input.type === "file")
+							.map((input) => (input as ToolInputFile).mimeTypes)
+							.flat(),
+						isOnByDefault: tool.isOnByDefault ?? true,
+						isLocked: tool.isLocked ?? true,
+						timeToUseMS:
+							toolUseDuration.find(
+								(el) => el.labels.tool === tool._id.toString() && el.labels.quantile === 0.9
+							)?.value ?? 15_000,
+					} satisfies ToolFront)
+			),
+		communityToolCount: await collections.tools.countDocuments({ type: "community" }),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
 			.map((el) => ({
@@ -185,10 +233,13 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			username: locals.user.username,
 			avatarUrl: locals.user.avatarUrl,
 			email: locals.user.email,
+			logoutDisabled: locals.user.logoutDisabled,
+			isAdmin: locals.user.isAdmin ?? false,
+			isEarlyAccess: locals.user.isEarlyAccess ?? false,
 		},
 		assistant,
 		enableAssistants,
-		enableAssistantsRAG: ENABLE_ASSISTANTS_RAG === "true",
+		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,

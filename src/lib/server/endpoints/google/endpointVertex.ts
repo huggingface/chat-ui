@@ -1,8 +1,14 @@
-import { VertexAI, HarmCategory, HarmBlockThreshold } from "@google-cloud/vertexai";
-import { buildPrompt } from "$lib/buildPrompt";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import {
+	VertexAI,
+	HarmCategory,
+	HarmBlockThreshold,
+	type Content,
+	type TextPart,
+} from "@google-cloud/vertexai";
 import type { Endpoint } from "../endpoints";
 import { z } from "zod";
+import type { Message } from "$lib/types/Message";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
 export const endpointVertexParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -11,10 +17,21 @@ export const endpointVertexParametersSchema = z.object({
 	location: z.string().default("europe-west1"),
 	project: z.string(),
 	apiEndpoint: z.string().optional(),
+	safetyThreshold: z
+		.enum([
+			HarmBlockThreshold.HARM_BLOCK_THRESHOLD_UNSPECIFIED,
+			HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+			HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+			HarmBlockThreshold.BLOCK_NONE,
+			HarmBlockThreshold.BLOCK_ONLY_HIGH,
+		])
+		.optional(),
+	tools: z.array(z.any()).optional(),
 });
 
 export function endpointVertex(input: z.input<typeof endpointVertexParametersSchema>): Endpoint {
-	const { project, location, model, apiEndpoint } = endpointVertexParametersSchema.parse(input);
+	const { project, location, model, apiEndpoint, safetyThreshold, tools } =
+		endpointVertexParametersSchema.parse(input);
 
 	const vertex_ai = new VertexAI({
 		project,
@@ -22,55 +39,107 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		apiEndpoint,
 	});
 
-	const generativeModel = vertex_ai.getGenerativeModel({
-		model: model.id ?? model.name,
-		safety_settings: [
-			{
-				category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-				threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-			},
-		],
-		generation_config: {},
-	});
+	return async ({ messages, preprompt, generateSettings }) => {
+		const parameters = { ...model.parameters, ...generateSettings };
 
-	return async ({ messages, preprompt, continueMessage }) => {
-		const prompt = await buildPrompt({
-			messages,
-			continueMessage,
-			preprompt,
-			model,
+		const generativeModel = vertex_ai.getGenerativeModel({
+			model: model.id ?? model.name,
+			safetySettings: safetyThreshold
+				? [
+						{
+							category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+							threshold: safetyThreshold,
+						},
+						{
+							category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+							threshold: safetyThreshold,
+						},
+						{
+							category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+							threshold: safetyThreshold,
+						},
+						{
+							category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+							threshold: safetyThreshold,
+						},
+						{
+							category: HarmCategory.HARM_CATEGORY_UNSPECIFIED,
+							threshold: safetyThreshold,
+						},
+				  ]
+				: undefined,
+			generationConfig: {
+				maxOutputTokens: parameters?.max_new_tokens ?? 4096,
+				stopSequences: parameters?.stop,
+				temperature: parameters?.temperature ?? 1,
+			},
+			tools,
 		});
 
-		const chat = generativeModel.startChat();
-		const result = await chat.sendMessageStream(prompt);
-		let tokenId = 0;
+		// Preprompt is the same as the first system message.
+		let systemMessage = preprompt;
+		if (messages[0].from === "system") {
+			systemMessage = messages[0].content;
+			messages.shift();
+		}
 
+		const vertexMessages = messages.map(({ from, content }: Omit<Message, "id">): Content => {
+			return {
+				role: from === "user" ? "user" : "model",
+				parts: [
+					{
+						text: content,
+					},
+				],
+			};
+		});
+
+		const result = await generativeModel.generateContentStream({
+			contents: vertexMessages,
+			systemInstruction: systemMessage
+				? {
+						role: "system",
+						parts: [
+							{
+								text: systemMessage,
+							},
+						],
+				  }
+				: undefined,
+		});
+
+		let tokenId = 0;
 		return (async function* () {
 			let generatedText = "";
 
 			for await (const data of result.stream) {
-				if (Array.isArray(data?.candidates) && data.candidates.length > 0) {
-					const firstPart = data.candidates[0].content.parts[0];
-					if ("text" in firstPart) {
-						const content = firstPart.text;
-						generatedText += content;
-						const output: TextGenerationStreamOutput = {
-							token: {
-								id: tokenId++,
-								text: content ?? "",
-								logprob: 0,
-								special: false,
-							},
-							generated_text: generatedText,
-							details: null,
-						};
-						yield output;
-					}
+				if (!data?.candidates?.length) break; // Handle case where no candidates are present
 
-					if (!data.candidates.slice(-1)[0].finishReason) break;
-				} else {
-					break;
-				}
+				const candidate = data.candidates[0];
+				if (!candidate.content?.parts?.length) continue; // Skip if no parts are present
+
+				const firstPart = candidate.content.parts.find((part) => "text" in part) as
+					| TextPart
+					| undefined;
+				if (!firstPart) continue; // Skip if no text part is found
+
+				const isLastChunk = !!candidate.finishReason;
+
+				const content = firstPart.text;
+				generatedText += content;
+				const output: TextGenerationStreamOutput = {
+					token: {
+						id: tokenId++,
+						text: content,
+						logprob: 0,
+						special: isLastChunk,
+					},
+					generated_text: isLastChunk ? generatedText : null,
+					details: null,
+				};
+				yield output;
+
+				if (isLastChunk) break;
 			}
 		})();
 	};

@@ -11,7 +11,11 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import type { MessageUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageUpdateStatus,
+		MessageUpdateType,
+		type MessageUpdate,
+	} from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -19,6 +23,7 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
+	import { useSettingsStore } from "$lib/stores/settings.js";
 
 	export let data;
 
@@ -74,21 +79,15 @@
 			$isAborted = false;
 			loading = true;
 			pending = true;
-
-			const module = await import("browser-image-resizer");
-			// currently, only IDEFICS is supported by TGI
-			// the size of images is hardcoded to 224x224 in TGI
-			// this will need to be configurable when support for more models is added
-			const resizedImages = await Promise.all(
-				files.map(async (file) => {
-					return await module
-						.readAndCompressImage(file, {
-							maxHeight: 224,
-							maxWidth: 224,
-							quality: 1,
-						})
-						.then(async (el) => await file2base64(el as File));
-				})
+			const base64Files = await Promise.all(
+				(files ?? []).map((file) =>
+					file2base64(file).then((value) => ({
+						type: "base64" as const,
+						value,
+						mime: file.type,
+						name: file.name,
+					}))
+				)
 			);
 
 			let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -120,7 +119,11 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "user", content: prompt },
+						{
+							from: "user",
+							content: prompt,
+							files: messageToRetry.files,
+						},
 						messageId
 					);
 					messageToWriteToId = addChildren(
@@ -128,7 +131,7 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "", files: resizedImages },
+						{ from: "assistant", content: "" },
 						newUserMessageId
 					);
 				} else if (messageToRetry?.from === "assistant") {
@@ -154,7 +157,7 @@
 					{
 						from: "user",
 						content: prompt ?? "",
-						files: resizedImages,
+						files: base64Files,
 						createdAt: new Date(),
 						updatedAt: new Date(),
 					},
@@ -181,6 +184,7 @@
 			}
 
 			messages = [...messages];
+			const userMessage = messages.find((message) => message.id === messageId);
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
@@ -198,7 +202,8 @@
 					isRetry,
 					isContinue,
 					webSearch: !hasAssistant && $webSearchParameters.useSearch,
-					files: isRetry ? undefined : resizedImages,
+					tools: $settings.tools, // preference for tools
+					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -209,43 +214,52 @@
 			files = [];
 
 			const messageUpdates: MessageUpdate[] = [];
+
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
 					messageUpdatesAbortController.abort();
 					return;
 				}
-				if (update.type === "finalAnswer") {
-					loading = false;
-					pending = false;
-					break;
+
+				// Remove null characters added due to remote keylogging prevention
+				// See server code for more details
+				if (update.type === MessageUpdateType.Stream) {
+					update.token = update.token.replaceAll("\0", "");
 				}
 
 				messageUpdates.push(update);
 
-				if (update.type === "stream") {
-					pending = false;
+				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
 					messageToWriteTo.content += update.token;
+					pending = false;
 					messages = [...messages];
-				} else if (update.type === "webSearch") {
+				} else if (
+					update.type === MessageUpdateType.WebSearch ||
+					update.type === MessageUpdateType.Tool
+				) {
 					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
-				} else if (update.type === "status") {
-					if (update.status === "title" && update.message) {
-						const convInData = data.conversations.find(({ id }) => id === $page.params.id);
-						if (convInData) {
-							convInData.title = update.message;
+				} else if (
+					update.type === MessageUpdateType.Status &&
+					update.status === MessageUpdateStatus.Error
+				) {
+					$error = update.message ?? "An error has occurred";
+				} else if (update.type === MessageUpdateType.Title) {
+					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+					if (convInData) {
+						convInData.title = update.title;
 
-							$titleUpdate = {
-								title: update.message,
-								convId: $page.params.id,
-							};
-						}
-					} else if (update.status === "error") {
-						$error = update.message ?? "An error has occurred";
+						$titleUpdate = {
+							title: update.title,
+							convId: $page.params.id,
+						};
 					}
-				} else if (update.type === "error") {
-					error.set(update.message);
-					messageUpdatesAbortController.abort();
+				} else if (update.type === MessageUpdateType.File) {
+					messageToWriteTo.files = [
+						...(messageToWriteTo.files ?? []),
+						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
+					];
+					messages = [...messages];
 				}
 			}
 
@@ -363,6 +377,7 @@
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
 	const convTreeStore = createConvTreeStore();
+	const settings = useSettingsStore();
 </script>
 
 <svelte:head>

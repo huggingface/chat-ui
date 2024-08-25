@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { PUBLIC_APP_NAME, PUBLIC_VERSION } from "$env/static/public";
-	import { PUBLIC_ANNOUNCEMENT_BANNERS } from "$env/static/public";
-	import { PUBLIC_APP_DESCRIPTION } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconGear from "~icons/bi/gear-fill";
@@ -20,8 +18,8 @@
 
 	$: currentModelMetadata = findCurrentModel(models, $settings.activeModel);
 
-	const announcementBanners = PUBLIC_ANNOUNCEMENT_BANNERS
-		? JSON5.parse(PUBLIC_ANNOUNCEMENT_BANNERS)
+	const announcementBanners = envPublic.PUBLIC_ANNOUNCEMENT_BANNERS
+		? JSON5.parse(envPublic.PUBLIC_ANNOUNCEMENT_BANNERS)
 		: [];
 
 	const dispatch = createEventDispatcher<{ message: string }>();
@@ -32,15 +30,15 @@
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 flex-none" />
-				{PUBLIC_APP_NAME}
+				{envPublic.PUBLIC_APP_NAME}
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
-					v{PUBLIC_VERSION}
+					v{envPublic.PUBLIC_VERSION}
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
-				{PUBLIC_APP_DESCRIPTION ||
+				{envPublic.PUBLIC_APP_DESCRIPTION ||
 					"Making the community's best AI chat models available to everyone."}
 			</p>
 		</div>
@@ -88,7 +86,7 @@
 				{#each currentModelMetadata.promptExamples as example}
 					<button
 						type="button"
-						class="rounded-xl border bg-gray-50 p-3 text-gray-600 hover:bg-gray-100 max-xl:text-sm xl:p-3.5 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+						class="rounded-xl border bg-gray-50 p-3 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 max-xl:text-sm xl:p-3.5"
 						on:click={() => dispatch("message", example.prompt)}
 					>
 						{example.title}

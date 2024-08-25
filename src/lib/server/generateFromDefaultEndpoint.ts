@@ -1,16 +1,18 @@
 import { smallModel } from "$lib/server/models";
-import type { Conversation } from "$lib/types/Conversation";
+import type { EndpointMessage } from "./endpoints/endpoints";
 
 export async function generateFromDefaultEndpoint({
 	messages,
 	preprompt,
+	generateSettings,
 }: {
-	messages: Omit<Conversation["messages"][0], "id">[];
+	messages: EndpointMessage[];
 	preprompt?: string;
+	generateSettings?: Record<string, unknown>;
 }): Promise<string> {
 	const endpoint = await smallModel.getEndpoint();
 
-	const tokenStream = await endpoint({ messages, preprompt });
+	const tokenStream = await endpoint({ messages, preprompt, generateSettings });
 
 	for await (const output of tokenStream) {
 		// if not generated_text is here it means the generation is not done

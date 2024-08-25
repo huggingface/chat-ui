@@ -1,18 +1,12 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { goto, invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { browser } from "$app/environment";
 
-	import {
-		PUBLIC_APP_DESCRIPTION,
-		PUBLIC_ORIGIN,
-		PUBLIC_PLAUSIBLE_SCRIPT_URL,
-	} from "$env/static/public";
-	import { PUBLIC_APP_ASSETS, PUBLIC_APP_NAME } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
@@ -26,6 +20,7 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
+	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -118,14 +113,37 @@
 
 	const settings = createSettingsStore(data.settings);
 
-	$: if (browser && $page.url.searchParams.has("model")) {
-		if ($settings.activeModel === $page.url.searchParams.get("model")) {
-			goto(`${base}/?`);
+	onMount(async () => {
+		if ($page.url.searchParams.has("model")) {
+			await settings
+				.instantSet({
+					activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
+				})
+				.then(async () => {
+					const query = new URLSearchParams($page.url.searchParams.toString());
+					query.delete("model");
+					await goto(`${base}/?${query.toString()}`, {
+						invalidateAll: true,
+					});
+				});
 		}
-		settings.instantSet({
-			activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
-		});
-	}
+
+		if ($page.url.searchParams.has("tools")) {
+			const tools = $page.url.searchParams.get("tools")?.split(",");
+
+			await settings
+				.instantSet({
+					tools: [...($settings.tools ?? []), ...(tools ?? [])],
+				})
+				.then(async () => {
+					const query = new URLSearchParams($page.url.searchParams.toString());
+					query.delete("tools");
+					await goto(`${base}/?${query.toString()}`, {
+						invalidateAll: true,
+					});
+				});
+		}
+	});
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
@@ -133,7 +151,7 @@
 </script>
 
 <svelte:head>
-	<title>{PUBLIC_APP_NAME}</title>
+	<title>{envPublic.PUBLIC_APP_NAME}</title>
 	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
@@ -141,44 +159,53 @@
 	<!-- use those meta tags everywhere except on the share assistant page -->
 	<!-- feel free to refacto if there's a better way -->
 	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/")}
-		<meta property="og:title" content={PUBLIC_APP_NAME} />
+		<meta property="og:title" content={envPublic.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
-		<meta property="og:url" content="{PUBLIC_ORIGIN || $page.url.origin}{base}" />
+		<meta property="og:url" content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}" />
 		<meta
 			property="og:image"
-			content="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/thumbnail.png"
+			content="{envPublic.PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/thumbnail.png"
 		/>
-		<meta property="og:description" content={PUBLIC_APP_DESCRIPTION} />
+		<meta property="og:description" content={envPublic.PUBLIC_APP_DESCRIPTION} />
 	{/if}
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/favicon.ico"
+		href="{envPublic.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/favicon.ico"
 		sizes="32x32"
 	/>
 	<link
 		rel="icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/icon.svg"
+		href="{envPublic.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/icon.svg"
 		type="image/svg+xml"
 	/>
 	<link
 		rel="apple-touch-icon"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/apple-touch-icon.png"
+		href="{envPublic.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/apple-touch-icon.png"
 	/>
 	<link
 		rel="manifest"
-		href="{PUBLIC_ORIGIN || $page.url.origin}{base}/{PUBLIC_APP_ASSETS}/manifest.json"
+		href="{envPublic.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/manifest.json"
 	/>
 
-	{#if PUBLIC_PLAUSIBLE_SCRIPT_URL && PUBLIC_ORIGIN}
+	{#if envPublic.PUBLIC_PLAUSIBLE_SCRIPT_URL && envPublic.PUBLIC_ORIGIN}
 		<script
 			defer
-			data-domain={new URL(PUBLIC_ORIGIN).hostname}
-			src={PUBLIC_PLAUSIBLE_SCRIPT_URL}
+			data-domain={new URL(envPublic.PUBLIC_ORIGIN).hostname}
+			src={envPublic.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		></script>
+	{/if}
+
+	{#if envPublic.PUBLIC_APPLE_APP_ID}
+		<meta name="apple-itunes-app" content={`app-id=${envPublic.PUBLIC_APPLE_APP_ID}`} />
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy`}
+{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
 	<DisclaimerModal />
 {/if}
 
@@ -193,7 +220,7 @@
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
 		? 'md:grid-cols-[280px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] md:grid-rows-[1fr] dark:text-gray-300"
+		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
 		<NavMenu

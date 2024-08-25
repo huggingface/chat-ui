@@ -2,7 +2,8 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
+	import { goto } from "$app/navigation";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
 
@@ -12,11 +13,13 @@
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonChat from "~icons/carbon/chat";
+	import CarbonStar from "~icons/carbon/star";
+	import CarbonTools from "~icons/carbon/tools";
 
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
-	import { goto } from "$app/navigation";
+	import ToolBadge from "$lib/components/ToolBadge.svelte";
 
 	export let data: PageData;
 
@@ -24,7 +27,8 @@
 
 	const settings = useSettingsStore();
 
-	const prefix = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || $page.url.origin}${base}`;
+	const prefix =
+		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
 
@@ -143,6 +147,26 @@
 						>
 					{/if}
 				{/if}
+				{#if data?.user?.isAdmin}
+					<form method="POST" action="?/delete" use:enhance>
+						<button type="submit" class="flex items-center text-red-600 underline">
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+						>
+					</form>
+					{#if assistant?.featured}
+						<form method="POST" action="?/unfeature" use:enhance>
+							<button type="submit" class="flex items-center text-red-600 underline">
+								<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
+							>
+						</form>
+					{:else}
+						<form method="POST" action="?/feature" use:enhance>
+							<button type="submit" class="flex items-center text-green-600 underline">
+								<CarbonStar class="mr-1.5 inline text-xs" />Feature</button
+							>
+						</form>
+					{/if}
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -194,6 +218,27 @@
 			{/if}
 		</div>
 
+		{#if assistant?.tools?.length}
+			<div class="mt-4">
+				<div class="mb-1 flex items-center gap-1">
+					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-purple-500/10"
+						title="This assistant uses the websearch."
+					>
+						<CarbonTools class="text-xs text-purple-600" />
+					</span>
+					<h2 class="font-semibold">Tools</h2>
+				</div>
+				<p class="w-full text-sm text-gray-500">
+					This Assistant has access to the following tools:
+				</p>
+				<ul class="mr-2 mt-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
+					{#each assistant.tools as tool}
+						<ToolBadge toolId={tool} />
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		{#if hasRag}
 			<div class="mt-4">
 				<div class="mb-1 flex items-center gap-1">

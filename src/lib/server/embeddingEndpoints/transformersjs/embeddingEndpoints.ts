@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { EmbeddingEndpoint } from "../embeddingEndpoints";
-import type { Tensor, FeatureExtractionPipeline } from "@xenova/transformers";
-import { pipeline } from "@xenova/transformers";
+import type { Tensor, FeatureExtractionPipeline } from "@huggingface/transformers";
+import { pipeline } from "@huggingface/transformers";
 
 export const embeddingEndpointTransformersJSParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -18,9 +18,10 @@ class TransformersJSModelsSingleton {
 
 		if (modelPipelineInstance) {
 			const [, modelPipeline] = modelPipelineInstance;
-			return modelPipeline;
+			// dispose of the previous pipeline to clear memory
+			await (await modelPipeline).dispose();
+			this.instances = this.instances.filter(([name]) => name !== modelName);
 		}
-
 		const newModelPipeline = pipeline("feature-extraction", modelName);
 		this.instances.push([modelName, newModelPipeline]);
 

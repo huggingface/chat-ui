@@ -3,7 +3,7 @@
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -76,16 +76,19 @@
 		settings.instantSet({
 			activeModel: modelId,
 		});
+
+		const query = $page.url.searchParams.get("q");
+		if (query) createConversation(query);
 	});
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={modelId + " - " + PUBLIC_APP_NAME} />
+	<meta property="og:title" content={modelId + " - " + envPublic.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${modelId} with ${PUBLIC_APP_NAME}`} />
+	<meta property="og:description" content={`Use ${modelId} with ${envPublic.PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
 	<meta property="og:url" content={$page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />

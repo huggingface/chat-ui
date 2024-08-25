@@ -6,7 +6,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
 	import { applyAction, enhance } from "$app/forms";
-	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/stores";
 	import IconGear from "~icons/bi/gear-fill";
 
@@ -24,29 +24,30 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={data.assistant.name + " - " + PUBLIC_APP_NAME} />
+	<meta property="og:title" content={data.assistant.name + " - " + envPublic.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
 	<meta
 		property="og:description"
-		content={`Use the ${data.assistant.name} assistant inside of ${PUBLIC_APP_NAME}`}
+		content={`Use the ${data.assistant.name} assistant inside of ${envPublic.PUBLIC_APP_NAME}`}
 	/>
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/assistant/{data.assistant._id}/thumbnail.png"
+		content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/assistant/{data.assistant
+			._id}/thumbnail.png"
 	/>
 	<meta property="og:url" content={$page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
 <div
-	class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
+	class="fixed inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
 >
 	<dialog
 		open
 		use:clickOutside={() => {
 			goto(previousPage);
 		}}
-		class="z-10 flex flex-col content-center items-center gap-x-10 gap-y-3 overflow-hidden rounded-2xl bg-white p-4 pt-6 text-center shadow-2xl outline-none max-sm:w-[85dvw] max-sm:px-6 md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
+		class="flex flex-col content-center items-center gap-x-10 gap-y-3 overflow-hidden rounded-2xl bg-white p-4 pt-6 text-center shadow-2xl outline-none max-sm:w-[85dvw] max-sm:px-6 md:w-96 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 	>
 		<div class="absolute right-0 top-0 m-6">
 			<form

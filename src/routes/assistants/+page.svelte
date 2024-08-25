@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { PUBLIC_APP_ASSETS, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { goto } from "$app/navigation";
@@ -15,6 +15,8 @@
 	import CarbonEarthAmerica from "~icons/carbon/earth-americas-filled";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
 	import CarbonSearch from "~icons/carbon/search";
+	import CarbonTools from "~icons/carbon/tools";
+
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import { getHref } from "$lib/utils/getHref";
@@ -95,8 +97,8 @@
 		/>
 		<meta
 			property="og:image"
-			content="{PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+			content="{envPublic.PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
 		/>
 		<meta property="og:url" content={$page.url.href} />
 	{/if}
@@ -136,7 +138,7 @@
 				href={`${base}/settings/assistants/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
-				<CarbonAdd />Create New assistant
+				<CarbonAdd />Create new assistant
 			</a>
 		</div>
 
@@ -195,7 +197,7 @@
 				{/if}
 			{/if}
 			<div
-				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 sm:w-64 dark:border-gray-600"
+				class="relative ml-auto flex h-[30px] w-40 items-center rounded-full border px-2 has-[:focus]:border-gray-400 dark:border-gray-600 sm:w-64"
 			>
 				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400" />
 				<input
@@ -213,8 +215,8 @@
 				on:change={sortAssistants}
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 			>
-				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
+				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 			</select>
 		</div>
 
@@ -227,7 +229,7 @@
 					!!assistant?.dynamicPrompt}
 
 				<button
-					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8 dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8"
 					on:click={() => {
 						if (data.settings.assistants.includes(assistant._id.toString())) {
 							settings.instantSet({ activeModel: assistant._id.toString() });
@@ -246,14 +248,24 @@
 						</div>
 					{/if}
 
-					{#if hasRag}
-						<div
-							class="absolute left-3 top-3 grid size-5 place-items-center rounded-full bg-blue-500/10"
-							title="This assistant uses the websearch."
-						>
-							<IconInternet classNames="text-sm text-blue-600" />
-						</div>
-					{/if}
+					<div class="absolute left-3 top-3 flex items-center gap-1 text-xs text-gray-400">
+						{#if assistant.tools?.length}
+							<div
+								class="grid size-5 place-items-center rounded-full bg-purple-500/10"
+								title="This assistant uses the websearch."
+							>
+								<CarbonTools class="text-xs text-purple-600" />
+							</div>
+						{/if}
+						{#if hasRag}
+							<div
+								class="grid size-5 place-items-center rounded-full bg-blue-500/10"
+								title="This assistant uses the websearch."
+							>
+								<IconInternet classNames="text-sm text-blue-600" />
+							</div>
+						{/if}
+					</div>
 
 					{#if assistant.avatar}
 						<img
@@ -263,7 +275,7 @@
 						/>
 					{:else}
 						<div
-							class="mb-2 flex aspect-square size-12 flex-none items-center justify-center rounded-full bg-gray-300 text-2xl font-bold uppercase text-gray-500 sm:mb-6 sm:size-20 dark:bg-gray-800"
+							class="mb-2 flex aspect-square size-12 flex-none items-center justify-center rounded-full bg-gray-300 text-2xl font-bold uppercase text-gray-500 dark:bg-gray-800 sm:mb-6 sm:size-20"
 						>
 							{assistant.name[0]}
 						</div>
@@ -273,7 +285,7 @@
 					>
 						{assistant.name}
 					</h3>
-					<p class="line-clamp-4 text-xs text-gray-700 sm:line-clamp-2 dark:text-gray-400">
+					<p class="line-clamp-4 text-xs text-gray-700 dark:text-gray-400 sm:line-clamp-2">
 						{assistant.description}
 					</p>
 					{#if assistant.createdByName}

@@ -3,10 +3,12 @@ import { type Actions, fail, redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
 import { base } from "$app/paths";
-import { PUBLIC_ORIGIN, PUBLIC_SHARE_PREFIX } from "$env/static/public";
-import { WEBHOOK_URL_REPORT_ASSISTANT } from "$env/static/private";
+import { env as envPublic } from "$env/dynamic/public";
+import { env } from "$env/dynamic/private";
 import { z } from "zod";
 import type { Assistant } from "$lib/types/Assistant";
+import { logger } from "$lib/server/logger";
+
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
 
@@ -14,7 +16,10 @@ async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 		throw Error("Assistant not found");
 	}
 
-	if (assistant.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString()) {
+	if (
+		assistant.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString() &&
+		!locals.user?.isAdmin
+	) {
 		throw Error("You are not the author of this assistant");
 	}
 
@@ -52,13 +57,14 @@ export const actions: Actions = {
 			fileId = await fileCursor.next();
 		}
 
-		throw redirect(302, `${base}/settings`);
+		redirect(302, `${base}/settings`);
 	},
 	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
 			createdBy: locals.user?._id ?? locals.sessionId,
-			assistantId: new ObjectId(params.assistantId),
+			object: "assistant",
+			contentId: new ObjectId(params.assistantId),
 		});
 
 		if (report) {
@@ -74,7 +80,8 @@ export const actions: Actions = {
 
 		const { acknowledged } = await collections.reports.insertOne({
 			_id: new ObjectId(),
-			assistantId: new ObjectId(params.assistantId),
+			contentId: new ObjectId(params.assistantId),
+			object: "assistant",
 			createdBy: locals.user?._id ?? locals.sessionId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
@@ -85,8 +92,9 @@ export const actions: Actions = {
 			return fail(500, { error: true, message: "Failed to report assistant" });
 		}
 
-		if (WEBHOOK_URL_REPORT_ASSISTANT) {
-			const prefixUrl = PUBLIC_SHARE_PREFIX || `${PUBLIC_ORIGIN || url.origin}${base}`;
+		if (env.WEBHOOK_URL_REPORT_ASSISTANT) {
+			const prefixUrl =
+				envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
 			const assistantUrl = `${prefixUrl}/assistant/${params.assistantId}`;
 
 			const assistant = await collections.assistants.findOne<Pick<Assistant, "name">>(
@@ -96,7 +104,7 @@ export const actions: Actions = {
 
 			const username = locals.user?.username;
 
-			const res = await fetch(WEBHOOK_URL_REPORT_ASSISTANT, {
+			const res = await fetch(env.WEBHOOK_URL_REPORT_ASSISTANT, {
 				method: "POST",
 				headers: {
 					"Content-type": "application/json",
@@ -109,7 +117,7 @@ export const actions: Actions = {
 			});
 
 			if (!res.ok) {
-				console.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
+				logger.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
 			}
 		}
 
@@ -162,6 +170,56 @@ export const actions: Actions = {
 			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
 		}
 
-		throw redirect(302, `${base}/settings`);
+		redirect(302, `${base}/settings`);
+	},
+
+	unfeature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const assistant = await collections.assistants.findOne({
+			_id: new ObjectId(params.assistantId),
+		});
+
+		if (!assistant) {
+			return fail(404, { error: true, message: "Assistant not found" });
+		}
+
+		const result = await collections.assistants.updateOne(
+			{ _id: assistant._id },
+			{ $set: { featured: false } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to unfeature assistant" });
+		}
+
+		return { from: "unfeature", ok: true, message: "Assistant unfeatured" };
+	},
+
+	feature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const assistant = await collections.assistants.findOne({
+			_id: new ObjectId(params.assistantId),
+		});
+
+		if (!assistant) {
+			return fail(404, { error: true, message: "Assistant not found" });
+		}
+
+		const result = await collections.assistants.updateOne(
+			{ _id: assistant._id },
+			{ $set: { featured: true } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to feature assistant" });
+		}
+
+		return { from: "feature", ok: true, message: "Assistant featured" };
 	},
 };
