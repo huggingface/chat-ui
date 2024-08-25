@@ -10,4 +10,5 @@ export interface User extends Timestamps {
 	avatarUrl: string | undefined;
 	hfUserId: string;
 	isAdmin?: boolean;
+	isEarlyAccess?: boolean;
 }

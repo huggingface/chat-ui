@@ -1,4 +1,4 @@
-import { dot } from "@xenova/transformers";
+import { dot } from "@huggingface/transformers";
 import type { EmbeddingBackendModel } from "$lib/server/embeddingModels";
 import type { Embedding } from "$lib/server/embeddingEndpoints/embeddingEndpoints";
 

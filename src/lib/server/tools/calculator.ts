@@ -1,30 +1,38 @@
-import type { BackendTool } from ".";
+import type { ConfigTool } from "$lib/types/Tool";
+import { ObjectId } from "mongodb";
 import vm from "node:vm";
 
-const calculator: BackendTool = {
-	name: "query_calculator",
+const calculator: ConfigTool = {
+	_id: new ObjectId("00000000000000000000000C"),
+	type: "config",
+	description: "Calculate the result of a mathematical expression",
+	color: "blue",
+	icon: "code",
 	displayName: "Calculator",
-	description:
-		"A simple calculator, takes a string containing a mathematical expression and returns the answer. Only supports +, -, *, ** (power) and /, as well as parenthesis ().",
-	isOnByDefault: true,
-	parameterDefinitions: {
-		equation: {
+	name: "calculator",
+	endpoint: null,
+	inputs: [
+		{
+			name: "equation",
+			type: "str",
 			description:
-				"The formula to evaluate. EXACTLY as you would plug into a calculator. No words, no letters, only numbers and operators. Letters will make the tool crash.",
-			type: "formula",
-			required: true,
+				"A mathematical expression to be evaluated. The result of the expression will be returned.",
+			paramType: "required",
 		},
-	},
-	async *call(params) {
+	],
+	outputComponent: null,
+	outputComponentIdx: null,
+	showOutput: false,
+	async *call({ equation }) {
 		try {
-			const blocks = String(params.equation).split("\n");
+			const blocks = String(equation).split("\n");
 			const query = blocks[blocks.length - 1].replace(/[^-()\d/*+.]/g, "");
 
 			return {
 				outputs: [{ calculator: `${query} = ${vm.runInNewContext(query)}` }],
 			};
 		} catch (cause) {
-			throw Error("Invalid expression", { cause });
+			throw new Error("Invalid expression", { cause });
 		}
 	},
 };

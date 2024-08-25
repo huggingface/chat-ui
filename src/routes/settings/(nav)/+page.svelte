@@ -46,6 +46,14 @@
 			</div>
 		</label>
 
+		<!-- svelte-ignore a11y-label-has-associated-control -->
+		<label class="mt-6 flex items-center">
+			<Switch name="disableStream" bind:checked={$settings.disableStream} />
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+				Disable streaming tokens
+			</div>
+		</label>
+
 		<div class="mt-12 flex flex-col gap-3">
 			<a
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
@@ -88,7 +96,7 @@
 				</p>
 				<button
 					type="submit"
-					class="mt-2 rounded-full bg-red-700 px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-all focus-visible:outline-none focus-visible:ring hover:ring"
+					class="mt-2 rounded-full bg-red-700 px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-all hover:ring focus-visible:outline-none focus-visible:ring"
 				>
 					Confirm deletion
 				</button>

@@ -1,10 +1,10 @@
 import { sveltekit } from "@sveltejs/kit/vite";
-import { defineConfig, type PluginOption } from "vite";
 import Icons from "unplugin-icons/vite";
 import { promises } from "fs";
+import { defineConfig } from "vitest/config";
 
 // used to load fonts server side for thumbnail generation
-function loadTTFAsArrayBuffer(): PluginOption {
+function loadTTFAsArrayBuffer() {
 	return {
 		name: "load-ttf-as-array-buffer",
 		async transform(_src, id) {
@@ -26,6 +26,20 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 	],
 	optimizeDeps: {
-		include: ["browser-image-resizer", "uuid", "@xenova/transformers"],
+		include: [
+			"browser-image-resizer",
+			"uuid",
+			"@huggingface/transformers",
+			"sharp",
+			"@gradio/client",
+		],
+	},
+	server: {
+		open: "/",
+	},
+	test: {
+		setupFiles: ["./scripts/setupTest.ts"],
+		deps: { inline: ["@sveltejs/kit"] },
+		globals: true,
 	},
 });

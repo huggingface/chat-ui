@@ -33,6 +33,8 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -80,11 +82,80 @@
 			onDrag = false;
 		}
 	};
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
+
+	const onPaste = (e: ClipboardEvent) => {
+		if (!e.clipboardData) {
+			return;
+		}
+
+		// paste of files
+		const pastedFiles = Array.from(e.clipboardData.files);
+		if (pastedFiles.length !== 0) {
+			e.preventDefault();
+
+			// filter based on activeMimeTypes, including wildcards
+			const filteredFiles = pastedFiles.filter((file) => {
+				return activeMimeTypes.some((mimeType: string) => {
+					const [type, subtype] = mimeType.split("/");
+					const [fileType, fileSubtype] = file.type.split("/");
+					return type === fileType && (subtype === "*" || fileSubtype === subtype);
+				});
+			});
+
+			files = [...files, ...filteredFiles];
+		}
 	};
 
 	const convTreeStore = useConvTreeStore();
+
+	const updateCurrentIndex = () => {
+		const url = new URL($page.url);
+		let leafId = url.searchParams.get("leafId");
+
+		// Ensure the function is only run in the browser.
+		if (!browser) return;
+
+		if (leafId) {
+			// Remove the 'leafId' from the URL to clean up after retrieving it.
+			url.searchParams.delete("leafId");
+			history.replaceState(null, "", url.toString());
+		} else {
+			// Retrieve the 'leafId' from localStorage if it's not in the URL.
+			leafId = localStorage.getItem("leafId");
+		}
+
+		// If a 'leafId' exists, find the corresponding message and update indices.
+		if (leafId) {
+			let leafMessage = messages.find((m) => m.id == leafId);
+			if (!leafMessage?.ancestors) return; // Exit if the message has no ancestors.
+
+			let ancestors = leafMessage.ancestors;
+
+			// Loop through all ancestors to update the current child index.
+			for (let i = 0; i < ancestors.length; i++) {
+				let curMessage = messages.find((m) => m.id == ancestors[i]);
+				if (curMessage?.children) {
+					for (let j = 0; j < curMessage.children.length; j++) {
+						// Check if the current message's child matches the next ancestor
+						// or the leaf itself, and update the currentChildIndex accordingly.
+						if (i + 1 < ancestors.length) {
+							if (curMessage.children[j] == ancestors[i + 1]) {
+								curMessage.currentChildIndex = j;
+								break;
+							}
+						} else {
+							if (curMessage.children[j] == leafId) {
+								curMessage.currentChildIndex = j;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	};
+
+	updateCurrentIndex();
 
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
 	$: lastIsError =
@@ -98,6 +169,10 @@
 	);
 
 	function onShare() {
+		if (!confirm("Are you sure you want to share this conversation? This cannot be undone.")) {
+			return;
+		}
+
 		dispatch("share");
 		isSharedRecently = true;
 		if (timeout) {
@@ -125,7 +200,29 @@
 	$: if (lastMessage && lastMessage.from === "user") {
 		scrollToBottom();
 	}
+
+	const settings = useSettingsStore();
+
+	// active tools are all the checked tools, either from settings or on by default
+	$: activeTools = $page.data.tools.filter((tool: ToolFront) =>
+		$settings?.tools?.includes(tool._id)
+	);
+	$: activeMimeTypes = [
+		...(!$page.data?.assistant && currentModel.tools
+			? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
+			: []),
+		...(currentModel.multimodal ? ["image/*"] : []),
+	];
+
+	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
+
+<svelte:window
+	on:dragenter={onDragEnter}
+	on:dragleave={onDragLeave}
+	on:dragover|preventDefault
+	on:drop|preventDefault={() => (onDrag = false)}
+/>
 
 <div class="relative min-h-0 min-w-0">
 	{#if loginModalOpen}
@@ -170,7 +267,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-6 pb-52 2xl:gap-7">
+				<div class="flex h-max flex-col gap-8 pb-52">
 					<ChatMessage
 						{loading}
 						{messages}
@@ -233,7 +330,7 @@
 		/>
 	</div>
 	<div
-		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 max-md:border-t max-md:bg-white sm:px-5 md:py-8 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:dark:bg-gray-900 [&>*]:pointer-events-auto"
+		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length}
 			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
@@ -274,8 +371,8 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if currentModel.multimodal || currentModel.tools}
-							<UploadBtn bind:files classNames="ml-auto" />
+						{#if isFileUploadEnabled}
+							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
@@ -292,21 +389,14 @@
 				{/if}
 			</div>
 			<form
-				on:dragover={onDragOver}
-				on:dragenter={onDragEnter}
-				on:dragleave={onDragLeave}
 				tabindex="-1"
-				aria-label="file dropzone"
+				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
-			{isReadOnly ? 'opacity-30' : ''}"
+            {isReadOnly ? 'opacity-30' : ''}"
 			>
-				{#if onDrag && (currentModel.multimodal || currentModel.tools)}
-					<FileDropzone
-						bind:files
-						bind:onDrag
-						onlyImages={currentModel.multimodal && !currentModel.tools}
-					/>
+				{#if onDrag && isFileUploadEnabled}
+					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
 					<div class="flex w-full flex-1 border-none bg-transparent">
 						{#if lastIsError}
@@ -324,6 +414,7 @@
 										loginModalOpen = true;
 									}
 								}}
+								on:paste={onPaste}
 								maxRows={6}
 								disabled={isReadOnly || lastIsError}
 							/>
@@ -331,19 +422,19 @@
 
 						{#if loading}
 							<button
-								class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 md:hidden dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
+								class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40 md:hidden"
 								on:click={() => dispatch("stop")}
 							>
 								<CarbonStopFilledAlt />
 							</button>
 							<div
-								class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 md:flex dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
+								class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40 md:flex"
 							>
 								<EosIconsLoading />
 							</div>
 						{:else}
 							<button
-								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 disabled:opacity-60 enabled:hover:text-gray-700 dark:disabled:opacity-40 enabled:dark:hover:text-gray-100"
+								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
 								disabled={!message || isReadOnly}
 								type="submit"
 							>

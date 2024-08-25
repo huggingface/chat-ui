@@ -23,7 +23,6 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
-	import { isReducedMotion } from "$lib/utils/isReduceMotion.js";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 
 	export let data;
@@ -80,8 +79,6 @@
 			$isAborted = false;
 			loading = true;
 			pending = true;
-			const reducedMotionMode = isReducedMotion(window);
-
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({
@@ -223,11 +220,6 @@
 					messageUpdatesAbortController.abort();
 					return;
 				}
-				if (update.type === "finalAnswer") {
-					loading = false;
-					pending = false;
-					break;
-				}
 
 				// Remove null characters added due to remote keylogging prevention
 				// See server code for more details
@@ -237,7 +229,7 @@
 
 				messageUpdates.push(update);
 
-				if (update.type === MessageUpdateType.Stream && !reducedMotionMode) {
+				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
 					messageToWriteTo.content += update.token;
 					pending = false;
 					messages = [...messages];

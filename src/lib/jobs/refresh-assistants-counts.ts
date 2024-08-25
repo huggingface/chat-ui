@@ -59,8 +59,7 @@ async function refreshAssistantsCountsHelper() {
 				})
 			);
 	} catch (e) {
-		logger.error("Refresh assistants counter failed!");
-		logger.error(e);
+		logger.error(e, "Refresh assistants counter failed!");
 	}
 }
 

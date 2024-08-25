@@ -14,6 +14,7 @@ import {
 	type MessageToolErrorUpdate,
 	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
+import { env as envPublic } from "$env/dynamic/public";
 
 export const isMessageWebSearchUpdate = (update: MessageUpdate): update is MessageWebSearchUpdate =>
 	update.type === MessageUpdateType.WebSearch;
@@ -48,7 +49,7 @@ type MessageUpdateRequestOptions = {
 	isRetry: boolean;
 	isContinue: boolean;
 	webSearch: boolean;
-	tools?: Record<string, boolean>;
+	tools?: Array<string>;
 	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
@@ -59,18 +60,28 @@ export async function fetchMessageUpdates(
 	const abortController = new AbortController();
 	abortSignal.addEventListener("abort", () => abortController.abort());
 
+	const form = new FormData();
+
+	const optsJSON = JSON.stringify({
+		inputs: opts.inputs,
+		id: opts.messageId,
+		is_retry: opts.isRetry,
+		is_continue: opts.isContinue,
+		web_search: opts.webSearch,
+		tools: opts.tools,
+	});
+
+	opts.files?.forEach((file) => {
+		const name = file.type + ";" + file.name;
+
+		form.append("files", new File([file.value], name, { type: file.mime }));
+	});
+
+	form.append("data", optsJSON);
+
 	const response = await fetch(`${opts.base}/conversation/${conversationId}`, {
 		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			inputs: opts.inputs,
-			id: opts.messageId,
-			is_retry: opts.isRetry,
-			is_continue: opts.isContinue,
-			web_search: opts.webSearch,
-			tools: opts.tools,
-			files: opts.files,
-		}),
+		body: form,
 		signal: abortController.signal,
 	});
 
@@ -84,6 +95,11 @@ export async function fetchMessageUpdates(
 	if (!response.body) {
 		throw Error("Body not defined");
 	}
+
+	if (!(envPublic.PUBLIC_SMOOTH_UPDATES === "true")) {
+		return endpointStreamToIterator(response, abortController);
+	}
+
 	return smoothAsyncIterator(
 		streamMessageUpdatesToFullWords(endpointStreamToIterator(response, abortController))
 	);

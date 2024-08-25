@@ -57,13 +57,14 @@ export const actions: Actions = {
 			fileId = await fileCursor.next();
 		}
 
-		throw redirect(302, `${base}/settings`);
+		redirect(302, `${base}/settings`);
 	},
 	report: async ({ request, params, locals, url }) => {
 		// is there already a report from this user for this model ?
 		const report = await collections.reports.findOne({
 			createdBy: locals.user?._id ?? locals.sessionId,
-			assistantId: new ObjectId(params.assistantId),
+			object: "assistant",
+			contentId: new ObjectId(params.assistantId),
 		});
 
 		if (report) {
@@ -79,7 +80,8 @@ export const actions: Actions = {
 
 		const { acknowledged } = await collections.reports.insertOne({
 			_id: new ObjectId(),
-			assistantId: new ObjectId(params.assistantId),
+			contentId: new ObjectId(params.assistantId),
+			object: "assistant",
 			createdBy: locals.user?._id ?? locals.sessionId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
@@ -168,7 +170,7 @@ export const actions: Actions = {
 			await collections.assistants.updateOne({ _id: assistant._id }, { $inc: { userCount: -1 } });
 		}
 
-		throw redirect(302, `${base}/settings`);
+		redirect(302, `${base}/settings`);
 	},
 
 	unfeature: async ({ params, locals }) => {
@@ -194,5 +196,30 @@ export const actions: Actions = {
 		}
 
 		return { from: "unfeature", ok: true, message: "Assistant unfeatured" };
+	},
+
+	feature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const assistant = await collections.assistants.findOne({
+			_id: new ObjectId(params.assistantId),
+		});
+
+		if (!assistant) {
+			return fail(404, { error: true, message: "Assistant not found" });
+		}
+
+		const result = await collections.assistants.updateOne(
+			{ _id: assistant._id },
+			{ $set: { featured: true } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to feature assistant" });
+		}
+
+		return { from: "feature", ok: true, message: "Assistant featured" };
 	},
 };

@@ -16,7 +16,11 @@ export async function buildPrompt({
 	tools,
 	toolResults,
 }: buildPromptOptions): Promise<string> {
-	const filteredMessages = messages.filter((m) => m.from !== "system");
+	const filteredMessages = messages;
+
+	if (filteredMessages[0].from === "system" && preprompt) {
+		filteredMessages[0].content = preprompt;
+	}
 
 	let prompt = model
 		.chatPromptRender({

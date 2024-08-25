@@ -7,18 +7,19 @@
 	} from "$lib/utils/messageUpdates";
 
 	import CarbonTools from "~icons/carbon/tools";
-	import { toolHasName } from "$lib/utils/tools";
-	import type { ToolFront } from "$lib/types/Tool";
+	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/stores";
-	import { onMount } from "svelte";
+	import { onDestroy } from "svelte";
 	import { browser } from "$app/environment";
 
 	export let tool: MessageToolUpdate[];
 	export let loading: boolean = false;
 
-	const toolName = tool.find(isMessageToolCallUpdate)?.call.name;
+	const toolFnName = tool.find(isMessageToolCallUpdate)?.call.name;
 	$: toolError = tool.some(isMessageToolErrorUpdate);
 	$: toolDone = tool.some(isMessageToolResultUpdate);
+
+	$: eta = tool.find((el) => el.subtype === MessageToolUpdateType.ETA)?.eta;
 
 	const availableTools: ToolFront[] = $page.data.tools;
 
@@ -26,16 +27,25 @@
 	let animation: Animation | undefined = undefined;
 
 	let isShowingLoadingBar = false;
-	onMount(() => {
-		if (!toolError && !toolDone && loading && loadingBarEl) {
+
+	$: !toolError &&
+		!toolDone &&
+		loading &&
+		loadingBarEl &&
+		eta &&
+		(() => {
 			loadingBarEl.classList.remove("hidden");
 			isShowingLoadingBar = true;
 			animation = loadingBarEl.animate([{ width: "0%" }, { width: "calc(100%+1rem)" }], {
-				duration: availableTools.find((tool) => tool.name === toolName)?.timeToUseMS,
+				duration: eta * 1000,
 				fill: "forwards",
 			});
+		})();
+
+	onDestroy(() => {
+		if (animation) {
+			animation.cancel();
 		}
-		return () => animation?.cancel();
 	});
 
 	// go to 100% quickly if loading is done
@@ -63,7 +73,7 @@
 		})();
 </script>
 
-{#if toolName && toolName !== "websearch"}
+{#if toolFnName && toolFnName !== "websearch"}
 	<details
 		class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm transition-all open:mb-3
         open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10"
@@ -103,7 +113,8 @@
 			<span>
 				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 				<span class="font-semibold"
-					>{availableTools.find((el) => toolHasName(toolName, el))?.displayName}</span
+					>{availableTools.find((tool) => tool.name === toolFnName)?.displayName ??
+						toolFnName}</span
 				>
 			</span>
 		</summary>
@@ -115,10 +126,12 @@
 				</div>
 				<ul class="py-1 text-sm">
 					{#each Object.entries(toolUpdate.call.parameters ?? {}) as [k, v]}
-						<li>
-							<span class="font-semibold">{k}</span>:
-							<span>{v}</span>
-						</li>
+						{#if v !== null}
+							<li>
+								<span class="font-semibold">{k}</span>:
+								<span>{v}</span>
+							</li>
+						{/if}
 					{/each}
 				</ul>
 			{:else if toolUpdate.subtype === MessageToolUpdateType.Error}
@@ -127,6 +140,23 @@
 					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
 				</div>
 				<p class="text-sm">{toolUpdate.message}</p>
+			{:else if isMessageToolResultUpdate(toolUpdate) && toolUpdate.result.status === ToolResultStatus.Success && toolUpdate.result.display}
+				<div class="mt-1 flex items-center gap-2 opacity-80">
+					<h3 class="text-sm">Result</h3>
+					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20" />
+				</div>
+				<ul class="py-1 text-sm">
+					{#each toolUpdate.result.outputs as output}
+						{#each Object.entries(output) as [k, v]}
+							{#if v !== null}
+								<li>
+									<span class="font-semibold">{k}</span>:
+									<span>{v}</span>
+								</li>
+							{/if}
+						{/each}
+					{/each}
+				</ul>
 			{/if}
 		{/each}
 	</details>

@@ -8,7 +8,7 @@ import {
 	getAssistantById,
 	processPreprompt,
 } from "./assistant";
-import { pickTools, runTools } from "./tools";
+import { getTools, runTools } from "./tools";
 import type { WebSearch } from "$lib/types/WebSearch";
 import {
 	type MessageUpdate,
@@ -19,16 +19,33 @@ import { generate } from "./generate";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import type { ToolResult } from "$lib/types/Tool";
+import { toolHasName } from "../tools/utils";
+
+async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
+	while (!done.aborted) {
+		yield {
+			type: MessageUpdateType.Status,
+			status: MessageUpdateStatus.KeepAlive,
+		};
+		await new Promise((resolve) => setTimeout(resolve, 5000));
+	}
+}
 
 export async function* textGeneration(ctx: TextGenerationContext) {
-	yield* mergeAsyncGenerators([
-		textGenerationWithoutTitle(ctx),
-		generateTitleForConversation(ctx.conv),
-	]);
+	const done = new AbortController();
+
+	const titleGen = generateTitleForConversation(ctx.conv);
+	const textGen = textGenerationWithoutTitle(ctx, done);
+	const keepAliveGen = keepAlive(done.signal);
+
+	// keep alive until textGen is done
+
+	yield* mergeAsyncGenerators([titleGen, textGen, keepAliveGen]);
 }
 
 async function* textGenerationWithoutTitle(
-	ctx: TextGenerationContext
+	ctx: TextGenerationContext,
+	done: AbortController
 ): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	yield {
 		type: MessageUpdateType.Status,
@@ -39,14 +56,15 @@ async function* textGenerationWithoutTitle(
 	const { model, conv, messages, assistant, isContinue, webSearch, toolsPreference } = ctx;
 	const convId = conv._id;
 
-	// perform websearch if requested
-	// it can be because the user toggled the webSearch or because the assistant has webSearch enabled
-	// if tools are enabled, we don't perform it here since we will add the websearch as a tool
 	let webSearchResult: WebSearch | undefined;
+
+	// run websearch if:
+	// - it's not continuing a previous message
+	// - AND the model doesn't support tools and websearch is selected
+	// - OR the assistant has websearch enabled (no tools for assistants for now)
 	if (
 		!isContinue &&
-		!model.tools &&
-		((webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
+		((!model.tools && webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
 	) {
 		webSearchResult = yield* runWebSearch(conv, messages, assistant?.rag);
 	}
@@ -59,11 +77,13 @@ async function* textGenerationWithoutTitle(
 
 	let toolResults: ToolResult[] = [];
 
-	if (model.tools && !conv.assistantId) {
-		const tools = pickTools(toolsPreference, Boolean(assistant));
-		toolResults = yield* runTools(ctx, tools, preprompt);
+	if (model.tools) {
+		const tools = await getTools(toolsPreference, ctx.assistant);
+		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
+		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
 	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
+	done.abort();
 }

@@ -3,7 +3,8 @@ import express from "express";
 import { logger } from "$lib/server/logger";
 import { env } from "$env/dynamic/private";
 import type { Model } from "$lib/types/Model";
-import type { Tool } from "$lib/types/Tool";
+import { onExit } from "./exitHandler";
+import { promisify } from "util";
 
 interface Metrics {
 	model: {
@@ -24,9 +25,9 @@ interface Metrics {
 	};
 
 	tool: {
-		toolUseCount: Counter<Tool["name"]>;
-		toolUseCountError: Counter<Tool["name"]>;
-		toolUseDuration: Summary<Tool["name"]>;
+		toolUseCount: Counter<string>;
+		toolUseCountError: Counter<string>;
+		toolUseDuration: Summary<string>;
 		timeToChooseTools: Summary;
 	};
 }
@@ -37,11 +38,26 @@ export class MetricsServer {
 
 	private constructor() {
 		const app = express();
-		const port = env.METRICS_PORT || "5565";
 
-		const server = app.listen(port, () => {
-			logger.info(`Metrics server listening on port ${port}`);
-		});
+		const port = Number(env.METRICS_PORT || "5565");
+		if (isNaN(port) || port < 0 || port > 65535) {
+			logger.warn(`Invalid value for METRICS_PORT: ${env.METRICS_PORT}`);
+		}
+
+		if (env.METRICS_ENABLED !== "false" && env.METRICS_ENABLED !== "true") {
+			logger.warn(`Invalid value for METRICS_ENABLED: ${env.METRICS_ENABLED}`);
+		}
+		if (env.METRICS_ENABLED === "true") {
+			const server = app.listen(port, () => {
+				logger.info(`Metrics server listening on port ${port}`);
+			});
+			const closeServer = promisify(server.close);
+			onExit(async () => {
+				logger.info("Disconnecting metrics server ...");
+				await closeServer();
+				logger.info("Server stopped ...");
+			});
+		}
 
 		const register = new Registry();
 		collectDefaultMetrics({ register });
@@ -159,14 +175,6 @@ export class MetricsServer {
 				res.set("Content-Type", "text/plain");
 				res.send(metrics);
 			});
-		});
-
-		process.on("SIGINT", async () => {
-			logger.info("Sigint received, disconnect metrics server ...");
-			server.close(() => {
-				logger.info("Server stopped ...");
-			});
-			process.exit();
 		});
 	}
 
