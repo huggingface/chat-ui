@@ -21,12 +21,12 @@ export async function* generateTitleForConversation(
 			title,
 		};
 	} catch (cause) {
-		console.error(Error("Failed whilte generating title for conversation", { cause }));
+		logger.error(Error("Failed whilte generating title for conversation", { cause }));
 	}
 }
 
 export async function generateTitle(prompt: string) {
-	if (!env.LLM_SUMMARIZATION) {
+	if (env.LLM_SUMMARIZATION !== "true") {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 

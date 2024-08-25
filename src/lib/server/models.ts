@@ -7,12 +7,12 @@ import { endpointTgi } from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
 import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
-import type { PreTrainedTokenizer } from "@xenova/transformers";
+import type { PreTrainedTokenizer } from "@huggingface/transformers";
 
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { ToolResultStatus } from "$lib/types/Tool";
+import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -100,7 +100,7 @@ async function getChatPromptRender(
 			role: message.from,
 		}));
 
-		if (preprompt) {
+		if (preprompt && formattedMessages[0].role !== "system") {
 			formattedMessages = [
 				{
 					role: "system",
@@ -113,32 +113,68 @@ async function getChatPromptRender(
 		if (toolResults?.length) {
 			// todo: should update the command r+ tokenizer to support system messages at any location
 			// or use the `rag` mode without the citations
-			formattedMessages = [
-				{
-					role: "system",
-					content:
-						"\n\n<results>\n" +
-						toolResults
-							.flatMap((result, idx) => {
-								if (result.status === ToolResultStatus.Error) {
+			const id = m.id ?? m.name;
+
+			if (id.startsWith("CohereForAI")) {
+				formattedMessages = [
+					{
+						role: "system",
+						content:
+							"\n\n<results>\n" +
+							toolResults
+								.flatMap((result, idx) => {
+									if (result.status === ToolResultStatus.Error) {
+										return (
+											`Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message
+										);
+									}
 									return (
-										`Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message
+										`Document: ${idx}\n` +
+										result.outputs
+											.flatMap((output) =>
+												Object.entries(output).map(([title, text]) => `${title}\n${text}`)
+											)
+											.join("\n")
 									);
-								}
-								return (
-									`Document: ${idx}\n` +
-									result.outputs
-										.flatMap((output) =>
-											Object.entries(output).map(([title, text]) => `${title}\n${text}`)
-										)
-										.join("\n")
-								);
-							})
-							.join("\n\n") +
-						"\n</results>",
-				},
-				...formattedMessages,
-			];
+								})
+								.join("\n\n") +
+							"\n</results>",
+					},
+					...formattedMessages,
+				];
+			} else if (id.startsWith("meta-llama")) {
+				const results = toolResults.flatMap((result) => {
+					if (result.status === ToolResultStatus.Error) {
+						return [
+							{
+								tool_call_id: result.call.name,
+								output: "Error: " + result.message,
+							},
+						];
+					} else {
+						return result.outputs.map((output) => ({
+							tool_call_id: result.call.name,
+							output: JSON.stringify(output),
+						}));
+					}
+				});
+
+				formattedMessages = [
+					...formattedMessages,
+					{
+						role: "python",
+						content: JSON.stringify(results),
+					},
+				];
+			} else {
+				formattedMessages = [
+					...formattedMessages,
+					{
+						role: "system",
+						content: JSON.stringify(toolResults),
+					},
+				];
+			}
 			tools = [];
 		}
 
@@ -156,17 +192,41 @@ async function getChatPromptRender(
 			);
 		});
 
+		const mappedTools =
+			tools?.map((tool) => {
+				const inputs: Record<
+					string,
+					{
+						type: ToolInput["type"];
+						description: string;
+						required: boolean;
+					}
+				> = {};
+
+				for (const value of tool.inputs) {
+					if (value.paramType !== "fixed") {
+						inputs[value.name] = {
+							type: value.type,
+							description: value.description ?? "",
+							required: value.paramType === "required",
+						};
+					}
+				}
+
+				return {
+					name: tool.name,
+					description: tool.description,
+					parameter_definitions: inputs,
+				};
+			}) ?? [];
+
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
 			add_generation_prompt: true,
 			chat_template: chatTemplate,
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
-			tools:
-				tools?.map(({ parameterDefinitions, ...tool }) => ({
-					parameter_definitions: parameterDefinitions,
-					...tool,
-				})) ?? [],
+			tools: mappedTools,
 			documents,
 		});
 
@@ -230,6 +290,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.ollama(args);
 					case "vertex":
 						return await endpoints.vertex(args);
+					case "genai":
+						return await endpoints.genai(args);
 					case "cloudflare":
 						return await endpoints.cloudflare(args);
 					case "cohere":

@@ -23,6 +23,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
+import { logger } from "$lib/server/logger.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -33,7 +34,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// check user
 	if (!userId) {
-		throw error(401, "Unauthorized");
+		error(401, "Unauthorized");
 	}
 
 	// check if the user has access to the conversation
@@ -56,7 +57,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		);
 
 		if (!res.acknowledged) {
-			throw error(500, "Failed to convert conversation");
+			error(500, "Failed to convert conversation");
 		}
 	}
 
@@ -66,7 +67,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	});
 
 	if (!conv) {
-		throw error(404, "Conversation not found");
+		error(404, "Conversation not found");
 	}
 
 	// register the event for ratelimiting
@@ -95,7 +96,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			)[0]?.messages ?? 0;
 
 		if (totalMessages > messagesBeforeLogin) {
-			throw error(429, "Exceeded number of messages before login");
+			error(429, "Exceeded number of messages before login");
 		}
 	}
 
@@ -112,12 +113,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			})
 		);
 		if (nEvents > usageLimits.messagesPerMinute) {
-			throw error(429, ERROR_MESSAGES.rateLimited);
+			error(429, ERROR_MESSAGES.rateLimited);
 		}
 	}
 
 	if (usageLimits?.messages && conv.messages.length > usageLimits.messages) {
-		throw error(
+		error(
 			429,
 			`This conversation has more than ${usageLimits.messages} messages. Start a new one to continue`
 		);
@@ -127,7 +128,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
-		throw error(410, "Model not available anymore");
+		error(410, "Model not available anymore");
 	}
 
 	// finally parse the content of the request
@@ -136,7 +137,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const json = form.get("data");
 
 	if (!json || typeof json !== "string") {
-		throw error(400, "Invalid request");
+		error(400, "Invalid request");
 	}
 
 	const {
@@ -158,7 +159,24 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			tools: z.record(z.boolean()).optional(),
+			tools: z
+				.array(z.string())
+				.optional()
+				.transform((tools) =>
+					// disable tools on huggingchat android app
+					request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_android") ? [] : tools
+				),
+
+			files: z.optional(
+				z.array(
+					z.object({
+						type: z.literal("base64").or(z.literal("hash")),
+						name: z.string(),
+						value: z.string(),
+						mime: z.string(),
+					})
+				)
+			),
 		})
 		.parse(JSON.parse(json));
 
@@ -179,7 +197,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	);
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
-		throw error(400, "Message too long.");
+		error(400, "Message too long.");
 	}
 
 	// each file is either:
@@ -197,7 +215,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// check sizes
 	// todo: make configurable
 	if (b64Files.some((file) => file.size > 10 * 1024 * 1024)) {
-		throw error(413, "File too large, should be <10MB");
+		error(413, "File too large, should be <10MB");
 	}
 
 	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv))).then(
@@ -213,7 +231,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		// if it's the last message and we continue then we build the prompt up to the last message
 		// we will strip the end tokens afterwards when the prompt is built
 		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
-			throw error(400, "Can only continue the last message");
+			error(400, "Can only continue the last message");
 		}
 		messageToWriteToId = messageId;
 		messagesForPrompt = buildSubtree(conv, messageId);
@@ -226,7 +244,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		const messageToRetry = conv.messages.find((message) => message.id === messageId);
 
 		if (!messageToRetry) {
-			throw error(404, "Message not found");
+			error(404, "Message not found");
 		}
 
 		if (messageToRetry.from === "user" && newPrompt) {
@@ -296,10 +314,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	const messageToWriteTo = conv.messages.find((message) => message.id === messageToWriteToId);
 	if (!messageToWriteTo) {
-		throw error(500, "Failed to create message");
+		error(500, "Failed to create message");
 	}
 	if (messagesForPrompt.length === 0) {
-		throw error(500, "Failed to create prompt");
+		error(500, "Failed to create prompt");
 	}
 
 	// update the conversation with the new messages
@@ -391,7 +409,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				controller.enqueue(JSON.stringify(event) + "\n");
 
 				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
-				if (event.type === "finalAnswer") {
+				if (event.type === MessageUpdateType.FinalAnswer) {
 					controller.enqueue(" ".repeat(4096));
 				}
 			}
@@ -404,6 +422,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 			let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
+
 			try {
 				const ctx: TextGenerationContext = {
 					model,
@@ -413,7 +432,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					assistant: undefined,
 					isContinue: isContinue ?? false,
 					webSearch: webSearch ?? false,
-					toolsPreference: toolsPreferences ?? {},
+					toolsPreference: toolsPreferences ?? [],
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
@@ -427,7 +446,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					status: MessageUpdateStatus.Error,
 					message: (e as Error).message,
 				});
-				console.error(e);
+				logger.error(e);
 			} finally {
 				// check if no output was generated
 				if (!hasError && messageToWriteTo.content === initialMessageContent) {
@@ -485,7 +504,7 @@ export async function DELETE({ locals, params }) {
 	});
 
 	if (!conv) {
-		throw error(404, "Conversation not found");
+		error(404, "Conversation not found");
 	}
 
 	await collections.conversations.deleteOne({ _id: conv._id });
@@ -506,7 +525,7 @@ export async function PATCH({ request, locals, params }) {
 	});
 
 	if (!conv) {
-		throw error(404, "Conversation not found");
+		error(404, "Conversation not found");
 	}
 
 	await collections.conversations.updateOne(

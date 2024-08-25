@@ -16,7 +16,12 @@ export async function endpointCloudflare(
 	input: z.input<typeof endpointCloudflareParametersSchema>
 ): Promise<Endpoint> {
 	const { accountId, apiToken, model } = endpointCloudflareParametersSchema.parse(input);
-	const apiURL = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@hf/${model.id}`;
+
+	if (!model.id.startsWith("@")) {
+		model.id = "@hf/" + model.id;
+	}
+
+	const apiURL = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model.id}`;
 
 	return async ({ messages, preprompt, generateSettings }) => {
 		let messagesFormatted = messages.map((message) => ({

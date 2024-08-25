@@ -11,7 +11,7 @@ const NUM_PER_PAGE = 24;
 
 export const load = async ({ url, locals }) => {
 	if (!env.ENABLE_ASSISTANTS) {
-		throw redirect(302, `${base}/`);
+		redirect(302, `${base}/`);
 	}
 
 	const modelId = url.searchParams.get("modelId");
@@ -28,17 +28,19 @@ export const load = async ({ url, locals }) => {
 			{ projection: { _id: 1 } }
 		);
 		if (!user) {
-			throw error(404, `User "${username}" doesn't exist`);
+			error(404, `User "${username}" doesn't exist`);
 		}
 	}
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user && !locals.user?.isAdmin
+			? { featured: true }
+			: {};
 
 	// if the user queried is not the current user, only show "public" assistants that have been shared before
 	const shouldHaveBeenShared =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser && !locals.user?.isAdmin
 			? { userCount: { $gt: 1 } }
 			: {};
 
@@ -53,11 +55,12 @@ export const load = async ({ url, locals }) => {
 	const assistants = await Database.getInstance()
 		.getCollections()
 		.assistants.find(filter)
-		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
-			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
-			userCount: -1,
+			...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
+			useCount: -1,
+			_id: 1,
 		})
+		.skip(NUM_PER_PAGE * pageIndex)
 		.limit(NUM_PER_PAGE)
 		.toArray();
 

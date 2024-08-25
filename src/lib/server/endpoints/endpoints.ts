@@ -8,6 +8,7 @@ import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/endpointLlamacpp";
 import endpointOllama, { endpointOllamaParametersSchema } from "./ollama/endpointOllama";
 import endpointVertex, { endpointVertexParametersSchema } from "./google/endpointVertex";
+import endpointGenAI, { endpointGenAIParametersSchema } from "./google/endpointGenAI";
 
 import {
 	endpointAnthropic,
@@ -65,6 +66,7 @@ export const endpoints = {
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
 	vertex: endpointVertex,
+	genai: endpointGenAI,
 	cloudflare: endpointCloudflare,
 	cohere: endpointCohere,
 	langserve: endpointLangserve,
@@ -79,6 +81,7 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointLlamacppParametersSchema,
 	endpointOllamaParametersSchema,
 	endpointVertexParametersSchema,
+	endpointGenAIParametersSchema,
 	endpointCloudflareParametersSchema,
 	endpointCohereParametersSchema,
 	endpointLangserveParametersSchema,

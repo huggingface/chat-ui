@@ -2,6 +2,7 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
+	import { goto } from "$app/navigation";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
@@ -11,17 +12,20 @@
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
+	import CarbonChat from "~icons/carbon/chat";
+	import CarbonStar from "~icons/carbon/star";
+	import CarbonTools from "~icons/carbon/tools";
+
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
+	import ToolBadge from "$lib/components/ToolBadge.svelte";
 
 	export let data: PageData;
 
 	$: assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
 
 	const settings = useSettingsStore();
-
-	$: isActive = $settings.activeModel === $page.params.assistantId;
 
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
@@ -95,16 +99,17 @@
 				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
 			>
 				<button
-					class="{isActive
-						? 'bg-gray-100 text-gray-800'
-						: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
-					disabled={isActive}
+					class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
 					name="Activate model"
 					on:click|stopPropagation={() => {
-						$settings.activeModel = $page.params.assistantId;
+						settings.instantSet({
+							activeModel: $page.params.assistantId,
+						});
+						goto(`${base}/`);
 					}}
 				>
-					{isActive ? "Active" : "Activate"}
+					<CarbonChat class="mr-1.5 text-sm" />
+					New chat
 				</button>
 				{#if assistant?.createdByMe}
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
@@ -152,6 +157,12 @@
 						<form method="POST" action="?/unfeature" use:enhance>
 							<button type="submit" class="flex items-center text-red-600 underline">
 								<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
+							>
+						</form>
+					{:else}
+						<form method="POST" action="?/feature" use:enhance>
+							<button type="submit" class="flex items-center text-green-600 underline">
+								<CarbonStar class="mr-1.5 inline text-xs" />Feature</button
 							>
 						</form>
 					{/if}
@@ -207,6 +218,27 @@
 			{/if}
 		</div>
 
+		{#if assistant?.tools?.length}
+			<div class="mt-4">
+				<div class="mb-1 flex items-center gap-1">
+					<span
+						class="inline-grid size-5 place-items-center rounded-full bg-purple-500/10"
+						title="This assistant uses the websearch."
+					>
+						<CarbonTools class="text-xs text-purple-600" />
+					</span>
+					<h2 class="font-semibold">Tools</h2>
+				</div>
+				<p class="w-full text-sm text-gray-500">
+					This Assistant has access to the following tools:
+				</p>
+				<ul class="mr-2 mt-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
+					{#each assistant.tools as tool}
+						<ToolBadge toolId={tool} />
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		{#if hasRag}
 			<div class="mt-4">
 				<div class="mb-1 flex items-center gap-1">

@@ -13,6 +13,8 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
+import type { CommunityToolDB } from "$lib/types/Tool";
+
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import { onExit } from "./exitHandler";
@@ -83,6 +85,7 @@ export class Database {
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
+		const tools = db.collection<CommunityToolDB>("tools");
 
 		return {
 			conversations,
@@ -99,6 +102,7 @@ export class Database {
 			bucket,
 			migrationResults,
 			semaphores,
+			tools,
 		};
 	}
 
@@ -120,6 +124,7 @@ export class Database {
 			sessions,
 			messageEvents,
 			semaphores,
+			tools,
 		} = this.getCollections();
 
 		conversations
@@ -197,6 +202,9 @@ export class Database {
 		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+		assistants
+			.createIndex({ last24HoursUseCount: -1, useCount: -1, _id: 1 })
+			.catch((e) => logger.error(e));
 		assistantStats
 			// Order of keys is important for the queries
 			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
@@ -209,6 +217,10 @@ export class Database {
 		semaphores
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
 			.catch((e) => logger.error(e));
+
+		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
+		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
+		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
 	}
 }
 
