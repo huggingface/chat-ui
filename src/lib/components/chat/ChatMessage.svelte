@@ -34,6 +34,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import DOMPurify from "isomorphic-dompurify";
 	import { enhance } from "$app/forms";
+	import { browser } from "$app/environment";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -207,6 +208,22 @@
 	}
 	const convTreeStore = useConvTreeStore();
 
+	$: if (message.children?.length === 0) {
+		$convTreeStore.leaf = message.id;
+		// Check if the code is running in a browser
+		if (browser) {
+			// Remember the last message viewed or interacted by the user
+			localStorage.setItem("leafId", message.id);
+		}
+	}
+
+	let isRun = false;
+	$: {
+		if (message.id && !isRun) {
+			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
+			isRun = true;
+		}
+	}
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 </script>
 
@@ -300,9 +317,9 @@
 		{#if !loading && (message.content || toolUpdates)}
 			<div
 				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
-		{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
-		{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
-		"
+	{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
+	{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
+	"
 			>
 				{#if isAuthor}
 					<button
@@ -334,7 +351,9 @@
 					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
 					type="button"
-					on:click={() => dispatch("retry", { id: message.id })}
+					on:click={() => {
+						dispatch("retry", { id: message.id });
+					}}
 				>
 					<CarbonRotate360 />
 				</button>
@@ -394,7 +413,7 @@
 							<button
 								type="submit"
 								class="btn rounded-lg px-3 py-1.5 text-sm
-								{loading
+                                {loading
 									? 'bg-gray-300 text-gray-400 dark:bg-gray-700 dark:text-gray-600'
 									: 'bg-gray-200 text-gray-600 hover:text-gray-800   focus:ring-0 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
 								"
@@ -417,8 +436,8 @@
 				{#if !loading && !editMode}
 					<div
 						class="
-						max-md:opacity-0' invisible absolute
-						right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
+                        max-md:opacity-0' invisible absolute
+                        right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
 						isCopied
 							? 'max-md:visible max-md:translate-y-0 max-md:opacity-100'
 							: ''}"
