@@ -108,6 +108,55 @@
 
 	const convTreeStore = useConvTreeStore();
 
+	const updateCurrentIndex = () => {
+		const url = new URL($page.url);
+		let leafId = url.searchParams.get("leafId");
+
+		// Ensure the function is only run in the browser.
+		if (!browser) return;
+
+		if (leafId) {
+			// Remove the 'leafId' from the URL to clean up after retrieving it.
+			url.searchParams.delete("leafId");
+			history.replaceState(null, "", url.toString());
+		} else {
+			// Retrieve the 'leafId' from localStorage if it's not in the URL.
+			leafId = localStorage.getItem("leafId");
+		}
+
+		// If a 'leafId' exists, find the corresponding message and update indices.
+		if (leafId) {
+			let leafMessage = messages.find((m) => m.id == leafId);
+			if (!leafMessage?.ancestors) return; // Exit if the message has no ancestors.
+
+			let ancestors = leafMessage.ancestors;
+
+			// Loop through all ancestors to update the current child index.
+			for (let i = 0; i < ancestors.length; i++) {
+				let curMessage = messages.find((m) => m.id == ancestors[i]);
+				if (curMessage?.children) {
+					for (let j = 0; j < curMessage.children.length; j++) {
+						// Check if the current message's child matches the next ancestor
+						// or the leaf itself, and update the currentChildIndex accordingly.
+						if (i + 1 < ancestors.length) {
+							if (curMessage.children[j] == ancestors[i + 1]) {
+								curMessage.currentChildIndex = j;
+								break;
+							}
+						} else {
+							if (curMessage.children[j] == leafId) {
+								curMessage.currentChildIndex = j;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	};
+
+	updateCurrentIndex();
+
 	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
 	$: lastIsError =
 		lastMessage &&
@@ -344,7 +393,7 @@
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
-			{isReadOnly ? 'opacity-30' : ''}"
+            {isReadOnly ? 'opacity-30' : ''}"
 			>
 				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
