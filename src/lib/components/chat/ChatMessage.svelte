@@ -5,7 +5,6 @@
 	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
-	import { enhance } from "$app/forms";
 
 	import CodeBlock from "../CodeBlock.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
@@ -33,6 +32,9 @@
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import DOMPurify from "isomorphic-dompurify";
+	import { enhance } from "$app/forms";
+	import { browser } from "$app/environment";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -53,6 +55,7 @@
 
 		return ret;
 	}
+
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<");
 	}
@@ -106,11 +109,10 @@
 	marked.use(
 		markedKatex({
 			throwOnError: false,
-			// output: "html",
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
@@ -209,7 +211,7 @@
 	$: if (message.children?.length === 0) {
 		$convTreeStore.leaf = message.id;
 		// Check if the code is running in a browser
-		if (typeof window !== "undefined") {
+		if (browser) {
 			// Remember the last message viewed or interacted by the user
 			localStorage.setItem("leafId", message.id);
 		}
@@ -227,7 +229,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-6 flex items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
@@ -283,8 +285,10 @@
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(token.raw, options)}
+						{#await marked.parse(token.raw, options) then parsed}
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html DOMPurify.sanitize(parsed)}
+						{/await}
 					{/if}
 				{/each}
 			</div>
@@ -312,10 +316,10 @@
 		</div>
 		{#if !loading && (message.content || toolUpdates)}
 			<div
-				class="absolute bottom-1 right-0 -mb-4 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
-        {message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
-        {isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
-        "
+				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
+	{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
+	{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
+	"
 			>
 				{#if isAuthor}
 					<button

@@ -1,6 +1,7 @@
-export async function share(url: string, title: string) {
-	if (typeof window === "undefined") return;
+import { browser } from "$app/environment";
 
+export async function share(url: string, title: string) {
+	if (!browser) return;
 	// Retrieve the leafId from localStorage
 	const leafId = localStorage.getItem("leafId");
 	if (leafId) {

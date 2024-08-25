@@ -35,7 +35,6 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
-	import { get } from "svelte/store";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -83,9 +82,6 @@
 			onDrag = false;
 		}
 	};
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
-	};
 
 	const onPaste = (e: ClipboardEvent) => {
 		if (!e.clipboardData) {
@@ -113,11 +109,11 @@
 	const convTreeStore = useConvTreeStore();
 
 	const updateCurrentIndex = () => {
-		const url = new URL(get(page).url);
+		const url = new URL($page.url);
 		let leafId = url.searchParams.get("leafId");
 
 		// Ensure the function is only run in the browser.
-		if (typeof window === "undefined") return;
+		if (!browser) return;
 
 		if (leafId) {
 			// Remove the 'leafId' from the URL to clean up after retrieving it.
@@ -221,6 +217,13 @@
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
 
+<svelte:window
+	on:dragenter={onDragEnter}
+	on:dragleave={onDragLeave}
+	on:dragover|preventDefault
+	on:drop|preventDefault={() => (onDrag = false)}
+/>
+
 <div class="relative min-h-0 min-w-0">
 	{#if loginModalOpen}
 		<LoginModal
@@ -264,7 +267,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-6 pb-52 2xl:gap-7">
+				<div class="flex h-max flex-col gap-8 pb-52">
 					<ChatMessage
 						{loading}
 						{messages}
@@ -386,9 +389,6 @@
 				{/if}
 			</div>
 			<form
-				on:dragover={onDragOver}
-				on:dragenter={onDragEnter}
-				on:dragleave={onDragLeave}
 				tabindex="-1"
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
