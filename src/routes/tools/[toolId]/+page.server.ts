@@ -36,8 +36,18 @@ export const actions: Actions = {
 
 		await collections.tools.deleteOne({ _id: tool._id });
 
-		// and remove it from all users settings
+		// Remove the tool from all users' settings
 		await collections.settings.updateMany(
+			{
+				tools: { $in: [tool._id.toString()] },
+			},
+			{
+				$pull: { tools: tool._id.toString() },
+			}
+		);
+
+		// Remove the tool from all assistants
+		await collections.assistants.updateMany(
 			{
 				tools: { $in: [tool._id.toString()] },
 			},

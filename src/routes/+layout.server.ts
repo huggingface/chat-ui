@@ -155,7 +155,8 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 				env.SEARCHAPI_KEY ||
 				env.YDC_API_KEY ||
 				env.USE_LOCAL_WEBSEARCH ||
-				env.SEARXNG_QUERY_URL
+				env.SEARXNG_QUERY_URL ||
+				env.BING_SUBSCRIPTION_KEY
 			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
