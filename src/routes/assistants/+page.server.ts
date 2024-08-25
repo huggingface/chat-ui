@@ -55,12 +55,12 @@ export const load = async ({ url, locals }) => {
 	const assistants = await Database.getInstance()
 		.getCollections()
 		.assistants.find(filter)
-		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
 			useCount: -1,
 			_id: 1,
 		})
+		.skip(NUM_PER_PAGE * pageIndex)
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
