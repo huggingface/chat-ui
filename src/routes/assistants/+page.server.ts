@@ -34,11 +34,13 @@ export const load = async ({ url, locals }) => {
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user && !locals.user?.isAdmin
+			? { featured: true }
+			: {};
 
 	// if the user queried is not the current user, only show "public" assistants that have been shared before
 	const shouldHaveBeenShared =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser && !locals.user?.isAdmin
 			? { userCount: { $gt: 1 } }
 			: {};
 
