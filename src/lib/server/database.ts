@@ -202,6 +202,9 @@ export class Database {
 		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+		assistants
+			.createIndex({ last24HoursUseCount: -1, useCount: -1, _id: 1 })
+			.catch((e) => logger.error(e));
 		assistantStats
 			// Order of keys is important for the queries
 			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })

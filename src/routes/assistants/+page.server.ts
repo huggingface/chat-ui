@@ -57,6 +57,7 @@ export const load = async ({ url, locals }) => {
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
 			useCount: -1,
+			_id: 1,
 		})
 		.limit(NUM_PER_PAGE)
 		.toArray();
