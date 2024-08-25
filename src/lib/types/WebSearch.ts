@@ -45,4 +45,5 @@ export enum WebSearchProvider {
 	GOOGLE = "Google",
 	YOU = "You.com",
 	SEARXNG = "SearXNG",
+	BING = "Bing",
 }
