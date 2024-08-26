@@ -72,7 +72,7 @@ export const editableToolSchema = z
 		name: z.string().min(1).max(40),
 		// only allow huggingface spaces either through namespace or direct URLs
 		baseUrl: z.union([
-			z.string().regex(/^[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/),
+			z.string().regex(/^[^/]+\/[^/]+$/),
 			z
 				.string()
 				.regex(/^https:\/\/huggingface\.co\/spaces\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/)
