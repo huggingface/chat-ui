@@ -56,8 +56,8 @@ export const load = async ({ url, locals }) => {
 		.getCollections()
 		.assistants.find(filter)
 		.sort({
-			...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
-			useCount: -1,
+			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
+			userCount: -1,
 			_id: 1,
 		})
 		.skip(NUM_PER_PAGE * pageIndex)
