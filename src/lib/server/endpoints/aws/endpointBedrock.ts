@@ -100,7 +100,7 @@ export async function endpointBedrock(
 							id: tokenId++,
 							text: "",
 							logprob: 0,
-							special: false,
+							special: true,
 						},
 						generated_text: text,
 						details: null,
