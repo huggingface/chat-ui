@@ -171,8 +171,7 @@ export const actions: Actions = {
 						allowedDomains: parse.data.ragDomainList,
 						allowAllDomains: parse.data.ragAllowAll,
 					},
-					// XXX: feature_flag_tools
-					tools: locals.user?.isEarlyAccess ? parse.data.tools : undefined,
+					tools: parse.data.tools,
 					dynamicPrompt: parse.data.dynamicPrompt,
 					searchTokens: generateSearchTokens(parse.data.name),
 					generateSettings: {
