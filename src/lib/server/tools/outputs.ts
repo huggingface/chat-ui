@@ -39,6 +39,10 @@ export const ToolOutputPaths: Record<
 		type: "file",
 		path: "$.url",
 	},
+	json: {
+		type: "str",
+		path: "$",
+	},
 };
 
 export const isValidOutputComponent = (
