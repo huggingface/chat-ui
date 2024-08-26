@@ -70,7 +70,14 @@ const toolInputSchema = toolInputBaseSchema.and(
 export const editableToolSchema = z
 	.object({
 		name: z.string().min(1).max(40),
-		baseUrl: z.string().min(1).max(100),
+		// only allow huggingface spaces either through namespace or direct URLs
+		baseUrl: z.union([
+			z.string().regex(/^[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/),
+			z
+				.string()
+				.regex(/^https:\/\/huggingface\.co\/spaces\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/)
+				.transform((url) => url.split("/").slice(-2).join("/")),
+		]),
 		endpoint: z.string().min(1).max(100),
 		inputs: z.array(toolInputSchema),
 		outputComponent: z.string().min(1).max(100),
@@ -85,7 +92,6 @@ export const editableToolSchema = z
 		outputComponentIdx: parseInt(tool.outputComponent.split(";")[0]),
 		outputComponent: ToolOutputComponents.parse(tool.outputComponent.split(";")[1]),
 	}));
-
 export const configTools = z
 	.array(
 		z
