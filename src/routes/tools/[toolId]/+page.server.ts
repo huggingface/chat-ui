@@ -147,4 +147,20 @@ export const actions: Actions = {
 
 		return { from: "unfeature", ok: true, message: "Tool unfeatured" };
 	},
+	feature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const result = await collections.tools.updateOne(
+			{ _id: new ObjectId(params.toolId) },
+			{ $set: { featured: true } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to feature tool" });
+		}
+
+		return { from: "feature", ok: true, message: "Tool featured" };
+	},
 };
