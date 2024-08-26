@@ -108,6 +108,7 @@
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
+		"@aws-sdk/client-bedrock-runtime": "^3.631.0",
 		"@anthropic-ai/sdk": "^0.25.0",
 		"@anthropic-ai/vertex-sdk": "^0.4.1",
 		"@google-cloud/vertexai": "^1.1.0",
