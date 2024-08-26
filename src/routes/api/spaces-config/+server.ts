@@ -15,7 +15,7 @@ export async function GET({ url, locals }) {
 	let namespace = null;
 	if (space.startsWith("https://huggingface.co/spaces/")) {
 		namespace = space.split("/").slice(-2).join("/");
-	} else if (space.match(/^[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/)) {
+	} else if (space.match(/^[^/]+\/[^/]+$/)) {
 		namespace = space;
 	}
 
