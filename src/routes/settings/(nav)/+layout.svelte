@@ -7,6 +7,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/ArrowUpRight";
 	import CarbonAdd from "~icons/carbon/add";
+	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 
 	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
@@ -56,10 +57,16 @@
 				class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
 					{model.id === $page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 			>
-				<div class="truncate">{model.displayName}</div>
+				<div class="mr-auto truncate">{model.displayName}</div>
+
+				{#if $settings.customPrompts?.[model.id]}
+					<CarbonTextLongParagraph
+						class="size-6 rounded-md border border-gray-300 p-1 text-gray-800"
+					/>
+				{/if}
 				{#if model.id === $settings.activeModel}
 					<div
-						class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+						class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
 					>
 						Active
 					</div>
