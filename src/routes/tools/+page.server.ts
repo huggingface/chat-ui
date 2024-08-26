@@ -44,7 +44,7 @@ export const load = async ({ url, locals }) => {
 	const queryTokens = !!query && generateQueryTokens(query);
 
 	const filter: Filter<CommunityToolDB> = {
-		...(!createdByCurrentUser && !activeOnly && { featured: true }),
+		...(!createdByCurrentUser && !activeOnly && !locals.user?.isAdmin && { featured: true }),
 		...(user && { createdById: user._id }),
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {

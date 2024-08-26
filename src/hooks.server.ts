@@ -110,8 +110,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		? event.request.headers.get(env.TRUSTED_EMAIL_HEADER)
 		: null;
 
-	let secretSessionId: string;
-	let sessionId: string;
+	let secretSessionId: string | null = null;
+	let sessionId: string | null = null;
 
 	if (email) {
 		secretSessionId = sessionId = await sha256(email);
@@ -136,8 +136,63 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (user) {
 			event.locals.user = user;
 		}
-	} else {
-		// if the user doesn't have any cookie, we generate one for him
+	} else if (event.url.pathname.startsWith(`${base}/api/`) && env.USE_HF_TOKEN_IN_API === "true") {
+		// if the request goes to the API and no user is available in the header
+		// check if a bearer token is available in the Authorization header
+
+		const authorization = event.request.headers.get("Authorization");
+
+		if (authorization && authorization.startsWith("Bearer ")) {
+			const token = authorization.slice(7);
+
+			const hash = await sha256(token);
+
+			sessionId = secretSessionId = hash;
+
+			// check if the hash is in the DB and get the user
+			// else check against https://huggingface.co/api/whoami-v2
+
+			const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
+
+			if (cacheHit) {
+				const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
+
+				if (!user) {
+					return errorResponse(500, "User not found");
+				}
+
+				event.locals.user = user;
+			} else {
+				const response = await fetch("https://huggingface.co/api/whoami-v2", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+
+				if (!response.ok) {
+					return errorResponse(401, "Unauthorized");
+				}
+
+				const data = await response.json();
+				const user = await collections.users.findOne({ hfUserId: data.id });
+
+				if (!user) {
+					return errorResponse(500, "User not found");
+				}
+
+				await collections.tokenCaches.insertOne({
+					tokenHash: hash,
+					userId: data.id,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				});
+
+				event.locals.user = user;
+			}
+		}
+	}
+
+	if (!sessionId || !secretSessionId) {
 		secretSessionId = crypto.randomUUID();
 		sessionId = await sha256(secretSessionId);
 

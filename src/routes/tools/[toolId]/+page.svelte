@@ -16,6 +16,7 @@
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
+	import CarbonStar from "~icons/carbon/star";
 
 	export let data;
 
@@ -160,6 +161,19 @@
 									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
 								>
 							</form>
+							{#if data.tool?.featured}
+								<form method="POST" action="?/unfeature" use:enhance>
+									<button type="submit" class="flex items-center text-red-600 underline">
+										<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
+									>
+								</form>
+							{:else}
+								<form method="POST" action="?/feature" use:enhance>
+									<button type="submit" class="flex items-center text-green-600 underline">
+										<CarbonStar class="mr-1.5 inline text-xs" />Feature</button
+									>
+								</form>
+							{/if}
 						{/if}
 					</div>
 				</div>

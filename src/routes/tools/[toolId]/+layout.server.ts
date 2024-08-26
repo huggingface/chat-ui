@@ -21,6 +21,7 @@ export const load = async ({ params, locals }) => {
 				createdByName: null,
 				createdByMe: false,
 				reported: false,
+				featured: false,
 			},
 		};
 	}

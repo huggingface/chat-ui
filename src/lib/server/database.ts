@@ -17,6 +17,7 @@ import type { CommunityToolDB } from "$lib/types/Tool";
 
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
+import type { TokenCache } from "$lib/types/TokenCache";
 import { onExit } from "./exitHandler";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
@@ -85,6 +86,7 @@ export class Database {
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
+		const tokenCaches = db.collection<TokenCache>("tokens");
 		const tools = db.collection<CommunityToolDB>("tools");
 
 		return {
@@ -102,6 +104,7 @@ export class Database {
 			bucket,
 			migrationResults,
 			semaphores,
+			tokenCaches,
 			tools,
 		};
 	}
@@ -124,6 +127,7 @@ export class Database {
 			sessions,
 			messageEvents,
 			semaphores,
+			tokenCaches,
 			tools,
 		} = this.getCollections();
 
@@ -202,6 +206,9 @@ export class Database {
 		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+		assistants
+			.createIndex({ last24HoursUseCount: -1, useCount: -1, _id: 1 })
+			.catch((e) => logger.error(e));
 		assistantStats
 			// Order of keys is important for the queries
 			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
@@ -214,7 +221,10 @@ export class Database {
 		semaphores
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
 			.catch((e) => logger.error(e));
-
+		tokenCaches
+			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
+			.catch((e) => logger.error(e));
+		tokenCaches.createIndex({ tokenHash: 1 }).catch((e) => logger.error(e));
 		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
 		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
 		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));

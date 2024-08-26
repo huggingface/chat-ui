@@ -33,11 +33,12 @@ export async function GET({ params, locals }) {
 								color: tool.color,
 								icon: tool.icon,
 								createdByName: tool.createdByName,
+								featured: tool.featured,
 						  }
 						: undefined
 				);
 
-			if (!tool) {
+			if (!tool || !tool.featured) {
 				return new Response(`Tool "${toolId}" not found`, { status: 404 });
 			}
 

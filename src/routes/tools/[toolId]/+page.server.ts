@@ -36,8 +36,18 @@ export const actions: Actions = {
 
 		await collections.tools.deleteOne({ _id: tool._id });
 
-		// and remove it from all users settings
+		// Remove the tool from all users' settings
 		await collections.settings.updateMany(
+			{
+				tools: { $in: [tool._id.toString()] },
+			},
+			{
+				$pull: { tools: tool._id.toString() },
+			}
+		);
+
+		// Remove the tool from all assistants
+		await collections.assistants.updateMany(
 			{
 				tools: { $in: [tool._id.toString()] },
 			},
@@ -136,5 +146,21 @@ export const actions: Actions = {
 		}
 
 		return { from: "unfeature", ok: true, message: "Tool unfeatured" };
+	},
+	feature: async ({ params, locals }) => {
+		if (!locals.user?.isAdmin) {
+			return fail(403, { error: true, message: "Permission denied" });
+		}
+
+		const result = await collections.tools.updateOne(
+			{ _id: new ObjectId(params.toolId) },
+			{ $set: { featured: true } }
+		);
+
+		if (result.modifiedCount === 0) {
+			return fail(500, { error: true, message: "Failed to feature tool" });
+		}
+
+		return { from: "feature", ok: true, message: "Tool featured" };
 	},
 };
