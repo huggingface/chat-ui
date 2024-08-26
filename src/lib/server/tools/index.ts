@@ -26,6 +26,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { ObjectId } from "mongodb";
 import { isValidOutputComponent, ToolOutputPaths } from "./outputs";
 import { downloadFile } from "../files/downloadFile";
+import { fileTypeFromBlob } from "file-type";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -253,13 +254,13 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 								await fetch(output)
 									.then((res) => res.blob())
 									.then(async (blob) => {
-										const mimeType = blob.type;
-										const fileType = blob.type.split("/")[1] ?? mimeType?.split("/")[1];
+										const { ext, mime } = (await fileTypeFromBlob(blob)) ?? { ext: "octet-stream" };
+
 										return new File(
 											[blob],
-											`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
+											`${idx}-${await sha256(JSON.stringify(params))}.${ext}`,
 											{
-												type: fileType,
+												type: mime,
 											}
 										);
 									})
