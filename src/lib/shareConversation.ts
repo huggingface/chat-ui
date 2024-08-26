@@ -8,7 +8,7 @@ export async function shareConversation(id: string, title: string) {
 	try {
 		if (id.length === 7) {
 			const url = get(page).url;
-			await share(getShareUrl(url, id), title);
+			await share(getShareUrl(url, id), title, true);
 		} else {
 			const res = await fetch(`${base}/conversation/${id}/share`, {
 				method: "POST",
@@ -24,7 +24,7 @@ export async function shareConversation(id: string, title: string) {
 			}
 
 			const { url } = await res.json();
-			await share(url, title);
+			await share(url, title, true);
 		}
 	} catch (err) {
 		error.set(ERROR_MESSAGES.default);
