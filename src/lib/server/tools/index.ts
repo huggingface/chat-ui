@@ -276,8 +276,9 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 						);
 
 						toolOutputs.push({
-							[tool.name + "-" + idx.toString()]:
-								"A file has been generated. Answer as if the user can already see the file. Do not try to insert the file. The user can already see the file. Do not try to describe the file as the model cannot interact with it. Be concise.",
+							[tool.name +
+							"-" +
+							idx.toString()]: `Only and always answer: 'I used the tool ${tool.displayName}, here is the result.' Don't add anything else.`,
 						});
 					} else {
 						for (const output of arrayedOutput) {
