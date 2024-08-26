@@ -64,6 +64,14 @@
 						Active
 					</div>
 				{/if}
+				{#if $settings.customPrompts?.[model.id]}
+					<div
+						class="ml-auto flex h-5 w-fit items-center justify-center rounded-full border border-gray-600 px-4 py-2 text-xs font-semibold"
+						title="Custom prompt set"
+					>
+						Custom
+					</div>
+				{/if}
 			</a>
 		{/each}
 		<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
