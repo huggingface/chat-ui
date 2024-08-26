@@ -40,6 +40,7 @@ export const ToolOutputComponents = z
 			z.literal("audio"),
 			z.literal("video"),
 			z.literal("file"),
+			z.literal("json"),
 		])
 	);
 
