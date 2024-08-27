@@ -4,6 +4,7 @@
 	import type { MessageFile } from "$lib/types/Message";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonDocumentBlank from "~icons/carbon/document-blank";
+	import CarbonDownload from "~icons/carbon/download";
 
 	import Modal from "../Modal.svelte";
 	import AudioPlayer from "../players/AudioPlayer.svelte";
@@ -35,7 +36,7 @@
 	const isAudio = (mime: string) =>
 		mime.startsWith("audio/") || mime === "mp3" || mime === "wav" || mime === "x-wav";
 	const isVideo = (mime: string) =>
-		mime.startsWith("video/") || mime === "mp4" || mime === "x-mpeg" || mime === "octet-stream";
+		mime.startsWith("video/") || mime === "mp4" || mime === "x-mpeg";
 
 	$: isClickable = isImage(file.mime) && !isPreview;
 </script>
@@ -90,6 +91,31 @@
 						: urlNotTrailing + "/output/" + file.value}
 					controls
 				/>
+			</div>
+		{:else if file.mime === "octet-stream"}
+			<div
+				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
+			>
+				<div
+					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
+				>
+					<CarbonDocumentBlank class="text-base text-gray-700 dark:text-gray-300" />
+				</div>
+				<dl class="flex flex-grow flex-col truncate leading-tight">
+					<dd class="text-sm">
+						{truncateMiddle(file.name, 28)}
+					</dd>
+					<dt class="text-xs text-gray-400">File type could not be determined</dt>
+				</dl>
+				<a
+					href={file.type === "base64"
+						? `data:application/octet-stream;base64,${file.value}`
+						: urlNotTrailing + "/output/" + file.value}
+					download={file.name}
+					class="ml-auto flex-none"
+				>
+					<CarbonDownload class="text-base text-gray-700 dark:text-gray-300" />
+				</a>
 			</div>
 		{:else}
 			<div

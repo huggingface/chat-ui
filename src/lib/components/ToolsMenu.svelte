@@ -7,6 +7,7 @@
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import IconTool from "./icons/IconTool.svelte";
 	import CarbonInformation from "~icons/carbon/information";
+	import CarbonGlobe from "~icons/carbon/earth-filled";
 
 	export let loading = false;
 	const settings = useSettingsStore();
@@ -129,7 +130,12 @@
 							}}
 						/>
 					{/if}
-					<label class="cursor-pointer" for={tool._id}>{tool.displayName} </label>
+					<label class="cursor-pointer" for={tool._id}>{tool.displayName}</label>
+					{#if tool.type === "community"}
+						<a href="{base}/tools/{tool._id}" class="text-purple-600 hover:text-purple-700">
+							<CarbonGlobe />
+						</a>
+					{/if}
 				</div>
 			{/each}
 		</div>

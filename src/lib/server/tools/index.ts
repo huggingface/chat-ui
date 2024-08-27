@@ -26,6 +26,7 @@ import { sha256 } from "$lib/utils/sha256";
 import { ObjectId } from "mongodb";
 import { isValidOutputComponent, ToolOutputPaths } from "./outputs";
 import { downloadFile } from "../files/downloadFile";
+import { fileTypeFromBlob } from "file-type";
 
 export type BackendToolContext = Pick<
 	TextGenerationContext,
@@ -69,7 +70,14 @@ const toolInputSchema = toolInputBaseSchema.and(
 export const editableToolSchema = z
 	.object({
 		name: z.string().min(1).max(40),
-		baseUrl: z.string().min(1).max(100),
+		// only allow huggingface spaces either through namespace or direct URLs
+		baseUrl: z.union([
+			z.string().regex(/^[^/]+\/[^/]+$/),
+			z
+				.string()
+				.regex(/^https:\/\/huggingface\.co\/spaces\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/)
+				.transform((url) => url.split("/").slice(-2).join("/")),
+		]),
 		endpoint: z.string().min(1).max(100),
 		inputs: z.array(toolInputSchema),
 		outputComponent: z.string().min(1).max(100),
@@ -84,7 +92,6 @@ export const editableToolSchema = z
 		outputComponentIdx: parseInt(tool.outputComponent.split(";")[0]),
 		outputComponent: ToolOutputComponents.parse(tool.outputComponent.split(";")[1]),
 	}));
-
 export const configTools = z
 	.array(
 		z
@@ -253,13 +260,13 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 								await fetch(output)
 									.then((res) => res.blob())
 									.then(async (blob) => {
-										const mimeType = blob.type;
-										const fileType = blob.type.split("/")[1] ?? mimeType?.split("/")[1];
+										const { ext, mime } = (await fileTypeFromBlob(blob)) ?? { ext: "octet-stream" };
+
 										return new File(
 											[blob],
-											`${idx}-${await sha256(JSON.stringify(params))}.${fileType}`,
+											`${idx}-${await sha256(JSON.stringify(params))}.${ext}`,
 											{
-												type: fileType,
+												type: mime,
 											}
 										);
 									})
@@ -269,8 +276,9 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 						);
 
 						toolOutputs.push({
-							[tool.name + "-" + idx.toString()]:
-								"A file has been generated. Answer as if the user can already see the file. Do not try to insert the file. The user can already see the file. Do not try to describe the file as the model cannot interact with it. Be concise.",
+							[tool.name +
+							"-" +
+							idx.toString()]: `Only and always answer: 'I used the tool ${tool.displayName}, here is the result.' Don't add anything else.`,
 						});
 					} else {
 						for (const output of arrayedOutput) {
