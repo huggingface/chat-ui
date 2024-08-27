@@ -327,12 +327,12 @@
 		</div>
 
 		<ScrollToPreviousBtn
-			class="right-4 max-md:bottom-[calc(50%+6px+20px)] md:bottom-48 lg:right-10"
+			class="fixed right-4 max-md:bottom-[calc(50%+26px)] md:bottom-48 lg:right-10"
 			scrollNode={chatContainer}
 		/>
 
 		<ScrollToBottomBtn
-			class="right-4 max-md:bottom-[calc(50%-47px+20px)] md:bottom-36 lg:right-10"
+			class="fixed right-4 max-md:bottom-[calc(50%-26px)] md:bottom-36 lg:right-10"
 			scrollNode={chatContainer}
 		/>
 	</div>
