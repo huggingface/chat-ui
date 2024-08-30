@@ -22,11 +22,18 @@
 		<p class="text-balance text-lg font-semibold leading-snug text-gray-800">
 			{envPublic.PUBLIC_APP_DESCRIPTION}
 		</p>
-		<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
-			You have reached the guest message limit, <strong class="font-semibold"
-				>Sign In with a free Hugging Face account</strong
-			> to continue using HuggingChat.
-		</p>
+			{#if envPublic.MESSAGES_BEFORE_LOGIN > 0}
+				<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
+					{envPublic.PUBLIC_APP_GUEST_MESSAGE || "You have reached the guest message limit, please sign in to continue using the HuggingChat."}
+				</p> 
+			{:else}
+				<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
+					You have reached the guest message limit, <strong class="font-semibold"
+						>Sign In with a free Hugging Face account</strong
+					> to continue using HuggingChat.
+				</p>
+			{/if}		
+
 
 		<form
 			action="{base}/{$page.data.loginRequired ? 'login' : 'settings'}"
