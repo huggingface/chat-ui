@@ -46,7 +46,7 @@ export interface EndpointParameters {
 interface CommonEndpoint {
 	weight: number;
 }
-type TextGenerationStreamOutputWithTools = TextGenerationStreamOutput & {
+export type TextGenerationStreamOutputWithTools = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken & { toolCalls?: ToolCall[] };
 };
 // type signature for the endpoint

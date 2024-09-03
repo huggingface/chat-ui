@@ -174,6 +174,7 @@ export type ToolResult = ToolResultSuccess | ToolResultError;
 export interface ToolCall {
 	name: string;
 	parameters: Record<string, string | number | boolean>;
+	correlationKey: string | undefined;
 }
 
 export type BackendCall = (
