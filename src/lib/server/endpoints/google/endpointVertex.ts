@@ -61,6 +61,8 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 	return async ({ messages, preprompt, generateSettings }) => {
 		const parameters = { ...model.parameters, ...generateSettings };
 
+		const hasFiles = messages.some(message => message.files && message.files.length > 0);
+
 		const generativeModel = vertex_ai.getGenerativeModel({
 			model: model.id ?? model.name,
 			safetySettings: safetyThreshold
@@ -93,7 +95,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				temperature: parameters?.temperature ?? 1,
 			},
 			// tools and multimodal are mutually exclusive
-			tools: !multimodal ? tools : undefined,
+			tools: !hasFiles ? tools : undefined,
 		});
 
 		// Preprompt is the same as the first system message.
