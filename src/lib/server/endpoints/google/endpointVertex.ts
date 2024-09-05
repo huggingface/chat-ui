@@ -62,7 +62,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		const parameters = { ...model.parameters, ...generateSettings };
 
 		const generativeModel = vertex_ai.getGenerativeModel({
-			model: model.name ?? model.id,
+			model: model.id ?? model.name,
 			safetySettings: safetyThreshold
 				? [
 						{
@@ -92,7 +92,8 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				stopSequences: parameters?.stop,
 				temperature: parameters?.temperature ?? 1,
 			},
-			tools,
+			// tools and multimodal are mutually exclusive
+			tools: !multimodal ? tools : undefined,
 		});
 
 		// Preprompt is the same as the first system message.

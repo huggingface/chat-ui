@@ -769,9 +769,7 @@ MODELS=`[
           "location": "europe-west3",
           "model": {
             "id": "some-id",
-            "name": "gemini-1.5-pro-preview-0409"
           },
-
           // Optional
           "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
           "apiEndpoint": "", // alternative api endpoint url,
@@ -780,15 +778,15 @@ MODELS=`[
               "disableAttribution": true
             }
           }],
-          "multimodal": "{
+          "multimodal": {
             "image": {
               "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
               "preferredMimeType": "image/png",
               "maxSizeInMB": 5,
               "maxWidth": 2000,
-              "maxHeight": number;
+              "maxHeight": 1000;
             }
-          }"
+          }
        }]
      },
 ]`
