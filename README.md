@@ -767,9 +767,7 @@ MODELS=`[
           "type": "vertex",
           "project": "abc-xyz",
           "location": "europe-west3",
-          "model": {
-            "id": "some-id",
-          },
+          "model": "gemini-1.5-pro-preview-0409", // model-name
           // Optional
           "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
           "apiEndpoint": "", // alternative api endpoint url,
