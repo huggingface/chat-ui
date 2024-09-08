@@ -7,17 +7,36 @@ const updateAssistantsModels: Migration = {
 	name: "Update deprecated models in assistants with the default model",
 	up: async () => {
 		const models = (await import("$lib/server/models")).models;
-
+		const oldModels = (await import("$lib/server/models")).oldModels;
 		const { assistants } = collections;
 
-		const modelIds = models.map((el) => el.id); // string[]
+		const modelIds = models.map((el) => el.id);
 		const defaultModelId = models[0].id;
 
-		// Find all assistants whose modelId is not in modelIds, and update it to use defaultModelId
-		await assistants.updateMany(
-			{ modelId: { $nin: modelIds } },
-			{ $set: { modelId: defaultModelId } }
-		);
+		// Find all assistants whose modelId is not in modelIds, and update it
+		const bulkOps = await assistants
+			.find({ modelId: { $nin: modelIds } })
+			.map((assistant) => {
+				// has an old model
+				let newModelId = defaultModelId;
+
+				const oldModel = oldModels.find((m) => m.id === assistant.modelId);
+				if (oldModel && oldModel.transferTo && !!models.find((m) => m.id === oldModel.transferTo)) {
+					newModelId = oldModel.transferTo;
+				}
+
+				return {
+					updateOne: {
+						filter: { _id: assistant._id },
+						update: { $set: { modelId: newModelId } },
+					},
+				};
+			})
+			.toArray();
+
+		if (bulkOps.length > 0) {
+			await assistants.bulkWrite(bulkOps);
+		}
 
 		return true;
 	},

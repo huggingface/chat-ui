@@ -326,6 +326,7 @@ export const oldModels = env.OLD_MODELS
 					id: z.string().optional(),
 					name: z.string().min(1),
 					displayName: z.string().min(1).optional(),
+					transferTo: z.string().optional(),
 				})
 			)
 			.parse(JSON5.parse(env.OLD_MODELS))
