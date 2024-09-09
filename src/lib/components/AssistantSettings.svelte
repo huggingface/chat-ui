@@ -542,8 +542,8 @@
 						<div
 							class="invisible absolute right-0 top-6 z-10 rounded-lg border bg-white p-2 text-xs shadow-lg peer-focus:visible hover:visible sm:w-96"
 						>
-							Will performs a GET request and injects the response into the prompt. Works better
-							with plain text, csv or json content.
+							Will perform a GET request and inject the response into the prompt. Works better with
+							plain text, csv or json content.
 							{#each templateVariables as match}
 								<a href={match} target="_blank" class="text-gray-500 underline decoration-gray-300"
 									>{match}</a
