@@ -36,6 +36,16 @@
 	let filterValue = data.query;
 	let isFilterInPorgress = false;
 	let sortValue = data.sort as SortKey;
+	let showUnfeatured = data.showUnfeatured;
+
+	const toggleShowUnfeatured = () => {
+		showUnfeatured = !showUnfeatured;
+		const newUrl = getHref($page.url, {
+			newKeys: { showUnfeatured: showUnfeatured ? "true" : undefined },
+			existingKeys: { behaviour: "delete", keys: [] },
+		});
+		goto(newUrl);
+	};
 
 	const onModelChange = (e: Event) => {
 		const newUrl = getHref($page.url, {
@@ -133,7 +143,12 @@
 					<option value={model.name}>{model.name}</option>
 				{/each}
 			</select>
-
+			{#if data.user?.isAdmin}
+				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
+					<input type="checkbox" checked={showUnfeatured} on:change={toggleShowUnfeatured} />
+					Show unfeatured assistants
+				</label>
+			{/if}
 			<a
 				href={`${base}/settings/assistants/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
@@ -229,7 +244,8 @@
 					!!assistant?.dynamicPrompt}
 
 				<button
-					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8"
+					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8
+					{!assistant.featured && !createdByMe ? 'border !border-red-500/30' : ''}"
 					on:click={() => {
 						if (data.settings.assistants.includes(assistant._id.toString())) {
 							settings.instantSet({ activeModel: assistant._id.toString() });
