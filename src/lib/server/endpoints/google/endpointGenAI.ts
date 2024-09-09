@@ -1,17 +1,18 @@
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
-import type { Content, Part, TextPart } from "@google/generative-ai";
+import type { Content, Part, SafetySetting, TextPart } from "@google/generative-ai";
 import { z } from "zod";
 import type { Message, MessageFile } from "$lib/types/Message";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { ImageProcessorOptions } from "../images";
+import { env } from "$env/dynamic/private";
 
 export const endpointGenAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("genai"),
-	apiKey: z.string(),
+	apiKey: z.string().default(env.GOOGLE_GENAI_API_KEY),
 	safetyThreshold: z
 		.enum([
 			HarmBlockThreshold.HARM_BLOCK_THRESHOLD_UNSPECIFIED,
@@ -40,35 +41,24 @@ export function endpointGenAI(input: z.input<typeof endpointGenAIParametersSchem
 
 	const genAI = new GoogleGenerativeAI(apiKey);
 
+	const safetySettings = safetyThreshold
+		? Object.keys(HarmCategory)
+				.filter((cat) => cat !== HarmCategory.HARM_CATEGORY_UNSPECIFIED)
+				.reduce((acc, val) => {
+					acc.push({
+						category: val as HarmCategory,
+						threshold: safetyThreshold,
+					});
+					return acc;
+				}, [] as SafetySetting[])
+		: undefined;
+
 	return async ({ messages, preprompt, generateSettings }) => {
 		const parameters = { ...model.parameters, ...generateSettings };
 
 		const generativeModel = genAI.getGenerativeModel({
 			model: model.id ?? model.name,
-			safetySettings: safetyThreshold
-				? [
-						{
-							category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-							threshold: safetyThreshold,
-						},
-						{
-							category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-							threshold: safetyThreshold,
-						},
-						{
-							category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-							threshold: safetyThreshold,
-						},
-						{
-							category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-							threshold: safetyThreshold,
-						},
-						{
-							category: HarmCategory.HARM_CATEGORY_UNSPECIFIED,
-							threshold: safetyThreshold,
-						},
-				  ]
-				: undefined,
+			safetySettings,
 			generationConfig: {
 				maxOutputTokens: parameters?.max_new_tokens ?? 4096,
 				stopSequences: parameters?.stop,
