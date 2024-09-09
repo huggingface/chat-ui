@@ -61,7 +61,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 	return async ({ messages, preprompt, generateSettings }) => {
 		const parameters = { ...model.parameters, ...generateSettings };
 
-		const hasFiles = messages.some(message => message.files && message.files.length > 0);
+		const hasFiles = messages.some((message) => message.files && message.files.length > 0);
 
 		const generativeModel = vertex_ai.getGenerativeModel({
 			model: model.id ?? model.name,
