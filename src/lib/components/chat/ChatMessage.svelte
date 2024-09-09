@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { marked, type MarkedOptions } from "marked";
 	import markedKatex from "marked-katex-extension";
-	import type { Message, MessageFile } from "$lib/types/Message";
+	import type { Message } from "$lib/types/Message";
 	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
@@ -30,9 +30,11 @@
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
-	import Modal from "../Modal.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import DOMPurify from "isomorphic-dompurify";
+	import { enhance } from "$app/forms";
+	import { browser } from "$app/environment";
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -53,6 +55,7 @@
 
 		return ret;
 	}
+
 	function unsanitizeMd(md: string) {
 		return md.replaceAll("&lt;", "<");
 	}
@@ -106,11 +109,10 @@
 	marked.use(
 		markedKatex({
 			throwOnError: false,
-			// output: "html",
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content));
+	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
@@ -206,34 +208,28 @@
 	}
 	const convTreeStore = useConvTreeStore();
 
+	$: if (message.children?.length === 0) {
+		$convTreeStore.leaf = message.id;
+		// Check if the code is running in a browser
+		if (browser) {
+			// Remember the last message viewed or interacted by the user
+			localStorage.setItem("leafId", message.id);
+		}
+	}
+
+	let isRun = false;
+	$: {
+		if (message.id && !isRun) {
+			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
+			isRun = true;
+		}
+	}
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
-
-	$: modalImageToShow = null as MessageFile | null;
 </script>
-
-{#if modalImageToShow}
-	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="sm:max-w-[500px]" on:close={() => (modalImageToShow = null)}>
-		{#if modalImageToShow.type === "hash"}
-			<img
-				src={urlNotTrailing + "/output/" + modalImageToShow.value}
-				alt="input from user"
-				class="aspect-auto"
-			/>
-		{:else}
-			<!-- handle the case where this is a base64 encoded image -->
-			<img
-				src={`data:${modalImageToShow.mime};base64,${modalImageToShow.value}`}
-				alt="input from user"
-				class="aspect-auto"
-			/>
-		{/if}
-	</Modal>
-{/if}
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-6 flex items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
@@ -257,23 +253,7 @@
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
 					{#each message.files as file}
-						<!-- handle the case where this is a hash that points to an image in the db, hash is always 64 char long -->
-						<button on:click={() => (modalImageToShow = file)}>
-							{#if file.type === "hash"}
-								<img
-									src={urlNotTrailing + "/output/" + file.value}
-									alt="output from assistant"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg xl:max-h-56"
-								/>
-							{:else}
-								<!-- handle the case where this is a base64 encoded image -->
-								<img
-									src={`data:${file.mime};base64,${file.value}`}
-									alt="output from assistant"
-									class="my-2 aspect-auto max-h-48 cursor-pointer rounded-lg shadow-lg xl:max-h-56"
-								/>
-							{/if}
-						</button>
+						<UploadedFile {file} canClose={false} isPreview={false} />
 					{/each}
 				</div>
 			{/if}
@@ -287,13 +267,15 @@
 			{#if toolUpdates}
 				{#each Object.values(toolUpdates) as tool}
 					{#if tool.length}
-						<ToolUpdate {tool} {loading} />
+						{#key tool[0].uuid}
+							<ToolUpdate {tool} {loading} />
+						{/key}
 					{/if}
 				{/each}
 			{/if}
 
 			<div
-				class="prose max-w-none max-sm:prose-sm dark:prose-invert prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				bind:this={contentEl}
 			>
 				{#if isLast && loading && $settings.disableStream}
@@ -303,8 +285,10 @@
 					{#if token.type === "code"}
 						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
 					{:else}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(token.raw, options)}
+						{#await marked.parse(token.raw, options) then parsed}
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html DOMPurify.sanitize(parsed)}
+						{/await}
 					{/if}
 				{/each}
 			</div>
@@ -332,14 +316,14 @@
 		</div>
 		{#if !loading && (message.content || toolUpdates)}
 			<div
-				class="absolute bottom-1 right-0 -mb-4 flex max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100
-		{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
-		{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
-		"
+				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
+	{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
+	{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
+	"
 			>
 				{#if isAuthor}
 					<button
-						class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+						class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score > 0
 							? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
 							: ''}"
@@ -351,7 +335,7 @@
 						<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
 					</button>
 					<button
-						class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300
+						class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
 					{message.score && message.score < 0
 							? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
 							: ''}"
@@ -364,10 +348,12 @@
 					</button>
 				{/if}
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
+					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
 					type="button"
-					on:click={() => dispatch("retry", { id: message.id })}
+					on:click={() => {
+						dispatch("retry", { id: message.id });
+					}}
 				>
 					<CarbonRotate360 />
 				</button>
@@ -375,7 +361,7 @@
 					on:click={() => {
 						isCopied = true;
 					}}
-					classNames="ml-1.5 !rounded-sm !p-1 !text-sm !text-gray-400 focus:!ring-0 hover:!text-gray-500 dark:!text-gray-400 dark:hover:!text-gray-300 !border-none !shadow-none"
+					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					value={message.content}
 				/>
 			</div>
@@ -394,13 +380,7 @@
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
-						{#if file.mime.startsWith("image/")}
-							<button on:click={() => (modalImageToShow = file)}>
-								<UploadedFile {file} canClose={false} />
-							</button>
-						{:else}
-							<UploadedFile {file} canClose={false} />
-						{/if}
+						<UploadedFile {file} canClose={false} isPreview={false} />
 					{/each}
 				</div>
 			{/if}
@@ -433,9 +413,9 @@
 							<button
 								type="submit"
 								class="btn rounded-lg px-3 py-1.5 text-sm
-								{loading
+                                {loading
 									? 'bg-gray-300 text-gray-400 dark:bg-gray-700 dark:text-gray-600'
-									: 'bg-gray-200 text-gray-600 focus:ring-0   hover:text-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
+									: 'bg-gray-200 text-gray-600 hover:text-gray-800   focus:ring-0 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-200'}
 								"
 								disabled={loading}
 							>
@@ -443,7 +423,7 @@
 							</button>
 							<button
 								type="button"
-								class="btn rounded-sm p-2 text-sm text-gray-400 focus:ring-0 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
+								class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 								on:click={() => {
 									$convTreeStore.editing = null;
 								}}
@@ -456,8 +436,8 @@
 				{#if !loading && !editMode}
 					<div
 						class="
-						max-md:opacity-0' invisible absolute
-						right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
+                        max-md:opacity-0' invisible absolute
+                        right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
 						isCopied
 							? 'max-md:visible max-md:translate-y-0 max-md:opacity-100'
 							: ''}"
@@ -465,7 +445,7 @@
 						<div class="mx-auto flex flex-row flex-nowrap gap-2">
 							{#if downloadLink}
 								<a
-									class="rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 max-sm:!hidden md:hidden dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+									class="rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 max-sm:!hidden md:hidden"
 									title="Download prompt and parameters"
 									type="button"
 									target="_blank"
@@ -476,7 +456,7 @@
 							{/if}
 							{#if !readOnly}
 								<button
-									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 md:hidden lg:-right-2 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
+									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
 									title="Branch"
 									type="button"
 									on:click={() => ($convTreeStore.editing = message.id)}
@@ -511,7 +491,7 @@
 					class="font-white group/navbranch z-10 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
 				>
 					<button
-						class="inline text-lg font-thin text-gray-400 disabled:pointer-events-none disabled:opacity-25 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
+						class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
 						on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
 						disabled={childrenToRender === 0 || loading}
 					>
@@ -521,7 +501,7 @@
 						{childrenToRender + 1} / {nChildren}
 					</span>
 					<button
-						class="inline text-lg font-thin text-gray-400 disabled:pointer-events-none disabled:opacity-25 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
+						class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
 						on:click={() =>
 							(childrenToRender = Math.min(
 								message?.children?.length ?? 1 - 1,
@@ -535,6 +515,11 @@
 							method="POST"
 							action="?/deleteBranch"
 							class="hidden group-hover/navbranch:block"
+							use:enhance={({ cancel }) => {
+								if (!confirm("Are you sure you want to delete this branch?")) {
+									cancel();
+								}
+							}}
 						>
 							<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
 							<button

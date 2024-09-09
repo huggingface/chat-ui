@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	// check user
 	if (!userId) {
-		throw error(401, "Unauthorized");
+		error(401, "Unauthorized");
 	}
 
 	if (params.id.length !== 7) {
@@ -26,7 +26,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		});
 
 		if (!conv) {
-			throw error(404, "Conversation not found");
+			error(404, "Conversation not found");
 		}
 	} else {
 		// look for the conversation in shared conversations
@@ -35,17 +35,20 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 		});
 
 		if (!conv) {
-			throw error(404, "Conversation not found");
+			error(404, "Conversation not found");
 		}
 	}
 
 	const { value, mime } = await downloadFile(sha256, params.id);
 
-	return new Response(Buffer.from(value, "base64"), {
+	const b64Value = Buffer.from(value, "base64");
+	return new Response(b64Value, {
 		headers: {
 			"Content-Type": mime ?? "application/octet-stream",
 			"Content-Security-Policy":
 				"default-src 'none'; script-src 'none'; style-src 'none'; sandbox;",
+			"Content-Length": b64Value.length.toString(),
+			"Accept-Range": "bytes",
 		},
 	});
 };
