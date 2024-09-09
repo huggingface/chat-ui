@@ -775,21 +775,29 @@ MODELS=`[
     {
        "name": "gemini-1.5-pro",
        "displayName": "Vertex Gemini Pro 1.5",
+       "multimodal": true,
        "endpoints" : [{
           "type": "vertex",
           "project": "abc-xyz",
           "location": "europe-west3",
           "model": "gemini-1.5-pro-preview-0409", // model-name
-
           // Optional
           "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
           "apiEndpoint": "", // alternative api endpoint url,
-          // Optional
           "tools": [{
             "googleSearchRetrieval": {
               "disableAttribution": true
             }
-          }]
+          }],
+          "multimodal": {
+            "image": {
+              "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
+              "preferredMimeType": "image/png",
+              "maxSizeInMB": 5,
+              "maxWidth": 2000,
+              "maxHeight": 1000;
+            }
+          }
        }]
      },
 ]`
