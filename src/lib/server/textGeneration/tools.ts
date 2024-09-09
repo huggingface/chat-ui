@@ -21,18 +21,21 @@ import { collections } from "../database";
 import { ObjectId } from "mongodb";
 import type { Message } from "$lib/types/Message";
 import type { Assistant } from "$lib/types/Assistant";
+import { assistantHasWebSearch } from "./assistant";
 
 export async function getTools(
 	toolsPreference: Array<string>,
-	assistant: Pick<Assistant, "tools"> | undefined
+	assistant: Pick<Assistant, "rag" | "tools"> | undefined
 ): Promise<Tool[]> {
 	let preferences = toolsPreference;
 
 	if (assistant) {
 		if (assistant?.tools?.length) {
 			preferences = assistant.tools;
-		} else {
+		} else if (assistantHasWebSearch(assistant)) {
 			return [directlyAnswer, websearch];
+		} else {
+			return [directlyAnswer];
 		}
 	}
 
