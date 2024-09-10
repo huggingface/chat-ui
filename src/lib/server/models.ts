@@ -320,6 +320,9 @@ export const models: ProcessedModel[] = await Promise.all(
 	modelsRaw.map((e) => processModel(e).then(addEndpoint))
 );
 
+// super ugly but not sure how to make typescript happier
+const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
+
 export const defaultModel = models[0];
 
 // Models that have been deprecated
@@ -330,6 +333,7 @@ export const oldModels = env.OLD_MODELS
 					id: z.string().optional(),
 					name: z.string().min(1),
 					displayName: z.string().min(1).optional(),
+					transferTo: validModelIdSchema.optional(),
 				})
 			)
 			.parse(JSON5.parse(env.OLD_MODELS))
