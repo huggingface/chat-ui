@@ -28,6 +28,7 @@ export async function buildPrompt({
 			preprompt,
 			tools,
 			toolResults,
+			continueMessage,
 		})
 		// Not super precise, but it's truncated in the model's backend anyway
 		.split(" ")
