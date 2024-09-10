@@ -94,7 +94,13 @@ async function getChatPromptRender(
 		process.exit();
 	}
 
-	const renderTemplate = ({ messages, preprompt, tools, toolResults }: ChatTemplateInput) => {
+	const renderTemplate = ({
+		messages,
+		preprompt,
+		tools,
+		toolResults,
+		continueMessage,
+	}: ChatTemplateInput) => {
 		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
 			content: message.content,
 			role: message.from,
@@ -222,10 +228,8 @@ async function getChatPromptRender(
 
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
-			add_generation_prompt: true,
+			add_generation_prompt: !continueMessage,
 			chat_template: chatTemplate,
-			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-			// @ts-ignore
 			tools: mappedTools,
 			documents,
 		});
