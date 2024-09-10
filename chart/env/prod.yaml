@@ -69,10 +69,10 @@ envVars:
         ]
       }, 
       {
-        "name" : "CohereForAI/c4ai-command-r-plus",
+        "name" : "CohereForAI/c4ai-command-r-plus-08-2024",
         "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"},
-        "description": "Cohere's largest language model, optimized for conversational interaction and tool use.",
-        "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus",
+        "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
+        "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
         "tools": true,
@@ -267,7 +267,8 @@ envVars:
       { "name": "codellama/CodeLlama-70b-Instruct-hf" },
       { "name": "openchat/openchat-3.5-0106" },
       { "name": "meta-llama/Meta-Llama-3-70B-Instruct"},
-      { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8"}
+      { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8"},
+      { "name": "CohereForAI/c4ai-command-r-plus", "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"}
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
   PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
