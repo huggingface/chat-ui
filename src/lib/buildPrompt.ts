@@ -28,6 +28,7 @@ export async function buildPrompt({
 			preprompt,
 			tools,
 			toolResults,
+			continueMessage,
 		})
 		// Not super precise, but it's truncated in the model's backend anyway
 		.split(" ")
@@ -35,12 +36,20 @@ export async function buildPrompt({
 		.join(" ");
 
 	if (continueMessage && model.parameters?.stop) {
-		prompt = model.parameters.stop.reduce((acc: string, curr: string) => {
-			if (acc.endsWith(curr)) {
-				return acc.slice(0, acc.length - curr.length);
+		let trimmedPrompt = prompt.trimEnd();
+		let hasRemovedStop = true;
+		while (hasRemovedStop) {
+			hasRemovedStop = false;
+			for (const stopToken of model.parameters.stop) {
+				if (trimmedPrompt.endsWith(stopToken)) {
+					trimmedPrompt = trimmedPrompt.slice(0, -stopToken.length);
+					hasRemovedStop = true;
+					break;
+				}
 			}
-			return acc;
-		}, prompt.trimEnd());
+			trimmedPrompt = trimmedPrompt.trimEnd();
+		}
+		prompt = trimmedPrompt;
 	}
 
 	return prompt;
