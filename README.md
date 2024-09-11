@@ -337,6 +337,49 @@ We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on T
     }
 ```
 
+#### Group-based Model Permissions
+
+If [logging in with OpenID](#openid-connect) via a supported provider, then user groups can be used in combination with the `allowed_groups` field for each model to show/hide models to users based on their group membership.
+
+For all providers, see the following. Then, see additional instructions for your provider below.
+
+1. Add `PROVIDER: "<provider-name-here>"` to your `.env.local` (you will enter the actual provider name later). Also, add `groups` to the `OPENID_CONFIG.SCOPES` field in your `.env.local` file:
+```env
+OPENID_CONFIG=`{
+  // rest of OPENID_CONFIG here
+  PROVIDER: "<provider-name-here>",
+  SCOPES: "openid profile groups",
+  // rest of OPENID_CONFIG here
+}`
+```
+
+2. Use the `allowed_groups` parameter for each model to specify which group(s) should have access to that model. If not specified, all users will be able to access the model.
+
+> [!WARNING]
+> The first model in your `.env.local` file is considered the "default" model and should be available to all users, so we strongly recommend against setting `allowed_groups` for this model.
+
+> Note that during development, it is common to have `APP_BASE=""` in your `.env.local` - however, due to the cookies created by using a provider, this value should not be empty (e.g. setting `APP_BASE="/"` in `.env.local` would work).
+
+#### Provider: Microsoft Entra
+
+In order to enable use of [Microsoft Entra Security Groups](https://learn.microsoft.com/en-us/entra/fundamentals/concept-learn-about-groups) to show/hide models, do the following:
+
+1. Replace `<provider-name-here>` with `entra` in `.env.local`.
+
+2. `allowed_groups` for each model in `.env.local` should be a list of Microsoft Entra **Group IDs** (not group names), e.g.:
+
+```env
+{
+// rest of the model config here
+"allowed_groups": ["123abcde-1234-abcd-cdef-1234567890ab", "abcde123-abcd-1234-cdef-abcdef123456"]
+}
+```
+
+3. Finally, configure your app in Microsoft Entra so that the app can access user groups via the MS Graph API:
+    - [Add groups claim](https://learn.microsoft.com/en-gb/entra/identity-platform/optional-claims?tabs=appui#configure-groups-optional-claims) to your app
+    - [Enable ID Tokens](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc#enable-id-tokens) for your app
+
+
 #### Running your own models using a custom endpoint
 
 If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.

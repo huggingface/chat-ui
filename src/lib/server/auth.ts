@@ -5,11 +5,13 @@ import {
 	type TokenSet,
 	custom,
 } from "openid-client";
+import { redirect } from "@sveltejs/kit";
 import { addHours, addWeeks } from "date-fns";
 import { env } from "$env/dynamic/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
+import { base } from "$app/paths";
 import type { Cookies } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import JSON5 from "json5";
@@ -17,6 +19,9 @@ import { logger } from "$lib/server/logger";
 
 export interface OIDCSettings {
 	redirectURI: string;
+	response_type?: string;
+	response_mode?: string | undefined;
+	nonce?: string | undefined;
 }
 
 export interface OIDCUserInfo {
@@ -34,6 +39,7 @@ export const OIDConfig = z
 	.object({
 		CLIENT_ID: stringWithDefault(env.OPENID_CLIENT_ID),
 		CLIENT_SECRET: stringWithDefault(env.OPENID_CLIENT_SECRET),
+		PROVIDER: stringWithDefault(env.OPENID_PROVIDER || ""),
 		PROVIDER_URL: stringWithDefault(env.OPENID_PROVIDER_URL),
 		SCOPES: stringWithDefault(env.OPENID_SCOPES),
 		NAME_CLAIM: stringWithDefault(env.OPENID_NAME_CLAIM).refine(
@@ -46,7 +52,14 @@ export const OIDConfig = z
 	})
 	.parse(JSON5.parse(env.OPENID_CONFIG || "{}"));
 
+export const ProviderCookieNames = {
+	ACCESS_TOKEN: OIDConfig.PROVIDER !== "" ? OIDConfig.PROVIDER + "-access-token" : "",
+	PROVIDER_PARAMS: OIDConfig.PROVIDER !== "" ? OIDConfig.PROVIDER + "-params" : "",
+};
+
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
+
+export const responseType = OIDConfig.SCOPES.includes("groups") ? "code id_token" : "code";
 
 const sameSite = z
 	.enum(["lax", "none", "strict"])
@@ -108,7 +121,7 @@ async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 		client_id: OIDConfig.CLIENT_ID,
 		client_secret: OIDConfig.CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
-		response_types: ["code"],
+		response_types: ["code", "id_token"],
 		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
 		id_token_signed_response_alg: OIDConfig.ID_TOKEN_SIGNED_RESPONSE_ALG || undefined,
 	};
@@ -131,8 +144,13 @@ export async function getOIDCAuthorizationUrl(
 
 	return client.authorizationUrl({
 		scope: OIDConfig.SCOPES,
-		state: csrfToken,
+		state: Buffer.from(JSON.stringify({ csrfToken, sessionId: params.sessionId })).toString(
+			"base64"
+		),
 		resource: OIDConfig.RESOURCE || undefined,
+		response_type: settings.response_type,
+		response_mode: settings.response_mode,
+		nonce: settings.nonce,
 	});
 }
 
@@ -142,7 +160,11 @@ export async function getOIDCUserData(
 	iss?: string
 ): Promise<OIDCUserInfo> {
 	const client = await getOIDCClient(settings);
-	const token = await client.callback(settings.redirectURI, { code, iss });
+	const token = await client.callback(
+		settings.redirectURI,
+		{ code, iss },
+		{ nonce: settings.nonce }
+	);
 	const userData = await client.userinfo(token);
 
 	return { token, userData };
@@ -174,4 +196,27 @@ export async function validateAndParseCsrfToken(
 		logger.error(e);
 	}
 	return null;
+}
+
+export async function logout(cookies: Cookies, locals: App.Locals) {
+	await collections.sessions.deleteOne({ sessionId: locals.sessionId });
+
+	const cookie_names = [env.COOKIE_NAME];
+	if (ProviderCookieNames.ACCESS_TOKEN) {
+		cookie_names.push(ProviderCookieNames.ACCESS_TOKEN);
+	}
+	if (ProviderCookieNames.PROVIDER_PARAMS) {
+		cookie_names.push(ProviderCookieNames.PROVIDER_PARAMS);
+	}
+
+	for (const cookie_name of cookie_names) {
+		cookies.delete(cookie_name, {
+			path: env.APP_BASE,
+			// So that it works inside the space's iframe
+			sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
+			secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
+			httpOnly: true,
+		});
+	}
+	redirect(303, `${base}/`);
 }
