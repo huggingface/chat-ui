@@ -3,7 +3,6 @@
 	import { page } from "$app/stores";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
-	import { error } from "$lib/stores/errors";
 
 	export let models: Model[];
 	export let currentModel: Model;
@@ -30,7 +29,7 @@
 
 			await invalidateAll();
 		} catch (error) {
-			$error = "Failed to change model";
+			console.error(error);
 		}
 	}
 </script>
