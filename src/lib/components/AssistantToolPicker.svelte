@@ -116,6 +116,9 @@
 						class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
 					>
 						{suggestion.displayName}
+						{#if suggestion.createdByName}
+							<span class="text-xs text-gray-500"> by {suggestion.createdByName}</span>
+						{/if}
 					</button>
 				{/each}
 			</div>
