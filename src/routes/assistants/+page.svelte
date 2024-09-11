@@ -142,7 +142,7 @@
 				aria-label="Filter assistants by model"
 			>
 				<option value="">All models</option>
-				{#each data.models.filter((model) => !model.unlisted) as model}
+				{#each data.models as model}
 					<option value={model.name}>{model.name}</option>
 				{/each}
 			</select>

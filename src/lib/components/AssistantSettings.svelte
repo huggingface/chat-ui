@@ -265,7 +265,7 @@
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						bind:value={modelId}
 					>
-						{#each models.filter((model) => !model.unlisted) as model}
+						{#each models as model}
 							<option value={model.id}>{model.displayName}</option>
 						{/each}
 						<p class="text-xs text-red-500">{getError("modelId", form)}</p>

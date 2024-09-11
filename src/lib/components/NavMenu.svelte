@@ -43,7 +43,7 @@
 		older: "Older",
 	} as const;
 
-	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
+	const nModels: number = $page.data.models.length;
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0">

@@ -43,7 +43,7 @@
 		</div>
 		<h2 class="text-gray-500">All models available on {envPublic.PUBLIC_APP_NAME}</h2>
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
-			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
+			{#each data.models as model, index (model.id)}
 				<div
 					aria-label="Model card"
 					role="region"

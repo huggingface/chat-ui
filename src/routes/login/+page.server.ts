@@ -1,5 +1,5 @@
 import { redirect } from "@sveltejs/kit";
-import { getOIDCAuthorizationUrl } from "$lib/server/auth";
+import { getOIDCAuthorizationUrl, responseType } from "$lib/server/auth";
 import { base } from "$app/paths";
 import { env } from "$env/dynamic/private";
 
@@ -18,7 +18,12 @@ export const actions = {
 		}
 
 		const authorizationUrl = await getOIDCAuthorizationUrl(
-			{ redirectURI },
+			{
+				redirectURI,
+				response_type: responseType,
+				response_mode: responseType.includes("id_token") ? "form_post" : undefined,
+				nonce: responseType.includes("id_token") ? locals.sessionId : undefined,
+			},
 			{ sessionId: locals.sessionId }
 		);
 
