@@ -6,4 +6,5 @@ export type ChatTemplateInput = {
 	preprompt?: string;
 	tools?: Tool[];
 	toolResults?: ToolResult[];
+	continueMessage?: boolean;
 };

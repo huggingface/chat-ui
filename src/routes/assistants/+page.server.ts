@@ -20,6 +20,7 @@ export const load = async ({ url, locals }) => {
 	const query = url.searchParams.get("q")?.trim() ?? null;
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
+	const showUnfeatured = url.searchParams.get("showUnfeatured") === "true";
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
@@ -34,7 +35,7 @@ export const load = async ({ url, locals }) => {
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user && !locals.user?.isAdmin
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user && !(locals.user?.isAdmin && showUnfeatured)
 			? { featured: true }
 			: {};
 
@@ -75,5 +76,6 @@ export const load = async ({ url, locals }) => {
 		numItemsPerPage: NUM_PER_PAGE,
 		query,
 		sort,
+		showUnfeatured,
 	};
 };

@@ -46,7 +46,7 @@
 		"prettier-plugin-svelte": "^2.10.1",
 		"prettier-plugin-tailwindcss": "^0.2.7",
 		"prom-client": "^15.1.2",
-		"svelte": "^4.2.18",
+		"svelte": "^4.2.19",
 		"svelte-check": "^3.8.5",
 		"ts-node": "^10.9.1",
 		"tslib": "^2.4.1",
@@ -108,6 +108,7 @@
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
+		"@aws-sdk/client-bedrock-runtime": "^3.631.0",
 		"@anthropic-ai/sdk": "^0.25.0",
 		"@anthropic-ai/vertex-sdk": "^0.4.1",
 		"@google-cloud/vertexai": "^1.1.0",

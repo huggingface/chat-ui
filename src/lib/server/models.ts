@@ -94,7 +94,13 @@ async function getChatPromptRender(
 		process.exit();
 	}
 
-	const renderTemplate = ({ messages, preprompt, tools, toolResults }: ChatTemplateInput) => {
+	const renderTemplate = ({
+		messages,
+		preprompt,
+		tools,
+		toolResults,
+		continueMessage,
+	}: ChatTemplateInput) => {
 		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
 			content: message.content,
 			role: message.from,
@@ -222,10 +228,8 @@ async function getChatPromptRender(
 
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
-			add_generation_prompt: true,
+			add_generation_prompt: !continueMessage,
 			chat_template: chatTemplate,
-			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-			// @ts-ignore
 			tools: mappedTools,
 			documents,
 		});
@@ -280,6 +284,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.anthropic(args);
 					case "anthropic-vertex":
 						return endpoints.anthropicvertex(args);
+					case "bedrock":
+						return endpoints.bedrock(args);
 					case "aws":
 						return await endpoints.aws(args);
 					case "openai":
@@ -314,6 +320,9 @@ export const models: ProcessedModel[] = await Promise.all(
 	modelsRaw.map((e) => processModel(e).then(addEndpoint))
 );
 
+// super ugly but not sure how to make typescript happier
+const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
+
 export const defaultModel = models[0];
 
 // Models that have been deprecated
@@ -324,6 +333,7 @@ export const oldModels = env.OLD_MODELS
 					id: z.string().optional(),
 					name: z.string().min(1),
 					displayName: z.string().min(1).optional(),
+					transferTo: validModelIdSchema.optional(),
 				})
 			)
 			.parse(JSON5.parse(env.OLD_MODELS))
