@@ -32,9 +32,14 @@ export async function getTools(
 	if (assistant) {
 		if (assistant?.tools?.length) {
 			preferences = assistant.tools;
-		} else if (assistantHasWebSearch(assistant)) {
-			return [directlyAnswer, websearch];
+
+			if (assistantHasWebSearch(assistant)) {
+				preferences.push(websearch._id.toString());
+			}
 		} else {
+			if (assistantHasWebSearch(assistant)) {
+				return [websearch, directlyAnswer];
+			}
 			return [directlyAnswer];
 		}
 	}
