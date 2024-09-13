@@ -240,6 +240,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 		assistant,
 		enableAssistants,
 		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
+		enableCommunityTools: env.COMMUNITY_TOOLS === "true",
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,

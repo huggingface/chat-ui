@@ -1,9 +1,9 @@
+import { env } from "$env/dynamic/private";
 import { Client } from "@gradio/client";
 
-export async function GET({ url, locals }) {
-	// XXX: feature_flag_tools
-	if (!locals.user?.isEarlyAccess) {
-		return new Response("Not early access", { status: 403 });
+export async function GET({ url }) {
+	if (env.COMMUNITY_TOOLS !== "true") {
+		return new Response("Community tools are not enabled", { status: 403 });
 	}
 
 	const space = url.searchParams.get("space");

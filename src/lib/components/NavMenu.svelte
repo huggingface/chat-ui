@@ -136,8 +136,7 @@
 			Assistants
 		</a>
 	{/if}
-	<!-- XXX: feature_flag_tools -->
-	{#if $page.data.user?.isEarlyAccess}
+	{#if $page.data.enableCommunityTools}
 		<a
 			href="{base}/tools"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
