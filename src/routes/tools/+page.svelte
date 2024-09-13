@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { goto } from "$app/navigation";
@@ -87,21 +86,6 @@
 		});
 	};
 </script>
-
-<svelte:head>
-	{#if isHuggingChat}
-		<title>HuggingChat - Tools</title>
-		<meta property="og:title" content="HuggingChat - Tools" />
-		<meta property="og:type" content="link" />
-		<meta property="og:description" content="Browse HuggingChat tools made by the community." />
-		<meta
-			property="og:image"
-			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/tools-thumbnail.png"
-		/>
-		<meta property="og:url" content={$page.url.href} />
-	{/if}
-</svelte:head>
 
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
