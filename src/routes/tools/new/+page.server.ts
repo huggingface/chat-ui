@@ -1,3 +1,4 @@
+import { env } from "$env/dynamic/private";
 import { authCondition, requiresUser } from "$lib/server/auth.js";
 import { collections } from "$lib/server/database.js";
 import { editableToolSchema } from "$lib/server/tools/index.js";
@@ -8,9 +9,8 @@ import { ObjectId } from "mongodb";
 
 export const actions = {
 	default: async ({ request, locals }) => {
-		// XXX: feature_flag_tools
-		if (!locals.user?.isEarlyAccess) {
-			error(403, "You need to be an early access user to create tools");
+		if (env.COMMUNITY_TOOLS !== "true") {
+			error(403, "Community tools are not enabled");
 		}
 
 		const body = await request.formData();
@@ -66,9 +66,7 @@ export const actions = {
 			updatedAt: new Date(),
 			last24HoursUseCount: 0,
 			useCount: 0,
-			// XXX: feature_flag_tools
-			// since this is scoped to internal team members only, we can assume that they should all be public
-			featured: true,
+			featured: locals.user?.isAdmin ?? false, // admin tools are featured by default
 			searchTokens: generateSearchTokens(parse.data.displayName),
 		});
 

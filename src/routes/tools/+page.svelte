@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { goto } from "$app/navigation";
@@ -88,21 +87,6 @@
 	};
 </script>
 
-<svelte:head>
-	{#if isHuggingChat}
-		<title>HuggingChat - Tools</title>
-		<meta property="og:title" content="HuggingChat - Tools" />
-		<meta property="og:type" content="link" />
-		<meta property="og:description" content="Browse HuggingChat tools made by the community." />
-		<meta
-			property="og:image"
-			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/tools-thumbnail.png"
-		/>
-		<meta property="og:url" content={$page.url.href} />
-	{/if}
-</svelte:head>
-
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
@@ -122,11 +106,10 @@
 		</div>
 		<h3 class="text-gray-500">Popular tools made by the community</h3>
 		<h4 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
-			This feature is in <span
+			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
-				>early access</span
-			>. Only team members can see it and use it for now. Feel free to share feedback on it
-			internally!
+				>experimental</span
+			>. Consider sharing your feedback with us!
 		</h4>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<a
@@ -262,7 +245,11 @@
 									{tool.createdByName}
 								</a>
 								<span class="text-gray-300">•</span>
-								{tool.useCount} runs
+								{#if tool.useCount === 1}
+									1 run
+								{:else}
+									{tool.useCount} runs
+								{/if}
 							</p>
 						{:else}
 							<p class="mt-auto text-xs text-purple-700 dark:text-purple-400">
