@@ -82,7 +82,11 @@
 								{data.tool?.createdByName}
 							</a>
 							<span class="text-gray-300">•</span>
-							{data.tool.useCount} runs
+							{#if data.tool.useCount === 1}
+								1 run
+							{:else}
+								{data.tool.useCount} runs
+							{/if}
 						</p>
 					{/if}
 

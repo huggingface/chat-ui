@@ -262,7 +262,11 @@
 									{tool.createdByName}
 								</a>
 								<span class="text-gray-300">•</span>
-								{tool.useCount} runs
+								{#if tool.useCount === 1}
+									1 run
+								{:else}
+									{tool.useCount} runs
+								{/if}
 							</p>
 						{:else}
 							<p class="mt-auto text-xs text-purple-700 dark:text-purple-400">
