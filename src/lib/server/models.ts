@@ -321,7 +321,7 @@ export const models: ProcessedModel[] = await Promise.all(
 );
 
 // super ugly but not sure how to make typescript happier
-const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
+export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
 
 export const defaultModel = models[0];
 

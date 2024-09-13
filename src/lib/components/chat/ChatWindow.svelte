@@ -35,6 +35,7 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
+	import ModelSwitch from "./ModelSwitch.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -279,6 +280,9 @@
 						on:vote
 						on:continue
 					/>
+					{#if isReadOnly}
+						<ModelSwitch {models} {currentModel} />
+					{/if}
 				</div>
 			{:else if pending}
 				<ChatMessage
@@ -403,9 +407,7 @@
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
-								placeholder={isReadOnly
-									? "This conversation is read-only. Start a new one to continue!"
-									: "Ask anything"}
+								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
 								bind:value={message}
 								on:submit={handleSubmit}
 								on:beforeinput={(ev) => {
