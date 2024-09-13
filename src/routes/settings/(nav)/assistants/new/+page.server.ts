@@ -142,8 +142,7 @@ export const actions: Actions = {
 			createdById,
 			createdByName: locals.user?.username ?? locals.user?.name,
 			...parse.data,
-			// XXX: feature_flag_tools
-			tools: locals.user?.isEarlyAccess ? parse.data.tools : undefined,
+			tools: parse.data.tools,
 			exampleInputs,
 			avatar: hash,
 			createdAt: new Date(),
