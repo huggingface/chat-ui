@@ -1,13 +1,13 @@
+import { env } from "$env/dynamic/private";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import type { BaseTool, CommunityToolDB } from "$lib/types/Tool.js";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
 
-export async function GET({ url, locals }) {
-	// XXX: feature_flag_tools
-	if (!locals.user?.isEarlyAccess) {
-		return new Response("Not early access", { status: 403 });
+export async function GET({ url }) {
+	if (env.COMMUNITY_TOOLS !== "true") {
+		return new Response("Community tools are not enabled", { status: 403 });
 	}
 
 	const query = url.searchParams.get("q")?.trim() ?? null;
@@ -33,6 +33,7 @@ export async function GET({ url, locals }) {
 
 	const matchingConfigTools = toolFromConfigs
 		.filter((tool) => !tool?.isHidden)
+		.filter((tool) => tool.name !== "websearch") // filter out websearch tool from config tools since its added separately
 		.filter((tool) => {
 			if (queryTokens) {
 				return generateSearchTokens(tool.displayName).some((token) =>

@@ -82,7 +82,7 @@
 	})();
 </script>
 
-<div class="flex {sizeClass} items-center justify-center">
+<div class="flex {sizeClass} relative items-center justify-center">
 	<svg xmlns="http://www.w3.org/2000/svg" class="absolute {sizeClass} h-full" viewBox="0 0 52 58">
 		<defs>
 			<linearGradient id="gradient-{gradientColor}" gradientTransform="rotate(90)">

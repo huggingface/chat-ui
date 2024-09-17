@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { goto } from "$app/navigation";
@@ -36,6 +35,8 @@
 	let filterValue = data.query;
 	let isFilterInPorgress = false;
 	let sortValue = data.sort as SortKey;
+
+	let showUnfeatured = data.showUnfeatured;
 
 	const resetFilter = () => {
 		filterValue = "";
@@ -74,6 +75,15 @@
 		goto(newUrl);
 	};
 
+	const toggleShowUnfeatured = () => {
+		showUnfeatured = !showUnfeatured;
+		const newUrl = getHref($page.url, {
+			newKeys: { showUnfeatured: showUnfeatured ? "true" : undefined },
+			existingKeys: { behaviour: "delete", keys: [] },
+		});
+		goto(newUrl);
+	};
+
 	const goToActiveUrl = () => {
 		return getHref($page.url, {
 			newKeys: { active: "true" },
@@ -87,21 +97,6 @@
 		});
 	};
 </script>
-
-<svelte:head>
-	{#if isHuggingChat}
-		<title>HuggingChat - Tools</title>
-		<meta property="og:title" content="HuggingChat - Tools" />
-		<meta property="og:type" content="link" />
-		<meta property="og:description" content="Browse HuggingChat tools made by the community." />
-		<meta
-			property="og:image"
-			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/tools-thumbnail.png"
-		/>
-		<meta property="og:url" content={$page.url.href} />
-	{/if}
-</svelte:head>
 
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
@@ -122,13 +117,18 @@
 		</div>
 		<h3 class="text-gray-500">Popular tools made by the community</h3>
 		<h4 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
-			This feature is in <span
+			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
-				>early access</span
-			>. Only team members can see it and use it for now. Feel free to share feedback on it
-			internally!
+				>experimental</span
+			>. Consider sharing your feedback with us!
 		</h4>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
+			{#if data.user?.isAdmin}
+				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
+					<input type="checkbox" checked={showUnfeatured} on:change={toggleShowUnfeatured} />
+					Show unfeatured tools
+				</label>
+			{/if}
 			<a
 				href={`${base}/tools/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
@@ -228,7 +228,10 @@
 				{@const isOfficial = !tool.createdByName}
 				<a
 					href="{base}/tools/{tool._id.toString()}"
-					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24"
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!tool.featured &&
+					!isOfficial
+						? ' border-red-500/30'
+						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}
 				>
 					<ToolLogo color={tool.color} icon={tool.icon} />
@@ -262,7 +265,11 @@
 									{tool.createdByName}
 								</a>
 								<span class="text-gray-300">•</span>
-								{tool.useCount} runs
+								{#if tool.useCount === 1}
+									1 run
+								{:else}
+									{tool.useCount} runs
+								{/if}
 							</p>
 						{:else}
 							<p class="mt-auto text-xs text-purple-700 dark:text-purple-400">

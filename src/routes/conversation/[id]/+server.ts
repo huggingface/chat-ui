@@ -2,7 +2,7 @@ import { env } from "$env/dynamic/private";
 import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { models } from "$lib/server/models";
+import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
@@ -513,8 +513,11 @@ export async function DELETE({ locals, params }) {
 }
 
 export async function PATCH({ request, locals, params }) {
-	const { title } = z
-		.object({ title: z.string().trim().min(1).max(100) })
+	const values = z
+		.object({
+			title: z.string().trim().min(1).max(100).optional(),
+			model: validModelIdSchema.optional(),
+		})
 		.parse(await request.json());
 
 	const convId = new ObjectId(params.id);
@@ -533,9 +536,7 @@ export async function PATCH({ request, locals, params }) {
 			_id: convId,
 		},
 		{
-			$set: {
-				title,
-			},
+			$set: values,
 		}
 	);
 

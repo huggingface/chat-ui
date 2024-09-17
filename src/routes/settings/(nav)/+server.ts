@@ -22,14 +22,6 @@ export async function POST({ request, locals }) {
 		})
 		.parse(body) satisfies SettingsEditable;
 
-	// only allow tools to be set to community tools if user is early access
-	// XXX: feature_flag_tools
-	if (!locals.user?.isEarlyAccess) {
-		settings.tools = settings.tools?.filter((toolId) => {
-			return toolFromConfigs.some((tool) => tool._id.toString() === toolId);
-		});
-	}
-
 	// make sure all tools exist
 	// either in db or in config
 	if (settings.tools) {
