@@ -163,7 +163,7 @@
 								>
 							{/if}
 						{/if}
-						{#if !data?.user?.isAdmin}
+						{#if data?.user?.isAdmin}
 							<form method="POST" action="?/delete" use:enhance>
 								<button type="submit" class="flex items-center text-red-600 underline">
 									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
