@@ -19,16 +19,27 @@
 	function handleKeydown(event: KeyboardEvent) {
 		// submit on enter
 		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
-			event.preventDefault();
-			// blur to close keyboard on mobile
-			textareaElement.blur();
-			// refocus so that user on desktop can start typing without needing to reclick on textarea
-			if (isDesktop(window)) {
-				textareaElement.focus();
+			//  using isDesktop to check if the user is on a mobile device
+			if (!isDesktop(window)) {
+				event.preventDefault(); // prevent the default behavior of the enter key
+				// insert a newline at the cursor position
+				const start = textareaElement.selectionStart;
+				const end = textareaElement.selectionEnd;
+				value = value.substring(0, start) + '\n' + value.substring(end);
+				textareaElement.selectionStart = textareaElement.selectionEnd = start + 1;
+			} else {
+				event.preventDefault();
+				// blur to close keyboard on mobile
+				textareaElement.blur();
+				// refocus so that user on desktop can start typing without needing to reclick on textarea
+				if (isDesktop(window)) {
+					textareaElement.focus();
+				}
+				dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 			}
-			dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 		}
 	}
+
 
 	onMount(() => {
 		if (isDesktop(window)) {
@@ -44,7 +55,7 @@
 		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
 	<textarea
-		enterkeyhint="send"
+		enterkeyhint={!isDesktop(window) ? "enter" : "send"}
 		tabindex="0"
 		rows="1"
 		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0"
