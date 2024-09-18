@@ -93,7 +93,7 @@
 					{/if}
 
 					<div
-						class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
+						class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
 					>
 						<div class="w-full sm:w-auto">
 							<button
@@ -163,7 +163,7 @@
 								>
 							{/if}
 						{/if}
-						{#if data?.user?.isAdmin}
+						{#if !data?.user?.isAdmin}
 							<form method="POST" action="?/delete" use:enhance>
 								<button type="submit" class="flex items-center text-red-600 underline">
 									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
