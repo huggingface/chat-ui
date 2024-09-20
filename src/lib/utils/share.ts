@@ -1,4 +1,5 @@
 import { browser } from "$app/environment";
+import { isDesktop } from "./isDesktop";
 
 export async function share(url: string, title: string, appendLeafId: boolean = false) {
 	if (!browser) return;
@@ -13,7 +14,7 @@ export async function share(url: string, title: string, appendLeafId: boolean = 
 		url = shareUrl.toString();
 	}
 
-	if (navigator.share) {
+	if (navigator.share && !isDesktop(window)) {
 		navigator.share({ url, title });
 	} else {
 		if (document.hasFocus()) {
