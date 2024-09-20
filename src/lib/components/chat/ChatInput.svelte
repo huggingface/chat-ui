@@ -25,7 +25,7 @@
 				// insert a newline at the cursor position
 				const start = textareaElement.selectionStart;
 				const end = textareaElement.selectionEnd;
-				value = value.substring(0, start) + '\n' + value.substring(end);
+				value = value.substring(0, start) + "\n" + value.substring(end);
 				textareaElement.selectionStart = textareaElement.selectionEnd = start + 1;
 			} else {
 				event.preventDefault();
@@ -39,7 +39,6 @@
 			}
 		}
 	}
-
 
 	onMount(() => {
 		if (isDesktop(window)) {
