@@ -46,29 +46,31 @@
 <Modal on:close={() => goto(previousPage)} width="min-w-xl">
 	<div class="w-full min-w-64 p-8">
 		<div class="flex h-full flex-col gap-2">
-			<div class="flex gap-6">
-				<ToolLogo color={data.tool.color} icon={data.tool.icon} size="lg" />
+			<div class="flex flex-col sm:flex-row sm:gap-6">
+				<div class="mb-4 flex justify-center sm:mb-0">
+					<ToolLogo color={data.tool.color} icon={data.tool.icon} size="lg" />
+				</div>
 
 				<div class="flex-1">
-					<div>
-						<h1 class="mr-1 inline text-xl font-semibold">
+					<div class="flex flex-wrap items-center gap-2">
+						<h1 class="break-words text-xl font-semibold">
 							{data.tool.displayName}
 						</h1>
-						<span class="ml-1 rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+						<span class="inline rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
 							>public</span
 						>
 					</div>
 
 					{#if data.tool?.baseUrl}
 						{#if data.tool.baseUrl.startsWith("https://")}
-							<p class="mb-2 line-clamp-2 font-mono text-gray-500">
+							<p class="mb-2 break-words font-mono text-gray-500">
 								{data.tool.baseUrl}
 							</p>
 						{:else}
 							<a
 								href="https://huggingface.co/spaces/{data.tool.baseUrl}"
 								target="_blank"
-								class="mb-2 line-clamp-2 font-mono text-gray-500 hover:underline"
+								class="mb-2 break-words font-mono text-gray-500 hover:underline"
 							>
 								{data.tool.baseUrl}
 							</a>
@@ -82,32 +84,38 @@
 								{data.tool?.createdByName}
 							</a>
 							<span class="text-gray-300">•</span>
-							{data.tool.useCount} runs
+							{#if data.tool.useCount === 1}
+								1 run
+							{:else}
+								{data.tool.useCount} runs
+							{/if}
 						</p>
 					{/if}
 
 					<div
-						class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
+						class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
 					>
-						<button
-							class="{isActive
-								? 'bg-gray-100 text-gray-800'
-								: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
-							name="Activate model"
-							on:click|stopPropagation={() => {
-								if (isActive) {
-									settings.instantSet({
-										tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
-									});
-								} else {
-									settings.instantSet({
-										tools: [...($settings?.tools ?? []), data.tool._id],
-									});
-								}
-							}}
-						>
-							{isActive ? "Deactivate" : "Activate"}
-						</button>
+						<div class="w-full sm:w-auto">
+							<button
+								class="{isActive
+									? 'bg-gray-100 text-gray-800'
+									: 'bg-black !text-white'} mx-auto my-2 flex w-full w-min items-center justify-center rounded-full px-3 py-1 text-base"
+								name="Activate model"
+								on:click|stopPropagation={() => {
+									if (isActive) {
+										settings.instantSet({
+											tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
+										});
+									} else {
+										settings.instantSet({
+											tools: [...($settings?.tools ?? []), data.tool._id],
+										});
+									}
+								}}
+							>
+								{isActive ? "Deactivate" : "Activate"}
+							</button>
+						</div>
 						{#if data.tool?.createdByMe}
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline"
 								><CarbonPen class="mr-1.5 inline text-xs" />Edit
@@ -178,8 +186,7 @@
 					</div>
 				</div>
 			</div>
-
-			<p class="text-sm">
+			<p class="text-sm max-sm:hidden">
 				Tools are applications that the model can choose to call while you are chatting with it.
 			</p>
 			{#if data.tool.description}
@@ -193,19 +200,22 @@
 				<h2 class="text-lg font-semibold">Direct URL</h2>
 
 				<p class="pb-2 text-sm text-gray-500">Share this link with people to use your tool.</p>
-
 				<div
-					class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
+					class="flex flex-row items-center gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
 				>
-					<input disabled class="flex-1 truncate bg-inherit" value={shareUrl} />
-					<CopyToClipBoardBtn
-						value={shareUrl}
-						classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
-					>
-						<div class="flex items-center gap-1.5 text-gray-500 hover:underline">
-							<CarbonLink />Copy
+					<div class="relative flex-1 overflow-hidden">
+						<input disabled class="w-full truncate bg-inherit pr-16" value={shareUrl} />
+						<div class="absolute right-0 top-1/2 -translate-y-1/2">
+							<CopyToClipBoardBtn
+								value={shareUrl}
+								classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
+							>
+								<div class="flex items-center gap-1.5 text-gray-500 hover:underline">
+									<CarbonLink />Copy
+								</div>
+							</CopyToClipBoardBtn>
 						</div>
-					</CopyToClipBoardBtn>
+					</div>
 				</div>
 			</div>
 		</div>
