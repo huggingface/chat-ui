@@ -73,7 +73,7 @@
 		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
-		"express": "^4.20.0",
+		"express": "^4.21.0",
 		"file-type": "^19.4.1",
 		"google-auth-library": "^9.13.0",
 		"handlebars": "^4.7.8",
