@@ -39,20 +39,23 @@ envVars:
   METRICS_ENABLED: "true"
   MODELS: >
     [
-      { 
-        "name" : "meta-llama/Meta-Llama-3.1-70B-Instruct",
+      {
+        "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
+        "tokenizer": {
+          "tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json",
+          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"
+        },
         "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
         "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
-        "preprompt" : "",
+        "preprompt": "",
         "parameters": {
-            "temperature": 0.6,
-            "top_p": 0.9,
-            "stop": ["<|endoftext|>", "<|eot_id|>"],
+          "temperature": 0.6,
+          "top_p": 0.9,
+          "stop": ["<|endoftext|>", "<|eot_id|>"],
           "max_new_tokens": 1024,
           "truncate": 7167
         },
@@ -60,18 +63,23 @@ envVars:
           {
             "title": "Write an email from bullet list",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          }, {
+          },
+          {
             "title": "Code a snake game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
+          },
+          {
             "title": "Assist in a task",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
-      }, 
+      },
       {
-        "name" : "CohereForAI/c4ai-command-r-plus-08-2024",
-        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"},
+        "name": "CohereForAI/c4ai-command-r-plus-08-2024",
+        "tokenizer": {
+          "tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json",
+          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"
+        },
         "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
@@ -79,151 +87,194 @@ envVars:
         "tools": true,
         "parameters": {
           "stop": ["<|END_OF_TURN_TOKEN|>"],
-          "truncate" : 28672,
-          "max_new_tokens" : 2048,
-          "temperature" : 0.3
+          "truncate": 28672,
+          "max_new_tokens": 2048,
+          "temperature": 0.3
         },
-        "promptExamples" : [
+        "promptExamples": [
           {
             "title": "Generate a mouse portrait",
             "prompt": "Generate the portrait of a scientific mouse in its laboratory."
-          }, {
+          },
+          {
             "title": "Review a pull request",
             "prompt": "Review this pull request: https://github.com/huggingface/chat-ui/pull/1131/files"
-          }, {
+          },
+          {
             "title": "Code a snake game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           }
         ]
       },
       {
-        "name" : "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "description" : "A high-quality sparse mixture of experts model with open weights.",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
-        "websiteUrl" : "https://mistral.ai/news/mixtral-of-experts/",
-        "modelUrl": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "tokenizer": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "preprompt" : "",
-        "parameters" : {
-          "temperature" : 0.6,
-          "top_p" : 0.95,
-          "repetition_penalty" : 1.2,
-          "top_k" : 50,
-          "truncate" : 24576,
-          "max_new_tokens" : 8192,
-          "stop" : ["</s>"]
+        "name": "Qwen/Qwen2.5-72B-Instruct",
+        "tokenizer": "Qwen/Qwen2.5-72B-Instruct",
+        "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
+        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "preprompt": "",
+        "parameters": {
+          "temperature": 0.6,
+          "stop": ["<|endoftext|>", "<|im_end|>"],
+          "truncate": 28672,
+          "max_new_tokens": 3072,
         },
-        "promptExamples" : [
+        "promptExamples": [
           {
             "title": "Write an email from bullet list",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          }, {
+          },
+          {
             "title": "Code a snake game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
-          }, {
+          },
+          {
             "title": "Assist in a task",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
       },
       {
-          "name" : "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-          "description" : "Nous Hermes' strong flagship model trained on the Mixtral 8x7B.",
-          "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
-          "websiteUrl" : "https://nousresearch.com/",
-          "modelUrl": "https://huggingface.co/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-          "tokenizer": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-          "promptExamples": [
-            {
-              "title": "Write an email from bullet list",
-              "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-            }, {
-              "title": "Code a snake game",
-              "prompt": "Code a basic snake game in python, give explanations for each step."
-            }, {
-              "title": "Assist in a task",
-              "prompt": "How do I make a delicious lemon cheesecake?"
-            }
-          ],
-          "parameters": {
-            "temperature": 0.7,
-            "top_p": 0.95,
-            "repetition_penalty": 1,
-            "top_k": 50,
-            "truncate": 24576,
-            "max_new_tokens": 2048,
-            "stop": ["<|im_end|>"]
+        "name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "description": "A high-quality sparse mixture of experts model with open weights.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
+        "websiteUrl": "https://mistral.ai/news/mixtral-of-experts/",
+        "modelUrl": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "tokenizer": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "preprompt": "",
+        "parameters": {
+          "temperature": 0.6,
+          "top_p": 0.95,
+          "repetition_penalty": 1.2,
+          "top_k": 50,
+          "truncate": 24576,
+          "max_new_tokens": 8192,
+          "stop": ["</s>"]
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
           }
-        },
-        {
-          "name": "mistralai/Mistral-7B-Instruct-v0.3",
-          "displayName": "mistralai/Mistral-7B-Instruct-v0.3",
-          "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
-          "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
-          "websiteUrl": "https://mistral.ai/news/announcing-mistral-7b/",
-          "modelUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
-          "tokenizer": "mistralai/Mistral-7B-Instruct-v0.3",
-          "preprompt": "",
-          "parameters": {
-            "temperature": 0.3,
-            "top_p": 0.95,
-            "repetition_penalty": 1.2,
-            "top_k": 50,
-            "truncate": 3072,
-            "max_new_tokens": 1024,
-            "stop": ["</s>"]
+        ]
+      },
+      {
+        "name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "description": "Nous Hermes' strong flagship model trained on the Mixtral 8x7B.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
+        "websiteUrl": "https://nousresearch.com/",
+        "modelUrl": "https://huggingface.co/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "tokenizer": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
-          "promptExamples": [
-            {
-              "title": "Write an email from bullet list",
-              "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-            }, {
-              "title": "Code a snake game",
-              "prompt": "Code a basic snake game in python, give explanations for each step."
-            }, {
-              "title": "Assist in a task",
-              "prompt": "How do I make a delicious lemon cheesecake?"
-            }
-          ]
-        },
-        {
-          "name": "microsoft/Phi-3-mini-4k-instruct",
-          "tokenizer": "microsoft/Phi-3-mini-4k-instruct",
-          "description" : "One of the best small models (3.8B parameters), super fast for simple tasks.",
-          "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
-          "modelUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
-          "websiteUrl": "https://azure.microsoft.com/en-us/blog/introducing-phi-3-redefining-whats-possible-with-slms/",
-          "preprompt": "",
-          "parameters": {
-            "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
-            "temperature": 0.7,
-            "max_new_tokens": 1024,
-            "truncate": 3071
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
           },
-          "promptExamples": [
-            {
-              "title": "Write an email from bullet list",
-              "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-            }, {
-              "title": "Code a snake game",
-              "prompt": "Code a basic snake game in python, give explanations for each step."
-            }, {
-              "title": "Assist in a task",
-              "prompt": "How do I make a delicious lemon cheesecake?"
-            }
-          ]
-        },
-        {
-          "name" : "llhf/Meta-Llama-3.1-8B-Instruct",
-        "tokenizer": {"tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json", "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"},
-          "parameters": {
-            "temperature": 0.6,
-            "top_p": 0.9,
-            "stop": ["<|endoftext|>", "<|eot_id|>"],
-          },
-          "unlisted": true
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
+        "parameters": {
+          "temperature": 0.7,
+          "top_p": 0.95,
+          "repetition_penalty": 1,
+          "top_k": 50,
+          "truncate": 24576,
+          "max_new_tokens": 2048,
+          "stop": ["<|im_end|>"]
         }
+      },
+      {
+        "name": "mistralai/Mistral-7B-Instruct-v0.3",
+        "displayName": "mistralai/Mistral-7B-Instruct-v0.3",
+        "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
+        "websiteUrl": "https://mistral.ai/news/announcing-mistral-7b/",
+        "modelUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+        "tokenizer": "mistralai/Mistral-7B-Instruct-v0.3",
+        "preprompt": "",
+        "parameters": {
+          "temperature": 0.3,
+          "top_p": 0.95,
+          "repetition_penalty": 1.2,
+          "top_k": 50,
+          "truncate": 3072,
+          "max_new_tokens": 1024,
+          "stop": ["</s>"]
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
+        "name": "microsoft/Phi-3-mini-4k-instruct",
+        "tokenizer": "microsoft/Phi-3-mini-4k-instruct",
+        "description": "One of the best small models (3.8B parameters), super fast for simple tasks.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
+        "modelUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
+        "websiteUrl": "https://azure.microsoft.com/en-us/blog/introducing-phi-3-redefining-whats-possible-with-slms/",
+        "preprompt": "",
+        "parameters": {
+          "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
+          "temperature": 0.7,
+          "max_new_tokens": 1024,
+          "truncate": 3071
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
+        "name": "llhf/Meta-Llama-3.1-8B-Instruct",
+        "tokenizer": {
+          "tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json",
+          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"
+        },
+        "parameters": {
+          "temperature": 0.6,
+          "top_p": 0.9,
+          "stop": ["<|endoftext|>", "<|eot_id|>"]
+        },
+        "unlisted": true
+      }
     ]
+
   NODE_ENV: "prod"
   NODE_LOG_STRUCTURED_DATA: true
   OLD_MODELS: >
