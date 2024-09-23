@@ -27,7 +27,7 @@ async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, unde
 			type: MessageUpdateType.Status,
 			status: MessageUpdateStatus.KeepAlive,
 		};
-		await new Promise((resolve) => setTimeout(resolve, 5000));
+		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
 }
 
