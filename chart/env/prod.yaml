@@ -115,7 +115,7 @@ envVars:
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
         "preprompt": "",
         "parameters": {
-          "temperature": 0.3,
+          "temperature": 0.6,
           "stop": ["<|endoftext|>", "<|im_end|>"],
           "truncate": 28672,
           "max_new_tokens": 3072,
