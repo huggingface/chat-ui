@@ -12,6 +12,7 @@ import JSON5 from "json5";
 import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
 import { collections } from "./database";
 import { ObjectId } from "mongodb";
+import { encrypt } from "$lib/utils/encryption";
 
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
@@ -44,6 +45,29 @@ const rawEmbeddingModelJSON =
 
 const embeddingModelsRaw = z.array(modelConfig).parse(JSON5.parse(rawEmbeddingModelJSON));
 
+const encryptEndpoints = (endpoints: z.infer<typeof modelConfig>["endpoints"]) =>
+	endpoints.map((endpoint) => {
+		switch (endpoint.type) {
+			case "openai":
+				return {
+					...endpoint,
+					apiKey: encrypt(endpoint.apiKey),
+				};
+			case "tei":
+				return {
+					...endpoint,
+					authorization: endpoint.authorization && encrypt(endpoint.authorization),
+				};
+			case "hfapi":
+				return {
+					...endpoint,
+					authorization: endpoint.authorization && encrypt(endpoint.authorization),
+				};
+			default:
+				return endpoint;
+		}
+	});
+
 const embeddingModels = embeddingModelsRaw.map((rawEmbeddingModel) => {
 	const embeddingModel: EmbeddingModel = {
 		name: rawEmbeddingModel.name,
@@ -57,7 +81,7 @@ const embeddingModels = embeddingModelsRaw.map((rawEmbeddingModel) => {
 		_id: new ObjectId(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
-		endpoints: rawEmbeddingModel.endpoints,
+		endpoints: encryptEndpoints(rawEmbeddingModel.endpoints),
 	};
 
 	return embeddingModel;
@@ -79,7 +103,6 @@ export const getEmbeddingEndpoint = async (embeddingModel: EmbeddingModel) => {
 	for (const endpoint of embeddingModel.endpoints) {
 		if (random < endpoint.weight) {
 			const args = { ...endpoint, model: embeddingModel };
-			console.log(args.type);
 
 			switch (args.type) {
 				case "tei":

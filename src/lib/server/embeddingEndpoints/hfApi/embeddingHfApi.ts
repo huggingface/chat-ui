@@ -4,6 +4,7 @@ import { chunk } from "$lib/utils/chunk";
 import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
 import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
+import { decrypt } from "$lib/utils/encryption";
 
 export const embeddingEndpointHfApiSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -23,6 +24,9 @@ export async function embeddingEndpointHfApi(
 ): Promise<EmbeddingEndpoint> {
 	const { model } = input;
 	const { authorization } = embeddingEndpointHfApiSchema.parse(input);
+
+	const decryptedAuthorization = authorization && decrypt(authorization);
+
 	const url = "https://api-inference.huggingface.co/models/" + model.name;
 
 	return async ({ inputs }) => {
@@ -35,7 +39,7 @@ export async function embeddingEndpointHfApi(
 					headers: {
 						Accept: "application/json",
 						"Content-Type": "application/json",
-						...(authorization ? { Authorization: authorization } : {}),
+						...(decryptedAuthorization ? { Authorization: decryptedAuthorization } : {}),
 					},
 					body: JSON.stringify({
 						inputs: {

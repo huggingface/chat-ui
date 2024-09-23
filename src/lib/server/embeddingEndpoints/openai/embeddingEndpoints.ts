@@ -3,6 +3,7 @@ import type { EmbeddingEndpoint, Embedding } from "../embeddingEndpoints";
 import { chunk } from "$lib/utils/chunk";
 import { env } from "$env/dynamic/private";
 import type { EmbeddingModel } from "$lib/types/EmbeddingModel";
+import { decrypt } from "$lib/utils/encryption";
 
 export const embeddingEndpointOpenAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -22,6 +23,8 @@ export async function embeddingEndpointOpenAI(
 	const { model } = input;
 	const { url, apiKey, defaultHeaders } = embeddingEndpointOpenAIParametersSchema.parse(input);
 
+	const decryptedApiKey = decrypt(apiKey);
+
 	const maxBatchSize = model.maxBatchSize || 100;
 
 	return async ({ inputs }) => {
@@ -36,7 +39,7 @@ export async function embeddingEndpointOpenAI(
 					headers: {
 						Accept: "application/json",
 						"Content-Type": "application/json",
-						...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						...(decryptedApiKey ? { Authorization: `Bearer ${decryptedApiKey}` } : {}),
 						...defaultHeaders,
 					},
 					body: JSON.stringify({ input: batchInputs, model: model.name }),
