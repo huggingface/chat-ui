@@ -21,6 +21,9 @@
 		<h2>Application Settings</h2>
 	</div>
 
+	<p class="text-sm text-gray-500">
+		Running on commit <span class="font-mono">{envPublic.PUBLIC_COMMIT_SHA.slice(0, 7)}</span>
+	</p>
 	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
 		{#if envPublic.PUBLIC_APP_DATA_SHARING === "1"}
 			<!-- svelte-ignore a11y-label-has-associated-control -->
