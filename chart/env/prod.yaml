@@ -136,14 +136,15 @@ envVars:
       },
       {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
-        "tokenizer": "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "description": "The latest multimodal model from Meta! Supports image inputs natively.",
         "websiteUrl": "https://llama.com/",
         "multimodal": true,
         "parameters": {
-          "stop": ["<|eot_id|>"],
+          "stop": ["<|eot_id|>", "<|im_end|>"],
           "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
         },
         "endpoint": {
           "type": "openai",
