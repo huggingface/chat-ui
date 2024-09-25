@@ -53,9 +53,8 @@ envVars:
         "tools": true,
         "preprompt": "",
         "parameters": {
-          "temperature": 0.6,
-          "top_p": 0.9,
           "stop": ["<|endoftext|>", "<|eot_id|>"],
+          "temperature": 0.6,
           "max_new_tokens": 1024,
           "truncate": 7167
         },
@@ -115,42 +114,10 @@ envVars:
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
         "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
         "parameters": {
-          "temperature": 0.6,
           "stop": ["<|endoftext|>", "<|im_end|>"],
-          "truncate": 28672,
-          "max_new_tokens": 3072,
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
-      },
-      {
-        "name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "description": "A high-quality sparse mixture of experts model with open weights.",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
-        "websiteUrl": "https://mistral.ai/news/mixtral-of-experts/",
-        "modelUrl": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "tokenizer": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "preprompt": "",
-        "parameters": {
           "temperature": 0.6,
-          "top_p": 0.95,
-          "repetition_penalty": 1.2,
-          "top_k": 50,
-          "truncate": 24576,
-          "max_new_tokens": 8192,
-          "stop": ["</s>"]
+          "truncate": 28672,
+          "max_new_tokens": 3072
         },
         "promptExamples": [
           {
@@ -168,12 +135,12 @@ envVars:
         ]
       },
       {
-        "name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        "description": "Nous Hermes' strong flagship model trained on the Mixtral 8x7B.",
+        "name": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "description": "Nous Research's latest Hermes 3 release in 8B size. Follows instruction closely.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
         "websiteUrl": "https://nousresearch.com/",
-        "modelUrl": "https://huggingface.co/NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        "tokenizer": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+        "tokenizer": "NousResearch/Hermes-3-Llama-3.1-8B",
         "promptExamples": [
           {
             "title": "Write an email from bullet list",
@@ -189,32 +156,26 @@ envVars:
           }
         ],
         "parameters": {
-          "temperature": 0.7,
-          "top_p": 0.95,
-          "repetition_penalty": 1,
-          "top_k": 50,
-          "truncate": 24576,
-          "max_new_tokens": 2048,
-          "stop": ["<|im_end|>"]
+          "stop": ["<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
         }
       },
       {
-        "name": "mistralai/Mistral-7B-Instruct-v0.3",
-        "displayName": "mistralai/Mistral-7B-Instruct-v0.3",
+        "name": "mistralai/Mistral-Nemo-Instruct-2407",
+        "tokenizer": "mistralai/Mistral-Nemo-Instruct-2407",
+        "displayName": "mistralai/Mistral-Nemo-Instruct-2407",
         "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
-        "websiteUrl": "https://mistral.ai/news/announcing-mistral-7b/",
-        "modelUrl": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
-        "tokenizer": "mistralai/Mistral-7B-Instruct-v0.3",
+        "websiteUrl": "https://mistral.ai/news/mistral-nemo/",
+        "modelUrl": "https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407",
         "preprompt": "",
         "parameters": {
-          "temperature": 0.3,
-          "top_p": 0.95,
-          "repetition_penalty": 1.2,
-          "top_k": 50,
-          "truncate": 3072,
-          "max_new_tokens": 1024,
-          "stop": ["</s>"]
+          "stop": ["</s>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
         },
         "promptExamples": [
           {
@@ -232,18 +193,18 @@ envVars:
         ]
       },
       {
-        "name": "microsoft/Phi-3-mini-4k-instruct",
-        "tokenizer": "microsoft/Phi-3-mini-4k-instruct",
+        "name": "microsoft/Phi-3.5-mini-instruct",
+        "tokenizer": "microsoft/Phi-3.5-mini-instruct",
         "description": "One of the best small models (3.8B parameters), super fast for simple tasks.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
-        "modelUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
-        "websiteUrl": "https://azure.microsoft.com/en-us/blog/introducing-phi-3-redefining-whats-possible-with-slms/",
+        "modelUrl": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct",
+        "websiteUrl": "https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/discover-the-new-multi-lingual-high-quality-phi-3-5-slms/ba-p/4225280/",
         "preprompt": "",
         "parameters": {
           "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
-          "temperature": 0.7,
-          "max_new_tokens": 1024,
-          "truncate": 3071
+          "temperature": 0.6,
+          "truncate": 28672,
+          "max_new_tokens": 3072
         },
         "promptExamples": [
           {
@@ -268,7 +229,6 @@ envVars:
         },
         "parameters": {
           "temperature": 0.6,
-          "top_p": 0.9,
           "stop": ["<|endoftext|>", "<|eot_id|>"]
         },
         "unlisted": true
@@ -290,10 +250,32 @@ envVars:
       { "name": "meta-llama/Llama-2-70b-chat-hf" },
       { "name": "codellama/CodeLlama-70b-Instruct-hf" },
       { "name": "openchat/openchat-3.5-0106" },
-      { "name": "meta-llama/Meta-Llama-3-70B-Instruct"},
-      { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8"},
-      { "name": "CohereForAI/c4ai-command-r-plus", "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"},
-      { "name": "01-ai/Yi-1.5-34B-Chat", "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"}
+      { "name": "meta-llama/Meta-Llama-3-70B-Instruct" },
+      { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8" },
+      {
+        "name": "CohereForAI/c4ai-command-r-plus",
+        "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"
+      },
+      {
+        "name": "01-ai/Yi-1.5-34B-Chat",
+        "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"
+      },
+      {
+        "name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "transferTo": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      {
+        "name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "transferTo": "NousResearch/Hermes-3-Llama-3.1-8B"
+      },
+      {
+        "name": "mistralai/Mistral-7B-Instruct-v0.3",
+        "transferTo": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      {
+        "name": "microsoft/Phi-3-mini-4k-instruct",
+        "transferTo": "microsoft/Phi-3.5-mini-instruct"
+      }
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
   PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
