@@ -93,7 +93,7 @@
 					{/if}
 
 					<div
-						class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
+						class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
 					>
 						<div class="w-full sm:w-auto">
 							<button
