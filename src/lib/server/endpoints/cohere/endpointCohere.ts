@@ -62,6 +62,7 @@ export async function endpointCohere(
 				});
 
 				stream = await cohere.chatStream({
+					force_single_step: true,
 					message: prompt,
 					rawPrompting: true,
 					model: model.id ?? model.name,
@@ -82,6 +83,7 @@ export async function endpointCohere(
 
 				stream = await cohere
 					.chatStream({
+						force_single_step: true,
 						model: model.id ?? model.name,
 						chatHistory: formattedMessages.slice(0, -1),
 						message: formattedMessages[formattedMessages.length - 1].message,
