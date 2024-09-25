@@ -9,6 +9,7 @@
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonChat from "~icons/carbon/chat";
+	import CarbonCode from "~icons/carbon/code";
 
 	import { goto } from "$app/navigation";
 
@@ -76,6 +77,17 @@
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Model website
+			</a>
+		{/if}
+		{#if model.hasInferenceAPI}
+			<a
+				href={"https://huggingface.co/playground?modelId=" + model.name}
+				target="_blank"
+				rel="noreferrer"
+				class="flex items-center truncate underline underline-offset-2"
+			>
+				<CarbonCode class="mr-1.5 shrink-0 text-xs " />
+				API Playground
 			</a>
 		{/if}
 		<CopyToClipBoardBtn
