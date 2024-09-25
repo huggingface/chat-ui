@@ -39,6 +39,16 @@
 			<div class="max-sm:hidden">&nbsp;page</div></a
 		>
 	{/if}
+	{#if model.hasInferenceAPI}
+		<a
+			href={"https://huggingface.co/playground?modelId=" + model.name}
+			target="_blank"
+			rel="noreferrer"
+			class="flex items-center hover:underline"
+			><CarbonCode class="mr-1.5 shrink-0 text-xs text-gray-400" />
+			API
+		</a>
+	{/if}
 	{#if model.websiteUrl}
 		<a
 			href={model.websiteUrl}
@@ -53,16 +63,6 @@
 				<CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
 				Website
 			{/if}
-		</a>
-	{/if}
-	{#if model.hasInferenceAPI}
-		<a
-			href={"https://huggingface.co/playground?modelId=" + model.name}
-			target="_blank"
-			rel="noreferrer"
-			class="flex items-center hover:underline"
-			><CarbonCode class="mr-1.5 shrink-0 text-xs text-gray-400" />
-			API
 		</a>
 	{/if}
 </div>
