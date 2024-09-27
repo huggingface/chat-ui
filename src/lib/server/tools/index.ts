@@ -69,7 +69,11 @@ const toolInputSchema = toolInputBaseSchema.and(
 
 export const editableToolSchema = z
 	.object({
-		name: z.string().min(1).max(40),
+		name: z
+			.string()
+			.regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/) // only allow letters, numbers, and underscores, and start with a letter or underscore
+			.min(1)
+			.max(40),
 		// only allow huggingface spaces either through namespace or direct URLs
 		baseUrl: z.union([
 			z.string().regex(/^[^/]+\/[^/]+$/),
