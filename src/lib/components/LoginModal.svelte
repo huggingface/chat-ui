@@ -23,9 +23,7 @@
 			{envPublic.PUBLIC_APP_DESCRIPTION}
 		</p>
 		<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
-			You have reached the guest message limit, <strong class="font-semibold"
-				>Sign In with a free Hugging Face account</strong
-			> to continue using HuggingChat.
+			{envPublic.PUBLIC_APP_GUEST_MESSAGE}
 		</p>
 
 		<form
