@@ -16,7 +16,7 @@ export const endpointVertexParametersSchema = z.object({
 	model: z.any(), // allow optional and validate against emptiness
 	type: z.literal("vertex"),
 	location: z.string().default("europe-west1"),
-	extraBody: z.record(z.any()).optional(),
+	extraBody: z.object({ model_version: z.string() }).optional(),
 	project: z.string(),
 	apiEndpoint: z.string().optional(),
 	safetyThreshold: z
