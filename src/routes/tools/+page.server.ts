@@ -23,6 +23,7 @@ export const load = async ({ url, locals }) => {
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 	const activeOnly = url.searchParams.get("active") === "true";
+	const showUnfeatured = url.searchParams.get("showUnfeatured") === "true";
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
@@ -44,7 +45,9 @@ export const load = async ({ url, locals }) => {
 	const queryTokens = !!query && generateQueryTokens(query);
 
 	const filter: Filter<CommunityToolDB> = {
-		...(!createdByCurrentUser && !activeOnly && !locals.user?.isAdmin && { featured: true }),
+		...(!createdByCurrentUser &&
+			!activeOnly &&
+			!(locals.user?.isAdmin && showUnfeatured) && { featured: true }),
 		...(user && { createdById: user._id }),
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {
@@ -90,5 +93,6 @@ export const load = async ({ url, locals }) => {
 		numItemsPerPage: NUM_PER_PAGE,
 		query,
 		sort,
+		showUnfeatured,
 	};
 };

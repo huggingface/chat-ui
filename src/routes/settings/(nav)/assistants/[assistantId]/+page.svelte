@@ -47,25 +47,26 @@
 	<ReportModal on:close={() => (displayReportModal = false)} />
 {/if}
 <div class="flex h-full flex-col gap-2">
-	<div class="flex gap-6">
-		{#if assistant?.avatar}
-			<!-- crop image if not square  -->
-			<img
-				src={`${base}/settings/assistants/${assistant?._id}/avatar.jpg?hash=${assistant?.avatar}`}
-				alt="Avatar"
-				class="size-16 flex-none rounded-full object-cover sm:size-24"
-			/>
-		{:else}
-			<div
-				class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24"
-			>
-				{assistant?.name[0]}
-			</div>
-		{/if}
+	<div class="flex flex-col sm:flex-row sm:gap-6">
+		<div class="mb-4 flex justify-center sm:mb-0">
+			{#if assistant?.avatar}
+				<img
+					src={`${base}/settings/assistants/${assistant?._id}/avatar.jpg?hash=${assistant?.avatar}`}
+					alt="Avatar"
+					class="size-16 flex-none rounded-full object-cover sm:size-24"
+				/>
+			{:else}
+				<div
+					class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24"
+				>
+					{assistant?.name[0]}
+				</div>
+			{/if}
+		</div>
 
 		<div class="flex-1">
-			<div class="mb-1.5">
-				<h1 class="mr-1 inline text-xl font-semibold">
+			<div class="flex flex-wrap items-center gap-2">
+				<h1 class="break-words text-xl font-semibold">
 					{assistant?.name}
 				</h1>
 
@@ -77,7 +78,7 @@
 						<IconInternet classNames="text-sm text-blue-600" />
 					</span>
 				{/if}
-				<span class="ml-1 rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
 					>public</span
 				>
 			</div>
@@ -96,21 +97,23 @@
 				</a>
 			</p>
 			<div
-				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
+				class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
 			>
-				<button
-					class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
-					name="Activate model"
-					on:click|stopPropagation={() => {
-						settings.instantSet({
-							activeModel: $page.params.assistantId,
-						});
-						goto(`${base}/`);
-					}}
-				>
-					<CarbonChat class="mr-1.5 text-sm" />
-					New chat
-				</button>
+				<div class="w-full sm:w-auto">
+					<button
+						class="mx-auto my-2 flex w-full w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
+						name="Activate model"
+						on:click|stopPropagation={() => {
+							settings.instantSet({
+								activeModel: $page.params.assistantId,
+							});
+							goto(`${base}/`);
+						}}
+					>
+						<CarbonChat class="mr-1.5 text-sm" />
+						New chat
+					</button>
+				</div>
 				{#if assistant?.createdByMe}
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
