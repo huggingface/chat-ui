@@ -65,7 +65,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		const hasFiles = messages.some((message) => message.files && message.files.length > 0);
 
 		const generativeModel = vertex_ai.getGenerativeModel({
-			model: extraBody.model_version ?? model.id ?? model.name,
+			model: extraBody?.model_version ?? model.id ?? model.name,
 			safetySettings: safetyThreshold
 				? [
 						{
