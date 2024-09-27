@@ -44,7 +44,8 @@
 				body: JSON.stringify({
 					model,
 					preprompt: $settings.customPrompts[$settings.activeModel],
-					assistantId: data.assistant?._id,
+					assistantId: data.embeddedAssistantId ?? data.assistant?._id,
+					// todo: embeddedAssistantId should be an actual field so that it can check
 				}),
 			});
 
@@ -62,6 +63,16 @@
 				content: message,
 				files,
 			});
+
+			// embedded assistant
+			if (data.embeddedAssistantId) {
+				await goto(
+					`${base}/conversation/${conversationId}/?embeddedAssistantId=${encodeURIComponent(
+						data.embeddedAssistantId
+					)}`
+				);
+				return;
+			}
 
 			// invalidateAll to update list of conversations
 			await goto(`${base}/conversation/${conversationId}`, { invalidateAll: true });

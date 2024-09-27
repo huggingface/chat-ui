@@ -226,7 +226,7 @@
 	on:drop|preventDefault={() => (onDrag = false)}
 />
 
-<div class="relative min-h-0 min-w-0">
+<div class="relative min-w-0" class:min-h-[400px]={$page.data.embeddedAssistantId}>
 	{#if loginModalOpen}
 		<LoginModal
 			on:close={() => {
@@ -238,11 +238,12 @@
 		class="scrollbar-custom mr-1 h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.length ? [...messages] : false}
 		bind:this={chatContainer}
+		id="chat-container"
 	>
 		<div
 			class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
 		>
-			{#if $page.data?.assistant && !!messages.length}
+			{#if $page.data?.assistant && !!messages.length && !$page.data.embeddedAssistantId}
 				<a
 					class="mx-auto flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 py-1 pl-1 pr-3 text-sm text-gray-800 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
 					href="{base}/settings/assistants/{$page.data.assistant._id}"
@@ -264,7 +265,7 @@
 
 					{$page.data.assistant.name}
 				</a>
-			{:else if preprompt && preprompt != currentModel.preprompt}
+			{:else if preprompt && preprompt != currentModel.preprompt && !$page.data.embeddedAssistantId}
 				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 
@@ -455,6 +456,7 @@
 			</form>
 			<div
 				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
+				class:hidden={$page.data.embeddedAssistantId}
 			>
 				<p>
 					Model:
