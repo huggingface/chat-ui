@@ -9,7 +9,7 @@
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonTools from "~icons/carbon/tools";
-
+	import CarbonImage from "~icons/carbon/image";
 	export let data: PageData;
 </script>
 
@@ -59,6 +59,14 @@
 								class="ml-auto grid size-[21px] place-items-center rounded-lg border border-purple-300 dark:border-purple-700"
 							>
 								<CarbonTools class="text-xxs text-purple-700 dark:text-purple-500" />
+							</div>
+						{/if}
+						{#if model.multimodal}
+							<div
+								title="This model is multimodal and supports image inputs natively."
+								class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-500"
+							>
+								<CarbonImage class="text-xxs text-blue-700 dark:text-blue-500" />
 							</div>
 						{/if}
 						{#if index === 0}

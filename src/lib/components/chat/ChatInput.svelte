@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isDesktop } from "$lib/utils/isDesktop";
+	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
 	export let value = "";
@@ -13,25 +13,41 @@
 
 	const dispatch = createEventDispatcher<{ submit: void }>();
 
+	function isVirtualKeyboard(): boolean {
+		if (!browser) return false;
+
+		// Check for touch capability
+		if (navigator.maxTouchPoints > 0) return true;
+
+		// Check for touch events
+		if ("ontouchstart" in window) return true;
+
+		// Fallback to user agent string check
+		const userAgent = navigator.userAgent.toLowerCase();
+
+		return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+	}
+
 	$: minHeight = `${1 + minRows * 1.5}em`;
 	$: maxHeight = maxRows ? `${1 + maxRows * 1.5}em` : `auto`;
 
 	function handleKeydown(event: KeyboardEvent) {
-		// submit on enter
 		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
 			event.preventDefault();
-			// blur to close keyboard on mobile
-			textareaElement.blur();
-			// refocus so that user on desktop can start typing without needing to reclick on textarea
-			if (isDesktop(window)) {
-				textareaElement.focus();
+			if (isVirtualKeyboard()) {
+				// Insert a newline at the cursor position
+				const start = textareaElement.selectionStart;
+				const end = textareaElement.selectionEnd;
+				value = value.substring(0, start) + "\n" + value.substring(end);
+				textareaElement.selectionStart = textareaElement.selectionEnd = start + 1;
+			} else {
+				dispatch("submit");
 			}
-			dispatch("submit"); // use a custom event instead of `event.target.form.requestSubmit()` as it does not work on Safari 14
 		}
 	}
 
 	onMount(() => {
-		if (isDesktop(window)) {
+		if (!isVirtualKeyboard()) {
 			textareaElement.focus();
 		}
 	});
@@ -44,7 +60,7 @@
 		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
 	<textarea
-		enterkeyhint="send"
+		enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
 		tabindex="0"
 		rows="1"
 		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0"
