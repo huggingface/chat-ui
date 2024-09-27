@@ -27,6 +27,7 @@
 	import AssistantIntroduction from "./AssistantIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
+	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
@@ -328,8 +329,14 @@
 				/>
 			{/if}
 		</div>
+
+		<ScrollToPreviousBtn
+			class="fixed right-4 max-md:bottom-[calc(50%+26px)] md:bottom-48 lg:right-10"
+			scrollNode={chatContainer}
+		/>
+
 		<ScrollToBottomBtn
-			class="bottom-36 right-4 max-md:hidden lg:right-10"
+			class="fixed right-4 max-md:bottom-[calc(50%-26px)] md:bottom-36 lg:right-10"
 			scrollNode={chatContainer}
 		/>
 	</div>
