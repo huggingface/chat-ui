@@ -8,7 +8,6 @@ export async function GET({ params }) {
 			const chatContainerEl = iframe.contentWindow.document.getElementById('chat-container');
 			if(chatContainerEl){
 				const contentHeight = chatContainerEl.scrollHeight;
-				console.log('Resizing iframe. Content height:', contentHeight);
 				iframe.style.height = Math.max(400, Math.min(contentHeight, maxHeight)) + "px";
 			}
 		}
@@ -44,7 +43,6 @@ export async function GET({ params }) {
 		iframe.src = \`http://localhost:5173/chat/?embeddedAssistantId=${id}\`;
 		
 		iframe.onload = function() {
-			console.log('Iframe loaded');
 			const iframeWindow = this.contentWindow;
 			const iframeDocument = iframeWindow.document;
 			
@@ -55,7 +53,6 @@ export async function GET({ params }) {
 				if (chatContainer) {
 					const newHeight = chatContainer.scrollHeight;
 					if (newHeight !== lastHeight) {
-						console.log('Height changed from', lastHeight, 'to', newHeight);
 						resizeIframeToContentSize(iframe);
 						lastHeight = newHeight;
 					}
@@ -68,17 +65,16 @@ export async function GET({ params }) {
 
 			// Set up MutationObserver as a backup
 			const observer = new MutationObserver(() => {
-				console.log('Mutation detected');
 				resizeIframeToContentSize(iframe);
 			});
 
 			function initMutationObserver() {
 				const chatContainer = iframeDocument.getElementById('chat-container');
 				if (chatContainer) {
-					console.log('Chat container found, setting up MutationObserver');
+					console.error('Chat container found, setting up MutationObserver');
 					observer.observe(chatContainer, { childList: true, subtree: true, attributes: true, characterData: true });
 				} else {
-					console.log('Chat container not found, retrying...');
+					console.error('Chat container not found, retrying...');
 					setTimeout(initMutationObserver, 500); // Retry after 500ms
 				}
 			}
