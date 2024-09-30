@@ -32,7 +32,7 @@
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
 	$: embedHtml =
-		`<HF_SCRIPT src="${prefix}/assistant/${assistant?._id}/embed-snippet" defer></HF_SCRIPT>`.replaceAll(
+		`<HF_SCRIPT src="${prefix}/api/assistant/${assistant?._id}/embed-snippet" defer></HF_SCRIPT>`.replaceAll(
 			"HF_SCRIPT",
 			"script"
 		); // replaceAll("HF_SCRIPT", "script") is needed to escape, otherwise svelte compiler breaks
