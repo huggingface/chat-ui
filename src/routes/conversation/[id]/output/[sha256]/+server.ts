@@ -47,6 +47,9 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 			"Content-Type": mime ?? "application/octet-stream",
 			"Content-Security-Policy":
 				"default-src 'none'; script-src 'none'; style-src 'none'; sandbox;",
+			"Content-Disposition": `attachment; filename="${sha256.slice(0, 8)}.${
+				mime?.split("/")[1] ?? "bin"
+			}"`,
 			"Content-Length": b64Value.length.toString(),
 			"Accept-Range": "bytes",
 		},
