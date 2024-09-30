@@ -15,12 +15,12 @@ export async function GET({ params }) {
 
 	document.addEventListener('DOMContentLoaded', function() {
 		const button = document.createElement('button');
-		button.className = 'fixed bottom-5 right-5 z-50 px-1.5 py-1 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 transition-colors flex items-center focus:outline-none';
+		button.className = 'fixed z-[1002] bottom-5 right-5 z-50 px-4 gap-1 py-1 bg-black rounded-full text-white rounded cursor-pointer hover:bg-gray-800 border border-gray-200/30 transition-colors flex items-center focus:outline-none';
 
 		const img = document.createElement('img');
 		img.src = 'https://huggingface.co/chat/huggingchat/logo.svg';
 		img.alt = 'HuggingChat Logo';
-		img.className = 'size-4 mr-0.5';
+		img.className = 'size-5 mr-0.5 flex-none';
 
 		const text = document.createTextNode('Chat');
 
@@ -31,14 +31,14 @@ export async function GET({ params }) {
 		modal.className = 'hidden fixed inset-0 z-[1001] overflow-auto bg-black bg-opacity-50';
 
 		const modalContent = document.createElement('div');
-		modalContent.className = 'bg-transparent mx-auto my-[5%] max-w-2xl rounded';
+		modalContent.className = 'bg-white  max-w-2xl rounded-xl overflow-hidden bottom-16 right-5 absolute max-sm:left-5 sm:w-[460px] shadow-2xl';
 
 		const closeButton = document.createElement('span');
 		closeButton.innerHTML = '&times;';
 		closeButton.className = 'text-gray-500 float-right text-2xl font-bold cursor-pointer hover:text-gray-700';
 
 		const iframe = document.createElement('iframe');
-		iframe.className = 'w-full rounded-xl';
+		iframe.className = 'w-full';
 		iframe.style.height = '400px'; // Set an initial height
 		iframe.src = \`http://localhost:5173/chat/?embeddedAssistantId=${id}\`;
 		
