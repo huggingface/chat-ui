@@ -33,10 +33,6 @@ export async function GET({ params }) {
 		const modalContent = document.createElement('div');
 		modalContent.className = 'bg-white  max-w-2xl rounded-xl overflow-hidden bottom-16 right-5 absolute max-sm:left-5 sm:w-[460px] shadow-2xl';
 
-		const closeButton = document.createElement('span');
-		closeButton.innerHTML = '&times;';
-		closeButton.className = 'text-gray-500 float-right text-2xl font-bold cursor-pointer hover:text-gray-700';
-
 		const iframe = document.createElement('iframe');
 		iframe.className = 'w-full';
 		iframe.style.height = '400px'; // Set an initial height
@@ -93,34 +89,31 @@ export async function GET({ params }) {
 			});
 		};
 
-		modalContent.appendChild(closeButton);
 		modalContent.appendChild(iframe);
 		modal.appendChild(modalContent);
 
 		// Store the original overflow style
 		let originalOverflow;
 
-		function openModal() {
-			modal.classList.remove('hidden');
-			resizeIframeToContentSize(iframe);
-			// Store the original overflow and prevent scrolling
-			originalOverflow = document.body.style.overflow;
-			document.body.style.overflow = 'hidden';
+		function toggleModal() {
+			if (modal.classList.contains('hidden')) {
+				modal.classList.remove('hidden');
+				resizeIframeToContentSize(iframe);
+				// Store the original overflow and prevent scrolling
+				originalOverflow = document.body.style.overflow;
+				document.body.style.overflow = 'hidden';
+			} else {
+				modal.classList.add('hidden');
+				// Restore the original overflow
+				document.body.style.overflow = originalOverflow;
+			}
 		}
 
-		function closeModal() {
-			modal.classList.add('hidden');
-			// Restore the original overflow
-			document.body.style.overflow = originalOverflow;
-		}
-
-		button.onclick = openModal;
-
-		closeButton.onclick = closeModal;
+		button.onclick = toggleModal;
 
 		window.onclick = function(event) {
 			if (event.target == modal) {
-				closeModal();
+				toggleModal();
 			}
 		};
 
