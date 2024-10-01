@@ -41,7 +41,9 @@
 				value = value.substring(0, start) + "\n" + value.substring(end);
 				textareaElement.selectionStart = textareaElement.selectionEnd = start + 1;
 			} else {
-				dispatch("submit");
+				if (value.trim() !== "") {
+					dispatch("submit");
+				}
 			}
 		}
 	}

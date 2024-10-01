@@ -135,6 +135,32 @@ envVars:
         ]
       },
       {
+        "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
+        "description": "The latest multimodal model from Meta! Supports image inputs natively.",
+        "websiteUrl": "https://llama.com/",
+        "multimodal": true,
+        "parameters": {
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
+        },
+        "endpoint": {
+          "type": "openai",
+          "baseURL": "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
+          "multimodal": {
+            "image": {
+              "maxSizeInMB": 10,
+              "maxWidth": 560,
+              "maxHeight": 560,
+              "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
+              "preferredMimeType": "image/webp"
+            }
+          }
+        }
+      },
+      {
         "name": "NousResearch/Hermes-3-Llama-3.1-8B",
         "description": "Nous Research's latest Hermes 3 release in 8B size. Follows instruction closely.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
