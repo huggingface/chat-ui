@@ -28,6 +28,7 @@
 		"@types/js-yaml": "^4.0.9",
 		"@types/jsdom": "^21.1.1",
 		"@types/jsonpath": "^0.2.4",
+		"@types/mime-types": "^2.1.4",
 		"@types/minimist": "^1.2.5",
 		"@types/node": "^22.1.0",
 		"@types/parquetjs": "^0.10.3",
@@ -108,9 +109,9 @@
 		"zod": "^3.22.3"
 	},
 	"optionalDependencies": {
-		"@aws-sdk/client-bedrock-runtime": "^3.631.0",
 		"@anthropic-ai/sdk": "^0.25.0",
 		"@anthropic-ai/vertex-sdk": "^0.4.1",
+		"@aws-sdk/client-bedrock-runtime": "^3.631.0",
 		"@google-cloud/vertexai": "^1.1.0",
 		"@google/generative-ai": "^0.14.1",
 		"aws4fetch": "^1.0.17",
