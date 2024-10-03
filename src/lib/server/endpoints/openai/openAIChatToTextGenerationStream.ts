@@ -96,18 +96,6 @@ export async function* openAIChatToTextGenerationStream(
 
 		if (choices[0]?.finish_reason === "tool_calls") {
 			yield prepareToolCalls(toolCalls, tokenId++);
-		} else {
-			const output: TextGenerationStreamOutput = {
-				token: {
-					id: tokenId++,
-					text: content ?? "",
-					logprob: 0,
-					special: last,
-				},
-				generated_text: last ? generatedText : null,
-				details: null,
-			};
-			yield output;
 		}
 	}
 }
