@@ -28,7 +28,7 @@ COPY --link --chown=1000 . .
 RUN npm run build
 
 # mongo image
-FROM mongo:latest AS mongo
+FROM mongo:7 AS mongo
 
 # image to be used if INCLUDE_DB is false
 FROM node:20-slim AS local_db_false
