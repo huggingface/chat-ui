@@ -13,6 +13,7 @@ import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
+import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -253,10 +254,6 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
 });
 
-export type ProcessedModel = Awaited<ReturnType<typeof processModel>> & {
-	getEndpoint: () => Promise<Endpoint>;
-};
-
 const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	...m,
 	getEndpoint: async (): Promise<Endpoint> => {
@@ -316,9 +313,39 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-export const models: ProcessedModel[] = await Promise.all(
-	modelsRaw.map((e) => processModel(e).then(addEndpoint))
+const hasInferenceAPI = async (m: Awaited<ReturnType<typeof processModel>>) => {
+	if (!isHuggingChat) {
+		return false;
+	}
+
+	const r = await fetch(`https://huggingface.co/api/models/${m.id}`);
+
+	if (!r.ok) {
+		logger.warn(`Failed to check if ${m.id} has inference API: ${r.statusText}`);
+		return false;
+	}
+
+	const json = await r.json();
+
+	if (json.cardData.inference === false) {
+		return false;
+	}
+
+	return true;
+};
+
+export const models = await Promise.all(
+	modelsRaw.map((e) =>
+		processModel(e)
+			.then(addEndpoint)
+			.then(async (m) => ({
+				...m,
+				hasInferenceAPI: await hasInferenceAPI(m),
+			}))
+	)
 );
+
+export type ProcessedModel = (typeof models)[number];
 
 // super ugly but not sure how to make typescript happier
 export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
@@ -357,5 +384,5 @@ export const smallModel = env.TASK_MODEL
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools"
+	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools" | "hasInferenceAPI"
 >;

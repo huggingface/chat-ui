@@ -18,4 +18,5 @@ export type Model = Pick<
 	| "multimodal"
 	| "unlisted"
 	| "tools"
+	| "hasInferenceAPI"
 >;

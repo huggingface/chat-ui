@@ -32,6 +32,8 @@
 	let loading = false;
 	let pending = false;
 
+	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
+
 	let files: File[] = [];
 
 	async function convFromShared() {
@@ -201,7 +203,7 @@
 					messageId,
 					isRetry,
 					isContinue,
-					webSearch: !hasAssistant && $webSearchParameters.useSearch,
+					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
 					tools: $settings.tools, // preference for tools
 					files: isRetry ? userMessage?.files : base64Files,
 				},

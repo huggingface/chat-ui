@@ -16,6 +16,7 @@ export const endpointVertexParametersSchema = z.object({
 	model: z.any(), // allow optional and validate against emptiness
 	type: z.literal("vertex"),
 	location: z.string().default("europe-west1"),
+	extraBody: z.object({ model_version: z.string() }).optional(),
 	project: z.string(),
 	apiEndpoint: z.string().optional(),
 	safetyThreshold: z
@@ -49,7 +50,7 @@ export const endpointVertexParametersSchema = z.object({
 });
 
 export function endpointVertex(input: z.input<typeof endpointVertexParametersSchema>): Endpoint {
-	const { project, location, model, apiEndpoint, safetyThreshold, tools, multimodal } =
+	const { project, location, model, apiEndpoint, safetyThreshold, tools, multimodal, extraBody } =
 		endpointVertexParametersSchema.parse(input);
 
 	const vertex_ai = new VertexAI({
@@ -64,7 +65,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		const hasFiles = messages.some((message) => message.files && message.files.length > 0);
 
 		const generativeModel = vertex_ai.getGenerativeModel({
-			model: model.id ?? model.name,
+			model: extraBody?.model_version ?? model.id ?? model.name,
 			safetySettings: safetyThreshold
 				? [
 						{
