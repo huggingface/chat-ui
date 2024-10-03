@@ -271,7 +271,9 @@ async function prepareFiles(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	files: MessageFile[]
 ): Promise<OpenAI.Chat.Completions.ChatCompletionContentPartImage[]> {
-	const processedFiles = await Promise.all(files.map(imageProcessor));
+	const processedFiles = await Promise.all(
+		files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
+	);
 	return processedFiles.map((file) => ({
 		type: "image_url" as const,
 		image_url: {
