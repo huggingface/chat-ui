@@ -39,7 +39,7 @@ function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompleti
 					parameter.type = "number";
 					break;
 				case "bool":
-					properties.type = "boolean";
+					parameter.type = "boolean";
 					break;
 				case "file":
 					throw new Error("File type's currently not supported");
