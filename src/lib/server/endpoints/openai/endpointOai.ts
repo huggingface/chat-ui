@@ -145,6 +145,11 @@ export async function endpointOai(
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
 	if (completion === "completions") {
+		if (model.tools) {
+			throw new Error(
+				"Tools are not supported for 'completions' mode, switch to 'chat_completions' instead"
+			);
+		}
 		return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 			const prompt = await buildPrompt({
 				messages,
