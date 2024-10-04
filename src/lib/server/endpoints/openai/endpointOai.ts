@@ -127,7 +127,6 @@ export async function endpointOai(
 		extraBody,
 	} = endpointOAIParametersSchema.parse(input);
 
-	/* eslint-disable-next-line no-shadow */
 	let OpenAI;
 	try {
 		OpenAI = (await import("openai")).OpenAI;
@@ -179,7 +178,7 @@ export async function endpointOai(
 	} else if (completion === "chat_completions") {
 		return async ({ messages, preprompt, generateSettings, tools, toolResults }) => {
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor);
+				await prepareMessages(messages, imageProcessor, !model.tools && model.multimodal);
 
 			if (messagesOpenAI?.[0]?.role !== "system") {
 				messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
@@ -251,11 +250,12 @@ export async function endpointOai(
 
 async function prepareMessages(
 	messages: EndpointMessage[],
-	imageProcessor: ReturnType<typeof makeImageProcessor>
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	isMultimodal: boolean
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	return Promise.all(
 		messages.map(async (message) => {
-			if (message.from === "user") {
+			if (message.from === "user" && isMultimodal) {
 				return {
 					role: message.from,
 					content: [
