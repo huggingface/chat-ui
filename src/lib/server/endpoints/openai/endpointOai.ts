@@ -15,7 +15,7 @@ import { createImageProcessorOptionsValidator, makeImageProcessor } from "../ima
 import type { MessageFile } from "$lib/types/Message";
 import { type Tool } from "$lib/types/Tool";
 import type { EndpointMessage } from "../endpoints";
-
+import { v4 as uuidv4 } from "uuid";
 function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompletionTool[] {
 	const toolChoices = [] as ChatCompletionTool[];
 	if (tools === undefined) {
@@ -195,32 +195,33 @@ export async function endpointOai(
 					tool_calls: [],
 				};
 
+				const responses: Array<OpenAI.Chat.Completions.ChatCompletionToolMessageParam> = [];
+
 				for (const result of toolResults) {
+					const id = uuidv4();
+
 					const toolCallResult: OpenAI.Chat.Completions.ChatCompletionMessageToolCall = {
-						id: result.call.correlationKey ?? "",
 						type: "function",
 						function: {
 							name: result.call.name,
 							arguments: JSON.stringify(result.call.parameters),
 						},
+						id,
 					};
-					toolCallRequests.tool_calls?.push(toolCallResult);
-				}
-				messagesOpenAI.push(toolCallRequests);
 
-				for (const result of toolResults) {
+					toolCallRequests.tool_calls?.push(toolCallResult);
 					const toolCallResponse: OpenAI.Chat.Completions.ChatCompletionToolMessageParam = {
 						role: "tool",
 						content: "",
-						tool_call_id: result.call.correlationKey ?? "",
+						tool_call_id: id,
 					};
-
 					if ("outputs" in result) {
 						toolCallResponse.content = JSON.stringify(result.outputs);
 					}
-
-					messagesOpenAI.push(toolCallResponse);
+					responses.push(toolCallResponse);
 				}
+				messagesOpenAI.push(toolCallRequests);
+				messagesOpenAI.push(...responses);
 			}
 
 			const parameters = { ...model.parameters, ...generateSettings };

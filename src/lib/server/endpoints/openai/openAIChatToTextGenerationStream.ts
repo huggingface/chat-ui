@@ -2,17 +2,13 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type OpenAI from "openai";
 import type { Stream } from "openai/streaming";
 import type { ToolCall } from "$lib/types/Tool";
-import type { TextGenerationStreamOutputWithTools } from "$lib/server/endpoints/endpoints";
 
 type ToolCallWithParameters = {
 	toolCall: ToolCall;
 	parameterJsonString: string;
 };
 
-function prepareToolCalls(
-	toolCallsWithParameters: ToolCallWithParameters[],
-	tokenId: number
-): TextGenerationStreamOutputWithTools {
+function prepareToolCalls(toolCallsWithParameters: ToolCallWithParameters[], tokenId: number) {
 	const toolCalls: ToolCall[] = [];
 
 	for (const toolCallWithParameters of toolCallsWithParameters) {
@@ -29,7 +25,7 @@ function prepareToolCalls(
 		toolCalls.push(toolCall);
 	}
 
-	const output: TextGenerationStreamOutputWithTools = {
+	const output = {
 		token: {
 			id: tokenId,
 			text: "",
@@ -82,7 +78,6 @@ export async function* openAIChatToTextGenerationStream(
 					toolCall: {
 						name: tool.function.name,
 						parameters: {},
-						correlationKey: tool.id,
 					},
 					parameterJsonString: "",
 				};
