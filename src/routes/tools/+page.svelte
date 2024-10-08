@@ -120,7 +120,12 @@
 			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
 				>experimental</span
-			>. Consider sharing your feedback with us!
+			>. Consider
+			<a
+				class="underline hover:text-purple-500"
+				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
+				target="_blank">sharing your feedback with us!</a
+			>
 		</h4>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
@@ -279,7 +284,11 @@
 					</div>
 				</a>
 			{:else}
-				No tools found
+				{#if activeOnly}
+					You don't have any active tools.
+				{:else}
+					No tools found
+				{/if}
 			{/each}
 		</div>
 
