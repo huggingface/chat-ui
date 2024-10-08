@@ -98,7 +98,7 @@
 	};
 </script>
 
-<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
+<div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Tools</h1>
@@ -120,7 +120,12 @@
 			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
 				>experimental</span
-			>. Consider sharing your feedback with us!
+			>. Consider
+			<a
+				class="underline hover:text-purple-500"
+				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
+				target="_blank">sharing your feedback with us!</a
+			>
 		</h4>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
@@ -279,7 +284,11 @@
 					</div>
 				</a>
 			{:else}
-				No tools found
+				{#if activeOnly}
+					You don't have any active tools.
+				{:else}
+					No tools found
+				{/if}
 			{/each}
 		</div>
 
