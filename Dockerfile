@@ -20,7 +20,9 @@ RUN --mount=type=cache,target=/app/.npm \
 COPY --link --chown=1000 . .
 
 RUN git config --global --add safe.directory /app && \
-    PUBLIC_COMMIT_SHA=$(git rev-parse HEAD) && npm run build
+    PUBLIC_COMMIT_SHA=$(git rev-parse HEAD) && \
+    echo "PUBLIC_COMMIT_SHA=$PUBLIC_COMMIT_SHA" >> /app/.env && \
+    npm run build
 
 # mongo image
 FROM mongo:7 AS mongo
