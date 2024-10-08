@@ -3,17 +3,11 @@
 # you will also find guides on how best to write your Dockerfile
 ARG INCLUDE_DB=false
 
-# stage that install the dependencies
-FROM node:20 AS builder-production
+FROM node:20 AS builder
 
 WORKDIR /app
 
 COPY --link --chown=1000 package-lock.json package.json ./
-RUN --mount=type=cache,target=/app/.npm \
-        npm set cache /app/.npm && \
-        npm ci --omit=dev
-
-FROM builder-production AS builder
 
 ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=blue
@@ -25,7 +19,8 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN npm run build
+RUN git config --global --add safe.directory /app && \
+    PUBLIC_COMMIT_SHA=$(git rev-parse HEAD) && npm run build
 
 # mongo image
 FROM mongo:7 AS mongo
