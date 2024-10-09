@@ -55,7 +55,6 @@ MODELS=`[
     "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
     "tokenizer": "microsoft/Phi-3-mini-4k-instruct-gguf",
     "preprompt": "",
-    "chatPromptTemplate": "<s>{{preprompt}}{{#each messages}}{{#ifUser}}<|user|>\n{{content}}<|end|>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}<|end|>\n{{/ifAssistant}}{{/each}}",
     "parameters": {
       "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
       "temperature": 0.7,
@@ -69,6 +68,8 @@ MODELS=`[
   },
 ]`
 ```
+
+The `tokenizer` field will be used to find the appropriate chat template for the model. Make sure to fill in a valid model from the Hugging Face hub.
 
 Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
