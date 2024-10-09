@@ -124,7 +124,10 @@
 			</div>
 		</div>
 
-		<div class="absolute right-3 top-3 md:right-4 md:top-4">
+		<div
+			class="absolute right-3 top-3 md:right-4 md:top-4"
+			class:hidden={$page.data.embeddedAssistantId}
+		>
 			<div class="flex flex-row items-center gap-1">
 				<button
 					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 max-sm:px-1.5 md:text-sm"
@@ -161,6 +164,7 @@
 				goto(`${base}/`);
 			}}
 			class="absolute -bottom-6 right-2 inline-flex items-center justify-center text-xs text-gray-600 underline hover:brightness-50 dark:text-gray-400 dark:hover:brightness-110"
+			class:hidden={$page.data.embeddedAssistantId}
 		>
 			<CarbonRenew class="mr-1.5 text-xxs" /> Reset to default model
 		</button>

@@ -31,6 +31,11 @@
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
+	$: embedHtml =
+		`<HF_SCRIPT src="${prefix}/api/assistant/${assistant?._id}/embed-snippet" defer></HF_SCRIPT>`.replaceAll(
+			"HF_SCRIPT",
+			"script"
+		); // replaceAll("HF_SCRIPT", "script") is needed to escape, otherwise svelte compiler breaks
 
 	let displayReportModal = false;
 
@@ -185,6 +190,26 @@
 			<input disabled class="flex-1 truncate bg-inherit" value={shareUrl} />
 			<CopyToClipBoardBtn
 				value={shareUrl}
+				classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
+			>
+				<div class="flex items-center gap-1.5 text-gray-500 hover:underline">
+					<CarbonLink />Copy
+				</div>
+			</CopyToClipBoardBtn>
+		</div>
+	</div>
+
+	<div>
+		<h2 class="b-2 inline font-semibold">Embed this assistant</h2>
+
+		<p class="pb-2 text-sm text-gray-500">Put the code below in your html head section.</p>
+
+		<div
+			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
+		>
+			<input disabled class="flex-1 truncate bg-inherit" value={embedHtml} />
+			<CopyToClipBoardBtn
+				value={embedHtml}
 				classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 			>
 				<div class="flex items-center gap-1.5 text-gray-500 hover:underline">

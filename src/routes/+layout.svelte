@@ -203,49 +203,69 @@
 	{#if envPublic.PUBLIC_APPLE_APP_ID}
 		<meta name="apple-itunes-app" content={`app-id=${envPublic.PUBLIC_APPLE_APP_ID}`} />
 	{/if}
+	<!-- TODO: remove -->
+	{#if !$page.data.embeddedAssistantId}
+		<script
+			src="http://localhost:5173/chat/api/assistant/{$page.data.assistants.at(-1)
+				._id}/embed-snippet"
+			defer
+		></script>
+	{/if}
 </svelte:head>
 
 {#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
 	<DisclaimerModal />
 {/if}
 
-<ExpandNavigation
-	isCollapsed={isNavCollapsed}
-	on:click={() => (isNavCollapsed = !isNavCollapsed)}
-	classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-		? 'left-[280px]'
-		: 'left-0'} *:transition-transform"
-/>
+{#if !$page.data.embeddedAssistantId}
+	<ExpandNavigation
+		isCollapsed={isNavCollapsed}
+		on:click={() => (isNavCollapsed = !isNavCollapsed)}
+		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
+			? 'left-[280px]'
+			: 'left-0'} *:transition-transform"
+	/>
 
-<div
-	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[280px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
->
-	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
-		<NavMenu
-			conversations={data.conversations}
-			user={data.user}
-			canLogin={data.user === undefined && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
-			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
-		/>
-	</MobileNav>
-	<nav
-		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+	<div
+		class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
+			? 'md:grid-cols-[280px,1fr]'
+			: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 	>
-		<NavMenu
-			conversations={data.conversations}
-			user={data.user}
-			canLogin={data.user === undefined && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
-			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
-		/>
-	</nav>
-	{#if currentError}
-		<Toast message={currentError} />
-	{/if}
-	<slot />
-</div>
+		<MobileNav
+			isOpen={isNavOpen}
+			on:toggle={(ev) => (isNavOpen = ev.detail)}
+			title={mobileNavTitle}
+		>
+			<NavMenu
+				conversations={data.conversations}
+				user={data.user}
+				canLogin={data.user === undefined && data.loginEnabled}
+				on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
+				on:deleteConversation={(ev) => deleteConversation(ev.detail)}
+				on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			/>
+		</MobileNav>
+		<nav
+			class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+		>
+			<NavMenu
+				conversations={data.conversations}
+				user={data.user}
+				canLogin={data.user === undefined && data.loginEnabled}
+				on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
+				on:deleteConversation={(ev) => deleteConversation(ev.detail)}
+				on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			/>
+		</nav>
+		{#if currentError}
+			<Toast message={currentError} />
+		{/if}
+		<slot />
+	</div>
+{:else}
+	<div
+		class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd dark:text-gray-300"
+	>
+		<slot />
+	</div>
+{/if}

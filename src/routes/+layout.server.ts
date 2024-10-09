@@ -11,8 +11,9 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
+import { error } from "@sveltejs/kit";
 
-export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
+export const load: LayoutServerLoad = async ({ locals, depends, request, url }) => {
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
@@ -44,7 +45,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
-	const assistant = assistantActive
+	let assistant = assistantActive
 		? JSON.parse(
 				JSON.stringify(
 					await collections.assistants.findOne({
@@ -53,6 +54,17 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 				)
 		  )
 		: null;
+
+	const embeddedAssistantId = url.searchParams.get("embeddedAssistantId");
+	if (embeddedAssistantId) {
+		const embeddedAssistant = await collections.assistants.findOne({
+			_id: new ObjectId(embeddedAssistantId),
+		});
+		if (!embeddedAssistant) {
+			error(404, "Embedded Assistant not found.");
+		}
+		assistant = JSON.parse(JSON.stringify(embeddedAssistant));
+	}
 
 	const conversations = await collections.conversations
 		.find(authCondition(locals))
@@ -245,5 +257,6 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
+		embeddedAssistantId: url.searchParams.get("embeddedAssistantId"),
 	};
 };
