@@ -4,6 +4,7 @@ import type { Timestamps } from "./Timestamps";
 import type { BackendToolContext } from "$lib/server/tools";
 import type { MessageUpdate } from "./MessageUpdate";
 import { z } from "zod";
+import type { ReviewStatus } from "./Review";
 
 export const ToolColor = z.union([
 	z.literal("purple"),
@@ -122,7 +123,7 @@ export interface CommunityTool extends BaseTool, Timestamps {
 	useCount: number;
 	last24HoursUseCount: number;
 
-	featured: boolean;
+	review: ReviewStatus;
 	searchTokens: string[];
 }
 
@@ -136,7 +137,7 @@ export type CommunityToolEditable = Omit<
 	| "last24HoursUseCount"
 	| "createdById"
 	| "createdByName"
-	| "featured"
+	| "review"
 	| "searchTokens"
 	| "type"
 	| "createdAt"

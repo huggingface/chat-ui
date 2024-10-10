@@ -25,6 +25,7 @@
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
+	import { ReviewStatus } from "$lib/types/Review";
 
 	export let data: PageData;
 
@@ -245,7 +246,7 @@
 
 				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8
-					{!assistant.featured && !createdByMe ? 'border !border-red-500/30' : ''}"
+					{!(assistant.review === ReviewStatus.APPROVED) && !createdByMe ? 'border !border-red-500/30' : ''}"
 					on:click={() => {
 						if (data.settings.assistants.includes(assistant._id.toString())) {
 							settings.instantSet({ activeModel: assistant._id.toString() });

@@ -19,6 +19,7 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
+	import { ReviewStatus } from "$lib/types/Review";
 
 	export let data: PageData;
 
@@ -233,8 +234,9 @@
 				{@const isOfficial = !tool.createdByName}
 				<a
 					href="{base}/tools/{tool._id.toString()}"
-					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!tool.featured &&
-					!isOfficial
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!(
+						tool.review === ReviewStatus.APPROVED
+					) && !isOfficial
 						? ' border-red-500/30'
 						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}

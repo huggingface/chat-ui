@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { User } from "./User";
 import type { Timestamps } from "./Timestamps";
+import type { ReviewStatus } from "./Review";
 
 export interface Assistant extends Timestamps {
 	_id: ObjectId;
@@ -13,7 +14,7 @@ export interface Assistant extends Timestamps {
 	exampleInputs: string[];
 	preprompt: string;
 	userCount?: number;
-	featured?: boolean;
+	review: ReviewStatus;
 	rag?: {
 		allowAllDomains: boolean;
 		allowedDomains: string[];

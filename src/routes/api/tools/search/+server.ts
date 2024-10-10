@@ -4,7 +4,7 @@ import { toolFromConfigs } from "$lib/server/tools/index.js";
 import type { BaseTool, CommunityToolDB } from "$lib/types/Tool.js";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
-
+import { ReviewStatus } from "$lib/types/Review";
 export async function GET({ url }) {
 	if (env.COMMUNITY_TOOLS !== "true") {
 		return new Response("Community tools are not enabled", { status: 403 });
@@ -15,7 +15,7 @@ export async function GET({ url }) {
 
 	const filter: Filter<CommunityToolDB> = {
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
-		featured: true,
+		review: ReviewStatus.APPROVED,
 	};
 
 	const matchingCommunityTools = await collections.tools

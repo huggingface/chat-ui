@@ -3,6 +3,7 @@ import { authCondition } from "$lib/server/auth.js";
 import { Database, collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { SortKey } from "$lib/types/Assistant.js";
+import { ReviewStatus } from "$lib/types/Review";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import type { User } from "$lib/types/User.js";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
@@ -47,7 +48,7 @@ export const load = async ({ url, locals }) => {
 	const filter: Filter<CommunityToolDB> = {
 		...(!createdByCurrentUser &&
 			!activeOnly &&
-			!(locals.user?.isAdmin && showUnfeatured) && { featured: true }),
+			!(locals.user?.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
 		...(user && { createdById: user._id }),
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {

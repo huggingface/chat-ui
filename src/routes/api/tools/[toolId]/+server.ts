@@ -1,6 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { ReviewStatus } from "$lib/types/Review";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import { ObjectId } from "mongodb";
 
@@ -33,12 +34,12 @@ export async function GET({ params }) {
 								color: tool.color,
 								icon: tool.icon,
 								createdByName: tool.createdByName,
-								featured: tool.featured,
+								review: tool.review,
 						  }
 						: undefined
 				);
 
-			if (!tool || !tool.featured) {
+			if (!tool || tool.review !== ReviewStatus.APPROVED) {
 				return new Response(`Tool "${toolId}" not found`, { status: 404 });
 			}
 

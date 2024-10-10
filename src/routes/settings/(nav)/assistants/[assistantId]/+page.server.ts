@@ -7,7 +7,8 @@ import { env as envPublic } from "$env/dynamic/public";
 import { env } from "$env/dynamic/private";
 import { z } from "zod";
 import type { Assistant } from "$lib/types/Assistant";
-import { logger } from "$lib/server/logger";
+import { ReviewStatus } from "$lib/types/Review";
+import { sendSlack } from "$lib/server/sendSlack";
 
 async function assistantOnlyIfAuthor(locals: App.Locals, assistantId?: string) {
 	const assistant = await collections.assistants.findOne({ _id: new ObjectId(assistantId) });
@@ -104,21 +105,11 @@ export const actions: Actions = {
 
 			const username = locals.user?.username;
 
-			const res = await fetch(env.WEBHOOK_URL_REPORT_ASSISTANT, {
-				method: "POST",
-				headers: {
-					"Content-type": "application/json",
-				},
-				body: JSON.stringify({
-					text: `Assistant <${assistantUrl}|${assistant?.name}> reported by ${
-						username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
-					}.\n\n> ${result.data}`,
-				}),
-			});
-
-			if (!res.ok) {
-				logger.error(`Webhook assistant report failed. ${res.statusText} ${res.text}`);
-			}
+			await sendSlack(
+				`🔴 Assistant <${assistantUrl}|${assistant?.name}> reported by ${
+					username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
+				}.\n\n> ${result.data}`
+			);
 		}
 
 		return { from: "report", ok: true, message: "Assistant reported" };
@@ -172,54 +163,105 @@ export const actions: Actions = {
 
 		redirect(302, `${base}/settings`);
 	},
-
-	unfeature: async ({ params, locals }) => {
-		if (!locals.user?.isAdmin) {
-			return fail(403, { error: true, message: "Permission denied" });
-		}
-
-		const assistant = await collections.assistants.findOne({
-			_id: new ObjectId(params.assistantId),
+	deny: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			assistantId: params.assistantId,
+			locals,
+			status: ReviewStatus.DENIED,
+			url,
 		});
-
-		if (!assistant) {
-			return fail(404, { error: true, message: "Assistant not found" });
-		}
-
-		const result = await collections.assistants.updateOne(
-			{ _id: assistant._id },
-			{ $set: { featured: false } }
-		);
-
-		if (result.modifiedCount === 0) {
-			return fail(500, { error: true, message: "Failed to unfeature assistant" });
-		}
-
-		return { from: "unfeature", ok: true, message: "Assistant unfeatured" };
 	},
-
-	feature: async ({ params, locals }) => {
-		if (!locals.user?.isAdmin) {
-			return fail(403, { error: true, message: "Permission denied" });
-		}
-
-		const assistant = await collections.assistants.findOne({
-			_id: new ObjectId(params.assistantId),
+	approve: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			assistantId: params.assistantId,
+			locals,
+			status: ReviewStatus.APPROVED,
+			url,
 		});
-
-		if (!assistant) {
-			return fail(404, { error: true, message: "Assistant not found" });
-		}
-
-		const result = await collections.assistants.updateOne(
-			{ _id: assistant._id },
-			{ $set: { featured: true } }
-		);
-
-		if (result.modifiedCount === 0) {
-			return fail(500, { error: true, message: "Failed to feature assistant" });
-		}
-
-		return { from: "feature", ok: true, message: "Assistant featured" };
+	},
+	request: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			assistantId: params.assistantId,
+			locals,
+			status: ReviewStatus.PENDING,
+			url,
+		});
+	},
+	unrequest: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			assistantId: params.assistantId,
+			locals,
+			status: ReviewStatus.PRIVATE,
+			url,
+		});
 	},
 };
+
+async function setReviewStatus({
+	locals,
+	assistantId,
+	status,
+	url,
+}: {
+	locals: App.Locals;
+	assistantId?: string;
+	status: ReviewStatus;
+	url: URL;
+}) {
+	if (!assistantId) {
+		return fail(400, { error: true, message: "Assistant ID is required" });
+	}
+
+	const assistant = await collections.assistants.findOne({
+		_id: new ObjectId(assistantId),
+	});
+
+	if (!assistant) {
+		return fail(404, { error: true, message: "Assistant not found" });
+	}
+
+	if (
+		!locals.user ||
+		(!locals.user.isAdmin && assistant.createdById.toString() !== locals.user._id.toString())
+	) {
+		return fail(403, { error: true, message: "Permission denied" });
+	}
+
+	// only admins can set the status to APPROVED or DENIED
+	// if the status is already APPROVED or DENIED, only admins can change it
+
+	if (
+		(status === ReviewStatus.APPROVED ||
+			status === ReviewStatus.DENIED ||
+			assistant.review === ReviewStatus.APPROVED ||
+			assistant.review === ReviewStatus.DENIED) &&
+		!locals.user?.isAdmin
+	) {
+		return fail(403, { error: true, message: "Permission denied" });
+	}
+
+	const result = await collections.assistants.updateOne(
+		{ _id: assistant._id },
+		{ $set: { review: status } }
+	);
+
+	if (result.modifiedCount === 0) {
+		return fail(500, { error: true, message: "Failed to update review status" });
+	}
+
+	if (status === ReviewStatus.PENDING) {
+		const prefixUrl =
+			envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
+		const assistantUrl = `${prefixUrl}/assistant/${assistantId}`;
+
+		const username = locals.user?.username;
+
+		await sendSlack(
+			`🟢 Assistant <${assistantUrl}|${assistant?.name}> requested to be featured by ${
+				username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
+			}.`
+		);
+	}
+
+	return { from: "setReviewStatus", ok: true, message: "Review status updated" };
+}

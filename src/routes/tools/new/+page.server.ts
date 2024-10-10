@@ -3,6 +3,7 @@ import { authCondition, requiresUser } from "$lib/server/auth.js";
 import { collections } from "$lib/server/database.js";
 import { editableToolSchema } from "$lib/server/tools/index.js";
 import { usageLimits } from "$lib/server/usageLimits.js";
+import { ReviewStatus } from "$lib/types/Review";
 import { generateSearchTokens } from "$lib/utils/searchTokens.js";
 import { error, fail } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -66,7 +67,7 @@ export const actions = {
 			updatedAt: new Date(),
 			last24HoursUseCount: 0,
 			useCount: 0,
-			featured: locals.user?.isAdmin ?? false, // admin tools are featured by default
+			review: ReviewStatus.PRIVATE,
 			searchTokens: generateSearchTokens(parse.data.displayName),
 		});
 
