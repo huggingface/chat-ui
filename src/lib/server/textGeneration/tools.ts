@@ -196,6 +196,7 @@ export async function* runTools(
 				type: input.type === "file" ? "str" : input.type,
 			})),
 		})),
+		conversationId: conv._id,
 	})) {
 		// model natively supports tool calls
 		if (output.token.toolCalls) {
