@@ -11,6 +11,7 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
+import { ReviewStatus } from "$lib/types/Review";
 
 export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 	depends(UrlDependency.ConversationList);
@@ -221,7 +222,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 			),
 		communityToolCount: await collections.tools.countDocuments({
 			type: "community",
-			featured: true,
+			review: ReviewStatus.APPROVED,
 		}),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
