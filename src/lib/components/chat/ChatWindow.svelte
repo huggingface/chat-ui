@@ -303,7 +303,6 @@
 				/>
 			{:else if !assistant}
 				<ChatIntroduction
-					{models}
 					{currentModel}
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
