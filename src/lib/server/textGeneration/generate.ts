@@ -18,6 +18,7 @@ export async function* generate(
 		generateSettings: assistant?.generateSettings,
 		toolResults,
 		isMultimodal: model.multimodal,
+		conversationId: conv._id,
 	})) {
 		// text generation completed
 		if (output.generated_text) {

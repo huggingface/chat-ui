@@ -29,6 +29,7 @@ import endpointLangserve, {
 } from "./langserve/endpointLangserve";
 
 import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
+import type { ObjectId } from "mongodb";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -41,6 +42,7 @@ export interface EndpointParameters {
 	tools?: Tool[];
 	toolResults?: ToolResult[];
 	isMultimodal?: boolean;
+	conversationId?: ObjectId;
 }
 
 interface CommonEndpoint {

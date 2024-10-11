@@ -78,6 +78,13 @@
 		const query = $page.url.searchParams.get("q");
 		if (query) createConversation(query);
 	});
+
+	$: currentModel = findCurrentModel(
+		[...data.models, ...data.oldModels],
+		!$settings.assistants.includes($settings.activeModel)
+			? $settings.activeModel
+			: data.assistant?.modelId
+	);
 </script>
 
 <svelte:head>
@@ -88,7 +95,7 @@
 	on:message={(ev) => createConversation(ev.detail)}
 	{loading}
 	assistant={data.assistant}
-	currentModel={findCurrentModel([...data.models, ...data.oldModels], $settings.activeModel)}
+	{currentModel}
 	models={data.models}
 	bind:files
 />
