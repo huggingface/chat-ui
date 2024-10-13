@@ -110,17 +110,23 @@
 			<div
 				class="invisible absolute z-10 mt-1 w-full rounded border border-gray-300 bg-white shadow-lg group-focus-within:visible"
 			>
-				{#each suggestions as suggestion}
-					<button
-						on:click|stopPropagation|preventDefault={() => addValue(suggestion)}
-						class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
-					>
-						{suggestion.displayName}
-						{#if suggestion.createdByName}
-							<span class="text-xs text-gray-500"> by {suggestion.createdByName}</span>
-						{/if}
-					</button>
-				{/each}
+				{#if inputValue === ""}
+					<p class="px-3 py-2 text-left text-xs text-gray-500">
+						Start typing to search for tools...
+					</p>
+				{:else}
+					{#each suggestions as suggestion}
+						<button
+							on:click|stopPropagation|preventDefault={() => addValue(suggestion)}
+							class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
+						>
+							{suggestion.displayName}
+							{#if suggestion.createdByName}
+								<span class="text-xs text-gray-500"> by {suggestion.createdByName}</span>
+							{/if}
+						</button>
+					{/each}
+				{/if}
 			</div>
 		{/if}
 	</div>
