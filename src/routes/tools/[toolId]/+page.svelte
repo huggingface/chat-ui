@@ -207,7 +207,7 @@
 									}
 								}}
 							>
-								<button type="submit" class="text-grey-600 flex items-center underline">
+								<button type="submit" class="flex items-center underline">
 									<CarbonStar class="mr-1.5 inline text-xs" />Request to be featured</button
 								>
 							</form>
