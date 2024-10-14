@@ -190,6 +190,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
+			multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
 			tools:
 				model.tools &&
 				// disable tools on huggingchat android app
