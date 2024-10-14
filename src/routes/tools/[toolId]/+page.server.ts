@@ -2,7 +2,8 @@ import { base } from "$app/paths";
 import { env } from "$env/dynamic/private";
 import { env as envPublic } from "$env/dynamic/public";
 import { collections } from "$lib/server/database";
-import { logger } from "$lib/server/logger";
+import { sendSlack } from "$lib/server/sendSlack";
+import { ReviewStatus } from "$lib/types/Review";
 import type { Tool } from "$lib/types/Tool";
 import { fail, redirect, type Actions } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -103,64 +104,111 @@ export const actions: Actions = {
 
 			const username = locals.user?.username;
 
-			const res = await fetch(env.WEBHOOK_URL_REPORT_ASSISTANT, {
-				method: "POST",
-				headers: {
-					"Content-type": "application/json",
-				},
-				body: JSON.stringify({
-					text: `Tool <${toolUrl}|${tool?.displayName}> reported by ${
-						username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
-					}.\n\n> ${result.data}`,
-				}),
-			});
-
-			if (!res.ok) {
-				logger.error(`Webhook tool report failed. ${res.statusText} ${res.text}`);
-			}
+			await sendSlack(
+				`🔴 Tool <${toolUrl}|${tool?.displayName}> reported by ${
+					username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
+				}.\n\n> ${result.data}`
+			);
 		}
 
 		return { from: "report", ok: true, message: "Tool reported" };
 	},
-
-	unfeature: async ({ params, locals }) => {
-		if (!locals.user?.isAdmin) {
-			return fail(403, { error: true, message: "Permission denied" });
-		}
-
-		const tool = await collections.tools.findOne({
-			_id: new ObjectId(params.toolId),
+	deny: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			toolId: params.toolId,
+			locals,
+			status: ReviewStatus.DENIED,
+			url,
 		});
-
-		if (!tool) {
-			return fail(404, { error: true, message: "Tool not found" });
-		}
-
-		const result = await collections.tools.updateOne(
-			{ _id: tool._id },
-			{ $set: { featured: false } }
-		);
-
-		if (result.modifiedCount === 0) {
-			return fail(500, { error: true, message: "Failed to unfeature tool" });
-		}
-
-		return { from: "unfeature", ok: true, message: "Tool unfeatured" };
 	},
-	feature: async ({ params, locals }) => {
-		if (!locals.user?.isAdmin) {
-			return fail(403, { error: true, message: "Permission denied" });
-		}
-
-		const result = await collections.tools.updateOne(
-			{ _id: new ObjectId(params.toolId) },
-			{ $set: { featured: true } }
-		);
-
-		if (result.modifiedCount === 0) {
-			return fail(500, { error: true, message: "Failed to feature tool" });
-		}
-
-		return { from: "feature", ok: true, message: "Tool featured" };
+	approve: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			toolId: params.toolId,
+			locals,
+			status: ReviewStatus.APPROVED,
+			url,
+		});
+	},
+	request: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			toolId: params.toolId,
+			locals,
+			status: ReviewStatus.PENDING,
+			url,
+		});
+	},
+	unrequest: async ({ params, locals, url }) => {
+		return await setReviewStatus({
+			toolId: params.toolId,
+			locals,
+			status: ReviewStatus.PRIVATE,
+			url,
+		});
 	},
 };
+
+async function setReviewStatus({
+	locals,
+	toolId,
+	status,
+	url,
+}: {
+	locals: App.Locals;
+	toolId?: string;
+	status: ReviewStatus;
+	url: URL;
+}) {
+	if (!toolId) {
+		return fail(400, { error: true, message: "Tool ID is required" });
+	}
+
+	const tool = await collections.tools.findOne({
+		_id: new ObjectId(toolId),
+	});
+
+	if (!tool) {
+		return fail(404, { error: true, message: "Tool not found" });
+	}
+
+	if (
+		!locals.user ||
+		(!locals.user.isAdmin && tool.createdById.toString() !== locals.user._id.toString())
+	) {
+		return fail(403, { error: true, message: "Permission denied" });
+	}
+
+	// only admins can set the status to APPROVED or DENIED
+	// if the status is already APPROVED or DENIED, only admins can change it
+
+	if (
+		(status === ReviewStatus.APPROVED ||
+			status === ReviewStatus.DENIED ||
+			tool.review === ReviewStatus.APPROVED ||
+			tool.review === ReviewStatus.DENIED) &&
+		!locals.user?.isAdmin
+	) {
+		return fail(403, { error: true, message: "Permission denied" });
+	}
+
+	const result = await collections.tools.updateOne({ _id: tool._id }, { $set: { review: status } });
+
+	if (result.modifiedCount === 0) {
+		return fail(500, { error: true, message: "Failed to update review status" });
+	}
+
+	if (status === ReviewStatus.PENDING) {
+		const prefixUrl =
+			envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
+		const toolUrl = `${prefixUrl}/tools/${toolId}`;
+
+		const username = locals.user?.username;
+
+		await sendSlack(
+			`🟢 Tool <${toolUrl}|${tool?.displayName}> requested to be featured by ${
+				username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
+			}.`
+		);
+	}
+
+	return { from: "setReviewStatus", ok: true, message: "Review status updated" };
+}

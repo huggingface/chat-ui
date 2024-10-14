@@ -6,6 +6,7 @@
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { ReviewStatus } from "$lib/types/Review";
 
 	import ReportModal from "../../settings/(nav)/assistants/[assistantId]/ReportModal.svelte";
 	import { applyAction, enhance } from "$app/forms";
@@ -17,6 +18,7 @@
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonStar from "~icons/carbon/star";
+	import CarbonLock from "~icons/carbon/locked";
 
 	export let data;
 
@@ -99,7 +101,7 @@
 							<button
 								class="{isActive
 									? 'bg-gray-100 text-gray-800'
-									: 'bg-black !text-white'} mx-auto my-2 flex w-full w-min items-center justify-center rounded-full px-3 py-1 text-base"
+									: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
 								name="Activate model"
 								on:click|stopPropagation={() => {
 									if (isActive) {
@@ -164,24 +166,51 @@
 							{/if}
 						{/if}
 						{#if data?.user?.isAdmin}
-							<form method="POST" action="?/delete" use:enhance>
-								<button type="submit" class="flex items-center text-red-600 underline">
-									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
-								>
-							</form>
-							{#if data.tool?.featured}
-								<form method="POST" action="?/unfeature" use:enhance>
+							{#if !data.tool?.createdByMe}
+								<form method="POST" action="?/delete" use:enhance>
 									<button type="submit" class="flex items-center text-red-600 underline">
-										<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
-									>
-								</form>
-							{:else}
-								<form method="POST" action="?/feature" use:enhance>
-									<button type="submit" class="flex items-center text-green-600 underline">
-										<CarbonStar class="mr-1.5 inline text-xs" />Feature</button
+										<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
 									>
 								</form>
 							{/if}
+							{#if data.tool?.review === ReviewStatus.PENDING}
+								<form method="POST" action="?/approve" use:enhance>
+									<button type="submit" class="flex items-center text-green-600 underline">
+										<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
+									>
+								</form>
+								<form method="POST" action="?/deny" use:enhance>
+									<button type="submit" class="flex items-center text-red-600">
+										<span class="mr-1.5 font-light no-underline">X</span>
+										<span class="underline">Deny</span>
+									</button>
+								</form>
+							{/if}
+							{#if data.tool?.review === ReviewStatus.APPROVED || data.tool?.review === ReviewStatus.DENIED}
+								<form method="POST" action="?/unrequest" use:enhance>
+									<button type="submit" class="flex items-center text-red-600 underline">
+										<CarbonLock class="mr-1.5 inline text-xs " />Make private</button
+									>
+								</form>
+							{/if}
+						{/if}
+						{#if data.tool?.createdByMe && data.tool?.review === ReviewStatus.PRIVATE}
+							<form
+								method="POST"
+								action="?/request"
+								use:enhance={async ({ cancel }) => {
+									const confirmed = confirm(
+										"Are you sure you want to request this tool to be featured? Make sure you have tried the tool and that it works as expected. We will review your request once submitted."
+									);
+									if (!confirmed) {
+										cancel();
+									}
+								}}
+							>
+								<button type="submit" class="flex items-center underline">
+									<CarbonStar class="mr-1.5 inline text-xs" />Request to be featured</button
+								>
+							</form>
 						{/if}
 					</div>
 				</div>
