@@ -31,6 +31,8 @@ envVars:
   ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   APP_BASE: "/chat"
   COMMUNITY_TOOLS: "true"
+  COOKIE_SAMESITE: "strict"
+  COOKIE_SECURE: "true"
   ENABLE_ASSISTANTS: "true"
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
