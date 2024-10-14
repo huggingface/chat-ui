@@ -202,7 +202,7 @@ export class Database {
 		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch((e) => logger.error(e));
 		assistants.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ featured: 1, userCount: -1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ review: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));

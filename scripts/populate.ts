@@ -20,6 +20,7 @@ import { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
 import { generateSearchTokens } from "../src/lib/utils/searchTokens.ts";
+import { ReviewStatus } from "../src/lib/types/Review.ts";
 
 const rl = readline.createInterface({
 	input: process.stdin,
@@ -151,6 +152,7 @@ async function seed() {
 				disableStream: faker.datatype.boolean(0.25),
 				customPrompts: {},
 				assistants: [],
+				disableStream: faker.datatype.boolean(0.25),
 			};
 			await collections.settings.updateOne(
 				{ userId: user._id },
@@ -175,7 +177,7 @@ async function seed() {
 						createdAt: faker.date.recent({ days: 30 }),
 						updatedAt: faker.date.recent({ days: 30 }),
 						userCount: faker.number.int({ min: 1, max: 100000 }),
-						featured: faker.datatype.boolean(0.25),
+						review: faker.helpers.enumValue(ReviewStatus),
 						modelId: faker.helpers.arrayElement(modelIds),
 						description: faker.lorem.sentence(),
 						preprompt: faker.hacker.phrase(),
@@ -307,7 +309,7 @@ async function seed() {
 						createdAt: faker.date.recent({ days: 30 }),
 						updatedAt: faker.date.recent({ days: 30 }),
 						searchTokens: generateSearchTokens(displayName),
-						featured: faker.datatype.boolean(),
+						review: faker.helpers.enumValue(ReviewStatus),
 						outputComponent: null,
 						outputComponentIdx: null,
 					};
