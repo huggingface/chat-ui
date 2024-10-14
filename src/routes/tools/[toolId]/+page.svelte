@@ -173,6 +173,13 @@
 									>
 								</form>
 							{/if}
+							{#if data.tool?.review === ReviewStatus.PRIVATE}
+								<form method="POST" action="?/approve" use:enhance>
+									<button type="submit" class="flex items-center text-green-600 underline">
+										<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
+									>
+								</form>
+							{/if}
 							{#if data.tool?.review === ReviewStatus.PENDING}
 								<form method="POST" action="?/approve" use:enhance>
 									<button type="submit" class="flex items-center text-green-600 underline">
@@ -189,7 +196,7 @@
 							{#if data.tool?.review === ReviewStatus.APPROVED || data.tool?.review === ReviewStatus.DENIED}
 								<form method="POST" action="?/unrequest" use:enhance>
 									<button type="submit" class="flex items-center text-red-600 underline">
-										<CarbonLock class="mr-1.5 inline text-xs " />Make private</button
+										<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 									>
 								</form>
 							{/if}
