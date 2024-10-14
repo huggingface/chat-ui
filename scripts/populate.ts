@@ -115,6 +115,8 @@ async function seed() {
 		await collections.assistants.deleteMany({});
 		await collections.conversations.deleteMany({});
 		await collections.tools.deleteMany({});
+		await collections.migrationResults.deleteMany({});
+		await collections.semaphores.deleteMany({});
 		console.log("Reset done");
 	}
 
@@ -146,6 +148,7 @@ async function seed() {
 				activeModel: faker.helpers.arrayElement(modelIds),
 				createdAt: faker.date.recent({ days: 30 }),
 				updatedAt: faker.date.recent({ days: 30 }),
+				disableStream: faker.datatype.boolean(0.25),
 				customPrompts: {},
 				assistants: [],
 			};
@@ -305,6 +308,8 @@ async function seed() {
 						updatedAt: faker.date.recent({ days: 30 }),
 						searchTokens: generateSearchTokens(displayName),
 						featured: faker.datatype.boolean(),
+						outputComponent: null,
+						outputComponentIdx: null,
 					};
 				},
 				{ count: faker.number.int({ min: 10, max: 200 }) }
