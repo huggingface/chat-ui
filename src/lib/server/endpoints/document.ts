@@ -1,9 +1,8 @@
 import type { MessageFile } from "$lib/types/Message";
-import { z, type util } from "zod";
+import { z } from "zod";
 
 export interface FileProcessorOptions<TMimeType extends string = string> {
 	supportedMimeTypes: TMimeType[];
-	preferredMimeType: TMimeType;
 	maxSizeInMB: number;
 }
 
@@ -25,9 +24,6 @@ export const createDocumentProcessorOptionsValidator = <TMimeType extends string
 					])
 				)
 				.default(defaults.supportedMimeTypes),
-			preferredMimeType: z
-				.enum([defaults.supportedMimeTypes[0], ...defaults.supportedMimeTypes.slice(1)])
-				.default(defaults.preferredMimeType as util.noUndefined<TMimeType>),
 			maxSizeInMB: z.number().positive().default(defaults.maxSizeInMB),
 		})
 		.default(defaults);
@@ -42,7 +38,7 @@ export function makeDocumentProcessor<TMimeType extends string = string>(
 	options: FileProcessorOptions<TMimeType>
 ): DocumentProcessor<TMimeType> {
 	return (file) => {
-		const { supportedMimeTypes, preferredMimeType, maxSizeInMB } = options;
+		const { supportedMimeTypes, maxSizeInMB } = options;
 		const { mime, value } = file;
 
 		const buffer = Buffer.from(value, "base64");
@@ -53,7 +49,7 @@ export function makeDocumentProcessor<TMimeType extends string = string>(
 			throw Error("Document is too large");
 		}
 
-		const outputMime = validateMimeType(supportedMimeTypes, preferredMimeType, mime);
+		const outputMime = validateMimeType(supportedMimeTypes, mime);
 
 		return { file: buffer, mime: outputMime };
 	};
@@ -61,14 +57,12 @@ export function makeDocumentProcessor<TMimeType extends string = string>(
 
 const validateMimeType = <T extends readonly string[]>(
 	supportedMimes: T,
-	preferredMime: string,
 	mime: string
 ): T[number] => {
-	if (!supportedMimes.includes(preferredMime)) {
+	if (!supportedMimes.includes(mime)) {
 		const supportedMimesStr = supportedMimes.join(", ");
-		throw Error(
-			`Preferred format "${preferredMime}" not found in supported mimes: ${supportedMimesStr}`
-		);
+
+		throw Error(`Mimetype "${mime}" not found in supported mimes: ${supportedMimesStr}`);
 	}
 
 	return mime;

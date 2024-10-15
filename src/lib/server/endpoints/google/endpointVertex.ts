@@ -48,8 +48,7 @@ export const endpointVertexParametersSchema = z.object({
 				maxHeight: 4096,
 			}),
 			document: createDocumentProcessorOptionsValidator({
-				supportedMimeTypes: ["application/pdf"],
-				preferredMimeType: "application/pdf",
+				supportedMimeTypes: ["application/pdf", "text/plain"],
 				maxSizeInMB: 20,
 			}),
 		})
@@ -126,7 +125,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 										const { image, mime } = await imageProcessor(file);
 
 										return { file: image, mime };
-									} else if (file.mime === "application/pdf") {
+									} else if (file.mime === "application/pdf" || file.mime === "text/plain") {
 										return documentProcessor(file);
 									}
 
