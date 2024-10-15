@@ -32,6 +32,8 @@ envVars:
   APP_BASE: "/chat"
   ALLOW_IFRAME: "false"
   COMMUNITY_TOOLS: "true"
+  COOKIE_SAMESITE: "strict"
+  COOKIE_SECURE: "true"
   ENABLE_ASSISTANTS: "true"
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
