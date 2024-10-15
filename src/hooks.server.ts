@@ -289,5 +289,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		},
 	});
 
+	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
+	if (env.ALLOW_IFRAME !== "true") {
+		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
+	}
+
 	return response;
 };
