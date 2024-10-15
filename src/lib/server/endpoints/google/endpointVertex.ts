@@ -51,7 +51,7 @@ export const endpointVertexParametersSchema = z.object({
 				supportedMimeTypes: ["application/pdf"],
 				preferredMimeType: "application/pdf",
 				maxSizeInMB: 20,
-			})
+			}),
 		})
 		.default({}),
 });
