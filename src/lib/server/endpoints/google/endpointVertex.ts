@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
+import { createDocumentProcessorOptionsValidator, makeDocumentProcessor } from "../document";
 
 export const endpointVertexParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -39,11 +40,16 @@ export const endpointVertexParametersSchema = z.object({
 					"image/avif",
 					"image/tiff",
 					"image/gif",
+					"application/pdf",
 				],
 				preferredMimeType: "image/webp",
-				maxSizeInMB: Infinity,
+				maxSizeInMB: 20,
 				maxWidth: 4096,
 				maxHeight: 4096,
+			}),
+			document: createDocumentProcessorOptionsValidator({
+				supportedMimeTypes: ["application/pdf", "text/plain"],
+				maxSizeInMB: 20,
 			}),
 		})
 		.default({}),
@@ -109,17 +115,33 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		const vertexMessages = await Promise.all(
 			messages.map(async ({ from, content, files }: Omit<Message, "id">): Promise<Content> => {
 				const imageProcessor = makeImageProcessor(multimodal.image);
-				const processedFiles =
+				const documentProcessor = makeDocumentProcessor(multimodal.document);
+
+				const processedFilesWithNull =
 					files && files.length > 0
-						? await Promise.all(files.map(async (file) => imageProcessor(file)))
+						? await Promise.all(
+								files.map(async (file) => {
+									if (file.mime.includes("image")) {
+										const { image, mime } = await imageProcessor(file);
+
+										return { file: image, mime };
+									} else if (file.mime === "application/pdf" || file.mime === "text/plain") {
+										return documentProcessor(file);
+									}
+
+									return null;
+								})
+						  )
 						: [];
+
+				const processedFiles = processedFilesWithNull.filter((file) => file !== null);
 
 				return {
 					role: from === "user" ? "user" : "model",
 					parts: [
 						...processedFiles.map((processedFile) => ({
 							inlineData: {
-								data: processedFile.image.toString("base64"),
+								data: processedFile.file.toString("base64"),
 								mimeType: processedFile.mime,
 							},
 						})),

@@ -63,6 +63,7 @@ const modelConfig = z.object({
 		.passthrough()
 		.optional(),
 	multimodal: z.boolean().default(false),
+	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
