@@ -138,6 +138,23 @@ envVars:
         ]
       },
       {
+        "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "websiteUrl": "https://www.nvidia.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
+        "description": "Nvidia's latest Llama fine-tune, topping alignment benchmarks and optimized for instruction following.",
+        "parameters": {
+          "stop": ["<|eot_id|>"],
+          "temperature": 0.6,
+          "truncate": 28672,
+          "max_new_tokens": 2048
+        },
+        "endpoint": {
+          "type": "openai",
+          "baseURL": "https://api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+        }
+      },
+      {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "description": "The latest multimodal model from Meta! Supports image inputs natively.",
