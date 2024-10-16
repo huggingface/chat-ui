@@ -149,6 +149,20 @@ envVars:
           "truncate": 28672,
           "max_new_tokens": 2048
         },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
         "endpoint": {
           "type": "openai",
           "baseURL": "https://api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
