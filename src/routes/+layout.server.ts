@@ -13,7 +13,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
 
-export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
+export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
@@ -191,10 +191,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
 			multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-			tools:
-				model.tools &&
-				// disable tools on huggingchat android app
-				!request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_android"),
+			tools: model.tools,
 			unlisted: model.unlisted,
 			hasInferenceAPI: model.hasInferenceAPI,
 		})),
