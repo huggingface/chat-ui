@@ -60,21 +60,7 @@ envVars:
           "temperature": 0.6,
           "max_new_tokens": 1024,
           "truncate": 7167
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
+        }
       },
       {
         "name": "CohereForAI/c4ai-command-r-plus-08-2024",
@@ -92,21 +78,7 @@ envVars:
           "truncate": 28672,
           "max_new_tokens": 2048,
           "temperature": 0.3
-        },
-        "promptExamples": [
-          {
-            "title": "Generate a mouse portrait",
-            "prompt": "Generate the portrait of a scientific mouse in its laboratory."
-          },
-          {
-            "title": "Review a pull request",
-            "prompt": "Review this pull request: https://github.com/huggingface/chat-ui/pull/1131/files"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          }
-        ]
+        }
       },
       {
         "name": "Qwen/Qwen2.5-72B-Instruct",
@@ -121,21 +93,7 @@ envVars:
           "temperature": 0.6,
           "truncate": 28672,
           "max_new_tokens": 3072
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
+        }
       },
       {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
@@ -170,20 +128,6 @@ envVars:
         "websiteUrl": "https://nousresearch.com/",
         "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
         "tokenizer": "NousResearch/Hermes-3-Llama-3.1-8B",
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ],
         "parameters": {
           "stop": ["<|im_end|>"],
           "temperature": 0.6,
@@ -205,21 +149,7 @@ envVars:
           "temperature": 0.6,
           "truncate": 14336,
           "max_new_tokens": 1536
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
+        }
       },
       {
         "name": "microsoft/Phi-3.5-mini-instruct",
@@ -234,21 +164,7 @@ envVars:
           "temperature": 0.6,
           "truncate": 28672,
           "max_new_tokens": 3072
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ]
+        }
       },
       {
         "name": "llhf/Meta-Llama-3.1-8B-Instruct",
@@ -304,6 +220,33 @@ envVars:
       {
         "name": "microsoft/Phi-3-mini-4k-instruct",
         "transferTo": "microsoft/Phi-3.5-mini-instruct"
+      }
+    ]
+  PROMPT_EXAMPLES: >
+    [
+      {
+        "title": "Write an email from bullet list",
+        "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+      },
+      {
+        "title": "Code a snake game",
+        "prompt": "Code a basic snake game in python, give explanations for each step."
+      },
+      {
+        "title": "Assist in a task",
+        "prompt": "How do I make a delicious lemon cheesecake?"
+      },
+      {
+        "type": "multimodal",
+        "title": "Identify a flower",
+        "prompt": "What kind of flower is this?",
+        "fileUrl": "https://huggingface.co/datasets/huggingchat/prompt-examples/resolve/main/flower.jpg"
+      },
+      {
+        "type": "tool",
+        "title": "Generate a painting",
+        "prompt": "Generate a painting of a forest, oil painting style.",
+        "toolId": "000000000000000000000001"
       }
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
