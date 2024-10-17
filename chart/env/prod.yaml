@@ -145,7 +145,7 @@ envVars:
         "description": "Nvidia's latest Llama fine-tune, topping alignment benchmarks and optimized for instruction following.",
         "parameters": {
           "stop": ["<|eot_id|>", "<|im_end|>"],
-          "temperature": 0.6,
+          "temperature": 0.5,
           "truncate": 28672,
           "max_new_tokens": 2048
         },
