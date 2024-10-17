@@ -12,6 +12,7 @@ import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
+import { promptExamples } from "$lib/server/promptExamples";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -186,7 +187,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			displayName: model.displayName,
 			description: model.description,
 			logoUrl: model.logoUrl,
-			promptExamples: model.promptExamples,
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
@@ -240,6 +240,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			isAdmin: locals.user.isAdmin ?? false,
 			isEarlyAccess: locals.user.isEarlyAccess ?? false,
 		},
+		promptExamples,
 		assistant,
 		enableAssistants,
 		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",

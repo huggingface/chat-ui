@@ -308,3 +308,6 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 }
 
 export const toolFromConfigs = configTools.parse(JSON5.parse(env.TOOLS)) satisfies ConfigTool[];
+export const validToolIdSchema = z.enum(
+	toolFromConfigs.map((t) => t._id.toString()) as [string, ...string[]]
+);
