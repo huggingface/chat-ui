@@ -71,5 +71,5 @@ jobs:
           wait-for-completion-interval: 10s
           display-workflow-run-url-interval: 10s
           ref: refs/heads/main
-          token: ${{ secrets.ARGO_CD_TOKEN }}
+          token: ${{ secrets.GIT_TOKEN_INFRA_DEPLOYMENT }}
           inputs: '{"path": "hub/chat-ui/chat-ui.yaml", "values": ${{ env.VALUES }}, "url": "${{ github.event.head_commit.url }}"}'
