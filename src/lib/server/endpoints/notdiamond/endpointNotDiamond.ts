@@ -59,7 +59,8 @@ export async function endpointNotdiamond(
 					logprob: 0,
 					special: true,
 				},
-				generated_text: generatedText,
+				generated_text:
+					generatedText + "\n\n" + "**Recommended Model:** " + (result?.provider.model || ""),
 				details: null,
 			};
 			yield finalOutput;
