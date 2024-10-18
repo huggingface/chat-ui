@@ -40,7 +40,6 @@ export const endpointVertexParametersSchema = z.object({
 					"image/avif",
 					"image/tiff",
 					"image/gif",
-					"application/pdf",
 				],
 				preferredMimeType: "image/webp",
 				maxSizeInMB: 20,
