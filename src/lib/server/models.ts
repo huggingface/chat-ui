@@ -14,6 +14,7 @@ import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { SupportedProvider, SupportedModel } from "notdiamond";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -66,6 +67,14 @@ const modelConfig = z.object({
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	llmProviders: z
+		.array(
+			z.object({
+				provider: z.enum(Object.values(SupportedProvider) as [string, ...string[]]),
+				model: z.enum(Object.values(SupportedModel) as [string, ...string[]]),
+			})
+		)
+		.optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -301,6 +310,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return await endpoints.cohere(args);
 					case "langserve":
 						return await endpoints.langserve(args);
+					case "notdiamond":
+						return await endpoints.notdiamond(args);
 					default:
 						// for legacy reason
 						return endpoints.tgi(args);

@@ -27,7 +27,7 @@ import { endpointCohere, endpointCohereParametersSchema } from "./cohere/endpoin
 import endpointLangserve, {
 	endpointLangserveParametersSchema,
 } from "./langserve/endpointLangserve";
-
+import endpointNotdiamond, { endpointNotDiamondSchema } from "./notdiamond/endpointNotDiamond";
 import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
 
 export type EndpointMessage = Omit<Message, "id">;
@@ -72,6 +72,7 @@ export const endpoints = {
 	cloudflare: endpointCloudflare,
 	cohere: endpointCohere,
 	langserve: endpointLangserve,
+	notdiamond: endpointNotdiamond,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -88,5 +89,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointCloudflareParametersSchema,
 	endpointCohereParametersSchema,
 	endpointLangserveParametersSchema,
+	endpointNotDiamondSchema,
 ]);
 export default endpoints;
