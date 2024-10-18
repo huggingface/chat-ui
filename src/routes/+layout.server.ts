@@ -46,13 +46,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
 	const assistant = assistantActive
-		? JSON.parse(
-				JSON.stringify(
-					await collections.assistants.findOne({
-						_id: new ObjectId(settings?.activeModel),
-					})
-				)
-		  )
+		? await collections.assistants.findOne({
+				_id: new ObjectId(settings?.activeModel),
+		  })
 		: null;
 
 	const conversations = await collections.conversations
@@ -112,9 +108,13 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
 
-	const activeCommunityToolIds = (settings?.tools ?? []).filter(
+	let activeCommunityToolIds = (settings?.tools ?? []).filter(
 		(key) => !configToolIds.includes(key)
 	);
+
+	if (assistant) {
+		activeCommunityToolIds = [...activeCommunityToolIds, ...(assistant.tools ?? [])];
+	}
 
 	const communityTools = await collections.tools
 		.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
@@ -240,7 +240,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			isAdmin: locals.user.isAdmin ?? false,
 			isEarlyAccess: locals.user.isEarlyAccess ?? false,
 		},
-		assistant,
+		assistant: assistant ? JSON.parse(JSON.stringify(assistant)) : null,
 		enableAssistants,
 		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
 		enableCommunityTools: env.COMMUNITY_TOOLS === "true",

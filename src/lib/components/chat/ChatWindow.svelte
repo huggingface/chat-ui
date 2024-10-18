@@ -206,13 +206,14 @@
 	const settings = useSettingsStore();
 
 	// active tools are all the checked tools, either from settings or on by default
-	$: activeTools = $page.data.tools.filter((tool: ToolFront) =>
-		$settings?.tools?.includes(tool._id)
-	);
+	$: activeTools = $page.data.tools.filter((tool: ToolFront) => {
+		if ($page.data?.assistant) {
+			return $page.data.assistant.tools?.includes(tool._id);
+		}
+		return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
+	});
 	$: activeMimeTypes = [
-		...(!$page.data?.assistant && currentModel.tools
-			? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
-			: []),
+		...(currentModel.tools ? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []) : []),
 		...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []),
 	];
 
