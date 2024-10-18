@@ -64,6 +64,7 @@ const modelConfig = z.object({
 		.passthrough()
 		.optional(),
 	multimodal: z.boolean().default(false),
+	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
@@ -329,7 +330,13 @@ const hasInferenceAPI = async (m: Awaited<ReturnType<typeof processModel>>) => {
 		return false;
 	}
 
-	const r = await fetch(`https://huggingface.co/api/models/${m.id}`);
+	let r: Response;
+	try {
+		r = await fetch(`https://huggingface.co/api/models/${m.id}`);
+	} catch (e) {
+		console.log(e);
+		return false;
+	}
 
 	if (!r.ok) {
 		logger.warn(`Failed to check if ${m.id} has inference API: ${r.statusText}`);

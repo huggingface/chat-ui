@@ -206,14 +206,15 @@
 	const settings = useSettingsStore();
 
 	// active tools are all the checked tools, either from settings or on by default
-	$: activeTools = $page.data.tools.filter((tool: ToolFront) =>
-		$settings?.tools?.includes(tool._id)
-	);
+	$: activeTools = $page.data.tools.filter((tool: ToolFront) => {
+		if ($page.data?.assistant) {
+			return $page.data.assistant.tools?.includes(tool._id);
+		}
+		return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
+	});
 	$: activeMimeTypes = [
-		...(!$page.data?.assistant && currentModel.tools
-			? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
-			: []),
-		...(currentModel.multimodal ? ["image/*"] : []),
+		...(currentModel.tools ? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []) : []),
+		...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []),
 	];
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
@@ -303,7 +304,6 @@
 				/>
 			{:else if !assistant}
 				<ChatIntroduction
-					{models}
 					{currentModel}
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
@@ -343,7 +343,7 @@
 	<div
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if sources?.length}
+		{#if sources?.length && !loading}
 			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
 				{#each sources as source, index}
 					{#await source then src}

@@ -1,17 +1,3 @@
----
-title: chat-ui
-emoji: 🔥
-colorFrom: purple
-colorTo: purple
-sdk: docker
-pinned: false
-license: apache-2.0
-base_path: /chat
-app_port: 3000
-failure_strategy: rollback
-load_balancing_strategy: random
----
-
 # Chat UI
 
 **Find the docs at [hf.co/docs/chat-ui](https://huggingface.co/docs/chat-ui/index).**
@@ -69,7 +55,6 @@ MODELS=`[
     "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
     "tokenizer": "microsoft/Phi-3-mini-4k-instruct-gguf",
     "preprompt": "",
-    "chatPromptTemplate": "<s>{{preprompt}}{{#each messages}}{{#ifUser}}<|user|>\n{{content}}<|end|>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}<|end|>\n{{/ifAssistant}}{{/each}}",
     "parameters": {
       "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
       "temperature": 0.7,
@@ -83,6 +68,8 @@ MODELS=`[
   },
 ]`
 ```
+
+The `tokenizer` field will be used to find the appropriate chat template for the model. Make sure to fill in a valid model from the Hugging Face hub.
 
 Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
@@ -780,7 +767,10 @@ MODELS=`[
           "type": "vertex",
           "project": "abc-xyz",
           "location": "europe-west3",
-          "model": "gemini-1.5-pro-preview-0409", // model-name
+          "extraBody": {
+          "model_version": "gemini-1.5-pro-preview-0409",
+          },
+
           // Optional
           "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
           "apiEndpoint": "", // alternative api endpoint url,
@@ -795,7 +785,7 @@ MODELS=`[
               "preferredMimeType": "image/png",
               "maxSizeInMB": 5,
               "maxWidth": 2000,
-              "maxHeight": 1000;
+              "maxHeight": 1000,
             }
           }
        }]

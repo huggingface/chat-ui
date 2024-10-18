@@ -11,8 +11,9 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
+import { ReviewStatus } from "$lib/types/Review";
 
-export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
+export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
@@ -45,13 +46,9 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
 	const assistant = assistantActive
-		? JSON.parse(
-				JSON.stringify(
-					await collections.assistants.findOne({
-						_id: new ObjectId(settings?.activeModel),
-					})
-				)
-		  )
+		? await collections.assistants.findOne({
+				_id: new ObjectId(settings?.activeModel),
+		  })
 		: null;
 
 	const conversations = await collections.conversations
@@ -111,9 +108,13 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 
 	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
 
-	const activeCommunityToolIds = (settings?.tools ?? []).filter(
+	let activeCommunityToolIds = (settings?.tools ?? []).filter(
 		(key) => !configToolIds.includes(key)
 	);
+
+	if (assistant) {
+		activeCommunityToolIds = [...activeCommunityToolIds, ...(assistant.tools ?? [])];
+	}
 
 	const communityTools = await collections.tools
 		.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
@@ -189,10 +190,8 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
-			tools:
-				model.tools &&
-				// disable tools on huggingchat android app
-				!request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_android"),
+			multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+			tools: model.tools,
 			unlisted: model.unlisted,
 			hasInferenceAPI: model.hasInferenceAPI,
 		})),
@@ -219,7 +218,10 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 							)?.value ?? 15_000,
 					} satisfies ToolFront)
 			),
-		communityToolCount: await collections.tools.countDocuments({ type: "community" }),
+		communityToolCount: await collections.tools.countDocuments({
+			type: "community",
+			review: ReviewStatus.APPROVED,
+		}),
 		assistants: assistants
 			.filter((el) => userAssistantsSet.has(el._id.toString()))
 			.map((el) => ({
@@ -238,7 +240,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, request }) => {
 			isAdmin: locals.user.isAdmin ?? false,
 			isEarlyAccess: locals.user.isEarlyAccess ?? false,
 		},
-		assistant,
+		assistant: assistant ? JSON.parse(JSON.stringify(assistant)) : null,
 		enableAssistants,
 		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
 		enableCommunityTools: env.COMMUNITY_TOOLS === "true",

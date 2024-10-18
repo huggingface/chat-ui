@@ -409,7 +409,7 @@
 				</div>
 				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
 			</label>
-			{#if $page.data.user?.isEarlyAccess && selectedModel?.tools}
+			{#if selectedModel?.tools}
 				<div>
 					<span class="text-smd font-semibold"
 						>Tools

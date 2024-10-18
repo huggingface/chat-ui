@@ -19,6 +19,7 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
+	import { ReviewStatus } from "$lib/types/Review";
 
 	export let data: PageData;
 
@@ -120,7 +121,12 @@
 			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
 				>experimental</span
-			>. Consider sharing your feedback with us!
+			>. Consider
+			<a
+				class="underline hover:text-purple-500"
+				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
+				target="_blank">sharing your feedback with us!</a
+			>
 		</h4>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
@@ -228,8 +234,9 @@
 				{@const isOfficial = !tool.createdByName}
 				<a
 					href="{base}/tools/{tool._id.toString()}"
-					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!tool.featured &&
-					!isOfficial
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!(
+						tool.review === ReviewStatus.APPROVED
+					) && !isOfficial
 						? ' border-red-500/30'
 						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}
@@ -279,7 +286,11 @@
 					</div>
 				</a>
 			{:else}
-				No tools found
+				{#if activeOnly}
+					You don't have any active tools.
+				{:else}
+					No tools found
+				{/if}
 			{/each}
 		</div>
 

@@ -17,11 +17,15 @@
 </script>
 
 <div class="flex w-full flex-col gap-5">
-	<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
+	<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 		<h2>Application Settings</h2>
+		<span class="text-sm font-light text-gray-500">
+			Latest deployment <span class="gap-2 font-mono"
+				>{envPublic.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
+			>
+		</span>
 	</div>
-
-	<div class="flex h-full flex-col gap-4 pt-4 max-sm:pt-0">
+	<div class="flex h-full flex-col gap-2 max-sm:pt-0">
 		{#if envPublic.PUBLIC_APP_DATA_SHARING === "1"}
 			<!-- svelte-ignore a11y-label-has-associated-control -->
 			<label class="flex items-center">
