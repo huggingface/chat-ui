@@ -232,8 +232,11 @@
 			{#each tools as tool}
 				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				{@const isOfficial = !tool.createdByName}
-				<a
-					href="{base}/tools/{tool._id.toString()}"
+				<div
+					on:click={() => goto(`${base}/tools/${tool._id.toString()}`)}
+					on:keydown={(e) => e.key === "Enter" && goto(`${base}/tools/${tool._id.toString()}`)}
+					role="button"
+					tabindex="0"
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!(
 						tool.review === ReviewStatus.APPROVED
 					) && !isOfficial
@@ -284,7 +287,7 @@
 							</p>
 						{/if}
 					</div>
-				</a>
+				</div>
 			{:else}
 				{#if activeOnly}
 					You don't have any active tools.
