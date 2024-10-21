@@ -121,9 +121,17 @@
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
 					</a>
 					<form method="POST" action="?/delete" use:enhance>
-						<button type="submit" class="flex items-center underline">
-							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+						<button
+							type="submit"
+							class="flex items-center underline"
+							on:click={(event) => {
+								if (!confirm("Are you sure you want to delete this assistant?")) {
+									event.preventDefault();
+								}
+							}}
 						>
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+						</button>
 					</form>
 				{:else}
 					<form method="POST" action="?/unsubscribe" use:enhance>
@@ -155,9 +163,17 @@
 				{#if data?.user?.isAdmin}
 					{#if !assistant?.createdByMe}
 						<form method="POST" action="?/delete" use:enhance>
-							<button type="submit" class="flex items-center text-red-600 underline">
-								<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+							<button
+								type="submit"
+								class="flex items-center text-red-600 underline"
+								on:click={(event) => {
+									if (!confirm("Are you sure you want to delete this assistant?")) {
+										event.preventDefault();
+									}
+								}}
 							>
+								<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+							</button>
 						</form>
 					{/if}
 					{#if assistant?.review === ReviewStatus.PRIVATE}
