@@ -4,5 +4,8 @@
 	"editor.codeActionsOnSave": {
 		"source.fixAll": "explicit"
 	},
-	"eslint.validate": ["javascript", "svelte"]
+	"eslint.validate": ["javascript", "svelte"],
+	"[svelte]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	}
 }

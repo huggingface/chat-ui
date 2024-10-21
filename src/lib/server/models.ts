@@ -79,19 +79,26 @@ async function getChatPromptRender(
 	}
 	let tokenizer: PreTrainedTokenizer;
 
-	if (!m.tokenizer) {
-		return compileTemplate<ChatTemplateInput>(
-			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
-			m
-		);
-	}
-
 	try {
-		tokenizer = await getTokenizer(m.tokenizer);
+		tokenizer = await getTokenizer(m.tokenizer ?? m.id ?? m.name);
 	} catch (e) {
+		// if fetching the tokenizer fails but it wasnt manually set, use the default template
+		if (!m.tokenizer) {
+			logger.warn(
+				`No tokenizer found for model ${m.name}, using default template. Consider setting tokenizer manually or making sure the model is available on the hub.`,
+				m
+			);
+			return compileTemplate<ChatTemplateInput>(
+				"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
+				m
+			);
+		}
+
 		logger.error(
 			e,
-			`Failed to load tokenizer for model ${m.name} consider setting chatPromptTemplate manually or making sure the model is available on the hub.`
+			`Failed to load tokenizer ${
+				m.tokenizer ?? m.id ?? m.name
+			} make sure the model is available on the hub and you have access to any gated models.`
 		);
 		process.exit();
 	}
