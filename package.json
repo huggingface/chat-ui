@@ -117,6 +117,6 @@
 		"aws4fetch": "^1.0.17",
 		"cohere-ai": "^7.9.0",
 		"openai": "^4.44.0",
-		"notdiamond": "^0.3.12"
+		"notdiamond": "^1.0.2"
 	}
 }
