@@ -20,7 +20,7 @@ import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import { MetricsServer } from "../metrics";
 import { logger } from "$lib/server/logger";
 
-const MAX_N_PAGES_TO_SCRAPE = 8 as const;
+const MAX_N_PAGES_TO_SCRAPE = 5 as const;
 const MAX_N_PAGES_TO_EMBED = 5 as const;
 
 export async function* runWebSearch(

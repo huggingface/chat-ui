@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 
-export async function generateQuery(messages: Message[]) {
+export async function generateQuery(messages: Message[], generatedQueries?: string[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
 	const userMessages = messages.filter(({ from }) => from === "user");
 	const previousUserMessages = userMessages.slice(0, -1);
@@ -17,6 +17,9 @@ export async function generateQuery(messages: Message[]) {
 - Who is the president of France?
 
 Current Question: What about Mexico?
+
+Previously generated queries:
+- President list of Mexico
 `,
 		},
 		{
@@ -47,8 +50,26 @@ Current Question: Where is it being hosted?`,
 			from: "assistant",
 			content: `news ${format(new Date(Date.now() - 864e5), "MMMM d, yyyy")}`,
 		},
-		{ from: "user", content: "What is the current weather in Paris?" },
-		{ from: "assistant", content: `weather in Paris ${currentDate}` },
+		{
+			from: "user",
+			content: `Current Question: My dog has been bitten, what should the gums look like so that he is healthy and when does he need an infusion?
+
+Previously generated queries:
+- What healthy gums look like in dogs
+- What unhealthy gums look like in dogs
+`,
+		},
+		{ from: "assistant", content: `dog, gums, indications of necessary infusion` },
+		{
+			from: "user",
+			content: `Current Question: Who is Elon Musk ?
+
+Previously generated queries:
+- Elon Musk biography
+- Who is Elon Musk
+`,
+		},
+		{ from: "assistant", content: `Elon Musk` },
 		{
 			from: "user",
 			content:
@@ -58,13 +79,19 @@ Current Question: Where is it being hosted?`,
 							.join("\n")}`
 					: "") +
 				"\n\nCurrent Question: " +
-				lastMessage.content,
+				lastMessage.content +
+				"\n" +
+				(generatedQueries && generatedQueries.length > 0
+					? `Previously generated queries:\n${generatedQueries.map((q) => `- ${q}`).join("\n")}`
+					: ""),
 		},
 	];
 
+	const preprompt = `You are tasked with generating precise and effective web search queries to answer the user's question. Provide a concise and specific query for Google search that will yield the most relevant and up-to-date results. Include key terms and related phrases, and avoid unnecessary words. Answer with only the query. Avoid duplicates, make the prompts as divers as you can. You are not allowed to repeat queries. Today is ${currentDate}`;
+
 	const webQuery = await generateFromDefaultEndpoint({
 		messages: convQuery,
-		preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
+		preprompt,
 		generateSettings: {
 			max_new_tokens: 30,
 		},
