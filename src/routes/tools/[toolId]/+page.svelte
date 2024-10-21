@@ -186,6 +186,7 @@
 										}}
 									>
 										<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+									</button>
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.PRIVATE}
