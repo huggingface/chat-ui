@@ -19,6 +19,9 @@ import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
+	// Set HF_TOKEN as a process variable for Transformers.JS to see it
+	process.env.HF_TOKEN ??= env.HF_TOKEN;
+
 	logger.info("Starting server...");
 	initExitHandler();
 
