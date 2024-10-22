@@ -27,22 +27,52 @@ export async function* search(
 	undefined
 > {
 	const searchQueries: string[] = [];
+	const newLinks: string[] = [];
+	let requireQuery = false;
 
 	if (ragSettings && ragSettings?.allowedLinks.length > 0) {
-		yield makeGeneralUpdate({ message: "Using links specified in Assistant" });
-		return {
-			searchQuery: "",
-			pages: await directLinksToSource(ragSettings.allowedLinks).then(filterByBlockList),
-		};
+		for (const link of ragSettings.allowedLinks) {
+			if (link.includes("[query]")) {
+				requireQuery = true;
+				break;
+			}
+		}
+		if (!requireQuery) {
+			yield makeGeneralUpdate({ message: "Using links specified in Assistant" });
+			return {
+				searchQuery: "",
+				pages: await directLinksToSource(ragSettings?.allowedLinks).then(filterByBlockList),
+			};
+		}
 	}
 
 	for (let i = 0; i < num_searches; i++) {
 		const searchQuery = query ?? (await generateQuery(messages, searchQueries));
 		searchQueries.push(searchQuery);
-		yield makeGeneralUpdate({
-			message: `Searching ${getWebSearchProvider()}`,
-			args: [searchQuery],
-		});
+
+		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
+			for (const link of ragSettings.allowedLinks) {
+				const newLink = link.replace("[query]", encodeURIComponent(searchQuery));
+				newLinks.push(newLink);
+			}
+			yield makeGeneralUpdate({
+				message: `Querying provided Endpoints with`,
+				args: [searchQuery],
+			});
+		} else {
+			yield makeGeneralUpdate({
+				message: `Searching ${getWebSearchProvider()}`,
+				args: [searchQuery],
+			});
+		}
+	}
+
+	if (newLinks.length > 0) {
+		yield makeGeneralUpdate({ message: "Using links specified in Assistant" });
+		return {
+			searchQuery: "",
+			pages: await directLinksToSource(newLinks).then(filterByBlockList),
+		};
 	}
 
 	let combinedResults: WebSearchSource[] = [];
