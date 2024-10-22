@@ -53,7 +53,9 @@ export async function* search(
 		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
 			for (const link of ragSettings.allowedLinks) {
 				const newLink = link.replace("[query]", encodeURIComponent(searchQuery));
-				newLinks.push(newLink);
+				if (!newLinks.includes(newLink)) {
+					newLinks.push(newLink);
+				}
 			}
 			yield makeGeneralUpdate({
 				message: `Querying provided Endpoints with`,
