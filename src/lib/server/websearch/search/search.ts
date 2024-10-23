@@ -15,7 +15,6 @@ import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 const listSchema = z.array(z.string()).default([]);
 const allowList = listSchema.parse(JSON5.parse(env.WEBSEARCH_ALLOWLIST));
 const blockList = listSchema.parse(JSON5.parse(env.WEBSEARCH_BLOCKLIST));
-const num_searches = 3;
 
 export async function* search(
 	messages: Message[],
@@ -26,7 +25,6 @@ export async function* search(
 	{ searchQuery: string; pages: WebSearchSource[] },
 	undefined
 > {
-	const searchQueries: string[] = [];
 	const newLinks: string[] = [];
 	let requireQuery = false;
 
@@ -46,10 +44,12 @@ export async function* search(
 		}
 	}
 
-	for (let i = 0; i < num_searches; i++) {
-		const searchQuery = query ?? (await generateQuery(messages, searchQueries));
-		searchQueries.push(searchQuery);
+	let searchQueries = await generateQuery(messages);
+	if (!searchQueries.length && query) {
+		searchQueries = [query];
+	}
 
+	for (const searchQuery of searchQueries) {
 		if (ragSettings && ragSettings?.allowedLinks.length > 0) {
 			for (const link of ragSettings.allowedLinks) {
 				const newLink = link.replace("[query]", encodeURIComponent(searchQuery));
@@ -101,8 +101,8 @@ export async function* search(
 	// example input: [a1,a2,a3,a4,a5,b1,b2,b3,b4,b5,c1,c2,c3,c4,c5]
 	// example output: [a1,b1,c1,a2,b2,c2,a3,b3,c3,a4,b4,c4,a5,b5,c5]
 	const sortedResults = [];
-	for (let i = 0; i < num_searches; i++) {
-		for (let j = i; j < combinedResults.length; j += num_searches) {
+	for (let i = 0; i < searchQueries.length; i++) {
+		for (let j = i; j < combinedResults.length; j += searchQueries.length) {
 			sortedResults.push(combinedResults[j]);
 		}
 	}
