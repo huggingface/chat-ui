@@ -228,10 +228,13 @@
 	let audioChunks = [];
 
 	async function initializeTranscriber() {
-		transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-large-v3-turbo');
+		if (!transcriber) {
+			transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-large-v3-turbo', { device: 'webgpu' });
+		}
 	}
 
 	async function startRecording() {
+		await initializeTranscriber();
 		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 		mediaRecorder = new MediaRecorder(stream);
 		audioChunks = [];
@@ -255,10 +258,6 @@
 		mediaRecorder.stop();
 		isRecording = false;
 	}
-
-	onMount(() => {
-		initializeTranscriber();
-	});
 </script>
 
 <svelte:window
