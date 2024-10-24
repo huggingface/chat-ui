@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick } from "svelte";
+	import { createEventDispatcher, onDestroy, tick, onMount } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
@@ -38,6 +38,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
+	import TranscriptionAnimation from "../animations/TranscriptionAnimation.svelte";
 
 	import { pipeline } from "@huggingface/transformers";
 
@@ -226,10 +227,23 @@
 	let isRecording = false;
 	let mediaRecorder;
 	let audioChunks = [];
+	let isLoadingModel = false;
+	let isTranscribing = false;
 
 	async function initializeTranscriber() {
 		if (!transcriber) {
-			transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-large-v3-turbo', { device: 'webgpu' });
+			isLoadingModel = true;
+			transcriber = await pipeline(
+				"automatic-speech-recognition",
+				"onnx-community/whisper-large-v3-turbo",
+				{
+					device: "webgpu",
+					progress_callback: (progress) => {
+						console.log(`Model loading progress: ${progress * 100}%`);
+					},
+				}
+			);
+			isLoadingModel = false;
 		}
 	}
 
@@ -244,10 +258,12 @@
 		};
 
 		mediaRecorder.onstop = async () => {
-			const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+			const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
 			const audioUrl = URL.createObjectURL(audioBlob);
+			isTranscribing = true;
 			const output = await transcriber(audioUrl);
 			message = output.text;
+			isTranscribing = false;
 		};
 
 		mediaRecorder.start();
@@ -258,6 +274,17 @@
 		mediaRecorder.stop();
 		isRecording = false;
 	}
+
+	onMount(() => {
+		const microphoneButton = document.querySelector("#microphone-button");
+		if (microphoneButton) {
+			microphoneButton.addEventListener("click", async () => {
+				if (!transcriber) {
+					await initializeTranscriber();
+				}
+			});
+		}
+	});
 </script>
 
 <svelte:window
@@ -490,6 +517,7 @@
 								<CarbonSendAltFilled />
 							</button>
 							<button
+								id="microphone-button"
 								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
 								on:click={isRecording ? stopRecording : startRecording}
 								type="button"
@@ -553,5 +581,11 @@
 				{/if}
 			</div>
 		</div>
+		{#if isLoadingModel}
+			<LoadingAnimation classNames="absolute inset-0 z-10" />
+		{/if}
+		{#if isTranscribing}
+			<TranscriptionAnimation classNames="absolute inset-0 z-10" />
+		{/if}
 	</div>
 </div>
