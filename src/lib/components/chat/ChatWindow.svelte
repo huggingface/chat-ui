@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick } from "svelte";
+	import { createEventDispatcher, onDestroy, tick, onMount } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
@@ -39,7 +39,7 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
-	import { pipeline } from "@xenova/transformers";
+	import { AutomaticSpeechRecognitionPipeline, pipeline } from "@huggingface/transformers";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -222,10 +222,10 @@
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 
-	let transcriber;
+	let transcriber: AutomaticSpeechRecognitionPipeline | ((arg0: string) => any);
 	let isRecording = false;
-	let mediaRecorder;
-	let audioChunks = [];
+	let mediaRecorder: MediaRecorder;
+	let audioChunks: BlobPart[] = [];
 
 	async function initializeTranscriber() {
 		transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-large-v3-turbo');
