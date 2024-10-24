@@ -43,6 +43,10 @@ export const ToolOutputPaths: Record<
 		type: "str",
 		path: "$",
 	},
+	weather: {
+		type: "str",
+		path: "$",
+	},
 };
 
 export const isValidOutputComponent = (
