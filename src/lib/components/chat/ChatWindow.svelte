@@ -40,7 +40,8 @@
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import TranscriptionAnimation from "../animations/TranscriptionAnimation.svelte";
 
-	import { pipeline } from "@huggingface/transformers";
+	import { AutomaticSpeechRecognitionPipeline, pipeline } from "@huggingface/transformers";
+	import LoadingAnimation from "../animations/LoadingAnimation.svelte";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -223,10 +224,10 @@
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 
-	let transcriber;
+	let transcriber: AutomaticSpeechRecognitionPipeline;
 	let isRecording = false;
-	let mediaRecorder;
-	let audioChunks = [];
+	let mediaRecorder: MediaRecorder;
+	let audioChunks: BlobPart[] = [];
 	let isLoadingModel = false;
 	let isTranscribing = false;
 
@@ -235,12 +236,9 @@
 			isLoadingModel = true;
 			transcriber = await pipeline(
 				"automatic-speech-recognition",
-				"onnx-community/whisper-large-v3-turbo",
+				"onnx-community/whisper-small",
 				{
-					device: "webgpu",
-					progress_callback: (progress) => {
-						console.log(`Model loading progress: ${progress * 100}%`);
-					},
+					device: "webgpu"
 				}
 			);
 			isLoadingModel = false;
@@ -261,7 +259,10 @@
 			const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
 			const audioUrl = URL.createObjectURL(audioBlob);
 			isTranscribing = true;
-			const output = await transcriber(audioUrl);
+			const userLanguage = navigator.language;
+			console.log("Detected language:", userLanguage);
+			const firstTwoChars = userLanguage.slice(0, 2).toLowerCase();
+			const output = await transcriber(audioUrl, {language: firstTwoChars, task: 'transcribe' });
 			message = output.text;
 			isTranscribing = false;
 		};
