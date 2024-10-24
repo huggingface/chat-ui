@@ -234,13 +234,9 @@
 	async function initializeTranscriber() {
 		if (!transcriber) {
 			isLoadingModel = true;
-			transcriber = await pipeline(
-				"automatic-speech-recognition",
-				"onnx-community/whisper-small",
-				{
-					device: "webgpu"
-				}
-			);
+			transcriber = await pipeline("automatic-speech-recognition", "onnx-community/whisper-small", {
+				device: "webgpu",
+			});
 			isLoadingModel = false;
 		}
 	}
@@ -262,7 +258,7 @@
 			const userLanguage = navigator.language;
 			console.log("Detected language:", userLanguage);
 			const firstTwoChars = userLanguage.slice(0, 2).toLowerCase();
-			const output = await transcriber(audioUrl, {language: firstTwoChars, task: 'transcribe' });
+			const output = await transcriber(audioUrl, { language: firstTwoChars, task: "transcribe" });
 			message = output.text;
 			isTranscribing = false;
 		};
