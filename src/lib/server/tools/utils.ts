@@ -112,7 +112,7 @@ export async function extractJson(text: string): Promise<unknown[]> {
 	return calls.flat();
 }
 
-export async function fetchWeatherData(latitude: number, longitude: number): Promise<any> {
+export async function fetchWeatherData(latitude: number, longitude: number): Promise<ArrayBuffer> {
 	const response = await fetch(
 		`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m`
 	);
@@ -122,7 +122,9 @@ export async function fetchWeatherData(latitude: number, longitude: number): Pro
 	return response.json();
 }
 
-export async function fetchCoordinates(location: string): Promise<{ latitude: number; longitude: number }> {
+export async function fetchCoordinates(
+	location: string
+): Promise<{ latitude: number; longitude: number }> {
 	const response = await fetch(
 		`https://geocoding-api.open-meteo.com/v1/search?name=${location}&count=1`
 	);
