@@ -7,6 +7,7 @@
 	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonMicrophone from "~icons/carbon/microphone";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -37,6 +38,8 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
+
+	import { pipeline } from "@xenova/transformers";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -218,6 +221,44 @@
 	];
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
+
+	let transcriber;
+	let isRecording = false;
+	let mediaRecorder;
+	let audioChunks = [];
+
+	async function initializeTranscriber() {
+		transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-large-v3-turbo');
+	}
+
+	async function startRecording() {
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		mediaRecorder = new MediaRecorder(stream);
+		audioChunks = [];
+
+		mediaRecorder.ondataavailable = (event) => {
+			audioChunks.push(event.data);
+		};
+
+		mediaRecorder.onstop = async () => {
+			const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+			const audioUrl = URL.createObjectURL(audioBlob);
+			const output = await transcriber(audioUrl);
+			message = output.text;
+		};
+
+		mediaRecorder.start();
+		isRecording = true;
+	}
+
+	function stopRecording() {
+		mediaRecorder.stop();
+		isRecording = false;
+	}
+
+	onMount(() => {
+		initializeTranscriber();
+	});
 </script>
 
 <svelte:window
@@ -448,6 +489,13 @@
 								type="submit"
 							>
 								<CarbonSendAltFilled />
+							</button>
+							<button
+								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
+								on:click={isRecording ? stopRecording : startRecording}
+								type="button"
+							>
+								<CarbonMicrophone />
 							</button>
 						{/if}
 					</div>
