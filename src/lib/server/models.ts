@@ -78,7 +78,7 @@ const modelConfig = z.object({
 		.optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+export const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
 
 async function getChatPromptRender(
 	m: z.infer<typeof modelConfig>
@@ -262,7 +262,7 @@ async function getChatPromptRender(
 	return renderTemplate;
 }
 
-const processModel = async (m: z.infer<typeof modelConfig>) => ({
+export const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	...m,
 	chatPromptRender: await getChatPromptRender(m),
 	id: m.id || m.name,
@@ -271,9 +271,10 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
 });
 
-const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
-	...m,
-	getEndpoint: async (): Promise<Endpoint> => {
+export const getEndpoint = (
+	m: Awaited<ReturnType<typeof processModel>>
+): (() => Promise<Endpoint>) => {
+	return async () => {
 		if (!m.endpoints) {
 			return endpointTgi({
 				type: "tgi",
@@ -329,7 +330,12 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		}
 
 		throw new Error(`Failed to select endpoint`);
-	},
+	};
+};
+
+const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
+	...m,
+	getEndpoint: getEndpoint(m),
 });
 
 const hasInferenceAPI = async (m: Awaited<ReturnType<typeof processModel>>) => {

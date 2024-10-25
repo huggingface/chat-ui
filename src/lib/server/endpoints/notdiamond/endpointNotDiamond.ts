@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Endpoint } from "../endpoints";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import { NotDiamond } from "notdiamond";
+import { NotDiamond, SupportedModel } from "notdiamond";
+import { getEndpoint, modelsRaw, processModel } from "$lib/server/models";
 
 export const endpointNotDiamondSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -9,62 +9,60 @@ export const endpointNotDiamondSchema = z.object({
 	type: z.literal("notdiamond"),
 });
 
+const modelsMapping = z.record(
+	z.enum(Object.values(SupportedModel) as [string, ...string[]]),
+	z.string()
+);
+
 export async function endpointNotdiamond(
 	input: z.input<typeof endpointNotDiamondSchema>
 ): Promise<Endpoint> {
 	const llmProviders = input.model.llmProviders;
+	const notDiamond = new NotDiamond();
 
-	return async ({ messages }) => {
-		const notDiamond = new NotDiamond();
+	const ND_MODELS_TO_HF_MODELS: z.input<typeof modelsMapping> = {
+		"Meta-Llama-3.1-70B-Instruct-Turbo": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+		"Qwen2-72B-Instruct": "Qwen/Qwen2.5-72B-Instruct",
+		"open-mistral-nemo": "mistralai/Mistral-Nemo-Instruct-2407",
+	};
+
+	return async ({ messages, ...rest }) => {
 		const ndMessages = messages.map(({ content, from }) => ({ content, role: from }));
+		const modelSelect = await notDiamond.modelSelect({
+			messages: ndMessages,
+			llmProviders,
+			tradeoff: "cost",
+		});
 
-		return (async function* () {
-			let generatedText = "";
-			let tokenId = 0;
+		const lastMessage = messages[messages.length - 1];
 
-			const result = await notDiamond.stream({
-				messages: ndMessages,
-				llmProviders,
-			});
+		if (!("providers" in modelSelect) || !modelSelect.providers?.[0]?.model) {
+			throw new Error("No suitable model found");
+		}
 
-			for await (const chunk of result?.stream ?? []) {
-				if (!chunk) continue;
+		const currentModel = modelsRaw.find(
+			(model) => model.name === ND_MODELS_TO_HF_MODELS[modelSelect.providers[0].model]
+		);
 
-				const tokens = chunk.split(/(\s+)/);
+		if (!currentModel) {
+			throw new Error(`Model ${modelSelect.providers[0].model} not found in mapping`);
+		}
 
-				for (const token of tokens) {
-					if (!token) continue;
+		const messagesWithLlmUsed = [
+			...messages.slice(0, -1),
+			{
+				...lastMessage,
+				content:
+					lastMessage.content +
+					"\n\n" +
+					`At the end of the response mention the llm model that you used: ${currentModel?.name}`,
+			},
+		];
 
-					generatedText += token;
+		const m = await processModel(currentModel);
+		const endpoint = await getEndpoint(m)();
 
-					const output: TextGenerationStreamOutput = {
-						generated_text: null,
-						token: {
-							id: tokenId++,
-							text: token,
-							logprob: 0,
-							special: false,
-						},
-						details: null,
-					};
-
-					yield output;
-				}
-			}
-
-			const finalOutput: TextGenerationStreamOutput = {
-				token: {
-					id: tokenId++,
-					text: "",
-					logprob: 0,
-					special: true,
-				},
-				generated_text:
-					generatedText + "\n\n" + "**Recommended Model:** " + (result?.provider.model || ""),
-				details: null,
-			};
-			yield finalOutput;
-		})();
+		return endpoint({ messages: messagesWithLlmUsed, ...rest });
 	};
 }
 
