@@ -33,7 +33,7 @@ export async function* generate(
 				text = text.slice(0, text.length - stopToken.length);
 			}
 
-			yield { type: MessageUpdateType.FinalAnswer, text, interrupted };
+			yield { type: MessageUpdateType.FinalAnswer, text, interrupted, webSources: output.webSources };
 			continue;
 		}
 
