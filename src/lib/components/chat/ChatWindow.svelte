@@ -86,6 +86,15 @@
 	};
 
 	const onPaste = (e: ClipboardEvent) => {
+		const textContent = e.clipboardData?.getData("text");
+
+		if (textContent && textContent.length > 256) {
+			e.preventDefault();
+			const pastedFile = new File([textContent], "Pasted Content", { type: "text/plain" });
+
+			files = [...files, pastedFile];
+		}
+
 		if (!e.clipboardData) {
 			return;
 		}
