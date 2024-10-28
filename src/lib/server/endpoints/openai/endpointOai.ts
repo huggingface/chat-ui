@@ -86,7 +86,7 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	apiKey: z.string().default(env.OPENAI_API_KEY ?? "sk-"),
+	apiKey: z.string().default(env.OPENAI_API_KEY || env.HF_TOKEN || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
@@ -135,7 +135,7 @@ export async function endpointOai(
 	}
 
 	const openai = new OpenAI({
-		apiKey: apiKey ?? "sk-",
+		apiKey: apiKey || "sk-",
 		baseURL,
 		defaultHeaders,
 		defaultQuery,
