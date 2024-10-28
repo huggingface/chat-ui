@@ -55,7 +55,7 @@ export async function endpointNotdiamond(
 				content:
 					lastMessage.content +
 					"\n\n" +
-					`At the end of the response mention the llm model that you used: ${currentModel?.name}`,
+					`IMPORTANT, after you've executed your main instructions provided above, add the following information to the end of the response: Model: ${currentModel?.name}`,
 			},
 		];
 
