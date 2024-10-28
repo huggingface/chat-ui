@@ -146,7 +146,7 @@ async function getChatPromptRender(
 			// or use the `rag` mode without the citations
 			const id = m.id ?? m.name;
 
-			if (id.startsWith("CohereForAI")) {
+			if (isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
 						role: m.systemRoleSupported ? "system" : "user",
@@ -173,7 +173,7 @@ async function getChatPromptRender(
 					},
 					...formattedMessages,
 				];
-			} else if (id.startsWith("meta-llama")) {
+			} else if (isHuggingChat && id.startsWith("meta-llama")) {
 				const results = toolResults.flatMap((result) => {
 					if (result.status === ToolResultStatus.Error) {
 						return [
