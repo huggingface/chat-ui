@@ -50,7 +50,7 @@ interface CommonEndpoint {
 }
 export type TextGenerationStreamOutputWithToolsAndWebSources = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken & { toolCalls?: ToolCall[] };
-	webSources?: {uri: string, title: string}[];
+	webSources?: { uri: string; title: string }[];
 };
 // type signature for the endpoint
 export type Endpoint = (
