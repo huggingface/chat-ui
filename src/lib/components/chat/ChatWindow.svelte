@@ -230,6 +230,8 @@
 	let audioChunks: BlobPart[] = [];
 	let isLoadingModel = false;
 	let isTranscribing = false;
+	let webgpuSupported = false;
+	let microphoneButton: HTMLButtonElement;
 
 	async function initializeTranscriber() {
 		if (!transcriber) {
@@ -273,13 +275,8 @@
 	}
 
 	onMount(() => {
-		const microphoneButton = document.querySelector("#microphone-button");
-		if (microphoneButton) {
-			microphoneButton.addEventListener("click", async () => {
-				if (!transcriber) {
-					await initializeTranscriber();
-				}
-			});
+		if (navigator.gpu) {
+			webgpuSupported = true;
 		}
 	});
 </script>
@@ -287,7 +284,7 @@
 <svelte:window
 	on:dragenter={onDragEnter}
 	on:dragleave={onDragLeave}
-	on:dragover|preventDefault
+	on:dragleover|preventDefault
 	on:drop|preventDefault={() => (onDrag = false)}
 />
 
@@ -513,14 +510,16 @@
 							>
 								<CarbonSendAltFilled />
 							</button>
-							<button
-								id="microphone-button"
-								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
-								on:click={isRecording ? stopRecording : startRecording}
-								type="button"
-							>
-								<CarbonMicrophone />
-							</button>
+								{#if webgpuSupported}
+									<button
+										bind:this={microphoneButton}
+										class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
+										on:click={isRecording ? stopRecording : startRecording}
+										type="button"
+									>
+										<CarbonMicrophone />
+									</button>
+								{/if}
 						{/if}
 					</div>
 				{/if}
