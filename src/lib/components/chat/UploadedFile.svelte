@@ -10,6 +10,9 @@
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
+	import { fly } from "svelte/transition";
+	import { cubicInOut } from "svelte/easing";
+
 	export let file: MessageFile;
 	export let canClose = true;
 
@@ -97,7 +100,12 @@
 	</Modal>
 {/if}
 
-<button on:click={() => (showModal = true)} disabled={!isClickable} class:clickable={isClickable}>
+<button
+	in:fly={{ y: -20, easing: cubicInOut }}
+	on:click={() => (showModal = true)}
+	disabled={!isClickable}
+	class:clickable={isClickable}
+>
 	<div class="group relative flex items-center rounded-xl shadow-sm">
 		{#if isImage(file.mime)}
 			<div class="size-48 overflow-hidden rounded-xl">
@@ -192,7 +200,8 @@
 		<!-- add a button on top that removes the image -->
 		{#if canClose}
 			<button
-				class="invisible absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
+				class="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
+				class:invisible={navigator.maxTouchPoints === 0}
 				on:click|stopPropagation|preventDefault={() => dispatch("close")}
 			>
 				<CarbonClose class=" text-xs  text-white" />
