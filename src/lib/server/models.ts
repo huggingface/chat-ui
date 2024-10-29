@@ -67,6 +67,8 @@ const modelConfig = z.object({
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	/** Used to enable/disable system prompt usage */
+	systemRoleSupported: z.boolean().default(true),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -115,10 +117,24 @@ async function getChatPromptRender(
 			role: message.from,
 		}));
 
+		if (!m.systemRoleSupported) {
+			const firstSystemMessage = formattedMessages.find((msg) => msg.role === "system");
+			formattedMessages = formattedMessages.filter((msg) => msg.role !== "system");
+
+			if (
+				firstSystemMessage &&
+				formattedMessages.length > 0 &&
+				formattedMessages[0].role === "user"
+			) {
+				formattedMessages[0].content =
+					firstSystemMessage.content + "\n" + formattedMessages[0].content;
+			}
+		}
+
 		if (preprompt && formattedMessages[0].role !== "system") {
 			formattedMessages = [
 				{
-					role: "system",
+					role: m.systemRoleSupported ? "system" : "user",
 					content: preprompt,
 				},
 				...formattedMessages,
@@ -133,7 +149,7 @@ async function getChatPromptRender(
 			if (isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
-						role: "system",
+						role: m.systemRoleSupported ? "system" : "user",
 						content:
 							"\n\n<results>\n" +
 							toolResults
@@ -185,7 +201,7 @@ async function getChatPromptRender(
 				formattedMessages = [
 					...formattedMessages,
 					{
-						role: "system",
+						role: m.systemRoleSupported ? "system" : "user",
 						content: JSON.stringify(toolResults),
 					},
 				];
