@@ -11,7 +11,8 @@ export async function preprocessMessages(
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => addWebSearchContext(msgs, webSearch))
-		.then((msgs) => downloadFiles(msgs, convId));
+		.then((msgs) => downloadFiles(msgs, convId))
+		.then((msgs) => injectPlaintextFiles(msgs));
 }
 
 function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"]) {
@@ -52,5 +53,19 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 				(files) => ({ ...message, files })
 			)
 		)
+	);
+}
+
+async function injectPlaintextFiles(messages: EndpointMessage[]) {
+	return Promise.all(
+		messages.map((message) => {
+			const plaintextFiles = message.files?.filter((file) => file.mime === "text/plain");
+			if (!plaintextFiles || plaintextFiles.length === 0) return message;
+
+			return {
+				...message,
+				content: `${plaintextFiles.map((file) => file.value).join("\n\n")}\n\n${message.content}`,
+			};
+		})
 	);
 }
