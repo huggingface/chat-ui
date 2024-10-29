@@ -357,6 +357,7 @@
 				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
+							shouldAnimate={sources.length <= 1}
 							file={src}
 							on:close={() => {
 								files = files.filter((_, i) => i !== index);

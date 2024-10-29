@@ -14,6 +14,7 @@
 	import { cubicInOut } from "svelte/easing";
 
 	export let file: MessageFile;
+	export let shouldAnimate = false;
 	export let canClose = true;
 
 	$: showModal = false;
@@ -101,7 +102,7 @@
 {/if}
 
 <button
-	in:fly={{ y: -20, easing: cubicInOut }}
+	in:fly|local={shouldAnimate ? { y: -20, easing: cubicInOut } : undefined}
 	on:click={() => (showModal = true)}
 	disabled={!isClickable}
 	class:clickable={isClickable}
