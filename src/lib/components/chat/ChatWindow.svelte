@@ -92,7 +92,7 @@
 	const onPaste = (e: ClipboardEvent) => {
 		const textContent = e.clipboardData?.getData("text");
 
-		if (textContent && textContent.length > 256) {
+		if (!$settings.directPaste && textContent && textContent.length > 256) {
 			e.preventDefault();
 			pastedLongContent = true;
 			setTimeout(() => {
