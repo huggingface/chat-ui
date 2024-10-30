@@ -9,6 +9,7 @@
 	import Modal from "../Modal.svelte";
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
+	import { base } from "$app/paths";
 
 	export let file: MessageFile;
 	export let canClose = true;
@@ -69,7 +70,14 @@
 			{/if}
 		{:else if isPlainText(file.mime)}
 			<div class="relative flex h-full w-full flex-col gap-4 p-4">
-				<h3 class="-mb-2 pt-2 text-xl font-bold">{file.name}</h3>
+				<h3 class="-mb-4 pt-2 text-xl font-bold">{file.name}</h3>
+				{#if file.mime === "application/vnd.chatui.clipboard"}
+					<p class="text-sm text-gray-500">
+						If you prefer to inject clipboard content directly in the chat, you can disable this
+						feature in the
+						<a href={`${base}/settings`} class="underline">settings page</a>.
+					</p>
+				{/if}
 				<button
 					class="absolute right-4 top-4 text-xl text-gray-500 hover:text-gray-800"
 					on:click={() => (showModal = false)}
