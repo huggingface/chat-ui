@@ -47,7 +47,8 @@
 		mime === "text/csv" ||
 		mime === "text/markdown" ||
 		mime === "application/json" ||
-		mime === "application/xml";
+		mime === "application/xml" ||
+		mime === "application/vnd.chatui.clipboard";
 
 	$: isClickable = isImage(file.mime) || isPlainText(file.mime);
 </script>
@@ -87,14 +88,18 @@
 					{:then result}
 						<pre
 							class="w-full whitespace-pre-wrap break-words pt-0 text-sm"
-							class:font-sans={file.mime === "text/plain"}
-							class:font-mono={file.mime !== "text/plain"}>{result}</pre>
+							class:font-sans={file.mime === "text/plain" ||
+								file.mime === "application/vnd.chatui.clipboard"}
+							class:font-mono={file.mime !== "text/plain" &&
+								file.mime !== "application/vnd.chatui.clipboard"}>{result}</pre>
 					{/await}
 				{:else}
 					<pre
 						class="w-full whitespace-pre-wrap break-words pt-0 text-sm"
-						class:font-sans={file.mime === "text/plain"}
-						class:font-mono={file.mime !== "text/plain"}>{atob(file.value)}</pre>
+						class:font-sans={file.mime === "text/plain" ||
+							file.mime === "application/vnd.chatui.clipboard"}
+						class:font-mono={file.mime !== "text/plain" &&
+							file.mime !== "application/vnd.chatui.clipboard"}>{atob(file.value)}</pre>
 				{/if}
 			</div>
 		{/if}
@@ -151,7 +156,11 @@
 					<dd class="text-sm">
 						{truncateMiddle(file.name, 28)}
 					</dd>
-					<dt class="text-xs text-gray-400">{file.mime}</dt>
+					{#if file.mime === "application/vnd.chatui.clipboard"}
+						<dt class="text-xs text-gray-400">Clipboard source</dt>
+					{:else}
+						<dt class="text-xs text-gray-400">{file.mime}</dt>
+					{/if}
 				</dl>
 			</div>
 		{:else if file.mime === "octet-stream"}

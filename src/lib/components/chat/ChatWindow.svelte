@@ -90,7 +90,7 @@
 
 		if (textContent && textContent.length > 256) {
 			e.preventDefault();
-			const pastedFile = new File([textContent], "Pasted Content", { type: "text/plain" });
+			const pastedFile = new File([textContent], "Pasted Content", { type: "application/vnd.chatui.clipboard" });
 
 			files = [...files, pastedFile];
 		}
