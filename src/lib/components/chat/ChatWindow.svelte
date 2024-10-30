@@ -38,6 +38,9 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
+	import { fly } from "svelte/transition";
+	import { cubicInOut } from "svelte/easing";
+
 	export let messages: Message[] = [];
 	export let loading = false;
 	export let pending = false;
@@ -360,13 +363,13 @@
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length && !loading}
-			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
-				{#each sources as source, index (source)}
+			<div
+				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
+				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl max-md:pb-3"
+			>
+				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
-							shouldAnimate={!!(
-								sources.length === 1 && src.mime === "application/vnd.chatui.clipboard"
-							)}
 							file={src}
 							on:close={() => {
 								files = files.filter((_, i) => i !== index);
@@ -429,7 +432,7 @@
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
 					<div
-						class="flex w-full flex-1 border-none bg-transparent"
+						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
 						class:paste-glow={pastedLongContent}
 					>
 						{#if lastIsError}
@@ -534,9 +537,7 @@
 <style lang="postcss">
 	.paste-glow {
 		animation: glow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-		animation-iteration-count: 1;
 		will-change: box-shadow;
-		border-radius: inherit;
 	}
 
 	@keyframes glow {

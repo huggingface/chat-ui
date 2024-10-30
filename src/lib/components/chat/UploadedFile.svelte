@@ -10,11 +10,7 @@
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
-	import { fly } from "svelte/transition";
-	import { cubicInOut } from "svelte/easing";
-
 	export let file: MessageFile;
-	export let shouldAnimate = false;
 	export let canClose = true;
 
 	$: showModal = false;
@@ -106,12 +102,7 @@
 	</Modal>
 {/if}
 
-<button
-	in:fly|local={shouldAnimate ? { y: -20, easing: cubicInOut } : undefined}
-	on:click={() => (showModal = true)}
-	disabled={!isClickable}
-	class:clickable={isClickable}
->
+<button on:click={() => (showModal = true)} disabled={!isClickable} class:clickable={isClickable}>
 	<div class="group relative flex items-center rounded-xl shadow-sm">
 		{#if isImage(file.mime)}
 			<div class="size-48 overflow-hidden rounded-xl">
@@ -146,7 +137,6 @@
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
 				class:hoverable={isClickable}
-				class:glow-on-mount={shouldAnimate}
 			>
 				<div
 					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
@@ -224,21 +214,5 @@
 <style lang="postcss">
 	.hoverable {
 		@apply hover:bg-gray-500/10;
-	}
-
-	.glow-on-mount {
-		animation: glow 1s ease-out;
-	}
-
-	@keyframes glow {
-		0% {
-			background-color: transparent;
-		}
-		50% {
-			background-color: rgba(59, 130, 246, 0.2);
-		}
-		100% {
-			background-color: transparent;
-		}
 	}
 </style>
