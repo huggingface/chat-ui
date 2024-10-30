@@ -146,6 +146,7 @@
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
 				class:hoverable={isClickable}
+				class:glow-on-mount={shouldAnimate}
 			>
 				<div
 					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
@@ -223,5 +224,21 @@
 <style lang="postcss">
 	.hoverable {
 		@apply hover:bg-gray-500/10;
+	}
+
+	.glow-on-mount {
+		animation: glow 1s ease-out;
+	}
+
+	@keyframes glow {
+		0% {
+			background-color: transparent;
+		}
+		50% {
+			background-color: rgba(59, 130, 246, 0.2);
+		}
+		100% {
+			background-color: transparent;
+		}
 	}
 </style>

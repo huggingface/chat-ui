@@ -55,6 +55,7 @@
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
+	$: pastedLongContent = false;
 	$: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
@@ -90,7 +91,13 @@
 
 		if (textContent && textContent.length > 256) {
 			e.preventDefault();
-			const pastedFile = new File([textContent], "Pasted Content", { type: "application/vnd.chatui.clipboard" });
+			pastedLongContent = true;
+			setTimeout(() => {
+				pastedLongContent = false;
+			}, 1000);
+			const pastedFile = new File([textContent], "Pasted Content", {
+				type: "application/vnd.chatui.clipboard",
+			});
 
 			files = [...files, pastedFile];
 		}
@@ -354,10 +361,12 @@
 	>
 		{#if sources?.length && !loading}
 			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
-				{#each sources as source, index}
+				{#each sources as source, index (source)}
 					{#await source then src}
 						<UploadedFile
-							shouldAnimate={sources.length <= 1}
+							shouldAnimate={!!(
+								sources.length === 1 && src.mime === "application/vnd.chatui.clipboard"
+							)}
 							file={src}
 							on:close={() => {
 								files = files.filter((_, i) => i !== index);
@@ -419,7 +428,10 @@
 				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
-					<div class="flex w-full flex-1 border-none bg-transparent">
+					<div
+						class="flex w-full flex-1 border-none bg-transparent"
+						class:paste-glow={pastedLongContent}
+					>
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
@@ -518,3 +530,24 @@
 		</div>
 	</div>
 </div>
+
+<style lang="postcss">
+	.paste-glow {
+		animation: glow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		animation-iteration-count: 1;
+		will-change: box-shadow;
+		border-radius: inherit;
+	}
+
+	@keyframes glow {
+		0% {
+			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8);
+		}
+		50% {
+			box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.6);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+		}
+	}
+</style>
