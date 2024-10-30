@@ -65,6 +65,7 @@ async function injectPlaintextFiles(messages: EndpointMessage[]) {
 			return {
 				...message,
 				content: `${plaintextFiles.map((file) => file.value).join("\n\n")}\n\n${message.content}`,
+				files: message.files?.filter((file) => file.mime !== "text/plain"),
 			};
 		})
 	);
