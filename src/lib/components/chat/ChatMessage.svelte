@@ -23,10 +23,12 @@
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import {
+		MessageUpdateType,
 		MessageWebSearchUpdateType,
 		type MessageToolUpdate,
 		type MessageWebSearchSourcesUpdate,
 		type MessageWebSearchUpdate,
+		type MessageFinalAnswerUpdate,
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
@@ -149,6 +151,10 @@
 	$: searchUpdates = (message.updates?.filter(({ type }) => type === "webSearch") ??
 		[]) as MessageWebSearchUpdate[];
 
+	$: messageFinalAnswer = message.updates?.find(
+		({ type }) => type === MessageUpdateType.FinalAnswer
+	) as MessageFinalAnswerUpdate;
+
 	// filter all updates with type === "tool" then group them by uuid field
 
 	$: toolUpdates = message.updates
@@ -254,7 +260,7 @@
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
 					{#each message.files as file}
-						<UploadedFile {file} canClose={false} isPreview={false} />
+						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
 			{/if}
@@ -314,7 +320,29 @@
 					{/each}
 				</div>
 			{/if}
+
+			<!-- Endpoint web sources -->
+			{#if messageFinalAnswer?.webSources && messageFinalAnswer.webSources.length}
+				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+					<div class="text-gray-400">Sources:</div>
+					{#each messageFinalAnswer.webSources as { uri, title }}
+						<a
+							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+							href={uri}
+							target="_blank"
+						>
+							<img
+								class="h-3.5 w-3.5 rounded"
+								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(uri).hostname}"
+								alt="{title} favicon"
+							/>
+							<div>{title}</div>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
+
 		{#if !loading && (message.content || toolUpdates)}
 			<div
 				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
@@ -382,7 +410,7 @@
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
-						<UploadedFile {file} canClose={false} isPreview={false} />
+						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
 			{/if}

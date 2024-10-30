@@ -67,6 +67,8 @@ const modelConfig = z.object({
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	/** Used to enable/disable system prompt usage */
+	systemRoleSupported: z.boolean().default(true),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -79,19 +81,26 @@ async function getChatPromptRender(
 	}
 	let tokenizer: PreTrainedTokenizer;
 
-	if (!m.tokenizer) {
-		return compileTemplate<ChatTemplateInput>(
-			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
-			m
-		);
-	}
-
 	try {
-		tokenizer = await getTokenizer(m.tokenizer);
+		tokenizer = await getTokenizer(m.tokenizer ?? m.id ?? m.name);
 	} catch (e) {
+		// if fetching the tokenizer fails but it wasnt manually set, use the default template
+		if (!m.tokenizer) {
+			logger.warn(
+				`No tokenizer found for model ${m.name}, using default template. Consider setting tokenizer manually or making sure the model is available on the hub.`,
+				m
+			);
+			return compileTemplate<ChatTemplateInput>(
+				"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
+				m
+			);
+		}
+
 		logger.error(
 			e,
-			`Failed to load tokenizer for model ${m.name} consider setting chatPromptTemplate manually or making sure the model is available on the hub.`
+			`Failed to load tokenizer ${
+				m.tokenizer ?? m.id ?? m.name
+			} make sure the model is available on the hub and you have access to any gated models.`
 		);
 		process.exit();
 	}
@@ -108,10 +117,24 @@ async function getChatPromptRender(
 			role: message.from,
 		}));
 
+		if (!m.systemRoleSupported) {
+			const firstSystemMessage = formattedMessages.find((msg) => msg.role === "system");
+			formattedMessages = formattedMessages.filter((msg) => msg.role !== "system");
+
+			if (
+				firstSystemMessage &&
+				formattedMessages.length > 0 &&
+				formattedMessages[0].role === "user"
+			) {
+				formattedMessages[0].content =
+					firstSystemMessage.content + "\n" + formattedMessages[0].content;
+			}
+		}
+
 		if (preprompt && formattedMessages[0].role !== "system") {
 			formattedMessages = [
 				{
-					role: "system",
+					role: m.systemRoleSupported ? "system" : "user",
 					content: preprompt,
 				},
 				...formattedMessages,
@@ -123,10 +146,10 @@ async function getChatPromptRender(
 			// or use the `rag` mode without the citations
 			const id = m.id ?? m.name;
 
-			if (id.startsWith("CohereForAI")) {
+			if (isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
-						role: "system",
+						role: m.systemRoleSupported ? "system" : "user",
 						content:
 							"\n\n<results>\n" +
 							toolResults
@@ -150,7 +173,7 @@ async function getChatPromptRender(
 					},
 					...formattedMessages,
 				];
-			} else if (id.startsWith("meta-llama")) {
+			} else if (isHuggingChat && id.startsWith("meta-llama")) {
 				const results = toolResults.flatMap((result) => {
 					if (result.status === ToolResultStatus.Error) {
 						return [
@@ -178,7 +201,7 @@ async function getChatPromptRender(
 				formattedMessages = [
 					...formattedMessages,
 					{
-						role: "system",
+						role: m.systemRoleSupported ? "system" : "user",
 						content: JSON.stringify(toolResults),
 					},
 				];
@@ -319,7 +342,13 @@ const hasInferenceAPI = async (m: Awaited<ReturnType<typeof processModel>>) => {
 		return false;
 	}
 
-	const r = await fetch(`https://huggingface.co/api/models/${m.id}`);
+	let r: Response;
+	try {
+		r = await fetch(`https://huggingface.co/api/models/${m.id}`);
+	} catch (e) {
+		console.log(e);
+		return false;
+	}
 
 	if (!r.ok) {
 		logger.warn(`Failed to check if ${m.id} has inference API: ${r.statusText}`);
