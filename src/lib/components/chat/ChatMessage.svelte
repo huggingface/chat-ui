@@ -260,7 +260,7 @@
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
 					{#each message.files as file}
-						<UploadedFile {file} canClose={false} isPreview={false} />
+						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
 			{/if}
@@ -410,7 +410,7 @@
 			{#if message.files?.length}
 				<div class="flex w-fit gap-4 px-5">
 					{#each message.files as file}
-						<UploadedFile {file} canClose={false} isPreview={false} />
+						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
 			{/if}

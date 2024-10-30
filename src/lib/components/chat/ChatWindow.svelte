@@ -38,6 +38,9 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
+	import { fly } from "svelte/transition";
+	import { cubicInOut } from "svelte/easing";
+
 	export let messages: Message[] = [];
 	export let loading = false;
 	export let pending = false;
@@ -55,6 +58,7 @@
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
+	$: pastedLongContent = false;
 	$: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
@@ -86,6 +90,21 @@
 	};
 
 	const onPaste = (e: ClipboardEvent) => {
+		const textContent = e.clipboardData?.getData("text");
+
+		if (textContent && textContent.length > 256) {
+			e.preventDefault();
+			pastedLongContent = true;
+			setTimeout(() => {
+				pastedLongContent = false;
+			}, 1000);
+			const pastedFile = new File([textContent], "Pasted Content", {
+				type: "application/vnd.chatui.clipboard",
+			});
+
+			files = [...files, pastedFile];
+		}
+
 		if (!e.clipboardData) {
 			return;
 		}
@@ -344,7 +363,10 @@
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length && !loading}
-			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
+			<div
+				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
+				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl max-md:pb-3"
+			>
 				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
@@ -409,7 +431,10 @@
 				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
-					<div class="flex w-full flex-1 border-none bg-transparent">
+					<div
+						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+						class:paste-glow={pastedLongContent}
+					>
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
@@ -508,3 +533,22 @@
 		</div>
 	</div>
 </div>
+
+<style lang="postcss">
+	.paste-glow {
+		animation: glow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		will-change: box-shadow;
+	}
+
+	@keyframes glow {
+		0% {
+			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8);
+		}
+		50% {
+			box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.6);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+		}
+	}
+</style>

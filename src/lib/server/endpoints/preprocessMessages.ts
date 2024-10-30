@@ -11,7 +11,8 @@ export async function preprocessMessages(
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => addWebSearchContext(msgs, webSearch))
-		.then((msgs) => downloadFiles(msgs, convId));
+		.then((msgs) => downloadFiles(msgs, convId))
+		.then((msgs) => injectClipboardFiles(msgs));
 }
 
 function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"]) {
@@ -52,5 +53,23 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 				(files) => ({ ...message, files })
 			)
 		)
+	);
+}
+
+async function injectClipboardFiles(messages: EndpointMessage[]) {
+	return Promise.all(
+		messages.map((message) => {
+			const plaintextFiles = message.files
+				?.filter((file) => file.mime === "application/vnd.chatui.clipboard")
+				.map((file) => Buffer.from(file.value, "base64").toString("utf-8"));
+
+			if (!plaintextFiles || plaintextFiles.length === 0) return message;
+
+			return {
+				...message,
+				content: `${plaintextFiles.join("\n\n")}\n\n${message.content}`,
+				files: message.files?.filter((file) => file.mime !== "application/vnd.chatui.clipboard"),
+			};
+		})
 	);
 }
