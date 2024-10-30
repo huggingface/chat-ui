@@ -19,6 +19,7 @@ export async function POST({ request, locals }) {
 			customPrompts: z.record(z.string()).default({}),
 			tools: z.array(z.string()).optional(),
 			disableStream: z.boolean().default(false),
+			directPaste: z.boolean().default(false),
 		})
 		.parse(body) satisfies SettingsEditable;
 

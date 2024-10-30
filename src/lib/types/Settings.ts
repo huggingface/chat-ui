@@ -23,6 +23,7 @@ export interface Settings extends Timestamps {
 	assistants?: Assistant["_id"][];
 	tools?: string[];
 	disableStream: boolean;
+	directPaste: boolean;
 }
 
 export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "createdAt" | "updatedAt">;
@@ -35,4 +36,5 @@ export const DEFAULT_SETTINGS = {
 	assistants: [],
 	tools: [],
 	disableStream: false,
+	directPaste: false,
 } satisfies SettingsEditable;
