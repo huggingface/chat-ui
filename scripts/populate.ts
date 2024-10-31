@@ -150,9 +150,9 @@ async function seed() {
 				createdAt: faker.date.recent({ days: 30 }),
 				updatedAt: faker.date.recent({ days: 30 }),
 				disableStream: faker.datatype.boolean(0.25),
+				directPaste: faker.datatype.boolean(0.25),
 				customPrompts: {},
 				assistants: [],
-				disableStream: faker.datatype.boolean(0.25),
 			};
 			await collections.settings.updateOne(
 				{ userId: user._id },

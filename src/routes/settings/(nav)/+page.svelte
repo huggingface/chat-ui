@@ -25,7 +25,7 @@
 			>
 		</span>
 	</div>
-	<div class="flex h-full flex-col gap-2 max-sm:pt-0">
+	<div class="flex h-full max-w-2xl flex-col gap-2 max-sm:pt-0">
 		{#if envPublic.PUBLIC_APP_DATA_SHARING === "1"}
 			<!-- svelte-ignore a11y-label-has-associated-control -->
 			<label class="flex items-center">
@@ -45,16 +45,31 @@
 		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
 				Hide emoticons in conversation topics
+				<p class="text-sm font-normal text-gray-500">
+					Emoticons are shown in the sidebar by default, enable this to hide them.
+				</p>
 			</div>
 		</label>
 
 		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="disableStream" bind:checked={$settings.disableStream} />
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
 				Disable streaming tokens
+			</div>
+		</label>
+
+		<!-- svelte-ignore a11y-label-has-associated-control -->
+		<label class="mt-6 flex items-center">
+			<Switch name="directPaste" bind:checked={$settings.directPaste} />
+			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
+				Paste text directly into chat
+				<p class="text-sm font-normal text-gray-500">
+					By default, when pasting long text into the chat, we treat it as a plaintext file. Enable
+					this to paste directly into the chat instead.
+				</p>
 			</div>
 		</label>
 

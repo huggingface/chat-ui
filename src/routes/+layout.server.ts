@@ -174,6 +174,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 					.filter((el) => !el.isHidden && el.isOnByDefault)
 					.map((el) => el._id.toString()),
 			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
+			directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 		},
 		models: models.map((model) => ({
 			id: model.id,
