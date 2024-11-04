@@ -9,12 +9,14 @@ export const embeddingEndpointOpenAIParametersSchema = z.object({
 	type: z.literal("openai"),
 	url: z.string().url().default("https://api.openai.com/v1/embeddings"),
 	apiKey: z.string().default(env.OPENAI_API_KEY),
+	defaultHeaders: z.record(z.string()).default({}),
 });
 
 export async function embeddingEndpointOpenAI(
 	input: z.input<typeof embeddingEndpointOpenAIParametersSchema>
 ): Promise<EmbeddingEndpoint> {
-	const { url, model, apiKey } = embeddingEndpointOpenAIParametersSchema.parse(input);
+	const { url, model, apiKey, defaultHeaders } =
+		embeddingEndpointOpenAIParametersSchema.parse(input);
 
 	const maxBatchSize = model.maxBatchSize || 100;
 
@@ -31,6 +33,7 @@ export async function embeddingEndpointOpenAI(
 						Accept: "application/json",
 						"Content-Type": "application/json",
 						...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						...defaultHeaders,
 					},
 					body: JSON.stringify({ input: batchInputs, model: model.name }),
 				});

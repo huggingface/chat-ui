@@ -3,7 +3,7 @@ import { stringifyHTMLElements, stringifyHTMLElementsUnformatted } from "./utils
 import { MarkdownElementType, tagNameMap, type HeaderElement, type MarkdownElement } from "./types";
 import type { SerializedHTMLElement } from "../scrape/types";
 
-type ConversionState = {
+interface ConversionState {
 	defaultType:
 		| MarkdownElementType.Paragraph
 		| MarkdownElementType.BlockQuote
@@ -11,7 +11,7 @@ type ConversionState = {
 		| MarkdownElementType.OrderedListItem;
 	listDepth: number;
 	blockQuoteDepth: number;
-};
+}
 export function htmlElementToMarkdownElements(
 	parent: HeaderElement,
 	elem: SerializedHTMLElement | string,

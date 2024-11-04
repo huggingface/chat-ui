@@ -15,6 +15,9 @@ type SettingsStore = {
 	customPrompts: Record<string, string>;
 	recentlySaved: boolean;
 	assistants: Array<ObjectId | string>;
+	tools?: Array<string>;
+	disableStream: boolean;
+	directPaste: boolean;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {

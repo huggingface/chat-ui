@@ -8,6 +8,10 @@
 	import TokensCounter from "$lib/components/TokensCounter.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
+	import CarbonChat from "~icons/carbon/chat";
+	import CarbonCode from "~icons/carbon/code";
+
+	import { goto } from "$app/navigation";
 
 	const settings = useSettingsStore();
 
@@ -22,8 +26,6 @@
 	$: hasCustomPreprompt =
 		$settings.customPrompts[$page.params.model] !==
 		$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt;
-
-	$: isActive = $settings.activeModel === $page.params.model;
 
 	$: model = $page.data.models.find((el: BackendModel) => el.id === $page.params.model);
 </script>
@@ -77,6 +79,19 @@
 				Model website
 			</a>
 		{/if}
+
+		{#if model.hasInferenceAPI}
+			<a
+				href={"https://huggingface.co/playground?modelId=" + model.name}
+				target="_blank"
+				rel="noreferrer"
+				class="flex items-center truncate underline underline-offset-2"
+			>
+				<CarbonCode class="mr-1.5 shrink-0 text-xs " />
+				API Playground
+			</a>
+		{/if}
+
 		<CopyToClipBoardBtn
 			value="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/models/{model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
@@ -88,16 +103,17 @@
 	</div>
 
 	<button
-		class="{isActive
-			? 'bg-gray-100'
-			: 'bg-black text-white'} my-8 flex items-center rounded-full px-3 py-1"
-		disabled={isActive}
+		class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
 		name="Activate model"
 		on:click|stopPropagation={() => {
-			$settings.activeModel = $page.params.model;
+			settings.instantSet({
+				activeModel: $page.params.model,
+			});
+			goto(`${base}/`);
 		}}
 	>
-		{isActive ? "Active model" : "Activate"}
+		<CarbonChat class="mr-1.5 text-sm" />
+		New chat
 	</button>
 
 	<div class="relative flex w-full flex-col gap-2">

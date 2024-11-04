@@ -25,7 +25,7 @@
 		confirmDelete = false;
 	}}
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-10 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 {conv.id ===
+	class="group flex h-10 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:h-[2.35rem] {conv.id ===
 	$page.params.id
 		? 'bg-gray-100 dark:bg-gray-700'
 		: ''}"
@@ -55,6 +55,14 @@
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+			title="Cancel delete action"
+			on:click|preventDefault={() => (confirmDelete = false)}
+		>
+			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+		</button>
+		<button
+			type="button"
+			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Confirm delete action"
 			on:click|preventDefault={() => {
 				confirmDelete = false;
@@ -62,14 +70,6 @@
 			}}
 		>
 			<CarbonCheckmark class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
-		</button>
-		<button
-			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Cancel delete action"
-			on:click|preventDefault={() => (confirmDelete = false)}
-		>
-			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
 	{:else}
 		<button

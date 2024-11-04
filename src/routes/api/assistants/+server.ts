@@ -4,6 +4,7 @@ import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
 import { env } from "$env/dynamic/private";
+import { ReviewStatus } from "$lib/types/Review";
 
 const NUM_PER_PAGE = 24;
 
@@ -27,7 +28,7 @@ export async function GET({ url, locals }) {
 
 	// if there is no user, we show community assistants, so only show featured assistants
 	const shouldBeFeatured =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { featured: true } : {};
+		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user ? { review: ReviewStatus.APPROVED } : {};
 
 	// if the user queried is not the current user, only show "public" assistants that have been shared before
 	const shouldHaveBeenShared =

@@ -1,12 +1,12 @@
 import { smallModel } from "$lib/server/models";
-import type { Conversation } from "$lib/types/Conversation";
+import type { EndpointMessage } from "./endpoints/endpoints";
 
 export async function generateFromDefaultEndpoint({
 	messages,
 	preprompt,
 	generateSettings,
 }: {
-	messages: Omit<Conversation["messages"][0], "id">[];
+	messages: EndpointMessage[];
 	preprompt?: string;
 	generateSettings?: Record<string, unknown>;
 }): Promise<string> {

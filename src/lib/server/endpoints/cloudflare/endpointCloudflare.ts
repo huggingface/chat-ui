@@ -16,9 +16,14 @@ export async function endpointCloudflare(
 	input: z.input<typeof endpointCloudflareParametersSchema>
 ): Promise<Endpoint> {
 	const { accountId, apiToken, model } = endpointCloudflareParametersSchema.parse(input);
-	const apiURL = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@hf/${model.id}`;
 
-	return async ({ messages, preprompt }) => {
+	if (!model.id.startsWith("@")) {
+		model.id = "@hf/" + model.id;
+	}
+
+	const apiURL = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model.id}`;
+
+	return async ({ messages, preprompt, generateSettings }) => {
 		let messagesFormatted = messages.map((message) => ({
 			role: message.from,
 			content: message.content,
@@ -28,9 +33,16 @@ export async function endpointCloudflare(
 			messagesFormatted = [{ role: "system", content: preprompt ?? "" }, ...messagesFormatted];
 		}
 
+		const parameters = { ...model.parameters, ...generateSettings };
+
 		const payload = JSON.stringify({
 			messages: messagesFormatted,
 			stream: true,
+			max_tokens: parameters?.max_new_tokens,
+			temperature: parameters?.temperature,
+			top_p: parameters?.top_p,
+			top_k: parameters?.top_k,
+			repetition_penalty: parameters?.repetition_penalty,
 		});
 
 		const res = await fetch(apiURL, {
@@ -105,8 +117,8 @@ export async function endpointCloudflare(
 						try {
 							data = JSON.parse(jsonString);
 						} catch (e) {
-							logger.error("Failed to parse JSON", e);
-							logger.error("Problematic JSON string:", jsonString);
+							logger.error(e, "Failed to parse JSON");
+							logger.error(jsonString, "Problematic JSON string:");
 							continue; // Skip this iteration and try the next chunk
 						}
 

@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { isURL } from "$lib/server/isURLLocal";
+import { isURL } from "$lib/utils/isUrl";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
 interface YouWebSearch {
