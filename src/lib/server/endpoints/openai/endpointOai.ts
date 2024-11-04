@@ -16,6 +16,7 @@ import type { MessageFile } from "$lib/types/Message";
 import { type Tool } from "$lib/types/Tool";
 import type { EndpointMessage } from "../endpoints";
 import { v4 as uuidv4 } from "uuid";
+import { toolHasName } from "$lib/utils/tools";
 function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompletionTool[] {
 	const toolChoices = [] as ChatCompletionTool[];
 	if (tools === undefined) {
@@ -236,6 +237,7 @@ export async function endpointOai(
 			}
 
 			const parameters = { ...model.parameters, ...generateSettings };
+			tools = tools?.filter((tool) => !toolHasName("directlyAnswer", tool));
 			const toolCallChoices = createChatCompletionToolsArray(tools);
 			const body: ChatCompletionCreateParamsStreaming = {
 				model: model.id ?? model.name,
