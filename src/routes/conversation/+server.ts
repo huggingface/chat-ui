@@ -10,7 +10,6 @@ import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
-import { MetricsServer } from "$lib/server/metrics";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -27,20 +26,23 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.safeParse(JSON.parse(body));
 
 	if (!parsedBody.success) {
-		error(400, "Invalid request");
+		throw error(400, "Invalid request");
 	}
 	const values = parsedBody.data;
 
 	const convCount = await collections.conversations.countDocuments(authCondition(locals));
 
 	if (usageLimits?.conversations && convCount > usageLimits?.conversations) {
-		error(429, "You have reached the maximum number of conversations. Delete some to continue.");
+		throw error(
+			429,
+			"You have reached the maximum number of conversations. Delete some to continue."
+		);
 	}
 
 	const model = models.find((m) => (m.id || m.name) === values.model);
 
 	if (!model) {
-		error(400, "Invalid model");
+		throw error(400, "Invalid model");
 	}
 
 	let messages: Message[] = [
@@ -64,7 +66,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		});
 
 		if (!conversation) {
-			error(404, "Conversation not found");
+			throw error(404, "Conversation not found");
 		}
 
 		title = conversation.title;
@@ -79,7 +81,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	embeddingModel ??= model.embeddingModel ?? defaultEmbeddingModel.name;
 
 	if (model.unlisted) {
-		error(400, "Can't start a conversation with an unlisted model");
+		throw error(400, "Can't start a conversation with an unlisted model");
 	}
 
 	// get preprompt from assistant if it exists
@@ -113,8 +115,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 
-	MetricsServer.getMetrics().model.conversationsTotal.inc({ model: values.model });
-
 	return new Response(
 		JSON.stringify({
 			conversationId: res.insertedId.toString(),
@@ -124,5 +124,5 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 };
 
 export const GET: RequestHandler = async () => {
-	redirect(302, `${base}/`);
+	throw redirect(302, `${base}/`);
 };

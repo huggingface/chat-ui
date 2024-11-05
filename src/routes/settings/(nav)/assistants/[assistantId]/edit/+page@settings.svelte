@@ -6,7 +6,7 @@
 	export let data: PageData;
 	export let form: ActionData;
 
-	let assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
+	$: assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
 </script>
 
 <AssistantSettings bind:form {assistant} models={data.models} />

@@ -18,7 +18,7 @@ export const GET: RequestHandler = (async ({ params }) => {
 	});
 
 	if (!assistant) {
-		error(404, "Assistant not found.");
+		throw error(404, "Assistant not found.");
 	}
 
 	let avatar = "";

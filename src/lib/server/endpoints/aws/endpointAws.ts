@@ -8,20 +8,8 @@ export const endpointAwsParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("aws"),
 	url: z.string().url(),
-	accessKey: z
-		.string({
-			description:
-				"An AWS Access Key ID. If not provided, the default AWS identity resolution will be used",
-		})
-		.min(1)
-		.optional(),
-	secretKey: z
-		.string({
-			description:
-				"An AWS Access Key Secret. If not provided, the default AWS identity resolution will be used",
-		})
-		.min(1)
-		.optional(),
+	accessKey: z.string().min(1),
+	secretKey: z.string().min(1),
 	sessionToken: z.string().optional(),
 	service: z.union([z.literal("sagemaker"), z.literal("lambda")]).default("sagemaker"),
 	region: z.string().optional(),
@@ -30,23 +18,22 @@ export const endpointAwsParametersSchema = z.object({
 export async function endpointAws(
 	input: z.input<typeof endpointAwsParametersSchema>
 ): Promise<Endpoint> {
-	let createSignedFetcher;
+	let AwsClient;
 	try {
-		createSignedFetcher = (await import("aws-sigv4-fetch")).createSignedFetcher;
+		AwsClient = (await import("aws4fetch")).AwsClient;
 	} catch (e) {
-		throw new Error("Failed to import aws-sigv4-fetch");
+		throw new Error("Failed to import aws4fetch");
 	}
 
 	const { url, accessKey, secretKey, sessionToken, model, region, service } =
 		endpointAwsParametersSchema.parse(input);
 
-	const signedFetch = createSignedFetcher({
+	const aws = new AwsClient({
+		accessKeyId: accessKey,
+		secretAccessKey: secretKey,
+		sessionToken,
 		service,
 		region,
-		credentials:
-			accessKey && secretKey
-				? { accessKeyId: accessKey, secretAccessKey: secretKey, sessionToken }
-				: undefined,
 	});
 
 	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
@@ -65,7 +52,7 @@ export async function endpointAws(
 			},
 			{
 				use_cache: false,
-				fetch: signedFetch,
+				fetch: aws.fetch.bind(aws) as typeof fetch,
 			}
 		);
 	};

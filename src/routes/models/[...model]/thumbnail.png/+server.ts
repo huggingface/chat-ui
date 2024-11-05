@@ -15,7 +15,7 @@ export const GET: RequestHandler = (async ({ params }) => {
 	const model = models.find(({ id }) => id === params.model);
 
 	if (!model || model.unlisted) {
-		redirect(302, `${base}/`);
+		throw redirect(302, `${base}/`);
 	}
 	const renderedComponent = (ModelThumbnail as unknown as SvelteComponent).render({
 		name: model.name,

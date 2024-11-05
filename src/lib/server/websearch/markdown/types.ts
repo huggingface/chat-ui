@@ -11,25 +11,27 @@ export enum MarkdownElementType {
 	OrderedListItem = "ORDERED_LIST_ITEM",
 }
 
-interface BaseMarkdownElement<T = MarkdownElementType> {
-	type: T;
+type BaseMarkdownElement = {
+	type: MarkdownElementType;
 	content: string;
 	parent: HeaderElement | null;
-}
+};
 
-export interface HeaderElement extends BaseMarkdownElement<MarkdownElementType.Header> {
+export type HeaderElement = BaseMarkdownElement & {
+	type: MarkdownElementType.Header;
 	level: number;
 	children: MarkdownElement[];
-}
-type ListItem = MarkdownElementType.UnorderedListItem | MarkdownElementType.OrderedListItem;
-interface ListItemElement extends BaseMarkdownElement<ListItem> {
+};
+type ParagraphElement = BaseMarkdownElement & { type: MarkdownElementType.Paragraph };
+type CodeBlockElement = BaseMarkdownElement & { type: MarkdownElementType.CodeBlock };
+type ListItemElement = BaseMarkdownElement & {
+	type: MarkdownElementType.UnorderedListItem | MarkdownElementType.OrderedListItem;
 	depth: number;
-}
-interface BlockQuoteElement extends BaseMarkdownElement<MarkdownElementType.BlockQuote> {
+};
+type BlockQuoteElement = BaseMarkdownElement & {
+	type: MarkdownElementType.BlockQuote;
 	depth: number;
-}
-interface ParagraphElement extends BaseMarkdownElement<MarkdownElementType.Paragraph> {}
-interface CodeBlockElement extends BaseMarkdownElement<MarkdownElementType.CodeBlock> {}
+};
 
 export type MarkdownElement =
 	| HeaderElement

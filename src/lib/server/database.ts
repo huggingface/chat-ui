@@ -13,12 +13,8 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
-import type { CommunityToolDB } from "$lib/types/Tool";
-
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
-import type { TokenCache } from "$lib/types/TokenCache";
-import { onExit } from "./exitHandler";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -39,14 +35,21 @@ export class Database {
 		});
 
 		this.client.connect().catch((err) => {
-			logger.error(err, "Connection error");
+			logger.error("Connection error", err);
 			process.exit(1);
 		});
 		this.client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 		this.client.on("open", () => this.initDatabase());
 
-		// Disconnect DB on exit
-		onExit(() => this.client.close(true));
+		// Disconnect DB on process kill
+		process.on("SIGINT", async () => {
+			await this.client.close(true);
+
+			// https://github.com/sveltejs/kit/issues/9540
+			setTimeout(() => {
+				process.exit(0);
+			}, 100);
+		});
 	}
 
 	public static getInstance(): Database {
@@ -86,8 +89,6 @@ export class Database {
 		const bucket = new GridFSBucket(db, { bucketName: "files" });
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
-		const tokenCaches = db.collection<TokenCache>("tokens");
-		const tools = db.collection<CommunityToolDB>("tools");
 
 		return {
 			conversations,
@@ -104,8 +105,6 @@ export class Database {
 			bucket,
 			migrationResults,
 			semaphores,
-			tokenCaches,
-			tools,
 		};
 	}
 
@@ -127,8 +126,6 @@ export class Database {
 			sessions,
 			messageEvents,
 			semaphores,
-			tokenCaches,
-			tools,
 		} = this.getCollections();
 
 		conversations
@@ -136,24 +133,22 @@ export class Database {
 				{ sessionId: 1, updatedAt: -1 },
 				{ partialFilterExpression: { sessionId: { $exists: true } } }
 			)
-			.catch((e) => logger.error(e));
+			.catch(logger.error);
 		conversations
 			.createIndex(
 				{ userId: 1, updatedAt: -1 },
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
-			.catch((e) => logger.error(e));
+			.catch(logger.error);
 		conversations
 			.createIndex(
 				{ "message.id": 1, "message.ancestors": 1 },
 				{ partialFilterExpression: { userId: { $exists: true } } }
 			)
-			.catch((e) => logger.error(e));
+			.catch(logger.error);
 		// Not strictly necessary, could use _id, but more convenient. Also for stats
 		// To do stats on conversation messages
-		conversations
-			.createIndex({ "messages.createdAt": 1 }, { sparse: true })
-			.catch((e) => logger.error(e));
+		conversations.createIndex({ "messages.createdAt": 1 }, { sparse: true }).catch(logger.error);
 		// Unique index for stats
 		conversationStats
 			.createIndex(
@@ -166,7 +161,7 @@ export class Database {
 				},
 				{ unique: true }
 			)
-			.catch((e) => logger.error(e));
+			.catch(logger.error);
 		// Allow easy check of last computed stat for given type/dateField
 		conversationStats
 			.createIndex({
@@ -174,60 +169,38 @@ export class Database {
 				"date.field": 1,
 				"date.at": 1,
 			})
-			.catch((e) => logger.error(e));
+			.catch(logger.error);
 		abortedGenerations
 			.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 })
-			.catch((e) => logger.error(e));
-		abortedGenerations
-			.createIndex({ conversationId: 1 }, { unique: true })
-			.catch((e) => logger.error(e));
-		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
-		settings
-			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
-			.catch((e) => logger.error(e));
-		settings
-			.createIndex({ userId: 1 }, { unique: true, sparse: true })
-			.catch((e) => logger.error(e));
-		settings.createIndex({ assistants: 1 }).catch((e) => logger.error(e));
-		users.createIndex({ hfUserId: 1 }, { unique: true }).catch((e) => logger.error(e));
-		users
-			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
-			.catch((e) => logger.error(e));
+			.catch(logger.error);
+		abortedGenerations.createIndex({ conversationId: 1 }, { unique: true }).catch(logger.error);
+		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch(logger.error);
+		settings.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
+		settings.createIndex({ userId: 1 }, { unique: true, sparse: true }).catch(logger.error);
+		settings.createIndex({ assistants: 1 }).catch(logger.error);
+		users.createIndex({ hfUserId: 1 }, { unique: true }).catch(logger.error);
+		users.createIndex({ sessionId: 1 }, { unique: true, sparse: true }).catch(logger.error);
 		// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
-		users.createIndex({ username: 1 }).catch((e) => logger.error(e));
-		messageEvents
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
-			.catch((e) => logger.error(e));
-		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch((e) => logger.error(e));
-		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch((e) => logger.error(e));
-		assistants.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ review: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
-		assistants
-			.createIndex({ last24HoursUseCount: -1, useCount: -1, _id: 1 })
-			.catch((e) => logger.error(e));
+		users.createIndex({ username: 1 }).catch(logger.error);
+		messageEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
+		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(logger.error);
+		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch(logger.error);
+		assistants.createIndex({ createdById: 1, userCount: -1 }).catch(logger.error);
+		assistants.createIndex({ userCount: 1 }).catch(logger.error);
+		assistants.createIndex({ featured: 1, userCount: -1 }).catch(logger.error);
+		assistants.createIndex({ modelId: 1, userCount: -1 }).catch(logger.error);
+		assistants.createIndex({ searchTokens: 1 }).catch(logger.error);
+		assistants.createIndex({ last24HoursCount: 1 }).catch(logger.error);
 		assistantStats
 			// Order of keys is important for the queries
 			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-			.catch((e) => logger.error(e));
-		reports.createIndex({ assistantId: 1 }).catch((e) => logger.error(e));
-		reports.createIndex({ createdBy: 1, assistantId: 1 }).catch((e) => logger.error(e));
+			.catch(logger.error);
+		reports.createIndex({ assistantId: 1 }).catch(logger.error);
+		reports.createIndex({ createdBy: 1, assistantId: 1 }).catch(logger.error);
 
 		// Unique index for semaphore and migration results
-		semaphores.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
-		semaphores
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
-			.catch((e) => logger.error(e));
-		tokenCaches
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
-			.catch((e) => logger.error(e));
-		tokenCaches.createIndex({ tokenHash: 1 }).catch((e) => logger.error(e));
-		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
-		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+		semaphores.createIndex({ key: 1 }, { unique: true }).catch(logger.error);
+		semaphores.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(logger.error);
 	}
 }
 

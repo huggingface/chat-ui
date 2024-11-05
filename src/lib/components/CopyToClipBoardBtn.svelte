@@ -35,7 +35,7 @@
 </script>
 
 <button
-	class={classNames}
+	class="btn rounded-lg border border-gray-200 px-2 py-2 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:hover:border-gray-500 {classNames}"
 	title={"Copy to clipboard"}
 	type="button"
 	on:click
@@ -43,7 +43,7 @@
 >
 	<div class="relative">
 		<slot>
-			<IconCopy classNames="h-[1.14em] w-[1.14em]" />
+			<IconCopy classNames="dark:text-gray-700 text-gray-200" />
 		</slot>
 
 		<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />

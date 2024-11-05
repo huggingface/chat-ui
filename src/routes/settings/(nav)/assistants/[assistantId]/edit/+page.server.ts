@@ -10,7 +10,6 @@ import { sha256 } from "$lib/utils/sha256";
 import sharp from "sharp";
 import { parseStringToList } from "$lib/utils/parseStringToList";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
-import { toolFromConfigs } from "$lib/server/tools";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -40,21 +39,6 @@ const newAsssistantSchema = z.object({
 	top_k: z
 		.union([z.literal(""), z.coerce.number().min(5).max(100)])
 		.transform((v) => (v === "" ? undefined : v)),
-	tools: z
-		.string()
-		.optional()
-		.transform((v) => (v ? v.split(",") : []))
-		.transform(async (v) => [
-			...(await collections.tools
-				.find({ _id: { $in: v.map((toolId) => new ObjectId(toolId)) } })
-				.project({ _id: 1 })
-				.toArray()
-				.then((tools) => tools.map((tool) => tool._id.toString()))),
-			...toolFromConfigs
-				.filter((el) => (v ?? []).includes(el._id.toString()))
-				.map((el) => el._id.toString()),
-		])
-		.optional(),
 });
 
 const uploadAvatar = async (avatar: File, assistantId: ObjectId): Promise<string> => {
@@ -90,7 +74,7 @@ export const actions: Actions = {
 
 		const formData = Object.fromEntries(await request.formData());
 
-		const parse = await newAsssistantSchema.safeParseAsync(formData);
+		const parse = newAsssistantSchema.safeParse(formData);
 
 		if (!parse.success) {
 			// Loop through the errors array and create a custom errors array
@@ -171,7 +155,6 @@ export const actions: Actions = {
 						allowedDomains: parse.data.ragDomainList,
 						allowAllDomains: parse.data.ragAllowAll,
 					},
-					tools: parse.data.tools,
 					dynamicPrompt: parse.data.dynamicPrompt,
 					searchTokens: generateSearchTokens(parse.data.name),
 					generateSettings: {
@@ -185,7 +168,7 @@ export const actions: Actions = {
 		);
 
 		if (acknowledged) {
-			redirect(302, `${base}/settings/assistants/${assistant._id}`);
+			throw redirect(302, `${base}/settings/assistants/${assistant._id}`);
 		} else {
 			throw Error("Update failed");
 		}

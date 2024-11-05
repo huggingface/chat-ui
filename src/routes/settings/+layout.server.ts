@@ -9,12 +9,9 @@ export const load = (async ({ locals, parent }) => {
 	const createdBy = locals.user?._id ?? locals.sessionId;
 	if (createdBy) {
 		const reports = await collections.reports
-			.find<Pick<Report, "contentId">>(
-				{ createdBy, object: "assistant" },
-				{ projection: { _id: 0, contentId: 1 } }
-			)
+			.find<Pick<Report, "assistantId">>({ createdBy }, { projection: { _id: 0, assistantId: 1 } })
 			.toArray();
-		reportsByUser = reports.map((r) => r.contentId.toString());
+		reportsByUser = reports.map((r) => r.assistantId.toString());
 	}
 
 	return {

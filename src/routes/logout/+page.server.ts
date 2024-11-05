@@ -15,6 +15,6 @@ export const actions = {
 			secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
 			httpOnly: true,
 		});
-		redirect(303, `${base}/`);
+		throw redirect(303, `${base}/`);
 	},
 };

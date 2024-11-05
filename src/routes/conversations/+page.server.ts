@@ -12,6 +12,6 @@ export const actions = {
 			});
 		}
 
-		redirect(303, `${base}/`);
+		throw redirect(303, `${base}/`);
 	},
 };

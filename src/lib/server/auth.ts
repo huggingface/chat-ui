@@ -1,10 +1,4 @@
-import {
-	Issuer,
-	type BaseClient,
-	type UserinfoResponse,
-	type TokenSet,
-	custom,
-} from "openid-client";
+import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
 import { addHours, addWeeks } from "date-fns";
 import { env } from "$env/dynamic/private";
 import { sha256 } from "$lib/utils/sha256";
@@ -47,22 +41,12 @@ export const OIDConfig = z
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
-const sameSite = z
-	.enum(["lax", "none", "strict"])
-	.default(dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
-	.parse(env.COOKIE_SAMESITE === "" ? undefined : env.COOKIE_SAMESITE);
-
-const secure = z
-	.boolean()
-	.default(!(dev || env.ALLOW_INSECURE_COOKIES === "true"))
-	.parse(env.COOKIE_SECURE === "" ? undefined : env.COOKIE_SECURE === "true");
-
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(env.COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite,
-		secure,
+		sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
+		secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
 	});
@@ -126,13 +110,9 @@ export async function getOIDCAuthorizationUrl(
 	});
 }
 
-export async function getOIDCUserData(
-	settings: OIDCSettings,
-	code: string,
-	iss?: string
-): Promise<OIDCUserInfo> {
+export async function getOIDCUserData(settings: OIDCSettings, code: string): Promise<OIDCUserInfo> {
 	const client = await getOIDCClient(settings);
-	const token = await client.callback(settings.redirectURI, { code, iss });
+	const token = await client.callback(settings.redirectURI, { code });
 	const userData = await client.userinfo(token);
 
 	return { token, userData };

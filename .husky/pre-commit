@@ -1,2 +1,0 @@
-set -e
-npx lint-staged --config ./.husky/lint-stage-config.js

@@ -1,4 +1,3 @@
-{{- if $.Values.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -7,17 +6,6 @@ metadata:
   name: {{ include "name" . }}
   namespace: {{ .Release.Namespace }}
 spec:
-  {{ if $.Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className }}
-  {{ end }}
-  {{- with .Values.ingress.tls }}
-  tls:
-    - hosts:
-        - {{ $.Values.domain | quote }}
-      {{- with .secretName }}
-      secretName: {{ . }}
-      {{- end }}
-  {{- end }}
   rules:
     - host: {{ .Values.domain }}
       http:
@@ -29,4 +17,3 @@ spec:
                   name: http
             path: {{ $.Values.ingress.path | default "/" }}
             pathType: Prefix
-{{- end }}

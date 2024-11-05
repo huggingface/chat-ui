@@ -1,5 +1,5 @@
 import { JSDOM, VirtualConsole } from "jsdom";
-import { isURL } from "$lib/utils/isUrl";
+import { isURL } from "$lib/server/isURLLocal";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
 export default async function searchWebLocal(query: string): Promise<WebSearchSource[]> {

@@ -1,4 +1,4 @@
-export function clickOutside(element: HTMLElement, callbackFunction: () => void) {
+export function clickOutside(element: HTMLDialogElement, callbackFunction: () => void) {
 	function onClick(event: MouseEvent) {
 		if (!element.contains(event.target as Node)) {
 			callbackFunction();

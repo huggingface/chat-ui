@@ -76,9 +76,6 @@
 		settings.instantSet({
 			activeModel: modelId,
 		});
-
-		const query = $page.url.searchParams.get("q");
-		if (query) createConversation(query);
 	});
 </script>
 

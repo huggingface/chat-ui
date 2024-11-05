@@ -1,33 +1,22 @@
-import { MetricsServer } from "$lib/server/metrics";
 import type { WebSearchScrapedSource, WebSearchUsedSource } from "$lib/types/WebSearch";
 import type { EmbeddingBackendModel } from "../../embeddingModels";
 import { getSentenceSimilarity, innerProduct } from "../../sentenceSimilarity";
 import { MarkdownElementType, type MarkdownElement } from "../markdown/types";
 import { stringifyMarkdownElement } from "../markdown/utils/stringify";
-import { getCombinedSentenceSimilarity } from "./combine";
 import { flattenTree } from "./tree";
 
-const MIN_CHARS = 3_000;
-const SOFT_MAX_CHARS = 8_000;
+const MIN_CHARS = 3000;
+const SOFT_MAX_CHARS = 8000;
 
 export async function findContextSources(
 	sources: WebSearchScrapedSource[],
 	prompt: string,
 	embeddingModel: EmbeddingBackendModel
 ) {
-	const startTime = Date.now();
-
 	const sourcesMarkdownElems = sources.map((source) => flattenTree(source.page.markdownTree));
 	const markdownElems = sourcesMarkdownElems.flat();
 
-	// When using CPU embedding (transformersjs), join sentences together to the max character limit
-	// to reduce inference time
-	const embeddingFunc =
-		embeddingModel.endpoints[0].type === "transformersjs"
-			? getCombinedSentenceSimilarity
-			: getSentenceSimilarity;
-
-	const embeddings = await embeddingFunc(
+	const embeddings = await getSentenceSimilarity(
 		embeddingModel,
 		prompt,
 		markdownElems
@@ -78,8 +67,6 @@ export async function findContextSources(
 			return { ...source, context };
 		})
 		.filter((contextSource) => contextSource.context.length > 0);
-
-	MetricsServer.getMetrics().webSearch.embeddingDuration.observe(Date.now() - startTime);
 
 	return contextSources;
 }

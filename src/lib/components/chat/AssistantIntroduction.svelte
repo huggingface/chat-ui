@@ -1,24 +1,18 @@
 <script lang="ts">
 	import { createEventDispatcher } from "svelte";
-	import { base } from "$app/paths";
-	import { goto } from "$app/navigation";
-	import type { Model } from "$lib/types/Model";
-	import type { Assistant } from "$lib/types/Assistant";
-	import { useSettingsStore } from "$lib/stores/settings";
-	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import IconGear from "~icons/bi/gear-fill";
+	import { base } from "$app/paths";
+	import type { Assistant } from "$lib/types/Assistant";
+	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import IconInternet from "../icons/IconInternet.svelte";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
-	import CarbonRenew from "~icons/carbon/renew";
 	import CarbonUserMultiple from "~icons/carbon/user-multiple";
-	import CarbonTools from "~icons/carbon/tools";
 
 	import { share } from "$lib/utils/share";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/stores";
 
-	export let models: Model[];
 	export let assistant: Pick<
 		Assistant,
 		| "avatar"
@@ -31,7 +25,6 @@
 		| "_id"
 		| "description"
 		| "userCount"
-		| "tools"
 	>;
 
 	const dispatch = createEventDispatcher<{ message: string }>();
@@ -48,8 +41,6 @@
 	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
 
 	let isCopied = false;
-
-	const settings = useSettingsStore();
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
@@ -69,7 +60,7 @@
 				/>
 			{:else}
 				<div
-					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 dark:bg-gray-600 max-sm:self-start sm:text-4xl md:size-32"
+					class="flex size-12 flex-none items-center justify-center rounded-full bg-gray-300 object-cover text-xl font-bold uppercase text-gray-500 max-sm:self-start sm:text-4xl md:size-32 dark:bg-gray-600"
 				>
 					{assistant?.name[0]}
 				</div>
@@ -85,15 +76,6 @@
 					</p>
 				{/if}
 
-				{#if assistant?.tools?.length}
-					<div
-						class="flex h-5 w-fit items-center gap-1 rounded-full bg-purple-500/10 pl-1 pr-2 text-xs"
-						title="This assistant uses the websearch."
-					>
-						<CarbonTools class="text-sm text-purple-600" />
-						Has tools
-					</div>
-				{/if}
 				{#if hasRag}
 					<div
 						class="flex h-5 w-fit items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs"
@@ -127,7 +109,7 @@
 		<div class="absolute right-3 top-3 md:right-4 md:top-4">
 			<div class="flex flex-row items-center gap-1">
 				<button
-					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 max-sm:px-1.5 md:text-sm"
+					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner max-sm:px-1.5 md:text-sm dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
 					on:click={() => {
 						if (!isCopied) {
 							share(shareUrl, assistant.name);
@@ -148,22 +130,11 @@
 				</button>
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
-					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 md:text-sm"
+					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner md:text-sm dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800"
 					><IconGear class="text-xxs" />Settings</a
 				>
 			</div>
 		</div>
-		<button
-			on:click={() => {
-				settings.instantSet({
-					activeModel: models[0].name,
-				});
-				goto(`${base}/`);
-			}}
-			class="absolute -bottom-6 right-2 inline-flex items-center justify-center text-xs text-gray-600 underline hover:brightness-50 dark:text-gray-400 dark:hover:brightness-110"
-		>
-			<CarbonRenew class="mr-1.5 text-xxs" /> Reset to default model
-		</button>
 	</div>
 	{#if assistant.exampleInputs}
 		<div class="mx-auto mt-auto w-full gap-8 sm:-mb-8">

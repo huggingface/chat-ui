@@ -1,7 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
+import { isURL } from "$lib/server/isURLLocal";
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { isURL } from "$lib/utils/isUrl";
 
 export default async function searchSearxng(query: string): Promise<WebSearchSource[]> {
 	const abortController = new AbortController();
@@ -21,7 +21,7 @@ export default async function searchSearxng(query: string): Promise<WebSearchSou
 	})
 		.then((response) => response.json() as Promise<{ results: { url: string }[] }>)
 		.catch((error) => {
-			logger.error(error, "Failed to fetch or parse JSON");
+			logger.error("Failed to fetch or parse JSON", error);
 			throw new Error("Failed to fetch or parse JSON", { cause: error });
 		});
 

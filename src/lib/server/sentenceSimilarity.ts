@@ -1,4 +1,4 @@
-import { dot } from "@huggingface/transformers";
+import { dot } from "@xenova/transformers";
 import type { EmbeddingBackendModel } from "$lib/server/embeddingModels";
 import type { Embedding } from "$lib/server/embeddingEndpoints/embeddingEndpoints";
 
@@ -18,9 +18,7 @@ export async function getSentenceSimilarity(
 	];
 
 	const embeddingEndpoint = await embeddingModel.getEndpoint();
-	const output = await embeddingEndpoint({ inputs }).catch((err) => {
-		throw Error("Failed to generate embeddings for sentence similarity", { cause: err });
-	});
+	const output = await embeddingEndpoint({ inputs });
 
 	const queryEmbedding: Embedding = output[0];
 	const sentencesEmbeddings: Embedding[] = output.slice(1);

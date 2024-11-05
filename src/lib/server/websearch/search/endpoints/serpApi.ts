@@ -1,13 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { getJson, type GoogleParameters } from "serpapi";
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { isURL } from "$lib/utils/isUrl";
-
-type SerpApiResponse = {
-	organic_results: {
-		link: string;
-	}[];
-};
+import { isURL } from "$lib/server/isURLLocal";
 
 export default async function searchWebSerpApi(query: string): Promise<WebSearchSource[]> {
 	const params = {
@@ -19,7 +13,8 @@ export default async function searchWebSerpApi(query: string): Promise<WebSearch
 	} satisfies GoogleParameters;
 
 	// Show result as JSON
-	const response = (await getJson("google", params)) as unknown as SerpApiResponse;
+	const response = await getJson("google", params);
 
+	// todo: typing
 	return response.organic_results.filter(({ link }) => isURL(link));
 }

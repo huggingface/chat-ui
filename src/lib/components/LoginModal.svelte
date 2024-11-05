@@ -23,7 +23,9 @@
 			{envPublic.PUBLIC_APP_DESCRIPTION}
 		</p>
 		<p class="text-balance rounded-xl border bg-white/80 p-2 text-base text-gray-800">
-			{envPublic.PUBLIC_APP_GUEST_MESSAGE}
+			You have reached the guest message limit, <strong class="font-semibold"
+				>Sign In with a free Hugging Face account</strong
+			> to continue using HuggingChat.
 		</p>
 
 		<form
@@ -35,13 +37,11 @@
 			{#if $page.data.loginRequired}
 				<button
 					type="submit"
-					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+					class="flex w-full items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 				>
 					Sign in
 					{#if envPublic.PUBLIC_APP_NAME === "HuggingChat"}
-						<span class="flex items-center">
-							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
-						</span>
+						with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 					{/if}
 				</button>
 			{:else}

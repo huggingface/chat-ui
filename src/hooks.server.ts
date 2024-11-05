@@ -9,27 +9,17 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
+import { refreshAssistantsCounts } from "$lib/assistantStats/refresh-assistants-counts";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
-import { initExitHandler } from "$lib/server/exitHandler";
-import { ObjectId } from "mongodb";
-import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
-import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
-	// Set HF_TOKEN as a process variable for Transformers.JS to see it
-	process.env.HF_TOKEN ??= env.HF_TOKEN;
-
-	logger.info("Starting server...");
-	initExitHandler();
-
 	await checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
-	refreshConversationStats();
 
 	// Init metrics server
 	MetricsServer.getInstance();
@@ -38,7 +28,7 @@ if (!building) {
 	AbortedGenerations.getInstance();
 }
 
-export const handleError: HandleServerError = async ({ error, event, status, message }) => {
+export const handleError: HandleServerError = async ({ error, event }) => {
 	// handle 404
 
 	if (building) {
@@ -58,10 +48,8 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 		url: event.request.url,
 		params: event.params,
 		request: event.request,
-		message,
 		error,
 		errorId,
-		status,
 	});
 
 	return {
@@ -108,29 +96,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const token = event.cookies.get(env.COOKIE_NAME);
 
-	// if the trusted email header is set we use it to get the user email
-	const email = env.TRUSTED_EMAIL_HEADER
-		? event.request.headers.get(env.TRUSTED_EMAIL_HEADER)
-		: null;
+	let secretSessionId: string;
+	let sessionId: string;
 
-	let secretSessionId: string | null = null;
-	let sessionId: string | null = null;
-
-	if (email) {
-		secretSessionId = sessionId = await sha256(email);
-
-		event.locals.user = {
-			// generate id based on email
-			_id: new ObjectId(sessionId.slice(0, 24)),
-			name: email,
-			email,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			hfUserId: email,
-			avatarUrl: "",
-			logoutDisabled: true,
-		};
-	} else if (token) {
+	if (token) {
 		secretSessionId = token;
 		sessionId = await sha256(token);
 
@@ -139,63 +108,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (user) {
 			event.locals.user = user;
 		}
-	} else if (event.url.pathname.startsWith(`${base}/api/`) && env.USE_HF_TOKEN_IN_API === "true") {
-		// if the request goes to the API and no user is available in the header
-		// check if a bearer token is available in the Authorization header
-
-		const authorization = event.request.headers.get("Authorization");
-
-		if (authorization && authorization.startsWith("Bearer ")) {
-			const token = authorization.slice(7);
-
-			const hash = await sha256(token);
-
-			sessionId = secretSessionId = hash;
-
-			// check if the hash is in the DB and get the user
-			// else check against https://huggingface.co/api/whoami-v2
-
-			const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
-
-			if (cacheHit) {
-				const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
-
-				if (!user) {
-					return errorResponse(500, "User not found");
-				}
-
-				event.locals.user = user;
-			} else {
-				const response = await fetch("https://huggingface.co/api/whoami-v2", {
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				});
-
-				if (!response.ok) {
-					return errorResponse(401, "Unauthorized");
-				}
-
-				const data = await response.json();
-				const user = await collections.users.findOne({ hfUserId: data.id });
-
-				if (!user) {
-					return errorResponse(500, "User not found");
-				}
-
-				await collections.tokenCaches.insertOne({
-					tokenHash: hash,
-					userId: data.id,
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				});
-
-				event.locals.user = user;
-			}
-		}
-	}
-
-	if (!sessionId || !secretSessionId) {
+	} else {
+		// if the user doesn't have any cookie, we generate one for him
 		secretSessionId = crypto.randomUUID();
 		sessionId = await sha256(secretSessionId);
 
@@ -265,7 +179,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!requiresUser &&
 			!event.url.pathname.startsWith(`${base}/settings`) &&
-			envPublic.PUBLIC_APP_DISCLAIMER === "1"
+			!!envPublic.PUBLIC_APP_DISCLAIMER
 		) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
@@ -291,11 +205,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
 	});
-
-	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
-	if (env.ALLOW_IFRAME !== "true") {
-		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
-	}
 
 	return response;
 };

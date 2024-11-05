@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { isURL } from "$lib/utils/isUrl";
+import { isURL } from "$lib/server/isURLLocal";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
 type SerpStackResponse = {
@@ -29,7 +29,7 @@ export default async function searchSerpStack(query: string): Promise<WebSearchS
 		.filter(({ url }) => isURL(url))
 		.map(({ title, url, snippet }) => ({
 			title,
-			link: url,
+			link: new URL(url),
 			text: snippet ?? "",
 		}));
 }

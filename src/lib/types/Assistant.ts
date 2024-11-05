@@ -1,7 +1,6 @@
 import type { ObjectId } from "mongodb";
 import type { User } from "./User";
 import type { Timestamps } from "./Timestamps";
-import type { ReviewStatus } from "./Review";
 
 export interface Assistant extends Timestamps {
 	_id: ObjectId;
@@ -14,7 +13,7 @@ export interface Assistant extends Timestamps {
 	exampleInputs: string[];
 	preprompt: string;
 	userCount?: number;
-	review: ReviewStatus;
+	featured?: boolean;
 	rag?: {
 		allowAllDomains: boolean;
 		allowedDomains: string[];
@@ -29,7 +28,6 @@ export interface Assistant extends Timestamps {
 	dynamicPrompt?: boolean;
 	searchTokens: string[];
 	last24HoursCount: number;
-	tools?: string[];
 }
 
 // eslint-disable-next-line no-shadow

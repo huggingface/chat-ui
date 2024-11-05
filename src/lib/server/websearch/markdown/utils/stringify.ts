@@ -26,18 +26,11 @@ export function stringifyMarkdownElement(elem: MarkdownElement): string {
 	return `${content}\n\n`;
 }
 
-/** Converts a tree of markdown elements to a string with formatting */
-export function stringifyMarkdownElementTree(elem: MarkdownElement): string {
-	const stringified = stringifyMarkdownElement(elem);
-	if (!("children" in elem)) return stringified;
-	return stringified + elem.children.map(stringifyMarkdownElementTree).join("");
-}
-
 // ----- HTML Elements -----
 
 /** Ignores all non-inline tag types and grabs their text. Converts inline tags to markdown */
-export function stringifyHTMLElements(elems: (SerializedHTMLElement | string)[]): string {
-	return elems.map(stringifyHTMLElement).join("").trim();
+export function stringifyHTMLElements(elem: (SerializedHTMLElement | string)[]): string {
+	return elem.map(stringifyHTMLElement).join("").trim();
 }
 
 /** Ignores all non-inline tag types and grabs their text. Converts inline tags to markdown */
@@ -52,9 +45,8 @@ export function stringifyHTMLElement(elem: SerializedHTMLElement | string): stri
 	if (elem.tagName === "em" || elem.tagName === "i") return `*${content}*`;
 	if (elem.tagName === "s" || elem.tagName === "strike") return `~~${content}~~`;
 
-	if (elem.tagName === "code" || elem.tagName === "var" || elem.tagName === "tt") {
+	if (elem.tagName === "code" || elem.tagName === "var" || elem.tagName === "tt")
 		return `\`${content}\``;
-	}
 
 	if (elem.tagName === "sup") return `<sup>${content}</sup>`;
 	if (elem.tagName === "sub") return `<sub>${content}</sub>`;
@@ -69,10 +61,8 @@ export function stringifyHTMLElement(elem: SerializedHTMLElement | string): stri
 }
 
 /** Grabs all text content directly, ignoring HTML tags */
-export function stringifyHTMLElementsUnformatted(
-	elems: (SerializedHTMLElement | string)[]
-): string {
-	return elems.map(stringifyHTMLElementUnformatted).join("");
+export function stringifyHTMLElementsUnformatted(elem: (SerializedHTMLElement | string)[]): string {
+	return elem.map(stringifyHTMLElementUnformatted).join("");
 }
 
 /** Grabs all text content directly, ignoring HTML tags */

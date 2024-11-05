@@ -2,13 +2,9 @@
 	import CarbonEarth from "~icons/carbon/earth";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import BIMeta from "~icons/bi/meta";
-	import CarbonCode from "~icons/carbon/code";
 	import type { Model } from "$lib/types/Model";
 
-	export let model: Pick<
-		Model,
-		"name" | "datasetName" | "websiteUrl" | "modelUrl" | "datasetUrl" | "hasInferenceAPI"
-	>;
+	export let model: Pick<Model, "name" | "datasetName" | "websiteUrl" | "modelUrl" | "datasetUrl">;
 
 	export let variant: "light" | "dark" = "light";
 </script>
@@ -39,16 +35,6 @@
 			<div class="max-sm:hidden">&nbsp;page</div></a
 		>
 	{/if}
-	{#if model.hasInferenceAPI}
-		<a
-			href={"https://huggingface.co/playground?modelId=" + model.name}
-			target="_blank"
-			rel="noreferrer"
-			class="flex items-center hover:underline"
-			><CarbonCode class="mr-1.5 shrink-0 text-xs text-gray-400" />
-			API
-		</a>
-	{/if}
 	{#if model.websiteUrl}
 		<a
 			href={model.websiteUrl}
@@ -56,9 +42,9 @@
 			class="ml-auto flex items-center hover:underline"
 			rel="noreferrer"
 		>
-			{#if model.name.startsWith("meta-llama/Meta-Llama")}
+			{#if model.name === "meta-llama/Meta-Llama-3-70B-Instruct"}
 				<BIMeta class="mr-1.5 shrink-0 text-xs text-gray-400" />
-				Built with Llama
+				Built with Meta Llama 3
 			{:else}
 				<CarbonEarth class="mr-1.5 shrink-0 text-xs text-gray-400" />
 				Website

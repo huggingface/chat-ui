@@ -2,7 +2,6 @@
 
 import { logger } from "$lib/server/logger";
 import { collections } from "$lib/server/database";
-import { onExit } from "./exitHandler";
 
 export class AbortedGenerations {
 	private static instance: AbortedGenerations;
@@ -11,7 +10,10 @@ export class AbortedGenerations {
 
 	private constructor() {
 		const interval = setInterval(this.updateList, 1000);
-		onExit(() => clearInterval(interval));
+
+		process.on("SIGINT", () => {
+			clearInterval(interval);
+		});
 	}
 
 	public static getInstance(): AbortedGenerations {

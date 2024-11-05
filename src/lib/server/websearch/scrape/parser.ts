@@ -1,12 +1,12 @@
 import type { SerializedHTMLElement } from "./types";
 
-interface DBSCANOptions<T> {
+type DBSCANOptions<T> = {
 	dataset: T[];
 	epsilon?: number;
 	epsilonCompare?: (distance: number, epsilon: number) => boolean;
 	minimumPoints?: number;
 	distanceFunction: (a: T, b: T) => number;
-}
+};
 
 export function spatialParser() {
 	/**
@@ -14,11 +14,15 @@ export function spatialParser() {
 	 */
 	const DBSCAN = <T>({
 		dataset,
-		epsilon = 1,
-		epsilonCompare = (dist, e) => dist < e,
-		minimumPoints = 2,
+		epsilon,
+		epsilonCompare,
+		minimumPoints,
 		distanceFunction,
 	}: DBSCANOptions<T>) => {
+		epsilon = epsilon || 1; // aka maxDistance
+		epsilonCompare = epsilonCompare || ((dist, e) => dist < e);
+		minimumPoints = minimumPoints || 2;
+
 		const visitedIndices: Record<number, boolean> = {};
 		const isVisited = (i: number) => visitedIndices[i];
 		const markVisited = (i: number) => {
@@ -432,7 +436,7 @@ export function spatialParser() {
 		});
 
 		// if there is a dominant cluster with more than 60% text share, return that
-		const dominantCluster = clusterWithMetrics[0]?.percentageTextShare > 60;
+		const dominantCluster = clusterWithMetrics[0].percentageTextShare > 60;
 		if (dominantCluster) return [clusterWithMetrics[0].cluster];
 
 		// clusters are sorted by text share after applying a penalty for centrality
@@ -448,7 +452,7 @@ export function spatialParser() {
 		// find all clusters that are similar to the largest cluster in terms of text share
 		// and see if they are enough to cover at least 60% of the text share
 		const largeTextShareClusters = sortedClusters.filter((c) =>
-			approximatelyEqual(c.percentageTextShare, sortedClusters[0]?.percentageTextShare, 10)
+			approximatelyEqual(c.percentageTextShare, sortedClusters[0].percentageTextShare, 10)
 		);
 
 		const totalTextShareOfLargeClusters = largeTextShareClusters.reduce(

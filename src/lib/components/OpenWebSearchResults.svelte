@@ -1,25 +1,16 @@
 <script lang="ts">
-	import {
-		MessageWebSearchUpdateType,
-		type MessageWebSearchUpdate,
-	} from "$lib/types/MessageUpdate";
-	import { isMessageWebSearchSourcesUpdate } from "$lib/utils/messageUpdates";
+	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
 
 	import CarbonError from "~icons/carbon/error-filled";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconInternet from "./icons/IconInternet.svelte";
 
 	export let classNames = "";
-	export let webSearchMessages: MessageWebSearchUpdate[] = [];
+	export let webSearchMessages: WebSearchUpdate[] = [];
 
-	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
-	$: lastMessage = webSearchMessages
-		.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
-		.at(-1) as MessageWebSearchUpdate;
-	$: errored = webSearchMessages.some(
-		(update) => update.subtype === MessageWebSearchUpdateType.Error
-	);
-	$: loading = !sources && !errored;
+	$: sources = webSearchMessages.find((m) => m.sources)?.sources;
+	$: lastMessage = webSearchMessages.filter((m) => m.messageType !== "sources").slice(-1)[0];
+	$: loading = !sources && lastMessage.messageType !== "error";
 </script>
 
 <details
@@ -56,7 +47,7 @@
 				{#if sources}
 					Completed
 				{:else}
-					{"message" in lastMessage ? lastMessage.message : "An error occurred"}
+					{lastMessage.message}
 				{/if}
 			</dt>
 		</dl>
@@ -70,7 +61,7 @@
 		{:else}
 			<ol>
 				{#each webSearchMessages as message}
-					{#if message.subtype === MessageWebSearchUpdateType.Update}
+					{#if message.messageType === "update"}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<div
@@ -83,12 +74,12 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}
 						</li>
-					{:else if message.subtype === MessageWebSearchUpdateType.Error}
+					{:else if message.messageType === "error"}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<CarbonError
@@ -99,7 +90,7 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}

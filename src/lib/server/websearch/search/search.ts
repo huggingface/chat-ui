@@ -1,44 +1,38 @@
 import type { WebSearchSource } from "$lib/types/WebSearch";
 import type { Message } from "$lib/types/Message";
 import type { Assistant } from "$lib/types/Assistant";
+import type { AppendUpdate } from "../runWebSearch";
 import { getWebSearchProvider, searchWeb } from "./endpoints";
 import { generateQuery } from "./generateQuery";
-import { isURLStringLocal } from "$lib/server/isURLLocal";
-import { isURL } from "$lib/utils/isUrl";
+import { isURL, isURLStringLocal } from "$lib/server/isURLLocal";
 
 import z from "zod";
 import JSON5 from "json5";
 import { env } from "$env/dynamic/private";
-import { makeGeneralUpdate } from "../update";
-import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 
 const listSchema = z.array(z.string()).default([]);
 const allowList = listSchema.parse(JSON5.parse(env.WEBSEARCH_ALLOWLIST));
 const blockList = listSchema.parse(JSON5.parse(env.WEBSEARCH_BLOCKLIST));
 
-export async function* search(
+export async function search(
 	messages: Message[],
-	ragSettings?: Assistant["rag"],
-	query?: string
-): AsyncGenerator<
-	MessageWebSearchUpdate,
-	{ searchQuery: string; pages: WebSearchSource[] },
-	undefined
-> {
+	ragSettings: Assistant["rag"] | undefined,
+	appendUpdate: AppendUpdate
+): Promise<{ searchQuery: string; pages: WebSearchSource[] }> {
 	if (ragSettings && ragSettings?.allowedLinks.length > 0) {
-		yield makeGeneralUpdate({ message: "Using links specified in Assistant" });
+		appendUpdate("Using links specified in Assistant");
 		return {
 			searchQuery: "",
 			pages: await directLinksToSource(ragSettings.allowedLinks).then(filterByBlockList),
 		};
 	}
 
-	const searchQuery = query ?? (await generateQuery(messages));
-	yield makeGeneralUpdate({ message: `Searching ${getWebSearchProvider()}`, args: [searchQuery] });
+	const searchQuery = await generateQuery(messages);
+	appendUpdate(`Searching ${getWebSearchProvider()}`, [searchQuery]);
 
 	// handle the global and (optional) rag lists
 	if (ragSettings && ragSettings?.allowedDomains.length > 0) {
-		yield makeGeneralUpdate({ message: "Filtering on specified domains" });
+		appendUpdate("Filtering on specified domains");
 	}
 	const filters = buildQueryFromSiteFilters(
 		[...(ragSettings?.allowedDomains ?? []), ...allowList],

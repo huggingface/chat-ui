@@ -7,7 +7,7 @@ export async function load({ parent, params }) {
 	const model = data.models.find((m: { id: string }) => m.id === params.model);
 
 	if (!model || model.unlisted) {
-		redirect(302, `${base}/settings`);
+		throw redirect(302, `${base}/settings`);
 	}
 
 	return data;

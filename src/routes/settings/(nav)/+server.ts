@@ -1,9 +1,7 @@
 import { collections } from "$lib/server/database";
 import { z } from "zod";
 import { authCondition } from "$lib/server/auth";
-import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
-import { toolFromConfigs } from "$lib/server/tools/index.js";
-import { ObjectId } from "mongodb";
+import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
 export async function POST({ request, locals }) {
 	const body = await request.json();
@@ -17,28 +15,8 @@ export async function POST({ request, locals }) {
 			ethicsModalAccepted: z.boolean().optional(),
 			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 			customPrompts: z.record(z.string()).default({}),
-			tools: z.array(z.string()).optional(),
-			disableStream: z.boolean().default(false),
-			directPaste: z.boolean().default(false),
 		})
-		.parse(body) satisfies SettingsEditable;
-
-	// make sure all tools exist
-	// either in db or in config
-	if (settings.tools) {
-		const newTools = [
-			...(await collections.tools
-				.find({ _id: { $in: settings.tools.map((toolId) => new ObjectId(toolId)) } })
-				.project({ _id: 1 })
-				.toArray()
-				.then((tools) => tools.map((tool) => tool._id.toString()))),
-			...toolFromConfigs
-				.filter((el) => (settings?.tools ?? []).includes(el._id.toString()))
-				.map((el) => el._id.toString()),
-		];
-
-		settings.tools = newTools;
-	}
+		.parse(body);
 
 	await collections.settings.updateOne(
 		authCondition(locals),

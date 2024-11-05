@@ -2,7 +2,6 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
-	import { goto } from "$app/navigation";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
@@ -12,22 +11,17 @@
 	import CarbonCopy from "~icons/carbon/copy-file";
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
-	import CarbonChat from "~icons/carbon/chat";
-	import CarbonStar from "~icons/carbon/star";
-	import CarbonTools from "~icons/carbon/tools";
-	import CarbonLock from "~icons/carbon/locked";
-
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
-	import ToolBadge from "$lib/components/ToolBadge.svelte";
-	import { ReviewStatus } from "$lib/types/Review";
 
 	export let data: PageData;
 
 	$: assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
 
 	const settings = useSettingsStore();
+
+	$: isActive = $settings.activeModel === $page.params.assistantId;
 
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
@@ -49,26 +43,25 @@
 	<ReportModal on:close={() => (displayReportModal = false)} />
 {/if}
 <div class="flex h-full flex-col gap-2">
-	<div class="flex flex-col sm:flex-row sm:gap-6">
-		<div class="mb-4 flex justify-center sm:mb-0">
-			{#if assistant?.avatar}
-				<img
-					src={`${base}/settings/assistants/${assistant?._id}/avatar.jpg?hash=${assistant?.avatar}`}
-					alt="Avatar"
-					class="size-16 flex-none rounded-full object-cover sm:size-24"
-				/>
-			{:else}
-				<div
-					class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24"
-				>
-					{assistant?.name[0]}
-				</div>
-			{/if}
-		</div>
+	<div class="flex gap-6">
+		{#if assistant?.avatar}
+			<!-- crop image if not square  -->
+			<img
+				src={`${base}/settings/assistants/${assistant?._id}/avatar.jpg?hash=${assistant?.avatar}`}
+				alt="Avatar"
+				class="size-16 flex-none rounded-full object-cover sm:size-24"
+			/>
+		{:else}
+			<div
+				class="flex size-16 flex-none items-center justify-center rounded-full bg-gray-300 text-4xl font-semibold uppercase text-gray-500 sm:size-24"
+			>
+				{assistant?.name[0]}
+			</div>
+		{/if}
 
 		<div class="flex-1">
-			<div class="flex flex-wrap items-center gap-2">
-				<h1 class="break-words text-xl font-semibold">
+			<div class="mb-1.5">
+				<h1 class="mr-1 inline text-xl font-semibold">
 					{assistant?.name}
 				</h1>
 
@@ -80,7 +73,7 @@
 						<IconInternet classNames="text-sm text-blue-600" />
 					</span>
 				{/if}
-				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+				<span class="ml-1 rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
 					>public</span
 				>
 			</div>
@@ -99,39 +92,28 @@
 				</a>
 			</p>
 			<div
-				class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
+				class="flex items-center gap-4 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800"
 			>
-				<div class="w-full sm:w-auto">
-					<button
-						class="mx-auto my-2 flex w-full w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
-						name="Activate model"
-						on:click|stopPropagation={() => {
-							settings.instantSet({
-								activeModel: $page.params.assistantId,
-							});
-							goto(`${base}/`);
-						}}
-					>
-						<CarbonChat class="mr-1.5 text-sm" />
-						New chat
-					</button>
-				</div>
+				<button
+					class="{isActive
+						? 'bg-gray-100 text-gray-800'
+						: 'bg-black !text-white'} my-2 flex w-fit items-center rounded-full px-3 py-1 text-base"
+					disabled={isActive}
+					name="Activate model"
+					on:click|stopPropagation={() => {
+						$settings.activeModel = $page.params.assistantId;
+					}}
+				>
+					{isActive ? "Active" : "Activate"}
+				</button>
 				{#if assistant?.createdByMe}
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
 					</a>
 					<form method="POST" action="?/delete" use:enhance>
-						<button
-							type="submit"
-							class="flex items-center underline"
-							on:click={(event) => {
-								if (!confirm("Are you sure you want to delete this assistant?")) {
-									event.preventDefault();
-								}
-							}}
+						<button type="submit" class="flex items-center underline">
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
 						>
-							<CarbonTrash class="mr-1.5 inline text-xs" />Delete
-						</button>
 					</form>
 				{:else}
 					<form method="POST" action="?/unsubscribe" use:enhance>
@@ -159,68 +141,6 @@
 							<CarbonFlag class="mr-1.5 inline text-xs" />Reported</button
 						>
 					{/if}
-				{/if}
-				{#if data?.user?.isAdmin}
-					{#if !assistant?.createdByMe}
-						<form method="POST" action="?/delete" use:enhance>
-							<button
-								type="submit"
-								class="flex items-center text-red-600 underline"
-								on:click={(event) => {
-									if (!confirm("Are you sure you want to delete this assistant?")) {
-										event.preventDefault();
-									}
-								}}
-							>
-								<CarbonTrash class="mr-1.5 inline text-xs" />Delete
-							</button>
-						</form>
-					{/if}
-					{#if assistant?.review === ReviewStatus.PRIVATE}
-						<form method="POST" action="?/approve" use:enhance>
-							<button type="submit" class="flex items-center text-green-600 underline">
-								<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
-							>
-						</form>
-					{/if}
-					{#if assistant?.review === ReviewStatus.PENDING}
-						<form method="POST" action="?/approve" use:enhance>
-							<button type="submit" class="flex items-center text-green-600 underline">
-								<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
-							>
-						</form>
-						<form method="POST" action="?/deny" use:enhance>
-							<button type="submit" class="flex items-center text-red-600">
-								<span class="mr-1.5 font-light no-underline">X</span>
-								<span class="underline">Deny</span>
-							</button>
-						</form>
-					{/if}
-					{#if assistant?.review === ReviewStatus.APPROVED || assistant?.review === ReviewStatus.DENIED}
-						<form method="POST" action="?/unrequest" use:enhance>
-							<button type="submit" class="flex items-center text-red-600 underline">
-								<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
-							>
-						</form>
-					{/if}
-				{/if}
-				{#if assistant?.createdByMe && assistant?.review === ReviewStatus.PRIVATE}
-					<form
-						method="POST"
-						action="?/request"
-						use:enhance={async ({ cancel }) => {
-							const confirmed = confirm(
-								"Are you sure you want to request this assistant to be featured? Make sure you have tried the assistant and that it works as expected. "
-							);
-							if (!confirmed) {
-								cancel();
-							}
-						}}
-					>
-						<button type="submit" class="flex items-center underline">
-							<CarbonStar class="mr-1.5 inline text-xs" />Request to be featured</button
-						>
-					</form>
 				{/if}
 			</div>
 		</div>
@@ -273,27 +193,6 @@
 			{/if}
 		</div>
 
-		{#if assistant?.tools?.length}
-			<div class="mt-4">
-				<div class="mb-1 flex items-center gap-1">
-					<span
-						class="inline-grid size-5 place-items-center rounded-full bg-purple-500/10"
-						title="This assistant uses the websearch."
-					>
-						<CarbonTools class="text-xs text-purple-600" />
-					</span>
-					<h2 class="font-semibold">Tools</h2>
-				</div>
-				<p class="w-full text-sm text-gray-500">
-					This Assistant has access to the following tools:
-				</p>
-				<ul class="mr-2 mt-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
-					{#each assistant.tools as tool}
-						<ToolBadge toolId={tool} />
-					{/each}
-				</ul>
-			</div>
-		{/if}
 		{#if hasRag}
 			<div class="mt-4">
 				<div class="mb-1 flex items-center gap-1">

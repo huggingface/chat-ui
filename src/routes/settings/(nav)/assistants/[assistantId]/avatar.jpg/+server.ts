@@ -8,18 +8,18 @@ export const GET: RequestHandler = async ({ params }) => {
 	});
 
 	if (!assistant) {
-		error(404, "No assistant found");
+		throw error(404, "No assistant found");
 	}
 
 	if (!assistant.avatar) {
-		error(404, "No avatar found");
+		throw error(404, "No avatar found");
 	}
 
 	const fileId = collections.bucket.find({ filename: assistant._id.toString() });
 
 	const content = await fileId.next().then(async (file) => {
 		if (!file?._id) {
-			error(404, "Avatar not found");
+			throw error(404, "Avatar not found");
 		}
 
 		const fileStream = collections.bucket.openDownloadStream(file?._id);
@@ -37,8 +37,6 @@ export const GET: RequestHandler = async ({ params }) => {
 	return new Response(content, {
 		headers: {
 			"Content-Type": "image/jpeg",
-			"Content-Security-Policy":
-				"default-src 'none'; script-src 'none'; style-src 'none'; sandbox;",
 		},
 	});
 };

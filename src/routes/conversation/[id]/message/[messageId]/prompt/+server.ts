@@ -19,7 +19,7 @@ export async function GET({ params, locals }) {
 			  });
 
 	if (conv === null) {
-		error(404, "Conversation not found");
+		throw error(404, "Conversation not found");
 	}
 
 	const messageId = params.messageId;
@@ -27,13 +27,13 @@ export async function GET({ params, locals }) {
 	const messageIndex = conv.messages.findIndex((msg) => msg.id === messageId);
 
 	if (!isMessageId(messageId) || messageIndex === -1) {
-		error(404, "Message not found");
+		throw error(404, "Message not found");
 	}
 
 	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
-		error(404, "Conversation model not found");
+		throw error(404, "Conversation model not found");
 	}
 
 	const messagesUpTo = buildSubtree(conv, messageId);
@@ -43,9 +43,6 @@ export async function GET({ params, locals }) {
 		messages: messagesUpTo,
 		model,
 	});
-
-	const userMessage = conv.messages[messageIndex];
-	const assistantMessage = conv.messages[messageIndex + 1];
 
 	return new Response(
 		JSON.stringify(
@@ -57,8 +54,6 @@ export async function GET({ params, locals }) {
 					...model.parameters,
 					return_full_text: false,
 				},
-				userMessage,
-				...(assistantMessage ? { assistantMessage } : {}),
 			},
 			null,
 			2

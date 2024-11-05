@@ -10,7 +10,7 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			sessionId: string;
-			user?: User & { logoutDisabled?: boolean };
+			user?: User;
 		}
 
 		interface Error {

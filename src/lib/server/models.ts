@@ -3,17 +3,15 @@ import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
-import { endpointTgi } from "./endpoints/tgi/endpointTgi";
+import endpointTgi from "./endpoints/tgi/endpointTgi";
 import { sum } from "$lib/utils/sum";
 import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
-import type { PreTrainedTokenizer } from "@huggingface/transformers";
+import type { PreTrainedTokenizer } from "@xenova/transformers";
 
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -63,12 +61,8 @@ const modelConfig = z.object({
 		.passthrough()
 		.optional(),
 	multimodal: z.boolean().default(false),
-	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
-	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
-	/** Used to enable/disable system prompt usage */
-	systemRoleSupported: z.boolean().default(true),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -81,182 +75,44 @@ async function getChatPromptRender(
 	}
 	let tokenizer: PreTrainedTokenizer;
 
-	try {
-		tokenizer = await getTokenizer(m.tokenizer ?? m.id ?? m.name);
-	} catch (e) {
-		// if fetching the tokenizer fails but it wasnt manually set, use the default template
-		if (!m.tokenizer) {
-			logger.warn(
-				`No tokenizer found for model ${m.name}, using default template. Consider setting tokenizer manually or making sure the model is available on the hub.`,
-				m
-			);
-			return compileTemplate<ChatTemplateInput>(
-				"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
-				m
-			);
-		}
+	if (!m.tokenizer) {
+		return compileTemplate<ChatTemplateInput>(
+			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
+			m
+		);
+	}
 
+	try {
+		tokenizer = await getTokenizer(m.tokenizer);
+	} catch (e) {
 		logger.error(
-			e,
-			`Failed to load tokenizer ${
-				m.tokenizer ?? m.id ?? m.name
-			} make sure the model is available on the hub and you have access to any gated models.`
+			"Failed to load tokenizer for model " +
+				m.name +
+				" consider setting chatPromptTemplate manually or making sure the model is available on the hub. Error: " +
+				(e as Error).message
 		);
 		process.exit();
 	}
 
-	const renderTemplate = ({
-		messages,
-		preprompt,
-		tools,
-		toolResults,
-		continueMessage,
-	}: ChatTemplateInput) => {
+	const renderTemplate = ({ messages, preprompt }: ChatTemplateInput) => {
 		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
 			content: message.content,
 			role: message.from,
 		}));
 
-		if (!m.systemRoleSupported) {
-			const firstSystemMessage = formattedMessages.find((msg) => msg.role === "system");
-			formattedMessages = formattedMessages.filter((msg) => msg.role !== "system");
-
-			if (
-				firstSystemMessage &&
-				formattedMessages.length > 0 &&
-				formattedMessages[0].role === "user"
-			) {
-				formattedMessages[0].content =
-					firstSystemMessage.content + "\n" + formattedMessages[0].content;
-			}
-		}
-
-		if (preprompt && formattedMessages[0].role !== "system") {
+		if (preprompt) {
 			formattedMessages = [
 				{
-					role: m.systemRoleSupported ? "system" : "user",
+					role: "system",
 					content: preprompt,
 				},
 				...formattedMessages,
 			];
 		}
 
-		if (toolResults?.length) {
-			// todo: should update the command r+ tokenizer to support system messages at any location
-			// or use the `rag` mode without the citations
-			const id = m.id ?? m.name;
-
-			if (isHuggingChat && id.startsWith("CohereForAI")) {
-				formattedMessages = [
-					{
-						role: m.systemRoleSupported ? "system" : "user",
-						content:
-							"\n\n<results>\n" +
-							toolResults
-								.flatMap((result, idx) => {
-									if (result.status === ToolResultStatus.Error) {
-										return (
-											`Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message
-										);
-									}
-									return (
-										`Document: ${idx}\n` +
-										result.outputs
-											.flatMap((output) =>
-												Object.entries(output).map(([title, text]) => `${title}\n${text}`)
-											)
-											.join("\n")
-									);
-								})
-								.join("\n\n") +
-							"\n</results>",
-					},
-					...formattedMessages,
-				];
-			} else if (isHuggingChat && id.startsWith("meta-llama")) {
-				const results = toolResults.flatMap((result) => {
-					if (result.status === ToolResultStatus.Error) {
-						return [
-							{
-								tool_call_id: result.call.name,
-								output: "Error: " + result.message,
-							},
-						];
-					} else {
-						return result.outputs.map((output) => ({
-							tool_call_id: result.call.name,
-							output: JSON.stringify(output),
-						}));
-					}
-				});
-
-				formattedMessages = [
-					...formattedMessages,
-					{
-						role: "python",
-						content: JSON.stringify(results),
-					},
-				];
-			} else {
-				formattedMessages = [
-					...formattedMessages,
-					{
-						role: m.systemRoleSupported ? "system" : "user",
-						content: JSON.stringify(toolResults),
-					},
-				];
-			}
-			tools = [];
-		}
-
-		const chatTemplate = tools?.length ? "tool_use" : undefined;
-
-		const documents = (toolResults ?? []).flatMap((result) => {
-			if (result.status === ToolResultStatus.Error) {
-				return [{ title: `Tool "${result.call.name}" error`, text: "\n" + result.message }];
-			}
-			return result.outputs.flatMap((output) =>
-				Object.entries(output).map(([title, text]) => ({
-					title: `Tool "${result.call.name}" ${title}`,
-					text: "\n" + text,
-				}))
-			);
-		});
-
-		const mappedTools =
-			tools?.map((tool) => {
-				const inputs: Record<
-					string,
-					{
-						type: ToolInput["type"];
-						description: string;
-						required: boolean;
-					}
-				> = {};
-
-				for (const value of tool.inputs) {
-					if (value.paramType !== "fixed") {
-						inputs[value.name] = {
-							type: value.type,
-							description: value.description ?? "",
-							required: value.paramType === "required",
-						};
-					}
-				}
-
-				return {
-					name: tool.name,
-					description: tool.description,
-					parameter_definitions: inputs,
-				};
-			}) ?? [];
-
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
-			add_generation_prompt: !continueMessage,
-			chat_template: chatTemplate,
-			tools: mappedTools,
-			documents,
+			add_generation_prompt: true,
 		});
 
 		if (typeof output !== "string") {
@@ -303,10 +159,6 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.tgi(args);
 					case "anthropic":
 						return endpoints.anthropic(args);
-					case "anthropic-vertex":
-						return endpoints.anthropicvertex(args);
-					case "bedrock":
-						return endpoints.bedrock(args);
 					case "aws":
 						return await endpoints.aws(args);
 					case "openai":
@@ -317,8 +169,6 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.ollama(args);
 					case "vertex":
 						return await endpoints.vertex(args);
-					case "genai":
-						return await endpoints.genai(args);
 					case "cloudflare":
 						return await endpoints.cloudflare(args);
 					case "cohere":
@@ -337,48 +187,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-const hasInferenceAPI = async (m: Awaited<ReturnType<typeof processModel>>) => {
-	if (!isHuggingChat) {
-		return false;
-	}
-
-	let r: Response;
-	try {
-		r = await fetch(`https://huggingface.co/api/models/${m.id}`);
-	} catch (e) {
-		console.log(e);
-		return false;
-	}
-
-	if (!r.ok) {
-		logger.warn(`Failed to check if ${m.id} has inference API: ${r.statusText}`);
-		return false;
-	}
-
-	const json = await r.json();
-
-	if (json.cardData.inference === false) {
-		return false;
-	}
-
-	return true;
-};
-
-export const models = await Promise.all(
-	modelsRaw.map((e) =>
-		processModel(e)
-			.then(addEndpoint)
-			.then(async (m) => ({
-				...m,
-				hasInferenceAPI: await hasInferenceAPI(m),
-			}))
-	)
-);
-
-export type ProcessedModel = (typeof models)[number];
-
-// super ugly but not sure how to make typescript happier
-export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
+export const models = await Promise.all(modelsRaw.map((e) => processModel(e).then(addEndpoint)));
 
 export const defaultModel = models[0];
 
@@ -390,7 +199,6 @@ export const oldModels = env.OLD_MODELS
 					id: z.string().optional(),
 					name: z.string().min(1),
 					displayName: z.string().min(1).optional(),
-					transferTo: validModelIdSchema.optional(),
 				})
 			)
 			.parse(JSON5.parse(env.OLD_MODELS))
@@ -414,5 +222,5 @@ export const smallModel = env.TASK_MODEL
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools" | "hasInferenceAPI"
+	"preprompt" | "parameters" | "multimodal" | "unlisted"
 >;

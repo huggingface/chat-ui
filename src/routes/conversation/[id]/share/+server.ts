@@ -14,7 +14,7 @@ export async function POST({ params, url, locals }) {
 	});
 
 	if (!conversation) {
-		error(404, "Conversation not found");
+		throw error(404, "Conversation not found");
 	}
 
 	const hash = await hashConv(conversation);

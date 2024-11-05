@@ -12,45 +12,26 @@ service:
   type: NodePort
   annotations: { }
 
-serviceAccount:
-  enabled: false
-  create: false
-  name: ""
-  automountServiceAccountToken: true
-  annotations: { }
-
 ingress:
-  enabled: true
   path: "/"
   annotations: { }
-  # className: "nginx"
-  tls: { }
-    # secretName: XXX
 
 resources:
   requests:
-    cpu: 2
-    memory: 4Gi
+    cpu: 1
+    memory: 8Gi
   limits:
-    cpu: 2
-    memory: 4Gi
+    cpu: 1
+    memory: 8Gi
 nodeSelector: {}
 tolerations: []
 
 envVars: { }
-
-infisical:
+externalSecrets:
   enabled: false
-  env: ""
-  project: "huggingchat-v2-a1"
-  url: ""
-  resyncInterval: 60
-  operatorSecretName: "huggingchat-operator-secrets"
-  operatorSecretNamespace: "hub-utils"
-
-# Allow to environment injections on top or instead of infisical
-extraEnvFrom: []
-extraEnv: []
+  secretStoreName: ""
+  secretName: ""
+  parameters: { }
 
 autoscaling:
   enabled: false

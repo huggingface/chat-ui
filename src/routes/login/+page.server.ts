@@ -22,6 +22,6 @@ export const actions = {
 			{ sessionId: locals.sessionId }
 		);
 
-		redirect(303, authorizationUrl);
+		throw redirect(303, authorizationUrl);
 	},
 };

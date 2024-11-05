@@ -9,7 +9,7 @@ export async function load({ params, locals, parent }) {
 	const data = await parent();
 
 	if (!model || model.unlisted) {
-		redirect(302, `${base}/`);
+		throw redirect(302, `${base}/`);
 	}
 
 	if (locals.user?._id ?? locals.sessionId) {
