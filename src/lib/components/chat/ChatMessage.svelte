@@ -43,7 +43,7 @@
 		return md.replace(/ *\[\[(\d+)\]\]/gm, (textToReplace, index) => {
 			const source = webSearchSources[Number(index) - 1];
 			if (!source) return "";
-			return ` <sup><a href="${source.link}" target="_blank" rel="noreferrer" class="text-primary-400 no-underline hover:underline font-bold">${index}</a></sup>`;
+			return ` <sup><a href="${source.link}" target="_blank" rel="noreferrer" style="color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;">${index}</a></sup>`;
 		});
 	}
 
