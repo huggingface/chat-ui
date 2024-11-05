@@ -20,7 +20,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -207,7 +206,7 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
+{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && envPublic.PUBLIC_APP_DISCLAIMER === "1"}
 	<DisclaimerModal />
 {/if}
 
