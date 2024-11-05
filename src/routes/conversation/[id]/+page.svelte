@@ -4,7 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { goto, invalidate, invalidateAll } from "$app/navigation";
+	import { goto, invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
