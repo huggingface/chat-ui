@@ -37,6 +37,28 @@
 	import DOMPurify from "isomorphic-dompurify";
 	import { enhance } from "$app/forms";
 	import { browser } from "$app/environment";
+	import type { WebSearchSource } from "$lib/types/WebSearch";
+
+	function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
+		const linkStyle =
+			"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
+
+		return md.replace(/\[(\d+)\]/g, (match: string) => {
+			const indices: number[] = (match.match(/\d+/g) || []).map(Number);
+			const links: string = indices
+				.map((index: number) => {
+					const source = webSearchSources[index - 1];
+					if (source) {
+						return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
+					}
+					return "";
+				})
+				.filter(Boolean)
+				.join(", ");
+
+			return links ? ` <sup>${links}</sup>` : match;
+		});
+	}
 
 	function sanitizeMd(md: string) {
 		let ret = md
@@ -114,7 +136,7 @@
 		})
 	);
 
-	$: tokens = marked.lexer(sanitizeMd(message.content ?? ""));
+	$: tokens = marked.lexer(addInlineCitations(sanitizeMd(message.content), webSearchSources));
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
