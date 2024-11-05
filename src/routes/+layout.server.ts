@@ -51,38 +51,52 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		  })
 		: null;
 
-	const conversations = await collections.conversations
-		.find(authCondition(locals))
-		.sort({ updatedAt: -1 })
-		.project<
-			Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId">
-		>({
-			title: 1,
-			model: 1,
-			_id: 1,
-			updatedAt: 1,
-			createdAt: 1,
-			assistantId: 1,
-		})
-		.limit(300)
-		.toArray();
+	const nConversations = await collections.conversations.countDocuments(authCondition(locals));
+
+	const conversations =
+		nConversations === 0
+			? Promise.resolve([])
+			: collections.conversations
+					.find(authCondition(locals))
+					.sort({ updatedAt: -1 })
+					.project<
+						Pick<
+							Conversation,
+							"title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId"
+						>
+					>({
+						title: 1,
+						model: 1,
+						_id: 1,
+						updatedAt: 1,
+						createdAt: 1,
+						assistantId: 1,
+					})
+					.limit(300)
+					.toArray();
 
 	const userAssistants = settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
 	const userAssistantsSet = new Set(userAssistants);
 
-	const assistantIds = [
-		...userAssistants.map((el) => new ObjectId(el)),
-		...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
-	];
-
-	const assistants = await collections.assistants.find({ _id: { $in: assistantIds } }).toArray();
+	const assistants = conversations.then((conversations) =>
+		collections.assistants
+			.find({
+				_id: {
+					$in: [
+						...userAssistants.map((el) => new ObjectId(el)),
+						...(conversations.map((conv) => conv.assistantId).filter((el) => !!el) as ObjectId[]),
+					],
+				},
+			})
+			.toArray()
+	);
 
 	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
 
 	let loginRequired = false;
 
 	if (requiresUser && !locals.user && messagesBeforeLogin) {
-		if (conversations.length > messagesBeforeLogin) {
+		if (nConversations > messagesBeforeLogin) {
 			loginRequired = true;
 		} else {
 			// get the number of messages where `from === "assistant"` across all conversations.
@@ -129,25 +143,42 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		);
 
 	return {
-		conversations: conversations.map((conv) => {
-			if (settings?.hideEmojiOnSidebar) {
-				conv.title = conv.title.replace(/\p{Emoji}/gu, "");
-			}
+		nConversations,
+		conversations: conversations.then(
+			async (convs) =>
+				await Promise.all(
+					convs.map(async (conv) => {
+						if (settings?.hideEmojiOnSidebar) {
+							conv.title = conv.title.replace(/\p{Emoji}/gu, "");
+						}
 
-			// remove invalid unicode and trim whitespaces
-			conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
+						// remove invalid unicode and trim whitespaces
+						conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
 
-			return {
-				id: conv._id.toString(),
-				title: conv.title,
-				model: conv.model ?? defaultModel,
-				updatedAt: conv.updatedAt,
-				assistantId: conv.assistantId?.toString(),
-				avatarHash:
-					conv.assistantId &&
-					assistants.find((a) => a._id.toString() === conv.assistantId?.toString())?.avatar,
-			};
-		}) satisfies ConvSidebar[],
+						let avatarUrl: string | undefined = undefined;
+
+						if (conv.assistantId) {
+							const hash = (
+								await collections.assistants.findOne({
+									_id: new ObjectId(conv.assistantId),
+								})
+							)?.avatar;
+							if (hash) {
+								avatarUrl = `/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${hash}`;
+							}
+						}
+
+						return {
+							id: conv._id.toString(),
+							title: conv.title,
+							model: conv.model ?? defaultModel,
+							updatedAt: conv.updatedAt,
+							assistantId: conv.assistantId?.toString(),
+							avatarUrl,
+						} satisfies ConvSidebar;
+					})
+				)
+		),
 		settings: {
 			searchEnabled: !!(
 				env.SERPAPI_KEY ||
@@ -223,15 +254,17 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			type: "community",
 			review: ReviewStatus.APPROVED,
 		}),
-		assistants: assistants
-			.filter((el) => userAssistantsSet.has(el._id.toString()))
-			.map((el) => ({
-				...el,
-				_id: el._id.toString(),
-				createdById: undefined,
-				createdByMe:
-					el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-			})),
+		assistants: assistants.then((assistants) =>
+			assistants
+				.filter((el) => userAssistantsSet.has(el._id.toString()))
+				.map((el) => ({
+					...el,
+					_id: el._id.toString(),
+					createdById: undefined,
+					createdByMe:
+						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+				}))
+		),
 		user: locals.user && {
 			id: locals.user._id.toString(),
 			username: locals.user.username,
