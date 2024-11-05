@@ -95,8 +95,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	let loginRequired = false;
 
-	if (requiresUser && !locals.user && messagesBeforeLogin) {
-		if (nConversations > messagesBeforeLogin) {
+	if (requiresUser && !locals.user) {
+		if (messagesBeforeLogin === 0) {
+			loginRequired = true;
+		} else if (nConversations >= messagesBeforeLogin) {
 			loginRequired = true;
 		} else {
 			// get the number of messages where `from === "assistant"` across all conversations.
@@ -114,7 +116,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 						.toArray()
 				)[0]?.messages ?? 0;
 
-			loginRequired = totalMessages > messagesBeforeLogin;
+			loginRequired = totalMessages >= messagesBeforeLogin;
 		}
 	}
 
