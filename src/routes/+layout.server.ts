@@ -53,21 +53,27 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	const nConversations = await collections.conversations.countDocuments(authCondition(locals));
 
-	const conversations = collections.conversations
-		.find(authCondition(locals))
-		.sort({ updatedAt: -1 })
-		.project<
-			Pick<Conversation, "title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId">
-		>({
-			title: 1,
-			model: 1,
-			_id: 1,
-			updatedAt: 1,
-			createdAt: 1,
-			assistantId: 1,
-		})
-		.limit(300)
-		.toArray();
+	const conversations =
+		nConversations === 0
+			? Promise.resolve([])
+			: collections.conversations
+					.find(authCondition(locals))
+					.sort({ updatedAt: -1 })
+					.project<
+						Pick<
+							Conversation,
+							"title" | "model" | "_id" | "updatedAt" | "createdAt" | "assistantId"
+						>
+					>({
+						title: 1,
+						model: 1,
+						_id: 1,
+						updatedAt: 1,
+						createdAt: 1,
+						assistantId: 1,
+					})
+					.limit(300)
+					.toArray();
 
 	const userAssistants = settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
 	const userAssistantsSet = new Set(userAssistants);
