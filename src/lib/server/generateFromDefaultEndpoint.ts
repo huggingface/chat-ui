@@ -14,9 +14,10 @@ export async function* generateFromDefaultEndpoint({
 	const endpoint = await smallModel.getEndpoint();
 
 	const tokenStream = await endpoint({ messages, preprompt, generateSettings });
-
+	let text = "";
 	for await (const output of tokenStream) {
 		// if not generated_text is here it means the generation is not done
+		text = text + output?.token.text;
 		if (output.generated_text) {
 			let generated_text = output.generated_text;
 			for (const stop of [...(smallModel.parameters?.stop ?? []), "<|endoftext|>"]) {
@@ -31,5 +32,6 @@ export async function* generateFromDefaultEndpoint({
 			token: output.token.text,
 		};
 	}
+	if (text.trim() != "") return text;
 	throw new Error("Generation failed");
 }
