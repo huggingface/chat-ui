@@ -33,11 +33,9 @@ const websearch: ConfigTool = {
 		return {
 			outputs: [
 				{
-					websearch: webSearchContext,
-				},
-				{
-					instructions:
-						"When answering the question, if you use sources from the websearch results above, cite each index inline individually wrapped like: [1], [2] etc.",
+					websearch:
+						webSearchContext +
+						"\n\nWhen answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3].",
 				},
 			],
 			display: false,
