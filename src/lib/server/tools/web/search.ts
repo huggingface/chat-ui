@@ -25,12 +25,21 @@ const websearch: ConfigTool = {
 	showOutput: false,
 	async *call({ query }, { conv, assistant, messages }) {
 		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, String(query));
-		const chunks = webSearchToolResults?.contextSources
-			.map(({ context }) => context)
-			.join("\n------------\n");
+
+		const webSearchContext = webSearchToolResults?.contextSources
+			.map(({ context }, idx) => `Source [${idx + 1}]\n${context.trim()}`)
+			.join("\n\n----------\n\n");
 
 		return {
-			outputs: [{ websearch: chunks }],
+			outputs: [
+				{
+					websearch: webSearchContext,
+				},
+				{
+					instructions:
+						"When answering the question, if you use sources from the websearch results above, cite each index inline individually wrapped like: [1], [2] etc.",
+				},
+			],
 			display: false,
 		};
 	},

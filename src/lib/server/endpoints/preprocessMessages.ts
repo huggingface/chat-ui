@@ -17,7 +17,7 @@ export async function preprocessMessages(
 
 function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"]) {
 	const webSearchContext = webSearch?.contextSources
-		.map(({ context }) => context.trim())
+		.map(({ context }, idx) => `Source [${idx + 1}]\n${context.trim()}`)
 		.join("\n\n----------\n\n");
 
 	// No web search context available, skip
@@ -35,7 +35,7 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 	const finalMessage = {
 		...messages[messages.length - 1],
 		content: `I searched the web using the query: ${webSearch.searchQuery}.
-Today is ${currentDate} and here are the results:
+Today is ${currentDate} and here are the results. When answering the question, if you use a source, cite its index inline like this: [1], [2], etc.
 =====================
 ${webSearchContext}
 =====================
