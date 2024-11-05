@@ -207,7 +207,7 @@
 </svelte:head>
 
 {#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && envPublic.PUBLIC_APP_DISCLAIMER === "1"}
-	<DisclaimerModal />
+	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
 <ExpandNavigation
