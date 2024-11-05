@@ -38,12 +38,26 @@
 	import { enhance } from "$app/forms";
 	import { browser } from "$app/environment";
 	import type { WebSearchSource } from "$lib/types/WebSearch";
+	import { matchesGlob } from "node:path";
 
-	function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []) {
-		return md.replace(/ *\[\[(\d+)\]\]/gm, (textToReplace, index) => {
-			const source = webSearchSources[Number(index) - 1];
-			if (!source) return "";
-			return ` <sup><a href="${source.link}" target="_blank" rel="noreferrer" style="color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;">${index}</a></sup>`;
+	function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
+		const linkStyle =
+			"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
+
+		return md.replace(/\[(\d+)\]/g, (match: string) => {
+			const indices: number[] = (match.match(/\d+/g) || []).map(Number);
+			const links: string = indices
+				.map((index: number) => {
+					const source = webSearchSources[index - 1];
+					if (source) {
+						return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
+					}
+					return "";
+				})
+				.filter(Boolean)
+				.join(", ");
+
+			return links ? ` <sup>${links}</sup>` : match;
 		});
 	}
 

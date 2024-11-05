@@ -27,7 +27,7 @@ const websearch: ConfigTool = {
 		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, String(query));
 
 		const webSearchContext = webSearchToolResults?.contextSources
-			.map(({ context }, idx) => `Source [[${idx + 1}]]\n${context.trim()}`)
+			.map(({ context }, idx) => `Source [${idx + 1}]\n${context.trim()}`)
 			.join("\n\n----------\n\n");
 
 		return {
@@ -37,7 +37,7 @@ const websearch: ConfigTool = {
 				},
 				{
 					instructions:
-						"When answering the question, if you use a source from the websearch results above, cite its index inline like: [[1]], [[2]], etc.",
+						"When answering the question, if you use sources from the websearch results above, cite each index inline individually wrapped like: [1], [2] etc.",
 				},
 			],
 			display: false,
