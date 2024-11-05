@@ -100,15 +100,17 @@
 	$: if ($error) onError();
 
 	$: if ($titleUpdate) {
-		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+		data.conversations.then((convs) => {
+			const convIdx = convs.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-		if (convIdx != -1) {
-			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
-		}
-		// update data.conversations
-		data.conversations = [...data.conversations];
+			if (convIdx != -1) {
+				convs[convIdx].title = $titleUpdate?.title ?? convs[convIdx].title;
+			}
+			// update data.conversations
+			data.conversations = Promise.resolve([...convs]);
 
-		$titleUpdate = null;
+			$titleUpdate = null;
+		});
 	}
 
 	const settings = createSettingsStore(data.settings);
@@ -147,7 +149,7 @@
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
-		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+		: data.conversations.then((convs) => convs.find((conv) => conv.id === $page.params.id)?.title);
 </script>
 
 <svelte:head>

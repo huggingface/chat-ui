@@ -18,7 +18,7 @@ export const load = (async ({ locals, parent }) => {
 	}
 
 	return {
-		assistants: assistants.map((el) => ({
+		assistants: (await assistants).map((el) => ({
 			...el,
 			reported: reportsByUser.includes(el._id),
 		})),

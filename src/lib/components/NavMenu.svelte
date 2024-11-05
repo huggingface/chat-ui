@@ -11,7 +11,8 @@
 	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/stores";
 
-	export let conversations: ConvSidebar[] = [];
+	import { fade } from "svelte/transition";
+	export let conversations: Promise<ConvSidebar[]>;
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
 
@@ -25,16 +26,16 @@
 		new Date().setMonth(new Date().getMonth() - 1),
 	];
 
-	$: groupedConversations = {
-		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
-		week: conversations.filter(
+	$: groupedConversations = conversations.then((convs) => ({
+		today: convs.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
+		week: convs.filter(
 			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
 		),
-		month: conversations.filter(
+		month: convs.filter(
 			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
 		),
-		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
-	};
+		older: convs.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+	}));
 
 	const titles: { [key: string]: string } = {
 		today: "Today",
@@ -65,16 +66,31 @@
 <div
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	{#each Object.entries(groupedConversations) as [group, convs]}
-		{#if convs.length}
-			<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-				{titles[group]}
-			</h4>
-			{#each convs as conv}
-				<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
-			{/each}
+	{#await groupedConversations}
+		{#if $page.data.nConversations > 0}
+			<div class="overflow-y-hidden">
+				<div class="flex animate-pulse flex-col gap-4">
+					<div class="h-4 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+					{#each Array(100) as _}
+						<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700" />
+					{/each}
+				</div>
+			</div>
 		{/if}
-	{/each}
+	{:then groupedConversations}
+		<div transition:fade class="flex flex-col gap-1">
+			{#each Object.entries(groupedConversations) as [group, convs]}
+				{#if convs.length}
+					<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
+						{titles[group]}
+					</h4>
+					{#each convs as conv}
+						<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
+					{/each}
+				{/if}
+			{/each}
+		</div>
+	{/await}
 </div>
 <div
 	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
