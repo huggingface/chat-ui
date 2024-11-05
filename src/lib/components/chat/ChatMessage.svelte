@@ -38,7 +38,6 @@
 	import { enhance } from "$app/forms";
 	import { browser } from "$app/environment";
 	import type { WebSearchSource } from "$lib/types/WebSearch";
-	import { matchesGlob } from "node:path";
 
 	function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
 		const linkStyle =
