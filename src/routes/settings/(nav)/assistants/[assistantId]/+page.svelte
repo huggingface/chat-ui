@@ -121,9 +121,17 @@
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
 					</a>
 					<form method="POST" action="?/delete" use:enhance>
-						<button type="submit" class="flex items-center underline">
-							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+						<button
+							type="submit"
+							class="flex items-center underline"
+							on:click={(event) => {
+								if (!confirm("Are you sure you want to delete this assistant?")) {
+									event.preventDefault();
+								}
+							}}
 						>
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+						</button>
 					</form>
 				{:else}
 					<form method="POST" action="?/unsubscribe" use:enhance>
@@ -155,8 +163,23 @@
 				{#if data?.user?.isAdmin}
 					{#if !assistant?.createdByMe}
 						<form method="POST" action="?/delete" use:enhance>
-							<button type="submit" class="flex items-center text-red-600 underline">
-								<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+							<button
+								type="submit"
+								class="flex items-center text-red-600 underline"
+								on:click={(event) => {
+									if (!confirm("Are you sure you want to delete this assistant?")) {
+										event.preventDefault();
+									}
+								}}
+							>
+								<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+							</button>
+						</form>
+					{/if}
+					{#if assistant?.review === ReviewStatus.PRIVATE}
+						<form method="POST" action="?/approve" use:enhance>
+							<button type="submit" class="flex items-center text-green-600 underline">
+								<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 							>
 						</form>
 					{/if}
@@ -176,7 +199,7 @@
 					{#if assistant?.review === ReviewStatus.APPROVED || assistant?.review === ReviewStatus.DENIED}
 						<form method="POST" action="?/unrequest" use:enhance>
 							<button type="submit" class="flex items-center text-red-600 underline">
-								<CarbonLock class="mr-1.5 inline text-xs " />Make private</button
+								<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 							>
 						</form>
 					{/if}

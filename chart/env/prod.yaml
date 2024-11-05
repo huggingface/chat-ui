@@ -30,7 +30,10 @@ envVars:
   ADDRESS_HEADER: 'X-Forwarded-For'
   ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   APP_BASE: "/chat"
+  ALLOW_IFRAME: "false"
   COMMUNITY_TOOLS: "true"
+  COOKIE_SAMESITE: "lax"
+  COOKIE_SECURE: "true"
   ENABLE_ASSISTANTS: "true"
   ENABLE_ASSISTANTS_RAG: "true"
   EXPOSE_API: "true"
@@ -42,10 +45,7 @@ envVars:
       {
         "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "tokenizer": {
-          "tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json",
-          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"
-        },
+        "tokenizer": "nsarrazin/llama3.1-tokenizer",
         "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
         "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/",
@@ -75,10 +75,7 @@ envVars:
       },
       {
         "name": "CohereForAI/c4ai-command-r-plus-08-2024",
-        "tokenizer": {
-          "tokenizerUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/resolve/main/tokenizer.json",
-          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/c4ai-command-r-v01-tokenizer/raw/main/tokenizer_config.json"
-        },
+        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
         "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
@@ -135,6 +132,38 @@ envVars:
         ]
       },
       {
+        "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "websiteUrl": "https://www.nvidia.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
+        "description": "Nvidia's latest Llama fine-tune, topping alignment benchmarks and optimized for instruction following.",
+        "parameters": {
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.5,
+          "truncate": 28672,
+          "max_new_tokens": 2048
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [{
+          "type": "openai",
+          "baseURL": "https://api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+        }]
+      },
+      {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "description": "The latest multimodal model from Meta! Supports image inputs natively.",
@@ -146,7 +175,7 @@ envVars:
           "truncate": 14336,
           "max_new_tokens": 1536
         },
-        "endpoint": {
+        "endpoints": [{
           "type": "openai",
           "baseURL": "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
           "multimodal": {
@@ -158,7 +187,7 @@ envVars:
               "preferredMimeType": "image/webp"
             }
           }
-        }
+        }]
       },
       {
         "name": "NousResearch/Hermes-3-Llama-3.1-8B",

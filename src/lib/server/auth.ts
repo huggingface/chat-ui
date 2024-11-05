@@ -47,12 +47,22 @@ export const OIDConfig = z
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
+const sameSite = z
+	.enum(["lax", "none", "strict"])
+	.default(dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
+	.parse(env.COOKIE_SAMESITE === "" ? undefined : env.COOKIE_SAMESITE);
+
+const secure = z
+	.boolean()
+	.default(!(dev || env.ALLOW_INSECURE_COOKIES === "true"))
+	.parse(env.COOKIE_SECURE === "" ? undefined : env.COOKIE_SECURE === "true");
+
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(env.COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
-		secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
+		sameSite,
+		secure,
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
 	});

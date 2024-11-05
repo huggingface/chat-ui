@@ -136,9 +136,17 @@
 									};
 								}}
 							>
-								<button type="submit" class="flex items-center underline">
-									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+								<button
+									type="submit"
+									class="flex items-center underline"
+									on:click={(event) => {
+										if (!confirm("Are you sure you want to delete this tool?")) {
+											event.preventDefault();
+										}
+									}}
 								>
+									<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+								</button>
 							</form>
 						{:else if !!data.tool?.baseUrl}
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline">
@@ -168,8 +176,23 @@
 						{#if data?.user?.isAdmin}
 							{#if !data.tool?.createdByMe}
 								<form method="POST" action="?/delete" use:enhance>
-									<button type="submit" class="flex items-center text-red-600 underline">
-										<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+									<button
+										type="submit"
+										class="flex items-center text-red-600 underline"
+										on:click={(event) => {
+											if (!confirm("Are you sure you want to delete this tool?")) {
+												event.preventDefault();
+											}
+										}}
+									>
+										<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+									</button>
+								</form>
+							{/if}
+							{#if data.tool?.review === ReviewStatus.PRIVATE}
+								<form method="POST" action="?/approve" use:enhance>
+									<button type="submit" class="flex items-center text-green-600 underline">
+										<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 									>
 								</form>
 							{/if}
@@ -189,7 +212,7 @@
 							{#if data.tool?.review === ReviewStatus.APPROVED || data.tool?.review === ReviewStatus.DENIED}
 								<form method="POST" action="?/unrequest" use:enhance>
 									<button type="submit" class="flex items-center text-red-600 underline">
-										<CarbonLock class="mr-1.5 inline text-xs " />Make private</button
+										<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 									>
 								</form>
 							{/if}
