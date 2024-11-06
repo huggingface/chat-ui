@@ -17,7 +17,7 @@ export async function preprocessMessages(
 
 function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"]) {
 	const webSearchContext = webSearch?.contextSources
-		.map(({ context }) => context.trim())
+		.map(({ context }, idx) => `Source [${idx + 1}]\n${context.trim()}`)
 		.join("\n\n----------\n\n");
 
 	// No web search context available, skip
@@ -35,7 +35,8 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 	const finalMessage = {
 		...messages[messages.length - 1],
 		content: `I searched the web using the query: ${webSearch.searchQuery}.
-Today is ${currentDate} and here are the results:
+Today is ${currentDate} and here are the results.
+When answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3].
 =====================
 ${webSearchContext}
 =====================

@@ -25,12 +25,19 @@ const websearch: ConfigTool = {
 	showOutput: false,
 	async *call({ query }, { conv, assistant, messages }) {
 		const webSearchToolResults = yield* runWebSearch(conv, messages, assistant?.rag, String(query));
-		const chunks = webSearchToolResults?.contextSources
-			.map(({ context }) => context)
-			.join("\n------------\n");
+
+		const webSearchContext = webSearchToolResults?.contextSources
+			.map(({ context }, idx) => `Source [${idx + 1}]\n${context.trim()}`)
+			.join("\n\n----------\n\n");
 
 		return {
-			outputs: [{ websearch: chunks }],
+			outputs: [
+				{
+					websearch:
+						webSearchContext +
+						"\n\nWhen answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3].",
+				},
+			],
 			display: false,
 		};
 	},

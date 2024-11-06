@@ -103,7 +103,7 @@
 			>
 				<div class="w-full sm:w-auto">
 					<button
-						class="mx-auto my-2 flex w-full w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
+						class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
 						name="Activate model"
 						on:click|stopPropagation={() => {
 							settings.instantSet({

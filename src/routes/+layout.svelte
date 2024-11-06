@@ -20,7 +20,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -100,15 +99,17 @@
 	$: if ($error) onError();
 
 	$: if ($titleUpdate) {
-		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+		data.conversations.then((convs) => {
+			const convIdx = convs.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-		if (convIdx != -1) {
-			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
-		}
-		// update data.conversations
-		data.conversations = [...data.conversations];
+			if (convIdx != -1) {
+				convs[convIdx].title = $titleUpdate?.title ?? convs[convIdx].title;
+			}
+			// update data.conversations
+			data.conversations = Promise.resolve([...convs]);
 
-		$titleUpdate = null;
+			$titleUpdate = null;
+		});
 	}
 
 	const settings = createSettingsStore(data.settings);
@@ -147,7 +148,7 @@
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
-		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+		: data.conversations.then((convs) => convs.find((conv) => conv.id === $page.params.id)?.title);
 </script>
 
 <svelte:head>
@@ -205,8 +206,8 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
-	<DisclaimerModal />
+{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && envPublic.PUBLIC_APP_DISCLAIMER === "1"}
+	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
 <ExpandNavigation
