@@ -174,6 +174,10 @@
 							{/if}
 						{/if}
 						{#if data?.user?.isAdmin}
+							<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+								>{data.tool?.review?.toLocaleUpperCase()}</span
+							>
+
 							{#if !data.tool?.createdByMe}
 								<form method="POST" action="?/delete" use:enhance>
 									<button
