@@ -65,6 +65,7 @@
 				</div>
 				<a
 					href="{base}/settings/{currentModel.id}"
+					aria-label="Settings"
 					class="btn ml-auto flex h-7 w-7 self-start rounded-full bg-gray-100 p-1 text-xs hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-600"
 					><IconGear /></a
 				>
