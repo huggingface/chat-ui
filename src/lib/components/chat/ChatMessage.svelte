@@ -335,7 +335,8 @@
 						>
 							<img
 								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname}"
+								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname ||
+									'placeholder'}"
 								alt="{title} favicon"
 							/>
 							<div>{new URL(link).hostname.replace(/^www\./, "")}</div>
@@ -356,7 +357,8 @@
 						>
 							<img
 								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(uri).hostname}"
+								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(uri).hostname ||
+									'placeholder'}"
 								alt="{title} favicon"
 							/>
 							<div>{title}</div>
