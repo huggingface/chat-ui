@@ -19,7 +19,7 @@ export async function load({ params, locals }) {
 				authCondition(locals),
 				{
 					$set: {
-						activeModel: assistant.modelId,
+						activeModel: assistant._id.toString(),
 						updatedAt: new Date(),
 					},
 					$push: { assistants: assistant._id },
