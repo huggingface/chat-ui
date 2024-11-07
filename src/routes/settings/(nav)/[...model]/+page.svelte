@@ -130,6 +130,7 @@
 			{/if}
 		</div>
 		<textarea
+			aria-label="Custom system prompt"
 			rows="10"
 			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
 			bind:value={$settings.customPrompts[$page.params.model]}
