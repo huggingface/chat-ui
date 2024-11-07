@@ -4,7 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { goto, invalidateAll } from "$app/navigation";
+	import { goto, invalidate } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -24,6 +24,7 @@
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
+	import { UrlDependency } from "$lib/types/UrlDependency.js";
 
 	export let data;
 
@@ -247,7 +248,9 @@
 				) {
 					$error = update.message ?? "An error has occurred";
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+					const convInData = await data.conversations.then((convs) =>
+						convs.find(({ id }) => id === $page.params.id)
+					);
 					if (convInData) {
 						convInData.title = update.title;
 
@@ -280,7 +283,7 @@
 		} finally {
 			loading = false;
 			pending = false;
-			await invalidateAll();
+			await invalidate(UrlDependency.Conversation);
 		}
 	}
 
@@ -376,14 +379,18 @@
 	}
 
 	$: $page.params.id, (($isAborted = true), (loading = false), ($convTreeStore.editing = null));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+	$: title = data.conversations.then(
+		(convs) => convs.find((conv) => conv.id === $page.params.id)?.title ?? data.title
+	);
 
 	const convTreeStore = createConvTreeStore();
 	const settings = useSettingsStore();
 </script>
 
 <svelte:head>
-	<title>{title}</title>
+	{#await title then title}
+		<title>{title}</title>
+	{/await}
 	<link
 		rel="stylesheet"
 		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"

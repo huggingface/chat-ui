@@ -127,17 +127,19 @@
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/357"
 					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
 					target="_blank"
+					aria-label="Hub discussion about assistants"
 				>
 					<CarbonHelpFilled />
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular assistants made by the community</h3>
+		<h2 class="text-gray-500">Popular assistants made by the community</h2>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 				bind:value={data.selectedModel}
 				on:change={onModelChange}
+				aria-label="Filter assistants by model"
 			>
 				<option value="">All models</option>
 				{#each data.models.filter((model) => !model.unlisted) as model}
@@ -224,11 +226,13 @@
 					bind:this={filterInputEl}
 					maxlength="150"
 					type="search"
+					aria-label="Filter assistants by name"
 				/>
 			</div>
 			<select
 				bind:value={sortValue}
 				on:change={sortAssistants}
+				aria-label="Sort assistants"
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 			>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>

@@ -103,7 +103,7 @@
 			>
 				<div class="w-full sm:w-auto">
 					<button
-						class="mx-auto my-2 flex w-full w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
+						class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
 						name="Activate model"
 						on:click|stopPropagation={() => {
 							settings.instantSet({
@@ -161,6 +161,10 @@
 					{/if}
 				{/if}
 				{#if data?.user?.isAdmin}
+					<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+						>{assistant?.review?.toLocaleUpperCase()}</span
+					>
+
 					{#if !assistant?.createdByMe}
 						<form method="POST" action="?/delete" use:enhance>
 							<button

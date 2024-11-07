@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy, onMount } from "svelte";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
@@ -12,7 +12,6 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 
 	import { shareConversation } from "$lib/shareConversation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -20,7 +19,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -60,9 +58,12 @@
 				return;
 			}
 
-			if ($page.params.id !== id) {
-				await invalidate(UrlDependency.ConversationList);
-			} else {
+			data.conversations.then((convs) => {
+				const newConvs = convs.filter((conv) => conv.id !== id);
+				data.conversations = Promise.resolve(newConvs);
+			});
+
+			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
 			}
 		} catch (err) {
@@ -86,7 +87,10 @@
 				return;
 			}
 
-			await invalidate(UrlDependency.ConversationList);
+			data.conversations.then((convs) => {
+				const newConvs = convs.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+				data.conversations = Promise.resolve(newConvs);
+			});
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
@@ -100,15 +104,17 @@
 	$: if ($error) onError();
 
 	$: if ($titleUpdate) {
-		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+		data.conversations.then((convs) => {
+			const convIdx = convs.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-		if (convIdx != -1) {
-			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
-		}
-		// update data.conversations
-		data.conversations = [...data.conversations];
+			if (convIdx != -1) {
+				convs[convIdx].title = $titleUpdate?.title ?? convs[convIdx].title;
+			}
+			// update data.conversations
+			data.conversations = Promise.resolve([...convs]);
 
-		$titleUpdate = null;
+			$titleUpdate = null;
+		});
 	}
 
 	const settings = createSettingsStore(data.settings);
@@ -147,7 +153,7 @@
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
-		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+		: data.conversations.then((convs) => convs.find((conv) => conv.id === $page.params.id)?.title);
 </script>
 
 <svelte:head>
@@ -205,8 +211,8 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
-	<DisclaimerModal />
+{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && envPublic.PUBLIC_APP_DISCLAIMER === "1"}
+	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
 <ExpandNavigation

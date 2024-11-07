@@ -34,9 +34,9 @@
 		{#if confirmDelete}
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarHash}
+		{#if conv.avatarUrl}
 			<img
-				src="{base}/settings/assistants/{conv.assistantId}/avatar.jpg?hash={conv.avatarHash}"
+				src="{base}{conv.avatarUrl}"
 				alt="Assistant avatar"
 				class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
 			/>
