@@ -111,13 +111,14 @@
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/357"
 					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
 					target="_blank"
+					aria-label="Hub discussion about tools"
 				>
 					<CarbonHelpFilled />
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular tools made by the community</h3>
-		<h4 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
+		<h2 class="text-gray-500">Popular tools made by the community</h2>
+		<h3 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
 			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
 				>experimental</span
@@ -127,7 +128,7 @@
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
 				target="_blank">sharing your feedback with us!</a
 			>
-		</h4>
+		</h3>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
@@ -216,12 +217,14 @@
 					bind:this={filterInputEl}
 					maxlength="150"
 					type="search"
+					aria-label="Filter tools by name"
 				/>
 			</div>
 			<select
 				bind:value={sortValue}
 				on:change={sortTools}
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				aria-label="Sort tools"
 			>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
 				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
