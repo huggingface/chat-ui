@@ -5,12 +5,26 @@
 	const dispatch = createEventDispatcher();
 	let loader: HTMLDivElement;
 	let observer: IntersectionObserver;
+	let intervalId: ReturnType<typeof setInterval> | undefined;
 
 	onMount(() => {
 		observer = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
 				if (entry.isIntersecting) {
-					dispatch("visible");
+					// Clear any existing interval
+					if (intervalId) {
+						clearInterval(intervalId);
+					}
+					// Start new interval that dispatches every 250ms
+					intervalId = setInterval(() => {
+						dispatch("visible");
+					}, 250);
+				} else {
+					// Clear interval when not intersecting
+					if (intervalId) {
+						clearInterval(intervalId);
+						intervalId = undefined;
+					}
 				}
 			});
 		});
@@ -19,6 +33,9 @@
 
 		return () => {
 			observer.disconnect();
+			if (intervalId) {
+				clearInterval(intervalId);
+			}
 		};
 	});
 </script>

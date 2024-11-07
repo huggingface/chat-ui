@@ -12,13 +12,12 @@
 	import { page } from "$app/stores";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
 	import type { Conversation } from "$lib/types/Conversation";
-	import { tick } from "svelte";
 
 	export let conversations: Promise<ConvSidebar[]>;
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
 
-	$: p = 0;
+	export let p = 0;
 
 	let hasMore = true;
 
@@ -120,10 +119,10 @@
 				{/if}
 			{/each}
 		</div>
+		{#if hasMore}
+			<InfiniteScroll on:visible={handleVisible} />
+		{/if}
 	{/await}
-	{#if hasMore}
-		<InfiniteScroll on:visible={handleVisible} />
-	{/if}
 </div>
 <div
 	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"

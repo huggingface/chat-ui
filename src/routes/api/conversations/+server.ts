@@ -3,7 +3,7 @@ import { models } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 
-const NUM_PER_PAGE = 40;
+const NUM_PER_PAGE = 5;
 
 export async function GET({ locals, url }) {
 	const p = parseInt(url.searchParams.get("p") ?? "0");
