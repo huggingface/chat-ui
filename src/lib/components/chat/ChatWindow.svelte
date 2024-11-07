@@ -471,6 +471,8 @@
 								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
 								disabled={!message || isReadOnly}
 								type="submit"
+								aria-label="Send message"
+								name="submit"
 							>
 								<CarbonSendAltFilled />
 							</button>
