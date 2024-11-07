@@ -10,10 +10,19 @@
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/stores";
+	import InfiniteScroll from "./InfiniteScroll.svelte";
+	import type { Conversation } from "$lib/types/Conversation";
+	import { tick } from "svelte";
 
 	export let conversations: Promise<ConvSidebar[]>;
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
+
+	$: p = 0;
+
+	let hasMore = true;
+
+	let scrollContainer: HTMLDivElement;
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -44,6 +53,27 @@
 	} as const;
 
 	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
+
+	async function handleVisible() {
+		p++;
+		const newConvs = await fetch(`${base}/api/conversations?p=${p}`)
+			.then((res) => res.json())
+			.then((convs) =>
+				convs.map(
+					(conv: Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">) => ({
+						...conv,
+						updatedAt: new Date(conv.updatedAt),
+					})
+				)
+			)
+			.catch(() => []);
+
+		if (newConvs.length === 0) {
+			hasMore = false;
+		}
+
+		conversations = Promise.resolve([...(await conversations), ...newConvs]);
+	}
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-3 py-3.5 max-sm:pt-0">
@@ -63,6 +93,7 @@
 	</a>
 </div>
 <div
+	bind:this={scrollContainer}
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	{#await groupedConversations}
@@ -90,6 +121,9 @@
 			{/each}
 		</div>
 	{/await}
+	{#if hasMore}
+		<InfiniteScroll on:visible={handleVisible} />
+	{/if}
 </div>
 <div
 	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
