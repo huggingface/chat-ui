@@ -10,7 +10,10 @@
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonTools from "~icons/carbon/tools";
 	import CarbonImage from "~icons/carbon/image";
+	import { useSettingsStore } from "$lib/stores/settings";
 	export let data: PageData;
+
+	const settings = useSettingsStore();
 </script>
 
 <svelte:head>
@@ -45,6 +48,7 @@
 					aria-label="Model card"
 					role="region"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class:active-model={model.id === $settings.activeModel}
 				>
 					<a
 						href="{base}/models/{model.id}"
@@ -84,7 +88,13 @@
 								<CarbonImage class="text-xxs text-blue-700 dark:text-blue-500" />
 							</span>
 						{/if}
-						{#if index === 0}
+						{#if model.id === $settings.activeModel}
+							<span
+								class="rounded-full border border-blue-500 bg-blue-500/5 px-2 py-0.5 text-xs text-blue-500 dark:border-blue-500 dark:bg-blue-500/10"
+							>
+								Active
+							</span>
+						{:else if index === 0}
 							<span
 								class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
 							>
@@ -103,3 +113,9 @@
 		</div>
 	</div>
 </div>
+
+<style lang="postcss">
+	.active-model {
+		@apply border-blue-500 bg-blue-500/5 hover:bg-blue-500/10;
+	}
+</style>

@@ -60,6 +60,8 @@
 	onMount(async () => {
 		const query = $page.url.searchParams.get("q");
 		if (query) createConversation(query);
+
+		settings.instantSet({ activeModel: modelId });
 	});
 </script>
 
