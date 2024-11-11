@@ -167,7 +167,7 @@ envVars:
         "name": "Qwen/Qwen2.5-Coder-32B-Instruct",
         "description": "Qwen's latest coding model, in its biggest size yet. SOTA on many coding benchmarks.",
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
-        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-coder/",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-coder-family/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
         "parameters": {
           "stop": ["<|im_end|>", "<|endoftext|>"],
