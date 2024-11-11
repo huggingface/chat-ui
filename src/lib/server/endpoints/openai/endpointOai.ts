@@ -167,6 +167,7 @@ export async function endpointOai(
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
+				presence_penalty: parameters?.presence_penalty,
 			};
 
 			const openAICompletion = await openai.completions.create(body, {
@@ -245,6 +246,7 @@ export async function endpointOai(
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
+				presence_penalty: parameters?.presence_penalty,
 				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
 			};
 
