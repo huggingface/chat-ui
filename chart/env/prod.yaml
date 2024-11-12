@@ -169,6 +169,7 @@ envVars:
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
         "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-coder-family/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
         "parameters": {
           "stop": ["<|im_end|>", "<|endoftext|>"],
           "temperature": 0.6,
