@@ -2,7 +2,9 @@ import { vi } from "vitest";
 import dotenv from "dotenv";
 import { resolve } from "path";
 import fs from "fs";
+import { MongoMemoryServer } from "mongodb-memory-server";
 
+let mongoServer: MongoMemoryServer;
 // Load the .env file
 const envPath = resolve(__dirname, "../.env");
 dotenv.config({ path: envPath });
@@ -29,9 +31,13 @@ vi.mock("$env/dynamic/public", () => ({
 	env: publicEnv,
 }));
 
-vi.mock("$env/dynamic/private", () => ({
-	env: {
-		...privateEnv,
-		MONGODB_URL: "mongodb://127.0.0.1:27017/",
-	},
-}));
+vi.mock("$env/dynamic/private", async () => {
+	mongoServer = await MongoMemoryServer.create();
+
+	return {
+		env: {
+			...privateEnv,
+			MONGODB_URL: mongoServer.getUri(),
+		},
+	};
+});
