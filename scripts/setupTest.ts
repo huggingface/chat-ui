@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi, afterAll } from "vitest";
 import dotenv from "dotenv";
 import { resolve } from "path";
 import fs from "fs";
@@ -40,4 +40,10 @@ vi.mock("$env/dynamic/private", async () => {
 			MONGODB_URL: mongoServer.getUri(),
 		},
 	};
+});
+
+afterAll(async () => {
+	if (mongoServer) {
+		await mongoServer.stop();
+	}
 });
