@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy, onMount } from "svelte";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
@@ -12,7 +12,6 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 
 	import { shareConversation } from "$lib/shareConversation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -59,9 +58,12 @@
 				return;
 			}
 
-			if ($page.params.id !== id) {
-				await invalidate(UrlDependency.ConversationList);
-			} else {
+			data.conversations.then((convs) => {
+				const newConvs = convs.filter((conv) => conv.id !== id);
+				data.conversations = Promise.resolve(newConvs);
+			});
+
+			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
 			}
 		} catch (err) {
@@ -85,7 +87,10 @@
 				return;
 			}
 
-			await invalidate(UrlDependency.ConversationList);
+			data.conversations.then((convs) => {
+				const newConvs = convs.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+				data.conversations = Promise.resolve(newConvs);
+			});
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
