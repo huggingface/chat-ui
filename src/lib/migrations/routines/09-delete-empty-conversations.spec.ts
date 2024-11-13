@@ -61,7 +61,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 	test("a conversation with no messages should get deleted", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 		});
 
 		const result = await deleteConversations(collections);
@@ -71,7 +71,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 	test("a conversation with no messages that is less than 1 hour old should not get deleted", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 			createdAt: new Date(Date.now() - 30 * 60 * 1000),
 		});
 
@@ -82,7 +82,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 	test("a conversation with only system messages should get deleted", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 			messages: [systemMessage],
 		});
 
@@ -93,7 +93,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 	test("a conversation with a user message should not get deleted", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 			messages: [userMessage],
 		});
 
@@ -104,7 +104,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 	test("a conversation with an assistant message should not get deleted", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 			messages: [assistantMessage],
 		});
 
@@ -115,7 +115,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 	test("a conversation with a mix of messages should not get deleted", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 			messages: [systemMessage, userMessage, assistantMessage, userMessage, assistantMessage],
 		});
 
@@ -148,7 +148,7 @@ describe.sequential("Deleting discarded conversations", async () => {
 		await collections.conversations.insertOne({
 			...conversationBase,
 			messages: [userMessage, assistantMessage],
-			sessionId: sessionForUser._id.toString(),
+			sessionId: sessionForUser.sessionId,
 		});
 
 		const result = await deleteConversations(collections);
@@ -177,6 +177,18 @@ describe.sequential("Deleting discarded conversations", async () => {
 		const result = await deleteConversations(collections);
 
 		expect(result).toBe(1);
+	});
+	test("many conversations should get deleted", async () => {
+		const conversations = Array.from({ length: 10010 }, () => ({
+			...conversationBase,
+			_id: new ObjectId(),
+		}));
+
+		await collections.conversations.insertMany(conversations);
+
+		const result = await deleteConversations(collections);
+
+		expect(result).toBe(10010);
 	});
 });
 
