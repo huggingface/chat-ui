@@ -35,25 +35,27 @@ export async function deleteConversations(
 	for (const { filter } of deletionCriteria) {
 		const cursor = conversations.find(filter).batchSize(BATCH_SIZE);
 
+		let batch = [];
 		while (await cursor.hasNext()) {
-			const batch = [];
-			for (let i = 0; i < BATCH_SIZE; i++) {
-				if (await cursor.hasNext()) {
-					const doc = await cursor.next();
-					if (doc) {
-						batch.push(doc._id);
-					}
-				} else {
-					break;
-				}
+			const doc = await cursor.next();
+			if (doc) {
+				batch.push(doc._id);
 			}
 
-			if (batch.length > 0) {
+			if (batch.length >= BATCH_SIZE) {
 				const deleteResult = await conversations.deleteMany({
 					_id: { $in: batch },
 				});
 				deleteCount += deleteResult.deletedCount;
+				batch = [];
 			}
+		}
+
+		if (batch.length > 0) {
+			const deleteResult = await conversations.deleteMany({
+				_id: { $in: batch },
+			});
+			deleteCount += deleteResult.deletedCount;
 		}
 	}
 
