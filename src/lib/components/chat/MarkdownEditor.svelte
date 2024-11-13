@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "highlight.js/styles/atom-one-dark.css";
 	import { onDestroy, onMount } from "svelte";
 	import { Editor, Extension, type Editor as EditorType } from "@tiptap/core";
 	import { common, createLowlight } from "lowlight";
@@ -17,34 +18,37 @@
 
 	const lowlight = createLowlight(common);
 
+	const handleKeyboardShortcut = ({ editor }: { editor: EditorType }) => {
+		const { from } = editor.state.selection;
+		const textBefore = editor.state.doc.textBetween(Math.max(0, from - 3), from, "\n");
+
+		if (textBefore === "```") {
+			editor.commands.deleteRange({
+				from: from - 3,
+				to: from,
+			});
+
+			// Separate new code block from previous entered data in the editor
+			editor
+				.chain()
+				.insertContent({ type: "paragraph" })
+				.toggleNode("codeBlock", "paragraph", { language: null })
+				.focus()
+				.run();
+
+			return true;
+		}
+
+		return false;
+	};
+
 	// Allows creation of more than one code block in the editor
 	const CustomCodeBlockExtension = Extension.create({
 		name: "customCodeBlock",
 		addKeyboardShortcuts() {
 			return {
-				Space: ({ editor }) => {
-					const { from } = editor.state.selection;
-					const textBefore = editor.state.doc.textBetween(Math.max(0, from - 3), from, "\n");
-
-					if (textBefore === "```" || textBefore === "```\n") {
-						editor.commands.deleteRange({
-							from: from - 3,
-							to: from,
-						});
-
-						// Separate new code block from previous entered data in the editor
-						editor
-							.chain()
-							.insertContent({ type: "paragraph" })
-							.toggleNode("codeBlock", "paragraph", { language: null })
-							.focus()
-							.run();
-
-						return true;
-					}
-
-					return false;
-				},
+				Space: handleKeyboardShortcut,
+				"Shift-Enter": handleKeyboardShortcut,
 			};
 		},
 	});
