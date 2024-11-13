@@ -26,7 +26,7 @@
 					const { from } = editor.state.selection;
 					const textBefore = editor.state.doc.textBetween(Math.max(0, from - 3), from, "\n");
 
-					if (textBefore === "```") {
+					if (textBefore === "```" || textBefore === "```\n") {
 						editor.commands.deleteRange({
 							from: from - 3,
 							to: from,
