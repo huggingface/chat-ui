@@ -72,7 +72,6 @@
 					orderedList: false,
 					listItem: false,
 					horizontalRule: false,
-					code: false,
 					// We're using CodeBlockLowlight instead
 					codeBlock: false,
 				}),
@@ -133,6 +132,15 @@
 		min-height: inherit;
 		height: auto;
 		outline: none !important;
+	}
+
+	:global(.ProseMirror code) {
+		background-color: #000000;
+		color: #ffffff;
+		border-radius: 4px;
+		padding: 2px 4px;
+		font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+		font-size: 95%;
 	}
 
 	:global(.ProseMirror p.is-editor-empty:first-child::before) {
