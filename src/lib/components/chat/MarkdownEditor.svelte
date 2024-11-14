@@ -297,7 +297,7 @@
 		border-radius: 0;
 	}
 
-	/*additional customized editor code syntax highlighting*/
+	/*Optional: additional ways to further customize code highlights*/
 	/* :global(.hljs-comment),
 	:global(.hljs-quote) {
 		color: #5c6370 !important;

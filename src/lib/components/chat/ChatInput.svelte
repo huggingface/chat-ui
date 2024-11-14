@@ -9,7 +9,7 @@
 	export let placeholder = "";
 	export let disabled = false;
 
-	const dispatch = createEventDispatcher<{ submit: void }>(); // Add this
+	const dispatch = createEventDispatcher<{ submit: void }>();
 
 	function isVirtualKeyboard(): boolean {
 		if (!browser) return false;
