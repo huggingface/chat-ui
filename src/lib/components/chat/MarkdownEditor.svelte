@@ -94,7 +94,10 @@
 		return true;
 	};
 
-	const dispatch = createEventDispatcher<{ submit: void }>();
+	const dispatch = createEventDispatcher<{
+		enterKey: { text: string };
+		submit: void;
+	}>();
 
 	/**
 	 * Handles keyboard events in the editor, specifically focusing on Enter key behavior.
@@ -124,7 +127,7 @@
 			if (!event.shiftKey) {
 				const text = value.trim();
 				if (text) {
-					dispatch("submit");
+					dispatch("enterKey", { text });
 				}
 				event.preventDefault();
 				return true;
@@ -184,30 +187,33 @@
 		defaultLanguage: null,
 	});
 
+	const starterKitConfig = StarterKit.configure({
+		// Disable these editor markdown shortcuts completely
+		heading: false,
+		bulletList: false,
+		orderedList: false,
+		listItem: false,
+		horizontalRule: false,
+		// We're using CodeBlockLowlight instead
+		codeBlock: false,
+	});
+
+	const placeholderConfig = Placeholder.configure({
+		placeholder,
+		emptyEditorClass: "is-editor-empty",
+	});
+
 	onMount(() => {
 		if (!editorContainer) return;
 
 		editor = new Editor({
 			element: editorContainer,
 			extensions: [
-				StarterKit.configure({
-					// Disable these editor markdown shortcuts completely
-					heading: false,
-					bulletList: false,
-					orderedList: false,
-					listItem: false,
-					horizontalRule: false,
-					// We're using CodeBlockLowlight instead
-					codeBlock: false,
-				}),
+				starterKitConfig,
 				CustomCodeBlockLowlight,
 				CustomCodeBlockExtension,
-
 				// Displays placeholder text on the editor
-				Placeholder.configure({
-					placeholder,
-					emptyEditorClass: "is-editor-empty",
-				}),
+				placeholderConfig,
 			],
 			content: value,
 			editable: !disabled,

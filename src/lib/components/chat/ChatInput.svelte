@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
+	import { createEventDispatcher } from "svelte";
 	import MarkdownEditor from "./MarkdownEditor.svelte";
 
 	export let value = "";
@@ -7,6 +8,8 @@
 	export let maxRows: null | number = null;
 	export let placeholder = "";
 	export let disabled = false;
+
+	const dispatch = createEventDispatcher<{ submit: void }>(); // Add this
 
 	function isVirtualKeyboard(): boolean {
 		if (!browser) return false;
@@ -31,5 +34,8 @@
 		{minHeight}
 		{maxHeight}
 		autofocus={!isVirtualKeyboard()}
+		on:enterKey={() => {
+			dispatch("submit");
+		}}
 	/>
 </div>
