@@ -27,13 +27,13 @@ Current Question: What about Mexico?
 		{
 			from: "user",
 			content: `Previous questions: 
-- When is the next formula 1 grand prix?
+- ¿Cuándo es el próximo partido de la liga española?
 
-Current Question: Where is it being hosted?`,
+Current Question: ¿Dónde se jugará?`,
 		},
 		{
 			from: "assistant",
-			content: "location of next formula 1 grand prix",
+			content: "ubicación del próximo partido de la liga española",
 		},
 		{
 			from: "user",
@@ -42,6 +42,17 @@ Current Question: Where is it being hosted?`,
 		{
 			from: "assistant",
 			content: "Epson F2270 DTG printer printhead",
+		},
+		{
+			from: "user",
+			content: `Previous questions:
+- Quels sont les films sortis récemment?
+
+Current Question: Où puis-je les regarder?`,
+		},
+		{
+			from: "assistant",
+			content: "cinémas où les films récents sont projetés",
 		},
 		{ from: "user", content: "What were the news yesterday?" },
 		{
@@ -52,14 +63,23 @@ Current Question: Where is it being hosted?`,
 		{ from: "assistant", content: `weather in Paris ${currentDate}` },
 		{
 			from: "user",
-			content:
+			content: "Current Question: Quines són les notícies més recents d'avui?",
+		},
+		{
+			from: "assistant",
+			content: `Notícies d'avui, ${currentDate}`,
+		},
+		{
+			from: "user",
+			content: (
 				(previousUserMessages.length > 0
 					? `Previous questions: \n${previousUserMessages
 							.map(({ content }) => `- ${content}`)
 							.join("\n")}`
 					: "") +
 				"\n\nCurrent Question: " +
-				lastMessage.content,
+				lastMessage.content
+			).trim(),
 		},
 	];
 
