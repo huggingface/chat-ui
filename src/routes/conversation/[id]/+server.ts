@@ -13,6 +13,7 @@ import {
 	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
+	MessageToolUpdateType,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
@@ -25,6 +26,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
+import { ToolResultStatus } from "$lib/types/Tool";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -328,7 +330,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const stream = new ReadableStream({
 		async start(controller) {
 			messageToWriteTo.updates ??= [];
+			messageToWriteTo.tool_calls ??= [];
 			async function update(event: MessageUpdate) {
+				if (
+					event.type == MessageUpdateType.Tool &&
+					event.subtype == MessageToolUpdateType.Result &&
+					event.result.status === ToolResultStatus.Success
+				) {
+					messageToWriteTo?.tool_calls?.push(event.result);
+				}
+
 				if (!messageToWriteTo || !conv) {
 					throw Error("No message or conversation to write events to");
 				}

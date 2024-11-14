@@ -1,5 +1,6 @@
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
+import type { ToolResultSuccess } from "./Tool";
 import type { WebSearch } from "./WebSearch";
 import type { v4 } from "uuid";
 
@@ -28,6 +29,7 @@ export type Message = Partial<Timestamps> & {
 
 	// the index of the current child in the children array of the message if the message has more than one child
 	currentChildIndex?: number;
+	tool_calls?: ToolResultSuccess[];
 };
 
 export type MessageFile = {

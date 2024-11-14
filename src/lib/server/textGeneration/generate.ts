@@ -1,4 +1,4 @@
-import type { ToolResult } from "$lib/types/Tool";
+import type { Tool, ToolResult } from "$lib/types/Tool";
 import {
 	MessageReasoningUpdateType,
 	MessageUpdateType,
@@ -15,7 +15,8 @@ type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: End
 export async function* generate(
 	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
 	toolResults: ToolResult[],
-	preprompt?: string
+	preprompt?: string,
+	tools?: Tool[]
 ): AsyncIterable<MessageUpdate> {
 	// reasoning mode is false by default
 	let reasoning = false;
@@ -45,6 +46,13 @@ export async function* generate(
 		toolResults,
 		isMultimodal: model.multimodal,
 		conversationId: conv._id,
+		tools: tools?.map((tool) => ({
+			...tool,
+			inputs: tool.inputs.map((input) => ({
+				...input,
+				type: input.type === "file" ? "str" : input.type,
+			})),
+		})),
 	})) {
 		// text generation completed
 		if (output.generated_text) {

@@ -190,7 +190,12 @@ export async function endpointOai(
 			conversationId,
 		}) => {
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor, !model.tools && model.multimodal);
+				await prepareMessages(
+					messages,
+					imageProcessor,
+					!model.tools && model.multimodal,
+					model.tools_history && tools && tools.length > 0
+				);
 
 			if (messagesOpenAI?.[0]?.role !== "system") {
 				messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
@@ -269,25 +274,52 @@ export async function endpointOai(
 async function prepareMessages(
 	messages: EndpointMessage[],
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	isMultimodal: boolean
+	isMultimodal: boolean,
+	tools_history: boolean
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-	return Promise.all(
-		messages.map(async (message) => {
-			if (message.from === "user" && isMultimodal) {
-				return {
-					role: message.from,
-					content: [
-						...(await prepareFiles(imageProcessor, message.files ?? [])),
-						{ type: "text", text: message.content },
-					],
+	const results: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+	for (const message of messages) {
+		if (message.from === "assistant" && tools_history && message.tool_calls) {
+			for (const result of message.tool_calls) {
+				const id = uuidv4();
+				const toolCallRequests: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam = {
+					role: "assistant",
+					content: null,
+					tool_calls: [],
 				};
+				const toolCallResult: OpenAI.Chat.Completions.ChatCompletionMessageToolCall = {
+					type: "function",
+					function: {
+						name: result.call.name,
+						arguments: JSON.stringify(result.call.parameters),
+					},
+					id,
+				};
+
+				toolCallRequests.tool_calls?.push(toolCallResult);
+				const toolCallResponse: OpenAI.Chat.Completions.ChatCompletionToolMessageParam = {
+					role: "tool",
+					content: "",
+					tool_call_id: id,
+				};
+				if ("outputs" in result) toolCallResponse.content = ""; //JSON.stringify(result.outputs);
+
+				results.push(toolCallRequests);
+				results.push(toolCallResponse);
 			}
-			return {
+			results.push({ role: message.from, content: message.content });
+		} else if (message.from === "user" && isMultimodal) {
+			results.push({
 				role: message.from,
-				content: message.content,
-			};
-		})
-	);
+				content: [
+					...(await prepareFiles(imageProcessor, message.files ?? [])),
+					{ type: "text", text: message.content },
+				],
+			});
+		} else results.push({ role: message.from, content: message.content });
+	}
+
+	return results;
 }
 
 async function prepareFiles(
