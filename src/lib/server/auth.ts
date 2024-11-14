@@ -103,13 +103,31 @@ export async function generateCsrfToken(sessionId: string, redirectUrl: string):
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 	const issuer = await Issuer.discover(OIDConfig.PROVIDER_URL);
 
-	return new issuer.Client({
+	const client_config = {
 		client_id: OIDConfig.CLIENT_ID,
 		client_secret: OIDConfig.CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
 		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
-	});
+		id_token_signed_response_alg: undefined,
+	};
+
+	if (OIDConfig.ID_TOKEN_SIGNED_RESPONSE_ALG) {
+		client_config.id_token_signed_response_alg = OIDConfig.ID_TOKEN_SIGNED_RESPONSE_ALG;
+	} else {
+		const alg_supported = issuer.metadata["id_token_signing_alg_values_supported"];
+		if (alg_supported && alg_supported.length > 0) {
+			// RS256 is the default algorithm for OpenID Connect (and openid-client lib):
+			// https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
+			if (!alg_supported.includes("RS256")) {
+				// Validation will fail if a different algorithm isn't selected.
+				// Select the first supported alg.
+				client_config.id_token_signed_response_alg = alg_supported[0];
+			}
+		}
+	}
+
+	return new issuer.Client(client_config);
 }
 
 export async function getOIDCAuthorizationUrl(
