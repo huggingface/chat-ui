@@ -3,6 +3,7 @@
 	import { createEventDispatcher, onDestroy, onMount } from "svelte";
 	import { Editor, Extension, type Editor as EditorType } from "@tiptap/core";
 	import { common, createLowlight } from "lowlight";
+	import { Markdown } from "tiptap-markdown";
 	import StarterKit from "@tiptap/starter-kit";
 	import Placeholder from "@tiptap/extension-placeholder";
 	import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -95,7 +96,7 @@
 	};
 
 	const dispatch = createEventDispatcher<{
-		enterKey: { text: string };
+		enterKey: { value: string };
 		submit: void;
 	}>();
 
@@ -125,9 +126,12 @@
 			}
 
 			if (!event.shiftKey) {
-				const text = value.trim();
-				if (text) {
-					dispatch("enterKey", { text });
+				if (value.trim().length > 0) {
+					value = editor.storage.markdown.getMarkdown();
+					dispatch("enterKey", { value });
+
+					// make sure to clear the input field after sending a message
+					editor.commands.clearContent(true);
 				}
 				event.preventDefault();
 				return true;
@@ -214,6 +218,12 @@
 				CustomCodeBlockExtension,
 				// Displays placeholder text on the editor
 				placeholderConfig,
+				// Allows retrieving editor content as markdown syntax
+				Markdown.configure({
+					html: false,
+					transformPastedText: true,
+					transformCopiedText: true,
+				}),
 			],
 			content: value,
 			editable: !disabled,
