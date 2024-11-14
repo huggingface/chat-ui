@@ -1,6 +1,6 @@
 <script lang="ts">
 	import "highlight.js/styles/atom-one-dark.css";
-	import { onDestroy, onMount } from "svelte";
+	import { createEventDispatcher, onDestroy, onMount } from "svelte";
 	import { Editor, Extension, type Editor as EditorType } from "@tiptap/core";
 	import { common, createLowlight } from "lowlight";
 	import StarterKit from "@tiptap/starter-kit";
@@ -14,41 +14,133 @@
 	export let maxHeight = "auto";
 	export let autofocus = false;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	export let handleKeyDown: (view: any, event: KeyboardEvent) => boolean;
 
 	const lowlight = createLowlight(common);
 
-	const handleKeyboardShortcut = ({ editor }: { editor: EditorType }) => {
+	/**
+	 * Handles the creation of code blocks in the editor when a valid trigger sequence is detected.
+	 * A valid trigger sequence consists of exactly three backticks optionally followed by a supported language identifier.
+	 *
+	 * Valid examples:
+	 * - ```                (creates a code block with no language)
+	 * - ```python          (creates a Python code block)
+	 * - ```cpp             (creates a C++ code block)
+	 *
+	 * Invalid examples:
+	 * - ``                 (too few backticks)
+	 * - ````               (too many backticks)
+	 * - ```invalidlang     (unsupported language)
+	 *
+	 * The function handles various edge cases:
+	 * - Works after line breaks and formatting tags
+	 * - Prevents nested code blocks
+	 * - Validates language support via lowlight
+	 *
+	 * @param {EditorType} params.editor - The TipTap editor instance
+	 * @returns {boolean} returns true if a code block was created, false otherwise
+	 */
+	const handleCodeBlockShortcut = ({ editor }: { editor: EditorType }): boolean => {
 		const { from } = editor.state.selection;
-		const textBefore = editor.state.doc.textBetween(Math.max(0, from - 3), from, "\n");
+		const doc = editor.state.doc;
 
-		if (textBefore === "```") {
-			editor.commands.deleteRange({
-				from: from - 3,
-				to: from,
-			});
+		const resolvedPos = editor.state.doc.resolve(from);
+		const currentElement = resolvedPos.parent.type.name;
 
-			// Separate new code block from previous entered data in the editor
-			editor
-				.chain()
-				.insertContent({ type: "paragraph" })
-				.toggleNode("codeBlock", "paragraph", { language: null })
-				.focus()
-				.run();
-
-			return true;
+		// check if codeblock is being opened from another codeblock
+		if (currentElement === "codeBlock") {
+			return false;
 		}
 
-		return false;
+		// Get all text from the start of the document up to the cursor
+		const fullTextUpToCursor = doc.textBetween(0, from);
+
+		// Clean up the text: normalize line breaks and collapse multiple spaces
+		const cleanText = fullTextUpToCursor.replace(/\s+/g, " ").trim();
+
+		// Look for the last occurrence of text that might be backticks
+		const matches = cleanText.match(/`+/g);
+		if (!matches) return false;
+
+		// Get the last set of backticks
+		const lastBackticks = matches[matches.length - 1];
+
+		if (lastBackticks.length !== 3) return false;
+
+		const lastBackticksIndex = cleanText.lastIndexOf(lastBackticks);
+
+		// Get everything after the last three backticks
+		const textAfterBackticks = cleanText.slice(lastBackticksIndex + 3);
+
+		// Get the language part (if any)
+		const language = textAfterBackticks.trim() || null;
+
+		// don't create a codeblock if language is not supported
+		if (language && !lowlight.registered(language)) return false;
+
+		const startPos = from - (cleanText.length - lastBackticksIndex);
+
+		// consume the codeblock shortcut from the editor
+		editor.commands.deleteRange({
+			from: startPos,
+			to: from,
+		});
+
+		editor
+			.chain()
+			.insertContent({ type: "paragraph" })
+			.toggleNode("codeBlock", "paragraph", { language })
+			.focus()
+			.run();
+
+		return true;
 	};
+
+	const dispatch = createEventDispatcher<{ submit: void }>();
+
+	/**
+	 * Handles keyboard events in the editor, specifically focusing on Enter key behavior.
+	 *
+	 * Key behaviors:
+	 * - In code blocks: Allows default newline behavior
+	 * - Outside code blocks:
+	 *   - Enter: Dispatches 'submit' event if there's content
+	 *   - Shift+Enter: Creates a new line
+	 *
+	 * @param {any} view - The editor view instance from TipTap
+	 * @param {KeyboardEvent} event - The keyboard event
+	 * @returns {boolean}
+	 * - true if the event was handled and should be prevented
+	 * - false if the event should be handled by default editor behavior
+	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	function handleKeyDown(view: any, event: KeyboardEvent): boolean {
+		if (event.key === "Enter") {
+			const node = view.state.selection.$from.parent;
+
+			if (node.type.name === "codeBlock") {
+				// Let Tiptap handle the newline
+				return false;
+			}
+
+			if (!event.shiftKey) {
+				const text = value.trim();
+				if (text) {
+					dispatch("submit");
+				}
+				event.preventDefault();
+				return true;
+			}
+		}
+		return false;
+	}
 
 	// Allows creation of more than one code block in the editor
 	const CustomCodeBlockExtension = Extension.create({
 		name: "customCodeBlock",
 		addKeyboardShortcuts() {
 			return {
-				Space: handleKeyboardShortcut,
-				"Shift-Enter": handleKeyboardShortcut,
+				Space: handleCodeBlockShortcut,
+				"Shift-Enter": handleCodeBlockShortcut,
 			};
 		},
 	});
@@ -62,6 +154,36 @@
 			editor.commands.setContent(value);
 		}
 	}
+
+	const CustomCodeBlockLowlight = CodeBlockLowlight.extend({
+		addKeyboardShortcuts() {
+			// disable all shortcuts except arrow down
+			return {
+				ArrowDown: ({ editor }) => {
+					const { state } = editor;
+					const { selection } = state;
+					const { $head } = selection;
+
+					const currentNode = $head.node();
+					if (currentNode.type.name === "codeBlock" && $head.pos === $head.end()) {
+						return editor.commands.exitCode();
+					}
+					return false;
+				},
+			};
+		},
+		addInputRules() {
+			// Disable default input rules
+			return [];
+		},
+	}).configure({
+		lowlight,
+		HTMLAttributes: {
+			class: "code-block",
+		},
+		languageClassPrefix: "language-",
+		defaultLanguage: null,
+	});
 
 	onMount(() => {
 		if (!editorContainer) return;
@@ -79,17 +201,7 @@
 					// We're using CodeBlockLowlight instead
 					codeBlock: false,
 				}),
-				CodeBlockLowlight.configure({
-					lowlight,
-					HTMLAttributes: {
-						class: "code-block",
-					},
-					// Exit conditions for code block
-					exitOnArrowDown: true,
-					exitOnTripleEnter: false,
-					languageClassPrefix: "language-",
-					defaultLanguage: null,
-				}),
+				CustomCodeBlockLowlight,
 				CustomCodeBlockExtension,
 
 				// Displays placeholder text on the editor
@@ -139,8 +251,8 @@
 	}
 
 	:global(.ProseMirror code) {
-		background-color: #000000;
-		color: #ffffff;
+		background-color: #282c34;
+		color: #abb2bf;
 		border-radius: 4px;
 		padding: 2px 4px;
 		font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
@@ -157,15 +269,15 @@
 
 	:global(.ProseMirror pre) {
 		margin: 0;
-		background: #f6f8fa;
+		background: #282c34;
 		border-radius: 6px;
 		border: 1px solid #d0d7de;
 		padding: 16px;
 	}
 
 	:global(.ProseMirror .code-block) {
-		background-color: #000000;
-		color: #ffffff;
+		background-color: #282c34;
+		color: #abb2bf;
 		font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
 		font-size: 95%;
 		line-height: 1.45;
@@ -174,38 +286,80 @@
 		word-break: break-word;
 	}
 
-	/*additional customized editor code syntax highlighting*/
-	:global(.hljs-comment),
-	:global(.hljs-quote) {
-		color: #1c871e;
+	:global(.ProseMirror .code-block code) {
+		padding: 0;
+		background-color: transparent;
+		border-radius: 0;
 	}
 
-	/* :global(.hljs-keyword),
-	:global(.hljs-selector-tag) {
-		color: #b927c7;
+	/*additional customized editor code syntax highlighting*/
+	/* :global(.hljs-comment),
+	:global(.hljs-quote) {
+		color: #5c6370 !important;
+		font-style: italic !important;
 	} */
 
-	/* :global(.hljs-string),
+	/* :global(.hljs-doctag),
+	:global(.hljs-keyword),
+	:global(.hljs-formula) {
+		color: #c678dd !important;
+	}
+
+	:global(.hljs-section),
+	:global(.hljs-name),
+	:global(.hljs-selector-tag),
+	:global(.hljs-deletion),
+	:global(.hljs-subst) {
+		color: #e06c75 !important;
+	}
+
 	:global(.hljs-literal) {
-		color: #de910b;
-	} */
+		color: #56b6c2 !important;
+	}
 
-	/* :global(.hljs-title),
-	:global(.hljs-function) {
-		color: #c3bd16;
-	} */
-	/* 
+	:global(.hljs-string),
+	:global(.hljs-regexp),
+	:global(.hljs-addition),
+	:global(.hljs-attribute),
+	:global(.hljs-meta .hljs-string) {
+		color: #98c379 !important;
+	}
+
+	:global(.hljs-attr),
+	:global(.hljs-variable),
+	:global(.hljs-template-variable),
+	:global(.hljs-type),
+	:global(.hljs-selector-class),
+	:global(.hljs-selector-attr),
+	:global(.hljs-selector-pseudo),
+	:global(.hljs-number) {
+		color: #d19a66 !important;
+	}
+
+	:global(.hljs-symbol),
+	:global(.hljs-bullet),
+	:global(.hljs-link),
+	:global(.hljs-meta),
+	:global(.hljs-selector-id),
+	:global(.hljs-title) {
+		color: #61aeee !important;
+	}
+
 	:global(.hljs-built_in),
-	:global(.hljs-type) {
-		color: #0880e2;
-	} */
+	:global(.hljs-title.class_),
+	:global(.hljs-class .hljs-title) {
+		color: #e6c07b !important;
+	}
 
-	/* :global(.hljs-tag),
-	:global(.hljs-name) {
-		color: #22863a;
-	} */
+	:global(.hljs-emphasis) {
+		font-style: italic !important;
+	}
 
-	/* :global(.hljs-attr) {
-		color: #c1c142;
+	:global(.hljs-strong) {
+		font-weight: bold !important;
+	}
+
+	:global(.hljs-link) {
+		text-decoration: underline !important;
 	} */
 </style>
