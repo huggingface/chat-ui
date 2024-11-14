@@ -13,7 +13,6 @@
 	export let minHeight = "1.5em";
 	export let maxHeight = "auto";
 	export let autofocus = false;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 	const lowlight = createLowlight(common);
 
@@ -51,27 +50,27 @@
 			return false;
 		}
 
-		// Get all text from the start of the document up to the cursor
+		// get all text from the start of the editor's input up to the cursor
 		const fullTextUpToCursor = doc.textBetween(0, from);
 
-		// Clean up the text: normalize line breaks and collapse multiple spaces
+		// clean up the text: normalize line breaks and collapse multiple spaces
 		const cleanText = fullTextUpToCursor.replace(/\s+/g, " ").trim();
 
-		// Look for the last occurrence of text that might be backticks
+		// look for the last occurrence of text that might be backticks
 		const matches = cleanText.match(/`+/g);
 		if (!matches) return false;
 
-		// Get the last set of backticks
+		// get the last set of backticks
 		const lastBackticks = matches[matches.length - 1];
 
 		if (lastBackticks.length !== 3) return false;
 
 		const lastBackticksIndex = cleanText.lastIndexOf(lastBackticks);
 
-		// Get everything after the last three backticks
+		// get everything after the last three backticks
 		const textAfterBackticks = cleanText.slice(lastBackticksIndex + 3);
 
-		// Get the language part (if any)
+		// get the language part if it exists
 		const language = textAfterBackticks.trim() || null;
 
 		// don't create a codeblock if language is not supported
