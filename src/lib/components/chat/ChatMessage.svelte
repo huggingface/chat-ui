@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { marked, type MarkedOptions } from "marked";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -157,6 +157,16 @@
 				}
 			}, 600);
 		}
+
+		if (contentEl) {
+			renderMathInElement(contentEl, {
+				delimiters: [
+					{ left: "$$", right: "$$", display: true },
+					{ left: "$", right: "$", display: false },
+					...(model.extraLatexDelimiters ?? []),
+				],
+			});
+		}
 	});
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -248,18 +258,6 @@
 		}
 	}
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
-
-	onMount(() => {
-		if (contentEl) {
-			renderMathInElement(contentEl, {
-				delimiters: [
-					{ left: "$$", right: "$$", display: true },
-					{ left: "$", right: "$", display: false },
-					...(model.extraLatexDelimiters ?? []),
-				],
-			});
-		}
-	});
 </script>
 
 {#if message.from === "assistant"}
