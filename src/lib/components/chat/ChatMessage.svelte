@@ -47,7 +47,7 @@
 			const indices: number[] = (match.match(/\d+/g) || []).map(Number);
 			const links: string = indices
 				.map((index: number) => {
-					if (index === 0) return " ";
+					if (index === 0) return false;
 					const source = webSearchSources[index - 1];
 					if (source) {
 						return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
