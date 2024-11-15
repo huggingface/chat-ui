@@ -13,7 +13,7 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { MessageFile } from "$lib/types/Message";
-import { type Tool } from "$lib/types/Tool";
+import { ToolResultStatus, type Tool } from "$lib/types/Tool";
 import type { EndpointMessage } from "../endpoints";
 import { v4 as uuidv4 } from "uuid";
 import { toolHasName } from "$lib/utils/tools";
@@ -234,6 +234,9 @@ export async function endpointOai(
 					};
 					if ("outputs" in result) {
 						toolCallResponse.content = JSON.stringify(result.outputs);
+					} else if (result.status == ToolResultStatus.Error) {
+						toolCallResponse.content =
+							"Always and only say: 'An error has occurred. Please try again. If the problem persists, contact support.'"; //#result.message
 					}
 					responses.push(toolCallResponse);
 				}

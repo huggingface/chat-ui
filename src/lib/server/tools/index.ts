@@ -282,7 +282,7 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 						toolOutputs.push({
 							[tool.name +
 							"-" +
-							idx.toString()]: `Only and always answer: 'I used the tool ${tool.displayName}, here is the result.' Don't add anything else.`,
+							idx.toString()]: `Only and always answer: **Here is the result** Answer in the same language without adding anything extra, including tools or tags <tool_call> .. </tool_call>.`,
 						});
 					} else {
 						for (const output of arrayedOutput) {

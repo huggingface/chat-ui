@@ -148,7 +148,7 @@ export async function* runTools(
 		return acc;
 	}, [] as string[]);
 
-	let formattedMessages = messages.map((message, msgIdx) => {
+	const formattedMessages = messages.map((message, msgIdx) => {
 		let content = message.content;
 
 		if (message.files && message.files.length > 0) {
@@ -180,9 +180,10 @@ export async function* runTools(
 	} satisfies Message;
 
 	// put fileMsg before last if files.length > 0
-	formattedMessages = files.length
-		? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
-		: messages;
+	formattedMessages[0].content += "\n" + fileMsg.content;
+	// formattedMessages = files.length
+	// 	? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
+	// 	: messages;
 
 	// do the function calling bits here
 	for await (const output of await endpoint({

@@ -119,11 +119,14 @@ export async function getOIDCAuthorizationUrl(
 	const client = await getOIDCClient(settings);
 	const csrfToken = await generateCsrfToken(params.sessionId, settings.redirectURI);
 
-	return client.authorizationUrl({
-		scope: OIDConfig.SCOPES,
-		state: csrfToken,
-		resource: OIDConfig.RESOURCE || undefined,
-	});
+	return decodeURIComponent(
+		client.authorizationUrl({
+			scope: OIDConfig.SCOPES,
+			state: csrfToken,
+			resource: OIDConfig.RESOURCE || undefined,
+			redirect_uri: settings.redirectURI,
+		})
+	);
 }
 
 export async function getOIDCUserData(
