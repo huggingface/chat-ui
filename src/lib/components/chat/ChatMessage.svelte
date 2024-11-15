@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { marked, type MarkedOptions } from "marked";
-	import markedKatex from "marked-katex-extension";
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, tick } from "svelte";
+	import { afterUpdate, createEventDispatcher, onMount, tick } from "svelte";
 	import { deepestChild } from "$lib/utils/deepestChild";
 	import { page } from "$app/stores";
 
@@ -38,6 +37,7 @@
 	import { enhance } from "$app/forms";
 	import { browser } from "$app/environment";
 	import type { WebSearchSource } from "$lib/types/WebSearch";
+	import renderMathInElement from "katex/contrib/auto-render";
 
 	function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
 		const linkStyle =
@@ -130,12 +130,6 @@
 		breaks: true,
 		renderer,
 	};
-
-	marked.use(
-		markedKatex({
-			throwOnError: false,
-		})
-	);
 
 	$: tokens = marked.lexer(addInlineCitations(sanitizeMd(message.content), webSearchSources));
 
@@ -254,11 +248,23 @@
 		}
 	}
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
+
+	onMount(() => {
+		if (contentEl) {
+			renderMathInElement(contentEl, {
+				delimiters: [
+					{ left: "$$", right: "$$", display: true },
+					{ left: "$", right: "$", display: false },
+					...(model.extraLatexDelimiters ?? []),
+				],
+			});
+		}
+	});
 </script>
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="message-assistant group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
 		id="message-assistant-{message.id}"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
@@ -425,7 +431,7 @@
 {/if}
 {#if message.from === "user"}
 	<div
-		class="group relative w-full items-start justify-start gap-4 max-sm:text-sm"
+		class="message-user group relative w-full items-start justify-start gap-4 max-sm:text-sm"
 		id="message-user-{message.id}"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}

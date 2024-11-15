@@ -70,6 +70,9 @@ const modelConfig = z.object({
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
+	extraLatexDelimiters: z
+		.array(z.object({ left: z.string(), right: z.string(), display: z.boolean() }))
+		.optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -400,5 +403,11 @@ export const smallModel = env.TASK_MODEL
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools" | "hasInferenceAPI"
+	| "preprompt"
+	| "parameters"
+	| "multimodal"
+	| "unlisted"
+	| "tools"
+	| "hasInferenceAPI"
+	| "extraLatexDelimiters"
 >;

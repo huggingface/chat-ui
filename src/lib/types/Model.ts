@@ -20,4 +20,5 @@ export type Model = Pick<
 	| "unlisted"
 	| "tools"
 	| "hasInferenceAPI"
+	| "extraLatexDelimiters"
 >;

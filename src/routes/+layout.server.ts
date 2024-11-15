@@ -228,6 +228,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			tools: model.tools,
 			unlisted: model.unlisted,
 			hasInferenceAPI: model.hasInferenceAPI,
+			extraLatexDelimiters: model.extraLatexDelimiters,
 		})),
 		oldModels,
 		tools: [...toolFromConfigs, ...communityTools]
