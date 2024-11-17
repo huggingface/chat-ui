@@ -85,6 +85,13 @@
 		}
 		return parsed;
 	}
+
+	DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+		if (node.tagName === "A") {
+			node.setAttribute("rel", "noreferrer");
+			node.setAttribute("target", "_blank");
+		}
+	});
 </script>
 
 <div
