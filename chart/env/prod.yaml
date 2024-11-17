@@ -130,7 +130,6 @@ envVars:
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
-
       },
       {
         "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
