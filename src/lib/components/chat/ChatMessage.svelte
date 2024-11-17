@@ -227,7 +227,7 @@
 				{#if isLast && loading && $settings.disableStream}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				<MarkdownRenderer {model} content={message.content} sources={webSearchSources} />
+				<MarkdownRenderer content={message.content} sources={webSearchSources} />
 			</div>
 
 			<!-- Web Search sources -->

@@ -2,11 +2,9 @@
 	import type { WebSearchSource } from "$lib/types/WebSearch";
 	import katex from "katex";
 	import DOMPurify from "isomorphic-dompurify";
-	import type { Model } from "$lib/types/Model";
 	import { marked, type MarkedOptions } from "marked";
 	import CodeBlock from "../CodeBlock.svelte";
 
-	export let model: Model;
 	export let content: string;
 	export let sources: WebSearchSource[] = [];
 
@@ -58,7 +56,6 @@
 			{ left: "$", right: "$", display: false },
 			{ left: "\\(", right: "\\)", display: false },
 			{ left: "\\[", right: "\\]", display: true },
-			...(model.extraLatexDelimiters || []),
 		];
 
 		for (const { left, right, display } of delimiters) {
