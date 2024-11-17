@@ -72,7 +72,7 @@
 			.replaceAll("<", "&lt;")
 			.trim();
 
-		for (const stop of [...(model.parameters?.stop ?? []), "<|endoftext|>"]) {
+		for (const stop of [...(model.parameters?.stop ?? [])]) {
 			if (ret.endsWith(stop)) {
 				ret = ret.slice(0, -stop.length).trim();
 			}
