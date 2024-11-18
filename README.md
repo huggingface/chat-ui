@@ -19,6 +19,18 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 
 ## Quickstart
 
+### Docker image
+
+You can deploy a chat-ui instance in a single command using the docker image. Get your huggingface token from [here](https://huggingface.co/settings/tokens).
+
+```bash
+docker run -p 3000 -e HF_TOKEN=hf_*** -v db:/data ghcr.io/huggingface/chat-ui-db:latest
+```
+
+Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) and the readme to see all the environment variables that you can set. We have endpoint support for all OpenAI API compatible local services as well as many other providers like Anthropic, Cloudflare, Google Vertex AI, etc.
+
+### Local setup
+
 You can quickly start a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 1 (Start llama.cpp server):**
