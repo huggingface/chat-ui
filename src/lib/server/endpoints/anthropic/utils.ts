@@ -2,7 +2,11 @@ import { makeImageProcessor, type ImageProcessorOptions } from "../images";
 import { makeDocumentProcessor, type FileProcessorOptions } from "../document";
 import type { EndpointMessage } from "../endpoints";
 import type { MessageFile } from "$lib/types/Message";
-import type { ImageBlockParam, MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
+import type {
+	ImageBlockParam,
+	MessageParam,
+	TextBlockParam,
+} from "@anthropic-ai/sdk/resources/messages.mjs";
 
 export interface DocumentBlockParam {
 	type: "document";
@@ -11,6 +15,12 @@ export interface DocumentBlockParam {
 		media_type: "application/pdf";
 		type: "base64";
 	};
+}
+
+export type ExtendedContentBlock = ImageBlockParam | TextBlockParam | DocumentBlockParam;
+
+export interface ExtendedMessageParam extends Omit<MessageParam, "content"> {
+	content: ExtendedContentBlock[];
 }
 
 export async function fileToImageBlock(
@@ -52,13 +62,13 @@ export async function endpointMessagesToAnthropicMessages(
 	messages: EndpointMessage[],
 	multimodal: {
 		image: ImageProcessorOptions<"image/png" | "image/jpeg" | "image/webp">;
-		document: ImageProcessorOptions<"application/pdf">;
+		document?: FileProcessorOptions<"application/pdf">; // Make optional
 	}
-): Promise<MessageParam[]> {
+): Promise<ExtendedMessageParam[]> {
 	return await Promise.all(
 		messages
 			.filter((message): message is NonSystemMessage => message.from !== "system")
-			.map<Promise<MessageParam>>(async (message) => {
+			.map<Promise<ExtendedMessageParam>>(async (message) => {
 				return {
 					role: message.from,
 					content: [
@@ -66,10 +76,10 @@ export async function endpointMessagesToAnthropicMessages(
 							(message.files ?? []).map(async (file) => {
 								if (file.mime.startsWith("image/")) {
 									return fileToImageBlock(file, multimodal.image);
-								} else if (file.mime === "application/pdf") {
+								} else if (file.mime === "application/pdf" && multimodal.document) {
 									return fileToDocumentBlock(file, multimodal.document);
 								} else {
-									throw new Error("Unsupported file type");
+									throw new Error(`Unsupported file type: ${file.mime}`);
 								}
 							})
 						)),
