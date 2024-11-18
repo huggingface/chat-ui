@@ -57,7 +57,22 @@ llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-min
 
 A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`. Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
-**Step 2 (tell chat-ui to use local llama.cpp server):**
+**Step 3 (make sure you have MongoDb running locally):**
+
+```bash
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+```
+
+Read more [here](#database).
+
+**Step 4 (clone chat-ui):**
+
+```bash
+git clone https://github.com/huggingface/chat-ui
+cd chat-ui
+```
+
+**Step 5 (tell chat-ui to use local llama.cpp server):**
 
 Add the following to your `.env.local`:
 
@@ -65,7 +80,7 @@ Add the following to your `.env.local`:
 MODELS=`[
   {
     "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
-    "tokenizer": "microsoft/Phi-3-mini-4k-instruct-gguf",
+    "tokenizer": "microsoft/Phi-3-mini-4k-instruct",
     "preprompt": "",
     "parameters": {
       "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
@@ -85,19 +100,9 @@ The `tokenizer` field will be used to find the appropriate chat template for the
 
 Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
-**Step 3 (make sure you have MongoDb running locally):**
+**Step 6 (start chat-ui):**
 
 ```bash
-docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
-```
-
-Read more [here](#database).
-
-**Step 4 (start chat-ui):**
-
-```bash
-git clone https://github.com/huggingface/chat-ui
-cd chat-ui
 npm install
 npm run dev -- --open
 ```
