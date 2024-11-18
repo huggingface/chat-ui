@@ -79,15 +79,7 @@ Add the following to your `.env.local`:
 ```ini
 MODELS=`[
   {
-    "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
-    "tokenizer": "microsoft/Phi-3-mini-4k-instruct",
-    "preprompt": "",
-    "parameters": {
-      "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
-      "temperature": 0.7,
-      "max_new_tokens": 1024,
-      "truncate": 3071
-    },
+    "name": "microsoft/Phi-3-mini-4k-instruct",
     "endpoints": [{
       "type" : "llamacpp",
       "baseURL": "http://localhost:8080"
