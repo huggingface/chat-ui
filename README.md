@@ -90,8 +90,7 @@ MODELS=`[
     },
     "endpoints": [{
       "type" : "llamacpp",
-      "baseURL": "http://localhost:8080",
-      "accessToken": " ",
+      "baseURL": "http://localhost:8080"
     }],
   },
 ]`
