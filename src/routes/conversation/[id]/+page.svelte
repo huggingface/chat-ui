@@ -4,7 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -24,7 +24,6 @@
 	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
-	import { UrlDependency } from "$lib/types/UrlDependency.js";
 
 	export let data;
 
@@ -283,7 +282,7 @@
 		} finally {
 			loading = false;
 			pending = false;
-			await invalidate(UrlDependency.Conversation);
+			await invalidateAll();
 		}
 	}
 
@@ -361,7 +360,7 @@
 
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
-			writeMessage({ messageId: event.detail.id, isContinue: true });
+			await writeMessage({ messageId: event.detail.id, isContinue: true });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
