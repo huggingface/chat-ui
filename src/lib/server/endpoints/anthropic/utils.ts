@@ -45,7 +45,7 @@ export async function fileToDocumentBlock(
 	opts: FileProcessorOptions<"application/pdf">
 ): Promise<DocumentBlockParam> {
 	const processor = makeDocumentProcessor(opts);
-	const { file: document, mime } = processor(file);
+	const { file: document, mime } = await processor(file);
 
 	return {
 		type: "document",

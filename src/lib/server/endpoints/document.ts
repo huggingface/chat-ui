@@ -34,15 +34,21 @@ export type DocumentProcessor<TMimeType extends string = string> = (file: Messag
 	mime: TMimeType;
 };
 
+export type AsyncDocumentProcessor<TMimeType extends string = string> = (
+	file: MessageFile
+) => Promise<{
+	file: Buffer;
+	mime: TMimeType;
+}>;
+
 export function makeDocumentProcessor<TMimeType extends string = string>(
 	options: FileProcessorOptions<TMimeType>
-): DocumentProcessor<TMimeType> {
-	return (file) => {
+): AsyncDocumentProcessor<TMimeType> {
+	return async (file) => {
 		const { supportedMimeTypes, maxSizeInMB } = options;
 		const { mime, value } = file;
 
 		const buffer = Buffer.from(value, "base64");
-
 		const tooLargeInBytes = buffer.byteLength > maxSizeInMB * 1000 * 1000;
 
 		if (tooLargeInBytes) {
@@ -50,7 +56,6 @@ export function makeDocumentProcessor<TMimeType extends string = string>(
 		}
 
 		const outputMime = validateMimeType(supportedMimeTypes, mime);
-
 		return { file: buffer, mime: outputMime };
 	};
 }
