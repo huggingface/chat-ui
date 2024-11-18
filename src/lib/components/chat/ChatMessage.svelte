@@ -177,8 +177,9 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="message-assistant group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
-		id="message-assistant-{message.id}"
+		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
+		data-message-id={message.id}
+		data-message-role="assistant"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
@@ -332,8 +333,9 @@
 {/if}
 {#if message.from === "user"}
 	<div
-		class="message-user group relative w-full items-start justify-start gap-4 max-sm:text-sm"
-		id="message-user-{message.id}"
+		class="group relative w-full items-start justify-start gap-4 max-sm:text-sm"
+		data-message-id={message.id}
+		data-message-type="user"
 		role="presentation"
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
