@@ -920,7 +920,7 @@ MODELS=`[
 
 ### 403：You don't have access to this conversation
 
-Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `ALLOW_INSECURE_COOKIES=true` to your `.env.local`.
+Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `COOKIE_SECURE=false` and `COOKIE_SAMESITE=lax` to your `.env.local`.
 
 Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
 
@@ -1005,3 +1005,13 @@ npm run populate users settings assistants conversations
 ```
 
 to populate the database with fake data, including fake conversations and assistants for your user.
+
+### Building the docker images locally
+
+You can build the docker images locally using the following commands:
+
+```bash
+docker build -t chat-ui-db:latest --build-arg INCLUDE_DB=true .
+docker build -t chat-ui:latest --build-arg INCLUDE_DB=false .
+docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_BASE=/chat --build-arg PUBLIC_APP_COLOR=yellow .
+```
