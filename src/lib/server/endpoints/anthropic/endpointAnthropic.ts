@@ -4,6 +4,7 @@ import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator } from "../images";
 import { endpointMessagesToAnthropicMessages } from "./utils";
+import { createDocumentProcessorOptionsValidator } from "../document";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -23,6 +24,10 @@ export const endpointAnthropicParametersSchema = z.object({
 				maxWidth: 4096,
 				maxHeight: 4096,
 			}),
+			document: createDocumentProcessorOptionsValidator({
+				supportedMimeTypes: ["application/pdf"],
+				maxSizeInMB: 32,
+			}),
 		})
 		.default({}),
 });
@@ -39,6 +44,7 @@ export async function endpointAnthropic(
 		throw new Error("Failed to import @anthropic-ai/sdk", { cause: e });
 	}
 
+	//	console.log("---->" + JSON.stringify(mime));
 	const anthropic = new Anthropic({
 		apiKey,
 		baseURL,
