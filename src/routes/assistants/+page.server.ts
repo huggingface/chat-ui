@@ -20,6 +20,7 @@ export const load = async ({ url, locals }) => {
 	const query = url.searchParams.get("q")?.trim() ?? null;
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const showUnfeatured = url.searchParams.get("showUnfeatured") === "true";
+	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
@@ -39,7 +40,7 @@ export const load = async ({ url, locals }) => {
 		if (!user) {
 			// only show featured assistants on the community page
 			shouldBeFeatured = { review: ReviewStatus.APPROVED };
-		} else {
+		} else if (!createdByCurrentUser) {
 			// on a user page show assistants that have been approved or are pending
 			shouldBeFeatured = { review: { $in: [ReviewStatus.APPROVED, ReviewStatus.PENDING] } };
 		}
