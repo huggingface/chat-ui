@@ -58,7 +58,8 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN npm run build
+RUN git config --global --add safe.directory /app && \
+    npm run build
 
 # mongo image
 FROM mongo:7 AS mongo
