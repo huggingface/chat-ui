@@ -9,6 +9,14 @@
 	import Logo from "./icons/Logo.svelte";
 
 	const settings = useSettingsStore();
+	let checkboxChecked = false;
+	function handleSubmit(event: Event) {
+        // Prevent form submission if checkbox is not checked
+        if (!checkboxChecked && envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1") {
+            event.preventDefault();
+            alert("You must accept the terms and conditions to proceed.");
+        }
+    }
 </script>
 
 <Modal on:close>
@@ -29,6 +37,15 @@
 		</p>
 
 		<div class="flex w-full flex-col items-center gap-2">
+			{#if envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1"}
+				<label>
+					<input type="checkbox" bind:checked={checkboxChecked} />
+					I have read and agree to the 
+					<a href="/privacy" target="_blank" class="text-blue-500 hover:underline">
+						Terms & Conditions and Privacy Policy
+					</a>.
+				</label>
+			{/if}
 			<button
 				class="w-full justify-center rounded-full border-2 border-gray-300 bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 				class:bg-white={$page.data.loginEnabled}
@@ -38,8 +55,9 @@
 					if (!cookiesAreEnabled()) {
 						window.open(window.location.href, "_blank");
 					}
-
-					$settings.ethicsModalAccepted = true;
+					
+					if (!checkboxChecked && envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1") alert("You must accept the terms and conditions to proceed.");
+					else $settings.ethicsModalAccepted  = true
 				}}
 			>
 				{#if $page.data.loginEnabled}
@@ -53,7 +71,7 @@
 				{/if}
 			</button>
 			{#if $page.data.loginEnabled}
-				<form action="{base}/login" target="_parent" method="POST" class="w-full">
+				<form action="{base}/login" target="_parent" method="POST" class="w-full" on:submit={handleSubmit}>
 					<button
 						type="submit"
 						class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"

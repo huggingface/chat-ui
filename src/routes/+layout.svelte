@@ -210,7 +210,9 @@
 </svelte:head>
 
 {#if showDisclaimer}
-	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
+	<DisclaimerModal on:close={() => {
+		if(envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX !== "1") $settings.ethicsModalAccepted = true}
+	} />
 {/if}
 
 <ExpandNavigation
