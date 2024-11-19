@@ -25,7 +25,7 @@ if (!building) {
 	logger.info("Starting server...");
 	initExitHandler();
 
-	await checkAndRunMigrations();
+	checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
