@@ -4,6 +4,7 @@
 ARG INCLUDE_DB=false
 
 FROM node:20-slim AS base
+ENV PLAYWRIGHT_SKIP_BROWSER_GC=1
 
 # install dotenv-cli
 RUN npm install -g dotenv-cli
@@ -24,17 +25,23 @@ RUN touch /app/.env.local
 
 # get the default config, the entrypoint script and the server script
 COPY --chown=1000 package.json /app/package.json
+COPY --chown=1000 package-lock.json /app/package-lock.json
 COPY --chown=1000 .env /app/.env
 COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
 COPY --chown=1000 gcp-*.json /app/
 
-RUN npx playwright install
+
+RUN --mount=type=cache,target=/app/.npm \
+        npm set cache /app/.npm && \
+        npm ci
 
 USER root
 RUN apt-get update
 RUN apt-get install gnupg curl -y
-RUN npx playwright install-deps
+RUN npx playwright install --with-deps chromium
+RUN chown -R 1000:1000 /home/user/.npm
 USER user
+
 RUN chmod +x /app/entrypoint.sh
 
 
@@ -54,10 +61,7 @@ RUN --mount=type=cache,target=/app/.npm \
 
 COPY --link --chown=1000 . .
 
-RUN git config --global --add safe.directory /app && \
-    PUBLIC_COMMIT_SHA=$(git rev-parse HEAD) && \
-    echo "PUBLIC_COMMIT_SHA=$PUBLIC_COMMIT_SHA" >> /app/.env && \
-    npm run build
+RUN npm run build
 
 # mongo image
 FROM mongo:7 AS mongo
