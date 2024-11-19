@@ -35,7 +35,6 @@
 		<p class="text-sm text-gray-500">
 			{envPublic.PUBLIC_APP_DISCLAIMER_MESSAGE}
 		</p>
-
 		<div class="flex w-full flex-col items-center gap-2">
 			{#if envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1"}
 				<label>
@@ -71,7 +70,7 @@
 				{/if}
 			</button>
 			{#if $page.data.loginEnabled}
-				<form action="{base}/login" target="_parent" method="POST" class="w-full" on:submit={handleSubmit}>
+				<form action="{base}/login" target="_self" method="POST" class="w-full" on:submit={handleSubmit}>
 					<button
 						type="submit"
 						class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
@@ -85,6 +84,13 @@
 						{/if}
 					</button>
 				</form>
+			{/if}
+			{#if envPublic.PUBLIC_ORIGIN}
+			<p>
+				<a href="{envPublic.PUBLIC_ORIGIN}{base}" target="_blank" class="text-neutral-500 hover:underline">
+					If you're having trouble, click here.
+				</a>
+			</p>
 			{/if}
 		</div>
 	</div>
