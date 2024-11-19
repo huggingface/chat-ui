@@ -23,21 +23,19 @@ WORKDIR /app
 RUN touch /app/.env.local
 
 
-# get the default config, the entrypoint script and the server script
-COPY --chown=1000 package.json /app/package.json
-COPY --chown=1000 package-lock.json /app/package-lock.json
-COPY --chown=1000 .env /app/.env
-COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
-COPY --chown=1000 gcp-*.json /app/
-
-RUN npm ci
-
+RUN npm i --no-package-lock --no-save playwright@1.47.0
 USER root
 RUN apt-get update
 RUN apt-get install gnupg curl -y
 RUN npx playwright install --with-deps chromium
 RUN chown -R 1000:1000 /home/user/.npm
 USER user
+
+COPY --chown=1000 .env /app/.env
+COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
+COPY --chown=1000 gcp-*.json /app/
+COPY --chown=1000 package.json /app/package.json
+COPY --chown=1000 package-lock.json /app/package-lock.json
 
 RUN chmod +x /app/entrypoint.sh
 
