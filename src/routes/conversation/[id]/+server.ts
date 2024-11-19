@@ -387,7 +387,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				// Append to the persistent message updates if it's not a stream update
-				if (event.type !== "stream") {
+				if (
+					event.type !== MessageUpdateType.Stream &&
+					!(
+						event.type === MessageUpdateType.Status &&
+						event.status === MessageUpdateStatus.KeepAlive
+					)
+				) {
 					messageToWriteTo?.updates?.push(event);
 				}
 
