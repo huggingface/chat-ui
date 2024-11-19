@@ -30,6 +30,7 @@ COPY --chown=1000 .env /app/.env
 COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
 COPY --chown=1000 gcp-*.json /app/
 
+RUN chown -R 1000:1000 /app/.npm
 
 RUN --mount=type=cache,target=/app/.npm \
         npm set cache /app/.npm && \
