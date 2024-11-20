@@ -1,6 +1,4 @@
 # syntax=docker/dockerfile:1
-# read the doc: https://huggingface.co/docs/hub/spaces-sdks-docker
-# you will also find guides on how best to write your Dockerfile
 ARG INCLUDE_DB=false
 
 FROM node:20-slim AS base
@@ -87,8 +85,9 @@ ENV INCLUDE_DB=${INCLUDE_DB}
 ARG APP_BASE=
 # tailwind requires the primary theme to be known at build time so it must be passed as a build arg
 ARG PUBLIC_APP_COLOR=blue
+ARG PUBLIC_COMMIT_SHA=
+ENV PUBLIC_COMMIT_SHA=${PUBLIC_COMMIT_SHA}
 ENV BODY_SIZE_LIMIT=15728640
-
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
