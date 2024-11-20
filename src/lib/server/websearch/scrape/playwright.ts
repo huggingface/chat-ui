@@ -60,17 +60,6 @@ async function getPlaywrightCtx() {
 	return browser.newContext(options);
 }
 
-// List of protocols to block
-const blockedProtocols = [
-	"file://",
-	"ftp://",
-	"data:",
-	"javascript:",
-	"blob:",
-	"chrome-extension://",
-	"about:",
-];
-
 export async function withPage<T>(
 	url: string,
 	callback: (page: Page, response?: Response) => Promise<T>
@@ -85,7 +74,7 @@ export async function withPage<T>(
 
 		await page.route("**", (route, request) => {
 			const requestUrl = request.url();
-			if (blockedProtocols.some((protocol) => requestUrl.startsWith(protocol))) {
+			if (!requestUrl.startsWith("https://")) {
 				logger.warn(`Blocked request to: ${requestUrl}`);
 				return route.abort();
 			}
