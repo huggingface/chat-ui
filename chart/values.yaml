@@ -8,6 +8,8 @@ replicas: 3
 
 domain: huggingface.co
 
+allowedBlocks: []
+
 service:
   type: NodePort
   annotations: { }
