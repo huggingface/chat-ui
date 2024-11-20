@@ -8,7 +8,9 @@ replicas: 3
 
 domain: huggingface.co
 
-allowedBlocks: []
+networkPolicy:
+  enabled: false
+  allowedBlocks: []
 
 service:
   type: NodePort
