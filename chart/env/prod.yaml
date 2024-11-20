@@ -14,6 +14,11 @@ serviceAccount:
   create: true
   name: huggingchat-prod
 
+networkPolicy:
+  enabled: true
+  allowedBlocks:
+    - 10.0.252.0/25
+
 ingress:
   path: "/chat"
   annotations:
