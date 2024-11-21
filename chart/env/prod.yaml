@@ -49,6 +49,35 @@ envVars:
   MODELS: >
     [
       {
+        "name": "Qwen/Qwen2.5-72B-Instruct",
+        "tokenizer": "Qwen/Qwen2.5-72B-Instruct",
+        "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
+        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+        "parameters": {
+          "stop": ["<|endoftext|>", "<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 28672,
+          "max_new_tokens": 3072
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
         "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "tokenizer": "nsarrazin/llama3.1-tokenizer",
@@ -105,35 +134,6 @@ envVars:
           {
             "title": "Code a snake game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
-          }
-        ]
-      },
-      {
-        "name": "Qwen/Qwen2.5-72B-Instruct",
-        "tokenizer": "Qwen/Qwen2.5-72B-Instruct",
-        "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
-        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
-        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
-        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
-        "parameters": {
-          "stop": ["<|endoftext|>", "<|im_end|>"],
-          "temperature": 0.6,
-          "truncate": 28672,
-          "max_new_tokens": 3072
-        },
-        "promptExamples": [
-          {
-            "title": "Write an email from bullet list",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a snake game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Assist in a task",
-            "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
       },
