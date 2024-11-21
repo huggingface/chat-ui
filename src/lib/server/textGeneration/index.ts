@@ -75,7 +75,8 @@ async function* textGenerationWithoutTitle(
 	let toolResults: ToolResult[] = [];
 
 	if (model.tools) {
-		const tools = await getTools(toolsPreference, ctx.assistant);
+		let tools = await getTools(toolsPreference, ctx.assistant);
+		if (webSearchResult) tools = tools.filter((tool) => !toolHasName("websearch", tool));
 		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
 		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}
