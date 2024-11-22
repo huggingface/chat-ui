@@ -88,8 +88,6 @@ MODELS=`[
 ]`
 ```
 
-The `tokenizer` field will be used to find the appropriate chat template for the model. Make sure to fill in a valid model from the Hugging Face hub.
-
 Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
 **Step 6 (start chat-ui):**

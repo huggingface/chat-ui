@@ -247,9 +247,7 @@
 				) {
 					$error = update.message ?? "An error has occurred";
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = await data.conversations.then((convs) =>
-						convs.find(({ id }) => id === $page.params.id)
-					);
+					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
 					if (convInData) {
 						convInData.title = update.title;
 
@@ -378,9 +376,7 @@
 	}
 
 	$: $page.params.id, (($isAborted = true), (loading = false), ($convTreeStore.editing = null));
-	$: title = data.conversations.then(
-		(convs) => convs.find((conv) => conv.id === $page.params.id)?.title ?? data.title
-	);
+	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
 	const convTreeStore = createConvTreeStore();
 	const settings = useSettingsStore();
