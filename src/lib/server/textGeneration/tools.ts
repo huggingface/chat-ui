@@ -255,12 +255,34 @@ function externalToToolCall(call: unknown, tools: Tool[]): ToolCall | undefined 
 		return undefined;
 	}
 
-	const parameters = buildParametersWithDefaults(tool.inputs, parsedCall.parameters);
-	if (!parameters) return undefined;
+	const parametersWithDefaults: Record<string, string> = {};
+
+	for (const input of tool.inputs) {
+		const value = parsedCall.parameters[input.name];
+
+		// Required so ensure it's there, otherwise return undefined
+		if (input.paramType === "required") {
+			if (value === undefined) {
+				logger.debug(
+					`Model requested tool "${parsedCall.tool_name}" but was missing required parameter "${input.name}". Skipping tool...`
+				);
+				return;
+			}
+			parametersWithDefaults[input.name] = value;
+			continue;
+		}
+
+		// Optional so use default if not there
+		parametersWithDefaults[input.name] = value;
+
+		if (input.paramType === "optional") {
+			parametersWithDefaults[input.name] ??= input.default.toString();
+		}
+	}
 
 	return {
 		name: parsedCall.tool_name,
-		parameters,
+		parameters: parametersWithDefaults,
 	};
 }
 
@@ -296,25 +318,4 @@ function parseExternalCall(callObj: Record<string, unknown>) {
 			parameters: z.record(z.any()),
 		})
 		.parse(groupedCall);
-}
-
-function buildParametersWithDefaults(
-	inputs: Tool["inputs"],
-	parameters: Record<string, string>
-): Record<string, string> | undefined {
-	const result: Record<string, string> = {};
-
-	for (const input of inputs) {
-		const value = parameters[input.name];
-
-		if (input.paramType === "required" && value === undefined) {
-			logger.debug(`Missing required parameter "${input.name}". Skipping tool...`);
-			return undefined;
-		}
-
-		result[input.name] =
-			value ?? (input.paramType === "optional" ? input.default.toString() : value);
-	}
-
-	return result;
 }
