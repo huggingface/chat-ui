@@ -79,4 +79,27 @@ TEXT_EMBEDDING_MODELS=`[
 
 ## OpenAI
 
-Please contribute an example!
+It's also possible to host your own OpenAI API compatible embedding models. [`Infinity`](https://github.com/michaelfeil/infinity) is one example. You may run it locally with Docker:
+
+`docker run -it --gpus all -v infinity-data:/app/.cache -p 7997:7997 michaelf34/infinity:latest v2 --model-id nomic-ai/nomic-embed-text-v1 --port 7997`
+
+You can then hook this up to your Chat UI instance with the following configuration.
+
+```ini
+TEXT_EMBEDDING_MODELS=`[
+  {
+    "name": "nomic-ai/nomic-embed-text-v1",
+    "displayName": "nomic-ai/nomic-embed-text-v1",
+    "chunkCharLength": 512,
+    "model": {
+      "name": "nomic-ai/nomic-embed-text-v1"
+    },
+    "endpoints": [
+      {
+        "type": "openai",
+        "url": "https://127.0.0.1:7997/embeddings"
+      }
+    ]
+  }
+]`
+```
