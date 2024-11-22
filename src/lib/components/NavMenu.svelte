@@ -71,7 +71,7 @@
 			hasMore = false;
 		}
 
-		conversations = Promise.resolve([...(await conversations), ...newConvs]);
+		conversations = [...conversations, ...newConvs];
 	}
 </script>
 
