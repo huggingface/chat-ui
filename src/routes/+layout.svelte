@@ -58,10 +58,7 @@
 				return;
 			}
 
-			data.conversations.then((convs) => {
-				const newConvs = convs.filter((conv) => conv.id !== id);
-				data.conversations = Promise.resolve(newConvs);
-			});
+			data.conversations = data.conversations.filter((conv) => conv.id !== id);
 
 			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
@@ -87,10 +84,9 @@
 				return;
 			}
 
-			data.conversations.then((convs) => {
-				const newConvs = convs.map((conv) => (conv.id === id ? { ...conv, title } : conv));
-				data.conversations = Promise.resolve(newConvs);
-			});
+			data.conversations = data.conversations.map((conv) =>
+				conv.id === id ? { ...conv, title } : conv
+			);
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
@@ -104,17 +100,13 @@
 	$: if ($error) onError();
 
 	$: if ($titleUpdate) {
-		data.conversations.then((convs) => {
-			const convIdx = convs.findIndex(({ id }) => id === $titleUpdate?.convId);
+		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-			if (convIdx != -1) {
-				convs[convIdx].title = $titleUpdate?.title ?? convs[convIdx].title;
-			}
-			// update data.conversations
-			data.conversations = Promise.resolve([...convs]);
+		if (convIdx != -1) {
+			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
+		}
 
-			$titleUpdate = null;
-		});
+		$titleUpdate = null;
 	}
 
 	const settings = createSettingsStore(data.settings);
@@ -153,7 +145,7 @@
 
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
-		: data.conversations.then((convs) => convs.find((conv) => conv.id === $page.params.id)?.title);
+		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
 </script>
 
 <svelte:head>

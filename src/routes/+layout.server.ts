@@ -146,7 +146,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 
 	return {
 		nConversations,
-		conversations: conversations.then(
+		conversations: await conversations.then(
 			async (convs) =>
 				await Promise.all(
 					convs.map(async (conv) => {
