@@ -217,8 +217,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	];
 
 	if (event.request.method === "POST") {
-		refreshSessionCookie(event.cookies, event.locals.sessionId);
-
 		if (nativeFormContentTypes.includes(requestContentType)) {
 			const origin = event.request.headers.get("origin");
 
