@@ -21,7 +21,7 @@
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^5.2.0",
-		"@sveltejs/kit": "^2.5.20",
+		"@sveltejs/kit": "^2.8.3",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/dompurify": "^3.0.5",
 		"@types/express": "^4.17.21",
