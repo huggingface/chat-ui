@@ -26,10 +26,6 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 	if (messages.length === 0) return messages;
 
 	const lastQuestion = messages.findLast((el) => el.from === "user")?.content ?? "";
-	const previousQuestions = messages
-		.filter((el) => el.from === "user")
-		.slice(0, -1)
-		.map((el) => el.content);
 	const currentDate = format(new Date(), "MMMM d, yyyy");
 
 	const finalMessage = {
@@ -38,10 +34,11 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 Today is ${currentDate} and here are the results.
 When answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3].
 =====================
+### Context
 ${webSearchContext}
 =====================
-${previousQuestions.length > 0 ? `Previous questions: \n- ${previousQuestions.join("\n- ")}` : ""}
-Answer the question: ${lastQuestion}`,
+### Question:
+${lastQuestion}`,
 	};
 
 	return [...messages.slice(0, -1), finalMessage];
