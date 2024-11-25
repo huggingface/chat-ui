@@ -26,7 +26,9 @@ export async function* callSpace<TInput extends unknown[], TOutput extends unkno
 		}
 	}
 	const client = await CustomClient.connect(name, {
-		hf_token: (env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`,
+		hf_token: ipToken // dont pass the hf token if we have an ip token
+			? undefined
+			: ((env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`),
 		events: ["status", "data"],
 	});
 

@@ -19,11 +19,13 @@
 <div class="flex w-full flex-col gap-5">
 	<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 		<h2>Application Settings</h2>
-		<span class="text-sm font-light text-gray-500">
-			Latest deployment <span class="gap-2 font-mono"
-				>{envPublic.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
-			>
-		</span>
+		{#if !!envPublic.PUBLIC_COMMIT_SHA}
+			<span class="text-sm font-light text-gray-500">
+				Latest deployment <span class="gap-2 font-mono"
+					>{envPublic.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
+				>
+			</span>
+		{/if}
 	</div>
 	<div class="flex h-full max-w-2xl flex-col gap-2 max-sm:pt-0">
 		{#if envPublic.PUBLIC_APP_DATA_SHARING === "1"}
