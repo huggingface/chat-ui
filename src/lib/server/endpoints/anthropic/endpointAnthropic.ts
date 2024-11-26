@@ -77,57 +77,7 @@ export async function endpointAnthropic(
 		if (model.tools && tools && tools.length > 0) {
 			anthropicTools = createAnthropicTools(tools);
 		}
-		anthropicTools.reverse().shift();
-		console.log(JSON.stringify(anthropicTools));
-		// Example tool for weather
-		const weatherTool: Anthropic.Messages.Tool[] = [
-			{
-				name: "get_weather",
-				description: "Get the current weather in a given location",
-				input_schema: {
-					type: "object",
-					properties: {
-						location: {
-							type: "string",
-							description: "The city and state, e.g. San Francisco, CA",
-						},
-						unit: {
-							type: "string",
-							enum: ["celsius", "fahrenheit"],
-							description: "The unit of temperature, either 'celsius' or 'fahrenheit'",
-						},
-					},
-					required: ["location"],
-				},
-			},
-		];
-
-		const calculatorTool: Anthropic.Messages.Tool[] = [
-			{
-				name: "calculator",
-				description: "Calculate the result of a mathematical expression",
-				input_schema: {
-					type: "object",
-					properties: {
-						equation: {
-							description:
-								"A mathematical expression to be evaluated. The result of the expression will be returned.",
-							type: "string",
-						},
-					},
-					required: ["equation"],
-				},
-			},
-		];
-
-		console.log("-------------");
-		console.log(JSON.stringify(weatherTool));
-		/*		if (!model.tools) {
-			anthropicTools = weatherTool;
-		}
-			
-*/
-
+		console.log(JSON.stringify(messages));
 		let anthropic_messages = await endpointMessagesToAnthropicMessages(messages, multimodal);
 		if (toolResults && toolResults.length > 0) {
 			anthropic_messages = addToolResults(anthropic_messages, toolResults);
@@ -137,8 +87,9 @@ export async function endpointAnthropic(
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-				tools: calculatorTool,
-				tool_choice: { type: "auto", disable_parallel_tool_use: false },
+				tools: anthropicTools,
+				tool_choice:
+					tools?.length ?? 0 > 0 ? { type: "auto", disable_parallel_tool_use: false } : undefined,
 				messages: anthropic_messages,
 				max_tokens: parameters?.max_new_tokens,
 				temperature: parameters?.temperature,
@@ -154,21 +105,9 @@ export async function endpointAnthropic(
 					stream.emitted("end"),
 				]);
 
-				// Stream end
 				if (result === undefined) {
-					stream.receivedMessages.forEach((message) => {
-						console.log("--->" + message.id + "..." + message.stop_reason + ".." + message.type);
-						message.content.forEach((contentBlock) => {
-							if (contentBlock.type === "tool_use") {
-								console.log(
-									"Tool call:",
-									contentBlock.id + contentBlock.name + JSON.stringify(contentBlock.input)
-								);
-							}
-						});
-					});
-
 					if ("tool_use" === stream.receivedMessages[0].stop_reason) {
+						// this should really create a new "Assistant" message with the tool id in it.
 						const toolCalls: ToolCall[] = stream.receivedMessages[0].content
 							.filter(
 								(block): block is Anthropic.Messages.ContentBlock & { type: "tool_use" } =>
@@ -220,31 +159,41 @@ function addToolResults(messages: MessageParam[], toolResults: ToolResult[]): Me
 	const assistantMessages: MessageParam[] = [];
 	const userMessages: MessageParam[] = [];
 
+	const [toolUseBlocks, toolResultBlocks] = toolResults.reduce<
+		[Anthropic.Messages.ToolUseBlockParam[], Anthropic.Messages.ToolResultBlockParam[]]
+	>(
+		(acc, toolResult, index) => {
+			acc[0].push({
+				type: "tool_use",
+				id: "tool_" + index,
+				name: toolResult.call.name,
+				input: toolResult.call.parameters,
+			});
+			acc[1].push({
+				type: "tool_result",
+				tool_use_id: "tool_" + index,
+				is_error: toolResult.status === "error",
+				content:
+					toolResult.status === "error"
+						? JSON.stringify(toolResult.message)
+						: JSON.stringify("outputs" in toolResult ? toolResult.outputs : ""),
+			});
+			return acc;
+		},
+		[[], []]
+	);
+
+	console.log(JSON.stringify(toolUseBlocks));
+	console.log(JSON.stringify(toolResultBlocks));
+
 	assistantMessages.push({
 		role: "assistant",
-		content: [
-			{
-				type: "tool_use",
-				id: "any_id",
-				name: toolResults[0].call.name,
-				input: toolResults[0].call.parameters, // Changed from JSON.stringify to direct object
-			},
-		],
+		content: toolUseBlocks,
 	});
 
 	userMessages.push({
 		role: "user",
-		content: [
-			{
-				type: "tool_result",
-				tool_use_id: "any_id",
-				is_error: toolResults[0].status === "error",
-				content:
-					toolResults[0].status === "error"
-						? JSON.stringify(toolResults[0].message) // Include error message if it's an error
-						: JSON.stringify("outputs" in toolResults[0] ? toolResults[0].outputs : ""), // Otherwise include the output
-			},
-		],
+		content: toolResultBlocks,
 	});
 
 	return [...messages, ...assistantMessages, ...userMessages];

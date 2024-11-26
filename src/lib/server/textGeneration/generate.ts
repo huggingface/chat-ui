@@ -9,13 +9,15 @@ type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: End
 export async function* generate(
 	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
 	toolResults: ToolResult[],
-	preprompt?: string
+	preprompt?: string,
+	tools?: Tools[]
 ): AsyncIterable<MessageUpdate> {
 	for await (const output of await endpoint({
 		messages,
 		preprompt,
 		continueMessage: isContinue,
 		generateSettings: assistant?.generateSettings,
+		tools,
 		toolResults,
 		isMultimodal: model.multimodal,
 		conversationId: conv._id,
