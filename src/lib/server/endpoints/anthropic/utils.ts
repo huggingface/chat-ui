@@ -7,6 +7,7 @@ import type {
 	BetaMessageParam,
 	BetaBase64PDFBlock,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs";
+import type { ToolResult } from "$lib/types/Tool";
 
 export async function fileToImageBlock(
 	file: MessageFile,
@@ -73,4 +74,37 @@ export async function endpointMessagesToAnthropicMessages(
 				};
 			})
 	);
+}
+
+export function addToolResults(
+	messages: BetaMessageParam[],
+	toolResults: ToolResult[]
+): BetaMessageParam[] {
+	const id = crypto.randomUUID();
+	if (toolResults.length === 0) {
+		return messages;
+	}
+	return [
+		...messages,
+		{
+			role: "assistant",
+			content: toolResults.map((result, index) => ({
+				type: "tool_use",
+				id: `tool_${index}_${id}`,
+				name: result.call.name,
+				input: result.call.parameters,
+			})),
+		},
+		{
+			role: "user",
+			content: toolResults.map((result, index) => ({
+				type: "tool_result",
+				tool_use_id: `tool_${index}_${id}`,
+				is_error: result.status === "error",
+				content: JSON.stringify(
+					result.status === "error" ? result.message : "outputs" in result ? result.outputs : ""
+				),
+			})),
+		},
+	];
 }

@@ -3,9 +3,8 @@ import type { Endpoint } from "../endpoints";
 import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator } from "../images";
-import { endpointMessagesToAnthropicMessages } from "./utils";
+import { endpointMessagesToAnthropicMessages, addToolResults } from "./utils";
 import { createDocumentProcessorOptionsValidator } from "../document";
-import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
 import type {
 	Tool,
 	ToolCall,
@@ -13,9 +12,9 @@ import type {
 	ToolInputFile,
 	ToolInputFixed,
 	ToolInputOptional,
-	ToolResult,
 } from "$lib/types/Tool";
 import type Anthropic from "@anthropic-ai/sdk";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -67,7 +66,7 @@ export async function endpointAnthropic(
 	// check if model has tools enabled
 	// process toolresults and add them to the request
 	// add a toolcall yield if the model stops for tool calling reasons.
-	return async ({ messages, preprompt, generateSettings, tools, toolResults }) => {
+	return async ({ messages, preprompt, generateSettings, tools = [], toolResults = [] }) => {
 		let system = preprompt;
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
@@ -77,26 +76,16 @@ export async function endpointAnthropic(
 
 		const parameters = { ...model.parameters, ...generateSettings };
 
-		let anthropicTools: Anthropic.Messages.Tool[] = [];
-
-		if (model.tools && tools && tools.length > 0) {
-			anthropicTools = createAnthropicTools(tools);
-		}
-		console.log(JSON.stringify(messages));
-		let anthropic_messages = await endpointMessagesToAnthropicMessages(messages, multimodal);
-		if (toolResults && toolResults.length > 0) {
-			anthropic_messages = addToolResults(anthropic_messages, toolResults);
-		}
-
-		//		console.log(JSON.stringify(anthropic_messages));
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-
-				tools: anthropicTools,
+				tools: createAnthropicTools(tools),
 				tool_choice:
-					tools?.length ?? 0 > 0 ? { type: "auto", disable_parallel_tool_use: false } : undefined,
-				messages: anthropic_messages,
+					tools.length > 0 ? { type: "auto", disable_parallel_tool_use: false } : undefined,
+				messages: addToolResults(
+					await endpointMessagesToAnthropicMessages(messages, multimodal),
+					toolResults
+				) as MessageParam[],
 				max_tokens: parameters?.max_new_tokens,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
@@ -159,50 +148,6 @@ export async function endpointAnthropic(
 			}
 		})();
 	};
-}
-
-function addToolResults(messages: MessageParam[], toolResults: ToolResult[]): MessageParam[] {
-	const assistantMessages: MessageParam[] = [];
-	const userMessages: MessageParam[] = [];
-
-	const [toolUseBlocks, toolResultBlocks] = toolResults.reduce<
-		[Anthropic.Messages.ToolUseBlockParam[], Anthropic.Messages.ToolResultBlockParam[]]
-	>(
-		(acc, toolResult, index) => {
-			acc[0].push({
-				type: "tool_use",
-				id: "tool_" + index,
-				name: toolResult.call.name,
-				input: toolResult.call.parameters,
-			});
-			acc[1].push({
-				type: "tool_result",
-				tool_use_id: "tool_" + index,
-				is_error: toolResult.status === "error",
-				content:
-					toolResult.status === "error"
-						? JSON.stringify(toolResult.message)
-						: JSON.stringify("outputs" in toolResult ? toolResult.outputs : ""),
-			});
-			return acc;
-		},
-		[[], []]
-	);
-
-	console.log(JSON.stringify(toolUseBlocks));
-	console.log(JSON.stringify(toolResultBlocks));
-
-	assistantMessages.push({
-		role: "assistant",
-		content: toolUseBlocks,
-	});
-
-	userMessages.push({
-		role: "user",
-		content: toolResultBlocks,
-	});
-
-	return [...messages, ...assistantMessages, ...userMessages];
 }
 
 function createAnthropicTools(tools: Tool[]): Anthropic.Messages.Tool[] {
