@@ -8,12 +8,15 @@ import type {
 	BetaBase64PDFBlock,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs";
 import type { ToolResult } from "$lib/types/Tool";
+import { downloadFile } from "$lib/server/files/downloadFile";
+import type { ObjectId } from "mongodb";
 
 export async function fileToImageBlock(
 	file: MessageFile,
 	opts: ImageProcessorOptions<"image/png" | "image/jpeg" | "image/webp">
 ): Promise<BetaImageBlockParam> {
 	const processor = makeImageProcessor(opts);
+
 	const { image, mime } = await processor(file);
 
 	return {
@@ -49,7 +52,8 @@ export async function endpointMessagesToAnthropicMessages(
 	multimodal: {
 		image: ImageProcessorOptions<"image/png" | "image/jpeg" | "image/webp">;
 		document?: FileProcessorOptions<"application/pdf">;
-	}
+	},
+	conversationId?: ObjectId | undefined
 ): Promise<BetaMessageParam[]> {
 	return await Promise.all(
 		messages
@@ -58,17 +62,23 @@ export async function endpointMessagesToAnthropicMessages(
 				return {
 					role: message.from,
 					content: [
-						...(await Promise.all(
-							(message.files ?? []).map(async (file) => {
-								if (file.mime.startsWith("image/")) {
-									return fileToImageBlock(file, multimodal.image);
-								} else if (file.mime === "application/pdf" && multimodal.document) {
-									return fileToDocumentBlock(file, multimodal.document);
-								} else {
-									throw new Error(`Unsupported file type: ${file.mime}`);
-								}
-							})
-						)),
+						...(message.from === "user"
+							? await Promise.all(
+									(message.files ?? []).map(async (file) => {
+										if (file.type === "hash" && conversationId) {
+											file = await downloadFile(file.value, conversationId);
+										}
+
+										if (file.mime.startsWith("image/")) {
+											return fileToImageBlock(file, multimodal.image);
+										} else if (file.mime === "application/pdf" && multimodal.document) {
+											return fileToDocumentBlock(file, multimodal.document);
+										} else {
+											throw new Error(`Unsupported file type: ${file.mime}`);
+										}
+									})
+							  )
+							: []),
 						{ type: "text", text: message.content },
 					],
 				};

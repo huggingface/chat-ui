@@ -61,12 +61,14 @@ export async function endpointAnthropic(
 		defaultQuery,
 	});
 
-	// get tool results and tools from this call
-	// convert from library to anthropic format of tools
-	// check if model has tools enabled
-	// process toolresults and add them to the request
-	// add a toolcall yield if the model stops for tool calling reasons.
-	return async ({ messages, preprompt, generateSettings, tools = [], toolResults = [] }) => {
+	return async ({
+		messages,
+		preprompt,
+		generateSettings,
+		conversationId,
+		tools = [],
+		toolResults = [],
+	}) => {
 		let system = preprompt;
 		if (messages?.[0]?.from === "system") {
 			system = messages[0].content;
@@ -83,7 +85,7 @@ export async function endpointAnthropic(
 				tool_choice:
 					tools.length > 0 ? { type: "auto", disable_parallel_tool_use: false } : undefined,
 				messages: addToolResults(
-					await endpointMessagesToAnthropicMessages(messages, multimodal),
+					await endpointMessagesToAnthropicMessages(messages, multimodal, conversationId),
 					toolResults
 				) as MessageParam[],
 				max_tokens: parameters?.max_new_tokens,
@@ -94,11 +96,7 @@ export async function endpointAnthropic(
 				system,
 			});
 			while (true) {
-				const result = await Promise.race([
-					//					stream.emitted("inputJson"),
-					stream.emitted("text"),
-					stream.emitted("end"),
-				]);
+				const result = await Promise.race([stream.emitted("text"), stream.emitted("end")]);
 
 				if (result === undefined) {
 					if ("tool_use" === stream.receivedMessages[0].stop_reason) {
@@ -134,17 +132,6 @@ export async function endpointAnthropic(
 
 					return;
 				}
-
-				yield {
-					token: {
-						id: tokenId++,
-						text: result as unknown as string,
-						special: false,
-						logprob: 0,
-					},
-					generated_text: null,
-					details: null,
-				} satisfies TextGenerationStreamOutput;
 			}
 		})();
 	};
