@@ -4,6 +4,8 @@ import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator } from "../images";
 import { endpointMessagesToAnthropicMessages } from "./utils";
+import { createDocumentProcessorOptionsValidator } from "../document";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
 import type {
 	Tool,
 	ToolCall,
@@ -33,6 +35,10 @@ export const endpointAnthropicParametersSchema = z.object({
 				maxSizeInMB: (5 / 4) * 3,
 				maxWidth: 4096,
 				maxHeight: 4096,
+			}),
+			document: createDocumentProcessorOptionsValidator({
+				supportedMimeTypes: ["application/pdf"],
+				maxSizeInMB: 32,
 			}),
 		})
 		.default({}),
@@ -87,6 +93,7 @@ export async function endpointAnthropic(
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
+
 				tools: anthropicTools,
 				tool_choice:
 					tools?.length ?? 0 > 0 ? { type: "auto", disable_parallel_tool_use: false } : undefined,
