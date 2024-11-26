@@ -3,30 +3,15 @@ import { makeDocumentProcessor, type FileProcessorOptions } from "../document";
 import type { EndpointMessage } from "../endpoints";
 import type { MessageFile } from "$lib/types/Message";
 import type {
-	ImageBlockParam,
-	MessageParam,
-	TextBlockParam,
-} from "@anthropic-ai/sdk/resources/messages.mjs";
-
-export interface DocumentBlockParam {
-	type: "document";
-	source: {
-		data: string;
-		media_type: "application/pdf";
-		type: "base64";
-	};
-}
-
-export type ExtendedContentBlock = ImageBlockParam | TextBlockParam | DocumentBlockParam;
-
-export interface ExtendedMessageParam extends Omit<MessageParam, "content"> {
-	content: ExtendedContentBlock[];
-}
+	BetaImageBlockParam,
+	BetaMessageParam,
+	BetaBase64PDFBlock,
+} from "@anthropic-ai/sdk/resources/beta/messages/messages.mjs";
 
 export async function fileToImageBlock(
 	file: MessageFile,
 	opts: ImageProcessorOptions<"image/png" | "image/jpeg" | "image/webp">
-): Promise<ImageBlockParam> {
+): Promise<BetaImageBlockParam> {
 	const processor = makeImageProcessor(opts);
 	const { image, mime } = await processor(file);
 
@@ -43,7 +28,7 @@ export async function fileToImageBlock(
 export async function fileToDocumentBlock(
 	file: MessageFile,
 	opts: FileProcessorOptions<"application/pdf">
-): Promise<DocumentBlockParam> {
+): Promise<BetaBase64PDFBlock> {
 	const processor = makeDocumentProcessor(opts);
 	const { file: document, mime } = await processor(file);
 
@@ -62,13 +47,13 @@ export async function endpointMessagesToAnthropicMessages(
 	messages: EndpointMessage[],
 	multimodal: {
 		image: ImageProcessorOptions<"image/png" | "image/jpeg" | "image/webp">;
-		document?: FileProcessorOptions<"application/pdf">; // Make optional
+		document?: FileProcessorOptions<"application/pdf">;
 	}
-): Promise<ExtendedMessageParam[]> {
+): Promise<BetaMessageParam[]> {
 	return await Promise.all(
 		messages
 			.filter((message): message is NonSystemMessage => message.from !== "system")
-			.map<Promise<ExtendedMessageParam>>(async (message) => {
+			.map<Promise<BetaMessageParam>>(async (message) => {
 				return {
 					role: message.from,
 					content: [
