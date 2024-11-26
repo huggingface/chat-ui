@@ -133,6 +133,17 @@ export async function endpointAnthropic(
 
 					return;
 				}
+				// Text delta
+				yield {
+					token: {
+						id: tokenId++,
+						text: result as unknown as string,
+						special: false,
+						logprob: 0,
+					},
+					generated_text: null,
+					details: null,
+				} satisfies TextGenerationStreamOutput;
 			}
 		})();
 	};
