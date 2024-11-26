@@ -16,7 +16,6 @@ import type {
 	ToolResult,
 } from "$lib/types/Tool";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
