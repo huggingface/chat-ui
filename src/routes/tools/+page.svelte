@@ -20,6 +20,7 @@
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
@@ -30,6 +31,11 @@
 	$: toolsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === toolsCreator;
 	$: activeOnly = $page.url.searchParams.get("active") === "true";
+
+	const settings = useSettingsStore();
+
+	$: currentModelSupportTools =
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement;
@@ -144,7 +150,7 @@
 			</a>
 		</div>
 
-		<div class="mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
+		<div class="mb-4 mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
 			{#if toolsCreator && !createdByMe}
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -231,7 +237,14 @@
 			</select>
 		</div>
 
-		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
+		{#if !currentModelSupportTools}
+			<div class="mx-auto text-center text-sm text-purple-700 dark:text-purple-300">
+				You are currently not using a model that supports tools. Activate one
+				<a href="{base}/models" class="underline">here</a>.
+			</div>
+		{/if}
+
+		<div class="mt-4 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
 				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				{@const isOfficial = !tool.createdByName}
