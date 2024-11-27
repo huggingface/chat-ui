@@ -20,6 +20,7 @@ import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import type { ToolResult } from "$lib/types/Tool";
 import { toolHasName } from "../tools/utils";
+import directlyAnswer from "../tools/directlyAnswer";
 
 async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	while (!done.aborted) {
@@ -73,14 +74,16 @@ async function* textGenerationWithoutTitle(
 	}
 
 	let toolResults: ToolResult[] = [];
+	let tools = model.tools ? await getTools(toolsPreference, ctx.assistant) : undefined;
 
-	if (model.tools) {
-		const tools = await getTools(toolsPreference, ctx.assistant);
-		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
-		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
+	if (tools) {
+		const toolCallsRequired = tools.some((tool) => !toolHasName(directlyAnswer.name, tool));
+		if (toolCallsRequired) {
+			toolResults = yield* runTools(ctx, tools, preprompt);
+		} else tools = undefined;
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
-	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
+	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt, tools);
 	done.abort();
 }
