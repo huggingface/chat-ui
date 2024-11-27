@@ -56,12 +56,11 @@
 					"<": "&lt;",
 					">": "&gt;",
 					"&": "&amp;",
-					"\n": "<br />",
 				}[x] || x)
 		);
 	}
 
-	$: tokens = marked.lexer(addInlineCitations(escapeHTML(content), sources));
+	$: tokens = marked.lexer(addInlineCitations(content, sources));
 
 	function processLatex(parsed: string) {
 		const delimiters = [
@@ -114,7 +113,7 @@
 		{#if token.type === "code"}
 			<CodeBlock lang={token.lang} code={token.text} />
 		{:else}
-			{@const parsed = marked.parse(processLatex(token.raw), options)}
+			{@const parsed = marked.parse(processLatex(escapeHTML(token.raw)), options)}
 			{#await parsed then parsed}
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html DOMPurify.sanitize(parsed)}
