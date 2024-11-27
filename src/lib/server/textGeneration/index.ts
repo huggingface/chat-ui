@@ -74,13 +74,13 @@ async function* textGenerationWithoutTitle(
 	}
 
 	let toolResults: ToolResult[] = [];
-	let tools = undefined;
+	let tools = model.tools ? await getTools(toolsPreference, ctx.assistant) : undefined;
 
-	if (model.tools) {
-		tools = await getTools(toolsPreference, ctx.assistant);
+	if (tools) {
 		const toolCallsRequired = tools.some((tool) => !toolHasName(directlyAnswer.name, tool));
-		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
-		else tools = undefined;
+		if (toolCallsRequired) {
+			toolResults = yield* runTools(ctx, tools, preprompt);
+		} else tools = undefined;
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
