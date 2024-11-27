@@ -228,6 +228,20 @@ export class Database {
 		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
 		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
 		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+
+		conversations
+			.createIndex({
+				"messages.from": 1,
+				createdAt: 1,
+			})
+			.catch((e) => logger.error(e));
+
+		conversations
+			.createIndex({
+				userId: 1,
+				sessionId: 1,
+			})
+			.catch((e) => logger.error(e));
 	}
 }
 

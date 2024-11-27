@@ -4,6 +4,8 @@ import { env } from "$env/dynamic/private";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator } from "../images";
 import { endpointMessagesToAnthropicMessages } from "./utils";
+import { createDocumentProcessorOptionsValidator } from "../document";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
 
 export const endpointAnthropicParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -22,6 +24,10 @@ export const endpointAnthropicParametersSchema = z.object({
 				maxSizeInMB: (5 / 4) * 3,
 				maxWidth: 4096,
 				maxHeight: 4096,
+			}),
+			document: createDocumentProcessorOptionsValidator({
+				supportedMimeTypes: ["application/pdf"],
+				maxSizeInMB: 32,
 			}),
 		})
 		.default({}),
@@ -59,7 +65,10 @@ export async function endpointAnthropic(
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-				messages: await endpointMessagesToAnthropicMessages(messages, multimodal),
+				messages: (await endpointMessagesToAnthropicMessages(
+					messages,
+					multimodal
+				)) as MessageParam[],
 				max_tokens: parameters?.max_new_tokens,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,

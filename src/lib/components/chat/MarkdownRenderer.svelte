@@ -48,7 +48,20 @@
 		renderer,
 	};
 
-	$: tokens = marked.lexer(addInlineCitations(content, sources));
+	function escapeHTML(content: string) {
+		return content.replace(
+			/[<>&\n]/g,
+			(x) =>
+				({
+					"<": "&lt;",
+					">": "&gt;",
+					"&": "&amp;",
+					"\n": "<br />",
+				}[x] || x)
+		);
+	}
+
+	$: tokens = marked.lexer(addInlineCitations(escapeHTML(content), sources));
 
 	function processLatex(parsed: string) {
 		const delimiters = [
