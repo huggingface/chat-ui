@@ -454,7 +454,7 @@
 			<svelte:fragment slot="childrenNav">
 				{#if nChildren > 1 && $convTreeStore.editing === null}
 					<div
-						class="font-white group/navbranch z-10 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
+						class="font-white group/navbranch z-0 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
 					>
 						<button
 							class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
