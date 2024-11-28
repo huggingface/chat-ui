@@ -44,7 +44,7 @@ export const OIDConfig = z
 		RESOURCE: stringWithDefault(env.OPENID_RESOURCE),
 		ID_TOKEN_SIGNED_RESPONSE_ALG: z.string().optional(),
 	})
-	.parse(JSON5.parse(env.OPENID_CONFIG));
+	.parse(JSON5.parse(env.OPENID_CONFIG || "{}"));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 

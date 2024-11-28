@@ -10,7 +10,7 @@
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 
 	export let isOpen = false;
-	export let title: Promise<string | undefined> | string;
+	export let title: string | undefined;
 
 	$: title = title ?? "New Chat";
 
