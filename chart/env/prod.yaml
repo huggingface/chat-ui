@@ -138,6 +138,23 @@ envVars:
         ]
       },
       {
+        "name": "Qwen/QwQ-32B-Preview",
+        "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
+        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
+        "parameters": {
+          "stop": ["<|im_end|>"],
+          "truncate": 12288,
+          "max_new_tokens": 4096,
+          "temperature": 0.7,
+          "top_k": 20,
+          "top_p": 0.8,
+          "repetition_penalty": 1.05
+        }
+      },
+      {
         "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
