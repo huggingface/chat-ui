@@ -146,8 +146,8 @@ envVars:
         "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
         "parameters": {
           "stop": ["<|im_end|>"],
-          "truncate": 26111,
-          "max_new_tokens": 6144,
+          "truncate": 12288,
+          "max_new_tokens": 4096,
           "temperature": 0.7,
           "top_k": 20,
           "top_p": 0.8,
