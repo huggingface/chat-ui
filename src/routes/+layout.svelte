@@ -146,6 +146,12 @@
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
 		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+
+	$: showDisclaimer =
+		!$settings.ethicsModalAccepted &&
+		$page.url.pathname !== `${base}/privacy` &&
+		envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
+		!($page.data.shared === true);
 </script>
 
 <svelte:head>
@@ -203,7 +209,7 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && envPublic.PUBLIC_APP_DISCLAIMER === "1"}
+{#if showDisclaimer}
 	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
