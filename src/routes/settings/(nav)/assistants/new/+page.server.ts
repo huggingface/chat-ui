@@ -11,6 +11,7 @@ import { parseStringToList } from "$lib/utils/parseStringToList";
 import { usageLimits } from "$lib/server/usageLimits";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
 import { toolFromConfigs } from "$lib/server/tools";
+import { ReviewStatus } from "$lib/types/Review";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -148,7 +149,7 @@ export const actions: Actions = {
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			userCount: 1,
-			featured: false,
+			review: ReviewStatus.PRIVATE,
 			rag: {
 				allowedLinks: parse.data.ragLinkList,
 				allowedDomains: parse.data.ragDomainList,

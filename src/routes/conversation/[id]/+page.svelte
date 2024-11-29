@@ -358,7 +358,7 @@
 
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
-			writeMessage({ messageId: event.detail.id, isContinue: true });
+			await writeMessage({ messageId: event.detail.id, isContinue: true });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
@@ -383,7 +383,9 @@
 </script>
 
 <svelte:head>
-	<title>{title}</title>
+	{#await title then title}
+		<title>{title}</title>
+	{/await}
 	<link
 		rel="stylesheet"
 		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"

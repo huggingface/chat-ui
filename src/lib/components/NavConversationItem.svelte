@@ -34,9 +34,9 @@
 		{#if confirmDelete}
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
-		{#if conv.avatarHash}
+		{#if conv.avatarUrl}
 			<img
-				src="{base}/settings/assistants/{conv.assistantId}/avatar.jpg?hash={conv.avatarHash}"
+				src="{base}{conv.avatarUrl}"
 				alt="Assistant avatar"
 				class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
 			/>
@@ -55,6 +55,14 @@
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+			title="Cancel delete action"
+			on:click|preventDefault={() => (confirmDelete = false)}
+		>
+			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+		</button>
+		<button
+			type="button"
+			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Confirm delete action"
 			on:click|preventDefault={() => {
 				confirmDelete = false;
@@ -62,14 +70,6 @@
 			}}
 		>
 			<CarbonCheckmark class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
-		</button>
-		<button
-			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Cancel delete action"
-			on:click|preventDefault={() => (confirmDelete = false)}
-		>
-			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
 	{:else}
 		<button

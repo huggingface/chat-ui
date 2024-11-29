@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { RequestHandler } from "./$types";
 import { downloadFile } from "$lib/server/files/downloadFile";
+import mimeTypes from "mime-types";
 
 export const GET: RequestHandler = async ({ locals, params }) => {
 	const sha256 = z.string().parse(params.sha256);
@@ -47,6 +48,9 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 			"Content-Type": mime ?? "application/octet-stream",
 			"Content-Security-Policy":
 				"default-src 'none'; script-src 'none'; style-src 'none'; sandbox;",
+			"Content-Disposition": `attachment; filename="${sha256.slice(0, 8)}.${
+				mime ? mimeTypes.extension(mime) || "bin" : "bin"
+			}"`,
 			"Content-Length": b64Value.length.toString(),
 			"Accept-Range": "bytes",
 		},

@@ -43,6 +43,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 		tools,
 		toolResults,
 		isMultimodal,
+		conversationId,
 	}) => {
 		const messagesWithResizedFiles = await Promise.all(
 			messages.map((message) => prepareMessage(Boolean(isMultimodal), message, imageProcessor))
@@ -72,6 +73,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 						info.headers = {
 							...info.headers,
 							Authorization: authorization,
+							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 						};
 					}
 					return fetch(endpointUrl, info);

@@ -1,4 +1,5 @@
 name: Lint and test
+
 on:
   pull_request:
   push:
@@ -25,19 +26,13 @@ jobs:
       - name: "Checking type errors"
         run: |
           npm run check
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    services:
-      mongodb:
-        image: mongo:6.0.5
-        ports:
-          - 27017:27017
-
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v3
         with:
           node-version: "20"
@@ -47,6 +42,7 @@ jobs:
       - name: "Tests"
         run: |
           npm run test
+
   build-check:
     runs-on: ubuntu-latest
     timeout-minutes: 10

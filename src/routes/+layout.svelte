@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy, onMount } from "svelte";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
@@ -12,7 +12,6 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 
 	import { shareConversation } from "$lib/shareConversation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -20,7 +19,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -60,9 +58,9 @@
 				return;
 			}
 
-			if ($page.params.id !== id) {
-				await invalidate(UrlDependency.ConversationList);
-			} else {
+			data.conversations = data.conversations.filter((conv) => conv.id !== id);
+
+			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
 			}
 		} catch (err) {
@@ -86,7 +84,9 @@
 				return;
 			}
 
-			await invalidate(UrlDependency.ConversationList);
+			data.conversations = data.conversations.map((conv) =>
+				conv.id === id ? { ...conv, title } : conv
+			);
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
@@ -105,8 +105,6 @@
 		if (convIdx != -1) {
 			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
 		}
-		// update data.conversations
-		data.conversations = [...data.conversations];
 
 		$titleUpdate = null;
 	}
@@ -148,6 +146,12 @@
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
 		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+
+	$: showDisclaimer =
+		!$settings.ethicsModalAccepted &&
+		$page.url.pathname !== `${base}/privacy` &&
+		envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
+		!($page.data.shared === true);
 </script>
 
 <svelte:head>
@@ -205,8 +209,8 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
-	<DisclaimerModal />
+{#if showDisclaimer}
+	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
 <ExpandNavigation

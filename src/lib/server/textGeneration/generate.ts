@@ -18,6 +18,7 @@ export async function* generate(
 		generateSettings: assistant?.generateSettings,
 		toolResults,
 		isMultimodal: model.multimodal,
+		conversationId: conv._id,
 	})) {
 		// text generation completed
 		if (output.generated_text) {
@@ -32,7 +33,12 @@ export async function* generate(
 				text = text.slice(0, text.length - stopToken.length);
 			}
 
-			yield { type: MessageUpdateType.FinalAnswer, text, interrupted };
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text,
+				interrupted,
+				webSources: output.webSources,
+			};
 			continue;
 		}
 

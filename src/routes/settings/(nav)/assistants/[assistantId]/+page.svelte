@@ -15,11 +15,13 @@
 	import CarbonChat from "~icons/carbon/chat";
 	import CarbonStar from "~icons/carbon/star";
 	import CarbonTools from "~icons/carbon/tools";
+	import CarbonLock from "~icons/carbon/locked";
 
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import ToolBadge from "$lib/components/ToolBadge.svelte";
+	import { ReviewStatus } from "$lib/types/Review";
 
 	export let data: PageData;
 
@@ -101,7 +103,7 @@
 			>
 				<div class="w-full sm:w-auto">
 					<button
-						class="mx-auto my-2 flex w-full w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
+						class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
 						name="Activate model"
 						on:click|stopPropagation={() => {
 							settings.instantSet({
@@ -119,9 +121,17 @@
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
 					</a>
 					<form method="POST" action="?/delete" use:enhance>
-						<button type="submit" class="flex items-center underline">
-							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+						<button
+							type="submit"
+							class="flex items-center underline"
+							on:click={(event) => {
+								if (!confirm("Are you sure you want to delete this assistant?")) {
+									event.preventDefault();
+								}
+							}}
 						>
+							<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+						</button>
 					</form>
 				{:else}
 					<form method="POST" action="?/unsubscribe" use:enhance>
@@ -151,24 +161,70 @@
 					{/if}
 				{/if}
 				{#if data?.user?.isAdmin}
-					<form method="POST" action="?/delete" use:enhance>
-						<button type="submit" class="flex items-center text-red-600 underline">
-							<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
-						>
-					</form>
-					{#if assistant?.featured}
-						<form method="POST" action="?/unfeature" use:enhance>
-							<button type="submit" class="flex items-center text-red-600 underline">
-								<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
+					<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+						>{assistant?.review?.toLocaleUpperCase()}</span
+					>
+
+					{#if !assistant?.createdByMe}
+						<form method="POST" action="?/delete" use:enhance>
+							<button
+								type="submit"
+								class="flex items-center text-red-600 underline"
+								on:click={(event) => {
+									if (!confirm("Are you sure you want to delete this assistant?")) {
+										event.preventDefault();
+									}
+								}}
 							>
+								<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+							</button>
 						</form>
-					{:else}
-						<form method="POST" action="?/feature" use:enhance>
+					{/if}
+					{#if assistant?.review === ReviewStatus.PRIVATE}
+						<form method="POST" action="?/approve" use:enhance>
 							<button type="submit" class="flex items-center text-green-600 underline">
-								<CarbonStar class="mr-1.5 inline text-xs" />Feature</button
+								<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 							>
 						</form>
 					{/if}
+					{#if assistant?.review === ReviewStatus.PENDING}
+						<form method="POST" action="?/approve" use:enhance>
+							<button type="submit" class="flex items-center text-green-600 underline">
+								<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
+							>
+						</form>
+						<form method="POST" action="?/deny" use:enhance>
+							<button type="submit" class="flex items-center text-red-600">
+								<span class="mr-1.5 font-light no-underline">X</span>
+								<span class="underline">Deny</span>
+							</button>
+						</form>
+					{/if}
+					{#if assistant?.review === ReviewStatus.APPROVED || assistant?.review === ReviewStatus.DENIED}
+						<form method="POST" action="?/unrequest" use:enhance>
+							<button type="submit" class="flex items-center text-red-600 underline">
+								<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
+							>
+						</form>
+					{/if}
+				{/if}
+				{#if assistant?.createdByMe && assistant?.review === ReviewStatus.PRIVATE}
+					<form
+						method="POST"
+						action="?/request"
+						use:enhance={async ({ cancel }) => {
+							const confirmed = confirm(
+								"Are you sure you want to request this assistant to be featured? Make sure you have tried the assistant and that it works as expected. "
+							);
+							if (!confirmed) {
+								cancel();
+							}
+						}}
+					>
+						<button type="submit" class="flex items-center underline">
+							<CarbonStar class="mr-1.5 inline text-xs" />Request to be featured</button
+						>
+					</form>
 				{/if}
 			</div>
 		</div>

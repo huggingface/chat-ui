@@ -19,6 +19,8 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
+	import { ReviewStatus } from "$lib/types/Review";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
@@ -29,6 +31,11 @@
 	$: toolsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === toolsCreator;
 	$: activeOnly = $page.url.searchParams.get("active") === "true";
+
+	const settings = useSettingsStore();
+
+	$: currentModelSupportTools =
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement;
@@ -98,7 +105,7 @@
 	};
 </script>
 
-<div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
+<div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Tools</h1>
@@ -110,18 +117,24 @@
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/357"
 					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
 					target="_blank"
+					aria-label="Hub discussion about tools"
 				>
 					<CarbonHelpFilled />
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular tools made by the community</h3>
-		<h4 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
+		<h2 class="text-gray-500">Popular tools made by the community</h2>
+		<h3 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
 			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
 				>experimental</span
-			>. Consider sharing your feedback with us!
-		</h4>
+			>. Consider
+			<a
+				class="underline hover:text-purple-500"
+				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
+				target="_blank">sharing your feedback with us!</a
+			>
+		</h3>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
@@ -137,7 +150,7 @@
 			</a>
 		</div>
 
-		<div class="mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
+		<div class="mb-4 mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
 			{#if toolsCreator && !createdByMe}
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -210,26 +223,39 @@
 					bind:this={filterInputEl}
 					maxlength="150"
 					type="search"
+					aria-label="Filter tools by name"
 				/>
 			</div>
 			<select
 				bind:value={sortValue}
 				on:change={sortTools}
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				aria-label="Sort tools"
 			>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
 				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 			</select>
 		</div>
 
-		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
+		{#if !currentModelSupportTools}
+			<div class="mx-auto text-center text-sm text-purple-700 dark:text-purple-300">
+				You are currently not using a model that supports tools. Activate one
+				<a href="{base}/models" class="underline">here</a>.
+			</div>
+		{/if}
+
+		<div class="mt-4 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
 				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				{@const isOfficial = !tool.createdByName}
-				<a
-					href="{base}/tools/{tool._id.toString()}"
-					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!tool.featured &&
-					!isOfficial
+				<div
+					on:click={() => goto(`${base}/tools/${tool._id.toString()}`)}
+					on:keydown={(e) => e.key === "Enter" && goto(`${base}/tools/${tool._id.toString()}`)}
+					role="button"
+					tabindex="0"
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!(
+						tool.review === ReviewStatus.APPROVED
+					) && !isOfficial
 						? ' border-red-500/30'
 						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}
@@ -277,9 +303,13 @@
 							</p>
 						{/if}
 					</div>
-				</a>
+				</div>
 			{:else}
-				No tools found
+				{#if activeOnly}
+					You don't have any active tools.
+				{:else}
+					No tools found
+				{/if}
 			{/each}
 		</div>
 

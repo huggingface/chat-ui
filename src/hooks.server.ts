@@ -19,10 +19,13 @@ import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
+	// Set HF_TOKEN as a process variable for Transformers.JS to see it
+	process.env.HF_TOKEN ??= env.HF_TOKEN;
+
 	logger.info("Starting server...");
 	initExitHandler();
 
-	await checkAndRunMigrations();
+	checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
@@ -59,6 +62,7 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 		error,
 		errorId,
 		status,
+		stack: error instanceof Error ? error.stack : undefined,
 	});
 
 	return {
@@ -213,8 +217,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	];
 
 	if (event.request.method === "POST") {
-		refreshSessionCookie(event.cookies, event.locals.sessionId);
-
 		if (nativeFormContentTypes.includes(requestContentType)) {
 			const origin = event.request.headers.get("origin");
 
@@ -246,6 +248,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
+		!event.url.pathname.startsWith(`${base}/settings`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
 		if (
@@ -288,6 +291,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
 	});
+
+	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
+	if (env.ALLOW_IFRAME !== "true") {
+		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
+	}
 
 	return response;
 };

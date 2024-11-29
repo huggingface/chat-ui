@@ -159,14 +159,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
-			tools: z
-				.array(z.string())
-				.optional()
-				.transform((tools) =>
-					// disable tools on huggingchat android app
-					request.headers.get("user-agent")?.includes("co.huggingface.chat_ui_android") ? [] : tools
-				),
-
+			tools: z.array(z.string()).optional(),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -394,7 +387,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 
 				// Append to the persistent message updates if it's not a stream update
-				if (event.type !== "stream") {
+				if (
+					event.type !== MessageUpdateType.Stream &&
+					!(
+						event.type === MessageUpdateType.Status &&
+						event.status === MessageUpdateStatus.KeepAlive
+					)
+				) {
 					messageToWriteTo?.updates?.push(event);
 				}
 

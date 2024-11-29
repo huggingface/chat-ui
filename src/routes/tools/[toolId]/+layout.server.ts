@@ -1,6 +1,7 @@
 import { base } from "$app/paths";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { ReviewStatus } from "$lib/types/Review.js";
 import { redirect } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -21,7 +22,7 @@ export const load = async ({ params, locals }) => {
 				createdByName: null,
 				createdByMe: false,
 				reported: false,
-				featured: false,
+				review: ReviewStatus.APPROVED,
 			},
 		};
 	}

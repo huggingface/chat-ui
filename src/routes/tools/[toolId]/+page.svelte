@@ -6,6 +6,7 @@
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { ReviewStatus } from "$lib/types/Review";
 
 	import ReportModal from "../../settings/(nav)/assistants/[assistantId]/ReportModal.svelte";
 	import { applyAction, enhance } from "$app/forms";
@@ -17,6 +18,7 @@
 	import CarbonFlag from "~icons/carbon/flag";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonStar from "~icons/carbon/star";
+	import CarbonLock from "~icons/carbon/locked";
 
 	export let data;
 
@@ -37,6 +39,9 @@
 	$: isActive = $settings.tools?.includes(data.tool?._id.toString());
 
 	let displayReportModal = false;
+
+	$: currentModelSupportTools =
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
 </script>
 
 {#if displayReportModal}
@@ -96,25 +101,34 @@
 						class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
 					>
 						<div class="w-full sm:w-auto">
-							<button
-								class="{isActive
-									? 'bg-gray-100 text-gray-800'
-									: 'bg-black !text-white'} mx-auto my-2 flex w-full w-min items-center justify-center rounded-full px-3 py-1 text-base"
-								name="Activate model"
-								on:click|stopPropagation={() => {
-									if (isActive) {
-										settings.instantSet({
-											tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
-										});
-									} else {
-										settings.instantSet({
-											tools: [...($settings?.tools ?? []), data.tool._id],
-										});
-									}
-								}}
-							>
-								{isActive ? "Deactivate" : "Activate"}
-							</button>
+							{#if currentModelSupportTools}
+								<button
+									class="{isActive
+										? 'bg-gray-100 text-gray-800'
+										: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
+									name="Activate model"
+									on:click|stopPropagation={() => {
+										if (isActive) {
+											settings.instantSet({
+												tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
+											});
+										} else {
+											settings.instantSet({
+												tools: [...($settings?.tools ?? []), data.tool._id],
+											});
+										}
+									}}
+								>
+									{isActive ? "Deactivate" : "Activate"}
+								</button>
+							{:else}
+								<button
+									disabled
+									class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-gray-200 px-3 py-1 text-base text-gray-500"
+								>
+									Activate
+								</button>
+							{/if}
 						</div>
 						{#if data.tool?.createdByMe}
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline"
@@ -134,9 +148,17 @@
 									};
 								}}
 							>
-								<button type="submit" class="flex items-center underline">
-									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
+								<button
+									type="submit"
+									class="flex items-center underline"
+									on:click={(event) => {
+										if (!confirm("Are you sure you want to delete this tool?")) {
+											event.preventDefault();
+										}
+									}}
 								>
+									<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+								</button>
 							</form>
 						{:else if !!data.tool?.baseUrl}
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline">
@@ -164,31 +186,84 @@
 							{/if}
 						{/if}
 						{#if data?.user?.isAdmin}
-							<form method="POST" action="?/delete" use:enhance>
-								<button type="submit" class="flex items-center text-red-600 underline">
-									<CarbonTrash class="mr-1.5 inline text-xs" />Delete</button
-								>
-							</form>
-							{#if data.tool?.featured}
-								<form method="POST" action="?/unfeature" use:enhance>
-									<button type="submit" class="flex items-center text-red-600 underline">
-										<CarbonTrash class="mr-1.5 inline text-xs" />Un-feature</button
+							<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+								>{data.tool?.review?.toLocaleUpperCase()}</span
+							>
+
+							{#if !data.tool?.createdByMe}
+								<form method="POST" action="?/delete" use:enhance>
+									<button
+										type="submit"
+										class="flex items-center text-red-600 underline"
+										on:click={(event) => {
+											if (!confirm("Are you sure you want to delete this tool?")) {
+												event.preventDefault();
+											}
+										}}
+									>
+										<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+									</button>
+								</form>
+							{/if}
+							{#if data.tool?.review === ReviewStatus.PRIVATE}
+								<form method="POST" action="?/approve" use:enhance>
+									<button type="submit" class="flex items-center text-green-600 underline">
+										<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 									>
 								</form>
-							{:else}
-								<form method="POST" action="?/feature" use:enhance>
+							{/if}
+							{#if data.tool?.review === ReviewStatus.PENDING}
+								<form method="POST" action="?/approve" use:enhance>
 									<button type="submit" class="flex items-center text-green-600 underline">
-										<CarbonStar class="mr-1.5 inline text-xs" />Feature</button
+										<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
+									>
+								</form>
+								<form method="POST" action="?/deny" use:enhance>
+									<button type="submit" class="flex items-center text-red-600">
+										<span class="mr-1.5 font-light no-underline">X</span>
+										<span class="underline">Deny</span>
+									</button>
+								</form>
+							{/if}
+							{#if data.tool?.review === ReviewStatus.APPROVED || data.tool?.review === ReviewStatus.DENIED}
+								<form method="POST" action="?/unrequest" use:enhance>
+									<button type="submit" class="flex items-center text-red-600 underline">
+										<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 									>
 								</form>
 							{/if}
 						{/if}
+						{#if data.tool?.createdByMe && data.tool?.review === ReviewStatus.PRIVATE}
+							<form
+								method="POST"
+								action="?/request"
+								use:enhance={async ({ cancel }) => {
+									const confirmed = confirm(
+										"Are you sure you want to request this tool to be featured? Make sure you have tried the tool and that it works as expected. We will review your request once submitted."
+									);
+									if (!confirmed) {
+										cancel();
+									}
+								}}
+							>
+								<button type="submit" class="flex items-center underline">
+									<CarbonStar class="mr-1.5 inline text-xs" />Request to be featured</button
+								>
+							</form>
+						{/if}
 					</div>
 				</div>
 			</div>
-			<p class="text-sm max-sm:hidden">
-				Tools are applications that the model can choose to call while you are chatting with it.
-			</p>
+			{#if !currentModelSupportTools}
+				<span class="relative text-sm text-gray-500">
+					You are currently not using a model that supports tools. Activate one
+					<a href="{base}/models" class="underline">here</a>.
+				</span>
+			{:else}
+				<p class="text-sm max-sm:hidden">
+					Tools are applications that the model can choose to call while you are chatting with it.
+				</p>
+			{/if}
 			{#if data.tool.description}
 				<div>
 					<h2 class="text-lg font-semibold">Description</h2>

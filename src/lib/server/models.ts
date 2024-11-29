@@ -52,20 +52,24 @@ const modelConfig = z.object({
 	endpoints: z.array(endpointSchema).optional(),
 	parameters: z
 		.object({
-			temperature: z.number().min(0).max(1).optional(),
+			temperature: z.number().min(0).max(2).optional(),
 			truncate: z.number().int().positive().optional(),
 			max_new_tokens: z.number().int().positive().optional(),
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),
 			repetition_penalty: z.number().min(-2).max(2).optional(),
+			presence_penalty: z.number().min(-2).max(2).optional(),
 		})
 		.passthrough()
 		.optional(),
 	multimodal: z.boolean().default(false),
+	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	/** Used to enable/disable system prompt usage */
+	systemRoleSupported: z.boolean().default(true),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -78,19 +82,26 @@ async function getChatPromptRender(
 	}
 	let tokenizer: PreTrainedTokenizer;
 
-	if (!m.tokenizer) {
-		return compileTemplate<ChatTemplateInput>(
-			"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
-			m
-		);
-	}
-
 	try {
-		tokenizer = await getTokenizer(m.tokenizer);
+		tokenizer = await getTokenizer(m.tokenizer ?? m.id ?? m.name);
 	} catch (e) {
+		// if fetching the tokenizer fails but it wasnt manually set, use the default template
+		if (!m.tokenizer) {
+			logger.warn(
+				`No tokenizer found for model ${m.name}, using default template. Consider setting tokenizer manually or making sure the model is available on the hub.`,
+				m
+			);
+			return compileTemplate<ChatTemplateInput>(
+				"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
+				m
+			);
+		}
+
 		logger.error(
 			e,
-			`Failed to load tokenizer for model ${m.name} consider setting chatPromptTemplate manually or making sure the model is available on the hub.`
+			`Failed to load tokenizer ${
+				m.tokenizer ?? m.id ?? m.name
+			} make sure the model is available on the hub and you have access to any gated models.`
 		);
 		process.exit();
 	}
@@ -107,10 +118,24 @@ async function getChatPromptRender(
 			role: message.from,
 		}));
 
+		if (!m.systemRoleSupported) {
+			const firstSystemMessage = formattedMessages.find((msg) => msg.role === "system");
+			formattedMessages = formattedMessages.filter((msg) => msg.role !== "system");
+
+			if (
+				firstSystemMessage &&
+				formattedMessages.length > 0 &&
+				formattedMessages[0].role === "user"
+			) {
+				formattedMessages[0].content =
+					firstSystemMessage.content + "\n" + formattedMessages[0].content;
+			}
+		}
+
 		if (preprompt && formattedMessages[0].role !== "system") {
 			formattedMessages = [
 				{
-					role: "system",
+					role: m.systemRoleSupported ? "system" : "user",
 					content: preprompt,
 				},
 				...formattedMessages,
@@ -122,10 +147,10 @@ async function getChatPromptRender(
 			// or use the `rag` mode without the citations
 			const id = m.id ?? m.name;
 
-			if (id.startsWith("CohereForAI")) {
+			if (isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
-						role: "system",
+						role: m.systemRoleSupported ? "system" : "user",
 						content:
 							"\n\n<results>\n" +
 							toolResults
@@ -149,7 +174,7 @@ async function getChatPromptRender(
 					},
 					...formattedMessages,
 				];
-			} else if (id.startsWith("meta-llama")) {
+			} else if (isHuggingChat && id.startsWith("meta-llama")) {
 				const results = toolResults.flatMap((result) => {
 					if (result.status === ToolResultStatus.Error) {
 						return [
@@ -177,7 +202,7 @@ async function getChatPromptRender(
 				formattedMessages = [
 					...formattedMessages,
 					{
-						role: "system",
+						role: m.systemRoleSupported ? "system" : "user",
 						content: JSON.stringify(toolResults),
 					},
 				];
@@ -313,26 +338,17 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-const hasInferenceAPI = async (m: Awaited<ReturnType<typeof processModel>>) => {
-	if (!isHuggingChat) {
-		return false;
-	}
-
-	const r = await fetch(`https://huggingface.co/api/models/${m.id}`);
-
-	if (!r.ok) {
-		logger.warn(`Failed to check if ${m.id} has inference API: ${r.statusText}`);
-		return false;
-	}
-
-	const json = await r.json();
-
-	if (json.cardData.inference === false) {
-		return false;
-	}
-
-	return true;
-};
+const inferenceApiIds = isHuggingChat
+	? await fetch(
+			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
+	  )
+			.then((r) => r.json())
+			.then((json) => json.map((r: { id: string }) => r.id))
+			.catch((err) => {
+				logger.error(err, "Failed to fetch inference API ids");
+				return [];
+			})
+	: [];
 
 export const models = await Promise.all(
 	modelsRaw.map((e) =>
@@ -340,7 +356,7 @@ export const models = await Promise.all(
 			.then(addEndpoint)
 			.then(async (m) => ({
 				...m,
-				hasInferenceAPI: await hasInferenceAPI(m),
+				hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
 			}))
 	)
 );

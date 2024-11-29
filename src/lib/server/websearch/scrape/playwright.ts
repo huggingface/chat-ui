@@ -68,7 +68,18 @@ export async function withPage<T>(
 
 	try {
 		const page = await ctx.newPage();
-		env.PLAYWRIGHT_ADBLOCKER === "true" && (await blocker.enableBlockingInPage(page));
+		if (env.PLAYWRIGHT_ADBLOCKER === "true") {
+			await blocker.enableBlockingInPage(page);
+		}
+
+		await page.route("**", (route, request) => {
+			const requestUrl = request.url();
+			if (!requestUrl.startsWith("https://")) {
+				logger.warn(`Blocked request to: ${requestUrl}`);
+				return route.abort();
+			}
+			return route.continue();
+		});
 
 		const res = await page
 			.goto(url, { waitUntil: "load", timeout: parseInt(env.WEBSEARCH_TIMEOUT) })
@@ -78,9 +89,8 @@ export async function withPage<T>(
 				);
 			});
 
-		// await needed here so that we don't close the context before the callback is done
 		return await callback(page, res ?? undefined);
 	} finally {
-		ctx.close();
+		await ctx.close();
 	}
 }
