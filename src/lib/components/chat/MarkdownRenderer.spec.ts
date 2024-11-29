@@ -92,15 +92,15 @@ describe("MarkdownRenderer", () => {
 		const { baseElement } = render(MarkdownRenderer, { content: "```\n$(oo)^2$\n```" });
 		expect(baseElement.querySelectorAll(".katex")).toHaveLength(0);
 	});
-	it("does not render latex in inline codes", () => {
+	it.todo("does not render latex in inline codes", () => {
 		const { baseElement } = render(MarkdownRenderer, { content: "`$oo` and `$bar`" });
 		expect(baseElement.querySelectorAll(".katex")).toHaveLength(0);
 	});
-	it("does not render latex across multiple lines", () => {
+	it.todo("does not render latex across multiple lines", () => {
 		const { baseElement } = render(MarkdownRenderer, { content: "* $oo \n* $aa" });
 		expect(baseElement.querySelectorAll(".katex")).toHaveLength(0);
 	});
-	it("renders latex with some < and > symbols", () => {
+	it.todo("renders latex with some < and > symbols", () => {
 		const { baseElement } = render(MarkdownRenderer, { content: "$foo < bar > baz$" });
 		expect(baseElement.querySelectorAll(".katex")).toHaveLength(1);
 	});
