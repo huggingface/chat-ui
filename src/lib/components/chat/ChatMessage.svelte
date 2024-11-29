@@ -354,7 +354,7 @@
 					<p
 						class="disabled w-full appearance-none whitespace-break-spaces text-wrap break-words bg-inherit px-5 py-3.5 text-gray-500 dark:text-gray-400"
 					>
-						{message.content.trim()}
+						<MarkdownRenderer content={message.content.trim()} />
 					</p>
 				{:else}
 					<form

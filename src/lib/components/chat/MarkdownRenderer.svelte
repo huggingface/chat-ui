@@ -48,20 +48,7 @@
 		renderer,
 	};
 
-	function escapeHTML(content: string) {
-		return content.replace(
-			/[<>&\n]/g,
-			(x) =>
-				({
-					"<": "&lt;",
-					">": "&gt;",
-					"&": "&amp;",
-					"\n": "<br />",
-				}[x] || x)
-		);
-	}
-
-	$: tokens = marked.lexer(addInlineCitations(escapeHTML(content), sources));
+	$: tokens = marked.lexer(addInlineCitations(content, sources));
 
 	function processLatex(parsed: string) {
 		const delimiters = [
@@ -108,7 +95,8 @@
 </script>
 
 <div
-	class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+	class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900
+  [&>p>code]:rounded [&>p>code]:bg-gray-700/20 [&>p>code]:px-1.5 [&>p>code]:py-0.5 [&>p>code]:font-mono [&>p>code]:before:content-[''] [&>p>code]:after:content-['']"
 >
 	{#each tokens as token}
 		{#if token.type === "code"}
