@@ -235,7 +235,7 @@
 		/>
 	{/if}
 	<div
-		class="scrollbar-custom mr-1 h-full overflow-y-auto"
+		class="scrollbar-custom h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.length ? [...messages] : false}
 		bind:this={chatContainer}
 	>
