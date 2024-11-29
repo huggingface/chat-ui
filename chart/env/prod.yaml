@@ -152,7 +152,21 @@ envVars:
           "top_k": 20,
           "top_p": 0.8,
           "repetition_penalty": 1.05
-        }
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ]
       },
       {
         "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
@@ -392,9 +406,9 @@ envVars:
   PUBLIC_ANNOUNCEMENT_BANNERS: >
     [
       {
-        "title": "Qwen 2.5-Coder 32B is now available!",
+        "title": "QwQ-32B-Preview from Qwen is now available!",
         "linkTitle": "Try it out!",
-        "linkHref": "https://huggingface.co/chat/models/Qwen/Qwen2.5-Coder-32B-Instruct"
+        "linkHref": "https://huggingface.co/chat/models/Qwen/QwQ-32B-Preview"
       }
     ]
   PUBLIC_APP_NAME: "HuggingChat"
