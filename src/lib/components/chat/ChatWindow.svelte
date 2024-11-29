@@ -38,6 +38,8 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
+	import ScreenshotButton from "$lib/components/ScreenshotButton.svelte";
+
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
 
@@ -210,7 +212,7 @@
 		}
 	});
 
-	let chatContainer: HTMLElement;
+	let chatContainer: HTMLDivElement;
 
 	async function scrollToBottom() {
 		await tick();
@@ -237,6 +239,16 @@
 	];
 
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
+	$: isScreenshotEnabled = currentModel.multimodal;
+
+	async function handleScreenshot(event: CustomEvent<File[]>) {
+		try {
+			// Add the screenshot file to the files array
+			files = [...files, ...event.detail];
+		} catch (error) {
+			console.error('Failed to handle screenshot:', error);
+		}
+	}
 </script>
 
 <svelte:window
@@ -383,11 +395,13 @@
 		<div class="w-full">
 			<div class="flex w-full pb-3">
 				{#if !assistant}
-					{#if currentModel.tools}
-						<ToolsMenu {loading} />
-					{:else if $page.data.settings?.searchEnabled}
-						<WebSearchToggle />
-					{/if}
+					<div class="flex items-center">
+						{#if currentModel.tools}
+							<ToolsMenu {loading} />
+						{:else if $page.data.settings?.searchEnabled}
+							<WebSearchToggle />
+						{/if}
+					</div>
 				{/if}
 				{#if loading}
 					<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
@@ -403,7 +417,10 @@
 						}}
 					/>
 				{:else}
-					<div class="ml-auto gap-2">
+					<div class="ml-auto gap-2 flex items-center">
+						{#if isScreenshotEnabled}
+							<ScreenshotButton on:capture={handleScreenshot} />
+						{/if}
 						{#if isFileUploadEnabled}
 							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
 						{/if}
@@ -421,11 +438,12 @@
 					</div>
 				{/if}
 			</div>
+			<div class="flex w-full items-center gap-2">
 			<form
 				tabindex="-1"
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				on:submit|preventDefault={handleSubmit}
-				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
+				class="relative flex flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
             {isReadOnly ? 'opacity-30' : ''}"
 			>
 				{#if onDrag && isFileUploadEnabled}
@@ -480,6 +498,7 @@
 					</div>
 				{/if}
 			</form>
+			</div>
 			<div
 				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
 			>
