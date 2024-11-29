@@ -9,8 +9,7 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"target": "ES2018",
-		"types": ["@testing-library/jest-dom/vitest"]
+		"target": "ES2018"
 	},
 	"exclude": ["vite.config.ts"]
 	// Path aliases are handled by https://kit.svelte.dev/docs/configuration#alias
