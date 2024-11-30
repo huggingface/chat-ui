@@ -399,6 +399,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					!(
 						event.type === MessageUpdateType.Status &&
 						event.status === MessageUpdateStatus.KeepAlive
+					) &&
+					!(
+						event.type === MessageUpdateType.Reasoning &&
+						event.subtype === MessageReasoningUpdateType.Stream
 					)
 				) {
 					messageToWriteTo?.updates?.push(event);
