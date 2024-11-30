@@ -228,7 +228,6 @@
 				if (update.type === MessageUpdateType.Stream) {
 					update.token = update.token.replaceAll("\0", "");
 				}
-
 				messageUpdates.push(update);
 
 				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
@@ -261,6 +260,9 @@
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
 					];
+					messages = [...messages];
+				} else if (update.type === MessageUpdateType.Reasoning) {
+					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
 				}
 			}
