@@ -482,7 +482,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 			messageToWriteTo.updatedAt = new Date();
 
-			// let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
 
 			try {
