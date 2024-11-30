@@ -16,7 +16,27 @@
 		<div
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
-			<IconThought class="text-lg {loading ? 'animate-spin-slow' : ''}" />
+			<svg
+				class="absolute inset-0 text-gray-300 transition-opacity dark:text-gray-700 {loading
+					? 'opacity-100'
+					: 'opacity-0'}"
+				width="40"
+				height="40"
+				viewBox="0 0 38 38"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<path
+					class="loading-path"
+					d="M8 2.5H30C30 2.5 35.5 2.5 35.5 8V30C35.5 30 35.5 35.5 30 35.5H8C8 35.5 2.5 35.5 2.5 30V8C2.5 8 2.5 2.5 8 2.5Z"
+					stroke="currentColor"
+					stroke-width="1"
+					stroke-linecap="round"
+					id="shape"
+				/>
+			</svg>
+
+			<IconThought class="text-[1rem]" />
 		</div>
 		<dl class="leading-4">
 			<dd class="text-sm">Reasoning</dd>
@@ -41,16 +61,14 @@
 		display: none;
 	}
 
-	:global(.animate-spin-slow) {
-		animation: spin 3s linear infinite;
+	.loading-path {
+		stroke-dasharray: 61.45;
+		animation: loading 2s linear infinite;
 	}
 
-	@keyframes spin {
-		from {
-			transform: rotate(0deg);
-		}
+	@keyframes loading {
 		to {
-			transform: rotate(360deg);
+			stroke-dashoffset: 122.9;
 		}
 	}
 </style>

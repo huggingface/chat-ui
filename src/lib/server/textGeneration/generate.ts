@@ -22,6 +22,7 @@ export async function* generate(
 	let reasoningBuffer = "";
 	let lastReasoningUpdate = new Date();
 	let status = "";
+	const startTime = new Date();
 	if (
 		model.reasoning &&
 		(model.reasoning.type === "regex" || model.reasoning.type === "summarize")
@@ -90,7 +91,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 				yield {
 					type: MessageUpdateType.Reasoning,
 					subtype: MessageReasoningUpdateType.Status,
-					status: "Done reasoning.",
+					status: `Done in ${Math.round((new Date().getTime() - startTime.getTime()) / 1000)}s.`,
 				};
 			}
 
@@ -118,7 +119,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 				yield {
 					type: MessageUpdateType.Reasoning,
 					subtype: MessageReasoningUpdateType.Status,
-					status: "Done reasoning.",
+					status: `Done in ${Math.round((new Date().getTime() - startTime.getTime()) / 1000)}s.`,
 				};
 			}
 		}
