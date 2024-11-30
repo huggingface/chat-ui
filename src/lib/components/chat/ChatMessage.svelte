@@ -217,7 +217,10 @@
 				<OpenWebSearchResults webSearchMessages={searchUpdates} />
 			{/if}
 			{#if reasoningUpdates && reasoningUpdates.length > 0}
-				<OpenReasoningResults updates={reasoningUpdates} />
+				<OpenReasoningResults
+					updates={reasoningUpdates}
+					loading={loading && message.content.length === 0}
+				/>
 			{/if}
 
 			{#if toolUpdates}
@@ -230,7 +233,10 @@
 				{/each}
 			{/if}
 
-			<div bind:this={contentEl}>
+			<div
+				bind:this={contentEl}
+				class:mt-2={reasoningUpdates.length > 0 || searchUpdates.length > 0}
+			>
 				{#if isLast && loading && $settings.disableStream}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}

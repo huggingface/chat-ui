@@ -8,6 +8,7 @@ import { AbortedGenerations } from "../abortedGenerations";
 import type { TextGenerationContext } from "./types";
 import type { EndpointMessage } from "../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
+import { generateSummaryOfReasoning } from "./reasoning";
 
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
@@ -19,6 +20,21 @@ export async function* generate(
 	// reasoning mode is false by default
 	let reasoning = false;
 	let reasoningBuffer = "";
+	let lastReasoningUpdate = new Date();
+
+	if (
+		model.reasoning &&
+		(model.reasoning.type === "regex" || model.reasoning.type === "summarize")
+	) {
+		// if the model has reasoning in regex or summarize mode, it starts in reasoning mode
+		// and we extract the answer from the reasoning
+		reasoning = true;
+		yield {
+			type: MessageUpdateType.Reasoning,
+			subtype: MessageReasoningUpdateType.Status,
+			status: "Started reasoning...",
+		};
+	}
 
 	for await (const output of await endpoint({
 		messages,
@@ -29,15 +45,6 @@ export async function* generate(
 		isMultimodal: model.multimodal,
 		conversationId: conv._id,
 	})) {
-		if (
-			model.reasoning &&
-			(model.reasoning.type === "regex" || model.reasoning.type === "summarize")
-		) {
-			// if the model has reasoning in regex or summarize mode, it starts in reasoning mode
-			// and we extract the answer from the reasoning
-			reasoning = true;
-		}
-
 		// text generation completed
 		if (output.generated_text) {
 			let interrupted =
@@ -56,6 +63,11 @@ export async function* generate(
 				const regex = new RegExp(model.reasoning.regex);
 				finalAnswer = regex.exec(reasoningBuffer)?.[1] ?? text;
 			} else if (model.reasoning && model.reasoning.type === "summarize") {
+				yield {
+					type: MessageUpdateType.Reasoning,
+					subtype: MessageReasoningUpdateType.Status,
+					status: "Summarizing reasoning...",
+				};
 				const summary = yield* generateFromDefaultEndpoint({
 					messages: [
 						{
@@ -65,7 +77,7 @@ export async function* generate(
 							}\n\nReasoning: ${reasoningBuffer}`,
 						},
 					],
-					preprompt: `Your task is to summarize concisely all your reasoning steps and then give the final answer. 
+					preprompt: `Your task is to summarize concisely all your reasoning steps and then give the final answer. Keep it short, one short paragraph at most.
 
 If the user is just having a casual conversation that doesn't require explanations, answer directly without explaining your steps, otherwise make sure to summarize step by step, make sure to skip dead-ends in your reasoning and removing excess detail.
 
@@ -75,6 +87,11 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 					},
 				});
 				finalAnswer = summary;
+				yield {
+					type: MessageUpdateType.Reasoning,
+					subtype: MessageReasoningUpdateType.Status,
+					status: "Done reasoning.",
+				};
 			}
 
 			yield {
@@ -90,9 +107,19 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			if (output.token.text === model.reasoning.beginToken) {
 				reasoning = true;
 				reasoningBuffer += output.token.text;
+				yield {
+					type: MessageUpdateType.Reasoning,
+					subtype: MessageReasoningUpdateType.Status,
+					status: "Reasoning started...",
+				};
 			} else if (output.token.text === model.reasoning.endToken) {
 				reasoning = false;
 				reasoningBuffer += output.token.text;
+				yield {
+					type: MessageUpdateType.Reasoning,
+					subtype: MessageReasoningUpdateType.Status,
+					status: "Done reasoning.",
+				};
 			}
 		}
 		// ignore special tokens
@@ -101,6 +128,11 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 		// pass down normal token
 		if (reasoning) {
 			reasoningBuffer += output.token.text;
+
+			if (new Date().getTime() - lastReasoningUpdate.getTime() > 5000) {
+				lastReasoningUpdate = new Date();
+				yield* generateSummaryOfReasoning(reasoningBuffer);
+			}
 			yield {
 				type: MessageUpdateType.Reasoning,
 				subtype: MessageReasoningUpdateType.Stream,
