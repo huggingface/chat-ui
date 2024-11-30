@@ -142,6 +142,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	const {
 		inputs: newPrompt,
+		is_streaming: isStreaming, // boolean flag to check if streaming or non-streaming
 		id: messageId,
 		is_retry: isRetry,
 		is_continue: isContinue,
@@ -156,6 +157,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.min(1)
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
+			is_streaming: z.optional(z.boolean()), // added is_streaming
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
 			web_search: z.optional(z.boolean()),
@@ -323,10 +325,71 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	let lastTokenTimestamp: undefined | Date = undefined;
 
+	// redeclaration of hasError
+	let hasError = false;
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
 			messageToWriteTo.updates ??= [];
+			// handle non-streaming requests
+			if (!isStreaming) {
+				try {
+					// Generate the text all at once
+					const ctx = {
+						model,
+						endpoint: await model.getEndpoint(),
+						conv,
+						messages: messagesForPrompt,
+						assistant: undefined,
+						isContinue: isContinue ?? false,
+						webSearch: webSearch ?? false,
+						toolsPreference: toolsPreferences ?? [],
+						promptedAt,
+						ip: getClientAddress(),
+						username: locals.user?.username,
+					};
+
+					let finalResult = "";
+					const initialMessageContent = "";
+					for await (const event of textGeneration(ctx)) {
+						if (event.type === MessageUpdateType.Stream && event.token != "") {
+							finalResult = event.token;
+						} else if (event.type === MessageUpdateType.FinalAnswer) {
+							messageToWriteTo.content = initialMessageContent + event.text;
+							messageToWriteTo.interrupted = event.interrupted;
+						}
+					}
+
+					// Update conversation in database
+					await collections.conversations.updateOne(
+						{ _id: convId },
+						{ $set: { messages: conv.messages, title: conv?.title, updatedAt: new Date() } }
+					);
+
+					// Send final result as JSON
+					controller.enqueue(
+						JSON.stringify({
+							content: finalResult,
+							updates: messageToWriteTo.updates,
+							interrupted: messageToWriteTo.interrupted ?? false,
+						}) + "\n"
+					);
+				} catch (e) {
+					hasError = true;
+					controller.enqueue(
+						JSON.stringify({
+							type: MessageUpdateType.Status,
+							status: MessageUpdateStatus.Error,
+							message: (e as Error).message,
+						}) + "\n"
+					);
+					logger.error(e);
+				} finally {
+					// Make sure stream is closed
+					controller.close();
+				}
+			}
 			async function update(event: MessageUpdate) {
 				if (!messageToWriteTo || !conv) {
 					throw Error("No message or conversation to write events to");
@@ -419,7 +482,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			);
 			messageToWriteTo.updatedAt = new Date();
 
-			let hasError = false;
+			// let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
 
 			try {
