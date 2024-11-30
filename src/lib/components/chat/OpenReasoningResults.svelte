@@ -1,24 +1,10 @@
 <script lang="ts">
-	import {
-		MessageReasoningUpdateType,
-		type MessageReasoningUpdate,
-	} from "$lib/types/MessageUpdate";
-
 	import IconThought from "~icons/carbon/circle-packing";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 
-	export let updates: MessageReasoningUpdate[];
+	export let summary: string;
+	export let content: string;
 	export let loading: boolean = false;
-
-	$: summaries = updates
-		.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
-		.map((u) => u.status);
-
-	$: content = updates
-		.filter((u) => u.subtype === MessageReasoningUpdateType.Stream)
-		.reduce((acc, u) => acc + u.token, "");
-
-	$: lastSummary = summaries[summaries.length - 1] || "";
 </script>
 
 <details
@@ -30,7 +16,7 @@
 		<div
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
-			<IconThought class="text-lg {loading ? 'animate-spin' : ''}" />
+			<IconThought class="text-lg {loading ? 'animate-spin-slow' : ''}" />
 		</div>
 		<dl class="leading-4">
 			<dd class="text-sm">Reasoning</dd>
@@ -38,7 +24,7 @@
 				class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400"
 				class:animate-pulse={loading}
 			>
-				{lastSummary}
+				{summary}
 			</dt>
 		</dl>
 	</summary>
@@ -53,5 +39,18 @@
 <style>
 	details summary::-webkit-details-marker {
 		display: none;
+	}
+
+	:global(.animate-spin-slow) {
+		animation: spin 3s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>

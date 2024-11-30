@@ -26,6 +26,7 @@
 		type MessageWebSearchUpdate,
 		type MessageFinalAnswerUpdate,
 		type MessageReasoningUpdate,
+		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import { useConvTreeStore } from "$lib/stores/convTree";
@@ -217,8 +218,13 @@
 				<OpenWebSearchResults webSearchMessages={searchUpdates} />
 			{/if}
 			{#if reasoningUpdates && reasoningUpdates.length > 0}
+				{@const summaries = reasoningUpdates
+					.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
+					.map((u) => u.status)}
+
 				<OpenReasoningResults
-					updates={reasoningUpdates}
+					summary={summaries[summaries.length - 1] || ""}
+					content={message.reasoning || ""}
 					loading={loading && message.content.length === 0}
 				/>
 			{/if}

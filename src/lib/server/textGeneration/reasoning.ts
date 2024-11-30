@@ -1,14 +1,11 @@
-import { MessageReasoningUpdateType, type MessageReasoningUpdate } from "$lib/types/MessageUpdate";
-
-import { MessageUpdateType } from "$lib/types/MessageUpdate";
-
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 
-export async function* generateSummaryOfReasoning(
-	buffer: string
-): AsyncGenerator<MessageReasoningUpdate> {
+export async function generateSummaryOfReasoning(buffer: string): Promise<string> {
+	// debug 5s delay
+	await new Promise((resolve) => setTimeout(resolve, 3000));
+
 	const summary = await getReturnFromGenerator(
 		generateFromDefaultEndpoint({
 			messages: [
@@ -29,9 +26,5 @@ export async function* generateSummaryOfReasoning(
 		return parts[0] + "...";
 	});
 
-	yield {
-		type: MessageUpdateType.Reasoning,
-		subtype: MessageReasoningUpdateType.Status,
-		status: summary,
-	};
+	return summary;
 }

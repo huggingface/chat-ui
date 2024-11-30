@@ -21,7 +21,7 @@ export async function* generate(
 	let reasoning = false;
 	let reasoningBuffer = "";
 	let lastReasoningUpdate = new Date();
-
+	let status = "";
 	if (
 		model.reasoning &&
 		(model.reasoning.type === "regex" || model.reasoning.type === "summarize")
@@ -129,9 +129,22 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 		if (reasoning) {
 			reasoningBuffer += output.token.text;
 
+			// yield status update if it has changed
+			if (status !== "") {
+				yield {
+					type: MessageUpdateType.Reasoning,
+					subtype: MessageReasoningUpdateType.Status,
+					status,
+				};
+				status = "";
+			}
+
+			// create a new status every 5 seconds
 			if (new Date().getTime() - lastReasoningUpdate.getTime() > 5000) {
 				lastReasoningUpdate = new Date();
-				yield* generateSummaryOfReasoning(reasoningBuffer);
+				generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
+					status = summary;
+				});
 			}
 			yield {
 				type: MessageUpdateType.Reasoning,
