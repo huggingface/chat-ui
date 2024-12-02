@@ -63,7 +63,7 @@
 	"dependencies": {
 		"@aws-sdk/credential-providers": "^3.592.0",
 		"@cliqz/adblocker-playwright": "^1.27.2",
-		"@gradio/client": "^1.1.1",
+		"@gradio/client": "^1.8.0",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.7.0",
 		"@huggingface/transformers": "^3.0.0-alpha.6",
