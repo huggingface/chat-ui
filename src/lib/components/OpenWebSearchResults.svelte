@@ -9,7 +9,6 @@
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconInternet from "./icons/IconInternet.svelte";
 
-	export let classNames = "";
 	export let webSearchMessages: MessageWebSearchUpdate[] = [];
 
 	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
@@ -23,7 +22,7 @@
 </script>
 
 <details
-	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
+	class="flex w-fit max-w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2">
 		<div
