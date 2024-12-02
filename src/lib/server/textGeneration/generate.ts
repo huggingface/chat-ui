@@ -78,7 +78,7 @@ export async function* generate(
 							}\n\nReasoning: ${reasoningBuffer}`,
 						},
 					],
-					preprompt: `Your task is to summarize concisely all your reasoning steps and then give the final answer. Keep it short, one short paragraph at most.
+					preprompt: `Your task is to summarize concisely all your reasoning steps and then give the final answer. Keep it short, one short paragraph at most. If the final solution includes code, make sure to include it in your answer.
 
 If the user is just having a casual conversation that doesn't require explanations, answer directly without explaining your steps, otherwise make sure to summarize step by step, make sure to skip dead-ends in your reasoning and removing excess detail.
 
@@ -111,7 +111,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 				yield {
 					type: MessageUpdateType.Reasoning,
 					subtype: MessageReasoningUpdateType.Status,
-					status: "Reasoning started...",
+					status: "Started thinking...",
 				};
 			} else if (output.token.text === model.reasoning.endToken) {
 				reasoning = false;
@@ -141,7 +141,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			}
 
 			// create a new status every 5 seconds
-			if (new Date().getTime() - lastReasoningUpdate.getTime() > 5000) {
+			if (new Date().getTime() - lastReasoningUpdate.getTime() > 4000) {
 				lastReasoningUpdate = new Date();
 				generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
 					status = summary;
