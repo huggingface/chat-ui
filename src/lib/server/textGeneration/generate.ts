@@ -78,7 +78,7 @@ export async function* generate(
 							}\n\nReasoning: ${reasoningBuffer}`,
 						},
 					],
-					preprompt: `Your task is to summarize concisely all your reasoning steps and then give the final answer. Keep it short, one short paragraph at most. If the final solution includes code, make sure to include it in your answer.
+					preprompt: `Your task is to summarize concisely all your reasoning steps and then give the final answer. Keep it short, one short paragraph at most. If the reasoning steps explicitly include a code solution, make sure to include it in your answer.
 
 If the user is just having a casual conversation that doesn't require explanations, answer directly without explaining your steps, otherwise make sure to summarize step by step, make sure to skip dead-ends in your reasoning and removing excess detail.
 
