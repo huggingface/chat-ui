@@ -39,7 +39,6 @@
 		"@types/uuid": "^9.0.8",
 		"@typescript-eslint/eslint-plugin": "^6.x",
 		"@typescript-eslint/parser": "^6.x",
-		"@vitest/ui": "^2.1.6",
 		"dompurify": "^3.1.6",
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
