@@ -144,6 +144,9 @@ envVars:
         "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
         "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
+        "reasoning": {
+          "type": "summarize"
+        },
         "parameters": {
           "stop": ["<|im_end|>"],
           "truncate": 12288,

@@ -17,6 +17,21 @@ import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
+const reasoningSchema = z.union([
+	z.object({
+		type: z.literal("regex"), // everything is reasoning, extract the answer from the regex
+		regex: z.string(),
+	}),
+	z.object({
+		type: z.literal("tokens"), // use beginning and end tokens that define the reasoning portion of the answer
+		beginToken: z.string(),
+		endToken: z.string(),
+	}),
+	z.object({
+		type: z.literal("summarize"), // everything is reasoning, summarize the answer
+	}),
+]);
+
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
@@ -70,6 +85,7 @@ const modelConfig = z.object({
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
+	reasoning: reasoningSchema.optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
