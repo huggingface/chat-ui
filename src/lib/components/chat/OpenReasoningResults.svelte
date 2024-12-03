@@ -7,7 +7,7 @@
 </script>
 
 <details
-	class="u flex w-fit max-w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+	class="flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary
 		class="grid min-w-72 cursor-pointer select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2"
@@ -52,7 +52,7 @@
 	</summary>
 
 	<div
-		class="border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 space-y-4"
+		class="space-y-4 border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
 	>
 		<MarkdownRenderer {content} />
 	</div>
