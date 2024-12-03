@@ -2,7 +2,7 @@
 	import type { WebSearchSource } from "$lib/types/WebSearch";
 	import katex from "katex";
 	import DOMPurify from "isomorphic-dompurify";
-	import { marked, type MarkedOptions } from "marked";
+	import { Marked } from "marked";
 	import CodeBlock from "../CodeBlock.svelte";
 
 	export let content: string;
@@ -30,24 +30,6 @@
 		});
 	}
 
-	const renderer = new marked.Renderer();
-
-	// For code blocks with simple backticks
-	renderer.codespan = (code) => {
-		// Unsanitize double-sanitized code
-		return `<code>${code.replaceAll("&amp;", "&")}</code>`;
-	};
-
-	renderer.link = (href, title, text) => {
-		return `<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`;
-	};
-
-	const options: MarkedOptions = {
-		gfm: true,
-		// breaks: true,
-		renderer,
-	};
-
 	function escapeHTML(content: string) {
 		return content.replace(
 			/[<>&\n]/g,
@@ -59,8 +41,6 @@
 				}[x] || x)
 		);
 	}
-
-	$: tokens = marked.lexer(addInlineCitations(content, sources));
 
 	function processLatex(parsed: string) {
 		const delimiters = [
@@ -98,6 +78,21 @@
 		return parsed;
 	}
 
+	const marked = new Marked({
+		hooks: {
+			preprocess: (md) => addInlineCitations(escapeHTML(md), sources),
+			postprocess: (html) => {
+				return DOMPurify.sanitize(processLatex(html));
+			},
+		},
+		renderer: {
+			codespan: (code) => `<code>${code.replaceAll("&amp;", "&")}</code>`,
+			link: (href, title, text) =>
+				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
+		},
+		gfm: true,
+	});
+
 	DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 		if (node.tagName === "A") {
 			node.setAttribute("rel", "noreferrer");
@@ -106,17 +101,20 @@
 	});
 </script>
 
-{#each tokens as token}
-	{#if token.type === "code"}
-		<CodeBlock lang={token.lang} code={token.text} />
-	{:else}
-		{@const parsed = marked.parse(processLatex(escapeHTML(token.raw)), options)}
-		{#await parsed then parsed}
-			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-			{@html DOMPurify.sanitize(parsed)}
-		{/await}
-	{/if}
-{/each}
+<div
+	class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+>
+	{#each marked.lexer(content) as token}
+		{#if token.type === "code"}
+			<CodeBlock lang={token.lang} code={token.text} />
+		{:else}
+			{#await marked.parse(token.raw) then parsed}
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+				{@html parsed}
+			{/await}
+		{/if}
+	{/each}
+</div>
 
 <style lang="postcss">
 	:global(.katex-display) {
