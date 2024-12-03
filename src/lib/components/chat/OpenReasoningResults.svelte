@@ -16,7 +16,7 @@
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
 			<div class="grid h-dvh place-items-center">
-				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 32 32">
 					<path
 						class="stroke-gray-600 dark:stroke-gray-400"
 						style="stroke-width: 1.9; fill: none; stroke-linecap: round; stroke-linejoin: round;"
