@@ -101,20 +101,16 @@
 	});
 </script>
 
-<div
-	class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
->
-	{#each marked.lexer(content) as token}
-		{#if token.type === "code"}
-			<CodeBlock lang={token.lang} code={token.text} />
-		{:else}
-			{#await marked.parse(token.raw) then parsed}
-				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-				{@html parsed}
-			{/await}
-		{/if}
-	{/each}
-</div>
+{#each marked.lexer(content) as token}
+	{#if token.type === "code"}
+		<CodeBlock lang={token.lang} code={token.text} />
+	{:else}
+		{#await marked.parse(token.raw) then parsed}
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+			{@html parsed}
+		{/await}
+	{/if}
+{/each}
 
 <style lang="postcss">
 	:global(.katex-display) {

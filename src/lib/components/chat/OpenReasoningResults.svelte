@@ -52,7 +52,7 @@
 	</summary>
 
 	<div
-		class="border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
+		class="border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 space-y-4"
 	>
 		<MarkdownRenderer {content} />
 	</div>
