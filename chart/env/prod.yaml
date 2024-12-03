@@ -139,6 +139,7 @@ envVars:
       },
       {
         "name": "Qwen/QwQ-32B-Preview",
+        "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
         "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
         "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
