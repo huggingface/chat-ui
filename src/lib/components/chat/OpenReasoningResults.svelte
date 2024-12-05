@@ -1,5 +1,6 @@
 <script lang="ts">
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
+	import CarbonCaretDown from "~icons/carbon/caret-down";
 
 	export let summary: string;
 	export let content: string;
@@ -7,16 +8,17 @@
 </script>
 
 <details
-	class="u flex w-fit max-w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary
-		class="grid min-w-72 cursor-pointer select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2"
+		class="
+		grid min-w-72 cursor-pointer select-none grid-cols-[40px,1fr,24px] items-center gap-2.5 rounded-xl p-2 group-open:rounded-b-none hover:bg-gray-500/10"
 	>
 		<div
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
 			<div class="grid h-dvh place-items-center">
-				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 32 32">
 					<path
 						class="stroke-gray-600 dark:stroke-gray-400"
 						style="stroke-width: 1.9; fill: none; stroke-linecap: round; stroke-linejoin: round;"
@@ -49,10 +51,11 @@
 				{summary}
 			</dt>
 		</dl>
+		<CarbonCaretDown class="size-6 text-gray-400 transition-transform group-open:rotate-180" />
 	</summary>
 
 	<div
-		class="border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
+		class="space-y-4 border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
 	>
 		<MarkdownRenderer {content} />
 	</div>
