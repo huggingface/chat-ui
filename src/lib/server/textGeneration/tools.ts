@@ -188,7 +188,7 @@ export async function* runTools(
 	for await (const output of await endpoint({
 		messages: formattedMessages,
 		preprompt,
-		generateSettings: assistant?.generateSettings,
+		generateSettings: { temperature: 0.1, ...assistant?.generateSettings },
 		tools: tools.map((tool) => ({
 			...tool,
 			inputs: tool.inputs.map((input) => ({
@@ -210,7 +210,6 @@ export async function* runTools(
 			try {
 				const rawCalls = await extractJson(output.generated_text);
 				const newCalls = rawCalls
-					.filter(isExternalToolCall)
 					.map((call) => externalToToolCall(call, tools))
 					.filter((call) => call !== undefined) as ToolCall[];
 
@@ -239,36 +238,33 @@ export async function* runTools(
 	return toolResults.filter((result): result is ToolResult => result !== undefined);
 }
 
-const externalToolCall = z.object({
-	tool_name: z.string(),
-	parameters: z.record(z.any()),
-});
+function externalToToolCall(call: unknown, tools: Tool[]): ToolCall | undefined {
+	// Early return if invalid input
+	if (!isValidCallObject(call)) {
+		return undefined;
+	}
 
-type ExternalToolCall = z.infer<typeof externalToolCall>;
+	const parsedCall = parseExternalCall(call);
+	if (!parsedCall) return undefined;
 
-function isExternalToolCall(call: unknown): call is ExternalToolCall {
-	return externalToolCall.safeParse(call).success;
-}
-
-function externalToToolCall(call: ExternalToolCall, tools: Tool[]): ToolCall | undefined {
-	// Convert - to _ since some models insist on using _ instead of -
-	const tool = tools.find((tool) => toolHasName(call.tool_name, tool));
-
+	const tool = tools.find((tool) => toolHasName(parsedCall.tool_name, tool));
 	if (!tool) {
-		logger.debug(`Model requested tool that does not exist: "${call.tool_name}". Skipping tool...`);
-		return;
+		logger.debug(
+			`Model requested tool that does not exist: "${parsedCall.tool_name}". Skipping tool...`
+		);
+		return undefined;
 	}
 
 	const parametersWithDefaults: Record<string, string> = {};
 
 	for (const input of tool.inputs) {
-		const value = call.parameters[input.name];
+		const value = parsedCall.parameters[input.name];
 
 		// Required so ensure it's there, otherwise return undefined
 		if (input.paramType === "required") {
 			if (value === undefined) {
 				logger.debug(
-					`Model requested tool "${call.tool_name}" but was missing required parameter "${input.name}". Skipping tool...`
+					`Model requested tool "${parsedCall.tool_name}" but was missing required parameter "${input.name}". Skipping tool...`
 				);
 				return;
 			}
@@ -285,7 +281,41 @@ function externalToToolCall(call: ExternalToolCall, tools: Tool[]): ToolCall | u
 	}
 
 	return {
-		name: call.tool_name,
+		name: parsedCall.tool_name,
 		parameters: parametersWithDefaults,
 	};
+}
+
+// Helper functions
+function isValidCallObject(call: unknown): call is Record<string, unknown> {
+	return typeof call === "object" && call !== null;
+}
+
+function parseExternalCall(callObj: Record<string, unknown>) {
+	const nameFields = ["tool_name", "name"] as const;
+	const parametersFields = ["parameters", "arguments"] as const;
+
+	const groupedCall = {
+		tool_name: "" as string,
+		parameters: undefined as Record<string, string> | undefined,
+	};
+
+	for (const name of nameFields) {
+		if (callObj[name]) {
+			groupedCall.tool_name = callObj[name] as string;
+		}
+	}
+
+	for (const name of parametersFields) {
+		if (callObj[name]) {
+			groupedCall.parameters = callObj[name] as Record<string, string>;
+		}
+	}
+
+	return z
+		.object({
+			tool_name: z.string(),
+			parameters: z.record(z.any()),
+		})
+		.parse(groupedCall);
 }
