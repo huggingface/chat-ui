@@ -184,6 +184,7 @@ export async function* runTools(
 		? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
 		: messages;
 
+	let rawText = "";
 	// do the function calling bits here
 	for await (const output of await endpoint({
 		messages: formattedMessages,
@@ -202,6 +203,24 @@ export async function* runTools(
 		if (output.token.toolCalls) {
 			calls.push(...output.token.toolCalls);
 			continue;
+		}
+
+		if (output.token.text) {
+			rawText += output.token.text;
+		}
+
+		// if we dont see a tool call in the first 25 chars, something is going wrong and we abort
+		if (rawText.length > 25 && !(rawText.includes("```json") || rawText.includes("{"))) {
+			return [];
+		}
+
+		// if we see a directly_answer tool call, we skip the rest
+		if (
+			rawText.includes("directly_answer") ||
+			rawText.includes("directlyAnswer") ||
+			rawText.includes("directly-answer")
+		) {
+			return [];
 		}
 
 		// look for a code blocks of ```json and parse them
