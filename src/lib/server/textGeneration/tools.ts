@@ -234,10 +234,7 @@ export async function* runTools(
 
 				calls.push(...newCalls);
 			} catch (e) {
-				logger.warn(
-					{ rawCall: output.generated_text, error: extractJson },
-					"Error while parsing tool calls"
-				);
+				logger.warn({ rawCall: output.generated_text, error: e }, "Error while parsing tool calls");
 				// error parsing the calls
 				yield {
 					type: MessageUpdateType.Status,
