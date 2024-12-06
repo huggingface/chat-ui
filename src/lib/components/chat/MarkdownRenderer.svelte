@@ -56,7 +56,7 @@
 			const escapedRight = right.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 			// Create regex pattern that matches content between delimiters
-			const pattern = new RegExp(`${escapedLeft}([^]*?)${escapedRight}`, "g");
+			const pattern = new RegExp(`(?<!\\w)${escapedLeft}([^]*?)${escapedRight}(?!\\w)`, "g");
 
 			parsed = parsed.replace(pattern, (match, latex) => {
 				try {
