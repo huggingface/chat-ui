@@ -80,7 +80,7 @@ envVars:
       {
         "name": "meta-llama/Llama-3.3-70B-Instruct",
         "id": "meta-llama/Llama-3.3-70B-Instruct",
-        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
+        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities. Now with the latest Llama 3.3 weights!",
         "modelUrl": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
