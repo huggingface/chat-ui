@@ -407,9 +407,9 @@ envVars:
   PUBLIC_ANNOUNCEMENT_BANNERS: >
     [
       {
-        "title": "QwQ-32B-Preview from Qwen is now available!",
+        "title": "Llama 3.3 70B is now available!",
         "linkTitle": "Try it out!",
-        "linkHref": "https://huggingface.co/chat/models/Qwen/QwQ-32B-Preview"
+        "linkHref": "https://huggingface.co/chat/models/meta-llama/Llama-3.3-70B-Instruct"
       }
     ]
   PUBLIC_APP_NAME: "HuggingChat"
