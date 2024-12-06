@@ -78,10 +78,10 @@ envVars:
         ]
       },
       {
-        "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
-        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "name": "meta-llama/Llama-3.3-70B-Instruct",
+        "id": "meta-llama/Llama-3.3-70B-Instruct",
+        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities. Now with the latest Llama 3.3 weights!",
+        "modelUrl": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
@@ -396,6 +396,10 @@ envVars:
       {
         "name": "microsoft/Phi-3-mini-4k-instruct",
         "transferTo": "microsoft/Phi-3.5-mini-instruct"
+      },
+      {
+        "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "transferTo": "meta-llama/Llama-3.3-70B-Instruct"
       }
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
