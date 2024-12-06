@@ -50,7 +50,6 @@ envVars:
     [
       {
         "name": "Qwen/Qwen2.5-72B-Instruct",
-        "tokenizer": "Qwen/Qwen2.5-72B-Instruct",
         "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
         "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5/",
@@ -62,6 +61,7 @@ envVars:
           "truncate": 28672,
           "max_new_tokens": 3072
         },
+        "tools": true,
         "promptExamples": [
           {
             "title": "Write an email from bullet list",
@@ -80,7 +80,6 @@ envVars:
       {
         "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "tokenizer": "nsarrazin/llama3.1-tokenizer",
         "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
         "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/",
@@ -110,7 +109,6 @@ envVars:
       },
       {
         "name": "CohereForAI/c4ai-command-r-plus-08-2024",
-        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
         "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
@@ -350,10 +348,6 @@ envVars:
       },
       {
         "name": "llhf/Meta-Llama-3.1-8B-Instruct",
-        "tokenizer": {
-          "tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json",
-          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"
-        },
         "parameters": {
           "temperature": 0.6,
           "stop": ["<|endoftext|>", "<|eot_id|>"]

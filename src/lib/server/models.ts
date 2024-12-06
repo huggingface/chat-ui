@@ -129,7 +129,11 @@ async function getChatPromptRender(
 		toolResults,
 		continueMessage,
 	}: ChatTemplateInput) => {
-		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
+		let formattedMessages: {
+			role: string;
+			content: string;
+			tool_calls?: { id: string; tool_call_id: string; output: string }[];
+		}[] = messages.map((message) => ({
 			content: message.content,
 			role: message.from,
 		}));
@@ -166,7 +170,7 @@ async function getChatPromptRender(
 			if (isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
-						role: m.systemRoleSupported ? "system" : "user",
+						role: "user",
 						content:
 							"\n\n<results>\n" +
 							toolResults
@@ -226,20 +230,6 @@ async function getChatPromptRender(
 			tools = [];
 		}
 
-		const chatTemplate = tools?.length ? "tool_use" : undefined;
-
-		const documents = (toolResults ?? []).flatMap((result) => {
-			if (result.status === ToolResultStatus.Error) {
-				return [{ title: `Tool "${result.call.name}" error`, text: "\n" + result.message }];
-			}
-			return result.outputs.flatMap((output) =>
-				Object.entries(output).map(([title, text]) => ({
-					title: `Tool "${result.call.name}" ${title}`,
-					text: "\n" + text,
-				}))
-			);
-		});
-
 		const mappedTools =
 			tools?.map((tool) => {
 				const inputs: Record<
@@ -271,9 +261,7 @@ async function getChatPromptRender(
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
 			add_generation_prompt: !continueMessage,
-			chat_template: chatTemplate,
-			tools: mappedTools,
-			documents,
+			tools: mappedTools.length ? mappedTools : undefined,
 		});
 
 		if (typeof output !== "string") {
@@ -282,7 +270,6 @@ async function getChatPromptRender(
 
 		return output;
 	};
-
 	return renderTemplate;
 }
 
