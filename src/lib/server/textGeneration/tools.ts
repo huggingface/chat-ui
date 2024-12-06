@@ -215,12 +215,15 @@ export async function* runTools(
 
 				calls.push(...newCalls);
 			} catch (e) {
-				logger.error(e, "Error while parsing tool calls, please retry");
+				logger.warn(
+					{ rawCall: output.generated_text, error: extractJson },
+					"Error while parsing tool calls"
+				);
 				// error parsing the calls
 				yield {
 					type: MessageUpdateType.Status,
 					status: MessageUpdateStatus.Error,
-					message: "Error while parsing tool calls, please retry",
+					message: "Error while parsing tool calls.",
 				};
 			}
 		}
@@ -293,7 +296,7 @@ function isValidCallObject(call: unknown): call is Record<string, unknown> {
 
 function parseExternalCall(callObj: Record<string, unknown>) {
 	const nameFields = ["tool_name", "name"] as const;
-	const parametersFields = ["parameters", "arguments"] as const;
+	const parametersFields = ["parameters", "arguments", "parameter_definitions"] as const;
 
 	const groupedCall = {
 		tool_name: "" as string,
