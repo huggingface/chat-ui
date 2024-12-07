@@ -199,6 +199,11 @@ export async function endpointOai(
 				messagesOpenAI[0].content = preprompt ?? "";
 			}
 
+			// if system role is not supported, convert first message to a user message.
+			if(!model.systemRoleSupported && messagesOpenAI?.[0]?.role === "system") {
+				messagesOpenAI[0].role = "user";
+			}
+
 			if (toolResults && toolResults.length > 0) {
 				const toolCallRequests: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam = {
 					role: "assistant",
