@@ -112,7 +112,7 @@ export const endpointOAIParametersSchema = z.object({
 		})
 		.default({}),
 	/* enable use of max_completion_tokens in place of max_tokens */
-	useCompletionTokens: z.boolean().default(true),
+	useCompletionTokens: z.boolean().default(false),
 });
 
 export async function endpointOai(
@@ -204,7 +204,10 @@ export async function endpointOai(
 
 			// if system role is not supported, convert first message to a user message.
 			if (!model.systemRoleSupported && messagesOpenAI?.[0]?.role === "system") {
-				messagesOpenAI[0].role = "user";
+				messagesOpenAI[0] = {
+					...messagesOpenAI[0],
+					role: "user",
+				};
 			}
 
 			if (toolResults && toolResults.length > 0) {
