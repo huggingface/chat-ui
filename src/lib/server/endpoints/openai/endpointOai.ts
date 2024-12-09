@@ -203,7 +203,7 @@ export async function endpointOai(
 			}
 
 			// if system role is not supported, convert first message to a user message.
-			if(!model.systemRoleSupported && messagesOpenAI?.[0]?.role === "system") {
+			if (!model.systemRoleSupported && messagesOpenAI?.[0]?.role === "system") {
 				messagesOpenAI[0].role = "user";
 			}
 
@@ -249,7 +249,9 @@ export async function endpointOai(
 				model: model.id ?? model.name,
 				messages: messagesOpenAI,
 				stream: true,
-				...(useCompletionTokens) ? {max_completion_tokens: parameters?.max_new_tokens} : {max_tokens: parameters?.max_new_tokens},
+				...(useCompletionTokens
+					? { max_completion_tokens: parameters?.max_new_tokens }
+					: { max_tokens: parameters?.max_new_tokens }),
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
