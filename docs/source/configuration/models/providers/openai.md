@@ -53,6 +53,25 @@ MODELS=`[{
 }]`
 ```
 
+We also support models in the `o1` family. You need to add a few more options ot the config: Here is an example for `o1-mini`:
+
+```ini
+MODELS=`[
+  {
+      "name": "o1-mini",
+      "description": "ChatGPT o1-mini",
+      "systemRoleSupported": false,
+      "parameters": {
+        "max_new_tokens": 2048,
+      },
+      "endpoints" : [{
+        "type": "openai",
+        "useCompletionTokens": true,
+      }]
+  }
+]
+```
+
 You may also consume any model provider that provides compatible OpenAI API endpoint. For example, you may self-host [Portkey](https://github.com/Portkey-AI/gateway) gateway and experiment with Claude or GPTs offered by Azure OpenAI. Example for Claude from Anthropic:
 
 ```ini
