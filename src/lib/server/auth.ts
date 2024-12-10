@@ -115,9 +115,10 @@ async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 
 	const alg_supported = issuer.metadata["id_token_signing_alg_values_supported"];
 
-	if (Array.isArray(alg_supported) && !alg_supported.includes("RS256")) {
+	if (Array.isArray(alg_supported)) {
 		client_config.id_token_signed_response_alg ??= alg_supported[0];
 	}
+
 	return new issuer.Client(client_config);
 }
 
