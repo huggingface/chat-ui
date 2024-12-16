@@ -53,26 +53,46 @@ export async function endpointBedrock(
 			messages = messages.slice(1); // Remove the first system message from the array
 		}
 
-		const formattedMessages = await prepareMessages(messages, imageProcessor);
+		const formattedMessages = await prepareMessages(messages, model.id, imageProcessor);
 
 		let tokenId = 0;
 		const parameters = { ...model.parameters, ...generateSettings };
 		return (async function* () {
-			const command = new InvokeModelWithResponseStreamCommand({
-				body: Buffer.from(
-					JSON.stringify({
-						anthropic_version: anthropicVersion,
-						max_tokens: parameters.max_new_tokens ? parameters.max_new_tokens : 4096,
-						messages: formattedMessages,
-						system,
-					}),
-					"utf-8"
-				),
+			const baseCommandParams = {
 				contentType: "application/json",
 				accept: "application/json",
 				modelId: model.id,
 				trace: "DISABLED",
+			};
+
+			const maxTokens = parameters.max_new_tokens || 4096;
+
+			let bodyContent;
+			if (model.id.includes("nova")) {
+				bodyContent = {
+					messages: formattedMessages,
+					inferenceConfig: {
+						maxTokens,
+						topP: 0.1,
+						temperature: 1.0,
+					},
+					system: [{ text: system }],
+				};
+			} else {
+				bodyContent = {
+					anthropic_version: anthropicVersion,
+					max_tokens: maxTokens,
+					messages: formattedMessages,
+					system,
+				};
+			}
+
+			const command = new InvokeModelWithResponseStreamCommand({
+				...baseCommandParams,
+				body: Buffer.from(JSON.stringify(bodyContent), "utf-8"),
 			});
+
+			console.log(JSON.stringify({ messages: formattedMessages }));
 
 			const response = await client.send(command);
 
@@ -80,21 +100,22 @@ export async function endpointBedrock(
 
 			for await (const item of response.body ?? []) {
 				const chunk = JSON.parse(new TextDecoder().decode(item.chunk?.bytes));
-				const chunk_type = chunk.type;
 
-				if (chunk_type === "content_block_delta") {
-					text += chunk.delta.text;
+				if ("contentBlockDelta" in chunk || chunk.type === "content_block_delta") {
+					const chunkText = chunk.contentBlockDelta?.delta?.text || chunk.delta?.text || "";
+					text += chunkText;
+					console.log(text);
 					yield {
 						token: {
 							id: tokenId++,
-							text: chunk.delta.text,
+							text: chunkText,
 							logprob: 0,
 							special: false,
 						},
 						generated_text: null,
 						details: null,
 					} satisfies TextGenerationStreamOutput;
-				} else if (chunk_type === "message_stop") {
+				} else if ("messageStop" in chunk || chunk.type === "message_stop") {
 					yield {
 						token: {
 							id: tokenId++,
@@ -114,17 +135,23 @@ export async function endpointBedrock(
 // Prepare the messages excluding system prompts
 async function prepareMessages(
 	messages: EndpointMessage[],
+	modelId: string,
 	imageProcessor: ReturnType<typeof makeImageProcessor>
 ) {
 	const formattedMessages = [];
+	const nova = modelId.includes("amazon.nova");
 
 	for (const message of messages) {
 		const content = [];
 
 		if (message.files?.length) {
-			content.push(...(await prepareFiles(imageProcessor, message.files)));
+			content.push(...(await prepareFiles(imageProcessor, modelId, message.files)));
 		}
-		content.push({ type: "text", text: message.content });
+		if (nova) {
+			content.push({ text: message.content });
+		} else {
+			content.push({ type: "text", text: message.content });
+		}
 
 		const lastMessage = formattedMessages[formattedMessages.length - 1];
 		if (lastMessage && lastMessage.role === message.from) {
@@ -140,11 +167,23 @@ async function prepareMessages(
 // Process files and convert them to base64 encoded strings
 async function prepareFiles(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	modelId: string,
 	files: MessageFile[]
 ) {
+	const nova = modelId.includes("amazon.nova");
 	const processedFiles = await Promise.all(files.map(imageProcessor));
-	return processedFiles.map((file) => ({
-		type: "image",
-		source: { type: "base64", media_type: "image/jpeg", data: file.image.toString("base64") },
-	}));
+
+	if (nova) {
+		return processedFiles.map((file) => ({
+			image: {
+				format: file.mime.substring("image/".length),
+				source: { bytes: file.image.toString("base64") },
+			},
+		}));
+	} else {
+		return processedFiles.map((file) => ({
+			type: "image",
+			source: { type: "base64", media_type: file.mime, data: file.image.toString("base64") },
+		}));
+	}
 }
