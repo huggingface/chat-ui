@@ -13,13 +13,10 @@
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
-	import WebSearchToggle from "../WebSearchToggle.svelte";
-	import ToolsMenu from "../ToolsMenu.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import { page } from "$app/stores";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
-	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import type { Assistant } from "$lib/types/Assistant";
 	import { base } from "$app/paths";
@@ -35,7 +32,6 @@
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
 	import { fly } from "svelte/transition";
@@ -224,15 +220,8 @@
 
 	const settings = useSettingsStore();
 
-	// active tools are all the checked tools, either from settings or on by default
-	$: activeTools = $page.data.tools.filter((tool: ToolFront) => {
-		if ($page.data?.assistant) {
-			return $page.data.assistant.tools?.includes(tool._id);
-		}
-		return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
-	});
 	$: activeMimeTypes = [
-		...(currentModel.tools ? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []) : []),
+		...(currentModel.tools ? ["application/*"] : []),
 		...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []),
 	];
 
@@ -382,13 +371,6 @@
 
 		<div class="w-full">
 			<div class="flex w-full pb-3">
-				{#if !assistant}
-					{#if currentModel.tools}
-						<ToolsMenu {loading} />
-					{:else if $page.data.settings?.searchEnabled}
-						<WebSearchToggle />
-					{/if}
-				{/if}
 				{#if loading}
 					<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
 				{:else if lastIsError}
@@ -404,9 +386,6 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if isFileUploadEnabled}
-							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
-						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
 								on:click={() => {
@@ -439,8 +418,12 @@
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
+								{assistant}
 								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+								{loading}
 								bind:value={message}
+								bind:files
+								mimeTypes={activeMimeTypes}
 								on:submit={handleSubmit}
 								on:beforeinput={(ev) => {
 									if ($page.data.loginRequired) {
@@ -449,8 +432,8 @@
 									}
 								}}
 								on:paste={onPaste}
-								maxRows={6}
 								disabled={isReadOnly || lastIsError}
+								modelHasTools={currentModel.tools}
 							/>
 						{/if}
 

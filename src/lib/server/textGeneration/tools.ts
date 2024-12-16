@@ -185,18 +185,21 @@ export async function* runTools(
 		: messages;
 
 	let rawText = "";
+
+	const mappedTools = tools.map((tool) => ({
+		...tool,
+		inputs: tool.inputs.map((input) => ({
+			...input,
+			type: input.type === "file" ? "str" : input.type,
+		})),
+	}));
+
 	// do the function calling bits here
 	for await (const output of await endpoint({
 		messages: formattedMessages,
 		preprompt,
 		generateSettings: { temperature: 0.1, ...assistant?.generateSettings },
-		tools: tools.map((tool) => ({
-			...tool,
-			inputs: tool.inputs.map((input) => ({
-				...input,
-				type: input.type === "file" ? "str" : input.type,
-			})),
-		})),
+		tools: mappedTools,
 		conversationId: conv._id,
 	})) {
 		// model natively supports tool calls
