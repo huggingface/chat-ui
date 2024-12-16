@@ -14,6 +14,10 @@
 		webSearchToolId,
 	} from "$lib/utils/toolIds";
 	import type { Assistant } from "$lib/types/Assistant";
+	import { page } from "$app/stores";
+	import type { ToolFront } from "$lib/types/Tool";
+	import IconTool from "../icons/IconTool.svelte";
+	import ToolLogo from "../ToolLogo.svelte";
 
 	export let files: File[] = [];
 	export let mimeTypes: string[] = [];
@@ -92,6 +96,10 @@
 			textareaElement.focus();
 		}
 	});
+
+	$: extraTools = $page.data.tools.filter((t: ToolFront) =>
+		[documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
+	) satisfies ToolFront[];
 </script>
 
 <div class="relative min-w-0 flex-1" on:paste>
@@ -119,7 +127,7 @@
 
 	{#if !assistant}
 		<div
-			class="absolute bottom-0 left-0 flex h-8 w-full items-center justify-start gap-2 p-3 text-smd text-gray-500 dark:text-gray-400"
+			class="mt-auto flex h-8 w-full flex-wrap items-center justify-start gap-2 p-3 text-smd text-gray-500 dark:text-gray-400"
 		>
 			<button
 				class="flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
@@ -189,6 +197,15 @@
 						Document Parser
 					{/if}
 				</button>
+				{#each extraTools as tool}
+					<button
+						class="active-tool flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
+						disabled={loading}
+					>
+						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
+						{tool.displayName}
+					</button>
+				{/each}
 			{/if}
 		</div>
 	{/if}
