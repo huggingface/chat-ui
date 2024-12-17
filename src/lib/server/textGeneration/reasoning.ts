@@ -1,6 +1,7 @@
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
+import { logger } from "../logger";
 
 export async function generateSummaryOfReasoning(buffer: string): Promise<string> {
 	// debug 5s delay
@@ -21,10 +22,15 @@ export async function generateSummaryOfReasoning(buffer: string): Promise<string
 				max_new_tokens: 50,
 			},
 		})
-	).then((summary) => {
-		const parts = summary.split("...");
-		return parts[0] + "...";
-	});
+	)
+		.then((summary) => {
+			const parts = summary.split("...");
+			return parts[0] + "...";
+		})
+		.catch((e) => {
+			logger.error(e);
+			return "Reasoning...";
+		});
 
 	return summary;
 }
