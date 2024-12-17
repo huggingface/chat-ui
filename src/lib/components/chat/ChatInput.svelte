@@ -16,8 +16,9 @@
 	import type { Assistant } from "$lib/types/Assistant";
 	import { page } from "$app/stores";
 	import type { ToolFront } from "$lib/types/Tool";
-	import IconTool from "../icons/IconTool.svelte";
 	import ToolLogo from "../ToolLogo.svelte";
+	import { goto } from "$app/navigation";
+	import { base } from "$app/paths";
 
 	export let files: File[] = [];
 	export let mimeTypes: string[] = [];
@@ -97,15 +98,17 @@
 		}
 	});
 
-	$: extraTools = $page.data.tools.filter((t: ToolFront) =>
-		[documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
-	) satisfies ToolFront[];
+	$: extraTools = $page.data.tools
+		.filter((t: ToolFront) => $settings.tools?.includes(t._id))
+		.filter(
+			(t: ToolFront) =>
+				![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
+		) satisfies ToolFront[];
 </script>
 
 <div class="relative min-w-0 flex-1" on:paste>
 	<pre
-		class:mb-8={!assistant}
-		class="scrollbar-custom invisible overflow-x-hidden overflow-y-scroll whitespace-pre-wrap break-words p-3"
+		class="invisible absolute top-0 overflow-x-hidden overflow-y-scroll whitespace-pre-wrap break-words p-3"
 		aria-hidden="true"
 		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
 
@@ -113,7 +116,7 @@
 		enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
 		tabindex="0"
 		rows="1"
-		class="scrollbar-custom absolute top-0 m-0 h-full w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
+		class="scrollbar-custom w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
 		class:text-gray-400={disabled}
 		bind:value
 		bind:this={textareaElement}
@@ -127,7 +130,7 @@
 
 	{#if !assistant}
 		<div
-			class="mt-auto flex h-8 w-full flex-wrap items-center justify-start gap-2 p-3 text-smd text-gray-500 dark:text-gray-400"
+			class="mt-auto flex w-full flex-wrap items-center justify-start gap-2 p-3 text-smd text-gray-500 dark:text-gray-400"
 		>
 			<button
 				class="flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
@@ -180,27 +183,32 @@
 						Image Gen
 					{/if}
 				</button>
-				<button
-					class="flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
-					class:active-tool={documentParserIsOn}
-					disabled={loading}
-				>
-					<input
-						class="absolute w-full cursor-pointer opacity-0"
-						aria-label="Upload file"
-						type="file"
-						on:change={onFileChange}
-						accept={mimeTypes.join(",")}
-					/>
-					<CarbonClip />
-					{#if documentParserIsOn}
-						Document Parser
-					{/if}
-				</button>
+				<form>
+					<button
+						class="relative flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
+						class:active-tool={documentParserIsOn}
+						disabled={loading}
+					>
+						<input
+							class="absolute w-full cursor-pointer opacity-0"
+							aria-label="Upload file"
+							type="file"
+							on:change={onFileChange}
+							accept={mimeTypes.join(",")}
+						/>
+						<CarbonClip />
+						{#if documentParserIsOn}
+							Document Parser
+						{/if}
+					</button>
+				</form>
 				{#each extraTools as tool}
 					<button
 						class="active-tool flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
 						disabled={loading}
+						on:click|preventDefault={async () => {
+							goto(`${base}/tools/${tool._id}`);
+						}}
 					>
 						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
 						{tool.displayName}
