@@ -194,6 +194,20 @@
 					{/if}
 				</button>
 			{/if}
+			{#if modelHasTools}
+				{#each extraTools as tool}
+					<button
+						class="active-tool base-tool"
+						disabled={loading}
+						on:click|preventDefault={async () => {
+							goto(`${base}/tools/${tool._id}`);
+						}}
+					>
+						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
+						{tool.displayName}
+					</button>
+				{/each}
+			{/if}
 			{#if modelIsMultimodal || modelHasTools}
 				<form>
 					<button
@@ -214,18 +228,6 @@
 						{/if}
 					</button>
 				</form>
-				{#each extraTools as tool}
-					<button
-						class="active-tool base-tool"
-						disabled={loading}
-						on:click|preventDefault={async () => {
-							goto(`${base}/tools/${tool._id}`);
-						}}
-					>
-						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
-						{tool.displayName}
-					</button>
-				{/each}
 			{/if}
 		</div>
 	{/if}
