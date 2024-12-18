@@ -31,14 +31,19 @@
 	export let assistant: Assistant | undefined = undefined;
 
 	export let modelHasTools = false;
+	export let modelIsMultimodal = false;
 
 	const onFileChange = async (e: Event) => {
 		if (!e.target) return;
 		const target = e.target as HTMLInputElement;
 		files = [...files, ...(target.files ?? [])];
-		await settings.instantSet({
-			tools: [...($settings.tools ?? []), documentParserToolId],
-		});
+
+		console.log(files.map((file) => file.type));
+		if (files.some((file) => file.type.startsWith("application/"))) {
+			await settings.instantSet({
+				tools: [...($settings.tools ?? []), documentParserToolId],
+			});
+		}
 	};
 
 	let textareaElement: HTMLTextAreaElement;
@@ -96,7 +101,9 @@
 		  ($settings.tools?.includes(fetchUrlToolId) ?? false)
 		: $webSearchParameters.useSearch;
 	$: imageGenIsOn = $settings.tools?.includes(imageGenToolId) ?? false;
-	$: documentParserIsOn = modelHasTools && files.length > 0;
+
+	$: documentParserIsOn =
+		modelHasTools && files.length > 0 && files.some((file) => file.type.startsWith("application/"));
 
 	onMount(() => {
 		if (!isVirtualKeyboard()) {
@@ -187,6 +194,8 @@
 						Image Gen
 					{/if}
 				</button>
+			{/if}
+			{#if modelIsMultimodal || modelHasTools}
 				<form>
 					<button
 						class="base-tool relative"

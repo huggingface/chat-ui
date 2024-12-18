@@ -36,6 +36,7 @@
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -220,11 +221,25 @@
 
 	const settings = useSettingsStore();
 
-	$: activeMimeTypes = [
-		...(currentModel.tools ? ["application/*"] : []),
-		...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []),
-	];
+	$: mimeTypesFromActiveTools = $page.data.tools
+		.filter((tool: ToolFront) => {
+			if ($page.data?.assistant) {
+				return $page.data.assistant.tools?.includes(tool._id);
+			}
+			if (currentModel.tools) {
+				return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
+			}
+			return false;
+		})
+		.flatMap((tool: ToolFront) => tool.mimeTypes ?? []);
 
+	$: activeMimeTypes = Array.from(
+		new Set([
+			...mimeTypesFromActiveTools, // fetch mime types from active tools either from tool settings or active assistant
+			...(currentModel.tools && !$page.data.assistant ? ["application/pdf"] : []), // if its a tool model, we can always enable document parser so we always accept pdfs
+			...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []), // if its a multimodal model, we always accept images
+		])
+	);
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 </script>
 
@@ -434,6 +449,7 @@
 								on:paste={onPaste}
 								disabled={isReadOnly || lastIsError}
 								modelHasTools={currentModel.tools}
+								modelIsMultimodal={currentModel.multimodal}
 							/>
 						{/if}
 
