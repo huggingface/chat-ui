@@ -61,8 +61,14 @@
 		return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
 	}
 
-	$: minHeight = `${1 + 1 * 1.5}em`;
-	$: maxHeight = `${1 + 6 * 1.5}em`;
+	function adjustTextareaHeight() {
+		if (!textareaElement) return;
+		textareaElement.style.height = "auto";
+		const newHeight = Math.min(textareaElement.scrollHeight, parseInt("96em"));
+		textareaElement.style.height = `${newHeight}px`;
+		if (!textareaElement.parentElement) return;
+		textareaElement.parentElement.style.height = `${newHeight}px`;
+	}
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
@@ -96,6 +102,7 @@
 		if (!isVirtualKeyboard()) {
 			textareaElement.focus();
 		}
+		adjustTextareaHeight();
 	});
 
 	$: extraTools = $page.data.tools
@@ -106,34 +113,31 @@
 		) satisfies ToolFront[];
 </script>
 
-<div class="relative min-w-0 flex-1" on:paste>
-	<pre
-		class="invisible absolute top-0 overflow-x-hidden overflow-y-scroll whitespace-pre-wrap break-words p-3"
-		aria-hidden="true"
-		style="min-height: {minHeight}; max-height: {maxHeight}">{(value || " ") + "\n"}</pre>
-
-	<textarea
-		enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
-		tabindex="0"
-		rows="1"
-		class="scrollbar-custom w-full resize-none scroll-p-3 overflow-x-hidden overflow-y-scroll border-0 bg-transparent p-3 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
-		class:text-gray-400={disabled}
-		bind:value
-		bind:this={textareaElement}
-		{disabled}
-		on:keydown={handleKeydown}
-		on:compositionstart={() => (isCompositionOn = true)}
-		on:compositionend={() => (isCompositionOn = false)}
-		on:beforeinput
-		{placeholder}
-	/>
-
+<div class="min-h-full flex-1" on:paste>
+	<div class="relative w-full min-w-0">
+		<textarea
+			enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
+			tabindex="0"
+			rows="1"
+			class="scrollbar-custom max-h-[96em] w-full resize-none scroll-p-3 overflow-y-auto overflow-x-hidden border-0 bg-transparent p-3 pb-1 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
+			class:text-gray-400={disabled}
+			bind:value
+			bind:this={textareaElement}
+			{disabled}
+			on:keydown={handleKeydown}
+			on:compositionstart={() => (isCompositionOn = true)}
+			on:compositionend={() => (isCompositionOn = false)}
+			on:input={adjustTextareaHeight}
+			on:beforeinput
+			{placeholder}
+		/>
+	</div>
 	{#if !assistant}
 		<div
-			class="mt-auto flex w-full flex-wrap items-center justify-start gap-2 p-3 text-smd text-gray-500 dark:text-gray-400"
+			class="flex w-full flex-wrap items-center justify-start gap-2 p-3 py-1 text-smd text-gray-500 dark:text-gray-400"
 		>
 			<button
-				class="flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
+				class="base-tool"
 				class:active-tool={webSearchIsOn}
 				disabled={loading}
 				on:click|preventDefault={async () => {
@@ -161,7 +165,7 @@
 			</button>
 			{#if modelHasTools}
 				<button
-					class="flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
+					class="base-tool"
 					class:active-tool={imageGenIsOn}
 					disabled={loading}
 					on:click|preventDefault={async () => {
@@ -185,7 +189,7 @@
 				</button>
 				<form>
 					<button
-						class="relative flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
+						class="base-tool relative"
 						class:active-tool={documentParserIsOn}
 						disabled={loading}
 					>
@@ -204,7 +208,7 @@
 				</form>
 				{#each extraTools as tool}
 					<button
-						class="active-tool flex items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300"
+						class="active-tool base-tool"
 						disabled={loading}
 						on:click|preventDefault={async () => {
 							goto(`${base}/tools/${tool._id}`);
@@ -227,7 +231,11 @@
 		line-height: 1.5;
 	}
 
+	.base-tool {
+		@apply flex h-fit min-h-7 items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300;
+	}
+
 	.active-tool {
-		@apply my-0 rounded-full border border-purple-300 bg-purple-400/20 px-2 text-purple-700 dark:border-purple-600 dark:text-purple-400;
+		@apply my-0 rounded-full border border-purple-300 bg-purple-400/20 px-2 text-purple-700 hover:text-purple-600 dark:border-purple-600 dark:text-purple-400 dark:hover:text-purple-300;
 	}
 </style>
