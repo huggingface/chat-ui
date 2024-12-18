@@ -38,7 +38,6 @@
 		const target = e.target as HTMLInputElement;
 		files = [...files, ...(target.files ?? [])];
 
-		console.log(files.map((file) => file.type));
 		if (files.some((file) => file.type.startsWith("application/"))) {
 			await settings.instantSet({
 				tools: [...($settings.tools ?? []), documentParserToolId],
