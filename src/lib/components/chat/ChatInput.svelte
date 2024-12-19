@@ -4,7 +4,6 @@
 
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import CarbonImage from "~icons/carbon/image";
-	import CarbonClip from "~icons/carbon/attachment";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import {
@@ -222,7 +221,20 @@
 							on:change={onFileChange}
 							accept={mimeTypes.join(",")}
 						/>
-						<CarbonClip />
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 10 11"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<path
+								d="M6.52896 3.07175L3.35489 6.24582C3.16063 6.44008 3.05149 6.70356 3.05149 6.97829C3.05149 7.25303 3.16063 7.51651 3.35489 7.71077C3.54916 7.90503 3.81264 8.01417 4.08737 8.01417C4.3621 8.01417 4.62558 7.90503 4.81984 7.71077L7.99391 4.53671C8.38244 4.14818 8.60071 3.62122 8.60071 3.07175C8.60071 2.52229 8.38244 1.99533 7.99391 1.6068C7.60538 1.21827 7.07842 1 6.52896 1C5.97949 1 5.45253 1.21827 5.064 1.6068L1.88994 4.78087C1.30715 5.36366 0.979736 6.1541 0.979736 6.97829C0.979736 7.80249 1.30715 8.59293 1.88994 9.17572C2.47273 9.75852 3.26317 10.0859 4.08737 10.0859C4.91156 10.0859 5.702 9.75852 6.2848 9.17572L9.45886 6.00166"
+								class="stroke-current stroke-[0.75]"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
 						{#if documentParserIsOn}
 							Document Parser
 						{/if}
