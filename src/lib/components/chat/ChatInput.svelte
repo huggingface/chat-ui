@@ -18,6 +18,7 @@
 	import ToolLogo from "../ToolLogo.svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
+	import IconAdd from "~icons/carbon/add";
 
 	export let files: File[] = [];
 	export let mimeTypes: string[] = [];
@@ -240,6 +241,12 @@
 						{/if}
 					</button>
 				</form>
+			{/if}
+			{#if modelHasTools}
+				<div class=" ml-1 h-5 w-[1px] bg-gray-300 dark:bg-gray-600" />
+				<a class="base-tool" href={`${base}/tools`} title="Browse more tools">
+					<IconAdd />
+				</a>
 			{/if}
 		</div>
 	{/if}
