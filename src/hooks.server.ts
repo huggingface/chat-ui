@@ -231,7 +231,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).host] : []),
 			];
 
-			// origin is null for some reason when the POST request callback comes from an auth provider like MS entra so we skip this check (CSRF token is still validated)
+			// origin is null when the POST request callback comes from an auth provider like MS entra
+			// so we skip this check (CSRF token is still validated)
 			if (
 				event.url.pathname !== `${base}/login/callback` &&
 				!validOrigins.includes(new URL(origin).host)
