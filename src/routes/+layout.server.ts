@@ -12,6 +12,7 @@ import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
+import { getAllowedModels } from "$lib/server/providers/providers";
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends(UrlDependency.ConversationList);
@@ -42,6 +43,14 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	}
 
 	const enableAssistants = env.ENABLE_ASSISTANTS === "true";
+
+	const allowedModelsDefault = models
+		.filter((model) => !model.allowed_groups)
+		.map((model) => model.id);
+	const allowedModels =
+		locals.user && locals.user.groups
+			? await getAllowedModels(models, locals.user.groups)
+			: allowedModelsDefault;
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
@@ -209,26 +218,28 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 			directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 		},
-		models: models.map((model) => ({
-			id: model.id,
-			name: model.name,
-			websiteUrl: model.websiteUrl,
-			modelUrl: model.modelUrl,
-			tokenizer: model.tokenizer,
-			datasetName: model.datasetName,
-			datasetUrl: model.datasetUrl,
-			displayName: model.displayName,
-			description: model.description,
-			logoUrl: model.logoUrl,
-			promptExamples: model.promptExamples,
-			parameters: model.parameters,
-			preprompt: model.preprompt,
-			multimodal: model.multimodal,
-			multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-			tools: model.tools,
-			unlisted: model.unlisted,
-			hasInferenceAPI: model.hasInferenceAPI,
-		})),
+		models: models
+			.filter((model) => !model.unlisted)
+			.filter((model) => allowedModels.includes(model.id))
+			.map((model) => ({
+				id: model.id,
+				name: model.name,
+				websiteUrl: model.websiteUrl,
+				modelUrl: model.modelUrl,
+				tokenizer: model.tokenizer,
+				datasetName: model.datasetName,
+				datasetUrl: model.datasetUrl,
+				displayName: model.displayName,
+				description: model.description,
+				logoUrl: model.logoUrl,
+				promptExamples: model.promptExamples,
+				parameters: model.parameters,
+				preprompt: model.preprompt,
+				multimodal: model.multimodal,
+				multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+				tools: model.tools,
+				hasInferenceAPI: model.hasInferenceAPI,
+			})),
 		oldModels,
 		tools: [...toolFromConfigs, ...communityTools]
 			.filter((tool) => !tool?.isHidden)

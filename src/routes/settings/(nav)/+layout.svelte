@@ -52,7 +52,7 @@
 	>
 		<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1">Models</h3>
 
-		{#each data.models.filter((el) => !el.unlisted) as model}
+		{#each data.models as model}
 			<a
 				href="{base}/settings/{model.id}"
 				class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl

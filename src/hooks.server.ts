@@ -9,6 +9,8 @@ import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
+import { logout, OIDConfig, ProviderCookieNames } from "$lib/server/auth";
+import { type AccessToken, providers } from "$lib/server/providers/providers";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
@@ -229,7 +231,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).host] : []),
 			];
 
-			if (!validOrigins.includes(new URL(origin).host)) {
+			// origin is null when the POST request callback comes from an auth provider like MS entra
+			// so we skip this check (CSRF token is still validated)
+			if (
+				event.url.pathname !== `${base}/login/callback` &&
+				!validOrigins.includes(new URL(origin).host)
+			) {
 				return errorResponse(403, "Invalid referer for POST request");
 			}
 		}
@@ -276,6 +283,55 @@ export const handle: Handle = async ({ event, resolve }) => {
 				return errorResponse(405, "You need to accept the welcome modal first");
 			}
 		}
+	}
+
+	// Get user groups for allowed models
+	if (OIDConfig.PROVIDER && OIDConfig.SCOPES.includes("groups")) {
+		const provider = providers[OIDConfig.PROVIDER];
+		const session_exists = event.cookies.get(env.COOKIE_NAME) !== undefined;
+
+		let accessToken: AccessToken = JSON.parse(
+			event.cookies.get(ProviderCookieNames.ACCESS_TOKEN)?.toString() || "{}"
+		);
+		let providerParameters = JSON.parse(
+			event.cookies.get(ProviderCookieNames.PROVIDER_PARAMS)?.toString() || "{}"
+		);
+
+		// If user is logged in, get/refresh access token and use it to retrieve user groups
+		if (event.locals.user) {
+			// Get access token upon login with id token
+			if (accessToken && providerParameters.idToken) {
+				[accessToken, providerParameters] = await provider.getAccessToken(
+					event.cookies,
+					providerParameters
+				);
+				event.locals.user.groups = await provider.getUserGroups(accessToken, providerParameters);
+			}
+			// Refresh access token on subsequent requests
+			else if (accessToken.refreshToken && providerParameters.userTid) {
+				accessToken = await provider.refreshAccessToken(
+					event.cookies,
+					accessToken,
+					providerParameters
+				);
+				event.locals.user.groups = await provider.getUserGroups(accessToken, providerParameters);
+			}
+			// Logout user automatically if session exists but access token and/or provider params cookies have expired
+			else if (session_exists) {
+				event.locals.user.groups = undefined;
+				await logout(event.cookies, event.locals);
+			}
+		}
+	} else if (OIDConfig.SCOPES.includes("groups")) {
+		return errorResponse(
+			500,
+			"'groups' has been set in OPENID_CONFIG.SCOPES, but OPENID_CONFIG.PROVIDER is undefined in .env file"
+		);
+	} else if (OIDConfig.PROVIDER) {
+		return errorResponse(
+			500,
+			"OPENID_CONFIG.PROVIDER has been set, but 'groups' scope not set in OPENID_CONFIG.SCOPES in .env file"
+		);
 	}
 
 	let replaced = false;
