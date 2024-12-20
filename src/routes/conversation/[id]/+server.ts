@@ -25,6 +25,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
+import { documentParserToolId } from "$lib/utils/toolIds.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -189,6 +190,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				};
 			})
 	);
+
+	// Check for PDF files in the input
+	const hasPdfFiles = inputFiles?.some((file) => file.mime === "application/pdf") ?? false;
+
+	// Check for existing PDF files in the conversation
+	const hasPdfInConversation =
+		conv.messages?.some((msg) => msg.files?.some((file) => file.mime === "application/pdf")) ??
+		false;
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		error(400, "Message too long.");
@@ -442,7 +451,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					assistant: undefined,
 					isContinue: isContinue ?? false,
 					webSearch: webSearch ?? false,
-					toolsPreference: toolsPreferences ?? [],
+					toolsPreference: [
+						...(toolsPreferences ?? []),
+						...(hasPdfFiles || hasPdfInConversation ? [documentParserToolId] : []), // Add document parser tool if PDF files are present
+					],
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,

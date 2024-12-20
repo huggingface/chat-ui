@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { useSettingsStore } from "$lib/stores/settings";
+	import { documentParserToolId } from "$lib/utils/toolIds";
 	import CarbonImage from "~icons/carbon/image";
 	// import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -7,6 +9,8 @@
 
 	export let onDrag = false;
 	export let onDragInner = false;
+
+	const settings = useSettingsStore();
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
@@ -32,7 +36,11 @@
 								);
 							})
 						) {
-							setErrorMsg(`Some file type not supported. Only allowed: ${mimeTypes.join(", ")}`);
+							setErrorMsg(
+								`Some file type not supported. Only allowed: ${mimeTypes.join(
+									", "
+								)}. Uploaded document is of type ${file.type}`
+							);
 							files = [];
 							return;
 						}
@@ -46,6 +54,10 @@
 
 						// add the file to the files array
 						files = [...files, file];
+
+						settings.instantSet({
+							tools: [...($settings.tools ?? []), documentParserToolId],
+						});
 					}
 				}
 				onDrag = false;
