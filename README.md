@@ -213,6 +213,7 @@ OPENID_CONFIG=`{
   SCOPES: "openid profile",
   TOLERANCE: // optional
   RESOURCE: // optional
+  PROVIDER: // required only for group-based permissions
 }`
 ```
 
@@ -343,7 +344,8 @@ If [logging in with OpenID](#openid-connect) via a supported provider, then user
 
 For all providers, see the following. Then, see additional instructions for your provider below.
 
-1. Add `PROVIDER: "<provider-name-here>"` to your `.env.local` (you will enter the actual provider name later). Also, add `groups` to the `OPENID_CONFIG.SCOPES` field in your `.env.local` file:
+1. Add `PROVIDER: "<provider-name-here>"` to your `.env.local`. Also, add `groups` to the `OPENID_CONFIG.SCOPES` field in your `.env.local` file:
+
 ```env
 OPENID_CONFIG=`{
   // rest of OPENID_CONFIG here
@@ -357,8 +359,6 @@ OPENID_CONFIG=`{
 
 > [!WARNING]
 > The first model in your `.env.local` file is considered the "default" model and should be available to all users, so we strongly recommend against setting `allowed_groups` for this model.
-
-> Note that during development, it is common to have `APP_BASE=""` in your `.env.local` - however, due to the cookies created by using a provider, this value should not be empty (e.g. setting `APP_BASE="/"` in `.env.local` would work).
 
 #### Provider: Microsoft Entra
 
@@ -376,9 +376,8 @@ In order to enable use of [Microsoft Entra Security Groups](https://learn.micros
 ```
 
 3. Finally, configure your app in Microsoft Entra so that the app can access user groups via the MS Graph API:
-    - [Add groups claim](https://learn.microsoft.com/en-gb/entra/identity-platform/optional-claims?tabs=appui#configure-groups-optional-claims) to your app
-    - [Enable ID Tokens](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc#enable-id-tokens) for your app
-
+   - [Add groups claim](https://learn.microsoft.com/en-gb/entra/identity-platform/optional-claims?tabs=appui#configure-groups-optional-claims) to your app
+   - [Enable ID Tokens](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc#enable-id-tokens) for your app
 
 #### Running your own models using a custom endpoint
 
