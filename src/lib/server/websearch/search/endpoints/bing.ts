@@ -27,8 +27,6 @@ export default async function search(query: string): Promise<WebSearchSource[]> 
 		);
 	}
 
-	console.log(data["webPages"]?.["value"]);
-
 	// Adapt the data structure from the Bing response to match the WebSearchSource type
 	const webPages = data["webPages"]?.["value"] ?? [];
 	return webPages.map((page: any) => ({

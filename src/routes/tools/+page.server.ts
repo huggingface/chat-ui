@@ -1,7 +1,9 @@
+import { env } from "$env/dynamic/private";
 import { authCondition } from "$lib/server/auth.js";
 import { Database, collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { SortKey } from "$lib/types/Assistant.js";
+import { ReviewStatus } from "$lib/types/Review";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import type { User } from "$lib/types/User.js";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
@@ -11,9 +13,8 @@ import { ObjectId, type Filter } from "mongodb";
 const NUM_PER_PAGE = 16;
 
 export const load = async ({ url, locals }) => {
-	// XXX: feature_flag_tools
-	if (!locals.user?.isEarlyAccess) {
-		error(403, "You need to be an early access user to view tools");
+	if (env.COMMUNITY_TOOLS !== "true") {
+		error(403, "Community tools are not enabled");
 	}
 
 	const username = url.searchParams.get("user");
@@ -23,6 +24,7 @@ export const load = async ({ url, locals }) => {
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 	const activeOnly = url.searchParams.get("active") === "true";
+	const showUnfeatured = url.searchParams.get("showUnfeatured") === "true";
 
 	let user: Pick<User, "_id"> | null = null;
 	if (username) {
@@ -44,7 +46,9 @@ export const load = async ({ url, locals }) => {
 	const queryTokens = !!query && generateQueryTokens(query);
 
 	const filter: Filter<CommunityToolDB> = {
-		...(!createdByCurrentUser && !activeOnly && !locals.user?.isAdmin && { featured: true }),
+		...(!createdByCurrentUser &&
+			!activeOnly &&
+			!(locals.user?.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
 		...(user && { createdById: user._id }),
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {
@@ -90,5 +94,6 @@ export const load = async ({ url, locals }) => {
 		numItemsPerPage: NUM_PER_PAGE,
 		query,
 		sort,
+		showUnfeatured,
 	};
 };

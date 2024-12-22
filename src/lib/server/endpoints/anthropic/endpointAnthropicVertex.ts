@@ -3,6 +3,7 @@ import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator } from "../images";
 import { endpointMessagesToAnthropicMessages } from "./utils";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
 
 export const endpointAnthropicVertexParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -56,7 +57,10 @@ export async function endpointAnthropicVertex(
 		return (async function* () {
 			const stream = anthropic.messages.stream({
 				model: model.id ?? model.name,
-				messages: await endpointMessagesToAnthropicMessages(messages, multimodal),
+				messages: (await endpointMessagesToAnthropicMessages(
+					messages,
+					multimodal
+				)) as MessageParam[],
 				max_tokens: model.parameters?.max_new_tokens,
 				temperature: model.parameters?.temperature,
 				top_p: model.parameters?.top_p,

@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy, onMount } from "svelte";
-	import { goto, invalidate } from "$app/navigation";
+	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
@@ -12,7 +12,6 @@
 	import { createSettingsStore } from "$lib/stores/settings";
 
 	import { shareConversation } from "$lib/shareConversation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -20,7 +19,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import { PUBLIC_APP_DISCLAIMER } from "$env/static/public";
 
 	export let data;
 
@@ -60,9 +58,9 @@
 				return;
 			}
 
-			if ($page.params.id !== id) {
-				await invalidate(UrlDependency.ConversationList);
-			} else {
+			data.conversations = data.conversations.filter((conv) => conv.id !== id);
+
+			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
 			}
 		} catch (err) {
@@ -86,7 +84,9 @@
 				return;
 			}
 
-			await invalidate(UrlDependency.ConversationList);
+			data.conversations = data.conversations.map((conv) =>
+				conv.id === id ? { ...conv, title } : conv
+			);
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
@@ -105,8 +105,6 @@
 		if (convIdx != -1) {
 			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
 		}
-		// update data.conversations
-		data.conversations = [...data.conversations];
 
 		$titleUpdate = null;
 	}
@@ -148,6 +146,12 @@
 	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
 		? ""
 		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+
+	$: showDisclaimer =
+		!$settings.ethicsModalAccepted &&
+		$page.url.pathname !== `${base}/privacy` &&
+		envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
+		!($page.data.shared === true);
 </script>
 
 <svelte:head>
@@ -158,7 +162,7 @@
 
 	<!-- use those meta tags everywhere except on the share assistant page -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/")}
+	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
 		<meta property="og:title" content={envPublic.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}" />
@@ -205,21 +209,21 @@
 	{/if}
 </svelte:head>
 
-{#if !$settings.ethicsModalAccepted && $page.url.pathname !== `${base}/privacy` && PUBLIC_APP_DISCLAIMER === "1"}
-	<DisclaimerModal />
+{#if showDisclaimer}
+	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
 <ExpandNavigation
 	isCollapsed={isNavCollapsed}
 	on:click={() => (isNavCollapsed = !isNavCollapsed)}
 	classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-		? 'left-[280px]'
+		? 'left-[290px]'
 		: 'left-0'} *:transition-transform"
 />
 
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[280px,1fr]'
+		? 'md:grid-cols-[290px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
@@ -233,7 +237,7 @@
 		/>
 	</MobileNav>
 	<nav
-		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
 	>
 		<NavMenu
 			conversations={data.conversations}

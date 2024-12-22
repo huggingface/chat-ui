@@ -84,8 +84,7 @@
 					{/if}
 				</button>
 			</div>
-			<!-- XXX: feature_flag_tools -->
-			{#if $page.data.user?.isEarlyAccess}
+			{#if $page.data.enableCommunityTools}
 				<a
 					href="{base}/tools"
 					class="col-span-2 my-1 h-fit w-fit items-center justify-center rounded-full bg-purple-500/20 px-2.5 py-1.5 text-sm hover:bg-purple-500/30"

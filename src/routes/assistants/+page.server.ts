@@ -6,7 +6,7 @@ import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import { error, redirect } from "@sveltejs/kit";
 import type { Filter } from "mongodb";
-
+import { ReviewStatus } from "$lib/types/Review";
 const NUM_PER_PAGE = 24;
 
 export const load = async ({ url, locals }) => {
@@ -19,6 +19,7 @@ export const load = async ({ url, locals }) => {
 	const username = url.searchParams.get("user");
 	const query = url.searchParams.get("q")?.trim() ?? null;
 	const sort = url.searchParams.get("sort")?.trim() ?? SortKey.TRENDING;
+	const showUnfeatured = url.searchParams.get("showUnfeatured") === "true";
 	const createdByCurrentUser = locals.user?.username && locals.user.username === username;
 
 	let user: Pick<User, "_id"> | null = null;
@@ -32,17 +33,18 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
-	// if there is no user, we show community assistants, so only show featured assistants
-	const shouldBeFeatured =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !user && !locals.user?.isAdmin
-			? { featured: true }
-			: {};
+	// if we require featured assistants, that we are not on a user page and we are not an admin who wants to see unfeatured assistants, we show featured assistants
+	let shouldBeFeatured = {};
 
-	// if the user queried is not the current user, only show "public" assistants that have been shared before
-	const shouldHaveBeenShared =
-		env.REQUIRE_FEATURED_ASSISTANTS === "true" && !createdByCurrentUser && !locals.user?.isAdmin
-			? { userCount: { $gt: 1 } }
-			: {};
+	if (env.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.user?.isAdmin && showUnfeatured)) {
+		if (!user) {
+			// only show featured assistants on the community page
+			shouldBeFeatured = { review: ReviewStatus.APPROVED };
+		} else if (!createdByCurrentUser) {
+			// on a user page show assistants that have been approved or are pending
+			shouldBeFeatured = { review: { $in: [ReviewStatus.APPROVED, ReviewStatus.PENDING] } };
+		}
+	}
 
 	// fetch the top assistants sorted by user count from biggest to smallest. filter by model too if modelId is provided or query if query is provided
 	const filter: Filter<Assistant> = {
@@ -50,7 +52,6 @@ export const load = async ({ url, locals }) => {
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
 		...shouldBeFeatured,
-		...shouldHaveBeenShared,
 	};
 	const assistants = await Database.getInstance()
 		.getCollections()
@@ -75,5 +76,6 @@ export const load = async ({ url, locals }) => {
 		numItemsPerPage: NUM_PER_PAGE,
 		query,
 		sort,
+		showUnfeatured,
 	};
 };

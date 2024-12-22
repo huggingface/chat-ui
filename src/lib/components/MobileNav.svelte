@@ -40,7 +40,11 @@
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
-	<span class="truncate px-4">{title}</span>
+	{#await title}
+		<div class="flex h-full items-center justify-center" />
+	{:then title}
+		<span class="truncate px-4">{title ?? ""}</span>
+	{/await}
 	<a
 		class:invisible={!$page.params.id}
 		href="{base}/"

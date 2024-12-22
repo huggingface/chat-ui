@@ -1,17 +1,3 @@
----
-title: chat-ui
-emoji: 🔥
-colorFrom: purple
-colorTo: purple
-sdk: docker
-pinned: false
-license: apache-2.0
-base_path: /chat
-app_port: 3000
-failure_strategy: rollback
-load_balancing_strategy: random
----
-
 # Chat UI
 
 **Find the docs at [hf.co/docs/chat-ui](https://huggingface.co/docs/chat-ui/index).**
@@ -32,6 +18,18 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 9. [Building](#building)
 
 ## Quickstart
+
+### Docker image
+
+You can deploy a chat-ui instance in a single command using the docker image. Get your huggingface token from [here](https://huggingface.co/settings/tokens).
+
+```bash
+docker run -p 3000 -e HF_TOKEN=hf_*** -v db:/data ghcr.io/huggingface/chat-ui-db:latest
+```
+
+Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) and the readme to see all the environment variables that you can set. We have endpoint support for all OpenAI API compatible local services as well as many other providers like Anthropic, Cloudflare, Google Vertex AI, etc.
+
+### Local setup
 
 You can quickly start a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
@@ -59,23 +57,29 @@ llama-server --hf-repo microsoft/Phi-3-mini-4k-instruct-gguf --hf-file Phi-3-min
 
 A local LLaMA.cpp HTTP Server will start on `http://localhost:8080`. Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
-**Step 2 (tell chat-ui to use local llama.cpp server):**
+**Step 3 (make sure you have MongoDb running locally):**
+
+```bash
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+```
+
+Read more [here](#database).
+
+**Step 4 (clone chat-ui):**
+
+```bash
+git clone https://github.com/huggingface/chat-ui
+cd chat-ui
+```
+
+**Step 5 (tell chat-ui to use local llama.cpp server):**
 
 Add the following to your `.env.local`:
 
 ```ini
 MODELS=`[
   {
-    "name": "Local microsoft/Phi-3-mini-4k-instruct-gguf",
-    "tokenizer": "microsoft/Phi-3-mini-4k-instruct-gguf",
-    "preprompt": "",
-    "chatPromptTemplate": "<s>{{preprompt}}{{#each messages}}{{#ifUser}}<|user|>\n{{content}}<|end|>\n<|assistant|>\n{{/ifUser}}{{#ifAssistant}}{{content}}<|end|>\n{{/ifAssistant}}{{/each}}",
-    "parameters": {
-      "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
-      "temperature": 0.7,
-      "max_new_tokens": 1024,
-      "truncate": 3071
-    },
+    "name": "microsoft/Phi-3-mini-4k-instruct",
     "endpoints": [{
       "type" : "llamacpp",
       "baseURL": "http://localhost:8080"
@@ -86,19 +90,9 @@ MODELS=`[
 
 Read more [here](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
 
-**Step 3 (make sure you have MongoDb running locally):**
+**Step 6 (start chat-ui):**
 
 ```bash
-docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
-```
-
-Read more [here](#database).
-
-**Step 4 (start chat-ui):**
-
-```bash
-git clone https://github.com/huggingface/chat-ui
-cd chat-ui
 npm install
 npm run dev -- --open
 ```
@@ -113,7 +107,7 @@ If you don't want to configure, setup, and launch your own Chat UI yourself, you
 
 You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
 
-Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets-and-environment-variables) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
+Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
@@ -322,7 +316,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 
 #### Multi modal model
 
-We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on TGI), OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](#OpenAI). For Anthropic, see the [Anthropic section](#anthropic).
+We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on TGI), OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](#openai-api-compatible-models). For Anthropic, see the [Anthropic section](#anthropic).
 
 ```env
     {
@@ -701,7 +695,7 @@ You can get the `accessKey` and `secretKey` from your AWS user, under programmat
 
 You can also use Cloudflare Workers AI to run your own models with serverless inference.
 
-You will need to have a Cloudflare account, then get your [account ID](https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/) as well as your [API token](https://developers.cloudflare.com/workers-ai/get-started/rest-api/#1-get-an-api-token) for Workers AI.
+You will need to have a Cloudflare account, then get your [account ID](https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/) as well as your [API token](https://developers.cloudflare.com/workers-ai/get-started/rest-api/#1-get-api-token-and-account-id) for Workers AI.
 
 You can either specify them directly in your `.env.local` using the `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` variables, or you can set them directly in the endpoint config.
 
@@ -775,21 +769,32 @@ MODELS=`[
     {
        "name": "gemini-1.5-pro",
        "displayName": "Vertex Gemini Pro 1.5",
+       "multimodal": true,
        "endpoints" : [{
           "type": "vertex",
           "project": "abc-xyz",
           "location": "europe-west3",
-          "model": "gemini-1.5-pro-preview-0409", // model-name
+          "extraBody": {
+          "model_version": "gemini-1.5-pro-preview-0409",
+          },
 
           // Optional
           "safetyThreshold": "BLOCK_MEDIUM_AND_ABOVE",
           "apiEndpoint": "", // alternative api endpoint url,
-          // Optional
           "tools": [{
             "googleSearchRetrieval": {
               "disableAttribution": true
             }
-          }]
+          }],
+          "multimodal": {
+            "image": {
+              "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
+              "preferredMimeType": "image/png",
+              "maxSizeInMB": 5,
+              "maxWidth": 2000,
+              "maxHeight": 1000,
+            }
+          }
        }]
      },
 ]`
@@ -910,7 +915,7 @@ MODELS=`[
 
 ### 403：You don't have access to this conversation
 
-Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `ALLOW_INSECURE_COOKIES=true` to your `.env.local`.
+Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `COOKIE_SECURE=false` and `COOKIE_SAMESITE=lax` to your `.env.local`.
 
 Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
 
@@ -995,3 +1000,13 @@ npm run populate users settings assistants conversations
 ```
 
 to populate the database with fake data, including fake conversations and assistants for your user.
+
+### Building the docker images locally
+
+You can build the docker images locally using the following commands:
+
+```bash
+docker build -t chat-ui-db:latest --build-arg INCLUDE_DB=true .
+docker build -t chat-ui:latest --build-arg INCLUDE_DB=false .
+docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_BASE=/chat --build-arg PUBLIC_APP_COLOR=yellow .
+```

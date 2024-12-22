@@ -1,16 +1,17 @@
+import { env } from "$env/dynamic/private";
 import { authCondition, requiresUser } from "$lib/server/auth.js";
 import { collections } from "$lib/server/database.js";
 import { editableToolSchema } from "$lib/server/tools/index.js";
 import { usageLimits } from "$lib/server/usageLimits.js";
+import { ReviewStatus } from "$lib/types/Review";
 import { generateSearchTokens } from "$lib/utils/searchTokens.js";
 import { error, fail } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
 export const actions = {
 	default: async ({ request, locals }) => {
-		// XXX: feature_flag_tools
-		if (!locals.user?.isEarlyAccess) {
-			error(403, "You need to be an early access user to create tools");
+		if (env.COMMUNITY_TOOLS !== "true") {
+			error(403, "Community tools are not enabled");
 		}
 
 		const body = await request.formData();
@@ -66,9 +67,7 @@ export const actions = {
 			updatedAt: new Date(),
 			last24HoursUseCount: 0,
 			useCount: 0,
-			// XXX: feature_flag_tools
-			// since this is scoped to internal team members only, we can assume that they should all be public
-			featured: true,
+			review: ReviewStatus.PRIVATE,
 			searchTokens: generateSearchTokens(parse.data.displayName),
 		});
 

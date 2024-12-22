@@ -42,17 +42,28 @@ export const OIDConfig = z
 		),
 		TOLERANCE: stringWithDefault(env.OPENID_TOLERANCE),
 		RESOURCE: stringWithDefault(env.OPENID_RESOURCE),
+		ID_TOKEN_SIGNED_RESPONSE_ALG: z.string().optional(),
 	})
-	.parse(JSON5.parse(env.OPENID_CONFIG));
+	.parse(JSON5.parse(env.OPENID_CONFIG || "{}"));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
+
+const sameSite = z
+	.enum(["lax", "none", "strict"])
+	.default(dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
+	.parse(env.COOKIE_SAMESITE === "" ? undefined : env.COOKIE_SAMESITE);
+
+const secure = z
+	.boolean()
+	.default(!(dev || env.ALLOW_INSECURE_COOKIES === "true"))
+	.parse(env.COOKIE_SECURE === "" ? undefined : env.COOKIE_SECURE === "true");
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(env.COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
-		secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
+		sameSite,
+		secure,
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
 	});
@@ -93,13 +104,22 @@ export async function generateCsrfToken(sessionId: string, redirectUrl: string):
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 	const issuer = await Issuer.discover(OIDConfig.PROVIDER_URL);
 
-	return new issuer.Client({
+	const client_config: ConstructorParameters<typeof issuer.Client>[0] = {
 		client_id: OIDConfig.CLIENT_ID,
 		client_secret: OIDConfig.CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
 		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
-	});
+		id_token_signed_response_alg: OIDConfig.ID_TOKEN_SIGNED_RESPONSE_ALG || undefined,
+	};
+
+	const alg_supported = issuer.metadata["id_token_signing_alg_values_supported"];
+
+	if (Array.isArray(alg_supported)) {
+		client_config.id_token_signed_response_alg ??= alg_supported[0];
+	}
+
+	return new issuer.Client(client_config);
 }
 
 export async function getOIDCAuthorizationUrl(

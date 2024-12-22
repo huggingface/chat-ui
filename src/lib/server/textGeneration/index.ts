@@ -27,7 +27,7 @@ async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, unde
 			type: MessageUpdateType.Status,
 			status: MessageUpdateStatus.KeepAlive,
 		};
-		await new Promise((resolve) => setTimeout(resolve, 5000));
+		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
 }
 
@@ -62,10 +62,7 @@ async function* textGenerationWithoutTitle(
 	// - it's not continuing a previous message
 	// - AND the model doesn't support tools and websearch is selected
 	// - OR the assistant has websearch enabled (no tools for assistants for now)
-	if (
-		!isContinue &&
-		((!model.tools && webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))
-	) {
+	if (!isContinue && ((webSearch && !conv.assistantId) || assistantHasWebSearch(assistant))) {
 		webSearchResult = yield* runWebSearch(conv, messages, assistant?.rag);
 	}
 

@@ -1,5 +1,8 @@
 name: Build and Publish Image
 
+permissions:
+  packages: write
+
 on:
   push:
     branches:
@@ -58,6 +61,9 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4.5.0
+
       - name: Build and Publish Docker Image with DB
         uses: docker/build-push-action@v5
         with:
@@ -67,8 +73,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             INCLUDE_DB=true
+            PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
   build-and-publish-image-nodb:
     runs-on: ubuntu-latest
     steps:
@@ -112,6 +121,9 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4.5.0
+
       - name: Build and Publish Docker Image without DB
         uses: docker/build-push-action@v5
         with:
@@ -121,5 +133,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             INCLUDE_DB=false
+            PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}

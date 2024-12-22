@@ -11,10 +11,7 @@ export const endpointLlamacppParametersSchema = z.object({
 	type: z.literal("llamacpp"),
 	url: z.string().url().default("http://127.0.0.1:8080"), // legacy, feel free to remove in breaking change update
 	baseURL: z.string().url().optional(),
-	accessToken: z
-		.string()
-		.min(1)
-		.default(env.HF_TOKEN ?? env.HF_ACCESS_TOKEN),
+	accessToken: z.string().default(env.HF_TOKEN ?? env.HF_ACCESS_TOKEN),
 });
 
 export function endpointLlamacpp(
