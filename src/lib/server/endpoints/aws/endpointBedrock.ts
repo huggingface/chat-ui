@@ -1,10 +1,6 @@
 import { z } from "zod";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
-import {
-	BedrockRuntimeClient,
-	InvokeModelWithResponseStreamCommand,
-} from "@aws-sdk/client-bedrock-runtime";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { EndpointMessage } from "../endpoints";
 import type { MessageFile } from "$lib/types/Message";
@@ -40,6 +36,16 @@ export async function endpointBedrock(
 ): Promise<Endpoint> {
 	const { region, model, anthropicVersion, multimodal } =
 		endpointBedrockParametersSchema.parse(input);
+
+	let BedrockRuntimeClient, InvokeModelWithResponseStreamCommand;
+	try {
+		({ BedrockRuntimeClient, InvokeModelWithResponseStreamCommand } = await import(
+			"@aws-sdk/client-bedrock-runtime"
+		));
+	} catch (error) {
+		throw new Error("Failed to import @aws-sdk/client-bedrock-runtime. Make sure it's installed.");
+	}
+
 	const client = new BedrockRuntimeClient({
 		region,
 	});

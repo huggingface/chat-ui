@@ -105,7 +105,7 @@
 				{/if}
 
 				{#if assistant.createdByName}
-					<p class="pt-1 text-sm text-gray-400 dark:text-gray-500">
+					<div class="pt-1 text-sm text-gray-400 dark:text-gray-500">
 						Created by
 						<a class="hover:underline" href="{base}/assistants?user={assistant.createdByName}">
 							{assistant.createdByName}
@@ -119,7 +119,7 @@
 								<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)} users
 							</div>
 						{/if}
-					</p>
+					</div>
 				{/if}
 			</div>
 		</div>

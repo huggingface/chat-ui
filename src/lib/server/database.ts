@@ -202,7 +202,7 @@ export class Database {
 		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch((e) => logger.error(e));
 		assistants.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ featured: 1, userCount: -1 }).catch((e) => logger.error(e));
+		assistants.createIndex({ review: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
 		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
@@ -228,6 +228,20 @@ export class Database {
 		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
 		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
 		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+
+		conversations
+			.createIndex({
+				"messages.from": 1,
+				createdAt: 1,
+			})
+			.catch((e) => logger.error(e));
+
+		conversations
+			.createIndex({
+				userId: 1,
+				sessionId: 1,
+			})
+			.catch((e) => logger.error(e));
 	}
 }
 

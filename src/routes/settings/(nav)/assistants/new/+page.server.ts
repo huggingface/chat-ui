@@ -11,6 +11,7 @@ import { parseStringToList } from "$lib/utils/parseStringToList";
 import { usageLimits } from "$lib/server/usageLimits";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
 import { toolFromConfigs } from "$lib/server/tools";
+import { ReviewStatus } from "$lib/types/Review";
 
 const newAsssistantSchema = z.object({
 	name: z.string().min(1),
@@ -142,14 +143,13 @@ export const actions: Actions = {
 			createdById,
 			createdByName: locals.user?.username ?? locals.user?.name,
 			...parse.data,
-			// XXX: feature_flag_tools
-			tools: locals.user?.isEarlyAccess ? parse.data.tools : undefined,
+			tools: parse.data.tools,
 			exampleInputs,
 			avatar: hash,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			userCount: 1,
-			featured: false,
+			review: ReviewStatus.PRIVATE,
 			rag: {
 				allowedLinks: parse.data.ragLinkList,
 				allowedDomains: parse.data.ragDomainList,

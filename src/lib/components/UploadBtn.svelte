@@ -21,6 +21,7 @@
 >
 	<input
 		class="absolute w-full cursor-pointer opacity-0"
+		aria-label="Upload file"
 		type="file"
 		on:change={onFileChange}
 		accept={mimeTypes.join(",")}

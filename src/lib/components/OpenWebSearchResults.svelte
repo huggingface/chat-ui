@@ -8,8 +8,8 @@
 	import CarbonError from "~icons/carbon/error-filled";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconInternet from "./icons/IconInternet.svelte";
+	import CarbonCaretDown from "~icons/carbon/caret-down";
 
-	export let classNames = "";
 	export let webSearchMessages: MessageWebSearchUpdate[] = [];
 
 	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
@@ -23,9 +23,11 @@
 </script>
 
 <details
-	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
+	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
-	<summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2">
+	<summary
+		class="grid min-w-72 cursor-pointer select-none grid-cols-[40px,1fr,24px] items-center gap-2.5 rounded-xl p-2 group-open:rounded-b-none hover:bg-gray-500/10"
+	>
 		<div
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
@@ -60,6 +62,7 @@
 				{/if}
 			</dt>
 		</dl>
+		<CarbonCaretDown class="size-6 text-gray-400 transition-transform group-open:rotate-180" />
 	</summary>
 
 	<div class="content px-5 pb-5 pt-4">

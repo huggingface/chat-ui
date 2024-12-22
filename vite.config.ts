@@ -41,5 +41,6 @@ export default defineConfig({
 		setupFiles: ["./scripts/setupTest.ts"],
 		deps: { inline: ["@sveltejs/kit"] },
 		globals: true,
+		testTimeout: 10000,
 	},
 });

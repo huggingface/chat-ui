@@ -12,9 +12,9 @@
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
 	import {
+		MessageReasoningUpdateType,
 		MessageUpdateStatus,
 		MessageUpdateType,
-		type MessageUpdate,
 	} from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
@@ -31,6 +31,8 @@
 
 	let loading = false;
 	let pending = false;
+
+	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
 
 	let files: File[] = [];
 
@@ -201,7 +203,7 @@
 					messageId,
 					isRetry,
 					isContinue,
-					webSearch: !hasAssistant && $webSearchParameters.useSearch,
+					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
 					tools: $settings.tools, // preference for tools
 					files: isRetry ? userMessage?.files : base64Files,
 				},
@@ -212,8 +214,6 @@
 			if (messageUpdatesIterator === undefined) return;
 
 			files = [];
-
-			const messageUpdates: MessageUpdate[] = [];
 
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
@@ -227,7 +227,7 @@
 					update.token = update.token.replaceAll("\0", "");
 				}
 
-				messageUpdates.push(update);
+				messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 
 				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
 					messageToWriteTo.content += update.token;
@@ -237,7 +237,6 @@
 					update.type === MessageUpdateType.WebSearch ||
 					update.type === MessageUpdateType.Tool
 				) {
-					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					messages = [...messages];
 				} else if (
 					update.type === MessageUpdateType.Status &&
@@ -260,10 +259,18 @@
 						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
 					];
 					messages = [...messages];
+				} else if (update.type === MessageUpdateType.Reasoning) {
+					if (!messageToWriteTo.reasoning) {
+						messageToWriteTo.reasoning = "";
+					}
+					if (update.subtype === MessageReasoningUpdateType.Stream) {
+						messageToWriteTo.reasoning += update.token;
+					} else {
+						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+					}
+					messages = [...messages];
 				}
 			}
-
-			messageToWriteTo.updates = messageUpdates;
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
@@ -356,7 +363,7 @@
 
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
-			writeMessage({ messageId: event.detail.id, isContinue: true });
+			await writeMessage({ messageId: event.detail.id, isContinue: true });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
@@ -381,7 +388,9 @@
 </script>
 
 <svelte:head>
-	<title>{title}</title>
+	{#await title then title}
+		<title>{title}</title>
+	{/await}
 	<link
 		rel="stylesheet"
 		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"

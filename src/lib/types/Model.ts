@@ -16,6 +16,8 @@ export type Model = Pick<
 	| "datasetUrl"
 	| "preprompt"
 	| "multimodal"
+	| "multimodalAcceptedMimetypes"
 	| "unlisted"
 	| "tools"
+	| "hasInferenceAPI"
 >;

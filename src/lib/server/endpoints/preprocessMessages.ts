@@ -11,12 +11,13 @@ export async function preprocessMessages(
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => addWebSearchContext(msgs, webSearch))
-		.then((msgs) => downloadFiles(msgs, convId));
+		.then((msgs) => downloadFiles(msgs, convId))
+		.then((msgs) => injectClipboardFiles(msgs));
 }
 
 function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"]) {
 	const webSearchContext = webSearch?.contextSources
-		.map(({ context }) => context.trim())
+		.map(({ context }, idx) => `Source [${idx + 1}]\n${context.trim()}`)
 		.join("\n\n----------\n\n");
 
 	// No web search context available, skip
@@ -34,7 +35,8 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 	const finalMessage = {
 		...messages[messages.length - 1],
 		content: `I searched the web using the query: ${webSearch.searchQuery}.
-Today is ${currentDate} and here are the results:
+Today is ${currentDate} and here are the results.
+When answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3].
 =====================
 ${webSearchContext}
 =====================
@@ -52,5 +54,23 @@ async function downloadFiles(messages: Message[], convId: ObjectId): Promise<End
 				(files) => ({ ...message, files })
 			)
 		)
+	);
+}
+
+async function injectClipboardFiles(messages: EndpointMessage[]) {
+	return Promise.all(
+		messages.map((message) => {
+			const plaintextFiles = message.files
+				?.filter((file) => file.mime === "application/vnd.chatui.clipboard")
+				.map((file) => Buffer.from(file.value, "base64").toString("utf-8"));
+
+			if (!plaintextFiles || plaintextFiles.length === 0) return message;
+
+			return {
+				...message,
+				content: `${plaintextFiles.join("\n\n")}\n\n${message.content}`,
+				files: message.files?.filter((file) => file.mime !== "application/vnd.chatui.clipboard"),
+			};
+		})
 	);
 }

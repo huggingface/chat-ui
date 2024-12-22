@@ -1,12 +1,13 @@
+import { env } from "$env/dynamic/private";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
+import { ReviewStatus } from "$lib/types/Review";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import { ObjectId } from "mongodb";
 
-export async function GET({ params, locals }) {
-	// XXX: feature_flag_tools
-	if (!locals.user?.isEarlyAccess) {
-		return new Response("Not early access", { status: 403 });
+export async function GET({ params }) {
+	if (env.COMMUNITY_TOOLS !== "true") {
+		return new Response("Community tools are not enabled", { status: 403 });
 	}
 
 	const toolId = params.toolId;
@@ -33,12 +34,12 @@ export async function GET({ params, locals }) {
 								color: tool.color,
 								icon: tool.icon,
 								createdByName: tool.createdByName,
-								featured: tool.featured,
+								review: tool.review,
 						  }
 						: undefined
 				);
 
-			if (!tool || !tool.featured) {
+			if (!tool || tool.review !== ReviewStatus.APPROVED) {
 				return new Response(`Tool "${toolId}" not found`, { status: 404 });
 			}
 
