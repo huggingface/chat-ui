@@ -556,7 +556,7 @@
 												fetch(match[2], {
 													method: "POST",
 													headers: { "Content-Type": "application/json" },
-													body: JSON.stringify({ message: "" }) // Hardcoded dummy body
+													body: JSON.stringify({ message: "" }), // Hardcoded dummy body
 												})
 													.then((response) => {
 														if (response.ok) {
@@ -576,7 +576,7 @@
 						</div>
 					</div>
 				{/if}
-			</div>			
+			</div>
 			<label class="pb-2 text-sm has-[:checked]:font-semibold">
 				<input type="checkbox" name="dynamicPrompt" bind:checked={dynamicPrompt} />
 				Dynamic Prompt
