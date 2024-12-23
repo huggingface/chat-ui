@@ -68,7 +68,6 @@ export async function endpointBedrock(
 				contentType: "application/json",
 				accept: "application/json",
 				modelId: model.id,
-				trace: "DISABLED",
 			};
 
 			const maxTokens = parameters.max_new_tokens || 4096;
@@ -96,6 +95,7 @@ export async function endpointBedrock(
 			const command = new InvokeModelWithResponseStreamCommand({
 				...baseCommandParams,
 				body: Buffer.from(JSON.stringify(bodyContent), "utf-8"),
+				trace: "DISABLED",
 			});
 
 			console.log(JSON.stringify({ messages: formattedMessages }));
