@@ -259,8 +259,17 @@
 		>
 			{#if assistant?.dynamicPrompt}
 				{#each prepromptTags as tag}
-					{#if tag.startsWith("{{") && tag.endsWith("}}") && tag.includes("url=")}
-						{@const url = tag.split("url=")[1].split("}}")[0]}
+					{#if tag.startsWith("{{") && tag.endsWith("}}") && tag.includes("get=")}
+						{@const url = tag.split("get=")[1].split("}}")[0]}
+						<a
+							target="_blank"
+							href={url.startsWith("http") ? url : `//${url}`}
+							class="break-words rounded-lg bg-blue-100 px-1 py-0.5 text-blue-800 hover:underline"
+						>
+							{tag}</a
+						>
+					{:else if tag.startsWith("{{") && tag.endsWith("}}") && tag.includes("post=")}
+						{@const url = tag.split("post=")[1].split("}}")[0]}
 						<a
 							target="_blank"
 							href={url.startsWith("http") ? url : `//${url}`}

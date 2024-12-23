@@ -5,26 +5,30 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { ObjectId } from "mongodb";
 
 export async function processPreprompt(preprompt: string, user_message: string | undefined) {
-	const urlRegex = /{{\s?url=(.*?)\s?}}/g;
+	const requestRegex = /{{\s?(get|post)=(.*?)\s?}}/g;
 
-	for (const match of preprompt.matchAll(urlRegex)) {
+	for (const match of preprompt.matchAll(requestRegex)) {
+		const method = match[1].toUpperCase();
+		const urlString = match[2];
 		try {
-			const url = new URL(match[1]);
+			const url = new URL(urlString);
 			if ((await isURLLocal(url)) && env.ENABLE_LOCAL_FETCH !== "true") {
 				throw new Error("URL couldn't be fetched, it resolved to a local address.");
 			}
-			
+
 			let res;
-			if (env.ENABLE_ASSISTANTS_POST === "true") {
+			if (method == "POST") {
 				res = await fetch(url.href, {
-					method: 'POST',
+					method: "POST",
 					body: user_message,
 					headers: {
-					  'Content-Type': 'text/plain'
-					}
-				  });
-			} else {
+						"Content-Type": "text/plain",
+					},
+				});
+			} else if (method == "GET") {
 				res = await fetch(url.href);
+			} else {
+				throw new Error("Invalid method " + method);
 			}
 
 			if (!res.ok) {
