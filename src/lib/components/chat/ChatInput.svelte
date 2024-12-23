@@ -3,7 +3,8 @@
 	import { createEventDispatcher, onMount } from "svelte";
 
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
-	import CarbonImage from "~icons/carbon/image";
+	import IconImageGen from "$lib/components/icons/IconImageGen.svelte";
+	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import {
@@ -125,7 +126,7 @@
 			enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
 			tabindex="0"
 			rows="1"
-			class="scrollbar-custom max-h-[96em] w-full resize-none scroll-p-3 overflow-y-auto overflow-x-hidden border-0 bg-transparent p-3 pb-1 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
+			class="scrollbar-custom max-h-[96em] w-full resize-none scroll-p-3 overflow-y-auto overflow-x-hidden border-0 bg-transparent px-3 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
 			class:text-gray-400={disabled}
 			bind:value
 			bind:this={textareaElement}
@@ -140,7 +141,7 @@
 	</div>
 	{#if !assistant}
 		<div
-			class="flex w-full flex-wrap items-center justify-start gap-2 p-3 py-1 text-smd text-gray-500 dark:text-gray-400"
+			class="-ml-0.5 flex h-12 items-center justify-start gap-2 px-3 text-gray-500 dark:text-gray-400"
 		>
 			<button
 				class="base-tool"
@@ -164,7 +165,7 @@
 					}
 				}}
 			>
-				<IconInternet />
+				<IconInternet classNames="text-xl" />
 				{#if webSearchIsOn}
 					Search
 				{/if}
@@ -188,7 +189,7 @@
 						}
 					}}
 				>
-					<CarbonImage />
+					<IconImageGen classNames="text-xl" />
 					{#if imageGenIsOn}
 						Image Gen
 					{/if}
@@ -222,20 +223,7 @@
 							on:change={onFileChange}
 							accept={mimeTypes.join(",")}
 						/>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 10 11"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								d="M6.52896 3.07175L3.35489 6.24582C3.16063 6.44008 3.05149 6.70356 3.05149 6.97829C3.05149 7.25303 3.16063 7.51651 3.35489 7.71077C3.54916 7.90503 3.81264 8.01417 4.08737 8.01417C4.3621 8.01417 4.62558 7.90503 4.81984 7.71077L7.99391 4.53671C8.38244 4.14818 8.60071 3.62122 8.60071 3.07175C8.60071 2.52229 8.38244 1.99533 7.99391 1.6068C7.60538 1.21827 7.07842 1 6.52896 1C5.97949 1 5.45253 1.21827 5.064 1.6068L1.88994 4.78087C1.30715 5.36366 0.979736 6.1541 0.979736 6.97829C0.979736 7.80249 1.30715 8.59293 1.88994 9.17572C2.47273 9.75852 3.26317 10.0859 4.08737 10.0859C4.91156 10.0859 5.702 9.75852 6.2848 9.17572L9.45886 6.00166"
-								class="stroke-current stroke-[0.75]"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							/>
-						</svg>
+						<IconPaperclip classNames="text-xl" />
 						{#if documentParserIsOn}
 							Document Parser
 						{/if}
@@ -261,10 +249,10 @@
 	}
 
 	.base-tool {
-		@apply flex h-fit min-h-7 items-center gap-1 transition-all hover:text-gray-400 dark:hover:text-gray-300;
+		@apply flex h-[1.6rem] items-center gap-[.2rem] text-xs outline-none transition-all hover:text-purple-600 focus:outline-none active:outline-none dark:hover:text-gray-300;
 	}
 
 	.active-tool {
-		@apply my-0 rounded-full border border-purple-300 bg-purple-400/20 px-2 text-purple-700 hover:text-purple-600 dark:border-purple-600 dark:text-purple-400 dark:hover:text-purple-300;
+		@apply rounded-full bg-purple-500/15 pl-1 pr-2 text-purple-600 hover:text-purple-600  dark:bg-purple-600/50 dark:text-purple-300;
 	}
 </style>
