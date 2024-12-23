@@ -2,20 +2,20 @@
 	export let label = "";
 	export let position: "top" | "bottom" | "left" | "right" = "bottom";
 	export let TooltipClassNames = "";
-  
+
 	const positionClasses = {
-	  top:    "bottom-full mb-2",
-	  bottom: "top-full mt-2",
-	  left:   "right-full mr-2 top-1/2 -translate-y-1/2",
-	  right:  "left-full ml-2 top-1/2 -translate-y-1/2"
+		top: "bottom-full mb-2",
+		bottom: "top-full mt-2",
+		left: "right-full mr-2 top-1/2 -translate-y-1/2",
+		right: "left-full ml-2 top-1/2 -translate-y-1/2",
 	};
-  </script>
-  
-  <div class="group/tooltip md:relative inline-block">
+</script>
+
+<div class="group/tooltip inline-block md:relative">
 	<slot />
-  
+
 	<div
-	  class="
+		class="
 		invisible
 		absolute
 		z-10
@@ -34,7 +34,6 @@
 		{TooltipClassNames}
 	  "
 	>
-	  {label}
+		{label}
 	</div>
-  </div>
-  
+</div>
