@@ -2,6 +2,7 @@
 	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
+	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import IconImageGen from "$lib/components/icons/IconImageGen.svelte";
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
@@ -141,59 +142,75 @@
 	</div>
 	{#if !assistant}
 		<div
-			class="-ml-0.5 flex h-12 items-center justify-start gap-2 px-3 text-gray-500 dark:text-gray-400"
+			class="-ml-0.5 flex flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 text-gray-500 dark:text-gray-400"
 		>
-			<button
-				class="base-tool"
-				class:active-tool={webSearchIsOn}
-				disabled={loading}
-				on:click|preventDefault={async () => {
-					if (modelHasTools) {
-						if (webSearchIsOn) {
-							await settings.instantSet({
-								tools: ($settings.tools ?? []).filter(
-									(t) => t !== webSearchToolId && t !== fetchUrlToolId
-								),
-							});
-						} else {
-							await settings.instantSet({
-								tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
-							});
-						}
-					} else {
-						$webSearchParameters.useSearch = !webSearchIsOn;
-					}
-				}}
+			<HoverTooltip
+				label="Search the web"
+				position="top"
+				TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
+					? 'hidden'
+					: ''}"
 			>
-				<IconInternet classNames="text-xl" />
-				{#if webSearchIsOn}
-					Search
-				{/if}
-			</button>
-			{#if modelHasTools}
 				<button
 					class="base-tool"
-					class:active-tool={imageGenIsOn}
+					class:active-tool={webSearchIsOn}
 					disabled={loading}
 					on:click|preventDefault={async () => {
 						if (modelHasTools) {
-							if (imageGenIsOn) {
+							if (webSearchIsOn) {
 								await settings.instantSet({
-									tools: ($settings.tools ?? []).filter((t) => t !== imageGenToolId),
+									tools: ($settings.tools ?? []).filter(
+										(t) => t !== webSearchToolId && t !== fetchUrlToolId
+									),
 								});
 							} else {
 								await settings.instantSet({
-									tools: [...($settings.tools ?? []), imageGenToolId],
+									tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
 								});
 							}
+						} else {
+							$webSearchParameters.useSearch = !webSearchIsOn;
 						}
 					}}
 				>
-					<IconImageGen classNames="text-xl" />
-					{#if imageGenIsOn}
-						Image Gen
+					<IconInternet classNames="text-xl" />
+					{#if webSearchIsOn}
+						Search
 					{/if}
 				</button>
+			</HoverTooltip>
+			{#if modelHasTools}
+				<HoverTooltip
+					label="Generate	images"
+					position="top"
+					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {imageGenIsOn
+						? 'hidden'
+						: ''}"
+				>
+					<button
+						class="base-tool"
+						class:active-tool={imageGenIsOn}
+						disabled={loading}
+						on:click|preventDefault={async () => {
+							if (modelHasTools) {
+								if (imageGenIsOn) {
+									await settings.instantSet({
+										tools: ($settings.tools ?? []).filter((t) => t !== imageGenToolId),
+									});
+								} else {
+									await settings.instantSet({
+										tools: [...($settings.tools ?? []), imageGenToolId],
+									});
+								}
+							}
+						}}
+					>
+						<IconImageGen classNames="text-xl" />
+						{#if imageGenIsOn}
+							Image Gen
+						{/if}
+					</button>
+				</HoverTooltip>
 			{/if}
 			{#if modelHasTools}
 				{#each extraTools as tool}
@@ -210,34 +227,50 @@
 				{/each}
 			{/if}
 			{#if modelIsMultimodal || modelHasTools}
-				<form>
-					<button
-						class="base-tool relative"
-						class:active-tool={documentParserIsOn}
-						disabled={loading}
+				<form class="flex items-center">
+					<HoverTooltip
+						label="Upload {mimeTypes.map((m) => m.split('/').pop()).join(',')} files"
+						position="top"
+						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
 					>
-						<input
-							class="absolute w-full cursor-pointer opacity-0"
-							aria-label="Upload file"
-							type="file"
-							on:change={onFileChange}
-							accept={mimeTypes.join(",")}
-						/>
-						<IconPaperclip classNames="text-xl" />
-						{#if documentParserIsOn}
-							Document Parser
-						{/if}
-					</button>
+						<button
+							class="base-tool relative"
+							class:active-tool={documentParserIsOn}
+							disabled={loading}
+						>
+							<input
+								class="absolute w-full cursor-pointer opacity-0"
+								aria-label="Upload file"
+								type="file"
+								on:change={onFileChange}
+								accept={mimeTypes.join(",")}
+							/>
+							<IconPaperclip classNames="text-xl" />
+							{#if documentParserIsOn}
+								Document Parser
+							{/if}
+						</button>
+					</HoverTooltip>
 				</form>
 			{/if}
 			{#if modelHasTools}
-				<div class=" ml-1 h-5 w-[1px] bg-gray-300 dark:bg-gray-600" />
-				<a class="base-tool" href={`${base}/tools`} title="Browse more tools">
-					<IconAdd />
-				</a>
+				<HoverTooltip
+					label="Browse more tools"
+					position="right"
+					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 max-sm:hidden"
+				>
+					<a
+						class="base-tool flex !size-[20px] items-center justify-center rounded-full bg-white/10"
+						href={`${base}/tools`}
+						title="Browse more tools"
+					>
+						<IconAdd class="text-sm" />
+					</a>
+				</HoverTooltip>
 			{/if}
 		</div>
 	{/if}
+	<slot />
 </div>
 
 <style lang="postcss">
@@ -249,10 +282,10 @@
 	}
 
 	.base-tool {
-		@apply flex h-[1.6rem] items-center gap-[.2rem] text-xs outline-none transition-all hover:text-purple-600 focus:outline-none active:outline-none dark:hover:text-gray-300;
+		@apply flex h-[1.6rem] items-center gap-[.2rem] whitespace-nowrap text-xs outline-none transition-all hover:text-purple-600 focus:outline-none active:outline-none dark:hover:text-gray-300;
 	}
 
 	.active-tool {
-		@apply rounded-full bg-purple-500/15 pl-1 pr-2 text-purple-600 hover:text-purple-600  dark:bg-purple-600/50 dark:text-purple-300;
+		@apply rounded-full bg-purple-500/15 pl-1 pr-2 text-purple-600 hover:text-purple-600  dark:bg-purple-600/40 dark:text-purple-300;
 	}
 </style>
