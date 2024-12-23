@@ -227,9 +227,19 @@
 				{/each}
 			{/if}
 			{#if modelIsMultimodal || modelHasTools}
+				{@const mimeTypesString = mimeTypes
+					.map((m) => {
+						// if the mime type ends in *, grab the first part so image/* becomes image
+						if (m.endsWith("*")) {
+							return m.split("/")[0];
+						}
+						// otherwise, return the second part for example application/pdf becomes pdf
+						return m.split("/")[1];
+					})
+					.join(", ")}
 				<form class="flex items-center">
 					<HoverTooltip
-						label="Upload {mimeTypes.map((m) => m.split('/').pop()).join(',')} files"
+						label={`Upload ${mimeTypesString} files`}
 						position="top"
 						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
 					>
