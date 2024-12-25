@@ -511,7 +511,8 @@ envVars:
         ],
         "outputComponent": "textbox",
         "outputComponentIdx": 0,
-        "showOutput": false
+        "showOutput": false,
+        "isHidden": true
       },
       {
         "_id": "000000000000000000000003",
