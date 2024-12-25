@@ -62,5 +62,5 @@ MODELS=`[{
     "type" : "tgi",
     "url": "https://HOST:PORT",
   }]
-}]
+}]`
 ```
