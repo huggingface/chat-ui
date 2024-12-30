@@ -46,11 +46,14 @@ export const load = async ({ url, locals }) => {
 		}
 	}
 
-	// fetch the top assistants sorted by user count from biggest to smallest. filter by model too if modelId is provided or query if query is provided
+	// fetch the top assistants sorted by user count from biggest to smallest.
+	// filter by model too if modelId is provided or query if query is provided
+	// if trending only show assistants that have been used by more than 5 users
 	const filter: Filter<Assistant> = {
 		...(modelId && { modelId }),
 		...(user && { createdById: user._id }),
 		...(query && { searchTokens: { $all: generateQueryTokens(query) } }),
+		...(sort === SortKey.TRENDING && { userCount: { $gte: 5 } }),
 		...shouldBeFeatured,
 	};
 	const assistants = await Database.getInstance()
