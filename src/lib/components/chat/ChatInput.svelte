@@ -147,43 +147,6 @@
 			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2 sm:gap-2.5 px-3 pb-2.5 pt-0.5
 			text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto"
 		>
-			{#if modelIsMultimodal || modelHasTools}
-				{@const mimeTypesString = mimeTypes
-					.map((m) => {
-						// if the mime type ends in *, grab the first part so image/* becomes image
-						if (m.endsWith("*")) {
-							return m.split("/")[0];
-						}
-						// otherwise, return the second part for example application/pdf becomes pdf
-						return m.split("/")[1];
-					})
-					.join(", ")}
-				<form class="flex items-center">
-					<HoverTooltip
-						label={`Upload ${mimeTypesString} files`}
-						position="top"
-						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
-					>
-						<button
-							class="base-tool relative"
-							class:active-tool={documentParserIsOn}
-							disabled={loading}
-						>
-							<input
-								class="absolute w-full cursor-pointer opacity-0"
-								aria-label="Upload file"
-								type="file"
-								on:change={onFileChange}
-								accept={mimeTypes.join(",")}
-							/>
-							<IconPaperclip classNames="text-xl" />
-							{#if documentParserIsOn}
-								Document Parser
-							{/if}
-						</button>
-					</HoverTooltip>
-				</form>
-			{/if}
 			<HoverTooltip
 				label="Search the web"
 				position="top"
@@ -251,6 +214,43 @@
 						{/if}
 					</button>
 				</HoverTooltip>
+				{#if modelIsMultimodal || modelHasTools}
+				{@const mimeTypesString = mimeTypes
+					.map((m) => {
+						// if the mime type ends in *, grab the first part so image/* becomes image
+						if (m.endsWith("*")) {
+							return m.split("/")[0];
+						}
+						// otherwise, return the second part for example application/pdf becomes pdf
+						return m.split("/")[1];
+					})
+					.join(", ")}
+				<form class="flex items-center">
+					<HoverTooltip
+						label={`Upload ${mimeTypesString} files`}
+						position="top"
+						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
+					>
+						<label
+							class="base-tool relative"
+							class:active-tool={documentParserIsOn}
+							>
+							<input
+								disabled={loading}
+								class="absolute size-0 hidden"
+								aria-label="Upload file"
+								type="file"
+								on:change={onFileChange}
+								accept={mimeTypes.join(",")}
+							/>
+							<IconPaperclip classNames="text-xl" />
+							{#if documentParserIsOn}
+								Document Parser
+							{/if}
+						</label>
+					</HoverTooltip>
+				</form>
+			{/if}
 			{/if}
 			{#if modelHasTools}
 				{#each extraTools as tool}
