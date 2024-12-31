@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
-	import { createEventDispatcher, onMount } from "svelte";
+	import { createEventDispatcher, onMount, tick } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
@@ -76,7 +76,7 @@
 		textareaElement.parentElement.style.height = `${newHeight}px`;
 	}
 
-	function handleKeydown(event: KeyboardEvent) {
+	async function handleKeydown(event: KeyboardEvent) {
 		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
 			event.preventDefault();
 			if (isVirtualKeyboard()) {
@@ -88,6 +88,8 @@
 			} else {
 				if (value.trim() !== "") {
 					dispatch("submit");
+					await tick();
+					adjustTextareaHeight();
 				}
 			}
 		}
@@ -121,7 +123,7 @@
 		) satisfies ToolFront[];
 </script>
 
-<div class="min-h-full flex-1 max-w-full overflow-hidden" on:paste>
+<div class="min-h-full flex-1" on:paste>
 	<div class="relative w-full min-w-0">
 		<textarea
 			enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
