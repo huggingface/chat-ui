@@ -121,7 +121,7 @@
 		) satisfies ToolFront[];
 </script>
 
-<div class="min-h-full flex-1" on:paste>
+<div class="min-h-full flex-1 max-w-full overflow-hidden" on:paste>
 	<div class="relative w-full min-w-0">
 		<textarea
 			enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
@@ -142,7 +142,7 @@
 	</div>
 	{#if !assistant}
 		<div
-			class="scrollbar-custom -ml-0.5 flex max-w-[90dvw] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5
+			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2 sm:gap-2.5 px-3 pb-2.5 pt-0.5
 			text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto"
 		>
 			{#if modelIsMultimodal || modelHasTools}
