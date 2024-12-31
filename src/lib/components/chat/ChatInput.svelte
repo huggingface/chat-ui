@@ -295,7 +295,7 @@
 	}
 
 	.base-tool {
-		@apply flex h-[1.6rem] items-center gap-[.2rem] whitespace-nowrap text-xs outline-none transition-all hover:text-purple-600 focus:outline-none active:outline-none dark:hover:text-gray-300;
+		@apply flex h-[1.6rem] items-center gap-[.2rem] whitespace-nowrap text-xs outline-none transition-all sm:hover:text-purple-600 focus:outline-none active:outline-none dark:hover:text-gray-300;
 	}
 
 	.active-tool {
