@@ -454,12 +454,11 @@
 
 						{#if loading}
 							<button
-							disabled
-								class="btn  absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400 "
+								disabled
+								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
 							>
-							<EosIconsLoading />
+								<EosIconsLoading />
 							</button>
-	
 						{:else}
 							<button
 								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
