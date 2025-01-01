@@ -228,7 +228,9 @@
 					.join(", ")}
 				<form class="flex items-center">
 					<HoverTooltip
-						label={`Upload ${mimeTypesString} files`}
+						label={mimeTypesString.includes("*")
+							? "Upload any file"
+							: `Upload ${mimeTypesString} files`}
 						position="top"
 						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
 					>
