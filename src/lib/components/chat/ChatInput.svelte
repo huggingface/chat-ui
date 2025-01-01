@@ -214,40 +214,40 @@
 						{/if}
 					</button>
 				</HoverTooltip>
-				{#if modelIsMultimodal || modelHasTools}
-					{@const mimeTypesString = mimeTypes
-						.map((m) => {
-							// if the mime type ends in *, grab the first part so image/* becomes image
-							if (m.endsWith("*")) {
-								return m.split("/")[0];
-							}
-							// otherwise, return the second part for example application/pdf becomes pdf
-							return m.split("/")[1];
-						})
-						.join(", ")}
-					<form class="flex items-center">
-						<HoverTooltip
-							label={`Upload ${mimeTypesString} files`}
-							position="top"
-							TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
-						>
-							<label class="base-tool relative" class:active-tool={documentParserIsOn}>
-								<input
-									disabled={loading}
-									class="absolute hidden size-0"
-									aria-label="Upload file"
-									type="file"
-									on:change={onFileChange}
-									accept={mimeTypes.join(",")}
-								/>
-								<IconPaperclip classNames="text-xl" />
-								{#if documentParserIsOn}
-									Document Parser
-								{/if}
-							</label>
-						</HoverTooltip>
-					</form>
-				{/if}
+			{/if}
+			{#if modelIsMultimodal || modelHasTools}
+				{@const mimeTypesString = mimeTypes
+					.map((m) => {
+						// if the mime type ends in *, grab the first part so image/* becomes image
+						if (m.endsWith("*")) {
+							return m.split("/")[0];
+						}
+						// otherwise, return the second part for example application/pdf becomes pdf
+						return m.split("/")[1];
+					})
+					.join(", ")}
+				<form class="flex items-center">
+					<HoverTooltip
+						label={`Upload ${mimeTypesString} files`}
+						position="top"
+						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
+					>
+						<label class="base-tool relative" class:active-tool={documentParserIsOn}>
+							<input
+								disabled={loading}
+								class="absolute hidden size-0"
+								aria-label="Upload file"
+								type="file"
+								on:change={onFileChange}
+								accept={mimeTypes.join(",")}
+							/>
+							<IconPaperclip classNames="text-xl" />
+							{#if documentParserIsOn}
+								Document Parser
+							{/if}
+						</label>
+					</HoverTooltip>
+				</form>
 			{/if}
 			{#if modelHasTools}
 				{#each extraTools as tool}
