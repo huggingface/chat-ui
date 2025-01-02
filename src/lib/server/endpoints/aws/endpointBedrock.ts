@@ -11,6 +11,7 @@ export const endpointBedrockParametersSchema = z.object({
 	region: z.string().default("us-east-1"),
 	model: z.any(),
 	anthropicVersion: z.string().default("bedrock-2023-05-31"),
+	isNova: z.boolean().default(false),
 	multimodal: z
 		.object({
 			image: createImageProcessorOptionsValidator({
@@ -34,7 +35,7 @@ export const endpointBedrockParametersSchema = z.object({
 export async function endpointBedrock(
 	input: z.input<typeof endpointBedrockParametersSchema>
 ): Promise<Endpoint> {
-	const { region, model, anthropicVersion, multimodal } =
+	const { region, model, anthropicVersion, multimodal, isNova } =
 		endpointBedrockParametersSchema.parse(input);
 
 	let BedrockRuntimeClient, InvokeModelWithResponseStreamCommand;
@@ -73,7 +74,7 @@ export async function endpointBedrock(
 			const maxTokens = parameters.max_new_tokens || 4096;
 
 			let bodyContent;
-			if (model.id.includes("nova")) {
+			if (isNova) {
 				bodyContent = {
 					messages: formattedMessages,
 					inferenceConfig: {
@@ -98,19 +99,15 @@ export async function endpointBedrock(
 				trace: "DISABLED",
 			});
 
-			console.log(JSON.stringify({ messages: formattedMessages }));
-
 			const response = await client.send(command);
 
 			let text = "";
 
 			for await (const item of response.body ?? []) {
 				const chunk = JSON.parse(new TextDecoder().decode(item.chunk?.bytes));
-
 				if ("contentBlockDelta" in chunk || chunk.type === "content_block_delta") {
 					const chunkText = chunk.contentBlockDelta?.delta?.text || chunk.delta?.text || "";
 					text += chunkText;
-					console.log(text);
 					yield {
 						token: {
 							id: tokenId++,
@@ -141,19 +138,18 @@ export async function endpointBedrock(
 // Prepare the messages excluding system prompts
 async function prepareMessages(
 	messages: EndpointMessage[],
-	modelId: string,
+	isNova: boolean,
 	imageProcessor: ReturnType<typeof makeImageProcessor>
 ) {
 	const formattedMessages = [];
-	const nova = modelId.includes("amazon.nova");
 
 	for (const message of messages) {
 		const content = [];
 
 		if (message.files?.length) {
-			content.push(...(await prepareFiles(imageProcessor, modelId, message.files)));
+			content.push(...(await prepareFiles(imageProcessor, isNova, message.files)));
 		}
-		if (nova) {
+		if (isNova) {
 			content.push({ text: message.content });
 		} else {
 			content.push({ type: "text", text: message.content });
@@ -173,13 +169,12 @@ async function prepareMessages(
 // Process files and convert them to base64 encoded strings
 async function prepareFiles(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	modelId: string,
+	isNova: boolean,
 	files: MessageFile[]
 ) {
-	const nova = modelId.includes("amazon.nova");
 	const processedFiles = await Promise.all(files.map(imageProcessor));
 
-	if (nova) {
+	if (isNova) {
 		return processedFiles.map((file) => ({
 			image: {
 				format: file.mime.substring("image/".length),
