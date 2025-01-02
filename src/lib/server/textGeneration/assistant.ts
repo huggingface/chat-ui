@@ -5,7 +5,7 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { ObjectId } from "mongodb";
 
 export async function processPreprompt(preprompt: string, user_message: string | undefined) {
-	const requestRegex = /{{\s?(get|post)=(.*?)\s?}}/g;
+	const requestRegex = /{{\s?(get|post|url)=(.*?)\s?}}/g;
 
 	for (const match of preprompt.matchAll(requestRegex)) {
 		const method = match[1].toUpperCase();
@@ -25,7 +25,7 @@ export async function processPreprompt(preprompt: string, user_message: string |
 						"Content-Type": "text/plain",
 					},
 				});
-			} else if (method == "GET") {
+			} else if (method == "GET" || method == "URL") {
 				res = await fetch(url.href);
 			} else {
 				throw new Error("Invalid method " + method);

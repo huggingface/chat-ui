@@ -259,8 +259,8 @@
 		>
 			{#if assistant?.dynamicPrompt}
 				{#each prepromptTags as tag}
-					{#if tag.startsWith("{{") && tag.endsWith("}}") && (tag.includes("get=") || tag.includes("post="))}
-						{@const url = tag.split("get=")[1].split("}}")[0]}
+					{#if tag.startsWith("{{") && tag.endsWith("}}") && (tag.includes("get=") || tag.includes("post=") || tag.includes("url="))}
+						{@const url = tag.match(/(?:get|post|url)=(.*?)}}/)?.[1] ?? ""}
 						<a
 							target="_blank"
 							href={url.startsWith("http") ? url : `//${url}`}

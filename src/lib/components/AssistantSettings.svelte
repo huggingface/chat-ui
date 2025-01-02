@@ -96,7 +96,7 @@
 		: false;
 
 	let tools = assistant?.tools ?? [];
-	const regex = /{{\s?(get|post)=(.*?)\s?}}/g;
+	const regex = /{{\s?(get|post|url)=(.*?)\s?}}/g;
 
 	$: templateVariables = [...systemPrompt.matchAll(regex)];
 	$: selectedModel = models.find((m) => m.id === modelId);
