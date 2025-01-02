@@ -550,24 +550,6 @@
 										href={match[1].toLowerCase() === "get" ? match[2] : "#"}
 										target={match[1].toLowerCase() === "get" ? "_blank" : ""}
 										class="text-gray-500 underline decoration-gray-300"
-										on:click={(e) => {
-											if (match[1].toLowerCase() === "post") {
-												e.preventDefault(); // Prevent navigation for POST requests
-												fetch(match[2], {
-													method: "POST",
-													headers: { "Content-Type": "application/json" },
-													body: JSON.stringify({ message: "" }), // Hardcoded dummy body
-												})
-													.then((response) => {
-														if (response.ok) {
-															console.log("POST request successful");
-														} else {
-															console.error("POST request failed");
-														}
-													})
-													.catch((error) => console.error("Error with POST request:", error));
-											}
-										}}
 									>
 										{match[1].toUpperCase()}: {match[2]}
 									</a>
