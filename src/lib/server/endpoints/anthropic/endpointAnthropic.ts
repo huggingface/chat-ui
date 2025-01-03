@@ -76,6 +76,14 @@ export async function endpointAnthropic(
 		}
 
 		let tokenId = 0;
+		if (tools.length === 0 && toolResults.length > 0) {
+			const toolNames = new Set(toolResults.map((tool) => tool.call.name));
+			tools = Array.from(toolNames).map((name) => ({
+				name,
+				description: "",
+				inputs: [],
+			})) as unknown as Tool[];
+		}
 
 		const parameters = { ...model.parameters, ...generateSettings };
 

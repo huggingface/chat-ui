@@ -84,6 +84,6 @@ async function* textGenerationWithoutTitle(
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
-	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt, tools);
+	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
 	done.abort();
 }
