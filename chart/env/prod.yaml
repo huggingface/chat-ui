@@ -50,7 +50,6 @@ envVars:
     [
       {
         "name": "Qwen/Qwen2.5-72B-Instruct",
-        "tokenizer": "Qwen/Qwen2.5-72B-Instruct",
         "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
         "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5/",
@@ -62,6 +61,7 @@ envVars:
           "truncate": 28672,
           "max_new_tokens": 3072
         },
+        "tools": true,
         "promptExamples": [
           {
             "title": "Write an email from bullet list",
@@ -78,11 +78,10 @@ envVars:
         ]
       },
       {
-        "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
-        "tokenizer": "nsarrazin/llama3.1-tokenizer",
-        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities.",
-        "modelUrl": "https://huggingface.co/meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "name": "meta-llama/Llama-3.3-70B-Instruct",
+        "id": "meta-llama/Llama-3.3-70B-Instruct",
+        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities. Now with the latest Llama 3.3 weights!",
+        "modelUrl": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
         "websiteUrl": "https://llama.meta.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "tools": true,
@@ -110,7 +109,6 @@ envVars:
       },
       {
         "name": "CohereForAI/c4ai-command-r-plus-08-2024",
-        "tokenizer": "nsarrazin/c4ai-command-r-v01-tokenizer",
         "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
         "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
@@ -134,6 +132,40 @@ envVars:
           {
             "title": "Code a snake game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
+          }
+        ]
+      },
+      {
+        "name": "Qwen/QwQ-32B-Preview",
+        "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
+        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
+        "reasoning": {
+          "type": "summarize"
+        },
+        "parameters": {
+          "stop": ["<|im_end|>"],
+          "truncate": 12288,
+          "max_new_tokens": 4096,
+          "temperature": 0.7,
+          "top_k": 20,
+          "top_p": 0.8,
+          "repetition_penalty": 1.05
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
           }
         ]
       },
@@ -316,10 +348,6 @@ envVars:
       },
       {
         "name": "llhf/Meta-Llama-3.1-8B-Instruct",
-        "tokenizer": {
-          "tokenizerUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/resolve/main/tokenizer.json",
-          "tokenizerConfigUrl": "https://huggingface.co/nsarrazin/llama3.1-tokenizer/raw/main/tokenizer_config.json"
-        },
         "parameters": {
           "temperature": 0.6,
           "stop": ["<|endoftext|>", "<|eot_id|>"]
@@ -368,6 +396,10 @@ envVars:
       {
         "name": "microsoft/Phi-3-mini-4k-instruct",
         "transferTo": "microsoft/Phi-3.5-mini-instruct"
+      },
+      {
+        "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "transferTo": "meta-llama/Llama-3.3-70B-Instruct"
       }
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
@@ -375,9 +407,9 @@ envVars:
   PUBLIC_ANNOUNCEMENT_BANNERS: >
     [
       {
-        "title": "Qwen 2.5-Coder 32B is now available!",
+        "title": "Llama 3.3 70B is now available!",
         "linkTitle": "Try it out!",
-        "linkHref": "https://huggingface.co/chat/models/Qwen/Qwen2.5-Coder-32B-Instruct"
+        "linkHref": "https://huggingface.co/chat/models/meta-llama/Llama-3.3-70B-Instruct"
       }
     ]
   PUBLIC_APP_NAME: "HuggingChat"
@@ -479,7 +511,8 @@ envVars:
         ],
         "outputComponent": "textbox",
         "outputComponentIdx": 0,
-        "showOutput": false
+        "showOutput": false,
+        "isHidden": true
       },
       {
         "_id": "000000000000000000000003",

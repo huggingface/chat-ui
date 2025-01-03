@@ -15,12 +15,14 @@ export const endpointCohereParametersSchema = z.object({
 	apiKey: z.string().default(env.COHERE_API_TOKEN),
 	clientName: z.string().optional(),
 	raw: z.boolean().default(false),
+	forceSingleStep: z.boolean().default(true),
 });
 
 export async function endpointCohere(
 	input: z.input<typeof endpointCohereParametersSchema>
 ): Promise<Endpoint> {
-	const { apiKey, clientName, model, raw } = endpointCohereParametersSchema.parse(input);
+	const { apiKey, clientName, model, raw, forceSingleStep } =
+		endpointCohereParametersSchema.parse(input);
 
 	let cohere: CohereClient;
 
@@ -62,7 +64,7 @@ export async function endpointCohere(
 				});
 
 				stream = await cohere.chatStream({
-					forceSingleStep: true,
+					forceSingleStep,
 					message: prompt,
 					rawPrompting: true,
 					model: model.id ?? model.name,
@@ -83,7 +85,7 @@ export async function endpointCohere(
 
 				stream = await cohere
 					.chatStream({
-						forceSingleStep: true,
+						forceSingleStep,
 						model: model.id ?? model.name,
 						chatHistory: formattedMessages.slice(0, -1),
 						message: formattedMessages[formattedMessages.length - 1].message,
