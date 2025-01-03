@@ -59,7 +59,7 @@ async function getAccessToken(
 	};
 
 	cookies.set(ProviderCookieNames.ACCESS_TOKEN, JSON.stringify(accessToken), {
-		path: env.APP_BASE,
+		path: env.APP_BASE || "/",
 		// So that it works inside the space's iframe
 		sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
 		secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
@@ -68,7 +68,7 @@ async function getAccessToken(
 	});
 
 	cookies.set(ProviderCookieNames.PROVIDER_PARAMS, JSON.stringify(newProviderParameters), {
-		path: env.APP_BASE,
+		path: env.APP_BASE || "/",
 		// So that it works inside the space's iframe
 		sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
 		secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),
@@ -109,7 +109,7 @@ async function refreshMicrosoftGraphToken(
 	};
 
 	cookies.set(ProviderCookieNames.ACCESS_TOKEN, JSON.stringify(refreshedAccessToken), {
-		path: env.APP_BASE,
+		path: env.APP_BASE || "/",
 		// So that it works inside the space's iframe
 		sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
 		secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),

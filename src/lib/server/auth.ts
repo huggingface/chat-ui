@@ -211,7 +211,7 @@ export async function logout(cookies: Cookies, locals: App.Locals) {
 
 	for (const cookie_name of cookie_names) {
 		cookies.delete(cookie_name, {
-			path: env.APP_BASE,
+			path: env.APP_BASE || "/",
 			// So that it works inside the space's iframe
 			sameSite: dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none",
 			secure: !dev && !(env.ALLOW_INSECURE_COOKIES === "true"),

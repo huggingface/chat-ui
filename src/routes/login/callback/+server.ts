@@ -89,7 +89,7 @@ async function handleLogin(requestEvent: RequestEvent) {
 				httpOnly: true,
 				secure: true,
 				sameSite: "none",
-				path: env.APP_BASE,
+				path: env.APP_BASE || "/",
 			}
 		);
 	}
