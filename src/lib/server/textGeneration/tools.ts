@@ -213,7 +213,7 @@ export async function* runTools(
 		}
 
 		// if we dont see a tool call in the first 25 chars, something is going wrong and we abort
-		if (rawText.length > 25 && !(rawText.includes("```json") || rawText.includes("{"))) {
+		if (rawText.length > 100 && !(rawText.includes("```json") || rawText.includes("{"))) {
 			return [];
 		}
 
