@@ -33,8 +33,6 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
-	import ScreenshotButton from "$lib/components/ScreenshotButton.svelte";
-
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
 	import type { ToolFront } from "$lib/types/Tool";
@@ -242,16 +240,6 @@
 		])
 	);
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
-	$: isScreenshotEnabled = currentModel.multimodal;
-
-	async function handleScreenshot(event: CustomEvent<File[]>) {
-		try {
-			// Add the screenshot file to the files array
-			files = [...files, ...event.detail];
-		} catch (error) {
-			console.error("Failed to handle screenshot:", error);
-		}
-	}
 </script>
 
 <svelte:window
@@ -412,9 +400,6 @@
 					/>
 				{:else}
 					<div class="ml-auto flex items-center gap-2">
-						{#if isScreenshotEnabled}
-							<ScreenshotButton on:capture={handleScreenshot} />
-						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
 								on:click={() => {
