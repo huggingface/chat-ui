@@ -21,8 +21,8 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import IconAdd from "~icons/carbon/add";
-	import CarbonCamera from "~icons/carbon/camera";
 	import { captureScreen } from "$lib/utils/screenshot";
+	import IconScreenshot from "../icons/iconScreenshot.svelte";
 
 	export let files: File[] = [];
 	export let mimeTypes: string[] = [];
@@ -269,7 +269,7 @@
 								files = [...files, file];
 							}}
 						>
-							<CarbonCamera class="text-base" />
+							<IconScreenshot classNames="text-xl" />
 						</button>
 					</HoverTooltip>
 				{/if}
