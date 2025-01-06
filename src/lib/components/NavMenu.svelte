@@ -8,7 +8,6 @@
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
-	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/stores";
 
 	export let conversations: ConvSidebar[];
