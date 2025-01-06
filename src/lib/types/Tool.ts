@@ -146,7 +146,10 @@ export type CommunityToolEditable = Omit<
 
 export type Tool = ConfigTool | CommunityTool;
 
-export type ToolFront = Pick<Tool, "type" | "name" | "displayName" | "description"> & {
+export type ToolFront = Pick<
+	Tool,
+	"type" | "name" | "displayName" | "description" | "color" | "icon"
+> & {
 	_id: string;
 	isOnByDefault: boolean;
 	isLocked: boolean;

@@ -217,13 +217,13 @@
 	isCollapsed={isNavCollapsed}
 	on:click={() => (isNavCollapsed = !isNavCollapsed)}
 	classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-		? 'left-[280px]'
+		? 'left-[290px]'
 		: 'left-0'} *:transition-transform"
 />
 
 <div
 	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[280px,1fr]'
+		? 'md:grid-cols-[290px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
@@ -237,7 +237,7 @@
 		/>
 	</MobileNav>
 	<nav
-		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[280px] max-md:hidden"
+		class=" grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
 	>
 		<NavMenu
 			conversations={data.conversations}

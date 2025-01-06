@@ -81,7 +81,7 @@ const deleteEmptyConversations: Migration = {
 		await deleteConversations(collections);
 		return true;
 	},
-	runEveryTime: true,
+	runEveryTime: false,
 	runForHuggingChat: "only",
 };
 
