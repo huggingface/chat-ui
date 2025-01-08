@@ -143,7 +143,9 @@
 		}
 	});
 
-	$: mobileNavTitle = ["/models", "/assistants", "/privacy"].includes($page.route.id ?? "")
+	$: mobileNavTitle = ["/models", "/assistants", "/privacy", "/tools"].includes(
+		$page.route.id ?? ""
+	)
 		? ""
 		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
 
