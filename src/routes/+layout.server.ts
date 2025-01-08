@@ -12,6 +12,7 @@ import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
+import { base } from "$app/paths";
 
 export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
@@ -56,7 +57,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	const conversations =
 		nConversations === 0
 			? Promise.resolve([])
-			: fetch(`${env.APP_BASE}/api/conversations`)
+			: fetch(`${base}/api/conversations`)
 					.then((res) => res.json())
 					.then(
 						(
