@@ -77,6 +77,7 @@
 		// reset p to 0 if there's only one page of content
 		// that would be caused by a data loading invalidation
 		p = 0;
+		hasMore = true;
 	}
 </script>
 
