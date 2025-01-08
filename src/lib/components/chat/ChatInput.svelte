@@ -253,7 +253,11 @@
 					</HoverTooltip>
 				</form>
 				{#if mimeTypes.includes("image/*")}
-					<HoverTooltip label="Capture screenshot" position="top">
+					<HoverTooltip
+						label="Capture screenshot"
+						position="top"
+						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
+					>
 						<button
 							class="base-tool"
 							on:click|preventDefault={async () => {
