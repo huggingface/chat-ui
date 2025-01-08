@@ -12,6 +12,7 @@
 	import { page } from "$app/stores";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
 	import type { Conversation } from "$lib/types/Conversation";
+	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
 	export let conversations: ConvSidebar[];
 	export let canLogin: boolean;
@@ -20,8 +21,6 @@
 	export let p = 0;
 
 	let hasMore = true;
-
-	let scrollContainer: HTMLDivElement;
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -73,6 +72,12 @@
 
 		conversations = [...conversations, ...newConvs];
 	}
+
+	$: if (conversations.length <= CONV_NUM_PER_PAGE) {
+		// reset p to 0 if there's only one page of content
+		// that would be caused by a data loading invalidation
+		p = 0;
+	}
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0">
@@ -92,7 +97,6 @@
 	</a>
 </div>
 <div
-	bind:this={scrollContainer}
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	{#await groupedConversations}

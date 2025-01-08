@@ -2,8 +2,7 @@ import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
-
-const NUM_PER_PAGE = 5;
+import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
 export async function GET({ locals, url }) {
 	const p = parseInt(url.searchParams.get("p") ?? "0");
@@ -20,8 +19,8 @@ export async function GET({ locals, url }) {
 				assistantId: 1,
 			})
 			.sort({ updatedAt: -1 })
-			.skip(p * NUM_PER_PAGE)
-			.limit(NUM_PER_PAGE)
+			.skip(p * CONV_NUM_PER_PAGE)
+			.limit(CONV_NUM_PER_PAGE)
 			.toArray();
 
 		if (convs.length === 0) {
