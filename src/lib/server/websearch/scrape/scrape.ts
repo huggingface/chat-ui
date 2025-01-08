@@ -35,6 +35,7 @@ export const scrape = (maxCharsPerElem: number) =>
 export async function scrapeUrl(url: string, maxCharsPerElem: number) {
 	return withPage(url, async (page, res) => {
 		if (!res) throw Error("Failed to load page");
+		if (!res.ok()) throw Error(`Failed to load page: ${res.status()}`);
 
 		// Check if it's a non-html content type that we can handle directly
 		// TODO: direct mappings to markdown can be added for markdown, csv and others
