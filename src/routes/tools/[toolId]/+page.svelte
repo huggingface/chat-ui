@@ -39,6 +39,9 @@
 	$: isActive = $settings.tools?.includes(data.tool?._id.toString());
 
 	let displayReportModal = false;
+
+	$: currentModelSupportTools =
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
 </script>
 
 {#if displayReportModal}
@@ -98,25 +101,34 @@
 						class="flex flex-wrap items-center gap-x-4 gap-y-2 whitespace-nowrap text-sm text-gray-500 hover:*:text-gray-800 max-sm:justify-center"
 					>
 						<div class="w-full sm:w-auto">
-							<button
-								class="{isActive
-									? 'bg-gray-100 text-gray-800'
-									: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
-								name="Activate model"
-								on:click|stopPropagation={() => {
-									if (isActive) {
-										settings.instantSet({
-											tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
-										});
-									} else {
-										settings.instantSet({
-											tools: [...($settings?.tools ?? []), data.tool._id],
-										});
-									}
-								}}
-							>
-								{isActive ? "Deactivate" : "Activate"}
-							</button>
+							{#if currentModelSupportTools}
+								<button
+									class="{isActive
+										? 'bg-gray-100 text-gray-800'
+										: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
+									name="Activate model"
+									on:click|stopPropagation={() => {
+										if (isActive) {
+											settings.instantSet({
+												tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
+											});
+										} else {
+											settings.instantSet({
+												tools: [...($settings?.tools ?? []), data.tool._id],
+											});
+										}
+									}}
+								>
+									{isActive ? "Deactivate" : "Activate"}
+								</button>
+							{:else}
+								<button
+									disabled
+									class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-gray-200 px-3 py-1 text-base text-gray-500"
+								>
+									Activate
+								</button>
+							{/if}
 						</div>
 						{#if data.tool?.createdByMe}
 							<a href="{base}/tools/{data.tool?._id}/edit" class="underline"
@@ -174,6 +186,10 @@
 							{/if}
 						{/if}
 						{#if data?.user?.isAdmin}
+							<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
+								>{data.tool?.review?.toLocaleUpperCase()}</span
+							>
+
 							{#if !data.tool?.createdByMe}
 								<form method="POST" action="?/delete" use:enhance>
 									<button
@@ -238,9 +254,16 @@
 					</div>
 				</div>
 			</div>
-			<p class="text-sm max-sm:hidden">
-				Tools are applications that the model can choose to call while you are chatting with it.
-			</p>
+			{#if !currentModelSupportTools}
+				<span class="relative text-sm text-gray-500">
+					You are currently not using a model that supports tools. Activate one
+					<a href="{base}/models" class="underline">here</a>.
+				</span>
+			{:else}
+				<p class="text-sm max-sm:hidden">
+					Tools are applications that the model can choose to call while you are chatting with it.
+				</p>
+			{/if}
 			{#if data.tool.description}
 				<div>
 					<h2 class="text-lg font-semibold">Description</h2>

@@ -31,7 +31,7 @@
 
 	function scrollToPrevious() {
 		if (!scrollNode) return;
-		const messages = scrollNode.querySelectorAll('[id^="message-"]');
+		const messages = scrollNode.querySelectorAll("[data-message-id]");
 		const scrollTop = scrollNode.scrollTop;
 		let previousMessage: Element | null = null;
 

@@ -11,6 +11,7 @@ export const endpointBedrockParametersSchema = z.object({
 	region: z.string().default("us-east-1"),
 	model: z.any(),
 	anthropicVersion: z.string().default("bedrock-2023-05-31"),
+	isNova: z.boolean().default(false),
 	multimodal: z
 		.object({
 			image: createImageProcessorOptionsValidator({
@@ -34,7 +35,7 @@ export const endpointBedrockParametersSchema = z.object({
 export async function endpointBedrock(
 	input: z.input<typeof endpointBedrockParametersSchema>
 ): Promise<Endpoint> {
-	const { region, model, anthropicVersion, multimodal } =
+	const { region, model, anthropicVersion, multimodal, isNova } =
 		endpointBedrockParametersSchema.parse(input);
 
 	let BedrockRuntimeClient, InvokeModelWithResponseStreamCommand;
@@ -59,24 +60,42 @@ export async function endpointBedrock(
 			messages = messages.slice(1); // Remove the first system message from the array
 		}
 
-		const formattedMessages = await prepareMessages(messages, imageProcessor);
+		const formattedMessages = await prepareMessages(messages, model.id, imageProcessor);
 
 		let tokenId = 0;
 		const parameters = { ...model.parameters, ...generateSettings };
 		return (async function* () {
-			const command = new InvokeModelWithResponseStreamCommand({
-				body: Buffer.from(
-					JSON.stringify({
-						anthropic_version: anthropicVersion,
-						max_tokens: parameters.max_new_tokens ? parameters.max_new_tokens : 4096,
-						messages: formattedMessages,
-						system,
-					}),
-					"utf-8"
-				),
+			const baseCommandParams = {
 				contentType: "application/json",
 				accept: "application/json",
 				modelId: model.id,
+			};
+
+			const maxTokens = parameters.max_new_tokens || 4096;
+
+			let bodyContent;
+			if (isNova) {
+				bodyContent = {
+					messages: formattedMessages,
+					inferenceConfig: {
+						maxTokens,
+						topP: 0.1,
+						temperature: 1.0,
+					},
+					system: [{ text: system }],
+				};
+			} else {
+				bodyContent = {
+					anthropic_version: anthropicVersion,
+					max_tokens: maxTokens,
+					messages: formattedMessages,
+					system,
+				};
+			}
+
+			const command = new InvokeModelWithResponseStreamCommand({
+				...baseCommandParams,
+				body: Buffer.from(JSON.stringify(bodyContent), "utf-8"),
 				trace: "DISABLED",
 			});
 
@@ -86,21 +105,20 @@ export async function endpointBedrock(
 
 			for await (const item of response.body ?? []) {
 				const chunk = JSON.parse(new TextDecoder().decode(item.chunk?.bytes));
-				const chunk_type = chunk.type;
-
-				if (chunk_type === "content_block_delta") {
-					text += chunk.delta.text;
+				if ("contentBlockDelta" in chunk || chunk.type === "content_block_delta") {
+					const chunkText = chunk.contentBlockDelta?.delta?.text || chunk.delta?.text || "";
+					text += chunkText;
 					yield {
 						token: {
 							id: tokenId++,
-							text: chunk.delta.text,
+							text: chunkText,
 							logprob: 0,
 							special: false,
 						},
 						generated_text: null,
 						details: null,
 					} satisfies TextGenerationStreamOutput;
-				} else if (chunk_type === "message_stop") {
+				} else if ("messageStop" in chunk || chunk.type === "message_stop") {
 					yield {
 						token: {
 							id: tokenId++,
@@ -120,6 +138,7 @@ export async function endpointBedrock(
 // Prepare the messages excluding system prompts
 async function prepareMessages(
 	messages: EndpointMessage[],
+	isNova: boolean,
 	imageProcessor: ReturnType<typeof makeImageProcessor>
 ) {
 	const formattedMessages = [];
@@ -128,9 +147,13 @@ async function prepareMessages(
 		const content = [];
 
 		if (message.files?.length) {
-			content.push(...(await prepareFiles(imageProcessor, message.files)));
+			content.push(...(await prepareFiles(imageProcessor, isNova, message.files)));
 		}
-		content.push({ type: "text", text: message.content });
+		if (isNova) {
+			content.push({ text: message.content });
+		} else {
+			content.push({ type: "text", text: message.content });
+		}
 
 		const lastMessage = formattedMessages[formattedMessages.length - 1];
 		if (lastMessage && lastMessage.role === message.from) {
@@ -146,11 +169,22 @@ async function prepareMessages(
 // Process files and convert them to base64 encoded strings
 async function prepareFiles(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	isNova: boolean,
 	files: MessageFile[]
 ) {
 	const processedFiles = await Promise.all(files.map(imageProcessor));
-	return processedFiles.map((file) => ({
-		type: "image",
-		source: { type: "base64", media_type: "image/jpeg", data: file.image.toString("base64") },
-	}));
+
+	if (isNova) {
+		return processedFiles.map((file) => ({
+			image: {
+				format: file.mime.substring("image/".length),
+				source: { bytes: file.image.toString("base64") },
+			},
+		}));
+	} else {
+		return processedFiles.map((file) => ({
+			type: "image",
+			source: { type: "base64", media_type: file.mime, data: file.image.toString("base64") },
+		}));
+	}
 }

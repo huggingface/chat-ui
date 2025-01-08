@@ -20,6 +20,7 @@
 	import { SortKey } from "$lib/types/Assistant";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
+	import { useSettingsStore } from "$lib/stores/settings";
 
 	export let data: PageData;
 
@@ -30,6 +31,11 @@
 	$: toolsCreator = $page.url.searchParams.get("user");
 	$: createdByMe = data.user?.username && data.user.username === toolsCreator;
 	$: activeOnly = $page.url.searchParams.get("active") === "true";
+
+	const settings = useSettingsStore();
+
+	$: currentModelSupportTools =
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement;
@@ -111,13 +117,14 @@
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/357"
 					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
 					target="_blank"
+					aria-label="Hub discussion about tools"
 				>
 					<CarbonHelpFilled />
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular tools made by the community</h3>
-		<h4 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
+		<h2 class="text-gray-500">Popular tools made by the community</h2>
+		<h3 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
 			This feature is <span
 				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
 				>experimental</span
@@ -127,7 +134,7 @@
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
 				target="_blank">sharing your feedback with us!</a
 			>
-		</h4>
+		</h3>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
@@ -143,7 +150,7 @@
 			</a>
 		</div>
 
-		<div class="mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
+		<div class="mb-4 mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">
 			{#if toolsCreator && !createdByMe}
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -216,19 +223,28 @@
 					bind:this={filterInputEl}
 					maxlength="150"
 					type="search"
+					aria-label="Filter tools by name"
 				/>
 			</div>
 			<select
 				bind:value={sortValue}
 				on:change={sortTools}
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+				aria-label="Sort tools"
 			>
 				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
 				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
 			</select>
 		</div>
 
-		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
+		{#if !currentModelSupportTools}
+			<div class="mx-auto text-center text-sm text-purple-700 dark:text-purple-300">
+				You are currently not using a model that supports tools. Activate one
+				<a href="{base}/models" class="underline">here</a>.
+			</div>
+		{/if}
+
+		<div class="mt-4 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
 				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				{@const isOfficial = !tool.createdByName}

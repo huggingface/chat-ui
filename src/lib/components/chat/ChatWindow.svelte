@@ -4,7 +4,6 @@
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
-	import CarbonStopFilledAlt from "~icons/carbon/stop-filled-alt";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import CarbonMicrophone from "~icons/carbon/microphone";
@@ -14,13 +13,10 @@
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
-	import WebSearchToggle from "../WebSearchToggle.svelte";
-	import ToolsMenu from "../ToolsMenu.svelte";
 	import LoginModal from "../LoginModal.svelte";
 	import { page } from "$app/stores";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
-	import UploadBtn from "../UploadBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import type { Assistant } from "$lib/types/Assistant";
 	import { base } from "$app/paths";
@@ -36,12 +32,15 @@
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import type { ToolFront } from "$lib/types/Tool";
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import TranscriptionAnimation from "../animations/TranscriptionAnimation.svelte";
 
 	import { AutomaticSpeechRecognitionPipeline, pipeline } from "@huggingface/transformers";
 	import LoadingAnimation from "../animations/LoadingAnimation.svelte";
+
+	import { fly } from "svelte/transition";
+	import { cubicInOut } from "svelte/easing";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -60,6 +59,7 @@
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
+	$: pastedLongContent = false;
 	$: $page.params.id && (isSharedRecently = false);
 
 	const dispatch = createEventDispatcher<{
@@ -91,6 +91,21 @@
 	};
 
 	const onPaste = (e: ClipboardEvent) => {
+		const textContent = e.clipboardData?.getData("text");
+
+		if (!$settings.directPaste && textContent && textContent.length >= 3984) {
+			e.preventDefault();
+			pastedLongContent = true;
+			setTimeout(() => {
+				pastedLongContent = false;
+			}, 1000);
+			const pastedFile = new File([textContent], "Pasted Content", {
+				type: "application/vnd.chatui.clipboard",
+			});
+
+			files = [...files, pastedFile];
+		}
+
 		if (!e.clipboardData) {
 			return;
 		}
@@ -210,18 +225,25 @@
 
 	const settings = useSettingsStore();
 
-	// active tools are all the checked tools, either from settings or on by default
-	$: activeTools = $page.data.tools.filter((tool: ToolFront) => {
-		if ($page.data?.assistant) {
-			return $page.data.assistant.tools?.includes(tool._id);
-		}
-		return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
-	});
-	$: activeMimeTypes = [
-		...(currentModel.tools ? activeTools.flatMap((tool: ToolFront) => tool.mimeTypes ?? []) : []),
-		...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []),
-	];
+	$: mimeTypesFromActiveTools = $page.data.tools
+		.filter((tool: ToolFront) => {
+			if ($page.data?.assistant) {
+				return $page.data.assistant.tools?.includes(tool._id);
+			}
+			if (currentModel.tools) {
+				return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
+			}
+			return false;
+		})
+		.flatMap((tool: ToolFront) => tool.mimeTypes ?? []);
 
+	$: activeMimeTypes = Array.from(
+		new Set([
+			...mimeTypesFromActiveTools, // fetch mime types from active tools either from tool settings or active assistant
+			...(currentModel.tools && !$page.data.assistant ? ["application/pdf"] : []), // if its a tool model, we can always enable document parser so we always accept pdfs
+			...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []), // if its a multimodal model, we always accept images
+		])
+	);
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
 
 	let transcriber: AutomaticSpeechRecognitionPipeline;
@@ -405,7 +427,10 @@
 		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length && !loading}
-			<div class="flex flex-row flex-wrap justify-center gap-2.5 max-md:pb-3">
+			<div
+				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
+				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl max-md:pb-3"
+			>
 				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
@@ -421,13 +446,6 @@
 
 		<div class="w-full">
 			<div class="flex w-full pb-3">
-				{#if !assistant}
-					{#if currentModel.tools}
-						<ToolsMenu {loading} />
-					{:else if $page.data.settings?.searchEnabled}
-						<WebSearchToggle />
-					{/if}
-				{/if}
 				{#if loading}
 					<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
 				{:else if lastIsError}
@@ -443,9 +461,6 @@
 					/>
 				{:else}
 					<div class="ml-auto gap-2">
-						{#if isFileUploadEnabled}
-							<UploadBtn bind:files mimeTypes={activeMimeTypes} classNames="ml-auto" />
-						{/if}
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
 								on:click={() => {
@@ -470,13 +485,20 @@
 				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
-					<div class="flex w-full flex-1 border-none bg-transparent">
+					<div
+						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+						class:paste-glow={pastedLongContent}
+					>
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
+								{assistant}
 								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+								{loading}
 								bind:value={message}
+								bind:files
+								mimeTypes={activeMimeTypes}
 								on:submit={handleSubmit}
 								on:beforeinput={(ev) => {
 									if ($page.data.loginRequired) {
@@ -485,28 +507,26 @@
 									}
 								}}
 								on:paste={onPaste}
-								maxRows={6}
 								disabled={isReadOnly || lastIsError}
+								modelHasTools={currentModel.tools}
+								modelIsMultimodal={currentModel.multimodal}
 							/>
 						{/if}
 
 						{#if loading}
 							<button
-								class="btn mx-1 my-1 inline-block h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40 md:hidden"
-								on:click={() => dispatch("stop")}
-							>
-								<CarbonStopFilledAlt />
-							</button>
-							<div
-								class="mx-1 my-1 hidden h-[2.4rem] items-center p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40 md:flex"
+								disabled
+								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
 							>
 								<EosIconsLoading />
-							</div>
+							</button>
 						{:else}
 							<button
-								class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
+								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
 								disabled={!message || isReadOnly}
 								type="submit"
+								aria-label="Send message"
+								name="submit"
 							>
 								<CarbonSendAltFilled />
 							</button>
@@ -585,3 +605,22 @@
 		{/if}
 	</div>
 </div>
+
+<style lang="postcss">
+	.paste-glow {
+		animation: glow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+		will-change: box-shadow;
+	}
+
+	@keyframes glow {
+		0% {
+			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8);
+		}
+		50% {
+			box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.6);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+		}
+	}
+</style>

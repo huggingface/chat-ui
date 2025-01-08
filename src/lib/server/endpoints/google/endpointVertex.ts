@@ -5,10 +5,9 @@ import {
 	type Content,
 	type TextPart,
 } from "@google-cloud/vertexai";
-import type { Endpoint } from "../endpoints";
+import type { Endpoint, TextGenerationStreamOutputWithToolsAndWebSources } from "../endpoints";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { createDocumentProcessorOptionsValidator, makeDocumentProcessor } from "../document";
 
@@ -170,6 +169,8 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		return (async function* () {
 			let generatedText = "";
 
+			const webSources = [];
+
 			for await (const data of result.stream) {
 				if (!data?.candidates?.length) break; // Handle case where no candidates are present
 
@@ -183,9 +184,29 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 
 				const isLastChunk = !!candidate.finishReason;
 
+				const candidateWebSources = candidate.groundingMetadata?.groundingChunks
+					?.map((chunk) => {
+						const uri = chunk.web?.uri ?? chunk.retrievedContext?.uri;
+						const title = chunk.web?.title ?? chunk.retrievedContext?.title;
+
+						if (!uri || !title) {
+							return null;
+						}
+
+						return {
+							uri,
+							title,
+						};
+					})
+					.filter((source) => source !== null);
+
+				if (candidateWebSources) {
+					webSources.push(...candidateWebSources);
+				}
+
 				const content = firstPart.text;
 				generatedText += content;
-				const output: TextGenerationStreamOutput = {
+				const output: TextGenerationStreamOutputWithToolsAndWebSources = {
 					token: {
 						id: tokenId++,
 						text: content,
@@ -194,6 +215,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 					},
 					generated_text: isLastChunk ? generatedText : null,
 					details: null,
+					webSources,
 				};
 				yield output;
 

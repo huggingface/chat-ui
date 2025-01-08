@@ -39,6 +39,7 @@
 		<h2 class="text-xl font-bold">Settings</h2>
 		<button
 			class="btn rounded-lg"
+			aria-label="Close settings"
 			on:click={() => {
 				goto(previousPage);
 			}}

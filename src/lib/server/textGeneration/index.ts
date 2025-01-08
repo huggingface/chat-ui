@@ -20,6 +20,7 @@ import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import type { ToolResult } from "$lib/types/Tool";
 import { toolHasName } from "../tools/utils";
+import directlyAnswer from "../tools/directlyAnswer";
 
 async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	while (!done.aborted) {
@@ -68,16 +69,18 @@ async function* textGenerationWithoutTitle(
 
 	let preprompt = conv.preprompt;
 	if (assistantHasDynamicPrompt(assistant) && preprompt) {
-		preprompt = await processPreprompt(preprompt);
+		preprompt = await processPreprompt(preprompt, messages.at(-1)?.content);
 		if (messages[0].from === "system") messages[0].content = preprompt;
 	}
 
 	let toolResults: ToolResult[] = [];
+	let tools = model.tools ? await getTools(toolsPreference, ctx.assistant) : undefined;
 
-	if (model.tools) {
-		const tools = await getTools(toolsPreference, ctx.assistant);
-		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
-		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
+	if (tools) {
+		const toolCallsRequired = tools.some((tool) => !toolHasName(directlyAnswer.name, tool));
+		if (toolCallsRequired) {
+			toolResults = yield* runTools(ctx, tools, preprompt);
+		} else tools = undefined;
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);

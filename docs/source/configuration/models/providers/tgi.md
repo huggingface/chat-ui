@@ -9,7 +9,7 @@
 
 \* Multimodal is only supported with the IDEFICS model. Please see the [Multimodal](../multimodal) section.
 
-By default, if `endpoints` are left unspecified, Chat UI will look for the model on the hosted Hugging Face inference API using the model name, and use your `HF_TOKEN`. Refer to the [overview](/configuration/models/overview) for more information about model configuration.
+By default, if `endpoints` are left unspecified, Chat UI will look for the model on the hosted Hugging Face inference API using the model name, and use your `HF_TOKEN`. Refer to the [overview](../overview) for more information about model configuration.
 
 ```ini
 MODELS=`[
@@ -62,5 +62,5 @@ MODELS=`[{
     "type" : "tgi",
     "url": "https://HOST:PORT",
   }]
-}]
+}]`
 ```

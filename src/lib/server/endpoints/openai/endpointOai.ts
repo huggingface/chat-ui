@@ -86,7 +86,7 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	apiKey: z.string().default(env.OPENAI_API_KEY ?? "sk-"),
+	apiKey: z.string().default(env.OPENAI_API_KEY || env.HF_TOKEN || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
@@ -111,6 +111,8 @@ export const endpointOAIParametersSchema = z.object({
 			}),
 		})
 		.default({}),
+	/* enable use of max_completion_tokens in place of max_tokens */
+	useCompletionTokens: z.boolean().default(false),
 });
 
 export async function endpointOai(
@@ -125,6 +127,7 @@ export async function endpointOai(
 		defaultQuery,
 		multimodal,
 		extraBody,
+		useCompletionTokens,
 	} = endpointOAIParametersSchema.parse(input);
 
 	let OpenAI;
@@ -135,7 +138,7 @@ export async function endpointOai(
 	}
 
 	const openai = new OpenAI({
-		apiKey: apiKey ?? "sk-",
+		apiKey: apiKey || "sk-",
 		baseURL,
 		defaultHeaders,
 		defaultQuery,
@@ -167,12 +170,14 @@ export async function endpointOai(
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
+				presence_penalty: parameters?.presence_penalty,
 			};
 
 			const openAICompletion = await openai.completions.create(body, {
 				body: { ...body, ...extraBody },
 				headers: {
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+					"X-use-cache": "false",
 				},
 			});
 
@@ -196,6 +201,14 @@ export async function endpointOai(
 
 			if (messagesOpenAI?.[0]) {
 				messagesOpenAI[0].content = preprompt ?? "";
+			}
+
+			// if system role is not supported, convert first message to a user message.
+			if (!model.systemRoleSupported && messagesOpenAI?.[0]?.role === "system") {
+				messagesOpenAI[0] = {
+					...messagesOpenAI[0],
+					role: "user",
+				};
 			}
 
 			if (toolResults && toolResults.length > 0) {
@@ -240,11 +253,14 @@ export async function endpointOai(
 				model: model.id ?? model.name,
 				messages: messagesOpenAI,
 				stream: true,
-				max_tokens: parameters?.max_new_tokens,
+				...(useCompletionTokens
+					? { max_completion_tokens: parameters?.max_new_tokens }
+					: { max_tokens: parameters?.max_new_tokens }),
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
+				presence_penalty: parameters?.presence_penalty,
 				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
 			};
 
@@ -252,6 +268,7 @@ export async function endpointOai(
 				body: { ...body, ...extraBody },
 				headers: {
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+					"X-use-cache": "false",
 				},
 			});
 

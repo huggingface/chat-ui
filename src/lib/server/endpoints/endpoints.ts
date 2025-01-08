@@ -48,13 +48,14 @@ export interface EndpointParameters {
 interface CommonEndpoint {
 	weight: number;
 }
-type TextGenerationStreamOutputWithTools = TextGenerationStreamOutput & {
+export type TextGenerationStreamOutputWithToolsAndWebSources = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken & { toolCalls?: ToolCall[] };
+	webSources?: { uri: string; title: string }[];
 };
 // type signature for the endpoint
 export type Endpoint = (
 	params: EndpointParameters
-) => Promise<AsyncGenerator<TextGenerationStreamOutputWithTools, void, void>>;
+) => Promise<AsyncGenerator<TextGenerationStreamOutputWithToolsAndWebSources, void, void>>;
 
 // generator function that takes in parameters for defining the endpoint and return the endpoint
 export type EndpointGenerator<T extends CommonEndpoint> = (parameters: T) => Endpoint;

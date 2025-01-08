@@ -25,7 +25,7 @@ if (!building) {
 	logger.info("Starting server...");
 	initExitHandler();
 
-	await checkAndRunMigrations();
+	checkAndRunMigrations();
 	if (env.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
@@ -62,6 +62,7 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 		error,
 		errorId,
 		status,
+		stack: error instanceof Error ? error.stack : undefined,
 	});
 
 	return {
@@ -216,8 +217,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	];
 
 	if (event.request.method === "POST") {
-		refreshSessionCookie(event.cookies, event.locals.sessionId);
-
 		if (nativeFormContentTypes.includes(requestContentType)) {
 			const origin = event.request.headers.get("origin");
 
@@ -249,6 +248,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
+		!event.url.pathname.startsWith(`${base}/settings`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
 		if (
