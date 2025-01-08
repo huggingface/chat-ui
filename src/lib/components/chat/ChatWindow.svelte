@@ -206,7 +206,7 @@
 		}
 	});
 
-	let chatContainer: HTMLDivElement;
+	let chatContainer: HTMLElement;
 
 	async function scrollToBottom() {
 		await tick();
@@ -399,7 +399,7 @@
 						}}
 					/>
 				{:else}
-					<div class="ml-auto flex items-center gap-2">
+					<div class="ml-auto gap-2">
 						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 							<ContinueBtn
 								on:click={() => {
@@ -414,67 +414,65 @@
 					</div>
 				{/if}
 			</div>
-			<div class="flex w-full items-center gap-2">
-				<form
-					tabindex="-1"
-					aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-					on:submit|preventDefault={handleSubmit}
-					class="relative flex flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
+			<form
+				tabindex="-1"
+				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
+				on:submit|preventDefault={handleSubmit}
+				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 focus-within:border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:focus-within:border-gray-500
             {isReadOnly ? 'opacity-30' : ''}"
-				>
-					{#if onDrag && isFileUploadEnabled}
-						<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
-					{:else}
-						<div
-							class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-							class:paste-glow={pastedLongContent}
-						>
-							{#if lastIsError}
-								<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-							{:else}
-								<ChatInput
-									{assistant}
-									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-									{loading}
-									bind:value={message}
-									bind:files
-									mimeTypes={activeMimeTypes}
-									on:submit={handleSubmit}
-									on:beforeinput={(ev) => {
-										if ($page.data.loginRequired) {
-											ev.preventDefault();
-											loginModalOpen = true;
-										}
-									}}
-									on:paste={onPaste}
-									disabled={isReadOnly || lastIsError}
-									modelHasTools={currentModel.tools}
-									modelIsMultimodal={currentModel.multimodal}
-								/>
-							{/if}
+			>
+				{#if onDrag && isFileUploadEnabled}
+					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+				{:else}
+					<div
+						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+						class:paste-glow={pastedLongContent}
+					>
+						{#if lastIsError}
+							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+						{:else}
+							<ChatInput
+								{assistant}
+								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+								{loading}
+								bind:value={message}
+								bind:files
+								mimeTypes={activeMimeTypes}
+								on:submit={handleSubmit}
+								on:beforeinput={(ev) => {
+									if ($page.data.loginRequired) {
+										ev.preventDefault();
+										loginModalOpen = true;
+									}
+								}}
+								on:paste={onPaste}
+								disabled={isReadOnly || lastIsError}
+								modelHasTools={currentModel.tools}
+								modelIsMultimodal={currentModel.multimodal}
+							/>
+						{/if}
 
-							{#if loading}
-								<button
-									disabled
-									class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
-								>
-									<EosIconsLoading />
-								</button>
-							{:else}
-								<button
-									class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
-									disabled={!message || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
-								>
-									<CarbonSendAltFilled />
-								</button>
-							{/if}
-						</div>
-					{/if}
-				</form>
-			</div>
+						{#if loading}
+							<button
+								disabled
+								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
+							>
+								<EosIconsLoading />
+							</button>
+						{:else}
+							<button
+								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
+								disabled={!message || isReadOnly}
+								type="submit"
+								aria-label="Send message"
+								name="submit"
+							>
+								<CarbonSendAltFilled />
+							</button>
+						{/if}
+					</div>
+				{/if}
+			</form>
 			<div
 				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
 			>
