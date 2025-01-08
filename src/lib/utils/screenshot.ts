@@ -1,7 +1,8 @@
 export async function captureScreen(): Promise<string> {
+	let stream: MediaStream | undefined;
 	try {
 		// This will show the native browser dialog for screen capture
-		const stream = await navigator.mediaDevices.getDisplayMedia({
+		stream = await navigator.mediaDevices.getDisplayMedia({
 			video: true,
 			audio: false,
 		});
@@ -18,20 +19,25 @@ export async function captureScreen(): Promise<string> {
 				video.play();
 				resolve(null);
 			};
-			video.srcObject = stream;
+			if (stream) {
+				video.srcObject = stream;
+			} else {
+				throw Error("No stream available");
+			}
 		});
 
 		// Draw the video frame to canvas
 		const context = canvas.getContext("2d");
 		context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-		// Stop all tracks
-		stream.getTracks().forEach((track) => track.stop());
-
 		// Convert to base64
 		return canvas.toDataURL("image/png");
 	} catch (error) {
 		console.error("Error capturing screenshot:", error);
 		throw error;
+	} finally {
+		// Stop all tracks
+		if (stream) {
+			stream.getTracks().forEach((track) => track.stop());
+		}
 	}
 }
