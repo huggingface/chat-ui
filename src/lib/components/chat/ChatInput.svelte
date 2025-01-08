@@ -22,7 +22,7 @@
 	import { base } from "$app/paths";
 	import IconAdd from "~icons/carbon/add";
 	import { captureScreen } from "$lib/utils/screenshot";
-	import IconScreenshot from "../icons/iconScreenshot.svelte";
+	import IconScreenshot from "../icons/IconScreenshot.svelte";
 
 	export let files: File[] = [];
 	export let mimeTypes: string[] = [];
