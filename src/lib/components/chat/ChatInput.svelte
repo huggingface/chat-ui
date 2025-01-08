@@ -21,6 +21,8 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import IconAdd from "~icons/carbon/add";
+	import { captureScreen } from "$lib/utils/screenshot";
+	import IconScreenshot from "../icons/IconScreenshot.svelte";
 
 	export let files: File[] = [];
 	export let mimeTypes: string[] = [];
@@ -250,6 +252,31 @@
 						</label>
 					</HoverTooltip>
 				</form>
+				{#if mimeTypes.includes("image/*")}
+					<HoverTooltip
+						label="Capture screenshot"
+						position="top"
+						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
+					>
+						<button
+							class="base-tool"
+							on:click|preventDefault={async () => {
+								const screenshot = await captureScreen();
+
+								// Convert base64 to blob
+								const base64Response = await fetch(screenshot);
+								const blob = await base64Response.blob();
+
+								// Create a File object from the blob
+								const file = new File([blob], "screenshot.png", { type: "image/png" });
+
+								files = [...files, file];
+							}}
+						>
+							<IconScreenshot classNames="text-xl" />
+						</button>
+					</HoverTooltip>
+				{/if}
 			{/if}
 			{#if modelHasTools}
 				{#each extraTools as tool}
