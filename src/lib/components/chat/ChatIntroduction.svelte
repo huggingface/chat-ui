@@ -40,7 +40,7 @@
 		{#each announcementBanners as banner}
 			<AnnouncementBanner classNames="mb-4" title={banner.title}>
 				<a
-					target="_blank"
+					target={banner.external ? "_blank" : "_self"}
 					href={banner.linkHref}
 					class="mr-2 flex items-center underline hover:no-underline">{banner.linkTitle}</a
 				>

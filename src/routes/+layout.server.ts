@@ -243,6 +243,8 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 							toolUseDuration.find(
 								(el) => el.labels.tool === tool._id.toString() && el.labels.quantile === 0.9
 							)?.value ?? 15_000,
+						color: tool.color,
+						icon: tool.icon,
 					} satisfies ToolFront)
 			),
 		communityToolCount: await collections.tools.countDocuments({

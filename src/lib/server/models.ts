@@ -17,6 +17,21 @@ import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
+const reasoningSchema = z.union([
+	z.object({
+		type: z.literal("regex"), // everything is reasoning, extract the answer from the regex
+		regex: z.string(),
+	}),
+	z.object({
+		type: z.literal("tokens"), // use beginning and end tokens that define the reasoning portion of the answer
+		beginToken: z.string(),
+		endToken: z.string(),
+	}),
+	z.object({
+		type: z.literal("summarize"), // everything is reasoning, summarize the answer
+	}),
+]);
+
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
@@ -70,6 +85,7 @@ const modelConfig = z.object({
 	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
+	reasoning: reasoningSchema.optional(),
 });
 
 const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
@@ -113,7 +129,11 @@ async function getChatPromptRender(
 		toolResults,
 		continueMessage,
 	}: ChatTemplateInput) => {
-		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
+		let formattedMessages: {
+			role: string;
+			content: string;
+			tool_calls?: { id: string; tool_call_id: string; output: string }[];
+		}[] = messages.map((message) => ({
 			content: message.content,
 			role: message.from,
 		}));
@@ -150,7 +170,7 @@ async function getChatPromptRender(
 			if (isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
-						role: m.systemRoleSupported ? "system" : "user",
+						role: "user",
 						content:
 							"\n\n<results>\n" +
 							toolResults
@@ -210,20 +230,6 @@ async function getChatPromptRender(
 			tools = [];
 		}
 
-		const chatTemplate = tools?.length ? "tool_use" : undefined;
-
-		const documents = (toolResults ?? []).flatMap((result) => {
-			if (result.status === ToolResultStatus.Error) {
-				return [{ title: `Tool "${result.call.name}" error`, text: "\n" + result.message }];
-			}
-			return result.outputs.flatMap((output) =>
-				Object.entries(output).map(([title, text]) => ({
-					title: `Tool "${result.call.name}" ${title}`,
-					text: "\n" + text,
-				}))
-			);
-		});
-
 		const mappedTools =
 			tools?.map((tool) => {
 				const inputs: Record<
@@ -255,9 +261,7 @@ async function getChatPromptRender(
 		const output = tokenizer.apply_chat_template(formattedMessages, {
 			tokenize: false,
 			add_generation_prompt: !continueMessage,
-			chat_template: chatTemplate,
-			tools: mappedTools,
-			documents,
+			tools: mappedTools.length ? mappedTools : undefined,
 		});
 
 		if (typeof output !== "string") {
@@ -266,7 +270,6 @@ async function getChatPromptRender(
 
 		return output;
 	};
-
 	return renderTemplate;
 }
 
