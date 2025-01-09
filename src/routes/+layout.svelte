@@ -19,6 +19,8 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
+	import { loginModalOpen } from "$lib/stores/loginModal";
+	import LoginModal from "$lib/components/LoginModal.svelte";
 
 	export let data;
 
@@ -213,6 +215,14 @@
 
 {#if showDisclaimer}
 	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
+{/if}
+
+{#if $loginModalOpen}
+	<LoginModal
+		on:close={() => {
+			$loginModalOpen = false;
+		}}
+	/>
 {/if}
 
 <ExpandNavigation
