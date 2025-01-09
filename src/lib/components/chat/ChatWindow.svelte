@@ -252,7 +252,10 @@
 	let audioChunks: BlobPart[] = [];
 	let isLoadingModel = false;
 	let isTranscribing = false;
-	let webgpuSupported = false;
+
+	// @ts-expect-error webgpu is not typed correctly
+	$: webgpuSupported = browser && navigator.gpu;
+
 	let microphoneButton: HTMLButtonElement;
 
 	async function initializeTranscriber() {
@@ -283,7 +286,11 @@
 			console.log("Detected language:", userLanguage);
 			const firstTwoChars = userLanguage.slice(0, 2).toLowerCase();
 			const output = await transcriber(audioUrl, { language: firstTwoChars, task: "transcribe" });
-			message = output.text;
+			if (Array.isArray(output)) {
+				message = output.map((o) => o.text).join(" ");
+			} else {
+				message = output.text;
+			}
 			isTranscribing = false;
 		};
 
@@ -295,18 +302,12 @@
 		mediaRecorder.stop();
 		isRecording = false;
 	}
-
-	onMount(() => {
-		if (navigator.gpu) {
-			webgpuSupported = true;
-		}
-	});
 </script>
 
 <svelte:window
 	on:dragenter={onDragEnter}
 	on:dragleave={onDragLeave}
-	on:dragleover|preventDefault
+	on:dragover|preventDefault
 	on:drop|preventDefault={() => (onDrag = false)}
 />
 
