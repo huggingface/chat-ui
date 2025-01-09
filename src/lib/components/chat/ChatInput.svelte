@@ -144,10 +144,11 @@
 			{placeholder}
 		/>
 	</div>
+
 	{#if !assistant}
 		<div
-			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2 px-3 pb-2.5 pt-0.5 text-gray-500
-			dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2.5"
+			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-0.5
+			text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto"
 		>
 			<HoverTooltip
 				label="Search the web"
@@ -299,7 +300,7 @@
 					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 max-sm:hidden"
 				>
 					<a
-						class="base-tool flex !size-[20px] items-center justify-center rounded-full bg-white/10"
+						class="base-tool flex !size-[20px] items-center justify-center rounded-full bg-gray-200 dark:bg-white/10"
 						href={`${base}/tools`}
 						title="Browse more tools"
 					>

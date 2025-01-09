@@ -376,7 +376,7 @@
 		{/if}
 
 		<div class="w-full">
-			<div class="flex w-full pb-3">
+			<div class="flex w-full *:mb-3">
 				{#if loading}
 					<StopGeneratingBtn classNames="ml-auto" on:click={() => dispatch("stop")} />
 				{:else if lastIsError}
@@ -390,19 +390,17 @@
 							}
 						}}
 					/>
-				{:else}
+				{:else if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
 					<div class="ml-auto gap-2">
-						{#if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
-							<ContinueBtn
-								on:click={() => {
-									if (lastMessage && lastMessage.ancestors) {
-										dispatch("continue", {
-											id: lastMessage?.id,
-										});
-									}
-								}}
-							/>
-						{/if}
+						<ContinueBtn
+							on:click={() => {
+								if (lastMessage && lastMessage.ancestors) {
+									dispatch("continue", {
+										id: lastMessage?.id,
+									});
+								}
+							}}
+						/>
 					</div>
 				{/if}
 			</div>
@@ -511,7 +509,7 @@
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
 							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
 						{:else}
-							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
+							<CarbonExport class="text-[.6rem] sm:mr-1.5 sm:text-primary-500" />
 							<div class="max-sm:hidden">Share this conversation</div>
 						{/if}
 					</button>
