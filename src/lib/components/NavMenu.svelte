@@ -10,10 +10,17 @@
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/stores";
+	import InfiniteScroll from "./InfiniteScroll.svelte";
+	import type { Conversation } from "$lib/types/Conversation";
+	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
 	export let conversations: ConvSidebar[];
 	export let canLogin: boolean;
 	export let user: LayoutData["user"];
+
+	export let p = 0;
+
+	let hasMore = true;
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -44,6 +51,34 @@
 	} as const;
 
 	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
+
+	async function handleVisible() {
+		p++;
+		const newConvs = await fetch(`${base}/api/conversations?p=${p}`)
+			.then((res) => res.json())
+			.then((convs) =>
+				convs.map(
+					(conv: Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">) => ({
+						...conv,
+						updatedAt: new Date(conv.updatedAt),
+					})
+				)
+			)
+			.catch(() => []);
+
+		if (newConvs.length === 0) {
+			hasMore = false;
+		}
+
+		conversations = [...conversations, ...newConvs];
+	}
+
+	$: if (conversations.length <= CONV_NUM_PER_PAGE) {
+		// reset p to 0 if there's only one page of content
+		// that would be caused by a data loading invalidation
+		p = 0;
+		hasMore = true;
+	}
 </script>
 
 <div class="sticky top-0 flex flex-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0">
@@ -89,6 +124,9 @@
 				{/if}
 			{/each}
 		</div>
+		{#if hasMore}
+			<InfiniteScroll on:visible={handleVisible} />
+		{/if}
 	{/await}
 </div>
 <div
