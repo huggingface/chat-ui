@@ -12,7 +12,6 @@
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
-	import LoginModal from "../LoginModal.svelte";
 	import { page } from "$app/stores";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
@@ -36,6 +35,7 @@
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
 	import type { ToolFront } from "$lib/types/Tool";
+	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -50,7 +50,6 @@
 
 	$: isReadOnly = !models.some((model) => model.id === currentModel.id);
 
-	let loginModalOpen = false;
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
@@ -250,13 +249,6 @@
 />
 
 <div class="relative min-h-0 min-w-0">
-	{#if loginModalOpen}
-		<LoginModal
-			on:close={() => {
-				loginModalOpen = false;
-			}}
-		/>
-	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.length ? [...messages] : false}
@@ -330,7 +322,7 @@
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
 							ev.preventDefault();
-							loginModalOpen = true;
+							$loginModalOpen = true;
 						} else {
 							dispatch("message", ev.detail);
 						}
@@ -343,7 +335,7 @@
 					on:message={(ev) => {
 						if ($page.data.loginRequired) {
 							ev.preventDefault();
-							loginModalOpen = true;
+							$loginModalOpen = true;
 						} else {
 							dispatch("message", ev.detail);
 						}
@@ -442,7 +434,7 @@
 								on:beforeinput={(ev) => {
 									if ($page.data.loginRequired) {
 										ev.preventDefault();
-										loginModalOpen = true;
+										$loginModalOpen = true;
 									}
 								}}
 								on:paste={onPaste}

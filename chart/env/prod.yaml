@@ -417,7 +417,7 @@ envVars:
   PUBLIC_APP_COLOR: "yellow"
   PUBLIC_APP_DESCRIPTION: "Making the community's best AI chat models available to everyone."
   PUBLIC_APP_DISCLAIMER_MESSAGE: "Disclaimer: AI is an area of active research with known problems such as biased generation and misinformation. Do not use this application for high-stakes decisions or advice."
-  PUBLIC_APP_GUEST_MESSAGE: "You have reached the guest message limit, Sign In with a free Hugging Face account to continue using HuggingChat."
+  PUBLIC_APP_GUEST_MESSAGE: "Sign in with a free Hugging Face account to continue using HuggingChat."
   PUBLIC_APP_DATA_SHARING: 0
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
