@@ -347,7 +347,7 @@
 								name="repetition_penalty"
 								min="0.1"
 								max="2"
-								step="0.1"
+								step="0.05"
 								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								placeholder={selectedModel?.parameters?.repetition_penalty?.toString() ?? "1.0"}
 								value={assistant?.generateSettings?.repetition_penalty ?? ""}
