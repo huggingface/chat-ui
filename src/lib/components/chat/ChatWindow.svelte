@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick, onMount } from "svelte";
+	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import CarbonSendAltFilled from "~icons/carbon/send-alt-filled";
 	import CarbonExport from "~icons/carbon/export";
@@ -249,6 +249,7 @@
 	let transcriber: AutomaticSpeechRecognitionPipeline;
 	let isRecording = false;
 	let mediaRecorder: MediaRecorder;
+	// eslint-disable-next-line no-undef
 	let audioChunks: BlobPart[] = [];
 	let isLoadingModel = false;
 	let isTranscribing = false;
