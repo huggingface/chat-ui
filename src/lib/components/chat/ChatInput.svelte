@@ -84,6 +84,7 @@
 	}
 
 	function adjustTextareaHeight() {
+		textareaElement.style.height = "auto";
 		textareaElement.style.height = `${textareaElement.scrollHeight}px`;
 
 		if (textareaElement.selectionStart === textareaElement.value.length) {
