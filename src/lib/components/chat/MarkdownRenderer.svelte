@@ -124,6 +124,20 @@
 		},
 	};
 
+	function escapeHTML(content: string) {
+		return content.replace(
+			/[<>&"']/g,
+			(x) =>
+				({
+					"<": "&lt;",
+					">": "&gt;",
+					"&": "&amp;",
+					"'": "&#39;",
+					'"': "&quot;",
+				}[x] || x)
+		);
+	}
+
 	function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
 		const linkStyle =
 			"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
@@ -153,6 +167,7 @@
 		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
+			html: (html) => escapeHTML(html),
 			link: (href, title, text) =>
 				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
 		},
