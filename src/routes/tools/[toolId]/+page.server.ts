@@ -204,7 +204,7 @@ async function setReviewStatus({
 		const username = locals.user?.username;
 
 		await sendSlack(
-			`🟢 Tool <${toolUrl}|${tool?.displayName}> requested to be featured by ${
+			`🟢🛠️ Tool <${toolUrl}|${tool?.displayName}> requested to be featured by ${
 				username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
 			}.`
 		);
