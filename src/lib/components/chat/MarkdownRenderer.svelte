@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { WebSearchSource } from "$lib/types/WebSearch";
 	import katex from "katex";
+	import "katex/dist/contrib/mhchem.mjs";
 	import DOMPurify from "isomorphic-dompurify";
 	import { Marked } from "marked";
 	import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
