@@ -12,6 +12,12 @@ const allowedUserEmails = z
 	.default([])
 	.parse(JSON5.parse(env.ALLOWED_USER_EMAILS));
 
+const allowedUserDomains = z
+	.array(z.string().regex(/\.\w+$/)) // Contains at least a dot
+	.optional()
+	.default([])
+	.parse(JSON5.parse(env.ALLOWED_USER_DOMAINS));
+
 export async function load({ url, locals, cookies, request, getClientAddress }) {
 	const { error: errorName, error_description: errorDescription } = z
 		.object({
@@ -46,8 +52,8 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		iss
 	);
 
-	// Filter by allowed user emails
-	if (allowedUserEmails.length > 0) {
+	// Filter by allowed user emails or domains
+	if (allowedUserEmails.length > 0 || allowedUserDomains.length > 0) {
 		if (!userData.email) {
 			error(403, "User not allowed: email not returned");
 		}
@@ -55,7 +61,12 @@ export async function load({ url, locals, cookies, request, getClientAddress }) 
 		if (!emailVerified) {
 			error(403, "User not allowed: email not verified");
 		}
-		if (!allowedUserEmails.includes(userData.email)) {
+
+		const emailDomain = userData.email.split("@")[1];
+		const isEmailAllowed = allowedUserEmails.includes(userData.email);
+		const isDomainAllowed = allowedUserDomains.includes(emailDomain);
+
+		if (!isEmailAllowed && !isDomainAllowed) {
 			error(403, "User not allowed");
 		}
 	}
