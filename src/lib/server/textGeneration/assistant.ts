@@ -5,6 +5,14 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { ObjectId } from "mongodb";
 
 export async function processPreprompt(preprompt: string, user_message: string | undefined) {
+	// Replace {{today}} with formatted date
+	const today = new Intl.DateTimeFormat("en-US", {
+		weekday: "long",
+		day: "numeric",
+		month: "long",
+		year: "numeric",
+	}).format(new Date());
+	preprompt = preprompt.replaceAll("{{today}}", today);
 	const requestRegex = /{{\s?(get|post|url)=(.*?)\s?}}/g;
 
 	for (const match of preprompt.matchAll(requestRegex)) {

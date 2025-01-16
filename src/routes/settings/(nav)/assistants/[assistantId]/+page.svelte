@@ -259,7 +259,7 @@
 		>
 			{#if assistant?.dynamicPrompt}
 				{#each prepromptTags as tag}
-					{#if tag.startsWith("{{") && tag.endsWith("}}") && (tag.includes("get=") || tag.includes("post=") || tag.includes("url="))}
+					{#if (tag.startsWith("{{") && tag.endsWith("}}") && (tag.includes("get=") || tag.includes("post=") || tag.includes("url="))) || tag.includes("today")}
 						{@const url = tag.match(/(?:get|post|url)=(.*?)}}/)?.[1] ?? ""}
 						<a
 							target="_blank"
