@@ -163,8 +163,7 @@
 
 	const marked = new Marked({
 		hooks: {
-			preprocess: (md) => addInlineCitations(md, sources),
-			postprocess: (html) => DOMPurify.sanitize(html),
+			postprocess: (html) => DOMPurify.sanitize(addInlineCitations(html, sources)),
 		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
