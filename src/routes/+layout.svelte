@@ -19,6 +19,8 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
+	import { loginModalOpen } from "$lib/stores/loginModal";
+	import LoginModal from "$lib/components/LoginModal.svelte";
 
 	export let data;
 
@@ -215,6 +217,14 @@
 	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
 {/if}
 
+{#if $loginModalOpen}
+	<LoginModal
+		on:close={() => {
+			$loginModalOpen = false;
+		}}
+	/>
+{/if}
+
 <ExpandNavigation
 	isCollapsed={isNavCollapsed}
 	on:click={() => (isNavCollapsed = !isNavCollapsed)}
@@ -224,7 +234,7 @@
 />
 
 <div
-	class="grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
+	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
 		? 'md:grid-cols-[290px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
-	import { createEventDispatcher, onMount, tick } from "svelte";
+	import { createEventDispatcher, onMount } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
@@ -31,7 +31,6 @@
 	export let placeholder = "";
 	export let loading = false;
 	export let disabled = false;
-
 	export let assistant: Assistant | undefined = undefined;
 
 	export let modelHasTools = false;
@@ -54,6 +53,21 @@
 
 	const dispatch = createEventDispatcher<{ submit: void }>();
 
+	onMount(() => {
+		if (!isVirtualKeyboard()) {
+			textareaElement.focus();
+		}
+		function onFormSubmit() {
+			adjustTextareaHeight();
+		}
+
+		const formEl = textareaElement.closest("form");
+		formEl?.addEventListener("submit", onFormSubmit);
+		return () => {
+			formEl?.removeEventListener("submit", onFormSubmit);
+		};
+	});
+
 	function isVirtualKeyboard(): boolean {
 		if (!browser) return false;
 
@@ -70,30 +84,24 @@
 	}
 
 	function adjustTextareaHeight() {
-		if (!textareaElement) return;
 		textareaElement.style.height = "auto";
-		const newHeight = Math.min(textareaElement.scrollHeight, parseInt("96em"));
-		textareaElement.style.height = `${newHeight}px`;
-		if (!textareaElement.parentElement) return;
-		textareaElement.parentElement.style.height = `${newHeight}px`;
+		textareaElement.style.height = `${textareaElement.scrollHeight}px`;
+
+		if (textareaElement.selectionStart === textareaElement.value.length) {
+			textareaElement.scrollTop = textareaElement.scrollHeight;
+		}
 	}
 
-	async function handleKeydown(event: KeyboardEvent) {
-		if (event.key === "Enter" && !event.shiftKey && !isCompositionOn) {
+	function handleKeydown(event: KeyboardEvent) {
+		if (
+			event.key === "Enter" &&
+			!event.shiftKey &&
+			!isCompositionOn &&
+			!isVirtualKeyboard() &&
+			value.trim() !== ""
+		) {
 			event.preventDefault();
-			if (isVirtualKeyboard()) {
-				// Insert a newline at the cursor position
-				const start = textareaElement.selectionStart;
-				const end = textareaElement.selectionEnd;
-				value = value.substring(0, start) + "\n" + value.substring(end);
-				textareaElement.selectionStart = textareaElement.selectionEnd = start + 1;
-			} else {
-				if (value.trim() !== "") {
-					dispatch("submit");
-					await tick();
-					adjustTextareaHeight();
-				}
-			}
+			dispatch("submit");
 		}
 	}
 
@@ -110,13 +118,6 @@
 	$: documentParserIsOn =
 		modelHasTools && files.length > 0 && files.some((file) => file.type.startsWith("application/"));
 
-	onMount(() => {
-		if (!isVirtualKeyboard()) {
-			textareaElement.focus();
-		}
-		adjustTextareaHeight();
-	});
-
 	$: extraTools = $page.data.tools
 		.filter((t: ToolFront) => $settings.tools?.includes(t._id))
 		.filter(
@@ -125,29 +126,27 @@
 		) satisfies ToolFront[];
 </script>
 
-<div class="min-h-full flex-1" on:paste>
-	<div class="relative w-full min-w-0">
-		<textarea
-			enterkeyhint={!isVirtualKeyboard() ? "enter" : "send"}
-			tabindex="0"
-			rows="1"
-			class="scrollbar-custom max-h-[96em] w-full resize-none scroll-p-3 overflow-y-auto overflow-x-hidden border-0 bg-transparent px-3 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 max-sm:p-2.5 max-sm:text-[16px]"
-			class:text-gray-400={disabled}
-			bind:value
-			bind:this={textareaElement}
-			{disabled}
-			on:keydown={handleKeydown}
-			on:compositionstart={() => (isCompositionOn = true)}
-			on:compositionend={() => (isCompositionOn = false)}
-			on:input={adjustTextareaHeight}
-			on:beforeinput
-			{placeholder}
-		/>
-	</div>
+<div class="flex min-h-full flex-1 flex-col" on:paste>
+	<textarea
+		rows="1"
+		tabindex="0"
+		inputmode="text"
+		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-y-auto overflow-x-hidden border-0 bg-transparent px-2.5 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 max-sm:text-[16px] sm:px-3"
+		class:text-gray-400={disabled}
+		bind:value
+		bind:this={textareaElement}
+		on:keydown={handleKeydown}
+		on:compositionstart={() => (isCompositionOn = true)}
+		on:compositionend={() => (isCompositionOn = false)}
+		on:input={adjustTextareaHeight}
+		on:beforeinput
+		{placeholder}
+		{disabled}
+	/>
+
 	{#if !assistant}
 		<div
-			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2 px-3 pb-2.5 pt-0.5 text-gray-500
-			dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2.5"
+			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2"
 		>
 			<HoverTooltip
 				label="Search the web"
@@ -299,7 +298,7 @@
 					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 max-sm:hidden"
 				>
 					<a
-						class="base-tool flex !size-[20px] items-center justify-center rounded-full bg-white/10"
+						class="base-tool flex !size-[20px] items-center justify-center rounded-full border !border-gray-200 !bg-white !transition-none dark:!border-gray-500 dark:!bg-transparent"
 						href={`${base}/tools`}
 						title="Browse more tools"
 					>
@@ -321,10 +320,10 @@
 	}
 
 	.base-tool {
-		@apply flex h-[1.6rem] items-center gap-[.2rem] whitespace-nowrap text-xs outline-none transition-all focus:outline-none active:outline-none dark:hover:text-gray-300 sm:hover:text-purple-600;
+		@apply flex h-[1.6rem] items-center gap-[.2rem] whitespace-nowrap border border-transparent text-xs outline-none transition-all focus:outline-none active:outline-none dark:hover:text-gray-300 sm:hover:text-purple-600;
 	}
 
 	.active-tool {
-		@apply rounded-full bg-purple-500/15 pl-1 pr-2 text-purple-600 hover:text-purple-600  dark:bg-purple-600/40 dark:text-purple-300;
+		@apply rounded-full !border-purple-200 bg-purple-100 pl-1 pr-2 text-purple-600 hover:text-purple-600  dark:!border-purple-700 dark:bg-purple-600/40 dark:text-purple-200;
 	}
 </style>

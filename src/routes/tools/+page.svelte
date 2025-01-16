@@ -21,6 +21,7 @@
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	export let data: PageData;
 
@@ -142,12 +143,23 @@
 					Show unfeatured tools
 				</label>
 			{/if}
-			<a
-				href={`${base}/tools/new`}
-				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
-			>
-				<CarbonAdd />Create new tool
-			</a>
+			{#if $page.data.loginRequired && !data.user}
+				<button
+					on:click={() => {
+						$loginModalOpen = true;
+					}}
+					class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
+				>
+					<CarbonAdd />Create new tool
+				</button>
+			{:else}
+				<a
+					href={`${base}/tools/new`}
+					class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
+				>
+					<CarbonAdd />Create new tool
+				</a>
+			{/if}
 		</div>
 
 		<div class="mb-4 mt-7 flex flex-wrap items-center gap-x-2 gap-y-3 text-sm">

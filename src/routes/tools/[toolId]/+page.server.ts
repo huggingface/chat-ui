@@ -97,15 +97,15 @@ export const actions: Actions = {
 				envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
 			const toolUrl = `${prefixUrl}/tools/${params.toolId}`;
 
-			const tool = await collections.tools.findOne<Pick<Tool, "displayName">>(
+			const tool = await collections.tools.findOne<Pick<Tool, "displayName" | "name">>(
 				{ _id: new ObjectId(params.toolId) },
-				{ projection: { displayName: 1 } }
+				{ projection: { displayName: 1, name: 1 } }
 			);
 
 			const username = locals.user?.username;
 
 			await sendSlack(
-				`🔴 Tool <${toolUrl}|${tool?.displayName}> reported by ${
+				`🔴 Tool <${toolUrl}|${tool?.displayName ?? tool?.name}> reported by ${
 					username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
 				}.\n\n> ${result.data}`
 			);
@@ -204,7 +204,7 @@ async function setReviewStatus({
 		const username = locals.user?.username;
 
 		await sendSlack(
-			`🟢 Tool <${toolUrl}|${tool?.displayName}> requested to be featured by ${
+			`🟢🛠️ Tool <${toolUrl}|${tool?.displayName}> requested to be featured by ${
 				username ? `<http://hf.co/${username}|${username}>` : "non-logged in user"
 			}.`
 		);
