@@ -27,7 +27,7 @@ You can deploy a chat-ui instance in a single command using the docker image. Ge
 docker run -p 3000 -e HF_TOKEN=hf_*** -v db:/data ghcr.io/huggingface/chat-ui-db:latest
 ```
 
-Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) and the readme to see all the environment variables that you can set. We have endpoint support for all OpenAI API compatible local services as well as many other providers like Anthropic, Cloudflare, Google Vertex AI, etc.
+Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) and the readme to see all the environment variables that you can set. We have endpoint support for all OpenAI API-compatible local services as well as many other providers like Anthropic, Cloudflare, Google Vertex AI, etc.
 
 ### Local setup
 
@@ -81,7 +81,7 @@ MODELS=`[
   {
     "name": "microsoft/Phi-3-mini-4k-instruct",
     "endpoints": [{
-      "type" : "llamacpp",
+      "type": "llamacpp",
       "baseURL": "http://localhost:8080"
     }],
   },
@@ -103,11 +103,11 @@ Read more [here](#launch).
 
 ## No Setup Deploy
 
-If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
+If you don't want to configure, set up, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
 
 You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
 
-Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro) curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
+Set `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets) to deploy a model with gated access or a model in a private repository. It's also compatible with [Inference for PROs](https://huggingface.co/blog/inference-pro), which is a curated list of powerful models with higher rate limits. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
@@ -132,7 +132,7 @@ You can use a local MongoDB instance. The easiest way is to spin one up using do
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
-In which case the url of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
+In which case the URL of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
 
 Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within their free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
 
@@ -154,7 +154,7 @@ npm run dev
 Chat UI features a powerful Web Search feature. It works by:
 
 1. Generating an appropriate search query from the user prompt.
-2. Performing web search and extracting content from webpages.
+2. Performing web searches and extracting content from web pages.
 3. Creating embeddings from texts using a text embedding model.
 4. From these embeddings, find the ones that are closest to the user query using a vector similarity search. Specifically, we use `inner product` distance.
 5. Get the corresponding texts to those closest embeddings and perform [Retrieval-Augmented Generation](https://huggingface.co/papers/2005.11401) (i.e. expand user prompt by adding those texts so that an LLM can use this information).
@@ -314,7 +314,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 {{assistantMessageToken}}
 ```
 
-#### Multi modal model
+#### Multi-modal model
 
 We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on TGI), OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](#openai-api-compatible-models). For Anthropic, see the [Anthropic section](#anthropic).
 
@@ -357,7 +357,7 @@ To do this, you can add your own endpoints to the `MODELS` variable in `.env.loc
 
 If `endpoints` are left unspecified, ChatUI will look for the model on the hosted Hugging Face inference API using the model name.
 
-##### OpenAI API compatible models
+##### OpenAI API-compatible models
 
 Chat UI can be used with any API server that supports OpenAI API compatibility, for example [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol) and [vllm](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
@@ -410,7 +410,7 @@ MODELS=`[{
 }]`
 ```
 
-You may also consume any model provider that provides compatible OpenAI API endpoint. For example, you may self-host [Portkey](https://github.com/Portkey-AI/gateway) gateway and experiment with Claude or GPTs offered by Azure OpenAI. Example for Claude from Anthropic:
+You may also consume any model provider that provides a compatible OpenAI API endpoint. For example, you may self-host [Portkey](https://github.com/Portkey-AI/gateway) gateway and experiment with Claude or GPTs offered by Azure OpenAI. Example for Claude from Anthropic:
 
 ```
 MODELS=`[{
@@ -467,7 +467,7 @@ Or try Mistral from [Deepinfra](https://deepinfra.com/mistralai/Mistral-7B-Instr
 MODELS=`[{
   "name": "mistral-7b",
   "displayName": "Mistral 7B",
-  "description": "A 7B dense Transformer, fast-deployed and easily customisable. Small, yet powerful for a variety of use cases. Supports English and code, and a 8k context window.",
+  "description": "A 7B dense Transformer, fast-deployed and easily customizable. Small, yet powerful for a variety of use cases. Supports English and code, and an 8k context window.",
   "parameters": {
       "temperature": 0.5,
       "max_new_tokens": 4096,
@@ -722,7 +722,7 @@ You can find the list of models available on Cloudflare [here](https://developer
 
 #### Cohere
 
-You can also use Cohere to run their models directly from chat-ui. You will need to have a Cohere account, then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify it directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set it in the endpoint config.
+You can also use Cohere to run their models directly from chat-ui. You will need to have a Cohere account, and then get your [API token](https://dashboard.cohere.com/api-keys). You can either specify it directly in your `.env.local` using the `COHERE_API_TOKEN` variable, or you can set it in the endpoint config.
 
 Here is an example of a Cohere model config. You can set which model you want to use by setting the `id` field to the model name.
 
@@ -915,7 +915,7 @@ MODELS=`[
 
 ### 403：You don't have access to this conversation
 
-Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `COOKIE_SECURE=false` and `COOKIE_SAMESITE=lax` to your `.env.local`.
+Most likely you are running chat-ui over HTTP. The recommended option is to set up something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `COOKIE_SECURE=false` and `COOKIE_SAMESITE=lax` to your `.env.local`.
 
 Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
 
