@@ -192,9 +192,3 @@
 		{/await}
 	{/if}
 {/each}
-
-<style lang="postcss">
-	:global(.katex-display) {
-		overflow: auto hidden;
-	}
-</style>
