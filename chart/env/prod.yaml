@@ -347,7 +347,7 @@ envVars:
         ]
       },
       {
-        "name": "llhf/Meta-Llama-3.1-8B-Instruct",
+        "name": "meta-llama/Llama-3.1-8B-Instruct",
         "parameters": {
           "temperature": 0.6,
           "stop": ["<|endoftext|>", "<|eot_id|>"]
@@ -422,7 +422,7 @@ envVars:
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  TASK_MODEL: "llhf/Meta-Llama-3.1-8B-Instruct"
+  TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
   TEXT_EMBEDDING_MODELS: >
     [{
       "name": "bge-base-en-v1-5-sxa",
