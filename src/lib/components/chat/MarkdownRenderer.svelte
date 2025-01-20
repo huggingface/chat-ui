@@ -163,13 +163,13 @@
 
 	const marked = new Marked({
 		hooks: {
-			preprocess: (md) => escapeHTML(md),
 			postprocess: (html) => DOMPurify.sanitize(addInlineCitations(html, sources)),
 		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
 			link: (href, title, text) =>
 				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
+			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
 	});
