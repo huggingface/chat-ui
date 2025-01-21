@@ -445,9 +445,9 @@ envVars:
   PUBLIC_ANNOUNCEMENT_BANNERS: >
     [
       {
-        "title": "Llama 3.3 70B is now available!",
+        "title": "DeepSeek R1 is now available!",
         "linkTitle": "Try it out!",
-        "linkHref": "https://huggingface.co/chat/models/meta-llama/Llama-3.3-70B-Instruct"
+        "linkHref": "https://huggingface.co/chat/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
       }
     ]
   PUBLIC_APP_NAME: "HuggingChat"
