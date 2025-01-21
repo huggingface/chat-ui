@@ -136,6 +136,72 @@ envVars:
         ]
       },
       {
+        "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "modelUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "websiteUrl": "https://deepseek.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/deepseek-logo.png",
+        "description": "The first reasoning model from DeepSeek, distilled into a 32B dense model. Outperforms o1-mini on multiple benchmarks.",
+        "reasoning": {
+          "type": "tokens",
+          "beginToken": "<think>",
+          "endToken": "</think>"
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+          }
+        ]
+      },
+      {
+        "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "websiteUrl": "https://www.nvidia.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
+        "description": "Nvidia's latest Llama fine-tune, topping alignment benchmarks and optimized for instruction following.",
+        "parameters": {
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.5,
+          "truncate": 28672,
+          "max_new_tokens": 2048
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+          }
+        ]
+      },
+      {
         "name": "Qwen/QwQ-32B-Preview",
         "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
         "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
@@ -170,38 +236,6 @@ envVars:
         ]
       },
       {
-        "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
-        "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
-        "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
-        "websiteUrl": "https://www.nvidia.com/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
-        "description": "Nvidia's latest Llama fine-tune, topping alignment benchmarks and optimized for instruction following.",
-        "parameters": {
-          "stop": ["<|eot_id|>", "<|im_end|>"],
-          "temperature": 0.5,
-          "truncate": 28672,
-          "max_new_tokens": 2048
-        },
-        "promptExamples": [
-          {
-            "title": "Rs in strawberry",
-            "prompt": "how many R in strawberry?"
-          },
-          {
-            "title": "Larger number",
-            "prompt": "9.11 or 9.9 which number is larger?"
-          },
-          {
-            "title": "Measuring 6 liters",
-            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
-          }
-        ],
-        "endpoints": [{
-          "type": "openai",
-          "baseURL": "https://api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
-        }]
-      },
-      {
         "name": "Qwen/Qwen2.5-Coder-32B-Instruct",
         "description": "Qwen's latest coding model, in its biggest size yet. SOTA on many coding benchmarks.",
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
@@ -228,10 +262,12 @@ envVars:
             "prompt": "Generate a snazzy static landing page for a local coffee shop using HTML and CSS. You can use tailwind using <script src='https://cdn.tailwindcss.com'></script>."
           }
         ],
-        "endpoints": [{
-          "type": "openai",
-          "baseURL": "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1"
-        }]
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1"
+          }
+        ]
       },
       {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
@@ -245,19 +281,21 @@ envVars:
           "truncate": 14336,
           "max_new_tokens": 1536
         },
-        "endpoints": [{
-          "type": "openai",
-          "baseURL": "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
-          "multimodal": {
-            "image": {
-              "maxSizeInMB": 10,
-              "maxWidth": 560,
-              "maxHeight": 560,
-              "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
-              "preferredMimeType": "image/webp"
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
+            "multimodal": {
+              "image": {
+                "maxSizeInMB": 10,
+                "maxWidth": 560,
+                "maxHeight": 560,
+                "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
+                "preferredMimeType": "image/webp"
+              }
             }
           }
-        }]
+        ]
       },
       {
         "name": "NousResearch/Hermes-3-Llama-3.1-8B",
