@@ -136,23 +136,15 @@ envVars:
         ]
       },
       {
-        "name": "Qwen/QwQ-32B-Preview",
-        "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
-        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
-        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
-        "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
+        "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "modelUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "websiteUrl": "https://deepseek.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/deepseek-logo.png",
+        "description": "The first reasoning model from DeepSeek, distilled into a 32B dense model. Outperforms o1-mini on multiple benchmarks.",
         "reasoning": {
-          "type": "summarize"
-        },
-        "parameters": {
-          "stop": ["<|im_end|>"],
-          "truncate": 12288,
-          "max_new_tokens": 4096,
-          "temperature": 0.7,
-          "top_k": 20,
-          "top_p": 0.8,
-          "repetition_penalty": 1.05
+          "type": "tokens",
+          "beginToken": "<think>",
+          "endToken": "</think>"
         },
         "promptExamples": [
           {
@@ -166,6 +158,12 @@ envVars:
           {
             "title": "Measuring 6 liters",
             "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
       },
@@ -204,15 +202,23 @@ envVars:
         ]
       },
       {
-        "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-        "modelUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-        "websiteUrl": "https://deepseek.com/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/deepseek-logo.png",
-        "description": "The first reasoning model from DeepSeek, distilled into a 32B dense model. Outperforms o1-mini on multiple benchmarks.",
+        "name": "Qwen/QwQ-32B-Preview",
+        "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
+        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
         "reasoning": {
-          "type": "tokens",
-          "beginToken": "<think>",
-          "endToken": "</think>"
+          "type": "summarize"
+        },
+        "parameters": {
+          "stop": ["<|im_end|>"],
+          "truncate": 12288,
+          "max_new_tokens": 4096,
+          "temperature": 0.7,
+          "top_k": 20,
+          "top_p": 0.8,
+          "repetition_penalty": 1.05
         },
         "promptExamples": [
           {
@@ -226,12 +232,6 @@ envVars:
           {
             "title": "Measuring 6 liters",
             "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
-          }
-        ],
-        "endpoints": [
-          {
-            "type": "openai",
-            "baseURL": "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
       },
