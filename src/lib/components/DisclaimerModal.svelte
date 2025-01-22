@@ -7,14 +7,27 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
+	import JSON5 from "json5";
 
 	const settings = useSettingsStore();
+	const defaultEthicsModalCheckbox = {
+		force: "0",
+		title: "I have read and agree to the",
+		linkTitle: "Terms & Conditions and Privacy Policy",
+		linkHref: "/privacy"
+	};
+
+	const ethicsModalCheckbox = envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX
+		? {...defaultEthicsModalCheckbox, ...JSON5.parse(envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX)}
+		: defaultEthicsModalCheckbox;
+	
+	
 	let checkboxChecked = false;
 	function handleSubmit(event: Event) {
         // Prevent form submission if checkbox is not checked
-        if (!checkboxChecked && envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1") {
+        if (!checkboxChecked && ethicsModalCheckbox.force === "1") {
             event.preventDefault();
-            alert("You must accept the terms and conditions to proceed.");
+            alert("You must accept the " + ethicsModalCheckbox.linkTitle.toLowerCase() + " to proceed.");
         }
     }
 </script>
@@ -36,12 +49,12 @@
 			{envPublic.PUBLIC_APP_DISCLAIMER_MESSAGE}
 		</p>
 		<div class="flex w-full flex-col items-center gap-2">
-			{#if envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1"}
+			{#if ethicsModalCheckbox.force === "1"}
 				<label>
 					<input type="checkbox" bind:checked={checkboxChecked} />
-					I have read and agree to the 
-					<a href="/privacy" target="_blank" class="text-blue-500 hover:underline">
-						Terms & Conditions and Privacy Policy
+					{ethicsModalCheckbox.title} 
+					<a href={ethicsModalCheckbox.linkHref} target="_blank" class="text-blue-500 hover:underline">
+						{ethicsModalCheckbox.linkTitle}
 					</a>.
 				</label>
 			{/if}
@@ -55,7 +68,7 @@
 						window.open(window.location.href, "_blank");
 					}
 					
-					if (!checkboxChecked && envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX === "1") alert("You must accept the terms and conditions to proceed.");
+					if (!checkboxChecked && ethicsModalCheckbox.force === "1") alert("You must accept the " + ethicsModalCheckbox.linkTitle.toLowerCase() + " to proceed.");
 					else $settings.ethicsModalAccepted  = true
 				}}
 			>

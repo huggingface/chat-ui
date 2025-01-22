@@ -19,6 +19,7 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
+	import JSON5 from "json5";
 
 	export let data;
 
@@ -27,6 +28,14 @@
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | null;
+
+	const defaultEthicsModalCheckbox = {
+		force: "0",
+	};
+
+	const ethicsModalCheckbox = envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX
+		? {...defaultEthicsModalCheckbox, ...JSON5.parse(envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX)}
+		: defaultEthicsModalCheckbox;
 
 	async function onError() {
 		// If a new different error comes, wait for the current error to hide first
@@ -211,7 +220,7 @@
 
 {#if showDisclaimer}
 	<DisclaimerModal on:close={() => {
-		if(envPublic.PUBLIC_FORCE_ETHICS_MODAL_CHECKBOX !== "1") $settings.ethicsModalAccepted = true}
+		if(ethicsModalCheckbox.force !== "1") $settings.ethicsModalAccepted = true}
 	} />
 {/if}
 
