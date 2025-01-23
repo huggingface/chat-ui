@@ -11,6 +11,13 @@ import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
 import { env } from "$env/dynamic/private";
 import { logger } from "$lib/server/logger";
+import JSON5 from "json5";
+
+const allowedOrgs = z
+	.array(z.string())
+	.optional()
+	.default([])
+	.parse(JSON5.parse(env.HF_ALLOWED_ORGS));
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
@@ -92,6 +99,11 @@ export async function updateUser(params: {
 	const isAdmin = (env.HF_ORG_ADMIN && orgs?.some((org) => org.sub === env.HF_ORG_ADMIN)) || false;
 	const isEarlyAccess =
 		(env.HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === env.HF_ORG_EARLY_ACCESS)) || false;
+
+	if (!isAdmin && allowedOrgs.length > 0) {
+		const allowed = orgs?.some((org) => allowedOrgs.includes(org.sub));
+		if (!allowed) error(403, "User not allowed: Unauthorized organization.");
+	}
 
 	logger.debug(
 		{
