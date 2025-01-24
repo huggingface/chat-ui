@@ -101,15 +101,26 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 					finalAnswer = text;
 					logger.error(e);
 				}
-			}
+			} else if (model.reasoning && model.reasoning.type === "tokens") {
+				// make sure to remove the content of the reasoning buffer from
+				// the final answer to avoid duplication
+				const beginIndex = reasoningBuffer.indexOf(model.reasoning.beginToken);
+				const endIndex = reasoningBuffer.lastIndexOf(model.reasoning.endToken);
 
-			yield {
-				type: MessageUpdateType.FinalAnswer,
-				text: finalAnswer,
-				interrupted,
-				webSources: output.webSources,
-			};
-			continue;
+				if (beginIndex !== -1 && endIndex !== -1) {
+					// Remove the reasoning section (including tokens) from final answer
+					finalAnswer =
+						text.slice(0, beginIndex) + text.slice(endIndex + model.reasoning.endToken.length);
+				}
+
+				yield {
+					type: MessageUpdateType.FinalAnswer,
+					text: finalAnswer,
+					interrupted,
+					webSources: output.webSources,
+				};
+				continue;
+			}
 		}
 
 		if (model.reasoning && model.reasoning.type === "tokens") {
@@ -121,6 +132,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 					subtype: MessageReasoningUpdateType.Status,
 					status: "Started thinking...",
 				};
+				continue;
 			} else if (output.token.text === model.reasoning.endToken) {
 				reasoning = false;
 				reasoningBuffer += output.token.text;
@@ -129,6 +141,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 					subtype: MessageReasoningUpdateType.Status,
 					status: `Done in ${Math.round((new Date().getTime() - startTime.getTime()) / 1000)}s.`,
 				};
+				continue;
 			}
 		}
 		// ignore special tokens

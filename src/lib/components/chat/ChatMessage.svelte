@@ -217,7 +217,7 @@
 			{#if searchUpdates && searchUpdates.length > 0}
 				<OpenWebSearchResults webSearchMessages={searchUpdates} />
 			{/if}
-			{#if reasoningUpdates && reasoningUpdates.length > 0}
+			{#if reasoningUpdates && reasoningUpdates.length > 0 && message.reasoning && message.reasoning.trim().length > 0}
 				{@const summaries = reasoningUpdates
 					.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
 					.map((u) => u.status)}

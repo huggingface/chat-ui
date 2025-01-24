@@ -96,7 +96,7 @@
 		: false;
 
 	let tools = assistant?.tools ?? [];
-	const regex = /{{\s?(get|post|url)=(.*?)\s?}}/g;
+	const regex = /{{\s?(get|post|url|today)(=.*?)?\s?}}/g;
 
 	$: templateVariables = [...systemPrompt.matchAll(regex)];
 	$: selectedModel = models.find((m) => m.id === modelId);
@@ -565,7 +565,8 @@
 				<p class="mb-2 text-xs font-normal text-gray-500">
 					Allow the use of template variables {"{{get=https://example.com/path}}"}
 					to insert dynamic content into your prompt by making GET requests to specified URLs on each
-					inference. You can also send the user's message as the body of a POST request, using {"{{post=https://example.com/path}}"}
+					inference. You can also send the user's message as the body of a POST request, using {"{{post=https://example.com/path}}"}.
+					Use {"{{today}}"} to include the current date.
 				</p>
 			</label>
 
