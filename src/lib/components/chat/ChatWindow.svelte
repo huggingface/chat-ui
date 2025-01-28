@@ -35,6 +35,8 @@
 	import { cubicInOut } from "svelte/easing";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
+	import ChatTranscribe from "./ChatTranscribe.svelte";
+	import { isWebGPUSupported } from "$lib/utils/isWebGPUSupported";
 
 	export let messages: Message[] = [];
 	export let loading = false;
@@ -440,7 +442,11 @@
 								modelIsMultimodal={currentModel.multimodal}
 							/>
 						{/if}
-
+						{#await isWebGPUSupported() then isWebGPUSupported}
+							{#if browser && isWebGPUSupported}
+								<ChatTranscribe bind:value={message} />
+							{/if}
+						{/await}
 						{#if loading}
 							<button
 								disabled
