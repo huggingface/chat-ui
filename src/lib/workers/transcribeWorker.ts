@@ -130,7 +130,6 @@ self.onmessage = async (ev: MessageEvent<Message>) => {
 			task: "transcribe",
 		})
 			.then((output) => {
-				console.log(output);
 				if (Array.isArray(output)) {
 					return output.map((o) => o.text).join(" ");
 				}
