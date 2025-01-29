@@ -73,15 +73,15 @@ async function* textGenerationWithoutTitle(
 	}
 
 	let toolResults: ToolResult[] = [];
-
+	let tools = undefined;
 	if (model.tools) {
-		let tools = await getTools(toolsPreference, ctx.assistant);
+		tools = await getTools(toolsPreference, ctx.assistant);
 		if (webSearchResult) tools = tools.filter((tool) => !toolHasName("websearch", tool));
 		const toolCallsRequired = tools.some((tool) => !toolHasName("directly_answer", tool));
 		if (toolCallsRequired) toolResults = yield* runTools(ctx, tools, preprompt);
 	}
 
 	const processedMessages = await preprocessMessages(messages, webSearchResult, convId);
-	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt);
+	yield* generate({ ...ctx, messages: processedMessages }, toolResults, preprompt, tools);
 	done.abort();
 }

@@ -305,7 +305,8 @@ async function prepareMessages(
 					content: "",
 					tool_call_id: id,
 				};
-				if ("outputs" in result) toolCallResponse.content = ""; //JSON.stringify(result.outputs);
+				if ("outputs" in result)
+					toolCallResponse.content = JSON.stringify(result.outputs).substring(0, 100);
 
 				results.push(toolCallRequests);
 				results.push(toolCallResponse);
