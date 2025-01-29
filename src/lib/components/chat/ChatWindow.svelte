@@ -290,7 +290,6 @@
 						id={messages[0].id}
 						isAuthor={!shared}
 						readOnly={isReadOnly}
-						model={currentModel}
 						on:retry
 						on:vote
 						on:continue
