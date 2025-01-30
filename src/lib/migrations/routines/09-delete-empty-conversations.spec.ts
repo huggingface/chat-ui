@@ -30,19 +30,19 @@ const sessionForUser = {
 Object.freeze(sessionForUser);
 
 const userMessage = {
-	role: "user",
+	from: "user",
 	id: "user-message-id",
 	content: "Hello, how are you?",
 } satisfies Message;
 
 const assistantMessage = {
-	role: "assistant",
+	from: "assistant",
 	id: "assistant-message-id",
 	content: "I'm fine, thank you!",
 } satisfies Message;
 
 const systemMessage = {
-	role: "system",
+	from: "system",
 	id: "system-message-id",
 	content: "This is a system message",
 } satisfies Message;
