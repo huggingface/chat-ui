@@ -909,6 +909,60 @@ MODELS=`[
       ]
   }
 ]`
+
+```
+
+### Reasoning Models
+
+ChatUI supports specialized reasoning/Chain-of-Thought (CoT) models through the `reasoning` configuration field. When properly configured, this displays a UI widget that allows users to view or collapse the model’s reasoning steps. We support three types of reasoning parsing:
+
+#### Token-Based Delimitations
+
+For models like DeepSeek R1, token-based delimitations can be used to identify reasoning steps. This is done by specifying the `beginToken` and `endToken` fields in the `reasoning` configuration.
+
+Example configuration for DeepSeek R1 (token-based):
+
+```json
+{
+	"name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+	// ...
+	"reasoning": {
+		"type": "tokens",
+		"beginToken": "<think>",
+		"endToken": "</think>"
+	}
+}
+```
+
+#### Summarizing the Chain of Thought
+
+For models like QwQ, which return a chain of thought but do not explicitly provide a final answer, the `summarize` type can be used. This automatically summarizes the reasoning steps using the `TASK_MODEL` (or the first model in the configuration if `TASK_MODEL` is not specified) and displays the summary as the final answer.
+
+Example configuration for QwQ (summarize-based):
+
+```json
+{
+	"name": "Qwen/QwQ-32B-Preview",
+	// ...
+	"reasoning": {
+		"type": "summarize"
+	}
+}
+```
+
+#### Regex-Based Delimitations
+
+In some cases, the final answer can be extracted from the model output using a regular expression. This is achieved by specifying the `regex` field in the `reasoning` configuration. For example, if your model wraps the final answer in a `\boxed{}` tag, you can use the following configuration:
+
+```json
+{
+	"name": "model/yourmodel",
+	// ...
+	"reasoning": {
+		"type": "regex",
+		"regex": "\\\\boxed\\{(.+?)\\}"
+	}
+}
 ```
 
 ## Common issues
