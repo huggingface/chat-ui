@@ -10,10 +10,30 @@
 	let isSuccess = false;
 	let timeout: ReturnType<typeof setTimeout>;
 
+	const unsecuredCopy = (text: string) => {
+		//Old or insecure browsers
+
+		const textArea = document.createElement("textarea");
+		textArea.value = text;
+		document.body.appendChild(textArea);
+		textArea.focus();
+		textArea.select();
+		document.execCommand("copy");
+		document.body.removeChild(textArea);
+
+		return Promise.resolve();
+	};
+
+	const copy = async (text: string) => {
+		if (window.isSecureContext && navigator.clipboard) {
+			return navigator.clipboard.writeText(text);
+		}
+		return unsecuredCopy(text);
+	};
+
 	const handleClick = async () => {
-		// writeText() can be unavailable or fail in some cases (iframe, etc) so we try/catch
 		try {
-			await navigator.clipboard.writeText(value);
+			await copy(value);
 
 			isSuccess = true;
 			if (timeout) {
