@@ -8,7 +8,7 @@ import { addSibling } from "./addSibling";
 
 const newMessage: Omit<Message, "id"> = {
 	content: "new message",
-	from: "user",
+	role: "user",
 };
 
 Object.freeze(newMessage);

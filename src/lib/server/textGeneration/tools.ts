@@ -138,7 +138,7 @@ export async function* runTools(
 
 	const files = messages.reduce((acc, curr, idx) => {
 		if (curr.files) {
-			const prefix = (curr.from === "user" ? "input" : "ouput") + "_" + idx;
+			const prefix = (curr.role === "user" ? "input" : "ouput") + "_" + idx;
 			acc.push(
 				...curr.files.map(
 					(file, fileIdx) => `${prefix}_${fileIdx}.${file?.name?.split(".")?.pop()?.toLowerCase()}`
@@ -156,7 +156,7 @@ export async function* runTools(
 				"\n\nAdded files: \n - " +
 				message.files
 					.map((file, fileIdx) => {
-						const prefix = message.from === "user" ? "input" : "output";
+						const prefix = message.role === "user" ? "input" : "output";
 						const fileName = file.name.split(".").pop()?.toLowerCase();
 
 						return `${prefix}_${msgIdx}_${fileIdx}.${fileName}`;
@@ -172,7 +172,7 @@ export async function* runTools(
 
 	const fileMsg = {
 		id: crypto.randomUUID(),
-		from: "system",
+		role: "system",
 		content:
 			"Here is the list of available filenames that can be used as input for tools. Use the filenames that are in this list. \n The filename structure is as follows : {input for user|output for tool}_{message index in the conversation}_{file index in the list of files}.{file extension} \n - " +
 			files.join("\n - ") +

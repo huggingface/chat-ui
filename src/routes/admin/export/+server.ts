@@ -81,7 +81,7 @@ export async function POST({ request }) {
 			created_at: conversation.created_at,
 			updated_at: conversation.updated_at,
 			messages: conversation.messages.map((message: Message) => ({
-				from: message.from,
+				from: message.role,
 				content: message.content,
 				...(message.score ? { score: message.score } : undefined),
 			})),
@@ -126,7 +126,7 @@ export async function POST({ request }) {
 			created_at: conversation.created_at,
 			updated_at: conversation.updated_at,
 			messages: conversation.messages.map((message: Message) => ({
-				from: message.from,
+				from: message.role,
 				content: message.content,
 				...(message.score ? { score: message.score } : undefined),
 			})),

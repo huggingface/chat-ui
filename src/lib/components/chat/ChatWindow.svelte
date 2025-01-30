@@ -176,7 +176,7 @@
 	$: lastIsError =
 		lastMessage &&
 		!loading &&
-		(lastMessage.from === "user" ||
+		(lastMessage.role === "user" ||
 			lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1);
 
 	$: sources = files?.map<Promise<MessageFile>>((file) =>
@@ -212,7 +212,7 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	$: if (lastMessage && lastMessage.from === "user") {
+	$: if (lastMessage && lastMessage.role === "user") {
 		scrollToBottom();
 	}
 
@@ -305,7 +305,7 @@
 						{
 							id: "0-0-0-0-0",
 							content: "",
-							from: "assistant",
+							role: "assistant",
 							children: [],
 						},
 					]}

@@ -113,7 +113,7 @@
 					$error = "Message not found";
 				}
 
-				if (messageToRetry?.from === "user" && prompt) {
+				if (messageToRetry?.role === "user" && prompt) {
 					// add a sibling to this message from the user, with the alternative prompt
 					// add a children to that sibling, where we can write to
 					const newUserMessageId = addSibling(
@@ -122,7 +122,7 @@
 							rootMessageId: data.rootMessageId,
 						},
 						{
-							from: "user",
+							role: "user",
 							content: prompt,
 							files: messageToRetry.files,
 						},
@@ -133,10 +133,10 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "" },
+						{ role: "assistant", content: "" },
 						newUserMessageId
 					);
-				} else if (messageToRetry?.from === "assistant") {
+				} else if (messageToRetry?.role === "assistant") {
 					// we're retrying an assistant message, to generate a new answer
 					// just add a sibling to the assistant answer where we can write to
 					messageToWriteToId = addSibling(
@@ -144,7 +144,7 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "" },
+						{ role: "assistant", content: "" },
 						messageId
 					);
 				}
@@ -157,7 +157,7 @@
 						rootMessageId: data.rootMessageId,
 					},
 					{
-						from: "user",
+						role: "user",
 						content: prompt ?? "",
 						files: base64Files,
 						createdAt: new Date(),
@@ -176,7 +176,7 @@
 						rootMessageId: data.rootMessageId,
 					},
 					{
-						from: "assistant",
+						role: "assistant",
 						content: "",
 						createdAt: new Date(),
 						updatedAt: new Date(),

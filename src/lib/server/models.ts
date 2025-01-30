@@ -135,7 +135,7 @@ async function getChatPromptRender(
 			tool_calls?: { id: string; tool_call_id: string; output: string }[];
 		}[] = messages.map((message) => ({
 			content: message.content,
-			role: message.from,
+			role: message.role,
 		}));
 
 		if (!m.systemRoleSupported) {

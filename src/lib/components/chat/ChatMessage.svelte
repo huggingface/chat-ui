@@ -180,7 +180,7 @@
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 </script>
 
-{#if message.from === "assistant"}
+{#if message.role === "assistant"}
 	<div
 		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
 		data-message-id={message.id}
@@ -352,7 +352,7 @@
 	</div>
 	<slot name="childrenNav" />
 {/if}
-{#if message.from === "user"}
+{#if message.role === "user"}
 	<div
 		class="group relative w-full items-start justify-start gap-4 max-sm:text-sm"
 		data-message-id={message.id}

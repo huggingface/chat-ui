@@ -6,14 +6,14 @@ import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
-	const userMessages = messages.filter(({ from }) => from === "user");
+	const userMessages = messages.filter(({ role }) => role === "user");
 	const previousUserMessages = userMessages.slice(0, -1);
 
 	const lastMessage = userMessages.slice(-1)[0];
 
 	const convQuery: Array<EndpointMessage> = [
 		{
-			from: "user",
+			role: "user",
 			content: `Previous Questions:
 - Who is the president of France?
 
@@ -21,37 +21,37 @@ Current Question: What about Mexico?
 `,
 		},
 		{
-			from: "assistant",
+			role: "assistant",
 			content: "President of Mexico",
 		},
 		{
-			from: "user",
+			role: "user",
 			content: `Previous questions: 
 - When is the next formula 1 grand prix?
 
 Current Question: Where is it being hosted?`,
 		},
 		{
-			from: "assistant",
+			role: "assistant",
 			content: "location of next formula 1 grand prix",
 		},
 		{
-			from: "user",
+			role: "user",
 			content: "Current Question: What type of printhead does the Epson F2270 DTG printer use?",
 		},
 		{
-			from: "assistant",
+			role: "assistant",
 			content: "Epson F2270 DTG printer printhead",
 		},
-		{ from: "user", content: "What were the news yesterday?" },
+		{ role: "user", content: "What were the news yesterday?" },
 		{
-			from: "assistant",
+			role: "assistant",
 			content: `news ${format(new Date(Date.now() - 864e5), "MMMM d, yyyy")}`,
 		},
-		{ from: "user", content: "What is the current weather in Paris?" },
-		{ from: "assistant", content: `weather in Paris ${currentDate}` },
+		{ role: "user", content: "What is the current weather in Paris?" },
+		{ role: "assistant", content: `weather in Paris ${currentDate}` },
 		{
-			from: "user",
+			role: "user",
 			content:
 				(previousUserMessages.length > 0
 					? `Previous questions: \n${previousUserMessages

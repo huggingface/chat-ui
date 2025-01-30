@@ -250,13 +250,13 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			error(404, "Message not found");
 		}
 
-		if (messageToRetry.from === "user" && newPrompt) {
+		if (messageToRetry.role === "user" && newPrompt) {
 			// add a sibling to this message from the user, with the alternative prompt
 			// add a children to that sibling, where we can write to
 			const newUserMessageId = addSibling(
 				conv,
 				{
-					from: "user",
+					role: "user",
 					content: newPrompt,
 					files: uploadedFiles,
 					createdAt: new Date(),
@@ -267,7 +267,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			messageToWriteToId = addChildren(
 				conv,
 				{
-					from: "assistant",
+					role: "assistant",
 					content: "",
 					createdAt: new Date(),
 					updatedAt: new Date(),
@@ -275,12 +275,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				newUserMessageId
 			);
 			messagesForPrompt = buildSubtree(conv, newUserMessageId);
-		} else if (messageToRetry.from === "assistant") {
+		} else if (messageToRetry.role === "assistant") {
 			// we're retrying an assistant message, to generate a new answer
 			// just add a sibling to the assistant answer where we can write to
 			messageToWriteToId = addSibling(
 				conv,
-				{ from: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
+				{ role: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
 				messageId
 			);
 			messagesForPrompt = buildSubtree(conv, messageId);
@@ -292,7 +292,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		const newUserMessageId = addChildren(
 			conv,
 			{
-				from: "user",
+				role: "user",
 				content: newPrompt ?? "",
 				files: uploadedFiles,
 				createdAt: new Date(),
@@ -304,7 +304,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		messageToWriteToId = addChildren(
 			conv,
 			{
-				from: "assistant",
+				role: "assistant",
 				content: "",
 				createdAt: new Date(),
 				updatedAt: new Date(),

@@ -25,7 +25,7 @@ export async function endpointCloudflare(
 
 	return async ({ messages, preprompt, generateSettings }) => {
 		let messagesFormatted = messages.map((message) => ({
-			role: message.from,
+			role: message.role,
 			content: message.content,
 		}));
 

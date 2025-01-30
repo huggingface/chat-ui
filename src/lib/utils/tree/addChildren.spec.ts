@@ -8,7 +8,7 @@ import type { Message } from "$lib/types/Message";
 
 const newMessage: Omit<Message, "id"> = {
 	content: "new message",
-	from: "user",
+	role: "user",
 };
 
 Object.freeze(newMessage);
@@ -39,7 +39,7 @@ describe("addChildren", async () => {
 		const messageThatAlreadyExists: Message = {
 			id: conv.messages[0].id,
 			content: "new message",
-			from: "user",
+			role: "user",
 		};
 
 		expect(() => addChildren(conv, messageThatAlreadyExists, conv.messages[0].id)).toThrow();

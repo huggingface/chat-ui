@@ -43,7 +43,7 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 
 	messages.push({
 		id: crypto.randomUUID(),
-		from: "system",
+		role: "system",
 		content: preprompt ?? "",
 		createdAt: faker.date.recent({ days: 30 }),
 		updatedAt: faker.date.recent({ days: 30 }),

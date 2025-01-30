@@ -76,7 +76,7 @@ export async function* generate(
 					const summary = yield* generateFromDefaultEndpoint({
 						messages: [
 							{
-								from: "user",
+								role: "user",
 								content: `Question: ${
 									messages[messages.length - 1].content
 								}\n\nReasoning: ${reasoningBuffer}`,

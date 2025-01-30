@@ -46,7 +46,7 @@ export async function fileToDocumentBlock(
 	};
 }
 
-type NonSystemMessage = EndpointMessage & { from: "user" | "assistant" };
+type NonSystemMessage = EndpointMessage & { role: "user" | "assistant" };
 export async function endpointMessagesToAnthropicMessages(
 	messages: EndpointMessage[],
 	multimodal: {
@@ -57,12 +57,12 @@ export async function endpointMessagesToAnthropicMessages(
 ): Promise<BetaMessageParam[]> {
 	return await Promise.all(
 		messages
-			.filter((message): message is NonSystemMessage => message.from !== "system")
+			.filter((message): message is NonSystemMessage => message.role !== "system")
 			.map<Promise<BetaMessageParam>>(async (message) => {
 				return {
-					role: message.from,
+					role: message.role,
 					content: [
-						...(message.from === "user"
+						...(message.role === "user"
 							? await Promise.all(
 									(message.files ?? []).map(async (file) => {
 										if (file.type === "hash" && conversationId) {

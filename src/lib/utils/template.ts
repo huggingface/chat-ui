@@ -1,14 +1,14 @@
 import type { Message } from "$lib/types/Message";
 import Handlebars from "handlebars";
 
-Handlebars.registerHelper("ifUser", function (this: Pick<Message, "from" | "content">, options) {
-	if (this.from == "user") return options.fn(this);
+Handlebars.registerHelper("ifUser", function (this: Pick<Message, "role" | "content">, options) {
+	if (this.role == "user") return options.fn(this);
 });
 
 Handlebars.registerHelper(
 	"ifAssistant",
-	function (this: Pick<Message, "from" | "content">, options) {
-		if (this.from == "assistant") return options.fn(this);
+	function (this: Pick<Message, "role" | "content">, options) {
+		if (this.role == "assistant") return options.fn(this);
 	}
 );
 

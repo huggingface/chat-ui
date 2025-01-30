@@ -23,7 +23,7 @@ export async function GET({ locals, params }) {
 				assistantId: conv.assistantId,
 				messages: conv.messages.map((message) => ({
 					content: message.content,
-					from: message.from,
+					from: message.role,
 					id: message.id,
 					createdAt: message.createdAt,
 					updatedAt: message.updatedAt,

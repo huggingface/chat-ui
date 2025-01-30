@@ -55,7 +55,7 @@ export async function endpointBedrock(
 	return async ({ messages, preprompt, generateSettings }) => {
 		let system = preprompt;
 		// Use the first message as the system prompt if it's of type "system"
-		if (messages?.[0]?.from === "system") {
+		if (messages?.[0]?.role === "system") {
 			system = messages[0].content;
 			messages = messages.slice(1); // Remove the first system message from the array
 		}
@@ -156,11 +156,11 @@ async function prepareMessages(
 		}
 
 		const lastMessage = formattedMessages[formattedMessages.length - 1];
-		if (lastMessage && lastMessage.role === message.from) {
+		if (lastMessage && lastMessage.role === message.role) {
 			// If the last message has the same role, merge the content
 			lastMessage.content.push(...content);
 		} else {
-			formattedMessages.push({ role: message.from, content });
+			formattedMessages.push({ role: message.role, content });
 		}
 	}
 	return formattedMessages;

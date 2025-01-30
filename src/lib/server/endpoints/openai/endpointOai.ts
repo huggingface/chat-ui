@@ -286,9 +286,9 @@ async function prepareMessages(
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	return Promise.all(
 		messages.map(async (message) => {
-			if (message.from === "user" && isMultimodal) {
+			if (message.role === "user" && isMultimodal) {
 				return {
-					role: message.from,
+					role: message.role,
 					content: [
 						...(await prepareFiles(imageProcessor, message.files ?? [])),
 						{ type: "text", text: message.content },
@@ -296,7 +296,7 @@ async function prepareMessages(
 				};
 			}
 			return {
-				role: message.from,
+				role: message.role,
 				content: message.content,
 			};
 		})

@@ -46,7 +46,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	let messages: Message[] = [
 		{
 			id: v4(),
-			from: "system",
+			role: "system",
 			content: values.preprompt ?? "",
 			createdAt: new Date(),
 			updatedAt: new Date(),
@@ -93,7 +93,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		values.preprompt ??= model?.preprompt ?? "";
 	}
 
-	if (messages && messages.length > 0 && messages[0].from === "system") {
+	if (messages && messages.length > 0 && messages[0].role === "system") {
 		messages[0].content = values.preprompt;
 	}
 

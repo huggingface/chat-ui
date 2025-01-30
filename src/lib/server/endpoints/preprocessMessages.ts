@@ -25,9 +25,9 @@ function addWebSearchContext(messages: Message[], webSearch: Message["webSearch"
 	// No messages available, skip
 	if (messages.length === 0) return messages;
 
-	const lastQuestion = messages.findLast((el) => el.from === "user")?.content ?? "";
+	const lastQuestion = messages.findLast((el) => el.role === "user")?.content ?? "";
 	const previousQuestions = messages
-		.filter((el) => el.from === "user")
+		.filter((el) => el.role === "user")
 		.slice(0, -1)
 		.map((el) => el.content);
 	const currentDate = format(new Date(), "MMMM d, yyyy");

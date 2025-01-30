@@ -11,7 +11,7 @@ export async function generateSummaryOfReasoning(buffer: string): Promise<string
 		generateFromDefaultEndpoint({
 			messages: [
 				{
-					from: "user",
+					role: "user",
 					content: buffer.slice(-200),
 				},
 			],

@@ -71,7 +71,7 @@ export async function endpointAnthropic(
 		toolResults = [],
 	}) => {
 		let system = preprompt;
-		if (messages?.[0]?.from === "system") {
+		if (messages?.[0]?.role === "system") {
 			system = messages[0].content;
 		}
 

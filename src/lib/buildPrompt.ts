@@ -18,7 +18,7 @@ export async function buildPrompt({
 }: buildPromptOptions): Promise<string> {
 	const filteredMessages = messages;
 
-	if (filteredMessages[0].from === "system" && preprompt) {
+	if (filteredMessages[0].role === "system" && preprompt) {
 		filteredMessages[0].content = preprompt;
 	}
 

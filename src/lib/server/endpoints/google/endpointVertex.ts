@@ -105,13 +105,13 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 
 		// Preprompt is the same as the first system message.
 		let systemMessage = preprompt;
-		if (messages[0].from === "system") {
+		if (messages[0].role === "system") {
 			systemMessage = messages[0].content;
 			messages.shift();
 		}
 
 		const vertexMessages = await Promise.all(
-			messages.map(async ({ from, content, files }: Omit<Message, "id">): Promise<Content> => {
+			messages.map(async ({ role, content, files }: Omit<Message, "id">): Promise<Content> => {
 				const imageProcessor = makeImageProcessor(multimodal.image);
 				const documentProcessor = makeDocumentProcessor(multimodal.document);
 
@@ -135,7 +135,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				const processedFiles = processedFilesWithNull.filter((file) => file !== null);
 
 				return {
-					role: from === "user" ? "user" : "model",
+					role: role === "user" ? "user" : "model",
 					parts: [
 						...processedFiles.map((processedFile) => ({
 							inlineData: {

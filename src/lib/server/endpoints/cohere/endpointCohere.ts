@@ -37,7 +37,7 @@ export async function endpointCohere(
 
 	return async ({ messages, preprompt, generateSettings, continueMessage, tools, toolResults }) => {
 		let system = preprompt;
-		if (messages?.[0]?.from === "system") {
+		if (messages?.[0]?.role === "system") {
 			system = messages[0].content;
 		}
 
@@ -77,9 +77,9 @@ export async function endpointCohere(
 				});
 			} else {
 				const formattedMessages = messages
-					.filter((message) => message.from !== "system")
+					.filter((message) => message.role !== "system")
 					.map((message) => ({
-						role: message.from === "user" ? "USER" : "CHATBOT",
+						role: message.role === "user" ? "USER" : "CHATBOT",
 						message: message.content,
 					})) satisfies Cohere.Message[];
 

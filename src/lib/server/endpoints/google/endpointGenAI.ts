@@ -67,15 +67,15 @@ export function endpointGenAI(input: z.input<typeof endpointGenAIParametersSchem
 		});
 
 		let systemMessage = preprompt;
-		if (messages[0].from === "system") {
+		if (messages[0].role === "system") {
 			systemMessage = messages[0].content;
 			messages.shift();
 		}
 
 		const genAIMessages = await Promise.all(
-			messages.map(async ({ from, content, files }: Omit<Message, "id">): Promise<Content> => {
+			messages.map(async ({ role, content, files }: Omit<Message, "id">): Promise<Content> => {
 				return {
-					role: from === "user" ? "user" : "model",
+					role: role === "user" ? "user" : "model",
 					parts: [
 						...(await Promise.all(
 							(files ?? []).map((file) => fileToImageBlock(file, multimodal.image))

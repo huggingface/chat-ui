@@ -49,7 +49,7 @@ export async function endpointAnthropicVertex(
 
 	return async ({ messages, preprompt }) => {
 		let system = preprompt;
-		if (messages?.[0]?.from === "system") {
+		if (messages?.[0]?.role === "system") {
 			system = messages[0].content;
 		}
 

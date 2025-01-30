@@ -9,7 +9,7 @@ export function convertLegacyConversation(
 	if (conv.messages.length === 0) return conv; // empty conversation
 	const messages = [
 		{
-			from: "system",
+			role: "system",
 			content: conv.preprompt ?? "",
 			createdAt: new Date(),
 			updatedAt: new Date(),
