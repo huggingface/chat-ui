@@ -7,7 +7,7 @@
 	import { enhance } from "$app/forms";
 
 	export let message: Message;
-	export let childrenToRender: number;
+	export let childToRender: number;
 	export let nChildren: number;
 	export let loading = false;
 </script>
@@ -17,19 +17,19 @@
 >
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-		on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
-		disabled={childrenToRender === 0 || loading}
+		on:click={() => (childToRender = Math.max(0, childToRender - 1))}
+		disabled={childToRender === 0 || loading}
 	>
 		<CarbonChevronLeft class="text-sm" />
 	</button>
 	<span class=" text-gray-400 dark:text-gray-500">
-		{childrenToRender + 1} / {nChildren}
+		{childToRender + 1} / {nChildren}
 	</span>
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
 		on:click={() =>
-			(childrenToRender = Math.min(message?.children?.length ?? 1 - 1, childrenToRender + 1))}
-		disabled={childrenToRender === nChildren - 1 || loading}
+			(childToRender = Math.min(message?.children?.length ?? 1 - 1, childToRender + 1))}
+		disabled={childToRender === nChildren - 1 || loading}
 	>
 		<CarbonChevronRight class="text-sm" />
 	</button>
@@ -43,7 +43,7 @@
 				}
 			}}
 		>
-			<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
+			<input name="messageId" value={message.children[childToRender]} type="hidden" />
 			<button
 				class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
 				type="submit"

@@ -144,14 +144,14 @@
 
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
-	$: childrenToRender = 0;
+	$: childToRender = 0;
 	$: nChildren = message?.children?.length ?? 0;
 
 	$: {
 		if (initialized) {
-			childrenToRender = Math.max(0, nChildren - 1);
+			childToRender = Math.max(0, nChildren - 1);
 		} else {
-			childrenToRender = 0;
+			childToRender = 0;
 			initialized = true;
 		}
 	}
@@ -169,7 +169,7 @@
 	let isRun = false;
 	$: {
 		if (message.id && !isRun) {
-			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
+			if (message.currentChildIndex) childToRender = message.currentChildIndex;
 			isRun = true;
 		}
 	}
@@ -430,7 +430,7 @@
 {/if}
 
 {#if nChildren > 0}
-	{@const messageId = messages.find((m) => m.id === id)?.children?.[childrenToRender]}
+	{@const messageId = messages.find((m) => m.id === id)?.children?.[childToRender]}
 	{#key messageId}
 		<svelte:self
 			{loading}
@@ -444,7 +444,7 @@
 		>
 			<svelte:fragment slot="childrenNav">
 				{#if nChildren > 1 && $convTreeStore.editing === null}
-					<Alternatives {message} bind:childrenToRender {nChildren} {loading} />
+					<Alternatives {message} bind:childToRender {nChildren} {loading} />
 				{/if}
 			</svelte:fragment>
 		</svelte:self>
