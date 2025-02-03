@@ -256,15 +256,12 @@
 			{:else if pending}
 				<ChatMessage
 					loading={true}
-					messages={[
-						{
-							id: "0-0-0-0-0",
-							content: "",
-							from: "assistant",
-							children: [],
-						},
-					]}
-					id={"0-0-0-0-0"}
+					message={{
+						id: "0-0-0-0-0",
+						content: "",
+						from: "assistant",
+						children: [],
+					}}
 					isAuthor={!shared}
 					readOnly={isReadOnly}
 				/>
