@@ -7,13 +7,9 @@
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
-	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonDownload from "~icons/carbon/download";
-	import CarbonThumbsUp from "~icons/carbon/thumbs-up";
-	import CarbonThumbsDown from "~icons/carbon/thumbs-down";
+
 	import CarbonPen from "~icons/carbon/pen";
-	import CarbonChevronLeft from "~icons/carbon/chevron-left";
-	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import UploadedFile from "./UploadedFile.svelte";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
@@ -31,10 +27,11 @@
 	import { useConvTreeStore } from "$lib/stores/convTree";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { enhance } from "$app/forms";
 	import { browser } from "$app/environment";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
+	import Alternatives from "./Alternatives.svelte";
+	import Vote from "./Vote.svelte";
 
 	export let id: Message["id"];
 	export let messages: Message[];
@@ -49,7 +46,6 @@
 
 	const dispatch = createEventDispatcher<{
 		retry: { content?: string; id: Message["id"] };
-		vote: { score: Message["score"]; id: Message["id"] };
 	}>();
 
 	let contentEl: HTMLElement;
@@ -148,14 +144,14 @@
 
 	$: isLast = (message && message.children?.length === 0) ?? false;
 
-	$: childrenToRender = 0;
+	$: childToRender = 0;
 	$: nChildren = message?.children?.length ?? 0;
 
 	$: {
 		if (initialized) {
-			childrenToRender = Math.max(0, nChildren - 1);
+			childToRender = Math.max(0, nChildren - 1);
 		} else {
-			childrenToRender = 0;
+			childToRender = 0;
 			initialized = true;
 		}
 	}
@@ -173,7 +169,7 @@
 	let isRun = false;
 	$: {
 		if (message.id && !isRun) {
-			if (message.currentChildIndex) childrenToRender = message.currentChildIndex;
+			if (message.currentChildIndex) childToRender = message.currentChildIndex;
 			isRun = true;
 		}
 	}
@@ -305,30 +301,7 @@
 	"
 			>
 				{#if isAuthor}
-					<button
-						class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
-					{message.score && message.score > 0
-							? 'text-green-500 hover:text-green-500 dark:text-green-400 hover:dark:text-green-400'
-							: ''}"
-						title={message.score === 1 ? "Remove +1" : "+1"}
-						type="button"
-						on:click={() =>
-							dispatch("vote", { score: message.score === 1 ? 0 : 1, id: message.id })}
-					>
-						<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
-					</button>
-					<button
-						class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300
-					{message.score && message.score < 0
-							? 'text-red-500 hover:text-red-500 dark:text-red-400 hover:dark:text-red-400'
-							: ''}"
-						title={message.score === -1 ? "Remove -1" : "-1"}
-						type="button"
-						on:click={() =>
-							dispatch("vote", { score: message.score === -1 ? 0 : -1, id: message.id })}
-					>
-						<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
-					</button>
+					<Vote {message} on:vote />
 				{/if}
 				<button
 					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
@@ -457,7 +430,7 @@
 {/if}
 
 {#if nChildren > 0}
-	{@const messageId = messages.find((m) => m.id === id)?.children?.[childrenToRender]}
+	{@const messageId = messages.find((m) => m.id === id)?.children?.[childToRender]}
 	{#key messageId}
 		<svelte:self
 			{loading}
@@ -471,49 +444,7 @@
 		>
 			<svelte:fragment slot="childrenNav">
 				{#if nChildren > 1 && $convTreeStore.editing === null}
-					<div
-						class="font-white group/navbranch z-0 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
-					>
-						<button
-							class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-							on:click={() => (childrenToRender = Math.max(0, childrenToRender - 1))}
-							disabled={childrenToRender === 0 || loading}
-						>
-							<CarbonChevronLeft class="text-sm" />
-						</button>
-						<span class=" text-gray-400 dark:text-gray-500">
-							{childrenToRender + 1} / {nChildren}
-						</span>
-						<button
-							class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-							on:click={() =>
-								(childrenToRender = Math.min(
-									message?.children?.length ?? 1 - 1,
-									childrenToRender + 1
-								))}
-							disabled={childrenToRender === nChildren - 1 || loading}
-						>
-							<CarbonChevronRight class="text-sm" />
-						</button>
-						{#if !loading && message.children}<form
-								method="POST"
-								action="?/deleteBranch"
-								class="hidden group-hover/navbranch:block"
-								use:enhance={({ cancel }) => {
-									if (!confirm("Are you sure you want to delete this branch?")) {
-										cancel();
-									}
-								}}
-							>
-								<input name="messageId" value={message.children[childrenToRender]} type="hidden" />
-								<button
-									class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
-									type="submit"
-									><CarbonTrashCan />
-								</button>
-							</form>
-						{/if}
-					</div>
+					<Alternatives {message} bind:childToRender {nChildren} {loading} />
 				{/if}
 			</svelte:fragment>
 		</svelte:self>
