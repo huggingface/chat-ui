@@ -3,11 +3,13 @@ image:
   name: chat-ui
 
 nodeSelector:
-  role-hub-utils: "true"
+  role-huggingchat: "true"
 
 tolerations:
-  - key: CriticalAddonsOnly
-    operator: Equal
+  - key: "huggingface.co/huggingchat"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
 
 serviceAccount:
   enabled: true
