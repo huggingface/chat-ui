@@ -26,7 +26,6 @@
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
-	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -37,6 +36,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	export let messages: Message[] = [];
+	export let messagesAlternatives: Message["id"][][] = [];
 	export let loading = false;
 	export let pending = false;
 
@@ -52,6 +52,7 @@
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
+	let editMsdgId: Message["id"] | null = null;
 	$: pastedLongContent = false;
 	$: $page.params.id && (isSharedRecently = false);
 
@@ -121,58 +122,7 @@
 		}
 	};
 
-	const convTreeStore = useConvTreeStore();
-
-	const updateCurrentIndex = () => {
-		const url = new URL($page.url);
-		let leafId = url.searchParams.get("leafId");
-
-		// Ensure the function is only run in the browser.
-		if (!browser) return;
-
-		if (leafId) {
-			// Remove the 'leafId' from the URL to clean up after retrieving it.
-			url.searchParams.delete("leafId");
-			history.replaceState(null, "", url.toString());
-		} else {
-			// Retrieve the 'leafId' from localStorage if it's not in the URL.
-			leafId = localStorage.getItem("leafId");
-		}
-
-		// If a 'leafId' exists, find the corresponding message and update indices.
-		if (leafId) {
-			let leafMessage = messages.find((m) => m.id == leafId);
-			if (!leafMessage?.ancestors) return; // Exit if the message has no ancestors.
-
-			let ancestors = leafMessage.ancestors;
-
-			// Loop through all ancestors to update the current child index.
-			for (let i = 0; i < ancestors.length; i++) {
-				let curMessage = messages.find((m) => m.id == ancestors[i]);
-				if (curMessage?.children) {
-					for (let j = 0; j < curMessage.children.length; j++) {
-						// Check if the current message's child matches the next ancestor
-						// or the leaf itself, and update the currentChildIndex accordingly.
-						if (i + 1 < ancestors.length) {
-							if (curMessage.children[j] == ancestors[i + 1]) {
-								curMessage.currentChildIndex = j;
-								break;
-							}
-						} else {
-							if (curMessage.children[j] == leafId) {
-								curMessage.currentChildIndex = j;
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-	};
-
-	updateCurrentIndex();
-
-	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
+	$: lastMessage = browser && (messages.at(-1) as Message);
 	$: lastIsError =
 		lastMessage &&
 		!loading &&
@@ -284,16 +234,21 @@
 
 			{#if messages.length > 0}
 				<div class="flex h-max flex-col gap-8 pb-52">
-					<ChatMessage
-						{loading}
-						{messages}
-						id={messages[0].id}
-						isAuthor={!shared}
-						readOnly={isReadOnly}
-						on:retry
-						on:vote
-						on:continue
-					/>
+					{#each messages as message, idx}
+						<ChatMessage
+							{loading}
+							{message}
+							alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
+							isAuthor={!shared}
+							readOnly={isReadOnly}
+							isLast={idx === messages.length - 1}
+							bind:editMsdgId
+							on:retry
+							on:vote
+							on:continue
+							on:showAlternateMsg
+						/>
+					{/each}
 					{#if isReadOnly}
 						<ModelSwitch {models} {currentModel} />
 					{/if}
