@@ -24,25 +24,21 @@
 		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
-	import { useConvTreeStore } from "$lib/stores/convTree";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { browser } from "$app/environment";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import Vote from "./Vote.svelte";
 
-	export let id: Message["id"];
-	export let messages: Message[];
+	export let message: Message;
 	export let loading = false;
 	export let isAuthor = true;
 	export let readOnly = false;
 	export let isTapped = false;
-
-	$: message = messages.find((m) => m.id === id) ?? ({} as Message);
-
-	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
+	export let alternatives: Message["id"][] = [];
+	export let editMsdgId: Message["id"] | null = null;
+	export let isLast = false;
 
 	const dispatch = createEventDispatcher<{
 		retry: { content?: string; id: Message["id"] };
@@ -52,8 +48,6 @@
 	let loadingEl: IconLoading;
 	let pendingTimeout: ReturnType<typeof setTimeout>;
 	let isCopied = false;
-
-	let initialized = false;
 
 	$: emptyLoad =
 		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
@@ -111,6 +105,7 @@
 			return acc;
 		}, {} as Record<string, MessageToolUpdate[]>);
 
+	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
 	$: downloadLink = urlNotTrailing + `/message/${message.id}/prompt`;
 
 	let webSearchIsDone = true;
@@ -130,7 +125,7 @@
 		}, 1000);
 	}
 
-	$: editMode = $convTreeStore.editing === message.id;
+	$: editMode = editMsdgId === message.id;
 	let editContentEl: HTMLTextAreaElement;
 	let editFormEl: HTMLFormElement;
 
@@ -141,39 +136,6 @@
 			editContentEl?.focus();
 		}
 	}
-
-	$: isLast = (message && message.children?.length === 0) ?? false;
-
-	$: childToRender = 0;
-	$: nChildren = message?.children?.length ?? 0;
-
-	$: {
-		if (initialized) {
-			childToRender = Math.max(0, nChildren - 1);
-		} else {
-			childToRender = 0;
-			initialized = true;
-		}
-	}
-	const convTreeStore = useConvTreeStore();
-
-	$: if (message.children?.length === 0) {
-		$convTreeStore.leaf = message.id;
-		// Check if the code is running in a browser
-		if (browser) {
-			// Remember the last message viewed or interacted by the user
-			localStorage.setItem("leafId", message.id);
-		}
-	}
-
-	let isRun = false;
-	$: {
-		if (message.id && !isRun) {
-			if (message.currentChildIndex) childToRender = message.currentChildIndex;
-			isRun = true;
-		}
-	}
-	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
 </script>
 
 {#if message.from === "assistant"}
@@ -323,7 +285,9 @@
 			</div>
 		{/if}
 	</div>
-	<slot name="childrenNav" />
+	{#if alternatives.length > 1 && editMsdgId === null}
+		<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+	{/if}
 {/if}
 {#if message.from === "user"}
 	<div
@@ -356,7 +320,7 @@
 						bind:this={editFormEl}
 						on:submit|preventDefault={() => {
 							dispatch("retry", { content: editContentEl.value, id: message.id });
-							$convTreeStore.editing = null;
+							editMsdgId = null;
 						}}
 					>
 						<textarea
@@ -383,7 +347,7 @@
 								type="button"
 								class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 								on:click={() => {
-									$convTreeStore.editing = null;
+									editMsdgId = null;
 								}}
 							>
 								Cancel
@@ -415,7 +379,7 @@
 									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
 									title="Branch"
 									type="button"
-									on:click={() => ($convTreeStore.editing = message.id)}
+									on:click={() => (editMsdgId = message.id)}
 								>
 									<CarbonPen />
 								</button>
@@ -424,31 +388,11 @@
 					</div>
 				{/if}
 			</div>
-			<slot name="childrenNav" />
+			{#if alternatives.length > 1 && editMsdgId === null}
+				<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+			{/if}
 		</div>
 	</div>
-{/if}
-
-{#if nChildren > 0}
-	{@const messageId = messages.find((m) => m.id === id)?.children?.[childToRender]}
-	{#key messageId}
-		<svelte:self
-			{loading}
-			{messages}
-			{isAuthor}
-			{readOnly}
-			id={messageId}
-			on:retry
-			on:vote
-			on:continue
-		>
-			<svelte:fragment slot="childrenNav">
-				{#if nChildren > 1 && $convTreeStore.editing === null}
-					<Alternatives {message} bind:childToRender {nChildren} {loading} />
-				{/if}
-			</svelte:fragment>
-		</svelte:self>
-	{/key}
 {/if}
 
 <style>
