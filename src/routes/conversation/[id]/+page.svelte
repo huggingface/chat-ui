@@ -37,6 +37,7 @@
 
 	let files: File[] = [];
 
+	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
 	$: messagesPath = createMessagesPath(messages);
 	$: messagesAlternatives = createMessagesAlternatives(messages);
 
