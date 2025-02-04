@@ -40,8 +40,6 @@
 	export let editMsdgId: Message["id"] | null = null;
 	export let isLast = false;
 
-	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
-
 	const dispatch = createEventDispatcher<{
 		retry: { content?: string; id: Message["id"] };
 	}>();
@@ -107,6 +105,7 @@
 			return acc;
 		}, {} as Record<string, MessageToolUpdate[]>);
 
+	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
 	$: downloadLink = urlNotTrailing + `/message/${message.id}/prompt`;
 
 	let webSearchIsDone = true;
