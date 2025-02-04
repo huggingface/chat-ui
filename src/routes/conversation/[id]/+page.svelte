@@ -31,6 +31,7 @@
 
 	let loading = false;
 	let pending = false;
+	let initialRun = true;
 
 	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
 
@@ -44,12 +45,15 @@
 	}
 
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
-		if (!msgId && $page.url.searchParams.get("leadId")) {
-			msgId = $page.url.searchParams.get("leadId") as string;
-			$page.url.searchParams.delete("leadId");
-		}
-		if (!msgId && browser && localStorage.getItem("leafId")) {
-			msgId = localStorage.getItem("leafId") as string;
+		if (initialRun) {
+			if (!msgId && $page.url.searchParams.get("leadId")) {
+				msgId = $page.url.searchParams.get("leadId") as string;
+				$page.url.searchParams.delete("leadId");
+			}
+			if (!msgId && browser && localStorage.getItem("leafId")) {
+				msgId = localStorage.getItem("leafId") as string;
+			}
+			initialRun = false;
 		}
 
 		const msg = messages.find((msg) => msg.id === msgId) ?? messages.at(-1);
