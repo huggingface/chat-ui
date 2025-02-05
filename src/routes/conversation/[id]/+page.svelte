@@ -47,9 +47,9 @@
 
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
 		if (initialRun) {
-			if (!msgId && $page.url.searchParams.get("leadId")) {
-				msgId = $page.url.searchParams.get("leadId") as string;
-				$page.url.searchParams.delete("leadId");
+			if (!msgId && $page.url.searchParams.get("leafId")) {
+				msgId = $page.url.searchParams.get("leafId") as string;
+				$page.url.searchParams.delete("leafId");
 			}
 			if (!msgId && browser && localStorage.getItem("leafId")) {
 				msgId = localStorage.getItem("leafId") as string;
