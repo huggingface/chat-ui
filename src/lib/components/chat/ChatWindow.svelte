@@ -26,7 +26,6 @@
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
-	import { useConvTreeStore } from "$lib/stores/convTree";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -37,6 +36,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	export let messages: Message[] = [];
+	export let messagesAlternatives: Message["id"][][] = [];
 	export let loading = false;
 	export let pending = false;
 
@@ -52,6 +52,7 @@
 	let message: string;
 	let timeout: ReturnType<typeof setTimeout>;
 	let isSharedRecently = false;
+	let editMsdgId: Message["id"] | null = null;
 	$: pastedLongContent = false;
 	$: $page.params.id && (isSharedRecently = false);
 
@@ -121,58 +122,7 @@
 		}
 	};
 
-	const convTreeStore = useConvTreeStore();
-
-	const updateCurrentIndex = () => {
-		const url = new URL($page.url);
-		let leafId = url.searchParams.get("leafId");
-
-		// Ensure the function is only run in the browser.
-		if (!browser) return;
-
-		if (leafId) {
-			// Remove the 'leafId' from the URL to clean up after retrieving it.
-			url.searchParams.delete("leafId");
-			history.replaceState(null, "", url.toString());
-		} else {
-			// Retrieve the 'leafId' from localStorage if it's not in the URL.
-			leafId = localStorage.getItem("leafId");
-		}
-
-		// If a 'leafId' exists, find the corresponding message and update indices.
-		if (leafId) {
-			let leafMessage = messages.find((m) => m.id == leafId);
-			if (!leafMessage?.ancestors) return; // Exit if the message has no ancestors.
-
-			let ancestors = leafMessage.ancestors;
-
-			// Loop through all ancestors to update the current child index.
-			for (let i = 0; i < ancestors.length; i++) {
-				let curMessage = messages.find((m) => m.id == ancestors[i]);
-				if (curMessage?.children) {
-					for (let j = 0; j < curMessage.children.length; j++) {
-						// Check if the current message's child matches the next ancestor
-						// or the leaf itself, and update the currentChildIndex accordingly.
-						if (i + 1 < ancestors.length) {
-							if (curMessage.children[j] == ancestors[i + 1]) {
-								curMessage.currentChildIndex = j;
-								break;
-							}
-						} else {
-							if (curMessage.children[j] == leafId) {
-								curMessage.currentChildIndex = j;
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-	};
-
-	updateCurrentIndex();
-
-	$: lastMessage = browser && (messages.find((m) => m.id == $convTreeStore.leaf) as Message);
+	$: lastMessage = browser && (messages.at(-1) as Message);
 	$: lastIsError =
 		lastMessage &&
 		!loading &&
@@ -220,8 +170,8 @@
 
 	$: mimeTypesFromActiveTools = $page.data.tools
 		.filter((tool: ToolFront) => {
-			if ($page.data?.assistant) {
-				return $page.data.assistant.tools?.includes(tool._id);
+			if (assistant) {
+				return assistant.tools?.includes(tool._id);
 			}
 			if (currentModel.tools) {
 				return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
@@ -233,7 +183,7 @@
 	$: activeMimeTypes = Array.from(
 		new Set([
 			...mimeTypesFromActiveTools, // fetch mime types from active tools either from tool settings or active assistant
-			...(currentModel.tools && !$page.data.assistant ? ["application/pdf"] : []), // if its a tool model, we can always enable document parser so we always accept pdfs
+			...(currentModel.tools && !assistant ? ["application/pdf"] : []), // if its a tool model, we can always enable document parser so we always accept pdfs
 			...(currentModel.multimodal ? currentModel.multimodalAcceptedMimetypes ?? ["image/*"] : []), // if its a multimodal model, we always accept images
 		])
 	);
@@ -256,15 +206,14 @@
 		<div
 			class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
 		>
-			{#if $page.data?.assistant && !!messages.length}
+			{#if assistant && !!messages.length}
 				<a
 					class="mx-auto flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 py-1 pl-1 pr-3 text-sm text-gray-800 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-					href="{base}/settings/assistants/{$page.data.assistant._id}"
+					href="{base}/settings/assistants/{assistant._id}"
 				>
-					{#if $page.data?.assistant.avatar}
+					{#if assistant.avatar}
 						<img
-							src="{base}/settings/assistants/{$page.data?.assistant._id.toString()}/avatar.jpg?hash=${$page
-								.data.assistant.avatar}"
+							src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash=${assistant.avatar}"
 							alt="Avatar"
 							class="size-5 rounded-full object-cover"
 						/>
@@ -272,11 +221,11 @@
 						<div
 							class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
 						>
-							{$page.data?.assistant.name[0]}
+							{assistant.name[0]}
 						</div>
 					{/if}
 
-					{$page.data.assistant.name}
+					{assistant.name}
 				</a>
 			{:else if preprompt && preprompt != currentModel.preprompt}
 				<SystemPromptModal preprompt={preprompt ?? ""} />
@@ -284,16 +233,21 @@
 
 			{#if messages.length > 0}
 				<div class="flex h-max flex-col gap-8 pb-52">
-					<ChatMessage
-						{loading}
-						{messages}
-						id={messages[0].id}
-						isAuthor={!shared}
-						readOnly={isReadOnly}
-						on:retry
-						on:vote
-						on:continue
-					/>
+					{#each messages as message, idx (message.id)}
+						<ChatMessage
+							{loading}
+							{message}
+							alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
+							isAuthor={!shared}
+							readOnly={isReadOnly}
+							isLast={idx === messages.length - 1}
+							bind:editMsdgId
+							on:retry
+							on:vote
+							on:continue
+							on:showAlternateMsg
+						/>
+					{/each}
 					{#if isReadOnly}
 						<ModelSwitch {models} {currentModel} />
 					{/if}
@@ -301,15 +255,12 @@
 			{:else if pending}
 				<ChatMessage
 					loading={true}
-					messages={[
-						{
-							id: "0-0-0-0-0",
-							content: "",
-							from: "assistant",
-							children: [],
-						},
-					]}
-					id={"0-0-0-0-0"}
+					message={{
+						id: "0-0-0-0-0",
+						content: "",
+						from: "assistant",
+						children: [],
+					}}
 					isAuthor={!shared}
 					readOnly={isReadOnly}
 				/>

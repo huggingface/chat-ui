@@ -21,9 +21,9 @@
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
-	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
+	import { browser } from "$app/environment";
 
 	export let data;
 
@@ -31,10 +31,72 @@
 
 	let loading = false;
 	let pending = false;
+	let initialRun = true;
 
 	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
 
 	let files: File[] = [];
+
+	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
+	$: messagesPath = createMessagesPath(messages);
+	$: messagesAlternatives = createMessagesAlternatives(messages);
+
+	$: if (browser && messagesPath.at(-1)?.id) {
+		localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
+	}
+
+	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
+		if (initialRun) {
+			if (!msgId && $page.url.searchParams.get("leafId")) {
+				msgId = $page.url.searchParams.get("leafId") as string;
+				$page.url.searchParams.delete("leafId");
+			}
+			if (!msgId && browser && localStorage.getItem("leafId")) {
+				msgId = localStorage.getItem("leafId") as string;
+			}
+			initialRun = false;
+		}
+
+		const msg = messages.find((msg) => msg.id === msgId) ?? messages.at(-1);
+		if (!msg) return [];
+		// ancestor path
+		const { ancestors } = msg;
+		const path = [];
+		if (ancestors?.length) {
+			for (const ancestorId of ancestors) {
+				const ancestor = messages.find((msg) => msg.id === ancestorId);
+				if (ancestor) {
+					path.push(ancestor);
+				}
+			}
+		}
+
+		// push the node itself in the middle
+		path.push(msg);
+
+		// children path
+		let childrenIds = msg.children;
+		while (childrenIds?.length) {
+			let lastChildId = childrenIds.at(-1);
+			const lastChild = messages.find((msg) => msg.id === lastChildId);
+			if (lastChild) {
+				path.push(lastChild);
+			}
+			childrenIds = lastChild?.children;
+		}
+
+		return path;
+	}
+
+	function createMessagesAlternatives(messages: Message[]): Message["id"][][] {
+		const alternatives = [];
+		for (const message of messages) {
+			if (message.children?.length) {
+				alternatives.push(message.children);
+			}
+		}
+		return alternatives;
+	}
 
 	async function convFromShared() {
 		try {
@@ -68,7 +130,7 @@
 	// this function is used to send new message to the backends
 	async function writeMessage({
 		prompt,
-		messageId = $convTreeStore.leaf ?? undefined,
+		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
 		isContinue = false,
 	}: {
@@ -338,6 +400,9 @@
 	}
 
 	async function onRetry(event: CustomEvent<{ id: Message["id"]; content?: string }>) {
+		const lastMsgId = event.detail.id;
+		messagesPath = createMessagesPath(messages, lastMsgId);
+
 		if (!data.shared) {
 			await writeMessage({
 				prompt: event.detail.content,
@@ -361,6 +426,11 @@
 		}
 	}
 
+	async function onShowAlternateMsg(event: CustomEvent<{ id: Message["id"] }>) {
+		const msgId = event.detail.id;
+		messagesPath = createMessagesPath(messages, msgId);
+	}
+
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
 			await writeMessage({ messageId: event.detail.id, isContinue: true });
@@ -380,10 +450,9 @@
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false), ($convTreeStore.editing = null));
+	$: $page.params.id, (($isAborted = true), (loading = false));
 	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
 
-	const convTreeStore = createConvTreeStore();
 	const settings = useSettingsStore();
 </script>
 
@@ -402,13 +471,15 @@
 <ChatWindow
 	{loading}
 	{pending}
-	{messages}
+	messages={messagesPath}
+	{messagesAlternatives}
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}
 	on:continue={onContinue}
+	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation($page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
