@@ -5,11 +5,17 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 
 	import { enhance } from "$app/forms";
+	import { createEventDispatcher } from "svelte";
 
 	export let message: Message;
-	export let childToRender: number;
-	export let nChildren: number;
+	export let alternatives: Message["id"][] = [];
 	export let loading = false;
+
+	$: currentIdx = alternatives.findIndex((id) => id === message.id);
+
+	const dispatch = createEventDispatcher<{
+		showAlternateMsg: { id: Message["id"] };
+	}>();
 </script>
 
 <div
@@ -17,19 +23,21 @@
 >
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-		on:click={() => (childToRender = Math.max(0, childToRender - 1))}
-		disabled={childToRender === 0 || loading}
+		on:click={() => dispatch("showAlternateMsg", { id: alternatives[Math.max(0, currentIdx - 1)] })}
+		disabled={currentIdx === 0 || loading}
 	>
 		<CarbonChevronLeft class="text-sm" />
 	</button>
 	<span class=" text-gray-400 dark:text-gray-500">
-		{childToRender + 1} / {nChildren}
+		{currentIdx + 1} / {alternatives.length}
 	</span>
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
 		on:click={() =>
-			(childToRender = Math.min(message?.children?.length ?? 1 - 1, childToRender + 1))}
-		disabled={childToRender === nChildren - 1 || loading}
+			dispatch("showAlternateMsg", {
+				id: alternatives[Math.min(alternatives.length - 1, currentIdx + 1)],
+			})}
+		disabled={currentIdx === alternatives.length - 1 || loading}
 	>
 		<CarbonChevronRight class="text-sm" />
 	</button>
@@ -43,7 +51,7 @@
 				}
 			}}
 		>
-			<input name="messageId" value={message.children[childToRender]} type="hidden" />
+			<input name="messageId" value={message.id} type="hidden" />
 			<button
 				class="flex items-center justify-center text-xs text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-200"
 				type="submit"
