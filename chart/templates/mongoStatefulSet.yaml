@@ -1,0 +1,34 @@
+{{- if .Values.mongo.enabled | default "true" -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+spec:
+  serviceName: mongodb-service
+  selector:
+    matchLabels:
+      app: mongodb
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: {{ .Values.mongo.image }}
+          volumeMounts:
+            - name: mongodb-disk
+              mountPath: /data/db
+  # Volume Claim
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-disk
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.mongo.storageSize }}
+        storageClassName: {{ .Values.mongo.storageClassName | quote }}
+{{ end }}

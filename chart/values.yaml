@@ -1,10 +1,10 @@
 image:
   repository: ghcr.io/huggingface
   name: chat-ui
-  tag: 0.0.0-latest
+  tag: latest
   pullPolicy: IfNotPresent
 
-replicas: 3
+replicas: 1
 
 domain: huggingface.co
 
@@ -27,9 +27,8 @@ ingress:
   enabled: true
   path: "/"
   annotations: { }
-  # className: "nginx"
+  className: "nginx"
   tls: { }
-    # secretName: XXX
 
 resources:
   requests:
@@ -65,3 +64,10 @@ autoscaling:
 
 monitoring:
   enabled: false
+
+mongo:
+  enabled: false
+  storageClassName: default
+  storageSize: 25Gi
+  image: mongo:8.0.4
+  port: 27017
