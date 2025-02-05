@@ -21,6 +21,8 @@ networkPolicy:
   allowedBlocks:
     - 10.0.252.0/25
     - 10.240.0.0/24
+    - 10.32.192.192/26
+    - 10.32.193.0/28
 
 ingress:
   path: "/chat"
