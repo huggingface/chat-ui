@@ -69,11 +69,11 @@ jobs:
       - name: Deploy on infra-deployments
         uses: aurelien-baudet/workflow-dispatch@v2
         with:
-          workflow: Update application values
+          workflow: Update application single value
           repo: huggingface/infra-deployments
           wait-for-completion: true
           wait-for-completion-interval: 10s
           display-workflow-run-url-interval: 10s
           ref: refs/heads/main
           token: ${{ secrets.GIT_TOKEN_INFRA_DEPLOYMENT }}
-          inputs: '{"path": "hub/chat-ui/chat-ui.yaml", "values": ${{ env.VALUES }}, "url": "${{ github.event.head_commit.url }}"}'
+          inputs: '{"path": "hub/chat-ui/chat-ui.yaml", "value": ${{ env.VALUES }}, "url": "${{ github.event.head_commit.url }}"}'
