@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createBubbler, preventDefault } from "svelte/legacy";
+	import { createBubbler } from "svelte/legacy";
 
 	const bubble = createBubbler();
 	import { browser } from "$app/environment";
@@ -187,7 +187,8 @@
 					class="base-tool"
 					class:active-tool={webSearchIsOn}
 					disabled={loading}
-					onclick={preventDefault(async () => {
+					onclick={async (e) => {
+						e.preventDefault();
 						if (modelHasTools) {
 							if (webSearchIsOn) {
 								await settings.instantSet({
@@ -203,7 +204,7 @@
 						} else {
 							$webSearchParameters.useSearch = !webSearchIsOn;
 						}
-					})}
+					}}
 				>
 					<IconInternet classNames="text-xl" />
 					{#if webSearchIsOn}
@@ -223,7 +224,8 @@
 						class="base-tool"
 						class:active-tool={imageGenIsOn}
 						disabled={loading}
-						onclick={preventDefault(async () => {
+						onclick={async (e) => {
+							e.preventDefault();
 							if (modelHasTools) {
 								if (imageGenIsOn) {
 									await settings.instantSet({
@@ -235,7 +237,7 @@
 									});
 								}
 							}
-						})}
+						}}
 					>
 						<IconImageGen classNames="text-xl" />
 						{#if imageGenIsOn}
@@ -287,7 +289,8 @@
 					>
 						<button
 							class="base-tool"
-							onclick={preventDefault(async () => {
+							onclick={async (e) => {
+								e.preventDefault();
 								const screenshot = await captureScreen();
 
 								// Convert base64 to blob
@@ -298,7 +301,7 @@
 								const file = new File([blob], "screenshot.png", { type: "image/png" });
 
 								files = [...files, file];
-							})}
+							}}
 						>
 							<IconScreenshot classNames="text-xl" />
 						</button>
@@ -310,9 +313,10 @@
 					<button
 						class="active-tool base-tool"
 						disabled={loading}
-						onclick={preventDefault(async () => {
+						onclick={async (e) => {
+							e.preventDefault();
 							goto(`${base}/tools/${tool._id}`);
-						})}
+						}}
 					>
 						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
 						{tool.displayName}

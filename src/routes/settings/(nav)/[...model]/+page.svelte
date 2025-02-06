@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { run, stopPropagation } from "svelte/legacy";
+	import { run } from "svelte/legacy";
 
 	import { page } from "$app/stores";
 	import { base } from "$app/paths";
@@ -111,12 +111,13 @@
 	<button
 		class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
 		name="Activate model"
-		onclick={stopPropagation(() => {
+		onclick={(e) => {
+			e.stopPropagation();
 			settings.instantSet({
 				activeModel: $page.params.model,
 			});
 			goto(`${base}/`);
-		})}
+		}}
 	>
 		<CarbonChat class="mr-1.5 text-sm" />
 		New chat
@@ -128,9 +129,10 @@
 			{#if hasCustomPreprompt}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
-					onclick={stopPropagation(
-						() => ($settings.customPrompts[$page.params.model] = model.preprompt)
-					)}
+					onclick={(e) => {
+						e.stopPropagation();
+						$settings.customPrompts[$page.params.model] = model.preprompt;
+					}}
 				>
 					Reset
 				</button>

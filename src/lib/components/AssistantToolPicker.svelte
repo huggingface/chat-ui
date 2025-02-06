@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { preventDefault, stopPropagation } from "svelte/legacy";
-
 	import { base } from "$app/paths";
 	import type { ToolLogoColor, ToolLogoIcon } from "$lib/types/Tool";
 	import { debounce } from "$lib/utils/debounce";
@@ -87,7 +85,11 @@
 					{/if}
 				</div>
 				<button
-					onclick={stopPropagation(preventDefault(() => removeValue(value._id)))}
+					onclick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						removeValue(value._id);
+					}}
 					class="text-lg text-gray-600"
 				>
 					<CarbonClose />
@@ -123,7 +125,11 @@
 				{:else}
 					{#each suggestions as suggestion}
 						<button
-							onclick={stopPropagation(preventDefault(() => addValue(suggestion)))}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								addValue(suggestion);
+							}}
 							class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
 						>
 							{suggestion.displayName}

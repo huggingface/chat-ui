@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { stopPropagation } from "svelte/legacy";
-
 	import { afterNavigate, goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -110,7 +108,8 @@
 										? 'bg-gray-100 text-gray-800'
 										: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
 									name="Activate model"
-									onclick={stopPropagation(() => {
+									onclick={(e) => {
+										e.stopPropagation();
 										if (isActive) {
 											settings.instantSet({
 												tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
@@ -120,7 +119,7 @@
 												tools: [...($settings?.tools ?? []), data.tool._id],
 											});
 										}
-									})}
+									}}
 								>
 									{isActive ? "Deactivate" : "Activate"}
 								</button>

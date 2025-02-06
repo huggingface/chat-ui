@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { preventDefault, stopPropagation } from "svelte/legacy";
-
 	import { createEventDispatcher } from "svelte";
 	import { page } from "$app/stores";
 	import type { MessageFile } from "$lib/types/Message";
@@ -231,7 +229,11 @@
 			<button
 				class="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
 				class:invisible={navigator.maxTouchPoints === 0}
-				onclick={stopPropagation(preventDefault(() => dispatch("close")))}
+				onclick={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					dispatch("close");
+				}}
 			>
 				<CarbonClose class=" text-xs  text-white" />
 			</button>

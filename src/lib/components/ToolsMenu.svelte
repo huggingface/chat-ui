@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { stopPropagation, preventDefault } from "svelte/legacy";
-
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { clickOutside } from "$lib/actions/clickOutside";
@@ -83,7 +81,10 @@
 				{/if}
 				<button
 					class="ml-auto text-xs underline"
-					onclick={stopPropagation(() => setAllTools(!allToolsEnabled))}
+					onclick={(e) => {
+						e.stopPropagation();
+						setAllTools(!allToolsEnabled);
+					}}
 				>
 					{#if allToolsEnabled}
 						Disable all
@@ -112,13 +113,13 @@
 							id={tool._id}
 							checked={true}
 							class="rounded-xs font-semibold accent-purple-500 hover:accent-purple-600"
-							onclick={stopPropagation(
-								preventDefault(async () => {
-									await settings.instantSet({
-										tools: $settings?.tools?.filter((t) => t !== tool._id) ?? [],
-									});
-								})
-							)}
+							onclick={async (e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								await settings.instantSet({
+									tools: $settings?.tools?.filter((t) => t !== tool._id) ?? [],
+								});
+							}}
 						/>
 					{:else}
 						<input
@@ -126,7 +127,9 @@
 							id={tool._id}
 							checked={isChecked}
 							disabled={loading}
-							onclick={stopPropagation(async () => {
+							onclick={async (e) => {
+								e.preventDefault();
+								e.stopPropagation();
 								if (isChecked) {
 									await settings.instantSet({
 										tools: ($settings?.tools ?? []).filter((t) => t !== tool._id),
@@ -136,7 +139,7 @@
 										tools: [...($settings?.tools ?? []), tool._id],
 									});
 								}
-							})}
+							}}
 						/>
 					{/if}
 					<label class="cursor-pointer" for={tool._id}>{tool.displayName}</label>

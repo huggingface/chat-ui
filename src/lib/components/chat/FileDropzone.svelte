@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createBubbler, preventDefault } from "svelte/legacy";
+	import { createBubbler } from "svelte/legacy";
 
 	const bubble = createBubbler();
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -88,7 +88,10 @@
 	ondrop={dropHandle}
 	ondragenter={() => (onDragInner = true)}
 	ondragleave={() => (onDragInner = false)}
-	ondragover={preventDefault(bubble("dragover"))}
+	ondragover={(e) => {
+		e.preventDefault();
+		bubble("dragover");
+	}}
 	class="relative flex h-28 w-full max-w-4xl flex-col items-center justify-center gap-1 rounded-xl border-2 border-dotted {onDragInner
 		? 'border-blue-200 !bg-blue-500/10 text-blue-600 *:pointer-events-none dark:border-blue-600 dark:bg-blue-500/20 dark:text-blue-500'
 		: 'bg-gray-100 text-gray-500 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-400'}"

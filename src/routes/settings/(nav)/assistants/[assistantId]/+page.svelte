@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { stopPropagation } from "svelte/legacy";
-
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -114,12 +112,13 @@
 					<button
 						class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
 						name="Activate model"
-						onclick={stopPropagation(() => {
+						onclick={(e) => {
+							e.stopPropagation();
 							settings.instantSet({
 								activeModel: $page.params.assistantId,
 							});
 							goto(`${base}/`);
-						})}
+						}}
 					>
 						<CarbonChat class="mr-1.5 text-sm" />
 						New chat

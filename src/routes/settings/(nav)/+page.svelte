@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { preventDefault, stopPropagation } from "svelte/legacy";
-
 	import Modal from "$lib/components/Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
@@ -87,7 +85,10 @@
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
 			<button
-				onclick={preventDefault(() => (isConfirmingDeletion = true))}
+				onclick={(e) => {
+					e.preventDefault();
+					isConfirmingDeletion = true;
+				}}
 				type="submit"
 				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
 				><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
@@ -110,7 +111,10 @@
 					<button
 						type="button"
 						class="group"
-						onclick={stopPropagation(() => (isConfirmingDeletion = false))}
+						onclick={(e) => {
+							e.stopPropagation();
+							isConfirmingDeletion = false;
+						}}
 					>
 						<CarbonClose class="text-gray-900 group-hover:text-gray-500" />
 					</button>

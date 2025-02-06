@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { preventDefault, stopPropagation } from "svelte/legacy";
-
 	import type { readAndCompressImage } from "browser-image-resizer";
 	import type { Model } from "$lib/types/Model";
 	import type { Assistant } from "$lib/types/Assistant";
@@ -221,12 +219,12 @@
 					<div class="mx-auto w-max pt-1">
 						<button
 							type="button"
-							onclick={stopPropagation(
-								preventDefault(() => {
-									files = null;
-									deleteExistingAvatar = true;
-								})
-							)}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								files = null;
+								deleteExistingAvatar = true;
+							}}
 							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
 						>
 							Delete

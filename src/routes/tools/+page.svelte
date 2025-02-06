@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createBubbler, stopPropagation } from "svelte/legacy";
+	import { createBubbler } from "svelte/legacy";
 
 	const bubble = createBubbler();
 	import type { PageData } from "./$types";
@@ -305,7 +305,10 @@
 								Added by <a
 									class="hover:underline"
 									href="{base}/tools?user={tool.createdByName}"
-									onclick={stopPropagation(bubble("click"))}
+									onclick={(e) => {
+										e.stopPropagation();
+										bubble("click");
+									}}
 								>
 									{tool.createdByName}
 								</a>

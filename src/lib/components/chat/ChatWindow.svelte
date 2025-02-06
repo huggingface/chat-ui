@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { run, createBubbler, preventDefault } from "svelte/legacy";
+	import { run, createBubbler } from "svelte/legacy";
 
 	const bubble = createBubbler();
 	import type { Message, MessageFile } from "$lib/types/Message";
@@ -230,8 +230,14 @@
 <svelte:window
 	ondragenter={onDragEnter}
 	ondragleave={onDragLeave}
-	ondragover={preventDefault(bubble("dragover"))}
-	ondrop={preventDefault(() => (onDrag = false))}
+	ondragover={(e) => {
+		e.preventDefault();
+		bubble("dragover");
+	}}
+	ondrop={(e) => {
+		e.preventDefault();
+		onDrag = false;
+	}}
 />
 
 <div class="relative min-h-0 min-w-0">
@@ -392,7 +398,10 @@
 			<form
 				tabindex="-1"
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-				onsubmit={preventDefault(handleSubmit)}
+				onsubmit={(e) => {
+					e.preventDefault();
+					handleSubmit();
+				}}
 				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-600 dark:bg-gray-700
             {isReadOnly ? 'opacity-30' : ''}"
 			>
