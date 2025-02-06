@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import "../styles/main.css";
 
 	import { onDestroy, onMount } from "svelte";
@@ -22,27 +24,27 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
 
-	export let data;
+	let { data = $bindable(), children } = $props();
 
-	let isNavOpen = false;
-	let isNavCollapsed = false;
+	let isNavOpen = $state(false);
+	let isNavCollapsed = $state(false);
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
-	let currentError: string | null;
+	let currentError: string | undefined = $state();
 
 	async function onError() {
 		// If a new different error comes, wait for the current error to hide first
 		if ($error && currentError && $error !== currentError) {
 			clearTimeout(errorToastTimeout);
-			currentError = null;
+			currentError = undefined;
 			await new Promise((resolve) => setTimeout(resolve, 300));
 		}
 
 		currentError = $error;
 
 		errorToastTimeout = setTimeout(() => {
-			$error = null;
-			currentError = null;
+			$error = undefined;
+			currentError = undefined;
 		}, 3000);
 	}
 
@@ -99,17 +101,22 @@
 		clearTimeout(errorToastTimeout);
 	});
 
-	$: if ($error) onError();
+	run(() => {
+		if ($error) onError();
+	});
 
-	$: if ($titleUpdate) {
-		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+	run(() => {
+		if ($titleUpdate) {
+			const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-		if (convIdx != -1) {
-			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
+			if (convIdx != -1) {
+				data.conversations[convIdx].title =
+					$titleUpdate?.title ?? data.conversations[convIdx].title;
+			}
+
+			$titleUpdate = null;
 		}
-
-		$titleUpdate = null;
-	}
+	});
 
 	const settings = createSettingsStore(data.settings);
 
@@ -145,17 +152,18 @@
 		}
 	});
 
-	$: mobileNavTitle = ["/models", "/assistants", "/privacy", "/tools"].includes(
-		$page.route.id ?? ""
-	)
-		? ""
-		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+	let mobileNavTitle = $derived(
+		["/models", "/assistants", "/privacy", "/tools"].includes($page.route.id ?? "")
+			? ""
+			: data.conversations.find((conv) => conv.id === $page.params.id)?.title
+	);
 
-	$: showDisclaimer =
+	let showDisclaimer = $derived(
 		!$settings.ethicsModalAccepted &&
-		$page.url.pathname !== `${base}/privacy` &&
-		envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
-		!($page.data.shared === true);
+			$page.url.pathname !== `${base}/privacy` &&
+			envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
+			!($page.data.shared === true)
+	);
 </script>
 
 <svelte:head>
@@ -232,7 +240,7 @@
 >
 	<ExpandNavigation
 		isCollapsed={isNavCollapsed}
-		on:click={() => (isNavCollapsed = !isNavCollapsed)}
+		onClick={() => (isNavCollapsed = !isNavCollapsed)}
 		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
 			? 'left-[290px]'
 			: 'left-0'} *:transition-transform"
@@ -263,5 +271,5 @@
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
-	<slot />
+	{@render children?.()}
 </div>

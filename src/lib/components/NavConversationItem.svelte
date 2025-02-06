@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { preventDefault } from "svelte/legacy";
+
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { createEventDispatcher } from "svelte";
@@ -9,9 +11,13 @@
 	import CarbonEdit from "~icons/carbon/edit";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
-	export let conv: ConvSidebar;
+	interface Props {
+		conv: ConvSidebar;
+	}
 
-	let confirmDelete = false;
+	let { conv }: Props = $props();
+
+	let confirmDelete = $state(false);
 
 	const dispatch = createEventDispatcher<{
 		deleteConversation: string;
@@ -21,7 +27,7 @@
 
 <a
 	data-sveltekit-noscroll
-	on:mouseleave={() => {
+	onmouseleave={() => {
 		confirmDelete = false;
 	}}
 	href="{base}/conversation/{conv.id}"
@@ -44,7 +50,7 @@
 		{:else if conv.assistantId}
 			<div
 				class="mr-1.5 flex size-4 flex-none items-center justify-center rounded-full bg-gray-300 text-xs font-bold uppercase text-gray-500"
-			/>
+			></div>
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else}
 			{conv.title}
@@ -56,7 +62,7 @@
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Cancel delete action"
-			on:click|preventDefault={() => (confirmDelete = false)}
+			onclick={preventDefault(() => (confirmDelete = false))}
 		>
 			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
@@ -64,10 +70,10 @@
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Confirm delete action"
-			on:click|preventDefault={() => {
+			onclick={preventDefault(() => {
 				confirmDelete = false;
 				dispatch("deleteConversation", conv.id);
-			}}
+			})}
 		>
 			<CarbonCheckmark class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
@@ -76,11 +82,11 @@
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Edit conversation title"
-			on:click|preventDefault={() => {
+			onclick={preventDefault(() => {
 				const newTitle = prompt("Edit this conversation title:", conv.title);
 				if (!newTitle) return;
 				dispatch("editConversationTitle", { id: conv.id, title: newTitle });
-			}}
+			})}
 		>
 			<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
 		</button>
@@ -89,7 +95,8 @@
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
 			title="Delete conversation"
-			on:click|preventDefault={(event) => {
+			onclick={(event) => {
+				event.preventDefault();
 				if (event.shiftKey) {
 					dispatch("deleteConversation", conv.id);
 				} else {

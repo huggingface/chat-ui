@@ -3,8 +3,12 @@
 	import { page } from "$app/stores";
 	import AssistantSettings from "$lib/components/AssistantSettings.svelte";
 
-	export let data: PageData;
-	export let form: ActionData;
+	interface Props {
+		data: PageData;
+		form: ActionData;
+	}
+
+	let { data, form = $bindable() }: Props = $props();
 
 	let assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
 </script>

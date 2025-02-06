@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
+	interface Props {
+		children?: import("svelte").Snippet;
+	}
 
-	let el: HTMLElement;
+	let { children }: Props = $props();
+
+	let el: HTMLElement | undefined = $state();
 
 	onMount(() => {
-		el.ownerDocument.body.appendChild(el);
+		el?.ownerDocument.body.appendChild(el);
 	});
 
 	onDestroy(() => {
@@ -15,5 +20,5 @@
 </script>
 
 <div bind:this={el} class="contents" hidden>
-	<slot />
+	{@render children?.()}
 </div>

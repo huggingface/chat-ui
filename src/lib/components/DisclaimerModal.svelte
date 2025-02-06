@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { preventDefault, stopPropagation } from "svelte/legacy";
+
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 	import { env as envPublic } from "$env/dynamic/public";
@@ -34,13 +36,15 @@
 				class:bg-white={$page.data.loginEnabled}
 				class:text-gray-800={$page.data.loginEnabled}
 				class:hover:bg-slate-100={$page.data.loginEnabled}
-				on:click|preventDefault|stopPropagation={() => {
-					if (!cookiesAreEnabled()) {
-						window.open(window.location.href, "_blank");
-					}
+				onclick={stopPropagation(
+					preventDefault(() => {
+						if (!cookiesAreEnabled()) {
+							window.open(window.location.href, "_blank");
+						}
 
-					$settings.ethicsModalAccepted = true;
-				}}
+						$settings.ethicsModalAccepted = true;
+					})
+				)}
 			>
 				{#if $page.data.loginEnabled}
 					{#if $page.data.guestMode}

@@ -2,9 +2,13 @@
 	import CarbonCaretLeft from "~icons/carbon/caret-left";
 	import CarbonCaretRight from "~icons/carbon/caret-right";
 
-	export let href: string;
-	export let direction: "next" | "previous";
-	export let isDisabled = false;
+	interface Props {
+		href: string;
+		direction: "next" | "previous";
+		isDisabled?: boolean;
+	}
+
+	let { href, direction, isDisabled = false }: Props = $props();
 </script>
 
 <a

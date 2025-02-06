@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { preventDefault, stopPropagation } from "svelte/legacy";
+
 	import { base } from "$app/paths";
 	import type { ToolLogoColor, ToolLogoIcon } from "$lib/types/Tool";
 	import { debounce } from "$lib/utils/debounce";
@@ -15,9 +17,13 @@
 		icon: ToolLogoIcon;
 	}
 
-	export let toolIds: string[] = [];
+	interface Props {
+		toolIds?: string[];
+	}
 
-	let selectedValues: ToolSuggestion[] = [];
+	let { toolIds = $bindable([]) }: Props = $props();
+
+	let selectedValues: ToolSuggestion[] = $state([]);
 
 	onMount(async () => {
 		selectedValues = await Promise.all(
@@ -27,10 +33,10 @@
 		await fetchSuggestions("");
 	});
 
-	let inputValue = "";
+	let inputValue = $state("");
 	let maxValues = 3;
 
-	let suggestions: ToolSuggestion[] = [];
+	let suggestions: ToolSuggestion[] = $state([]);
 
 	async function fetchSuggestions(query: string) {
 		suggestions = (await fetch(`${base}/api/tools/search?q=${query}`).then((res) =>
@@ -81,7 +87,7 @@
 					{/if}
 				</div>
 				<button
-					on:click|stopPropagation|preventDefault={() => removeValue(value._id)}
+					onclick={stopPropagation(preventDefault(() => removeValue(value._id)))}
 					class="text-lg text-gray-600"
 				>
 					<CarbonClose />
@@ -96,7 +102,7 @@
 		<input
 			type="text"
 			bind:value={inputValue}
-			on:input={(ev) => {
+			oninput={(ev) => {
 				inputValue = ev.currentTarget.value;
 				debouncedFetch(inputValue);
 			}}
@@ -117,7 +123,7 @@
 				{:else}
 					{#each suggestions as suggestion}
 						<button
-							on:click|stopPropagation|preventDefault={() => addValue(suggestion)}
+							onclick={stopPropagation(preventDefault(() => addValue(suggestion)))}
 							class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
 						>
 							{suggestion.displayName}

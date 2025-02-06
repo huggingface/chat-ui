@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run, stopPropagation } from "svelte/legacy";
+
 	import { page } from "$app/stores";
 	import { base } from "$app/paths";
 	import { env as envPublic } from "$env/dynamic/public";
@@ -15,19 +17,23 @@
 
 	const settings = useSettingsStore();
 
-	$: if ($settings.customPrompts[$page.params.model] === undefined) {
-		$settings.customPrompts = {
-			...$settings.customPrompts,
-			[$page.params.model]:
-				$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt || "",
-		};
-	}
+	run(() => {
+		if ($settings.customPrompts[$page.params.model] === undefined) {
+			$settings.customPrompts = {
+				...$settings.customPrompts,
+				[$page.params.model]:
+					$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt ||
+					"",
+			};
+		}
+	});
 
-	$: hasCustomPreprompt =
+	let hasCustomPreprompt = $derived(
 		$settings.customPrompts[$page.params.model] !==
-		$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt;
+			$page.data.models.find((el: BackendModel) => el.id === $page.params.model)?.preprompt
+	);
 
-	$: model = $page.data.models.find((el: BackendModel) => el.id === $page.params.model);
+	let model = $derived($page.data.models.find((el: BackendModel) => el.id === $page.params.model));
 </script>
 
 <div class="flex flex-col items-start">
@@ -105,12 +111,12 @@
 	<button
 		class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
 		name="Activate model"
-		on:click|stopPropagation={() => {
+		onclick={stopPropagation(() => {
 			settings.instantSet({
 				activeModel: $page.params.model,
 			});
 			goto(`${base}/`);
-		}}
+		})}
 	>
 		<CarbonChat class="mr-1.5 text-sm" />
 		New chat
@@ -122,8 +128,9 @@
 			{#if hasCustomPreprompt}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
-					on:click|stopPropagation={() =>
-						($settings.customPrompts[$page.params.model] = model.preprompt)}
+					onclick={stopPropagation(
+						() => ($settings.customPrompts[$page.params.model] = model.preprompt)
+					)}
 				>
 					Reset
 				</button>
@@ -134,7 +141,7 @@
 			rows="10"
 			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
 			bind:value={$settings.customPrompts[$page.params.model]}
-		/>
+		></textarea>
 		{#if model.tokenizer && $settings.customPrompts[$page.params.model]}
 			<TokensCounter
 				classNames="absolute bottom-2 right-2"

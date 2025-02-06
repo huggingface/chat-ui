@@ -10,10 +10,10 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 
-	export let data;
+	let { data } = $props();
 
-	let loading = false;
-	let files: File[] = [];
+	let loading = $state(false);
+	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
 	const modelId = $page.params.model;

@@ -5,7 +5,11 @@
 
 	import { createEventDispatcher } from "svelte";
 
-	export let message: Message;
+	interface Props {
+		message: Message;
+	}
+
+	let { message }: Props = $props();
 
 	const dispatch = createEventDispatcher<{
 		vote: { score: Message["score"]; id: Message["id"] };
@@ -19,7 +23,7 @@
 		: ''}"
 	title={message.score === 1 ? "Remove +1" : "+1"}
 	type="button"
-	on:click={() => dispatch("vote", { score: message.score === 1 ? 0 : 1, id: message.id })}
+	onclick={() => dispatch("vote", { score: message.score === 1 ? 0 : 1, id: message.id })}
 >
 	<CarbonThumbsUp class="h-[1.14em] w-[1.14em]" />
 </button>
@@ -30,7 +34,7 @@
 		: ''}"
 	title={message.score === -1 ? "Remove -1" : "-1"}
 	type="button"
-	on:click={() => dispatch("vote", { score: message.score === -1 ? 0 : -1, id: message.id })}
+	onclick={() => dispatch("vote", { score: message.score === -1 ? 0 : -1, id: message.id })}
 >
 	<CarbonThumbsDown class="h-[1.14em] w-[1.14em]" />
 </button>

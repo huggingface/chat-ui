@@ -11,7 +11,11 @@
 	import CarbonTools from "~icons/carbon/tools";
 	import CarbonImage from "~icons/carbon/image";
 	import { useSettingsStore } from "$lib/stores/settings";
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	const settings = useSettingsStore();
 </script>
@@ -54,7 +58,7 @@
 						href="{base}/models/{model.id}"
 						class="absolute inset-0 z-10"
 						aria-label="View details for {model.displayName}"
-					/>
+					></a>
 					<div class="flex items-center justify-between gap-1">
 						{#if model.logoUrl}
 							<img
@@ -66,7 +70,7 @@
 							<div
 								class="size-6 rounded border border-transparent bg-gray-300 dark:bg-gray-800"
 								aria-hidden="true"
-							/>
+							></div>
 						{/if}
 						{#if model.tools}
 							<span

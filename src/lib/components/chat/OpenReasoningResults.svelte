@@ -2,9 +2,13 @@
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
-	export let summary: string;
-	export let content: string;
-	export let loading: boolean = false;
+	interface Props {
+		summary: string;
+		content: string;
+		loading?: boolean;
+	}
+
+	let { summary, content, loading = false }: Props = $props();
 </script>
 
 <details

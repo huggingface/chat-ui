@@ -485,13 +485,16 @@ export function spatialParser() {
 	function serializeHTMLElement(node: Element): SerializedHTMLElement {
 		return {
 			tagName: node.tagName.toLowerCase(),
-			attributes: allowListedAttributes.reduce((acc, attr) => {
-				const value = node.getAttribute(attr);
-				if (value) {
-					acc[attr] = value;
-				}
-				return acc;
-			}, {} as Record<string, string>),
+			attributes: allowListedAttributes.reduce(
+				(acc, attr) => {
+					const value = node.getAttribute(attr);
+					if (value) {
+						acc[attr] = value;
+					}
+					return acc;
+				},
+				{} as Record<string, string>
+			),
 			content: Array.from(node.childNodes).map(serializeNode).filter(Boolean),
 		};
 	}

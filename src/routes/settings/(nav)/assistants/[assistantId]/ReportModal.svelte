@@ -6,7 +6,7 @@
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 
-	let reason = "";
+	let reason = $state("");
 </script>
 
 <Modal on:close>
@@ -34,13 +34,13 @@
 			placeholder="Reason(s) for the report"
 			maxlength="128"
 			bind:value={reason}
-		/>
+		></textarea>
 
 		<div class="flex w-full flex-row justify-between px-2 pt-4">
 			<button
 				type="button"
 				class="text-sm text-gray-700 hover:underline"
-				on:click={() => dispatch("close")}>Cancel</button
+				onclick={() => dispatch("close")}>Cancel</button
 			>
 
 			<button

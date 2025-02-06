@@ -1,20 +1,34 @@
 <script lang="ts">
-	export let type: string;
-	export let value: string | boolean | number;
-	export let disabled: boolean = false;
+	import { run } from "svelte/legacy";
 
-	let innerValue: string | boolean | number = (() => {
-		if (type === "bool") {
-			return Boolean(value) || false;
-		} else if (type === "int" || type === "float") {
-			return Number(value) || 0;
-		} else {
-			return value || "";
-		}
-	})();
-	let previousValue: string | boolean | number = innerValue;
+	interface Props {
+		type: string;
+		value: string | boolean | number;
+		disabled?: boolean;
+	}
 
-	$: value = typeof innerValue === "string" ? innerValue : innerValue.toString();
+	let { type, value = $bindable(), disabled = false }: Props = $props();
+
+	let innerValue: string | boolean | number = $state(
+		(() => {
+			if (type === "bool") {
+				return Boolean(value) || false;
+			} else if (type === "int" || type === "float") {
+				return Number(value) || 0;
+			} else {
+				return value || "";
+			}
+		})()
+	);
+	let previousValue: string | boolean | number = $state("");
+
+	$effect(() => {
+		previousValue = innerValue;
+	});
+
+	run(() => {
+		value = typeof innerValue === "string" ? innerValue : innerValue.toString();
+	});
 </script>
 
 {#if type === "str" && typeof innerValue === "string"}
@@ -30,7 +44,7 @@
 		step="1"
 		class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 		{disabled}
-		on:input={(e) => {
+		oninput={(e) => {
 			const value = e.currentTarget.value;
 			if (value === "" || isNaN(parseInt(value))) {
 				innerValue = previousValue;
@@ -49,7 +63,7 @@
 		step="0.001"
 		class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 		{disabled}
-		on:input={(e) => {
+		oninput={(e) => {
 			const value = e.currentTarget.value;
 			if (value === "" || isNaN(parseFloat(value))) {
 				innerValue = previousValue;

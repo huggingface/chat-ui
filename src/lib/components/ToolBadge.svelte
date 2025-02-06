@@ -3,7 +3,11 @@
 	import { base } from "$app/paths";
 	import { browser } from "$app/environment";
 
-	export let toolId: string;
+	interface Props {
+		toolId: string;
+	}
+
+	let { toolId }: Props = $props();
 </script>
 
 <div

@@ -7,8 +7,12 @@
 	import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
 	import CodeBlock from "../CodeBlock.svelte";
 
-	export let content: string;
-	export let sources: WebSearchSource[] = [];
+	interface Props {
+		content: string;
+		sources?: WebSearchSource[];
+	}
+
+	let { content, sources = [] }: Props = $props();
 
 	interface katexBlockToken extends Tokens.Generic {
 		type: "katexBlock";
@@ -135,7 +139,7 @@
 					"&": "&amp;",
 					"'": "&#39;",
 					'"': "&quot;",
-				}[x] || x)
+				})[x] || x
 		);
 	}
 

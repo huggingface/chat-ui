@@ -77,7 +77,7 @@ export async function endpointMessagesToAnthropicMessages(
 											throw new Error(`Unsupported file type: ${file.mime}`);
 										}
 									})
-							  )
+								)
 							: []),
 						{ type: "text", text: message.content },
 					],

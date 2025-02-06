@@ -3,10 +3,14 @@
 	import DOMPurify from "isomorphic-dompurify";
 	import hljs from "highlight.js";
 
-	export let code = "";
-	export let lang = "";
+	interface Props {
+		code?: string;
+		lang?: string;
+	}
 
-	$: highlightedCode = hljs.highlightAuto(code, hljs.getLanguage(lang)?.aliases).value;
+	let { code = "", lang = "" }: Props = $props();
+
+	let highlightedCode = $derived(hljs.highlightAuto(code, hljs.getLanguage(lang)?.aliases).value);
 </script>
 
 <div class="group relative my-4 rounded-lg">

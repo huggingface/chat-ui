@@ -8,8 +8,8 @@
 
 <div
 	class="flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
-	on:click={toggle}
-	on:keydown={toggle}
+	onclick={toggle}
+	onkeydown={toggle}
 	aria-checked={$webSearchParameters.useSearch}
 	aria-label="Web Search Toggle"
 	role="switch"

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { createBubbler, preventDefault } from "svelte/legacy";
+
+	const bubble = createBubbler();
 	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
@@ -24,17 +27,33 @@
 	import { captureScreen } from "$lib/utils/screenshot";
 	import IconScreenshot from "../icons/IconScreenshot.svelte";
 
-	export let files: File[] = [];
-	export let mimeTypes: string[] = [];
+	interface Props {
+		files?: File[];
+		mimeTypes?: string[];
+		value?: string;
+		placeholder?: string;
+		loading?: boolean;
+		disabled?: boolean;
+		assistant?: Assistant | undefined;
+		modelHasTools?: boolean;
+		modelIsMultimodal?: boolean;
+		children?: import("svelte").Snippet;
+		onPaste?: (e: ClipboardEvent) => void;
+	}
 
-	export let value = "";
-	export let placeholder = "";
-	export let loading = false;
-	export let disabled = false;
-	export let assistant: Assistant | undefined = undefined;
-
-	export let modelHasTools = false;
-	export let modelIsMultimodal = false;
+	let {
+		files = $bindable([]),
+		mimeTypes = [],
+		value = $bindable(""),
+		placeholder = "",
+		loading = false,
+		disabled = false,
+		assistant = undefined,
+		modelHasTools = false,
+		modelIsMultimodal = false,
+		children,
+		onPaste,
+	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
 		if (!e.target) return;
@@ -48,20 +67,20 @@
 		}
 	};
 
-	let textareaElement: HTMLTextAreaElement;
-	let isCompositionOn = false;
+	let textareaElement: HTMLTextAreaElement | undefined = $state();
+	let isCompositionOn = $state(false);
 
 	const dispatch = createEventDispatcher<{ submit: void }>();
 
 	onMount(() => {
 		if (!isVirtualKeyboard()) {
-			textareaElement.focus();
+			textareaElement?.focus();
 		}
 		function onFormSubmit() {
 			adjustTextareaHeight();
 		}
 
-		const formEl = textareaElement.closest("form");
+		const formEl = textareaElement?.closest("form");
 		formEl?.addEventListener("submit", onFormSubmit);
 		return () => {
 			formEl?.removeEventListener("submit", onFormSubmit);
@@ -84,6 +103,10 @@
 	}
 
 	function adjustTextareaHeight() {
+		if (!textareaElement) {
+			return;
+		}
+
 		textareaElement.style.height = "auto";
 		textareaElement.style.height = `${textareaElement.scrollHeight}px`;
 
@@ -109,24 +132,29 @@
 
 	// tool section
 
-	$: webSearchIsOn = modelHasTools
-		? ($settings.tools?.includes(webSearchToolId) ?? false) ||
-		  ($settings.tools?.includes(fetchUrlToolId) ?? false)
-		: $webSearchParameters.useSearch;
-	$: imageGenIsOn = $settings.tools?.includes(imageGenToolId) ?? false;
+	let webSearchIsOn = $derived(
+		modelHasTools
+			? ($settings.tools?.includes(webSearchToolId) ?? false) ||
+					($settings.tools?.includes(fetchUrlToolId) ?? false)
+			: $webSearchParameters.useSearch
+	);
+	let imageGenIsOn = $derived($settings.tools?.includes(imageGenToolId) ?? false);
 
-	$: documentParserIsOn =
-		modelHasTools && files.length > 0 && files.some((file) => file.type.startsWith("application/"));
+	let documentParserIsOn = $derived(
+		modelHasTools && files.length > 0 && files.some((file) => file.type.startsWith("application/"))
+	);
 
-	$: extraTools = $page.data.tools
-		.filter((t: ToolFront) => $settings.tools?.includes(t._id))
-		.filter(
-			(t: ToolFront) =>
-				![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
-		) satisfies ToolFront[];
+	let extraTools = $derived(
+		$page.data.tools
+			.filter((t: ToolFront) => $settings.tools?.includes(t._id))
+			.filter(
+				(t: ToolFront) =>
+					![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
+			) satisfies ToolFront[]
+	);
 </script>
 
-<div class="flex min-h-full flex-1 flex-col" on:paste>
+<div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
 	<textarea
 		rows="1"
 		tabindex="0"
@@ -135,14 +163,14 @@
 		class:text-gray-400={disabled}
 		bind:value
 		bind:this={textareaElement}
-		on:keydown={handleKeydown}
-		on:compositionstart={() => (isCompositionOn = true)}
-		on:compositionend={() => (isCompositionOn = false)}
-		on:input={adjustTextareaHeight}
-		on:beforeinput
+		onkeydown={handleKeydown}
+		oncompositionstart={() => (isCompositionOn = true)}
+		oncompositionend={() => (isCompositionOn = false)}
+		oninput={adjustTextareaHeight}
+		onbeforeinput={bubble("beforeinput")}
 		{placeholder}
 		{disabled}
-	/>
+	></textarea>
 
 	{#if !assistant}
 		<div
@@ -159,7 +187,7 @@
 					class="base-tool"
 					class:active-tool={webSearchIsOn}
 					disabled={loading}
-					on:click|preventDefault={async () => {
+					onclick={preventDefault(async () => {
 						if (modelHasTools) {
 							if (webSearchIsOn) {
 								await settings.instantSet({
@@ -175,7 +203,7 @@
 						} else {
 							$webSearchParameters.useSearch = !webSearchIsOn;
 						}
-					}}
+					})}
 				>
 					<IconInternet classNames="text-xl" />
 					{#if webSearchIsOn}
@@ -195,7 +223,7 @@
 						class="base-tool"
 						class:active-tool={imageGenIsOn}
 						disabled={loading}
-						on:click|preventDefault={async () => {
+						onclick={preventDefault(async () => {
 							if (modelHasTools) {
 								if (imageGenIsOn) {
 									await settings.instantSet({
@@ -207,7 +235,7 @@
 									});
 								}
 							}
-						}}
+						})}
 					>
 						<IconImageGen classNames="text-xl" />
 						{#if imageGenIsOn}
@@ -227,7 +255,7 @@
 						return m.split("/")[1];
 					})
 					.join(", ")}
-				<form class="flex items-center">
+				<div class="flex items-center">
 					<HoverTooltip
 						label={mimeTypesString.includes("*")
 							? "Upload any file"
@@ -241,7 +269,7 @@
 								class="absolute hidden size-0"
 								aria-label="Upload file"
 								type="file"
-								on:change={onFileChange}
+								onchange={onFileChange}
 								accept={mimeTypes.join(",")}
 							/>
 							<IconPaperclip classNames="text-xl" />
@@ -250,7 +278,7 @@
 							{/if}
 						</label>
 					</HoverTooltip>
-				</form>
+				</div>
 				{#if mimeTypes.includes("image/*")}
 					<HoverTooltip
 						label="Capture screenshot"
@@ -259,7 +287,7 @@
 					>
 						<button
 							class="base-tool"
-							on:click|preventDefault={async () => {
+							onclick={preventDefault(async () => {
 								const screenshot = await captureScreen();
 
 								// Convert base64 to blob
@@ -270,7 +298,7 @@
 								const file = new File([blob], "screenshot.png", { type: "image/png" });
 
 								files = [...files, file];
-							}}
+							})}
 						>
 							<IconScreenshot classNames="text-xl" />
 						</button>
@@ -282,9 +310,9 @@
 					<button
 						class="active-tool base-tool"
 						disabled={loading}
-						on:click|preventDefault={async () => {
+						onclick={preventDefault(async () => {
 							goto(`${base}/tools/${tool._id}`);
-						}}
+						})}
 					>
 						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
 						{tool.displayName}
@@ -308,12 +336,12 @@
 			{/if}
 		</div>
 	{/if}
-	<slot />
+	{@render children?.()}
 </div>
 
 <style lang="postcss">
-	pre,
-	textarea {
+	:global(pre),
+	:global(textarea) {
 		font-family: inherit;
 		box-sizing: border-box;
 		line-height: 1.5;
@@ -324,6 +352,6 @@
 	}
 
 	.active-tool {
-		@apply rounded-full !border-purple-200 bg-purple-100 pl-1 pr-2 text-purple-600 hover:text-purple-600  dark:!border-purple-700 dark:bg-purple-600/40 dark:text-purple-200;
+		@apply rounded-full !border-purple-200 bg-purple-100 pl-1 pr-2 text-purple-600 hover:text-purple-600 dark:!border-purple-700 dark:bg-purple-600/40 dark:text-purple-200;
 	}
 </style>

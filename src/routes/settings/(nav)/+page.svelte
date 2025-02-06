@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { preventDefault, stopPropagation } from "svelte/legacy";
+
 	import Modal from "$lib/components/Modal.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
@@ -11,7 +13,7 @@
 	import Switch from "$lib/components/Switch.svelte";
 	import { env as envPublic } from "$env/dynamic/public";
 
-	let isConfirmingDeletion = false;
+	let isConfirmingDeletion = $state(false);
 
 	let settings = useSettingsStore();
 </script>
@@ -34,7 +36,6 @@
 	</div>
 	<div class="flex h-full max-w-2xl flex-col gap-2 max-sm:pt-0">
 		{#if envPublic.PUBLIC_APP_DATA_SHARING === "1"}
-			<!-- svelte-ignore a11y-label-has-associated-control -->
 			<label class="flex items-center">
 				<Switch
 					name="shareConversationsWithModelAuthors"
@@ -49,7 +50,6 @@
 				Sharing your data will help improve the training data and make open models better over time.
 			</p>
 		{/if}
-		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
 			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
@@ -60,7 +60,6 @@
 			</div>
 		</label>
 
-		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="disableStream" bind:checked={$settings.disableStream} />
 			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
@@ -68,7 +67,6 @@
 			</div>
 		</label>
 
-		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label class="mt-6 flex items-center">
 			<Switch name="directPaste" bind:checked={$settings.directPaste} />
 			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
@@ -89,7 +87,7 @@
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
 			<button
-				on:click|preventDefault={() => (isConfirmingDeletion = true)}
+				onclick={preventDefault(() => (isConfirmingDeletion = true))}
 				type="submit"
 				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
 				><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
@@ -112,7 +110,7 @@
 					<button
 						type="button"
 						class="group"
-						on:click|stopPropagation={() => (isConfirmingDeletion = false)}
+						onclick={stopPropagation(() => (isConfirmingDeletion = false))}
 					>
 						<CarbonClose class="text-gray-900 group-hover:text-gray-500" />
 					</button>

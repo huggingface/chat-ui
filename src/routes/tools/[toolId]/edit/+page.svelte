@@ -2,8 +2,7 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import ToolEdit from "../../ToolEdit.svelte";
 
-	export let data;
-	export let form;
+	let { data, form = $bindable() } = $props();
 </script>
 
 <Modal

@@ -6,8 +6,13 @@
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import { fade, fly } from "svelte/transition";
+	interface Props {
+		children?: import("svelte").Snippet;
+	}
 
-	let previousPage: string = base;
+	let { children }: Props = $props();
+
+	let previousPage: string = $state(base);
 
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("settings")) {
@@ -33,7 +38,7 @@
 		}}
 		class="h-[95dvh] w-[90dvw] overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[85dvh] xl:w-[1200px] 2xl:h-[75dvh]"
 	>
-		<slot />
+		{@render children?.()}
 		{#if $settings.recentlySaved}
 			<div
 				class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-200 px-3 py-1 text-black"

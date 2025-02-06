@@ -12,13 +12,18 @@
 	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
 
-	export let data: LayoutData;
+	interface Props {
+		data: LayoutData;
+		children?: import("svelte").Snippet;
+	}
 
-	let previousPage: string = base;
-	let assistantsSection: HTMLHeadingElement;
+	let { data, children }: Props = $props();
+
+	let previousPage: string = $state(base);
+	let assistantsSection: HTMLHeadingElement | undefined = $state();
 
 	onMount(() => {
-		if ($page.params?.assistantId) {
+		if ($page.params?.assistantId && assistantsSection) {
 			assistantsSection.scrollIntoView();
 		}
 	});
@@ -40,7 +45,7 @@
 		<button
 			class="btn rounded-lg"
 			aria-label="Close settings"
-			on:click={() => {
+			onclick={() => {
 				goto(previousPage);
 			}}
 		>
@@ -162,7 +167,7 @@
 			</a>
 		{/if}
 
-		<div class="my-2 mt-auto w-full border-b border-gray-200" />
+		<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
 		<a
 			href="{base}/settings"
 			class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
@@ -175,6 +180,6 @@
 	<div
 		class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 max-md:pt-4 md:col-span-2 md:row-span-2"
 	>
-		<slot />
+		{@render children?.()}
 	</div>
 </div>

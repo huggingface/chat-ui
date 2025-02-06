@@ -4,12 +4,16 @@
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
 
-	export let models: Model[];
-	export let currentModel: Model;
+	interface Props {
+		models: Model[];
+		currentModel: Model;
+	}
 
-	let selectedModelId = models.map((m) => m.id).includes(currentModel.id)
-		? currentModel.id
-		: models[0].id;
+	let { models, currentModel }: Props = $props();
+
+	let selectedModelId = $state(
+		models.map((m) => m.id).includes(currentModel.id) ? currentModel.id : models[0].id
+	);
 
 	async function handleModelChange() {
 		if (!$page.params.id) return;
@@ -50,7 +54,7 @@
 			{/each}
 		</select>
 		<button
-			on:click={handleModelChange}
+			onclick={handleModelChange}
 			disabled={selectedModelId === currentModel.id}
 			class="rounded-md bg-gray-100 px-2 py-1 dark:bg-gray-900"
 		>

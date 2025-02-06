@@ -1,7 +1,15 @@
 <script lang="ts">
-	export let classNames = "";
-	export let label = "Copied";
-	export let position = "left-1/2 top-full transform -translate-x-1/2 translate-y-2";
+	interface Props {
+		classNames?: string;
+		label?: string;
+		position?: string;
+	}
+
+	let {
+		classNames = "",
+		label = "Copied",
+		position = "left-1/2 top-full transform -translate-x-1/2 translate-y-2",
+	}: Props = $props();
 </script>
 
 <div
@@ -17,6 +25,6 @@
 				border-left-color: transparent;
 				border-right-color: transparent;
 			"
-	/>
+	></div>
 	{label}
 </div>

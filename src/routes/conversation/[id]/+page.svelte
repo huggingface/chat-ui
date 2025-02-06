@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
@@ -25,25 +27,13 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
 
-	export let data;
+	let { data = $bindable() } = $props();
 
-	$: ({ messages } = data);
-
-	let loading = false;
-	let pending = false;
+	let loading = $state(false);
+	let pending = $state(false);
 	let initialRun = true;
 
-	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
-
-	let files: File[] = [];
-
-	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
-	$: messagesPath = createMessagesPath(messages);
-	$: messagesAlternatives = createMessagesAlternatives(messages);
-
-	$: if (browser && messagesPath.at(-1)?.id) {
-		localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
-	}
+	let files: File[] = $state([]);
 
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
 		if (initialRun) {
@@ -450,10 +440,24 @@
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
-
 	const settings = useSettingsStore();
+	let messages = $state(data.messages);
+
+	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
+	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
+	let messagesPath = $derived(createMessagesPath(messages));
+	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
+	run(() => {
+		if (browser && messagesPath.at(-1)?.id) {
+			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
+		}
+	});
+	run(() => {
+		$page.params.id, (($isAborted = true), (loading = false));
+	});
+	let title = $derived(
+		data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title
+	);
 </script>
 
 <svelte:head>

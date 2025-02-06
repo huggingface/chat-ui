@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { stopPropagation } from "svelte/legacy";
+
 	import { afterNavigate, goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -20,11 +22,11 @@
 	import CarbonStar from "~icons/carbon/star";
 	import CarbonLock from "~icons/carbon/locked";
 
-	export let data;
+	let { data } = $props();
 
 	const settings = useSettingsStore();
 
-	let previousPage: string = base;
+	let previousPage: string = $state(base);
 
 	afterNavigate(({ from }) => {
 		if (!from?.url.pathname.includes("tools/")) {
@@ -35,13 +37,14 @@
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
-	$: shareUrl = `${prefix}/tools/${data.tool?._id}`;
-	$: isActive = $settings.tools?.includes(data.tool?._id.toString());
+	let shareUrl = $derived(`${prefix}/tools/${data.tool?._id}`);
+	let isActive = $derived($settings.tools?.includes(data.tool?._id.toString()));
 
-	let displayReportModal = false;
+	let displayReportModal = $state(false);
 
-	$: currentModelSupportTools =
-		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
+	let currentModelSupportTools = $derived(
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false
+	);
 </script>
 
 {#if displayReportModal}
@@ -107,7 +110,7 @@
 										? 'bg-gray-100 text-gray-800'
 										: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
 									name="Activate model"
-									on:click|stopPropagation={() => {
+									onclick={stopPropagation(() => {
 										if (isActive) {
 											settings.instantSet({
 												tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
@@ -117,7 +120,7 @@
 												tools: [...($settings?.tools ?? []), data.tool._id],
 											});
 										}
-									}}
+									})}
 								>
 									{isActive ? "Deactivate" : "Activate"}
 								</button>
@@ -151,7 +154,7 @@
 								<button
 									type="submit"
 									class="flex items-center underline"
-									on:click={(event) => {
+									onclick={(event) => {
 										if (!confirm("Are you sure you want to delete this tool?")) {
 											event.preventDefault();
 										}
@@ -172,7 +175,7 @@
 							{#if !data.tool?.reported}
 								<button
 									type="button"
-									on:click={() => {
+									onclick={() => {
 										displayReportModal = true;
 									}}
 									class="underline"
@@ -195,7 +198,7 @@
 									<button
 										type="submit"
 										class="flex items-center text-red-600 underline"
-										on:click={(event) => {
+										onclick={(event) => {
 											if (!confirm("Are you sure you want to delete this tool?")) {
 												event.preventDefault();
 											}
