@@ -92,7 +92,7 @@
 		"lint-staged": "^15.2.7",
 		"marked": "^12.0.1",
 		"mongodb": "^5.8.0",
-		"nanoid": "^4.0.2",
+		"nanoid": "^5.0.9",
 		"openid-client": "^5.4.2",
 		"parquetjs": "^0.11.2",
 		"pino": "^9.0.0",
