@@ -25,40 +25,48 @@
 		}[];
 	} | null;
 
-	export let tool: CommunityToolEditable | undefined = undefined;
-	export let readonly = false;
-	export let form: ActionData;
+	interface Props {
+		tool?: CommunityToolEditable | undefined;
+		readonly?: boolean;
+		form: ActionData;
+	}
+
+	let { tool = undefined, readonly = false, form = $bindable() }: Props = $props();
 
 	function getError(field: string, returnForm: ActionData) {
 		return returnForm?.errors?.find((error) => error.field === field)?.message ?? "";
 	}
 
-	let APIloading = false;
-	let formLoading = false;
+	let APIloading = $state(false);
+	let formLoading = $state(false);
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	onMount(async () => {
 		await updateConfig();
 	});
 
-	let spaceUrl = tool?.baseUrl ?? "";
+	let spaceUrl = $state(tool?.baseUrl ?? "");
 
-	let editableTool: CommunityToolEditable = tool ?? {
-		displayName: "",
-		description: "",
-		// random color & icon for new tools
-		color: colors[Math.floor(Math.random() * colors.length)],
-		icon: icons[Math.floor(Math.random() * icons.length)],
-		baseUrl: "",
-		endpoint: "",
-		name: "",
-		inputs: [],
-		outputComponent: null,
-		outputComponentIdx: 0,
-		showOutput: true,
-	};
+	let editableTool: CommunityToolEditable = $state(
+		tool ?? {
+			displayName: "",
+			description: "",
+			// random color & icon for new tools
+			color: colors[Math.floor(Math.random() * colors.length)],
+			icon: icons[Math.floor(Math.random() * icons.length)],
+			baseUrl: "",
+			endpoint: "",
+			name: "",
+			inputs: [],
+			outputComponent: null,
+			outputComponentIdx: 0,
+			showOutput: true,
+		}
+	);
 
-	$: editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
+	$effect(() => {
+		editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
+	});
 
 	async function updateConfig() {
 		if (!browser || !editableTool.baseUrl || !editableTool.endpoint) {
@@ -151,7 +159,9 @@
 
 	const settings = useSettingsStore();
 
-	$: formSubmittable = editableTool.name && editableTool.baseUrl && editableTool.outputComponent;
+	let formSubmittable = $derived(
+		editableTool.name && editableTool.baseUrl && editableTool.outputComponent
+	);
 </script>
 
 <form
@@ -229,8 +239,8 @@
 							{#each icons as icon}
 								<option value={icon}>{icon}</option>
 							{/each}
-							<p class="text-xs text-red-500">{getError("icon", form)}</p>
 						</select>
+						<p class="text-xs text-red-500">{getError("icon", form)}</p>
 					</label>
 
 					<label class="flex-grow">
@@ -244,8 +254,8 @@
 							{#each colors as color}
 								<option value={color}>{color}</option>
 							{/each}
-							<p class="text-xs text-red-500">{getError("color", form)}</p>
 						</select>
+						<p class="text-xs text-red-500">{getError("color", form)}</p>
 					</label>
 				</div>
 
@@ -261,7 +271,7 @@
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						placeholder="This tool lets you generate images using SDXL."
 						bind:value={editableTool.description}
-					/>
+					></textarea>
 					<p class="text-xs text-red-500">{getError("description", form)}</p>
 				</label>
 
@@ -313,7 +323,7 @@
 									<input
 										type="radio"
 										disabled={readonly}
-										on:input={onEndpointChange}
+										oninput={onEndpointChange}
 										bind:group={editableTool.endpoint}
 										value={name}
 										name="endpoint"
@@ -438,7 +448,7 @@
 													placeholder="This is the description of the input."
 													bind:value={input.description}
 													disabled={readonly}
-												/>
+												></textarea>
 											</label>
 										{/if}
 										{#if input.paramType === "optional" || input.paramType === "fixed"}
@@ -497,7 +507,7 @@
 										<!-- divider -->
 										<div
 											class="flex w-full flex-row flex-nowrap gap-2 border-b border-gray-200 pt-2"
-										/>
+										></div>
 									{/each}
 
 									<div class="flex flex-col gap-4">
@@ -590,7 +600,7 @@
 				<button
 					type="button"
 					class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
-					on:click={() => dispatch("close")}
+					onclick={() => dispatch("close")}
 				>
 					Cancel
 				</button>

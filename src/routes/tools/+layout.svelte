@@ -3,6 +3,11 @@
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
+	interface Props {
+		children?: import("svelte").Snippet;
+	}
+
+	let { children }: Props = $props();
 </script>
 
 <svelte:head>
@@ -20,4 +25,4 @@
 	{/if}
 </svelte:head>
 
-<slot />
+{@render children?.()}

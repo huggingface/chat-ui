@@ -6,4 +6,4 @@ export const ERROR_MESSAGES = {
 	rateLimited: "You are sending too many messages. Try again later.",
 };
 
-export const error = writable<string | null>(null);
+export const error = writable<string | undefined>(undefined);

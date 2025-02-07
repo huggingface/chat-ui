@@ -11,11 +11,16 @@
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import { base } from "$app/paths";
 
-	export let file: MessageFile;
-	export let canClose = true;
+	interface Props {
+		file: MessageFile;
+		canClose?: boolean;
+	}
 
-	$: showModal = false;
-	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
+	let { file, canClose = true }: Props = $props();
+
+	let showModal = $state(false);
+
+	let urlNotTrailing = $derived($page.url.pathname.replace(/\/$/, ""));
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 
@@ -47,7 +52,7 @@
 		mime === "application/xml" ||
 		mime === "application/vnd.chatui.clipboard";
 
-	$: isClickable = isImage(file.mime) || isPlainText(file.mime);
+	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
 </script>
 
 {#if showModal && isClickable}
@@ -80,7 +85,7 @@
 				{/if}
 				<button
 					class="absolute right-4 top-4 text-xl text-gray-500 hover:text-gray-800"
-					on:click={() => (showModal = false)}
+					onclick={() => (showModal = false)}
 				>
 					<CarbonClose class="text-xl" />
 				</button>
@@ -110,7 +115,20 @@
 	</Modal>
 {/if}
 
-<button on:click={() => (showModal = true)} disabled={!isClickable} class:clickable={isClickable}>
+<div
+	onclick={() => isClickable && (showModal = true)}
+	onkeydown={(e) => {
+		if (!isClickable) {
+			return;
+		}
+		if (e.key === "Enter" || e.key === " ") {
+			showModal = true;
+		}
+	}}
+	class:clickable={isClickable}
+	role="button"
+	tabindex="0"
+>
 	<div class="group relative flex items-center rounded-xl shadow-sm">
 		{#if isImage(file.mime)}
 			<div class="size-48 overflow-hidden rounded-xl">
@@ -133,18 +151,18 @@
 			<div
 				class="border-1 w-72 overflow-clip rounded-xl border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 			>
-				<!-- svelte-ignore a11y-media-has-caption -->
+				<!-- svelte-ignore a11y_media_has_caption -->
 				<video
 					src={file.type === "base64"
 						? `data:${file.mime};base64,${file.value}`
 						: urlNotTrailing + "/output/" + file.value}
 					controls
-				/>
+				></video>
 			</div>
 		{:else if isPlainText(file.mime)}
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
-				class:hoverable={isClickable}
+				class:file-hoverable={isClickable}
 			>
 				<div
 					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
@@ -165,7 +183,7 @@
 		{:else if file.mime === "octet-stream"}
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
-				class:hoverable={isClickable}
+				class:file-hoverable={isClickable}
 			>
 				<div
 					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
@@ -191,7 +209,7 @@
 		{:else}
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
-				class:hoverable={isClickable}
+				class:file-hoverable={isClickable}
 			>
 				<div
 					class="grid size-10 flex-none place-items-center rounded-lg bg-gray-100 dark:bg-gray-800"
@@ -211,16 +229,14 @@
 			<button
 				class="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
 				class:invisible={navigator.maxTouchPoints === 0}
-				on:click|stopPropagation|preventDefault={() => dispatch("close")}
+				onclick={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					dispatch("close");
+				}}
 			>
 				<CarbonClose class=" text-xs  text-white" />
 			</button>
 		{/if}
 	</div>
-</button>
-
-<style lang="postcss">
-	.hoverable {
-		@apply hover:bg-gray-500/10;
-	}
-</style>
+</div>

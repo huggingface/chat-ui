@@ -10,9 +10,9 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { onMount } from "svelte";
 
-	export let data;
-	let loading = false;
-	let files: File[] = [];
+	let { data } = $props();
+	let loading = $state(false);
+	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
 
@@ -79,11 +79,13 @@
 		if (query) createConversation(query);
 	});
 
-	$: currentModel = findCurrentModel(
-		[...data.models, ...data.oldModels],
-		!$settings.assistants.includes($settings.activeModel)
-			? $settings.activeModel
-			: data.assistant?.modelId
+	let currentModel = $derived(
+		findCurrentModel(
+			[...data.models, ...data.oldModels],
+			!$settings.assistants.includes($settings.activeModel)
+				? $settings.activeModel
+				: data.assistant?.modelId
+		)
 	);
 </script>
 

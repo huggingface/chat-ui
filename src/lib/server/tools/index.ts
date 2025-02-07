@@ -280,9 +280,8 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 						);
 
 						toolOutputs.push({
-							[tool.name +
-							"-" +
-							idx.toString()]: `Only and always answer: 'I used the tool ${tool.displayName}, here is the result.' Don't add anything else.`,
+							[tool.name + "-" + idx.toString()]:
+								`Only and always answer: 'I used the tool ${tool.displayName}, here is the result.' Don't add anything else.`,
 						});
 					} else {
 						for (const output of arrayedOutput) {

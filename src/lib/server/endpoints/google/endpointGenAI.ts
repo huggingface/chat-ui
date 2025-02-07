@@ -93,7 +93,7 @@ export function endpointGenAI(input: z.input<typeof endpointGenAIParametersSchem
 					? {
 							role: "system",
 							parts: [{ text: systemMessage }],
-					  }
+						}
 					: undefined,
 		});
 

@@ -60,7 +60,7 @@ async function computeStats(params: {
 							[dateField]: { $gte: minDate },
 						},
 					},
-			  ]
+				]
 			: []),
 		{
 			$sort: {

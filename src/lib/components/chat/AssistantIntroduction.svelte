@@ -18,36 +18,41 @@
 	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/stores";
 
-	export let models: Model[];
-	export let assistant: Pick<
-		Assistant,
-		| "avatar"
-		| "name"
-		| "rag"
-		| "dynamicPrompt"
-		| "modelId"
-		| "createdByName"
-		| "exampleInputs"
-		| "_id"
-		| "description"
-		| "userCount"
-		| "tools"
-	>;
+	interface Props {
+		models: Model[];
+		assistant: Pick<
+			Assistant,
+			| "avatar"
+			| "name"
+			| "rag"
+			| "dynamicPrompt"
+			| "modelId"
+			| "createdByName"
+			| "exampleInputs"
+			| "_id"
+			| "description"
+			| "userCount"
+			| "tools"
+		>;
+	}
+
+	let { models, assistant }: Props = $props();
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 
-	$: hasRag =
+	let hasRag = $derived(
 		assistant?.rag?.allowAllDomains ||
-		(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
-		(assistant?.rag?.allowedLinks?.length ?? 0) > 0 ||
-		assistant?.dynamicPrompt;
+			(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
+			(assistant?.rag?.allowedLinks?.length ?? 0) > 0 ||
+			assistant?.dynamicPrompt
+	);
 
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
-	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
+	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 
-	let isCopied = false;
+	let isCopied = $state(false);
 
 	const settings = useSettingsStore();
 </script>
@@ -128,7 +133,7 @@
 			<div class="flex flex-row items-center gap-1">
 				<button
 					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 max-sm:px-1.5 md:text-sm"
-					on:click={() => {
+					onclick={() => {
 						if (!isCopied) {
 							share(shareUrl, assistant.name);
 							isCopied = true;
@@ -154,7 +159,7 @@
 			</div>
 		</div>
 		<button
-			on:click={() => {
+			onclick={() => {
 				settings.instantSet({
 					activeModel: models[0].name,
 				});
@@ -177,7 +182,7 @@
 						<button
 							type="button"
 							class="truncate whitespace-nowrap rounded-xl border bg-gray-50 px-3 py-2 text-left text-smd text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-							on:click={() => dispatch("message", example)}
+							onclick={() => dispatch("message", example)}
 						>
 							{example}
 						</button>

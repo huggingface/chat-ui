@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
@@ -25,25 +27,18 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
 
-	export let data;
+	let { data = $bindable() } = $props();
 
-	$: ({ messages } = data);
-
-	let loading = false;
-	let pending = false;
+	let loading = $state(false);
+	let pending = $state(false);
 	let initialRun = true;
 
-	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
+	let files: File[] = $state([]);
 
-	let files: File[] = [];
-
-	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
-	$: messagesPath = createMessagesPath(messages);
-	$: messagesAlternatives = createMessagesAlternatives(messages);
-
-	$: if (browser && messagesPath.at(-1)?.id) {
-		localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
-	}
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		conversations = data.conversations;
+	});
 
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
 		if (initialRun) {
@@ -306,7 +301,7 @@
 				) {
 					$error = update.message ?? "An error has occurred";
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+					const convInData = conversations.find(({ id }) => id === $page.params.id);
 					if (convInData) {
 						convInData.title = update.title;
 
@@ -450,16 +445,33 @@
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
-
 	const settings = useSettingsStore();
+	let messages = $state(data.messages);
+	$effect(() => {
+		messages = data.messages;
+	});
+
+	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
+	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
+	let messagesPath = $derived(createMessagesPath(messages));
+	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
+
+	$effect(() => {
+		if (browser && messagesPath.at(-1)?.id) {
+			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
+		}
+	});
+
+	run(() => {
+		$page.params.id, (($isAborted = true), (loading = false));
+	});
+	let title = $derived(
+		conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title
+	);
 </script>
 
 <svelte:head>
-	{#await title then title}
-		<title>{title}</title>
-	{/await}
+	<title>{title}</title>
 	<link
 		rel="stylesheet"
 		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"

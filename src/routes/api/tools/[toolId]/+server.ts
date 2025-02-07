@@ -35,7 +35,7 @@ export async function GET({ params }) {
 								icon: tool.icon,
 								createdByName: tool.createdByName,
 								review: tool.review,
-						  }
+							}
 						: undefined
 				);
 

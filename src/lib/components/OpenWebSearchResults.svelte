@@ -10,16 +10,22 @@
 	import IconInternet from "./icons/IconInternet.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
-	export let webSearchMessages: MessageWebSearchUpdate[] = [];
+	interface Props {
+		webSearchMessages?: MessageWebSearchUpdate[];
+	}
 
-	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
-	$: lastMessage = webSearchMessages
-		.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
-		.at(-1) as MessageWebSearchUpdate;
-	$: errored = webSearchMessages.some(
-		(update) => update.subtype === MessageWebSearchUpdateType.Error
+	let { webSearchMessages = [] }: Props = $props();
+
+	let sources = $derived(webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources);
+	let lastMessage = $derived(
+		webSearchMessages
+			.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
+			.at(-1) as MessageWebSearchUpdate
 	);
-	$: loading = !sources && !errored;
+	let errored = $derived(
+		webSearchMessages.some((update) => update.subtype === MessageWebSearchUpdateType.Error)
+	);
+	let loading = $derived(!sources && !errored);
 </script>
 
 <details
@@ -80,7 +86,7 @@
 									class="-ml-1.5 h-3 w-3 flex-none rounded-full bg-gray-200 dark:bg-gray-600 {loading
 										? 'group-last:animate-pulse group-last:bg-gray-300 group-last:dark:bg-gray-500'
 										: ''}"
-								/>
+								></div>
 								<h3 class="text-md -mt-1.5 pl-2.5 text-gray-800 dark:text-gray-100">
 									{message.message}
 								</h3>

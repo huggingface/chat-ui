@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { createBubbler } from "svelte/legacy";
+
+	const bubble = createBubbler();
 	import type { PageData } from "./$types";
 
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
@@ -23,28 +26,21 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
 
-	$: tools = data.tools.filter((t) =>
-		activeOnly ? data.settings.tools.some((toolId) => toolId === t._id.toString()) : true
-	);
-
-	$: toolsCreator = $page.url.searchParams.get("user");
-	$: createdByMe = data.user?.username && data.user.username === toolsCreator;
-	$: activeOnly = $page.url.searchParams.get("active") === "true";
+	let { data }: Props = $props();
 
 	const settings = useSettingsStore();
 
-	$: currentModelSupportTools =
-		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
-
 	const SEARCH_DEBOUNCE_DELAY = 400;
-	let filterInputEl: HTMLInputElement;
-	let filterValue = data.query;
+	let filterInputEl: HTMLInputElement | undefined = $state();
+	let filterValue = $state(data.query);
 	let isFilterInPorgress = false;
-	let sortValue = data.sort as SortKey;
+	let sortValue = $state(data.sort as SortKey);
 
-	let showUnfeatured = data.showUnfeatured;
+	let showUnfeatured = $state(data.showUnfeatured);
 
 	const resetFilter = () => {
 		filterValue = "";
@@ -65,7 +61,7 @@
 		});
 		await goto(newUrl);
 		if (isDesktop(window)) {
-			setTimeout(() => filterInputEl.focus(), 0);
+			setTimeout(() => filterInputEl?.focus(), 0);
 		}
 		isFilterInPorgress = false;
 
@@ -104,6 +100,17 @@
 			existingKeys: { behaviour: "delete_except", keys: ["sort", "q"] },
 		});
 	};
+	let activeOnly = $derived($page.url.searchParams.get("active") === "true");
+	let tools = $derived(
+		data.tools.filter((t) =>
+			activeOnly ? data.settings.tools.some((toolId) => toolId === t._id.toString()) : true
+		)
+	);
+	let toolsCreator = $derived($page.url.searchParams.get("user"));
+	let createdByMe = $derived(data.user?.username && data.user.username === toolsCreator);
+	let currentModelSupportTools = $derived(
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false
+	);
 </script>
 
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
@@ -139,13 +146,13 @@
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.user?.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
-					<input type="checkbox" checked={showUnfeatured} on:change={toggleShowUnfeatured} />
+					<input type="checkbox" checked={showUnfeatured} onchange={toggleShowUnfeatured} />
 					Show unfeatured tools
 				</label>
 			{/if}
 			{#if $page.data.loginRequired && !data.user}
 				<button
-					on:click={() => {
+					onclick={() => {
 						$loginModalOpen = true;
 					}}
 					class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
@@ -172,7 +179,7 @@
 						href={getHref($page.url, {
 							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
-						on:click={resetFilter}
+						onclick={resetFilter}
 						class="group"
 						><CarbonClose
 							class="text-xs group-hover:text-gray-800 dark:group-hover:text-gray-300"
@@ -214,7 +221,7 @@
 							newKeys: { user: data.user.username },
 							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q", "active"] },
 						})}
-						on:click={resetFilter}
+						onclick={resetFilter}
 						class="flex items-center gap-1.5 truncate rounded-full border px-3 py-1 {toolsCreator &&
 						createdByMe
 							? 'border-gray-300 bg-gray-50  dark:border-gray-600 dark:bg-gray-700 dark:text-white'
@@ -231,7 +238,7 @@
 					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
 					placeholder="Filter by name"
 					value={filterValue}
-					on:input={(e) => filterOnName(e.currentTarget.value)}
+					oninput={(e) => filterOnName(e.currentTarget.value)}
 					bind:this={filterInputEl}
 					maxlength="150"
 					type="search"
@@ -240,7 +247,7 @@
 			</div>
 			<select
 				bind:value={sortValue}
-				on:change={sortTools}
+				onchange={sortTools}
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 				aria-label="Sort tools"
 			>
@@ -261,8 +268,8 @@
 				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				{@const isOfficial = !tool.createdByName}
 				<div
-					on:click={() => goto(`${base}/tools/${tool._id.toString()}`)}
-					on:keydown={(e) => e.key === "Enter" && goto(`${base}/tools/${tool._id.toString()}`)}
+					onclick={() => goto(`${base}/tools/${tool._id.toString()}`)}
+					onkeydown={(e) => e.key === "Enter" && goto(`${base}/tools/${tool._id.toString()}`)}
 					role="button"
 					tabindex="0"
 					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!(
@@ -272,7 +279,9 @@
 						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}
 				>
-					<ToolLogo color={tool.color} icon={tool.icon} />
+					{#key tool.color + tool.icon}
+						<ToolLogo color={tool.color} icon={tool.icon} />
+					{/key}
 					<div class="flex h-full w-full flex-col items-start py-2 text-left">
 						<span class="font-bold">
 							<span class="w-full overflow-clip">
@@ -298,7 +307,10 @@
 								Added by <a
 									class="hover:underline"
 									href="{base}/tools?user={tool.createdByName}"
-									on:click|stopPropagation
+									onclick={(e) => {
+										e.stopPropagation();
+										bubble("click");
+									}}
 								>
 									{tool.createdByName}
 								</a>

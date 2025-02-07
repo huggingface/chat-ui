@@ -47,7 +47,7 @@
 			{:else}
 				<button
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
-					on:click={(e) => {
+					onclick={(e) => {
 						if (!cookiesAreEnabled()) {
 							e.preventDefault();
 							window.open(window.location.href, "_blank");

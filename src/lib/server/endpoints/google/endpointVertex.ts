@@ -92,7 +92,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 							category: HarmCategory.HARM_CATEGORY_UNSPECIFIED,
 							threshold: safetyThreshold,
 						},
-				  ]
+					]
 				: undefined,
 			generationConfig: {
 				maxOutputTokens: parameters?.max_new_tokens ?? 4096,
@@ -129,7 +129,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 
 									return null;
 								})
-						  )
+							)
 						: [];
 
 				const processedFiles = processedFilesWithNull.filter((file) => file !== null);
@@ -161,7 +161,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 								text: systemMessage,
 							},
 						],
-				  }
+					}
 				: undefined,
 		});
 

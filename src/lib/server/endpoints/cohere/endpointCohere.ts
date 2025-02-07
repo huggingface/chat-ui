@@ -104,7 +104,7 @@ export async function endpointCohere(
 											return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
 										}
 										return { call: toolResult.call, outputs: toolResult.outputs };
-								  })
+									})
 								: undefined,
 					})
 					.catch(async (err) => {

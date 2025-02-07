@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import type { Message } from "$lib/types/Message";
-	import { afterUpdate, createEventDispatcher, tick } from "svelte";
-	import { deepestChild } from "$lib/utils/deepestChild";
+	import { createEventDispatcher, tick } from "svelte";
 	import { page } from "$app/stores";
 
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
@@ -25,117 +26,106 @@
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import ToolUpdate from "./ToolUpdate.svelte";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import Vote from "./Vote.svelte";
 
-	export let message: Message;
-	export let loading = false;
-	export let isAuthor = true;
-	export let readOnly = false;
-	export let isTapped = false;
-	export let alternatives: Message["id"][] = [];
-	export let editMsdgId: Message["id"] | null = null;
-	export let isLast = false;
+	interface Props {
+		message: Message;
+		loading?: boolean;
+		isAuthor?: boolean;
+		readOnly?: boolean;
+		isTapped?: boolean;
+		alternatives?: Message["id"][];
+		editMsdgId?: Message["id"] | null;
+		isLast?: boolean;
+	}
+
+	let {
+		message,
+		loading = false,
+		isAuthor = true,
+		readOnly = false,
+		isTapped = $bindable(false),
+		alternatives = [],
+		editMsdgId = $bindable(null),
+		isLast = false,
+	}: Props = $props();
 
 	const dispatch = createEventDispatcher<{
 		retry: { content?: string; id: Message["id"] };
 	}>();
 
-	let contentEl: HTMLElement;
-	let loadingEl: IconLoading;
-	let pendingTimeout: ReturnType<typeof setTimeout>;
-	let isCopied = false;
-
-	$: emptyLoad =
-		!message.content && (webSearchIsDone || (searchUpdates && searchUpdates.length === 0));
-
-	const settings = useSettingsStore();
-
-	afterUpdate(() => {
-		if ($settings.disableStream) {
-			return;
-		}
-
-		loadingEl?.$destroy();
-		clearTimeout(pendingTimeout);
-
-		// Add loading animation to the last message if update takes more than 600ms
-		if (isLast && loading && emptyLoad) {
-			pendingTimeout = setTimeout(() => {
-				if (contentEl) {
-					loadingEl = new IconLoading({
-						target: deepestChild(contentEl),
-						props: { classNames: "loading inline ml-2 first:ml-0" },
-					});
-				}
-			}, 600);
-		}
-	});
+	let contentEl: HTMLElement | undefined = $state();
+	let isCopied = $state(false);
 
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-			editFormEl.requestSubmit();
+			editFormEl?.requestSubmit();
 		}
 	}
 
-	$: searchUpdates = (message.updates?.filter(({ type }) => type === MessageUpdateType.WebSearch) ??
-		[]) as MessageWebSearchUpdate[];
+	let editContentEl: HTMLTextAreaElement | undefined = $state();
+	let editFormEl: HTMLFormElement | undefined = $state();
 
-	$: reasoningUpdates = (message.updates?.filter(
-		({ type }) => type === MessageUpdateType.Reasoning
-	) ?? []) as MessageReasoningUpdate[];
-
-	$: messageFinalAnswer = message.updates?.find(
-		({ type }) => type === MessageUpdateType.FinalAnswer
-	) as MessageFinalAnswerUpdate;
-
-	// filter all updates with type === "tool" then group them by uuid field
-
-	$: toolUpdates = message.updates
-		?.filter(({ type }) => type === "tool")
-		.reduce((acc, update) => {
-			if (update.type !== "tool") {
-				return acc;
-			}
-			acc[update.uuid] = acc[update.uuid] ?? [];
-			acc[update.uuid].push(update);
-			return acc;
-		}, {} as Record<string, MessageToolUpdate[]>);
-
-	$: urlNotTrailing = $page.url.pathname.replace(/\/$/, "");
-	$: downloadLink = urlNotTrailing + `/message/${message.id}/prompt`;
-
-	let webSearchIsDone = true;
-
-	$: webSearchIsDone = searchUpdates.some(
-		(update) => update.subtype === MessageWebSearchUpdateType.Finished
+	let searchUpdates = $derived(
+		(message.updates?.filter(({ type }) => type === MessageUpdateType.WebSearch) ??
+			[]) as MessageWebSearchUpdate[]
 	);
 
-	$: webSearchSources = searchUpdates?.find(
-		(update): update is MessageWebSearchSourcesUpdate =>
-			update.subtype === MessageWebSearchUpdateType.Sources
-	)?.sources;
+	let reasoningUpdates = $derived(
+		(message.updates?.filter(({ type }) => type === MessageUpdateType.Reasoning) ??
+			[]) as MessageReasoningUpdate[]
+	);
 
-	$: if (isCopied) {
-		setTimeout(() => {
-			isCopied = false;
-		}, 1000);
-	}
+	let messageFinalAnswer = $derived(
+		message.updates?.find(
+			({ type }) => type === MessageUpdateType.FinalAnswer
+		) as MessageFinalAnswerUpdate
+	);
+	// filter all updates with type === "tool" then group them by uuid field
 
-	$: editMode = editMsdgId === message.id;
-	let editContentEl: HTMLTextAreaElement;
-	let editFormEl: HTMLFormElement;
-
-	$: if (editMode) {
-		tick();
-		if (editContentEl) {
-			editContentEl.value = message.content;
-			editContentEl?.focus();
+	let toolUpdates = $derived(
+		message.updates
+			?.filter(({ type }) => type === "tool")
+			.reduce(
+				(acc, update) => {
+					if (update.type !== "tool") {
+						return acc;
+					}
+					acc[update.uuid] = acc[update.uuid] ?? [];
+					acc[update.uuid].push(update);
+					return acc;
+				},
+				{} as Record<string, MessageToolUpdate[]>
+			)
+	);
+	let urlNotTrailing = $derived($page.url.pathname.replace(/\/$/, ""));
+	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
+	let webSearchSources = $derived(
+		searchUpdates?.find(
+			(update): update is MessageWebSearchSourcesUpdate =>
+				update.subtype === MessageWebSearchUpdateType.Sources
+		)?.sources
+	);
+	run(() => {
+		if (isCopied) {
+			setTimeout(() => {
+				isCopied = false;
+			}, 1000);
 		}
-	}
+	});
+	let editMode = $derived(editMsdgId === message.id);
+	run(() => {
+		if (editMode) {
+			tick();
+			if (editContentEl) {
+				editContentEl.value = message.content;
+				editContentEl?.focus();
+			}
+		}
+	});
 </script>
 
 {#if message.from === "assistant"}
@@ -144,8 +134,8 @@
 		data-message-id={message.id}
 		data-message-role="assistant"
 		role="presentation"
-		on:click={() => (isTapped = !isTapped)}
-		on:keydown={() => (isTapped = !isTapped)}
+		onclick={() => (isTapped = !isTapped)}
+		onkeydown={() => (isTapped = !isTapped)}
 	>
 		{#if $page.data?.assistant?.avatar}
 			<img
@@ -199,7 +189,7 @@
 				bind:this={contentEl}
 				class:mt-2={reasoningUpdates.length > 0 || searchUpdates.length > 0}
 			>
-				{#if isLast && loading && $settings.disableStream}
+				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 
@@ -269,14 +259,14 @@
 					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
 					type="button"
-					on:click={() => {
+					onclick={() => {
 						dispatch("retry", { id: message.id });
 					}}
 				>
 					<CarbonRotate360 />
 				</button>
 				<CopyToClipBoardBtn
-					on:click={() => {
+					onClick={() => {
 						isCopied = true;
 					}}
 					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
@@ -295,8 +285,8 @@
 		data-message-id={message.id}
 		data-message-type="user"
 		role="presentation"
-		on:click={() => (isTapped = !isTapped)}
-		on:keydown={() => (isTapped = !isTapped)}
+		onclick={() => (isTapped = !isTapped)}
+		onkeydown={() => (isTapped = !isTapped)}
 	>
 		<div class="flex w-full flex-col gap-2">
 			{#if message.files?.length}
@@ -318,8 +308,9 @@
 					<form
 						class="flex w-full flex-col"
 						bind:this={editFormEl}
-						on:submit|preventDefault={() => {
-							dispatch("retry", { content: editContentEl.value, id: message.id });
+						onsubmit={(e) => {
+							e.preventDefault();
+							dispatch("retry", { content: editContentEl?.value, id: message.id });
 							editMsdgId = null;
 						}}
 					>
@@ -328,9 +319,9 @@
 							rows="5"
 							bind:this={editContentEl}
 							value={message.content.trim()}
-							on:keydown={handleKeyDown}
+							onkeydown={handleKeyDown}
 							required
-						/>
+						></textarea>
 						<div class="flex w-full flex-row flex-nowrap items-center justify-center gap-2 pt-2">
 							<button
 								type="submit"
@@ -346,7 +337,7 @@
 							<button
 								type="button"
 								class="btn rounded-sm p-2 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-								on:click={() => {
+								onclick={() => {
 									editMsdgId = null;
 								}}
 							>
@@ -379,7 +370,7 @@
 									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
 									title="Branch"
 									type="button"
-									on:click={() => (editMsdgId = message.id)}
+									onclick={() => (editMsdgId = message.id)}
 								>
 									<CarbonPen />
 								</button>
