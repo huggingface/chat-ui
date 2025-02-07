@@ -442,16 +442,21 @@
 
 	const settings = useSettingsStore();
 	let messages = $state(data.messages);
+	$effect(() => {
+		messages = data.messages;
+	});
 
 	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
 	let messagesPath = $derived(createMessagesPath(messages));
 	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
-	run(() => {
+
+	$effect(() => {
 		if (browser && messagesPath.at(-1)?.id) {
 			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
 		}
 	});
+
 	run(() => {
 		$page.params.id, (($isAborted = true), (loading = false));
 	});
@@ -461,9 +466,7 @@
 </script>
 
 <svelte:head>
-	{#await title then title}
-		<title>{title}</title>
-	{/await}
+	<title>{title}</title>
 	<link
 		rel="stylesheet"
 		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"
