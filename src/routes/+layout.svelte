@@ -26,6 +26,11 @@
 
 	let { data = $bindable(), children } = $props();
 
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		conversations = data.conversations;
+	});
+
 	let isNavOpen = $state(false);
 	let isNavCollapsed = $state(false);
 
@@ -62,7 +67,7 @@
 				return;
 			}
 
-			data.conversations = data.conversations.filter((conv) => conv.id !== id);
+			conversations = conversations.filter((conv) => conv.id !== id);
 
 			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
@@ -88,9 +93,7 @@
 				return;
 			}
 
-			data.conversations = data.conversations.map((conv) =>
-				conv.id === id ? { ...conv, title } : conv
-			);
+			conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
@@ -107,11 +110,10 @@
 
 	run(() => {
 		if ($titleUpdate) {
-			const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+			const convIdx = conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
 			if (convIdx != -1) {
-				data.conversations[convIdx].title =
-					$titleUpdate?.title ?? data.conversations[convIdx].title;
+				conversations[convIdx].title = $titleUpdate?.title ?? conversations[convIdx].title;
 			}
 
 			$titleUpdate = null;
@@ -155,7 +157,7 @@
 	let mobileNavTitle = $derived(
 		["/models", "/assistants", "/privacy", "/tools"].includes($page.route.id ?? "")
 			? ""
-			: data.conversations.find((conv) => conv.id === $page.params.id)?.title
+			: conversations.find((conv) => conv.id === $page.params.id)?.title
 	);
 
 	let showDisclaimer = $derived(
@@ -248,7 +250,7 @@
 
 	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
 		<NavMenu
-			conversations={data.conversations}
+			{conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
@@ -260,7 +262,7 @@
 		class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
 	>
 		<NavMenu
-			conversations={data.conversations}
+			{conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}

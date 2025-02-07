@@ -35,6 +35,11 @@
 
 	let files: File[] = $state([]);
 
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		conversations = data.conversations;
+	});
+
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
 		if (initialRun) {
 			if (!msgId && $page.url.searchParams.get("leafId")) {
@@ -296,7 +301,7 @@
 				) {
 					$error = update.message ?? "An error has occurred";
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+					const convInData = conversations.find(({ id }) => id === $page.params.id);
 					if (convInData) {
 						convInData.title = update.title;
 
@@ -461,7 +466,7 @@
 		$page.params.id, (($isAborted = true), (loading = false));
 	});
 	let title = $derived(
-		data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title
+		conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title
 	);
 </script>
 
