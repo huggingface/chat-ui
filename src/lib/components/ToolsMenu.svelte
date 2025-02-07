@@ -9,17 +9,23 @@
 	import CarbonInformation from "~icons/carbon/information";
 	import CarbonGlobe from "~icons/carbon/earth-filled";
 
-	export let loading = false;
+	interface Props {
+		loading?: boolean;
+	}
+
+	let { loading = false }: Props = $props();
 	const settings = useSettingsStore();
 
-	let detailsEl: HTMLDetailsElement;
+	let detailsEl: HTMLDetailsElement | undefined = $state();
 
 	// active tools are all the checked tools, either from settings or on by default
-	$: activeToolCount = $page.data.tools.filter(
-		(tool: ToolFront) =>
-			// community tools are always on by default
-			tool.type === "community" || $settings?.tools?.includes(tool._id)
-	).length;
+	let activeToolCount = $derived(
+		$page.data.tools.filter(
+			(tool: ToolFront) =>
+				// community tools are always on by default
+				tool.type === "community" || $settings?.tools?.includes(tool._id)
+		).length
+	);
 
 	async function setAllTools(value: boolean) {
 		const configToolsIds = $page.data.tools
@@ -37,16 +43,16 @@
 		}
 	}
 
-	$: allToolsEnabled = activeToolCount === $page.data.tools.length;
+	let allToolsEnabled = $derived(activeToolCount === $page.data.tools.length);
 
-	$: tools = $page.data.tools;
+	let tools = $derived($page.data.tools);
 </script>
 
 <details
 	class="group relative bottom-0 h-full min-h-8"
 	bind:this={detailsEl}
 	use:clickOutside={() => {
-		if (detailsEl.hasAttribute("open")) {
+		if (detailsEl?.hasAttribute("open")) {
 			detailsEl.removeAttribute("open");
 		}
 	}}
@@ -75,7 +81,10 @@
 				{/if}
 				<button
 					class="ml-auto text-xs underline"
-					on:click|stopPropagation={() => setAllTools(!allToolsEnabled)}
+					onclick={(e) => {
+						e.stopPropagation();
+						setAllTools(!allToolsEnabled);
+					}}
 				>
 					{#if allToolsEnabled}
 						Disable all
@@ -104,7 +113,9 @@
 							id={tool._id}
 							checked={true}
 							class="rounded-xs font-semibold accent-purple-500 hover:accent-purple-600"
-							on:click|stopPropagation|preventDefault={async () => {
+							onclick={async (e) => {
+								e.preventDefault();
+								e.stopPropagation();
 								await settings.instantSet({
 									tools: $settings?.tools?.filter((t) => t !== tool._id) ?? [],
 								});
@@ -116,7 +127,9 @@
 							id={tool._id}
 							checked={isChecked}
 							disabled={loading}
-							on:click|stopPropagation={async () => {
+							onclick={async (e) => {
+								e.preventDefault();
+								e.stopPropagation();
 								if (isChecked) {
 									await settings.instantSet({
 										tools: ($settings?.tools ?? []).filter((t) => t !== tool._id),

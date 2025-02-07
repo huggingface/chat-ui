@@ -23,26 +23,33 @@
 	import ToolBadge from "$lib/components/ToolBadge.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
 
-	$: assistant = data.assistants.find((el) => el._id.toString() === $page.params.assistantId);
+	let { data }: Props = $props();
+
+	let assistant = $derived(
+		data.assistants.find((el) => el._id.toString() === $page.params.assistantId)
+	);
 
 	const settings = useSettingsStore();
 
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
 
-	$: shareUrl = `${prefix}/assistant/${assistant?._id}`;
+	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 
-	let displayReportModal = false;
+	let displayReportModal = $state(false);
 
-	$: hasRag =
+	let hasRag = $derived(
 		assistant?.rag?.allowAllDomains ||
-		!!assistant?.rag?.allowedDomains?.length ||
-		!!assistant?.rag?.allowedLinks?.length ||
-		!!assistant?.dynamicPrompt;
+			!!assistant?.rag?.allowedDomains?.length ||
+			!!assistant?.rag?.allowedLinks?.length ||
+			!!assistant?.dynamicPrompt
+	);
 
-	$: prepromptTags = assistant?.preprompt?.split(/(\{\{[^{}]*\}\})/) ?? [];
+	let prepromptTags = $derived(assistant?.preprompt?.split(/(\{\{[^{}]*\}\})/) ?? []);
 </script>
 
 {#if displayReportModal}
@@ -105,7 +112,8 @@
 					<button
 						class="mx-auto my-2 flex w-min items-center justify-center rounded-full bg-black px-3 py-1 text-base !text-white"
 						name="Activate model"
-						on:click|stopPropagation={() => {
+						onclick={(e) => {
+							e.stopPropagation();
 							settings.instantSet({
 								activeModel: $page.params.assistantId,
 							});
@@ -124,7 +132,7 @@
 						<button
 							type="submit"
 							class="flex items-center underline"
-							on:click={(event) => {
+							onclick={(event) => {
 								if (!confirm("Are you sure you want to delete this assistant?")) {
 									event.preventDefault();
 								}
@@ -147,7 +155,7 @@
 					{#if !assistant?.reported}
 						<button
 							type="button"
-							on:click={() => {
+							onclick={() => {
 								displayReportModal = true;
 							}}
 							class="underline"
@@ -170,7 +178,7 @@
 							<button
 								type="submit"
 								class="flex items-center text-red-600 underline"
-								on:click={(event) => {
+								onclick={(event) => {
 									if (!confirm("Are you sure you want to delete this assistant?")) {
 										event.preventDefault();
 									}

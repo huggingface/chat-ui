@@ -2,10 +2,13 @@
 	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
-	export let name: string;
-	export let logoUrl: string | undefined;
-
 	import logo from "../../../../../static/huggingchat/logo.svg?raw";
+	interface Props {
+		name: string;
+		logoUrl: string | undefined;
+	}
+
+	let { name, logoUrl }: Props = $props();
 </script>
 
 <div class=" flex h-[648px] w-full flex-col items-center bg-white">

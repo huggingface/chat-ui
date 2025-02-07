@@ -49,7 +49,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	const assistant = assistantActive
 		? await collections.assistants.findOne({
 				_id: new ObjectId(settings?.activeModel),
-		  })
+			})
 		: null;
 
 	const nConversations = await collections.conversations.countDocuments(authCondition(locals));
@@ -247,7 +247,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 							)?.value ?? 15_000,
 						color: tool.color,
 						icon: tool.icon,
-					} satisfies ToolFront)
+					}) satisfies ToolFront
 			),
 		communityToolCount: await collections.tools.countDocuments({
 			type: "community",

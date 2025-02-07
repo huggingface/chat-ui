@@ -5,10 +5,15 @@
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
 
-	export let width = "max-w-sm";
+	interface Props {
+		width?: string;
+		children?: import("svelte").Snippet;
+	}
 
-	let backdropEl: HTMLDivElement;
-	let modalEl: HTMLDivElement;
+	let { width = "max-w-sm", children }: Props = $props();
+
+	let backdropEl: HTMLDivElement | undefined = $state();
+	let modalEl: HTMLDivElement | undefined = $state();
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 
@@ -31,25 +36,25 @@
 
 	onMount(() => {
 		document.getElementById("app")?.setAttribute("inert", "true");
-		modalEl.focus();
+		modalEl?.focus();
 	});
 
 	onDestroy(() => {
 		if (!browser) return;
-		// remove inert attribute if this is the last modal
-		if (document.querySelectorAll('[role="dialog"]:not(#app *)').length === 1) {
-			document.getElementById("app")?.removeAttribute("inert");
-		}
+		document.getElementById("app")?.removeAttribute("inert");
 	});
 </script>
 
 <Portal>
-	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		role="presentation"
 		tabindex="-1"
 		bind:this={backdropEl}
-		on:click|stopPropagation={handleBackdropClick}
+		onclick={(e) => {
+			e.stopPropagation();
+			handleBackdropClick(e);
+		}}
 		transition:fade|local={{ easing: cubicOut, duration: 300 }}
 		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm dark:bg-black/50"
 	>
@@ -57,10 +62,10 @@
 			role="dialog"
 			tabindex="-1"
 			bind:this={modalEl}
-			on:keydown={handleKeydown}
+			onkeydown={handleKeydown}
 			class="max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10 {width}"
 		>
-			<slot />
+			{@render children?.()}
 		</div>
 	</div>
 </Portal>

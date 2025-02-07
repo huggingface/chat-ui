@@ -34,7 +34,9 @@
 				class:bg-white={$page.data.loginEnabled}
 				class:text-gray-800={$page.data.loginEnabled}
 				class:hover:bg-slate-100={$page.data.loginEnabled}
-				on:click|preventDefault|stopPropagation={() => {
+				onclick={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
 					if (!cookiesAreEnabled()) {
 						window.open(window.location.href, "_blank");
 					}

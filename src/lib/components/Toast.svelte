@@ -3,7 +3,11 @@
 
 	import IconDazzled from "$lib/components/icons/IconDazzled.svelte";
 
-	export let message = "";
+	interface Props {
+		message?: string;
+	}
+
+	let { message = "" }: Props = $props();
 </script>
 
 <div

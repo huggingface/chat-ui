@@ -15,9 +15,13 @@
 		icon: ToolLogoIcon;
 	}
 
-	export let toolIds: string[] = [];
+	interface Props {
+		toolIds?: string[];
+	}
 
-	let selectedValues: ToolSuggestion[] = [];
+	let { toolIds = $bindable([]) }: Props = $props();
+
+	let selectedValues: ToolSuggestion[] = $state([]);
 
 	onMount(async () => {
 		selectedValues = await Promise.all(
@@ -27,10 +31,10 @@
 		await fetchSuggestions("");
 	});
 
-	let inputValue = "";
+	let inputValue = $state("");
 	let maxValues = 3;
 
-	let suggestions: ToolSuggestion[] = [];
+	let suggestions: ToolSuggestion[] = $state([]);
 
 	async function fetchSuggestions(query: string) {
 		suggestions = (await fetch(`${base}/api/tools/search?q=${query}`).then((res) =>
@@ -61,7 +65,9 @@
 			<div
 				class="flex items-center justify-center space-x-2 rounded border border-gray-300 bg-gray-200 px-2 py-1"
 			>
-				<ToolLogo color={value.color} icon={value.icon} size="sm" />
+				{#key value.color + value.icon}
+					<ToolLogo color={value.color} icon={value.icon} size="sm" />
+				{/key}
 				<div class="flex flex-col items-center justify-center py-1">
 					<a
 						href={`${base}/tools/${value._id}`}
@@ -81,7 +87,11 @@
 					{/if}
 				</div>
 				<button
-					on:click|stopPropagation|preventDefault={() => removeValue(value._id)}
+					onclick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						removeValue(value._id);
+					}}
 					class="text-lg text-gray-600"
 				>
 					<CarbonClose />
@@ -96,7 +106,7 @@
 		<input
 			type="text"
 			bind:value={inputValue}
-			on:input={(ev) => {
+			oninput={(ev) => {
 				inputValue = ev.currentTarget.value;
 				debouncedFetch(inputValue);
 			}}
@@ -117,7 +127,11 @@
 				{:else}
 					{#each suggestions as suggestion}
 						<button
-							on:click|stopPropagation|preventDefault={() => addValue(suggestion)}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								addValue(suggestion);
+							}}
 							class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
 						>
 							{suggestion.displayName}

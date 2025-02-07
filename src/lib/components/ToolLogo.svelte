@@ -11,28 +11,34 @@
 	import CarbonSpeaker from "~icons/carbon/volume-up";
 	import CarbonVideo from "~icons/carbon/video";
 
-	export let color: string;
-	export let icon: string;
-	export let size: "xs" | "sm" | "md" | "lg" = "md";
+	interface Props {
+		color: string;
+		icon: string;
+		size?: "xs" | "sm" | "md" | "lg";
+	}
 
-	$: gradientColor = (() => {
-		switch (color) {
-			case "purple":
-				return "#653789";
-			case "blue":
-				return "#375889";
-			case "green":
-				return "#37894E";
-			case "yellow":
-				return "#897C37";
-			case "red":
-				return "#893737";
-			default:
-				return "#FFF";
-		}
-	})();
+	let { color, icon, size = "md" }: Props = $props();
 
-	let iconEl = CarbonWikis;
+	let gradientColor = $derived(
+		(() => {
+			switch (color) {
+				case "purple":
+					return "#653789";
+				case "blue":
+					return "#375889";
+				case "green":
+					return "#37894E";
+				case "yellow":
+					return "#897C37";
+				case "red":
+					return "#893737";
+				default:
+					return "#FFF";
+			}
+		})()
+	);
+
+	let iconEl = $state(CarbonWikis);
 
 	switch (icon) {
 		case "wikis":
@@ -70,18 +76,22 @@
 			break;
 	}
 
-	$: sizeClass = (() => {
-		switch (size) {
-			case "xs":
-				return "size-4";
-			case "sm":
-				return "size-8";
-			case "md":
-				return "size-14";
-			case "lg":
-				return "size-24";
-		}
-	})();
+	let sizeClass = $derived(
+		(() => {
+			switch (size) {
+				case "xs":
+					return "size-4";
+				case "sm":
+					return "size-8";
+				case "md":
+					return "size-14";
+				case "lg":
+					return "size-24";
+			}
+		})()
+	);
+
+	const SvelteComponent = $derived(iconEl);
 </script>
 
 <div class="flex {sizeClass} relative items-center justify-center">
@@ -100,5 +110,5 @@
 		</defs>
 		<rect width="100%" height="100%" fill="url(#gradient-{gradientColor})" mask="url(#mask)" />
 	</svg>
-	<svelte:component this={iconEl} class="relative {sizeClass} scale-50 text-clip text-gray-200" />
+	<SvelteComponent class="relative {sizeClass} scale-50 text-clip text-gray-200" />
 </div>

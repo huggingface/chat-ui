@@ -164,7 +164,7 @@ export const actions: Actions = {
 					modelId: parse.data.modelId,
 					preprompt: parse.data.preprompt,
 					exampleInputs,
-					avatar: deleteAvatar ? undefined : hash ?? assistant.avatar,
+					avatar: deleteAvatar ? undefined : (hash ?? assistant.avatar),
 					updatedAt: new Date(),
 					rag: {
 						allowedLinks: parse.data.ragLinkList,

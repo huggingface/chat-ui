@@ -161,10 +161,13 @@ function createAnthropicTools(tools: Tool[]): Anthropic.Messages.Tool[] {
 	return tools
 		.filter((tool) => tool.name !== directlyAnswer.name)
 		.map((tool) => {
-			const properties = tool.inputs.reduce((acc, input) => {
-				acc[input.name] = convertToolInputToJSONSchema(input);
-				return acc;
-			}, {} as Record<string, unknown>);
+			const properties = tool.inputs.reduce(
+				(acc, input) => {
+					acc[input.name] = convertToolInputToJSONSchema(input);
+					return acc;
+				},
+				{} as Record<string, unknown>
+			);
 
 			const required = tool.inputs
 				.filter((input) => input.paramType === "required")

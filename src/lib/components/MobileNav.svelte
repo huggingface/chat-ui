@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import { navigating } from "$app/stores";
 	import { createEventDispatcher } from "svelte";
 	import { browser } from "$app/environment";
@@ -9,25 +11,36 @@
 	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 
-	export let isOpen = false;
-	export let title: string | undefined;
+	interface Props {
+		isOpen?: boolean;
+		title: string | undefined;
+		children?: import("svelte").Snippet;
+	}
 
-	$: title = title ?? "New Chat";
+	let { isOpen = false, title = $bindable(), children }: Props = $props();
 
-	let closeEl: HTMLButtonElement;
-	let openEl: HTMLButtonElement;
+	run(() => {
+		title = title ?? "New Chat";
+	});
+
+	let closeEl: HTMLButtonElement | undefined = $state();
+	let openEl: HTMLButtonElement | undefined = $state();
 
 	const dispatch = createEventDispatcher();
 
-	$: if ($navigating) {
-		dispatch("toggle", false);
-	}
+	run(() => {
+		if ($navigating) {
+			dispatch("toggle", false);
+		}
+	});
 
-	$: if (isOpen && closeEl) {
-		closeEl.focus();
-	} else if (!isOpen && browser && document.activeElement === closeEl) {
-		openEl.focus();
-	}
+	run(() => {
+		if (isOpen && closeEl) {
+			closeEl.focus();
+		} else if (!isOpen && browser && document.activeElement === closeEl) {
+			openEl?.focus();
+		}
+	});
 </script>
 
 <nav
@@ -36,12 +49,12 @@
 	<button
 		type="button"
 		class="-ml-3 flex size-12 shrink-0 items-center justify-center text-lg"
-		on:click={() => dispatch("toggle", true)}
+		onclick={() => dispatch("toggle", true)}
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
 	{#await title}
-		<div class="flex h-full items-center justify-center" />
+		<div class="flex h-full items-center justify-center"></div>
 	{:then title}
 		<span class="truncate px-4">{title ?? ""}</span>
 	{/await}
@@ -60,10 +73,10 @@
 		<button
 			type="button"
 			class="-mr-3 ml-auto flex size-12 items-center justify-center text-lg"
-			on:click={() => dispatch("toggle", false)}
+			onclick={() => dispatch("toggle", false)}
 			aria-label="Close menu"
 			bind:this={closeEl}><CarbonClose /></button
 		>
 	</div>
-	<slot />
+	{@render children?.()}
 </nav>

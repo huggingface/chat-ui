@@ -5,12 +5,15 @@
 	import CarbonCode from "~icons/carbon/code";
 	import type { Model } from "$lib/types/Model";
 
-	export let model: Pick<
-		Model,
-		"name" | "datasetName" | "websiteUrl" | "modelUrl" | "datasetUrl" | "hasInferenceAPI"
-	>;
+	interface Props {
+		model: Pick<
+			Model,
+			"name" | "datasetName" | "websiteUrl" | "modelUrl" | "datasetUrl" | "hasInferenceAPI"
+		>;
+		variant?: "light" | "dark";
+	}
 
-	export let variant: "light" | "dark" = "light";
+	let { model, variant = "light" }: Props = $props();
 </script>
 
 <div

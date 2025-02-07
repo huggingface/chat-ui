@@ -61,7 +61,7 @@ export const load = async ({ params, depends, locals }) => {
 							_id: new ObjectId(convertedConv.assistantId),
 						})
 					)
-			  )
+				)
 			: null,
 		shared,
 	};

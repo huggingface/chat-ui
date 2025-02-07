@@ -45,7 +45,7 @@ export async function POST({ params, request, locals }) {
 						$set: {
 							"messages.$.score": score,
 						},
-				  }
+					}
 				: { $unset: { "messages.$.score": "" } }),
 		}
 	);

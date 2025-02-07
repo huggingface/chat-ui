@@ -7,11 +7,15 @@
 	import { enhance } from "$app/forms";
 	import { createEventDispatcher } from "svelte";
 
-	export let message: Message;
-	export let alternatives: Message["id"][] = [];
-	export let loading = false;
+	interface Props {
+		message: Message;
+		alternatives?: Message["id"][];
+		loading?: boolean;
+	}
 
-	$: currentIdx = alternatives.findIndex((id) => id === message.id);
+	let { message, alternatives = [], loading = false }: Props = $props();
+
+	let currentIdx = $derived(alternatives.findIndex((id) => id === message.id));
 
 	const dispatch = createEventDispatcher<{
 		showAlternateMsg: { id: Message["id"] };
@@ -23,7 +27,7 @@
 >
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-		on:click={() => dispatch("showAlternateMsg", { id: alternatives[Math.max(0, currentIdx - 1)] })}
+		onclick={() => dispatch("showAlternateMsg", { id: alternatives[Math.max(0, currentIdx - 1)] })}
 		disabled={currentIdx === 0 || loading}
 	>
 		<CarbonChevronLeft class="text-sm" />
@@ -33,7 +37,7 @@
 	</span>
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-		on:click={() =>
+		onclick={() =>
 			dispatch("showAlternateMsg", {
 				id: alternatives[Math.min(alternatives.length - 1, currentIdx + 1)],
 			})}

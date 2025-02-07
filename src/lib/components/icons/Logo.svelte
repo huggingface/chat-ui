@@ -3,7 +3,11 @@
 	import { env as envPublic } from "$env/dynamic/public";
 	import { base } from "$app/paths";
 
-	export let classNames = "";
+	interface Props {
+		classNames?: string;
+	}
+
+	let { classNames = "" }: Props = $props();
 </script>
 
 {#if envPublic.PUBLIC_APP_ASSETS === "chatui"}

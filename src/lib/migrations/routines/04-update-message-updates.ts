@@ -97,8 +97,8 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 				update.status === "started"
 					? MessageUpdateStatus.Started
 					: update.status === "finished"
-					? MessageUpdateStatus.Finished
-					: MessageUpdateStatus.Error;
+						? MessageUpdateStatus.Finished
+						: MessageUpdateStatus.Error;
 			return {
 				type: MessageUpdateType.Status,
 				status,
