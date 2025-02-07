@@ -60,7 +60,7 @@ export async function endpointBedrock(
 			messages = messages.slice(1); // Remove the first system message from the array
 		}
 
-		const formattedMessages = await prepareMessages(messages, model.id, imageProcessor);
+		const formattedMessages = await prepareMessages(messages, isNova, imageProcessor);
 
 		let tokenId = 0;
 		const parameters = { ...model.parameters, ...generateSettings };

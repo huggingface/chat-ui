@@ -50,7 +50,7 @@
 		errorToastTimeout = setTimeout(() => {
 			$error = undefined;
 			currentError = undefined;
-		}, 3000);
+		}, 10000);
 	}
 
 	async function deleteConversation(id: string) {
