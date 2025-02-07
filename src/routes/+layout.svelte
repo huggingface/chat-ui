@@ -3,7 +3,7 @@
 
 	import "../styles/main.css";
 
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -28,7 +28,7 @@
 
 	let conversations = $state(data.conversations);
 	$effect(() => {
-		conversations = data.conversations;
+		data.conversations && untrack(() => (conversations = data.conversations));
 	});
 
 	let isNavOpen = $state(false);
