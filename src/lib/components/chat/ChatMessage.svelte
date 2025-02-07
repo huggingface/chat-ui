@@ -26,7 +26,6 @@
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
 	import ToolUpdate from "./ToolUpdate.svelte";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -60,8 +59,6 @@
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
-
-	const settings = useSettingsStore();
 
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -192,7 +189,7 @@
 				bind:this={contentEl}
 				class:mt-2={reasoningUpdates.length > 0 || searchUpdates.length > 0}
 			>
-				{#if isLast && loading && $settings.disableStream}
+				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 
