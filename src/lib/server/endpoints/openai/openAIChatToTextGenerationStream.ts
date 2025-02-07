@@ -94,3 +94,25 @@ export async function* openAIChatToTextGenerationStream(
 		}
 	}
 }
+
+/**
+ * Transform a non-streaming OpenAI chat completion into a stream of TextGenerationStreamOutput
+ */
+export async function* openAIChatToTextGenerationSingle(
+	completion: OpenAI.Chat.Completions.ChatCompletion
+) {
+	const content = completion.choices[0]?.message?.content || "";
+	const tokenId = 0;
+
+	// Yield the content as a single token
+	yield {
+		token: {
+			id: tokenId,
+			text: content,
+			logprob: 0,
+			special: false,
+		},
+		generated_text: content,
+		details: null,
+	} as TextGenerationStreamOutput;
+}
