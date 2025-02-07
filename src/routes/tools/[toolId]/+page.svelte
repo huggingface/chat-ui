@@ -54,7 +54,9 @@
 		<div class="flex h-full flex-col gap-2">
 			<div class="flex flex-col sm:flex-row sm:gap-6">
 				<div class="mb-4 flex justify-center sm:mb-0">
-					<ToolLogo color={data.tool.color} icon={data.tool.icon} size="lg" />
+					{#key data.tool.color + data.tool.icon}
+						<ToolLogo color={data.tool.color} icon={data.tool.icon} size="lg" />
+					{/key}
 				</div>
 
 				<div class="flex-1">

@@ -15,7 +15,9 @@
 >
 	{#if browser}
 		{#await fetch(`${base}/api/tools/${toolId}`).then((res) => res.json()) then value}
-			<ToolLogo color={value.color} icon={value.icon} size="sm" />
+			{#key value.color + value.icon}
+				<ToolLogo color={value.color} icon={value.icon} size="sm" />
+			{/key}
 			<div class="flex flex-col items-center justify-center py-1">
 				<a
 					href={`${base}/tools/${value._id}`}

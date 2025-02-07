@@ -65,7 +65,9 @@
 			<div
 				class="flex items-center justify-center space-x-2 rounded border border-gray-300 bg-gray-200 px-2 py-1"
 			>
-				<ToolLogo color={value.color} icon={value.icon} size="sm" />
+				{#key value.color + value.icon}
+					<ToolLogo color={value.color} icon={value.icon} size="sm" />
+				{/key}
 				<div class="flex flex-col items-center justify-center py-1">
 					<a
 						href={`${base}/tools/${value._id}`}

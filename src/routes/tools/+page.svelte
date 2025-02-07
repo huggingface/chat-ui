@@ -279,7 +279,9 @@
 						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}
 				>
-					<ToolLogo color={tool.color} icon={tool.icon} />
+					{#key tool.color + tool.icon}
+						<ToolLogo color={tool.color} icon={tool.icon} />
+					{/key}
 					<div class="flex h-full w-full flex-col items-start py-2 text-left">
 						<span class="font-bold">
 							<span class="w-full overflow-clip">

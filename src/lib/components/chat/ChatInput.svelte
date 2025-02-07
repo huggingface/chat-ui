@@ -318,7 +318,9 @@
 							goto(`${base}/tools/${tool._id}`);
 						}}
 					>
-						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
+						{#key tool.icon + tool.color}
+							<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
+						{/key}
 						{tool.displayName}
 					</button>
 				{/each}
