@@ -95,13 +95,15 @@
 		<Logo classNames="mr-1" />
 		{envPublic.PUBLIC_APP_NAME}
 	</a>
-	<a
-		href={`${base}/`}
-		onclick={handleNewChatClick}
-		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
-	>
-		New Chat
-	</a>
+	{#if $page.url.pathname !== base + "/"}
+		<a
+			href={`${base}/`}
+			onclick={handleNewChatClick}
+			class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
+		>
+			New Chat
+		</a>
+	{/if}
 </div>
 <div
 	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
