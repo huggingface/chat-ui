@@ -18,7 +18,7 @@ export async function embeddingEndpointHfApi(
 	input: z.input<typeof embeddingEndpointHfApiSchema>
 ): Promise<EmbeddingEndpoint> {
 	const { model, authorization } = embeddingEndpointHfApiSchema.parse(input);
-	const url = "https://api-inference.huggingface.co/models/" + model.id;
+	const url = `${env.HF_API_ROOT}/${model.id}`;
 
 	return async ({ inputs }) => {
 		const batchesInputs = chunk(inputs, 128);
