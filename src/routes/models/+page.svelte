@@ -133,9 +133,3 @@
 		</div>
 	</div>
 </div>
-
-<style lang="postcss">
-	.active-model {
-		@apply border-blue-500 bg-blue-500/5 hover:bg-blue-500/10;
-	}
-</style>
