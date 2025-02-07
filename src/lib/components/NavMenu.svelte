@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import { base } from "$app/paths";
 
 	import Logo from "$lib/components/icons/Logo.svelte";
@@ -78,7 +76,7 @@
 		conversations = [...conversations, ...newConvs];
 	}
 
-	run(() => {
+	$effect(() => {
 		if (conversations.length <= CONV_NUM_PER_PAGE) {
 			// reset p to 0 if there's only one page of content
 			// that would be caused by a data loading invalidation
