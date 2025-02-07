@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import {
 		ToolOutputComponents,
 		type CommunityToolEditable,
@@ -66,7 +64,7 @@
 		}
 	);
 
-	run(() => {
+	$effect(() => {
 		editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
 	});
 
