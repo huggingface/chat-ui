@@ -19,7 +19,7 @@ export async function* generateFromDefaultEndpoint({
 		// if not generated_text is here it means the generation is not done
 		if (output.generated_text) {
 			let generated_text = output.generated_text;
-			for (const stop of [...(smallModel.parameters?.stop ?? []), "<|endoftext|>"]) {
+			for (const stop of [...(smallModel.parameters?.stop ?? [])]) {
 				if (generated_text.endsWith(stop)) {
 					generated_text = generated_text.slice(0, -stop.length).trimEnd();
 				}

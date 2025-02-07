@@ -5,6 +5,7 @@
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonMicrophone from "~icons/carbon/microphone";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -29,6 +30,10 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
+	import TranscriptionAnimation from "../animations/TranscriptionAnimation.svelte";
+
+	import { AutomaticSpeechRecognitionPipeline, pipeline } from "@huggingface/transformers";
+	import LoadingAnimation from "../animations/LoadingAnimation.svelte";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -188,6 +193,64 @@
 		])
 	);
 	$: isFileUploadEnabled = activeMimeTypes.length > 0;
+
+	let transcriber: AutomaticSpeechRecognitionPipeline;
+	let isRecording = false;
+	let mediaRecorder: MediaRecorder;
+	// eslint-disable-next-line no-undef
+	let audioChunks: BlobPart[] = [];
+	let isLoadingModel = false;
+	let isTranscribing = false;
+
+	// @ts-expect-error webgpu is not typed correctly
+	$: webgpuSupported = browser && navigator.gpu;
+
+	let microphoneButton: HTMLButtonElement;
+
+	async function initializeTranscriber() {
+		if (!transcriber) {
+			isLoadingModel = true;
+			transcriber = await pipeline("automatic-speech-recognition", "onnx-community/whisper-small", {
+				device: "webgpu",
+			});
+			isLoadingModel = false;
+		}
+	}
+
+	async function startRecording() {
+		await initializeTranscriber();
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		mediaRecorder = new MediaRecorder(stream);
+		audioChunks = [];
+
+		mediaRecorder.ondataavailable = (event) => {
+			audioChunks.push(event.data);
+		};
+
+		mediaRecorder.onstop = async () => {
+			const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+			const audioUrl = URL.createObjectURL(audioBlob);
+			isTranscribing = true;
+			const userLanguage = navigator.language;
+			console.log("Detected language:", userLanguage);
+			const firstTwoChars = userLanguage.slice(0, 2).toLowerCase();
+			const output = await transcriber(audioUrl, { language: firstTwoChars, task: "transcribe" });
+			if (Array.isArray(output)) {
+				message = output.map((o) => o.text).join(" ");
+			} else {
+				message = output.text;
+			}
+			isTranscribing = false;
+		};
+
+		mediaRecorder.start();
+		isRecording = true;
+	}
+
+	function stopRecording() {
+		mediaRecorder.stop();
+		isRecording = false;
+	}
 </script>
 
 <svelte:window
@@ -420,6 +483,16 @@
 									/>
 								</svg>
 							</button>
+							{#if webgpuSupported}
+								<button
+									bind:this={microphoneButton}
+									class="btn mx-1 my-1 h-[2.4rem] self-end rounded-lg bg-transparent p-1 px-[0.7rem] text-gray-400 enabled:hover:text-gray-700 disabled:opacity-60 enabled:dark:hover:text-gray-100 dark:disabled:opacity-40"
+									on:click={isRecording ? stopRecording : startRecording}
+									type="button"
+								>
+									<CarbonMicrophone />
+								</button>
+							{/if}
 						{/if}
 					</div>
 				{/if}
@@ -477,6 +550,12 @@
 				{/if}
 			</div>
 		</div>
+		{#if isLoadingModel}
+			<LoadingAnimation classNames="absolute inset-0 z-10" />
+		{/if}
+		{#if isTranscribing}
+			<TranscriptionAnimation classNames="absolute inset-0 z-10" />
+		{/if}
 	</div>
 </div>
 
