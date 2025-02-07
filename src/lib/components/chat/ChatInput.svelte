@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { createBubbler } from "svelte/legacy";
-
-	const bubble = createBubbler();
 	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
@@ -26,6 +23,7 @@
 	import IconAdd from "~icons/carbon/add";
 	import { captureScreen } from "$lib/utils/screenshot";
 	import IconScreenshot from "../icons/IconScreenshot.svelte";
+	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	interface Props {
 		files?: File[];
@@ -167,7 +165,12 @@
 		oncompositionstart={() => (isCompositionOn = true)}
 		oncompositionend={() => (isCompositionOn = false)}
 		oninput={adjustTextareaHeight}
-		onbeforeinput={bubble("beforeinput")}
+		onbeforeinput={(ev) => {
+			if ($page.data.loginRequired) {
+				ev.preventDefault();
+				$loginModalOpen = true;
+			}
+		}}
 		{placeholder}
 		{disabled}
 	></textarea>

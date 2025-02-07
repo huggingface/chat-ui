@@ -423,12 +423,6 @@
 								bind:files
 								mimeTypes={activeMimeTypes}
 								on:submit={handleSubmit}
-								on:beforeinput={(ev) => {
-									if ($page.data.loginRequired) {
-										ev.preventDefault();
-										$loginModalOpen = true;
-									}
-								}}
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
 								modelHasTools={currentModel.tools}
