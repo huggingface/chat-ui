@@ -14,6 +14,6 @@
 		class="pointer-events-auto flex items-center rounded-full bg-white/90 px-3 py-1 shadow-sm dark:bg-gray-900/80"
 	>
 		<IconDazzled classNames="text-2xl mr-2" />
-		<h2 class="font-semibold">{message}</h2>
+		<h2 class="max-w-2xl font-semibold">{message}</h2>
 	</div>
 </div>
