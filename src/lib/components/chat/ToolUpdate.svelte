@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import { MessageToolUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import {
 		isMessageToolCallUpdate,
@@ -34,7 +32,7 @@
 
 	let isShowingLoadingBar = $state(false);
 
-	run(() => {
+	$effect(() => {
 		!toolError &&
 			!toolDone &&
 			loading &&
@@ -57,7 +55,7 @@
 	});
 
 	// go to 100% quickly if loading is done
-	run(() => {
+	$effect(() => {
 		(!loading || toolDone || toolError) &&
 			browser &&
 			loadingBarEl &&
