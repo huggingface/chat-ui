@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
 	import { afterNavigate, goto } from "$app/navigation";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/ArrowUpRight";
@@ -23,7 +23,7 @@
 	let assistantsSection: HTMLHeadingElement | undefined = $state();
 
 	onMount(() => {
-		if ($page.params?.assistantId && assistantsSection) {
+		if (page.params?.assistantId && assistantsSection) {
 			assistantsSection.scrollIntoView();
 		}
 	});
@@ -61,7 +61,7 @@
 			<a
 				href="{base}/settings/{model.id}"
 				class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-					{model.id === $page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
+					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 			>
 				<div class="mr-auto truncate">{model.displayName}</div>
 
@@ -91,7 +91,7 @@
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
 					class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-					{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+					{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					{#if assistant.avatar}
 						<img
@@ -120,7 +120,7 @@
 				<a
 					href="{base}/settings/assistants/new"
 					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-				{$page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+				{page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					<CarbonAdd />
 					<div class="truncate">Create new assistant</div>
@@ -134,7 +134,7 @@
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
 					class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-						{assistant._id.toString() === $page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+						{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					{#if assistant.avatar}
 						<img
@@ -171,7 +171,7 @@
 		<a
 			href="{base}/settings"
 			class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
-				{$page.url.pathname === `${base}/settings` ? '!bg-gray-100 !text-gray-800' : ''}"
+				{page.url.pathname === `${base}/settings` ? '!bg-gray-100 !text-gray-800' : ''}"
 		>
 			<UserIcon class="text-sm" />
 			Application Settings

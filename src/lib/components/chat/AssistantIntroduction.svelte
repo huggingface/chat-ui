@@ -16,7 +16,7 @@
 
 	import { share } from "$lib/utils/share";
 	import { env as envPublic } from "$env/dynamic/public";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	interface Props {
 		models: Model[];
@@ -48,7 +48,7 @@
 	);
 
 	const prefix =
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
+		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 
