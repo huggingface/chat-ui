@@ -3,7 +3,7 @@
 
 	import type { Message } from "$lib/types/Message";
 	import { createEventDispatcher, tick } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
@@ -101,7 +101,7 @@
 				{} as Record<string, MessageToolUpdate[]>
 			)
 	);
-	let urlNotTrailing = $derived($page.url.pathname.replace(/\/$/, ""));
+	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 	let webSearchSources = $derived(
 		searchUpdates?.find(
@@ -137,9 +137,9 @@
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		{#if $page.data?.assistant?.avatar}
+		{#if page.data?.assistant?.avatar}
 			<img
-				src="{base}/settings/assistants/{$page.data.assistant._id}/avatar.jpg"
+				src="{base}/settings/assistants/{page.data.assistant._id}/avatar.jpg"
 				alt="Avatar"
 				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 			/>

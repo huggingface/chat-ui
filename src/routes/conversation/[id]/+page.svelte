@@ -5,7 +5,7 @@
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
@@ -42,9 +42,9 @@
 
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
 		if (initialRun) {
-			if (!msgId && $page.url.searchParams.get("leafId")) {
-				msgId = $page.url.searchParams.get("leafId") as string;
-				$page.url.searchParams.delete("leafId");
+			if (!msgId && page.url.searchParams.get("leafId")) {
+				msgId = page.url.searchParams.get("leafId") as string;
+				page.url.searchParams.delete("leafId");
 			}
 			if (!msgId && browser && localStorage.getItem("leafId")) {
 				msgId = localStorage.getItem("leafId") as string;
@@ -102,7 +102,7 @@
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					fromShare: $page.params.id,
+					fromShare: page.params.id,
 					model: data.model,
 				}),
 			});
@@ -250,10 +250,10 @@
 			}
 
 			// disable websearch if assistant is present
-			const hasAssistant = !!$page.data.assistant;
+			const hasAssistant = !!page.data.assistant;
 			const messageUpdatesAbortController = new AbortController();
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				$page.params.id,
+				page.params.id,
 				{
 					base,
 					inputs: prompt,
@@ -301,13 +301,13 @@
 				) {
 					$error = update.message ?? "An error has occurred";
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = conversations.find(({ id }) => id === $page.params.id);
+					const convInData = conversations.find(({ id }) => id === page.params.id);
 					if (convInData) {
 						convInData.title = update.title;
 
 						$titleUpdate = {
 							title: update.title,
-							convId: $page.params.id,
+							convId: page.params.id,
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
@@ -347,7 +347,7 @@
 	}
 
 	async function voteMessage(score: Message["score"], messageId: string) {
-		let conversationId = $page.params.id;
+		let conversationId = page.params.id;
 		let oldScore: Message["score"] | undefined;
 
 		// optimistic update to avoid waiting for the server
@@ -463,10 +463,10 @@
 	});
 
 	run(() => {
-		$page.params.id, (($isAborted = true), (loading = false));
+		page.params.id, (($isAborted = true), (loading = false));
 	});
 	let title = $derived(
-		conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title
+		conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title
 	);
 </script>
 
@@ -493,7 +493,7 @@
 	on:continue={onContinue}
 	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation($page.params.id, data.title)}
+	on:share={() => shareConversation(page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
