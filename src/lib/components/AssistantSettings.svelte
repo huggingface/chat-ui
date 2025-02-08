@@ -5,7 +5,7 @@
 
 	import { onMount } from "svelte";
 	import { applyAction, enhance } from "$app/forms";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
@@ -140,7 +140,7 @@
 
 		formData.delete("ragMode");
 
-		if (ragMode === false || !$page.data.enableAssistantsRAG) {
+		if (ragMode === false || !page.data.enableAssistantsRAG) {
 			formData.set("ragAllowAll", "false");
 			formData.set("ragLinkList", "");
 			formData.set("ragDomainList", "");
@@ -432,7 +432,7 @@
 				</div>
 				<AssistantToolPicker bind:toolIds={tools} />
 			{/if}
-			{#if $page.data.enableAssistantsRAG}
+			{#if page.data.enableAssistantsRAG}
 				<div class="flex flex-col flex-nowrap pb-4">
 					<span class="mt-2 text-smd font-semibold"
 						>Internet access

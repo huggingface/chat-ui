@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from "$app/navigation";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
 
@@ -16,10 +16,10 @@
 	);
 
 	async function handleModelChange() {
-		if (!$page.params.id) return;
+		if (!page.params.id) return;
 
 		try {
-			const response = await fetch(`${base}/conversation/${$page.params.id}`, {
+			const response = await fetch(`${base}/conversation/${page.params.id}`, {
 				method: "PATCH",
 				headers: {
 					"Content-Type": "application/json",

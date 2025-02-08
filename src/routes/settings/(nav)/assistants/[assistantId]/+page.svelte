@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -30,13 +30,13 @@
 	let { data }: Props = $props();
 
 	let assistant = $derived(
-		data.assistants.find((el) => el._id.toString() === $page.params.assistantId)
+		data.assistants.find((el) => el._id.toString() === page.params.assistantId)
 	);
 
 	const settings = useSettingsStore();
 
 	const prefix =
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
+		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 
@@ -115,7 +115,7 @@
 						onclick={(e) => {
 							e.stopPropagation();
 							settings.instantSet({
-								activeModel: $page.params.assistantId,
+								activeModel: page.params.assistantId,
 							});
 							goto(`${base}/`);
 						}}

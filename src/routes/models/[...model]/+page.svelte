@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
@@ -16,7 +16,7 @@
 	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
-	const modelId = $page.params.model;
+	const modelId = page.params.model;
 
 	async function createConversation(message: string) {
 		try {
@@ -58,7 +58,7 @@
 	}
 
 	onMount(async () => {
-		const query = $page.url.searchParams.get("q");
+		const query = page.url.searchParams.get("q");
 		if (query) createConversation(query);
 
 		settings.instantSet({ activeModel: modelId });
@@ -71,9 +71,9 @@
 	<meta property="og:description" content={`Use ${modelId} with ${envPublic.PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{envPublic.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
-	<meta property="og:url" content={$page.url.href} />
+	<meta property="og:url" content={page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 

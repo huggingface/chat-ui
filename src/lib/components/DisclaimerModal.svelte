@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { env as envPublic } from "$env/dynamic/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
@@ -31,9 +31,9 @@
 		<div class="flex w-full flex-col items-center gap-2">
 			<button
 				class="w-full justify-center rounded-full border-2 border-gray-300 bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
-				class:bg-white={$page.data.loginEnabled}
-				class:text-gray-800={$page.data.loginEnabled}
-				class:hover:bg-slate-100={$page.data.loginEnabled}
+				class:bg-white={page.data.loginEnabled}
+				class:text-gray-800={page.data.loginEnabled}
+				class:hover:bg-slate-100={page.data.loginEnabled}
 				onclick={(e) => {
 					e.preventDefault();
 					e.stopPropagation();
@@ -44,8 +44,8 @@
 					$settings.ethicsModalAccepted = true;
 				}}
 			>
-				{#if $page.data.loginEnabled}
-					{#if $page.data.guestMode}
+				{#if page.data.loginEnabled}
+					{#if page.data.guestMode}
 						Continue as guest
 					{:else}
 						Explore the app
@@ -54,7 +54,7 @@
 					Start chatting
 				{/if}
 			</button>
-			{#if $page.data.loginEnabled}
+			{#if page.data.loginEnabled}
 				<form action="{base}/login" target="_parent" method="POST" class="w-full">
 					<button
 						type="submit"

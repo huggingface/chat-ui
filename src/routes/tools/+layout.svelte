@@ -2,7 +2,7 @@
 	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	interface Props {
 		children?: import("svelte").Snippet;
 	}
@@ -19,9 +19,9 @@
 		<meta
 			property="og:image"
 			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/tools-thumbnail.png"
+				page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/tools-thumbnail.png"
 		/>
-		<meta property="og:url" content={$page.url.href} />
+		<meta property="og:url" content={page.url.href} />
 	{/if}
 </svelte:head>
 

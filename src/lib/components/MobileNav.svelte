@@ -1,7 +1,8 @@
+<!-- @migration task: review uses of `navigating` -->
 <script lang="ts">
 	import { run } from "svelte/legacy";
 
-	import { navigating } from "$app/stores";
+	import { navigating } from "$app/state";
 	import { createEventDispatcher } from "svelte";
 	import { browser } from "$app/environment";
 	import { base } from "$app/paths";
@@ -29,7 +30,7 @@
 	const dispatch = createEventDispatcher();
 
 	run(() => {
-		if ($navigating) {
+		if (navigating) {
 			dispatch("toggle", false);
 		}
 	});

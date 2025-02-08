@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { env as envPublic } from "$env/dynamic/public";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -75,7 +75,7 @@
 
 	onMount(() => {
 		// check if there's a ?q query param with a message
-		const query = $page.url.searchParams.get("q");
+		const query = page.url.searchParams.get("q");
 		if (query) createConversation(query);
 	});
 
