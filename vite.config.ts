@@ -2,6 +2,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import Icons from "unplugin-icons/vite";
 import { promises } from "fs";
 import { defineConfig } from "vitest/config";
+import { svelteTesting } from "@testing-library/svelte/vite";
 
 // used to load fonts server side for thumbnail generation
 function loadTTFAsArrayBuffer() {
@@ -24,6 +25,7 @@ export default defineConfig({
 			compiler: "svelte",
 		}),
 		loadTTFAsArrayBuffer(),
+		svelteTesting(),
 	],
 	optimizeDeps: {
 		include: [
@@ -38,9 +40,28 @@ export default defineConfig({
 		open: "/",
 	},
 	test: {
-		setupFiles: ["./scripts/setupTest.ts"],
-		deps: { inline: ["@sveltejs/kit"] },
-		globals: true,
-		testTimeout: 10000,
+		workspace: [
+			{
+				test: {
+					name: "node",
+					include: ["src/**/*.spec.ts"],
+					environment: "node",
+					setupFiles: ["./scripts/setupTest.ts"],
+					deps: { inline: ["@sveltejs/kit"] },
+					globals: true,
+				},
+			},
+			{
+				test: {
+					name: "jsdom",
+					include: ["src/**/*.svelte.spec.ts"],
+					setupFiles: ["./scripts/setupTest.ts"],
+					deps: { inline: ["@sveltejs/kit"] },
+					globals: true,
+					testTimeout: 10000,
+					environment: "jsdom",
+				},
+			},
+		],
 	},
 });
