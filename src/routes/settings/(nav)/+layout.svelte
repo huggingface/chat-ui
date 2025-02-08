@@ -157,6 +157,32 @@
 							Active
 						</div>
 					{/if}
+					<button
+						type="submit"
+						form={`unsubscribe-${assistant._id}`}
+						aria-label="Remove assistant from your list"
+						class={[
+							"rounded-full p-1 text-xs hover:bg-gray-500 hover:bg-opacity-20",
+							assistant._id.toString() === page.params.assistantId
+								? "block"
+								: "hidden group-hover:block",
+							assistant._id.toString() !== $settings.activeModel && "ml-auto",
+						]}
+						onclick={(event) => {
+							if (assistant._id.toString() === page.params.assistantId) {
+								goto(`${base}/settings`);
+							}
+							event.stopPropagation();
+						}}
+					>
+						<CarbonClose class="size-4 text-gray-500" />
+					</button>
+					<form
+						id={`unsubscribe-${assistant._id}`}
+						action="{base}/settings/assistants/{assistant._id.toString()}?/unsubscribe"
+						method="POST"
+						class="hidden"
+					></form>
 				</a>
 			{/each}
 			<a
