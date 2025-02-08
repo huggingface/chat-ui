@@ -145,7 +145,7 @@
 				await fetch(`${base}/api/logout`, {
 					method: "POST",
 				});
-				await goto(base + "/");
+				await goto(base + "/", { invalidateAll: true });
 			}}
 			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
