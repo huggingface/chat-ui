@@ -173,7 +173,20 @@
 						</button>
 					</form>
 				{:else}
-					<form method="POST" action="?/unsubscribe" use:enhance>
+					<form
+						onsubmit={() => {
+							fetch(`${base}/api/assistant/${assistant?._id}/subscribe`, {
+								method: "DELETE",
+							}).then((r) => {
+								if (r.ok) {
+									goto(`${base}/settings/assistants`, { invalidateAll: true });
+								} else {
+									console.error(r);
+									$error = r.statusText;
+								}
+							});
+						}}
+					>
 						<button type="submit" class="underline">
 							<CarbonTrash class="mr-1.5 inline text-xs" />Remove</button
 						>
