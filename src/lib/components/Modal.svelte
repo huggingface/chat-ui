@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher, onDestroy, onMount } from "svelte";
 	import { cubicOut } from "svelte/easing";
-	import { fade } from "svelte/transition";
+	import { fade, fly } from "svelte/transition";
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
 
@@ -63,7 +63,11 @@
 			tabindex="-1"
 			bind:this={modalEl}
 			onkeydown={handleKeydown}
-			class="max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10 {width}"
+			in:fly={{ y: 100 }}
+			class={[
+				"max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10",
+				width,
+			]}
 		>
 			{@render children?.()}
 		</div>
