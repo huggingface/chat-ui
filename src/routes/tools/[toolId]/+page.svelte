@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { afterNavigate, goto } from "$app/navigation";
+	import { afterNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import Modal from "$lib/components/Modal.svelte";
@@ -19,6 +19,7 @@
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonStar from "~icons/carbon/star";
 	import CarbonLock from "~icons/carbon/locked";
+	import { error } from "$lib/stores/errors";
 
 	let { data } = $props();
 
@@ -43,6 +44,20 @@
 	let currentModelSupportTools = $derived(
 		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false
 	);
+
+	function setFeatured(status: ReviewStatus) {
+		fetch(`${base}/api/tools/${data.tool?._id}/review`, {
+			method: "PATCH",
+			body: JSON.stringify({ status }),
+		})
+			.then(() => {
+				invalidateAll();
+			})
+			.catch((e) => {
+				console.error(e);
+				$error = e.message;
+			});
+	}
 </script>
 
 {#if displayReportModal}
@@ -213,19 +228,19 @@
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.PRIVATE}
-								<form method="POST" action="?/approve" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.APPROVED)}>
 									<button type="submit" class="flex items-center text-green-600 underline">
 										<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 									>
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.PENDING}
-								<form method="POST" action="?/approve" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.APPROVED)}>
 									<button type="submit" class="flex items-center text-green-600 underline">
 										<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
 									>
 								</form>
-								<form method="POST" action="?/deny" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.DENIED)}>
 									<button type="submit" class="flex items-center text-red-600">
 										<span class="mr-1.5 font-light no-underline">X</span>
 										<span class="underline">Deny</span>
@@ -233,7 +248,7 @@
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.APPROVED || data.tool?.review === ReviewStatus.DENIED}
-								<form method="POST" action="?/unrequest" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.PRIVATE)}>
 									<button type="submit" class="flex items-center text-red-600 underline">
 										<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 									>
@@ -242,15 +257,16 @@
 						{/if}
 						{#if data.tool?.createdByMe && data.tool?.review === ReviewStatus.PRIVATE}
 							<form
-								method="POST"
-								action="?/request"
-								use:enhance={async ({ cancel }) => {
+								onsubmit={() => {
 									const confirmed = confirm(
 										"Are you sure you want to request this tool to be featured? Make sure you have tried the tool and that it works as expected. We will review your request once submitted."
 									);
+
 									if (!confirmed) {
-										cancel();
+										return;
 									}
+
+									setFeatured(ReviewStatus.PENDING);
 								}}
 							>
 								<button type="submit" class="flex items-center underline">

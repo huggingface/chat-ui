@@ -2,7 +2,7 @@
 	import { enhance } from "$app/forms";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import { goto } from "$app/navigation";
+	import { goto, invalidateAll } from "$app/navigation";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
@@ -22,6 +22,7 @@
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import ToolBadge from "$lib/components/ToolBadge.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
+	import { error } from "$lib/stores/errors";
 
 	interface Props {
 		data: PageData;
@@ -50,6 +51,20 @@
 	);
 
 	let prepromptTags = $derived(assistant?.preprompt?.split(/(\{\{[^{}]*\}\})/) ?? []);
+
+	function setFeatured(status: ReviewStatus) {
+		fetch(`${base}/api/assistant/${assistant?._id}/review`, {
+			method: "PATCH",
+			body: JSON.stringify({ status }),
+		})
+			.then(() => {
+				invalidateAll();
+			})
+			.catch((e) => {
+				console.error(e);
+				$error = e.message;
+			});
+	}
 </script>
 
 {#if displayReportModal}
@@ -192,19 +207,19 @@
 						</form>
 					{/if}
 					{#if assistant?.review === ReviewStatus.PRIVATE}
-						<form method="POST" action="?/approve" use:enhance>
+						<form onsubmit={() => setFeatured(ReviewStatus.APPROVED)}>
 							<button type="submit" class="flex items-center text-green-600 underline">
 								<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 							>
 						</form>
 					{/if}
 					{#if assistant?.review === ReviewStatus.PENDING}
-						<form method="POST" action="?/approve" use:enhance>
+						<form onsubmit={() => setFeatured(ReviewStatus.APPROVED)}>
 							<button type="submit" class="flex items-center text-green-600 underline">
 								<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
 							>
 						</form>
-						<form method="POST" action="?/deny" use:enhance>
+						<form onsubmit={() => setFeatured(ReviewStatus.DENIED)}>
 							<button type="submit" class="flex items-center text-red-600">
 								<span class="mr-1.5 font-light no-underline">X</span>
 								<span class="underline">Deny</span>
@@ -212,7 +227,7 @@
 						</form>
 					{/if}
 					{#if assistant?.review === ReviewStatus.APPROVED || assistant?.review === ReviewStatus.DENIED}
-						<form method="POST" action="?/unrequest" use:enhance>
+						<form onsubmit={() => setFeatured(ReviewStatus.PRIVATE)}>
 							<button type="submit" class="flex items-center text-red-600 underline">
 								<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 							>
@@ -221,15 +236,16 @@
 				{/if}
 				{#if assistant?.createdByMe && assistant?.review === ReviewStatus.PRIVATE}
 					<form
-						method="POST"
-						action="?/request"
-						use:enhance={async ({ cancel }) => {
+						onsubmit={() => {
 							const confirmed = confirm(
 								"Are you sure you want to request this assistant to be featured? Make sure you have tried the assistant and that it works as expected. "
 							);
+
 							if (!confirmed) {
-								cancel();
+								return;
 							}
+
+							setFeatured(ReviewStatus.PENDING);
 						}}
 					>
 						<button type="submit" class="flex items-center underline">
