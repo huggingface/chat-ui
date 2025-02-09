@@ -56,14 +56,14 @@
 		fetch(`${base}/api/assistant/${assistant?._id}/review`, {
 			method: "PATCH",
 			body: JSON.stringify({ status }),
-		})
-			.then(() => {
+		}).then((r) => {
+			if (r.ok) {
 				invalidateAll();
-			})
-			.catch((e) => {
-				console.error(e);
-				$error = e.message;
-			});
+			} else {
+				console.error(r);
+				$error = r.statusText;
+			}
+		});
 	}
 </script>
 
@@ -150,14 +150,14 @@
 						onsubmit={() => {
 							fetch(`${base}/api/assistant/${assistant?._id}`, {
 								method: "DELETE",
-							})
-								.then(() => {
+							}).then((r) => {
+								if (r.ok) {
 									goto(`${base}/settings/assistants`, { invalidateAll: true });
-								})
-								.catch((e) => {
-									console.error(e);
-									$error = e.message;
-								});
+								} else {
+									console.error(r);
+									$error = r.statusText;
+								}
+							});
 						}}
 					>
 						<button
@@ -209,14 +209,14 @@
 							onsubmit={() => {
 								fetch(`${base}/api/assistant/${assistant?._id}`, {
 									method: "DELETE",
-								})
-									.then(() => {
+								}).then((r) => {
+									if (r.ok) {
 										goto(`${base}/settings/assistants`, { invalidateAll: true });
-									})
-									.catch((e) => {
-										console.error(e);
-										$error = e.message;
-									});
+									} else {
+										console.error(r);
+										$error = r.statusText;
+									}
+								});
 							}}
 						>
 							<button
