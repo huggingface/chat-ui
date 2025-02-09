@@ -53,7 +53,10 @@
 </script>
 
 {#if displayReportModal}
-	<ReportModal on:close={() => (displayReportModal = false)} />
+	<ReportModal
+		on:close={() => (displayReportModal = false)}
+		reportUrl={`${base}/api/assistant/${assistant?._id}/report`}
+	/>
 {/if}
 <div class="flex h-full flex-col gap-2">
 	<div class="flex flex-col sm:flex-row sm:gap-6">

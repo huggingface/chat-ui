@@ -46,7 +46,10 @@
 </script>
 
 {#if displayReportModal}
-	<ReportModal on:close={() => (displayReportModal = false)} />
+	<ReportModal
+		on:close={() => (displayReportModal = false)}
+		reportUrl={`${base}/api/tools/${data.tool?._id}/report`}
+	/>
 {/if}
 
 <Modal on:close={() => goto(previousPage)} width="min-w-xl">
