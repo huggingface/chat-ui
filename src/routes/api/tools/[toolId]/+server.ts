@@ -49,3 +49,42 @@ export async function GET({ params }) {
 		return new Response(`Tool "${toolId}" not found`, { status: 404 });
 	}
 }
+
+export async function DELETE({ params, locals }) {
+	const tool = await collections.tools.findOne({ _id: new ObjectId(params.toolId) });
+
+	if (!tool) {
+		return new Response("Tool not found", { status: 404 });
+	}
+
+	if (
+		tool.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString() &&
+		!locals.user?.isAdmin
+	) {
+		return new Response("You are not the creator of this tool", { status: 403 });
+	}
+
+	await collections.tools.deleteOne({ _id: tool._id });
+
+	// Remove the tool from all users' settings
+	await collections.settings.updateMany(
+		{
+			tools: { $in: [tool._id.toString()] },
+		},
+		{
+			$pull: { tools: tool._id.toString() },
+		}
+	);
+
+	// Remove the tool from all assistants
+	await collections.assistants.updateMany(
+		{
+			tools: { $in: [tool._id.toString()] },
+		},
+		{
+			$pull: { tools: tool._id.toString() },
+		}
+	);
+
+	return new Response("Tool deleted", { status: 200 });
+}

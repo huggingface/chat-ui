@@ -146,7 +146,20 @@
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
 						><CarbonPen class="mr-1.5 inline text-xs" />Edit
 					</a>
-					<form method="POST" action="?/delete" use:enhance>
+					<form
+						onsubmit={() => {
+							fetch(`${base}/api/assistant/${assistant?._id}`, {
+								method: "DELETE",
+							})
+								.then(() => {
+									goto(`${base}/settings/assistants`, { invalidateAll: true });
+								})
+								.catch((e) => {
+									console.error(e);
+									$error = e.message;
+								});
+						}}
+					>
 						<button
 							type="submit"
 							class="flex items-center underline"
@@ -192,7 +205,20 @@
 					>
 
 					{#if !assistant?.createdByMe}
-						<form method="POST" action="?/delete" use:enhance>
+						<form
+							onsubmit={() => {
+								fetch(`${base}/api/assistant/${assistant?._id}`, {
+									method: "DELETE",
+								})
+									.then(() => {
+										goto(`${base}/settings/assistants`, { invalidateAll: true });
+									})
+									.catch((e) => {
+										console.error(e);
+										$error = e.message;
+									});
+							}}
+						>
 							<button
 								type="submit"
 								class="flex items-center text-red-600 underline"

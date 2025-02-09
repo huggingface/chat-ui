@@ -157,17 +157,17 @@
 								><CarbonPen class="mr-1.5 inline text-xs" />Edit
 							</a>
 							<form
-								method="POST"
-								action="?/delete"
-								use:enhance={async () => {
-									return async ({ result }) => {
-										if (result.type === "success") {
-											$settings.tools = ($settings?.tools ?? []).filter((t) => t !== data.tool._id);
+								onsubmit={() => {
+									fetch(`${base}/api/tools/${data.tool?._id}`, {
+										method: "DELETE",
+									})
+										.then(() => {
 											goto(`${base}/tools`, { invalidateAll: true });
-										} else {
-											await applyAction(result);
-										}
-									};
+										})
+										.catch((e) => {
+											console.error(e);
+											$error = e.message;
+										});
 								}}
 							>
 								<button
@@ -213,7 +213,20 @@
 							>
 
 							{#if !data.tool?.createdByMe}
-								<form method="POST" action="?/delete" use:enhance>
+								<form
+									onsubmit={() => {
+										fetch(`${base}/api/tools/${data.tool?._id}`, {
+											method: "DELETE",
+										})
+											.then(() => {
+												goto(`${base}/tools`, { invalidateAll: true });
+											})
+											.catch((e) => {
+												console.error(e);
+												$error = e.message;
+											});
+									}}
+								>
 									<button
 										type="submit"
 										class="flex items-center text-red-600 underline"
