@@ -7,7 +7,7 @@
 		data: PageData;
 	}
 
-	let { data, form = $bindable() }: Props = $props();
+	let { data }: Props = $props();
 
 	let assistant = data.assistants.find((el) => el._id.toString() === page.params.assistantId);
 </script>
