@@ -9,7 +9,7 @@
 	import { ReviewStatus } from "$lib/types/Review";
 
 	import ReportModal from "../../settings/(nav)/assistants/[assistantId]/ReportModal.svelte";
-	import { applyAction, enhance } from "$app/forms";
+	import { enhance } from "$app/forms";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 
 	import CarbonPen from "~icons/carbon/pen";
