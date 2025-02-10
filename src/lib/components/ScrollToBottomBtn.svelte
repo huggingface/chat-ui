@@ -1,17 +1,15 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import { fade } from "svelte/transition";
-	import { onDestroy } from "svelte";
 	import IconChevron from "./icons/IconChevron.svelte";
 
-	let visible = $state(false);
 	interface Props {
 		scrollNode: HTMLElement;
 		class?: string;
 	}
 
 	let { scrollNode, class: className = "" }: Props = $props();
+
+	let visible = $state(false);
 	let observer: ResizeObserver | null = $state(null);
 
 	function updateVisibility() {
@@ -25,19 +23,15 @@
 		scrollNode?.removeEventListener("scroll", updateVisibility);
 	}
 
-	onDestroy(destroy);
-	run(() => {
+	$effect(() => {
 		if (scrollNode) {
-			destroy();
-
 			if (window.ResizeObserver) {
-				observer = new ResizeObserver(() => {
-					updateVisibility();
-				});
+				observer = new ResizeObserver(() => updateVisibility());
 				observer.observe(scrollNode);
 			}
 			scrollNode.addEventListener("scroll", updateVisibility);
 		}
+		return () => destroy();
 	});
 </script>
 
