@@ -4,7 +4,6 @@
 	import type { Assistant } from "$lib/types/Assistant";
 
 	import { onMount } from "svelte";
-	import { applyAction, enhance } from "$app/forms";
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
@@ -20,24 +19,24 @@
 	import HoverTooltip from "./HoverTooltip.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import AssistantToolPicker from "./AssistantToolPicker.svelte";
-
-	type ActionData = {
-		error: boolean;
-		errors: {
-			field: string | number;
-			message: string;
-		}[];
-	} | null;
+	import { error } from "$lib/stores/errors";
+	import { goto } from "$app/navigation";
 
 	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
 
 	interface Props {
-		form: ActionData;
 		assistant?: AssistantFront | undefined;
 		models?: Model[];
 	}
 
-	let { form = $bindable(), assistant = undefined, models = [] }: Props = $props();
+	let errors = $state<
+		{
+			field: string;
+			message: string;
+		}[]
+	>([]);
+
+	let { assistant = undefined, models = [] }: Props = $props();
 
 	let files: FileList | null = $state(null);
 	const settings = useSettingsStore();
@@ -61,10 +60,7 @@
 	let inputMessage4 = $state(assistant?.exampleInputs[3] ?? "");
 
 	function resetErrors() {
-		if (form) {
-			form.errors = [];
-			form.error = false;
-		}
+		errors = [];
 	}
 
 	function onFilesChange(e: Event) {
@@ -74,7 +70,7 @@
 				inputEl.files = null;
 				files = null;
 
-				form = { error: true, errors: [{ field: "avatar", message: "Only images are allowed" }] };
+				errors = [{ field: "avatar", message: "Only images are allowed" }];
 				return;
 			}
 			files = inputEl.files;
@@ -83,8 +79,8 @@
 		}
 	}
 
-	function getError(field: string, returnForm: ActionData) {
-		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
+	function getError(field: string) {
+		return errors.find((error) => error.field === field)?.message ?? "";
 	}
 
 	let deleteExistingAvatar = $state(false);
@@ -109,10 +105,16 @@
 </script>
 
 <form
-	method="POST"
 	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
 	enctype="multipart/form-data"
-	use:enhance={async ({ formData }) => {
+	onsubmit={async (e) => {
+		e.preventDefault();
+		if (!e.target) {
+			return;
+		}
+		const formData = new FormData(e.target as HTMLFormElement, e.submitter);
+
+		console.log(formData);
 		loading = true;
 		if (files?.[0] && files[0].size > 0 && compress) {
 			await compress(files[0], {
@@ -158,10 +160,40 @@
 
 		formData.set("tools", tools.join(","));
 
-		return async ({ result }) => {
-			loading = false;
-			await applyAction(result);
-		};
+		let response: Response;
+		if (assistant?._id) {
+			response = await fetch(`${base}/api/assistant/${assistant._id}`, {
+				method: "PATCH",
+				body: formData,
+			});
+			if (response.ok) {
+				goto(`${base}/settings/assistants/${assistant?._id}`, { invalidateAll: true });
+			} else {
+				if (response.status === 400) {
+					const data = await response.json();
+					errors = data.errors;
+				} else {
+					$error = response.statusText;
+				}
+			}
+		} else {
+			response = await fetch(`${base}/api/assistant`, {
+				method: "POST",
+				body: formData,
+			});
+
+			if (response.ok) {
+				const { assistantId } = await response.json();
+				goto(`${base}/settings/assistants/${assistantId}`, { invalidateAll: true });
+			} else {
+				if (response.status === 400) {
+					const data = await response.json();
+					errors = data.errors;
+				} else {
+					$error = response.statusText;
+				}
+			}
+		}
 	}}
 >
 	{#if assistant}
@@ -240,7 +272,7 @@
 						</label>
 					</div>
 				{/if}
-				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
+				<p class="text-xs text-red-500">{getError("avatar")}</p>
 			</div>
 
 			<label>
@@ -251,7 +283,7 @@
 					placeholder="Assistant Name"
 					value={assistant?.name ?? ""}
 				/>
-				<p class="text-xs text-red-500">{getError("name", form)}</p>
+				<p class="text-xs text-red-500">{getError("name")}</p>
 			</label>
 
 			<label>
@@ -262,7 +294,7 @@
 					placeholder="It knows everything about python"
 					value={assistant?.description ?? ""}
 				></textarea>
-				<p class="text-xs text-red-500">{getError("description", form)}</p>
+				<p class="text-xs text-red-500">{getError("description")}</p>
 			</label>
 
 			<label>
@@ -277,7 +309,7 @@
 							<option value={model.id}>{model.displayName}</option>
 						{/each}
 					</select>
-					<p class="text-xs text-red-500">{getError("modelId", form)}</p>
+					<p class="text-xs text-red-500">{getError("modelId")}</p>
 					<button
 						type="button"
 						class="flex aspect-square items-center gap-2 whitespace-nowrap rounded-lg border px-3 {showModelSettings
@@ -291,7 +323,7 @@
 					class="mt-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-2 py-0.5"
 					class:hidden={!showModelSettings}
 				>
-					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
+					<p class="text-xs text-red-500">{getError("inputMessage1")}</p>
 					<div class="my-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:grid-rows-2">
 						<label for="temperature" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
@@ -415,7 +447,7 @@
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
 				</div>
-				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
+				<p class="text-xs text-red-500">{getError("inputMessage1")}</p>
 			</label>
 			{#if selectedModel?.tools}
 				<div>
@@ -504,7 +536,7 @@
 							placeholder="wikipedia.org,bbc.com"
 							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
 						/>
-						<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
+						<p class="text-xs text-red-500">{getError("ragDomainList")}</p>
 					{/if}
 
 					<label class="mt-1">
@@ -530,7 +562,7 @@
 							placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
 							value={assistant?.rag?.allowedLinks.join(",") ?? ""}
 						/>
-						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
+						<p class="text-xs text-red-500">{getError("ragLinkList")}</p>
 					{/if}
 				</div>
 			{/if}
@@ -597,7 +629,7 @@
 					{/if}
 				{/if}
 
-				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
+				<p class="text-xs text-red-500">{getError("preprompt")}</p>
 			</div>
 			<div class="absolute bottom-6 flex w-full justify-end gap-2 md:right-0 md:w-fit">
 				<a
