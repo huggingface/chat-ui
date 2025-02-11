@@ -55,13 +55,13 @@
 			onclick={() => {
 				fetch(`${base}/api/conversation/${page.params.id}/message/${message.id}`, {
 					method: "DELETE",
-				})
-					.then(async () => {
+				}).then(async (r) => {
+					if (r.ok) {
 						await invalidate(UrlDependency.Conversation);
-					})
-					.catch((err) => {
-						$error = err.message;
-					});
+					} else {
+						$error = (await r.json()).message;
+					}
+				});
 			}}
 		>
 			<div
