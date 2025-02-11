@@ -74,7 +74,6 @@
 		"autoprefixer": "^10.4.14",
 		"aws-sigv4-fetch": "^4.0.1",
 		"aws4": "^1.13.0",
-		"browser-image-resizer": "^2.4.1",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.0.3",
 		"express": "^4.21.2",
