@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { readAndCompressImage } from "browser-image-resizer";
 	import type { Model } from "$lib/types/Model";
 	import type { Assistant } from "$lib/types/Assistant";
 
@@ -45,12 +44,7 @@
 	let dynamicPrompt = $state(assistant?.dynamicPrompt ?? false);
 	let showModelSettings = $state(Object.values(assistant?.generateSettings ?? {}).some((v) => !!v));
 
-	let compress: typeof readAndCompressImage | null = $state(null);
-
 	onMount(async () => {
-		const module = await import("browser-image-resizer");
-		compress = module.readAndCompressImage;
-
 		modelId = findCurrentModel(models, assistant ? assistant.modelId : $settings.activeModel).id;
 	});
 
@@ -116,14 +110,8 @@
 
 		console.log(formData);
 		loading = true;
-		if (files?.[0] && files[0].size > 0 && compress) {
-			await compress(files[0], {
-				maxWidth: 500,
-				maxHeight: 500,
-				quality: 1,
-			}).then((resizedImage) => {
-				formData.set("avatar", resizedImage);
-			});
+		if (files?.[0] && files[0].size > 0) {
+			formData.set("avatar", files[0]);
 		}
 
 		if (deleteExistingAvatar === true) {
