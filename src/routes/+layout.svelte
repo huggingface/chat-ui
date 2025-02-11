@@ -23,6 +23,8 @@
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
+	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	let { data = $bindable(), children } = $props();
 
@@ -33,6 +35,8 @@
 
 	let isNavOpen = $state(false);
 	let isNavCollapsed = $state(false);
+
+	let overloadedModalOpen = $state(false);
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | undefined = $state();
@@ -47,6 +51,9 @@
 
 		currentError = $error;
 
+		if (currentError === "Model is overloaded") {
+			overloadedModalOpen = true;
+		}
 		errorToastTimeout = setTimeout(() => {
 			$error = undefined;
 			currentError = undefined;
@@ -233,6 +240,10 @@
 			$loginModalOpen = false;
 		}}
 	/>
+{/if}
+
+{#if overloadedModalOpen && isHuggingChat}
+	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
 
 <div

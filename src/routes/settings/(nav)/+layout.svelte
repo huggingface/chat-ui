@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
-	import { afterNavigate, goto } from "$app/navigation";
+	import { afterNavigate, goto, invalidateAll } from "$app/navigation";
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
@@ -11,6 +11,7 @@
 
 	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
+	import { error } from "$lib/stores/errors";
 
 	interface Props {
 		data: LayoutData;
@@ -159,7 +160,6 @@
 					{/if}
 					<button
 						type="submit"
-						form={`unsubscribe-${assistant._id}`}
 						aria-label="Remove assistant from your list"
 						class={[
 							"rounded-full p-1 text-xs hover:bg-gray-500 hover:bg-opacity-20",
@@ -169,20 +169,25 @@
 							assistant._id.toString() !== $settings.activeModel && "ml-auto",
 						]}
 						onclick={(event) => {
-							if (assistant._id.toString() === page.params.assistantId) {
-								goto(`${base}/settings`);
-							}
 							event.stopPropagation();
+							fetch(`${base}/api/assistant/${assistant._id}/subscribe`, {
+								method: "DELETE",
+							}).then((r) => {
+								if (r.ok) {
+									if (assistant._id.toString() === page.params.assistantId) {
+										goto(`${base}/settings`, { invalidateAll: true });
+									} else {
+										invalidateAll();
+									}
+								} else {
+									console.error(r);
+									$error = r.statusText;
+								}
+							});
 						}}
 					>
 						<CarbonClose class="size-4 text-gray-500" />
 					</button>
-					<form
-						id={`unsubscribe-${assistant._id}`}
-						action="{base}/settings/assistants/{assistant._id.toString()}?/unsubscribe"
-						method="POST"
-						class="hidden"
-					></form>
 				</a>
 			{/each}
 			<a

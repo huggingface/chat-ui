@@ -1,17 +1,13 @@
 <script lang="ts">
-	import Modal from "$lib/components/Modal.svelte";
-	import CarbonClose from "~icons/carbon/close";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
-
-	import { enhance } from "$app/forms";
-	import { base } from "$app/paths";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import Switch from "$lib/components/Switch.svelte";
 	import { env as envPublic } from "$env/dynamic/public";
-
-	let isConfirmingDeletion = $state(false);
+	import { goto } from "$app/navigation";
+	import { error } from "$lib/stores/errors";
+	import { base } from "$app/paths";
 
 	let settings = useSettingsStore();
 </script>
@@ -85,9 +81,20 @@
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
 			<button
-				onclick={(e) => {
+				onclick={async (e) => {
 					e.preventDefault();
-					isConfirmingDeletion = true;
+
+					confirm("Are you sure you want to delete all conversations?") &&
+						(await fetch(`${base}/api/conversations`, {
+							method: "DELETE",
+						})
+							.then(async () => {
+								await goto(`${base}/`, { invalidateAll: true });
+							})
+							.catch((err) => {
+								console.error(err);
+								$error = err.message;
+							}));
 				}}
 				type="submit"
 				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
@@ -95,40 +102,4 @@
 			>
 		</div>
 	</div>
-
-	{#if isConfirmingDeletion}
-		<Modal on:close={() => (isConfirmingDeletion = false)}>
-			<form
-				use:enhance={() => {
-					isConfirmingDeletion = false;
-				}}
-				method="post"
-				action="{base}/conversations?/delete"
-				class="flex w-full flex-col gap-5 p-6"
-			>
-				<div class="flex items-start justify-between text-xl font-semibold text-gray-800">
-					<h2>Are you sure?</h2>
-					<button
-						type="button"
-						class="group"
-						onclick={(e) => {
-							e.stopPropagation();
-							isConfirmingDeletion = false;
-						}}
-					>
-						<CarbonClose class="text-gray-900 group-hover:text-gray-500" />
-					</button>
-				</div>
-				<p class="text-gray-800">
-					This action will delete all your conversations. This cannot be undone.
-				</p>
-				<button
-					type="submit"
-					class="mt-2 rounded-full bg-red-700 px-5 py-2 text-lg font-semibold text-gray-100 ring-gray-400 ring-offset-1 transition-all hover:ring focus-visible:outline-none focus-visible:ring"
-				>
-					Confirm deletion
-				</button>
-			</form>
-		</Modal>
-	{/if}
 </div>
