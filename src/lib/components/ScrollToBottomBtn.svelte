@@ -22,15 +22,17 @@
 		observer?.disconnect();
 		scrollNode?.removeEventListener("scroll", updateVisibility);
 	}
-
-	$effect(() => {
-		if (scrollNode) {
-			if (window.ResizeObserver) {
-				observer = new ResizeObserver(() => updateVisibility());
-				observer.observe(scrollNode);
+	const cleanup = $effect.root(() => {
+		$effect(() => {
+			if (scrollNode) {
+				if (window.ResizeObserver) {
+					observer = new ResizeObserver(() => updateVisibility());
+					observer.observe(scrollNode);
+					cleanup();
+				}
+				scrollNode?.addEventListener("scroll", updateVisibility);
 			}
-			scrollNode.addEventListener("scroll", updateVisibility);
-		}
+		});
 		return () => destroy();
 	});
 </script>
