@@ -142,7 +142,7 @@
 	{#if user?.username || user?.email}
 		<button
 			onclick={async () => {
-				await fetch(`${base}/api/logout`, {
+				await fetch(`${base}/logout`, {
 					method: "POST",
 				});
 				await goto(base + "/", { invalidateAll: true });
@@ -165,7 +165,7 @@
 	{#if canLogin}
 		<button
 			onclick={async () => {
-				const response = await fetch(`${base}/api/login`, {
+				const response = await fetch(`${base}/login`, {
 					method: "POST",
 					credentials: "include",
 				});

@@ -4,7 +4,7 @@ import { env } from "$env/dynamic/private";
 
 export async function POST({ request, url, locals }) {
 	const referer = request.headers.get("referer");
-	let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/api/login/callback`;
+	let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
 
 	// TODO: Handle errors if provider is not responding
 

@@ -29,7 +29,7 @@
 		<form
 			class="flex w-full flex-col items-center gap-2"
 			onsubmit={async () => {
-				const response = await fetch(`${base}/api/login`, {
+				const response = await fetch(`${base}/login`, {
 					method: "POST",
 				});
 				if (response.ok) {

@@ -57,7 +57,7 @@
 			{#if page.data.loginEnabled}
 				<button
 					onclick={async () => {
-						const response = await fetch(`${base}/api/login`, {
+						const response = await fetch(`${base}/login`, {
 							method: "POST",
 						});
 						if (response.ok) {
