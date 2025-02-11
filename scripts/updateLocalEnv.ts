@@ -8,9 +8,13 @@ const prod = JSON.parse(JSON.stringify(yaml.load(file)));
 const vars = prod.envVars as Record<string, string>;
 
 let PUBLIC_CONFIG = "";
-Object.entries(vars).forEach(([key, value]) => {
-	PUBLIC_CONFIG += `${key}=\`${value}\`\n`;
-});
+
+Object.entries(vars)
+	// filter keys used in prod with the proxy
+	.filter(([key]) => !["XFF_DEPTH", "ADDRESS_HEADER"].includes(key))
+	.forEach(([key, value]) => {
+		PUBLIC_CONFIG += `${key}=\`${value}\`\n`;
+	});
 
 const SECRET_CONFIG =
 	(fs.existsSync(".env.SECRET_CONFIG")
@@ -18,7 +22,15 @@ const SECRET_CONFIG =
 		: process.env.SECRET_CONFIG) ?? "";
 
 // Prepend the content of the env variable SECRET_CONFIG
-const full_config = `${PUBLIC_CONFIG}\n${SECRET_CONFIG}`;
+let full_config = `${PUBLIC_CONFIG}\n${SECRET_CONFIG}`;
+
+// replace the internal proxy url with the public endpoint
+full_config = full_config.replaceAll(
+	"https://proxy.serverless.api-inference.huggingface.tech",
+	"https://api-inference.huggingface.co"
+);
+
+console.log(full_config);
 
 // Write full_config to .env.local
 fs.writeFileSync(".env.local", full_config);
