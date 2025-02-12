@@ -30,7 +30,5 @@ full_config = full_config.replaceAll(
 	"https://api-inference.huggingface.co"
 );
 
-console.log(full_config);
-
 // Write full_config to .env.local
 fs.writeFileSync(".env.local", full_config);
