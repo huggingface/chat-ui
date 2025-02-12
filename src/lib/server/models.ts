@@ -24,7 +24,7 @@ const reasoningSchema = z.union([
 	}),
 	z.object({
 		type: z.literal("tokens"), // use beginning and end tokens that define the reasoning portion of the answer
-		beginToken: z.string(),
+		beginToken: z.string(), // empty string means the model starts in reasoning mode
 		endToken: z.string(),
 	}),
 	z.object({

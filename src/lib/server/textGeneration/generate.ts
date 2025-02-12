@@ -27,7 +27,10 @@ export async function* generate(
 	const startTime = new Date();
 	if (
 		model.reasoning &&
-		(model.reasoning.type === "regex" || model.reasoning.type === "summarize")
+		// if the beginToken is an empty string, the model starts in reasoning mode
+		(model.reasoning.type === "regex" ||
+			model.reasoning.type === "summarize" ||
+			(model.reasoning.type === "tokens" && model.reasoning.beginToken === ""))
 	) {
 		// if the model has reasoning in regex or summarize mode, it starts in reasoning mode
 		// and we extract the answer from the reasoning
@@ -104,7 +107,11 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			} else if (model.reasoning && model.reasoning.type === "tokens") {
 				// make sure to remove the content of the reasoning buffer from
 				// the final answer to avoid duplication
-				const beginIndex = reasoningBuffer.indexOf(model.reasoning.beginToken);
+
+				// if the beginToken is an empty string, we don't need to remove anything
+				const beginIndex = model.reasoning.beginToken
+					? reasoningBuffer.indexOf(model.reasoning.beginToken)
+					: 0;
 				const endIndex = reasoningBuffer.lastIndexOf(model.reasoning.endToken);
 
 				if (beginIndex !== -1 && endIndex !== -1) {
