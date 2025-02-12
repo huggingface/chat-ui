@@ -139,7 +139,7 @@ envVars:
         "description": "The first reasoning model from DeepSeek, distilled into a 32B dense model. Outperforms o1-mini on multiple benchmarks.",
         "reasoning": {
           "type": "tokens",
-          "beginToken": "<think>",
+          "beginToken": "",
           "endToken": "</think>"
         },
         "promptExamples": [
