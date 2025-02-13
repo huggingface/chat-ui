@@ -45,6 +45,7 @@ export default defineConfig({
 				test: {
 					name: "node",
 					include: ["src/**/*.spec.ts"],
+					exclude: ["src/**/*.svelte.spec.ts"],
 					environment: "node",
 					setupFiles: ["./scripts/setupTest.ts"],
 					deps: { inline: ["@sveltejs/kit"] },
@@ -52,6 +53,7 @@ export default defineConfig({
 				},
 			},
 			{
+				extends: true,
 				test: {
 					name: "jsdom",
 					include: ["src/**/*.svelte.spec.ts"],
