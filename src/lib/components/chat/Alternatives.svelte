@@ -53,15 +53,17 @@
 		<button
 			class="hidden group-hover/navbranch:block"
 			onclick={() => {
-				fetch(`${base}/api/conversation/${page.params.id}/message/${message.id}`, {
-					method: "DELETE",
-				}).then(async (r) => {
-					if (r.ok) {
-						await invalidate(UrlDependency.Conversation);
-					} else {
-						$error = (await r.json()).message;
-					}
-				});
+				if (confirm("Are you sure you want to delete this branch?")) {
+					fetch(`${base}/api/conversation/${page.params.id}/message/${message.id}`, {
+						method: "DELETE",
+					}).then(async (r) => {
+						if (r.ok) {
+							await invalidate(UrlDependency.Conversation);
+						} else {
+							$error = (await r.json()).message;
+						}
+					});
+				}
 			}}
 		>
 			<div
