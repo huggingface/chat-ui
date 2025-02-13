@@ -158,7 +158,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://proxy.serverless.api-inference.huggingface.tech/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
       },
@@ -192,7 +192,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://proxy.serverless.api-inference.huggingface.tech/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+            "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
       },
@@ -260,7 +260,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://proxy.serverless.api-inference.huggingface.tech/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1"
+            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1"
           }
         ]
       },
@@ -279,7 +279,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://proxy.serverless.api-inference.huggingface.tech/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
@@ -596,7 +596,7 @@ envVars:
     ]
   HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
   HF_ORG_EARLY_ACCESS: '5e67bd5b1009063689407478'
-  HF_API_ROOT: 'https://proxy.serverless.api-inference.huggingface.tech/models'
+  HF_API_ROOT: 'https://internal.api-inference.huggingface.co/models'
 infisical:
   enabled: true
   env: "prod-us-east-1"
