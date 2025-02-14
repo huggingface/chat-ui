@@ -27,10 +27,15 @@
 		</p>
 
 		<form
-			action="{base}/{page.data.loginRequired ? 'login' : 'settings'}"
-			target="_parent"
-			method="POST"
 			class="flex w-full flex-col items-center gap-2"
+			onsubmit={async () => {
+				const response = await fetch(`${base}/login`, {
+					method: "POST",
+				});
+				if (response.ok) {
+					window.location.href = await response.text();
+				}
+			}}
 		>
 			{#if page.data.loginRequired}
 				<button
