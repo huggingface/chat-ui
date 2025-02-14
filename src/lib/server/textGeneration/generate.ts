@@ -119,15 +119,15 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 					finalAnswer =
 						text.slice(0, beginIndex) + text.slice(endIndex + model.reasoning.endToken.length);
 				}
-
-				yield {
-					type: MessageUpdateType.FinalAnswer,
-					text: finalAnswer,
-					interrupted,
-					webSources: output.webSources,
-				};
-				continue;
 			}
+
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text: finalAnswer,
+				interrupted,
+				webSources: output.webSources,
+			};
+			continue;
 		}
 
 		if (model.reasoning && model.reasoning.type === "tokens") {
