@@ -1,0 +1,26 @@
+services:
+  mongo:
+    image: mongo:latest
+    expose:
+      - 27017
+    networks:
+      - huggingchat-mongo
+    restart: always
+
+  huggingchat:
+    image: chat-ui:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    networks:
+      - huggingchat-mongo
+    volumes:
+      - .env.local:/app/.env.local
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017
+    restart: always
+
+networks:
+  huggingchat-mongo:
+    driver: bridge
