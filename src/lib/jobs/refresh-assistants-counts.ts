@@ -3,11 +3,22 @@ import { acquireLock, refreshLock } from "$lib/migrations/lock";
 import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
 import { logger } from "$lib/server/logger";
-
+import { collections } from "$lib/server/database";
 const LOCK_KEY = "assistants.count";
 
 let hasLock = false;
 let lockId: ObjectId | null = null;
+
+async function getLastComputationTime(): Promise<Date> {
+	const lastStats = await collections.assistantStats.findOne({}, { sort: { "date.at": -1 } });
+	return lastStats?.date?.at || new Date(0);
+}
+
+async function shouldComputeStats(): Promise<boolean> {
+	const lastComputationTime = await getLastComputationTime();
+	const oneDayAgo = new Date(Date.now() - 24 * 3_600_000);
+	return lastComputationTime < oneDayAgo;
+}
 
 async function refreshAssistantsCountsHelper() {
 	if (!hasLock) {
@@ -81,9 +92,15 @@ async function maintainLock() {
 export function refreshAssistantsCounts() {
 	const ONE_HOUR_MS = 3_600_000;
 
-	maintainLock().then(() => {
-		refreshAssistantsCountsHelper();
+	maintainLock().then(async () => {
+		if (await shouldComputeStats()) {
+			refreshAssistantsCountsHelper();
+		}
 
-		setInterval(refreshAssistantsCountsHelper, ONE_HOUR_MS);
+		setInterval(async () => {
+			if (await shouldComputeStats()) {
+				refreshAssistantsCountsHelper();
+			}
+		}, 24 * ONE_HOUR_MS);
 	});
 }

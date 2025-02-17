@@ -1,16 +1,12 @@
-<!-- @migration task: review uses of `navigating` -->
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
-	import { navigating } from "$app/state";
-	import { createEventDispatcher } from "svelte";
 	import { browser } from "$app/environment";
+	import { beforeNavigate } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
-
+	import { page } from "$app/state";
+	import IconNew from "$lib/components/icons/IconNew.svelte";
+	import { createEventDispatcher } from "svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
-	import IconNew from "$lib/components/icons/IconNew.svelte";
 
 	interface Props {
 		isOpen?: boolean;
@@ -20,25 +16,24 @@
 
 	let { isOpen = false, title = $bindable(), children }: Props = $props();
 
-	run(() => {
-		title = title ?? "New Chat";
-	});
-
 	let closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
 
-	const dispatch = createEventDispatcher();
-
-	run(() => {
-		if (navigating) {
-			dispatch("toggle", false);
-		}
+	$effect(() => {
+		title ??= "New Chat";
 	});
 
-	run(() => {
-		if (isOpen && closeEl) {
-			closeEl.focus();
-		} else if (!isOpen && browser && document.activeElement === closeEl) {
+	const dispatch = createEventDispatcher();
+	beforeNavigate(() => {
+		dispatch("toggle", false);
+	});
+
+	let shouldFocusClose = $derived(isOpen && closeEl);
+	let shouldRefocusOpen = $derived(!isOpen && browser && document.activeElement === closeEl);
+	$effect(() => {
+		if (shouldFocusClose) {
+			closeEl?.focus();
+		} else if (shouldRefocusOpen) {
 			openEl?.focus();
 		}
 	});
@@ -54,13 +49,11 @@
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
-	{#await title}
-		<div class="flex h-full items-center justify-center"></div>
-	{:then title}
-		<span class="truncate px-4">{title ?? ""}</span>
-	{/await}
+	<div class="flex h-full items-center justify-center">
+		<span class="truncate px-4" data-testid="chat-title">{title}</span>
+	</div>
 	<a
-		class:invisible={!$page.params.id}
+		class:invisible={!page.params?.id}
 		href="{base}/"
 		class="-mr-3 flex size-12 shrink-0 items-center justify-center text-lg"><IconNew /></a
 	>
