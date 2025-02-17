@@ -20,7 +20,7 @@
 	let openEl: HTMLButtonElement | undefined = $state();
 
 	$effect(() => {
-		if (title === undefined) title = "New Chat";
+		title ??= "New Chat";
 	});
 
 	const dispatch = createEventDispatcher();
