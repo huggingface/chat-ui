@@ -10,6 +10,15 @@
 	let { classNames = "" }: Props = $props();
 </script>
 
+<svelte:head>
+	<link
+		rel="preload"
+		href="{envPublic.PUBLIC_ORIGIN || page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/logo.svg"
+		as="image"
+		type="image/svg+xml"
+	/>
+</svelte:head>
+
 {#if envPublic.PUBLIC_APP_ASSETS === "chatui"}
 	<svg
 		height="30"
