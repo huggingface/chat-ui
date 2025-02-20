@@ -198,6 +198,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
+		filterSerializedResponseHeaders: (header) => {
+			return header.includes("content-type");
+		},
 	});
 
 	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"

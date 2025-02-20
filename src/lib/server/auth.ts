@@ -189,7 +189,10 @@ export async function authenticateRequest(
 	headers: HeaderRecord,
 	cookie: CookieRecord,
 	isApi?: boolean
-) {
+): Promise<App.Locals & { secretSessionId: string }> {
+	// once the entire API has been moved to elysia
+	// we can move this function to authPlugin.ts
+	// and get rid of the isApi && type: "svelte" options
 	const token =
 		cookie.type === "elysia"
 			? cookie.value[env.COOKIE_NAME].value
@@ -229,7 +232,7 @@ export async function authenticateRequest(
 		secretSessionId = token;
 		sessionId = await sha256(token);
 		const user = await findUser(sessionId);
-		return { user, sessionId, secretSessionId };
+		return { user: user ?? undefined, sessionId, secretSessionId };
 	}
 
 	if (isApi) {
@@ -272,7 +275,11 @@ export async function authenticateRequest(
 				updatedAt: new Date(),
 			});
 
-			return { user, sessionId, secretSessionId };
+			return {
+				user,
+				sessionId,
+				secretSessionId,
+			};
 		}
 	}
 
@@ -284,5 +291,5 @@ export async function authenticateRequest(
 		throw new Error("Session ID collision");
 	}
 
-	return { user: null, sessionId, secretSessionId };
+	return { user: undefined, sessionId, secretSessionId };
 }
