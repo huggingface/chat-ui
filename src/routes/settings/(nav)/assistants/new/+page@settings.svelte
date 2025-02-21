@@ -1,9 +1,12 @@
 <script lang="ts">
-	import type { ActionData, PageData } from "./$types";
 	import AssistantSettings from "$lib/components/AssistantSettings.svelte";
+	import type { PageData } from "./$types";
 
-	export let data: PageData;
-	export let form: ActionData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 </script>
 
-<AssistantSettings bind:form models={data.models} />
+<AssistantSettings models={data.models} />

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { USAGE_LIMITS, RATE_LIMIT } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import JSON5 from "json5";
 
 // RATE_LIMIT is the legacy way to define messages per minute limit
@@ -12,12 +12,13 @@ export const usageLimitsSchema = z
 		messagesPerMinute: z
 			.preprocess((val) => {
 				if (val === undefined) {
-					return RATE_LIMIT;
+					return env.RATE_LIMIT;
 				}
 				return val;
 			}, z.coerce.number().optional())
 			.optional(), // how many messages per minute
+		tools: z.coerce.number().optional(), // how many tools
 	})
 	.optional();
 
-export const usageLimits = usageLimitsSchema.parse(JSON5.parse(USAGE_LIMITS));
+export const usageLimits = usageLimitsSchema.parse(JSON5.parse(env.USAGE_LIMITS));

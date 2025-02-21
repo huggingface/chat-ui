@@ -10,7 +10,12 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			sessionId: string;
-			user?: User;
+			user?: User & { logoutDisabled?: boolean };
+		}
+
+		interface Error {
+			message: string;
+			errorId?: ReturnType<typeof crypto.randomUUID>;
 		}
 		// interface PageData {}
 		// interface Platform {}

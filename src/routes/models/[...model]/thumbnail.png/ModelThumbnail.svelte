@@ -1,11 +1,14 @@
 <script lang="ts">
-	import { PUBLIC_APP_COLOR } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
-	export let name: string;
-	export let logoUrl: string | undefined;
-
 	import logo from "../../../../../static/huggingchat/logo.svg?raw";
+	interface Props {
+		name: string;
+		logoUrl: string | undefined;
+	}
+
+	let { name, logoUrl }: Props = $props();
 </script>
 
 <div class=" flex h-[648px] w-full flex-col items-center bg-white">
@@ -19,7 +22,7 @@
 	</div>
 
 	<div
-		class="flex h-[200px] w-full flex-col items-center justify-center rounded-b-none bg-{PUBLIC_APP_COLOR}-500/10 pb-10 pt-10 text-4xl text-gray-500"
+		class="flex h-[200px] w-full flex-col items-center justify-center rounded-b-none bg-{envPublic.PUBLIC_APP_COLOR}-500/10 pb-10 pt-10 text-4xl text-gray-500"
 		style="border-radius: 100% 100% 0 0;"
 	>
 		Try it now

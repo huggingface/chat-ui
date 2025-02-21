@@ -1,22 +1,19 @@
-import { Issuer, BaseClient, type UserinfoResponse, TokenSet, custom } from "openid-client";
-import { addHours, addWeeks } from "date-fns";
 import {
-	COOKIE_NAME,
-	OPENID_CLIENT_ID,
-	OPENID_CLIENT_SECRET,
-	OPENID_PROVIDER_URL,
-	OPENID_SCOPES,
-	OPENID_NAME_CLAIM,
-	OPENID_TOLERANCE,
-	OPENID_RESOURCE,
-	OPENID_CONFIG,
-} from "$env/static/private";
+	Issuer,
+	type BaseClient,
+	type UserinfoResponse,
+	type TokenSet,
+	custom,
+} from "openid-client";
+import { addHours, addWeeks } from "date-fns";
+import { env } from "$env/dynamic/private";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
 import type { Cookies } from "@sveltejs/kit";
-import { collections } from "./database";
+import { collections } from "$lib/server/database";
 import JSON5 from "json5";
+import { logger } from "$lib/server/logger";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -35,27 +32,38 @@ const stringWithDefault = (value: string) =>
 
 export const OIDConfig = z
 	.object({
-		CLIENT_ID: stringWithDefault(OPENID_CLIENT_ID),
-		CLIENT_SECRET: stringWithDefault(OPENID_CLIENT_SECRET),
-		PROVIDER_URL: stringWithDefault(OPENID_PROVIDER_URL),
-		SCOPES: stringWithDefault(OPENID_SCOPES),
-		NAME_CLAIM: stringWithDefault(OPENID_NAME_CLAIM).refine(
+		CLIENT_ID: stringWithDefault(env.OPENID_CLIENT_ID),
+		CLIENT_SECRET: stringWithDefault(env.OPENID_CLIENT_SECRET),
+		PROVIDER_URL: stringWithDefault(env.OPENID_PROVIDER_URL),
+		SCOPES: stringWithDefault(env.OPENID_SCOPES),
+		NAME_CLAIM: stringWithDefault(env.OPENID_NAME_CLAIM).refine(
 			(el) => !["preferred_username", "email", "picture", "sub"].includes(el),
 			{ message: "nameClaim cannot be one of the restricted keys." }
 		),
-		TOLERANCE: stringWithDefault(OPENID_TOLERANCE),
-		RESOURCE: stringWithDefault(OPENID_RESOURCE),
+		TOLERANCE: stringWithDefault(env.OPENID_TOLERANCE),
+		RESOURCE: stringWithDefault(env.OPENID_RESOURCE),
+		ID_TOKEN_SIGNED_RESPONSE_ALG: z.string().optional(),
 	})
-	.parse(JSON5.parse(OPENID_CONFIG));
+	.parse(JSON5.parse(env.OPENID_CONFIG || "{}"));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
+const sameSite = z
+	.enum(["lax", "none", "strict"])
+	.default(dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
+	.parse(env.COOKIE_SAMESITE === "" ? undefined : env.COOKIE_SAMESITE);
+
+const secure = z
+	.boolean()
+	.default(!(dev || env.ALLOW_INSECURE_COOKIES === "true"))
+	.parse(env.COOKIE_SECURE === "" ? undefined : env.COOKIE_SECURE === "true");
+
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
-	cookies.set(COOKIE_NAME, sessionId, {
+	cookies.set(env.COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
-		sameSite: dev ? "lax" : "none",
-		secure: !dev,
+		sameSite,
+		secure,
 		httpOnly: true,
 		expires: addWeeks(new Date(), 2),
 	});
@@ -96,13 +104,22 @@ export async function generateCsrfToken(sessionId: string, redirectUrl: string):
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 	const issuer = await Issuer.discover(OIDConfig.PROVIDER_URL);
 
-	return new issuer.Client({
+	const client_config: ConstructorParameters<typeof issuer.Client>[0] = {
 		client_id: OIDConfig.CLIENT_ID,
 		client_secret: OIDConfig.CLIENT_SECRET,
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
 		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
-	});
+		id_token_signed_response_alg: OIDConfig.ID_TOKEN_SIGNED_RESPONSE_ALG || undefined,
+	};
+
+	const alg_supported = issuer.metadata["id_token_signing_alg_values_supported"];
+
+	if (Array.isArray(alg_supported)) {
+		client_config.id_token_signed_response_alg ??= alg_supported[0];
+	}
+
+	return new issuer.Client(client_config);
 }
 
 export async function getOIDCAuthorizationUrl(
@@ -119,9 +136,13 @@ export async function getOIDCAuthorizationUrl(
 	});
 }
 
-export async function getOIDCUserData(settings: OIDCSettings, code: string): Promise<OIDCUserInfo> {
+export async function getOIDCUserData(
+	settings: OIDCSettings,
+	code: string,
+	iss?: string
+): Promise<OIDCUserInfo> {
 	const client = await getOIDCClient(settings);
-	const token = await client.callback(settings.redirectURI, { code });
+	const token = await client.callback(settings.redirectURI, { code, iss });
 	const userData = await client.userinfo(token);
 
 	return { token, userData };
@@ -150,7 +171,7 @@ export async function validateAndParseCsrfToken(
 			return { redirectUrl: data.redirectUrl };
 		}
 	} catch (e) {
-		console.error(e);
+		logger.error(e);
 	}
 	return null;
 }

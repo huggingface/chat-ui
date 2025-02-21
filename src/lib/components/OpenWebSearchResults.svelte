@@ -1,22 +1,39 @@
 <script lang="ts">
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageWebSearchUpdateType,
+		type MessageWebSearchUpdate,
+	} from "$lib/types/MessageUpdate";
+	import { isMessageWebSearchSourcesUpdate } from "$lib/utils/messageUpdates";
 
 	import CarbonError from "~icons/carbon/error-filled";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconInternet from "./icons/IconInternet.svelte";
+	import CarbonCaretDown from "~icons/carbon/caret-down";
 
-	export let classNames = "";
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	interface Props {
+		webSearchMessages?: MessageWebSearchUpdate[];
+	}
 
-	$: sources = webSearchMessages.find((m) => m.sources)?.sources;
-	$: lastMessage = webSearchMessages.filter((m) => m.messageType !== "sources").slice(-1)[0];
-	$: loading = !sources && lastMessage.messageType !== "error";
+	let { webSearchMessages = [] }: Props = $props();
+
+	let sources = $derived(webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources);
+	let lastMessage = $derived(
+		webSearchMessages
+			.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
+			.at(-1) as MessageWebSearchUpdate
+	);
+	let errored = $derived(
+		webSearchMessages.some((update) => update.subtype === MessageWebSearchUpdateType.Error)
+	);
+	let loading = $derived(!sources && !errored);
 </script>
 
 <details
-	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
+	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
-	<summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2">
+	<summary
+		class="grid min-w-72 cursor-pointer select-none grid-cols-[40px,1fr,24px] items-center gap-2.5 rounded-xl p-2 group-open:rounded-b-none hover:bg-gray-500/10"
+	>
 		<div
 			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
 		>
@@ -47,10 +64,11 @@
 				{#if sources}
 					Completed
 				{:else}
-					{lastMessage.message}
+					{"message" in lastMessage ? lastMessage.message : "An error occurred"}
 				{/if}
 			</dt>
 		</dl>
+		<CarbonCaretDown class="size-6 text-gray-400 transition-transform group-open:rotate-180" />
 	</summary>
 
 	<div class="content px-5 pb-5 pt-4">
@@ -61,25 +79,25 @@
 		{:else}
 			<ol>
 				{#each webSearchMessages as message}
-					{#if message.messageType === "update"}
+					{#if message.subtype === MessageWebSearchUpdateType.Update}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<div
 									class="-ml-1.5 h-3 w-3 flex-none rounded-full bg-gray-200 dark:bg-gray-600 {loading
 										? 'group-last:animate-pulse group-last:bg-gray-300 group-last:dark:bg-gray-500'
 										: ''}"
-								/>
+								></div>
 								<h3 class="text-md -mt-1.5 pl-2.5 text-gray-800 dark:text-gray-100">
 									{message.message}
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}
 						</li>
-					{:else if message.messageType === "error"}
+					{:else if message.subtype === MessageWebSearchUpdateType.Error}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<CarbonError
@@ -90,7 +108,7 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}

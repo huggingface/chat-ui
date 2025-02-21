@@ -7,7 +7,7 @@ export async function load({ parent, params }) {
 	const assistant = data.settings.assistants.find((id) => id === params.assistantId);
 
 	if (!assistant) {
-		throw redirect(302, `${base}/assistant/${params.assistantId}`);
+		redirect(302, `${base}/assistant/${params.assistantId}`);
 	}
 
 	return data;

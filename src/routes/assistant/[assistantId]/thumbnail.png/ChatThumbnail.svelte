@@ -1,10 +1,13 @@
 <script lang="ts">
-	export let name: string;
-	export let description: string = "";
-	export let createdByName: string | undefined;
-	export let avatar: string | undefined;
-
 	import logo from "../../../../../static/huggingchat/logo.svg?raw";
+	interface Props {
+		name: string;
+		description?: string;
+		createdByName: string | undefined;
+		avatar: string | undefined;
+	}
+
+	let { name, description = "", createdByName, avatar }: Props = $props();
 </script>
 
 <div class="flex h-full w-full flex-col items-center justify-center bg-black p-2">

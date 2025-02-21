@@ -1,0 +1,620 @@
+image:
+  repository: huggingface
+  name: chat-ui
+
+nodeSelector:
+  role-huggingchat: "true"
+
+tolerations:
+  - key: "huggingface.co/huggingchat"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+serviceAccount:
+  enabled: true
+  create: true
+  name: huggingchat-prod
+
+ingress:
+  path: "/chat"
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: "/healthcheck"
+    alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
+    alb.ingress.kubernetes.io/group.name: "hub-prod"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/tags: "Env=prod,Project=hub,Terraform=true"
+    alb.ingress.kubernetes.io/target-node-labels: "role-hub-utils=true"
+    kubernetes.io/ingress.class: "alb"
+
+envVars:
+  ADDRESS_HEADER: 'X-Forwarded-For'
+  ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
+  APP_BASE: "/chat"
+  ALLOW_IFRAME: "false"
+  COMMUNITY_TOOLS: "true"
+  COOKIE_SAMESITE: "lax"
+  COOKIE_SECURE: "true"
+  ENABLE_ASSISTANTS: "true"
+  ENABLE_ASSISTANTS_RAG: "true"
+  METRICS_PORT: 5565
+  LOG_LEVEL: "debug"
+  METRICS_ENABLED: "true"
+  MODELS: >
+    [
+      {
+        "name": "meta-llama/Llama-3.3-70B-Instruct",
+        "id": "meta-llama/Llama-3.3-70B-Instruct",
+        "description": "Ideal for everyday use. A fast and extremely capable model matching closed source models' capabilities. Now with the latest Llama 3.3 weights!",
+        "modelUrl": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+        "websiteUrl": "https://llama.meta.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
+        "tools": true,
+        "preprompt": "",
+        "parameters": {
+          "stop": ["<|endoftext|>", "<|eot_id|>"],
+          "temperature": 0.6,
+          "max_new_tokens": 1024,
+          "truncate": 7167
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
+        "name": "Qwen/Qwen2.5-72B-Instruct",
+        "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
+        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+        "parameters": {
+          "stop": ["<|endoftext|>", "<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 28672,
+          "max_new_tokens": 3072
+        },
+        "tools": true,
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
+        "name": "CohereForAI/c4ai-command-r-plus-08-2024",
+        "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
+        "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
+        "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
+        "tools": true,
+        "parameters": {
+          "stop": ["<|END_OF_TURN_TOKEN|>"],
+          "truncate": 28672,
+          "max_new_tokens": 2048,
+          "temperature": 0.3
+        },
+        "promptExamples": [
+          {
+            "title": "Generate a mouse portrait",
+            "prompt": "Generate the portrait of a scientific mouse in its laboratory."
+          },
+          {
+            "title": "Review a pull request",
+            "prompt": "Review this pull request: https://github.com/huggingface/chat-ui/pull/1131/files"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          }
+        ]
+      },
+      {
+        "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "modelUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "websiteUrl": "https://deepseek.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/deepseek-logo.png",
+        "description": "The first reasoning model from DeepSeek, distilled into a 32B dense model. Outperforms o1-mini on multiple benchmarks.",
+        "reasoning": {
+          "type": "tokens",
+          "beginToken": "",
+          "endToken": "</think>"
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+          }
+        ]
+      },
+      {
+        "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+        "websiteUrl": "https://www.nvidia.com/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
+        "description": "Nvidia's latest Llama fine-tune, topping alignment benchmarks and optimized for instruction following.",
+        "parameters": {
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.5,
+          "truncate": 28672,
+          "max_new_tokens": 2048
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+          }
+        ]
+      },
+      {
+        "name": "Qwen/QwQ-32B-Preview",
+        "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
+        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
+        "reasoning": {
+          "type": "summarize"
+        },
+        "parameters": {
+          "stop": ["<|im_end|>"],
+          "truncate": 12288,
+          "max_new_tokens": 4096,
+          "temperature": 0.7,
+          "top_k": 20,
+          "top_p": 0.8,
+          "repetition_penalty": 1.05
+        },
+        "promptExamples": [
+          {
+            "title": "Rs in strawberry",
+            "prompt": "how many R in strawberry?"
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+          {
+            "title": "Measuring 6 liters",
+            "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ]
+      },
+      {
+        "name": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "description": "Qwen's latest coding model, in its biggest size yet. SOTA on many coding benchmarks.",
+        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-coder-family/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+        "parameters": {
+          "stop": ["<|im_end|>", "<|endoftext|>"],
+          "temperature": 0.6,
+          "truncate": 28672,
+          "max_new_tokens": 3072
+        },
+        "promptExamples": [
+          {
+            "title": "To-do list web app",
+            "prompt": "Create a simple to-do list application where users can:\n- Add new tasks.\n- Mark tasks as complete.\n- Delete completed tasks.\nThe tasks should persist in the browser's local storage so that they remain available even after a page reload.\n"
+          },
+          {
+            "title": "Create a REST API",
+            "prompt": "Build a simple REST API using Node.js, TypeScript and Express:\n- POST /items: Accepts a JSON body with name and quantity and adds a new item.\n- GET /items: Returns a list of all items.\n- PUT /items/:id: Updates the name or quantity of an item by its id.\n- DELETE /items/:id: Removes an item by its id.\nUse an in-memory array as the data store (no need for a database). Include basic error handling (e.g., item not found)."
+          },
+          {
+            "title": "Simple website",
+            "prompt": "Generate a snazzy static landing page for a local coffee shop using HTML and CSS. You can use tailwind using <script src='https://cdn.tailwindcss.com'></script>."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1"
+          }
+        ]
+      },
+      {
+        "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
+        "description": "The latest multimodal model from Meta! Supports image inputs natively.",
+        "websiteUrl": "https://llama.com/",
+        "multimodal": true,
+        "parameters": {
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
+        },
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
+            "multimodal": {
+              "image": {
+                "maxSizeInMB": 10,
+                "maxWidth": 560,
+                "maxHeight": 560,
+                "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
+                "preferredMimeType": "image/webp"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "description": "Nous Research's latest Hermes 3 release in 8B size. Follows instruction closely.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
+        "websiteUrl": "https://nousresearch.com/",
+        "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+        "tokenizer": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
+        "parameters": {
+          "stop": ["<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
+        }
+      },
+      {
+        "name": "mistralai/Mistral-Nemo-Instruct-2407",
+        "tokenizer": "mistralai/Mistral-Nemo-Instruct-2407",
+        "displayName": "mistralai/Mistral-Nemo-Instruct-2407",
+        "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
+        "websiteUrl": "https://mistral.ai/news/mistral-nemo/",
+        "modelUrl": "https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407",
+        "preprompt": "",
+        "parameters": {
+          "stop": ["</s>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
+        "name": "microsoft/Phi-3.5-mini-instruct",
+        "tokenizer": "microsoft/Phi-3.5-mini-instruct",
+        "description": "One of the best small models (3.8B parameters), super fast for simple tasks.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
+        "modelUrl": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct",
+        "websiteUrl": "https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/discover-the-new-multi-lingual-high-quality-phi-3-5-slms/ba-p/4225280/",
+        "preprompt": "",
+        "parameters": {
+          "stop": ["<|end|>", "<|endoftext|>", "<|assistant|>"],
+          "temperature": 0.6,
+          "truncate": 28672,
+          "max_new_tokens": 3072
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ]
+      },
+      {
+        "name": "meta-llama/Llama-3.1-8B-Instruct",
+        "parameters": {
+          "temperature": 0.6,
+          "stop": ["<|endoftext|>", "<|eot_id|>"]
+        },
+        "unlisted": true
+      }
+    ]
+
+  NODE_ENV: "prod"
+  NODE_LOG_STRUCTURED_DATA: true
+  OLD_MODELS: >
+    [
+      { "name": "bigcode/starcoder" },
+      { "name": "OpenAssistant/oasst-sft-6-llama-30b-xor" },
+      { "name": "HuggingFaceH4/zephyr-7b-alpha" },
+      { "name": "openchat/openchat_3.5" },
+      { "name": "openchat/openchat-3.5-1210" },
+      { "name": "tiiuae/falcon-180B-chat" },
+      { "name": "codellama/CodeLlama-34b-Instruct-hf" },
+      { "name": "google/gemma-7b-it" },
+      { "name": "meta-llama/Llama-2-70b-chat-hf" },
+      { "name": "codellama/CodeLlama-70b-Instruct-hf" },
+      { "name": "openchat/openchat-3.5-0106" },
+      { "name": "meta-llama/Meta-Llama-3-70B-Instruct" },
+      { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8" },
+      {
+        "name": "CohereForAI/c4ai-command-r-plus",
+        "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"
+      },
+      {
+        "name": "01-ai/Yi-1.5-34B-Chat",
+        "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"
+      },
+      {
+        "name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "transferTo": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      {
+        "name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "transferTo": "NousResearch/Hermes-3-Llama-3.1-8B"
+      },
+      {
+        "name": "mistralai/Mistral-7B-Instruct-v0.3",
+        "transferTo": "mistralai/Mistral-Nemo-Instruct-2407"
+      },
+      {
+        "name": "microsoft/Phi-3-mini-4k-instruct",
+        "transferTo": "microsoft/Phi-3.5-mini-instruct"
+      },
+      {
+        "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        "transferTo": "meta-llama/Llama-3.3-70B-Instruct"
+      }
+    ]
+  PUBLIC_ORIGIN: "https://huggingface.co"
+  PUBLIC_SHARE_PREFIX: "https://hf.co/chat"
+  PUBLIC_ANNOUNCEMENT_BANNERS: >
+    [
+      {
+        "title": "DeepSeek R1 is now available!",
+        "linkTitle": "Try it out!",
+        "linkHref": "https://huggingface.co/chat/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+      }
+    ]
+  PUBLIC_APP_NAME: "HuggingChat"
+  PUBLIC_APP_ASSETS: "huggingchat"
+  PUBLIC_APP_COLOR: "yellow"
+  PUBLIC_APP_DESCRIPTION: "Making the community's best AI chat models available to everyone."
+  PUBLIC_APP_DISCLAIMER_MESSAGE: "Disclaimer: AI is an area of active research with known problems such as biased generation and misinformation. Do not use this application for high-stakes decisions or advice."
+  PUBLIC_APP_GUEST_MESSAGE: "Sign in with a free Hugging Face account to continue using HuggingChat."
+  PUBLIC_APP_DATA_SHARING: 0
+  PUBLIC_APP_DISCLAIMER: 1
+  PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
+  REQUIRE_FEATURED_ASSISTANTS: "true"
+  TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
+  TEXT_EMBEDDING_MODELS: >
+    [{
+      "name": "bge-base-en-v1-5-sxa",
+      "displayName": "bge-base-en-v1-5-sxa",
+      "chunkCharLength": 512,
+      "endpoints": [{
+        "type": "tei",
+        "url": "https://huggingchat-tei.hf.space/"
+      }]
+    }]
+  WEBSEARCH_BLOCKLIST: '["youtube.com", "twitter.com"]'
+  XFF_DEPTH: '2'
+  TOOLS: >
+    [
+      {
+        "_id": "000000000000000000000001",
+        "displayName": "Image Generation",
+        "description": "Use this tool to generate images based on a prompt.",
+        "color": "yellow",
+        "icon": "camera",
+        "baseUrl": "black-forest-labs/FLUX.1-schnell",
+        "name": "image_generation",
+        "endpoint": "/infer",
+        "inputs": [
+          {
+            "name": "prompt",
+            "description": "A prompt to generate an image from",
+            "paramType": "required",
+            "type": "str"
+          },
+          { "name": "seed", "paramType": "fixed", "value": "0", "type": "float" },
+          {
+            "name": "randomize_seed",
+            "paramType": "fixed",
+            "value": "true",
+            "type": "bool"
+          },
+          {
+            "name": "width",
+            "description": "numeric value between 256 and 2048",
+            "paramType": "optional",
+            "default": 1024,
+            "type": "float"
+          },
+          {
+            "name": "height",
+            "description": "numeric value between 256 and 2048",
+            "paramType": "optional",
+            "default": 1024,
+            "type": "float"
+          },
+          {
+            "name": "num_inference_steps",
+            "paramType": "fixed",
+            "value": "4",
+            "type": "float"
+          }
+        ],
+        "outputComponent": "image",
+        "outputComponentIdx": 0,
+        "showOutput": true
+      },
+      {
+        "_id": "000000000000000000000002",
+        "displayName": "Document Parser",
+        "description": "Use this tool to parse any document and get its content in markdown format.",
+        "color": "yellow",
+        "icon": "cloud",
+        "baseUrl": "huggingchat/document-parser",
+        "name": "document_parser",
+        "endpoint": "/predict",
+        "inputs": [
+          {
+            "name": "document",
+            "description": "Filename of the document to parse",
+            "paramType": "required",
+            "type": "file",
+            "mimeTypes": 'application/*'
+          },
+          {
+            "name": "filename",
+            "paramType": "fixed",
+            "value": "document.pdf",
+            "type": "str"
+          }
+        ],
+        "outputComponent": "textbox",
+        "outputComponentIdx": 0,
+        "showOutput": false,
+        "isHidden": true
+      },
+      {
+        "_id": "000000000000000000000003",
+        "name": "edit_image",
+        "baseUrl": "multimodalart/cosxl",
+        "endpoint": "/run_edit",
+        "inputs": [
+          {
+            "name": "image",
+            "description": "The image path to be edited",
+            "paramType": "required",
+            "type": "file",
+            "mimeTypes": 'image/*'
+          },
+          {
+            "name": "prompt",
+            "description": "The prompt with which to edit the image",
+            "paramType": "required",
+            "type": "str"
+          },
+          {
+            "name": "negative_prompt",
+            "paramType": "fixed",
+            "value": "",
+            "type": "str"
+          },
+          {
+            "name": "guidance_scale",
+            "paramType": "fixed",
+            "value": 6.5,
+            "type": "float"
+          },
+          {
+            "name": "steps",
+            "paramType": "fixed",
+            "value": 30,
+            "type": "float"
+          }
+        ],
+        "outputComponent": "image",
+        "showOutput": true,
+        "displayName": "Image Editor",
+        "color": "green",
+        "icon": "camera",
+        "description": "This tool lets you edit images",
+        "outputComponentIdx": 0
+      }
+    ]
+  HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
+  HF_ORG_EARLY_ACCESS: '5e67bd5b1009063689407478'
+  HF_API_ROOT: 'https://internal.api-inference.huggingface.co/models'
+infisical:
+  enabled: true
+  env: "prod-us-east-1"
+
+autoscaling:
+  enabled: true
+  minReplicas: 12
+  maxReplicas: 30
+  targetMemoryUtilizationPercentage: "50"
+  targetCPUUtilizationPercentage: "50"
+
+resources:
+  requests:
+    cpu: 2
+    memory: 4Gi
+  limits:
+    cpu: 4
+    memory: 8Gi
+
+monitoring:
+  enabled: true

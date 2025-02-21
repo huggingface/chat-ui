@@ -1,50 +1,35 @@
 <script lang="ts">
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { PUBLIC_APP_NAME, PUBLIC_ORIGIN } from "$env/static/public";
+	import { env as envPublic } from "$env/dynamic/public";
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 
-	export let data;
+	let { data } = $props();
 
-	let loading = false;
-	let files: File[] = [];
+	let loading = $state(false);
+	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
-	const modelId = $page.params.model;
+	const modelId = page.params.model;
 
 	async function createConversation(message: string) {
 		try {
 			loading = true;
-			// check if $settings.activeModel is a valid model
-			// else check if it's an assistant, and use that model
-			// else use the first model
 
-			const validModels = data.models.map((model) => model.id);
-
-			let model;
-			if (validModels.includes($settings.activeModel)) {
-				model = $settings.activeModel;
-			} else {
-				if (validModels.includes(data.assistant?.modelId)) {
-					model = data.assistant?.modelId;
-				} else {
-					model = data.models[0].id;
-				}
-			}
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					model,
-					preprompt: $settings.customPrompts[$settings.activeModel],
+					model: modelId,
+					preprompt: $settings.customPrompts[modelId],
 				}),
 			});
 
@@ -73,21 +58,22 @@
 	}
 
 	onMount(async () => {
-		settings.instantSet({
-			activeModel: modelId,
-		});
+		const query = page.url.searchParams.get("q");
+		if (query) createConversation(query);
+
+		settings.instantSet({ activeModel: modelId });
 	});
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={modelId + " - " + PUBLIC_APP_NAME} />
+	<meta property="og:title" content={modelId + " - " + envPublic.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${modelId} with ${PUBLIC_APP_NAME}`} />
+	<meta property="og:description" content={`Use ${modelId} with ${envPublic.PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{envPublic.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
-	<meta property="og:url" content={$page.url.href} />
+	<meta property="og:url" content={page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 

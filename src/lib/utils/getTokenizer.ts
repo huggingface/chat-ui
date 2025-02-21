@@ -1,5 +1,5 @@
 import type { Model } from "$lib/types/Model";
-import { AutoTokenizer, PreTrainedTokenizer } from "@xenova/transformers";
+import { AutoTokenizer, PreTrainedTokenizer } from "@huggingface/transformers";
 
 export async function getTokenizer(_modelTokenizer: Exclude<Model["tokenizer"], undefined>) {
 	if (typeof _modelTokenizer === "string") {

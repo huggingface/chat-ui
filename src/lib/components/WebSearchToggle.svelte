@@ -8,15 +8,17 @@
 
 <div
 	class="flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border bg-white p-1.5 shadow-sm hover:shadow-none dark:border-gray-800 dark:bg-gray-900"
-	on:click={toggle}
-	on:keydown={toggle}
+	onclick={toggle}
+	onkeydown={toggle}
 	aria-checked={$webSearchParameters.useSearch}
-	aria-label="web search toggle"
+	aria-label="Web Search Toggle"
 	role="switch"
 	tabindex="0"
 >
-	<Switch name="useSearch" bind:checked={$webSearchParameters.useSearch} on:click on:keydown />
-	<div class="whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">Search web</div>
+	<Switch name="useSearch" bind:checked={$webSearchParameters.useSearch} />
+	<label for="useSearch" class="whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+		Search web
+	</label>
 	<div class="group relative w-max">
 		<CarbonInformation class="text-xs text-gray-500" />
 		<div

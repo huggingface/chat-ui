@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
@@ -11,23 +13,85 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
-	import type { MessageUpdate } from "$lib/types/MessageUpdate";
+	import {
+		MessageReasoningUpdateType,
+		MessageUpdateStatus,
+		MessageUpdateType,
+	} from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
-	import { createConvTreeStore } from "$lib/stores/convTree";
 	import type { v4 } from "uuid";
+	import { useSettingsStore } from "$lib/stores/settings.js";
+	import { browser } from "$app/environment";
 
-	export let data;
+	let { data = $bindable() } = $props();
 
-	$: ({ messages } = data);
+	let loading = $state(false);
+	let pending = $state(false);
+	let initialRun = true;
 
-	let loading = false;
-	let pending = false;
+	let files: File[] = $state([]);
 
-	let files: File[] = [];
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		conversations = data.conversations;
+	});
+
+	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
+		if (initialRun) {
+			if (!msgId && page.url.searchParams.get("leafId")) {
+				msgId = page.url.searchParams.get("leafId") as string;
+				page.url.searchParams.delete("leafId");
+			}
+			if (!msgId && browser && localStorage.getItem("leafId")) {
+				msgId = localStorage.getItem("leafId") as string;
+			}
+			initialRun = false;
+		}
+
+		const msg = messages.find((msg) => msg.id === msgId) ?? messages.at(-1);
+		if (!msg) return [];
+		// ancestor path
+		const { ancestors } = msg;
+		const path = [];
+		if (ancestors?.length) {
+			for (const ancestorId of ancestors) {
+				const ancestor = messages.find((msg) => msg.id === ancestorId);
+				if (ancestor) {
+					path.push(ancestor);
+				}
+			}
+		}
+
+		// push the node itself in the middle
+		path.push(msg);
+
+		// children path
+		let childrenIds = msg.children;
+		while (childrenIds?.length) {
+			let lastChildId = childrenIds.at(-1);
+			const lastChild = messages.find((msg) => msg.id === lastChildId);
+			if (lastChild) {
+				path.push(lastChild);
+			}
+			childrenIds = lastChild?.children;
+		}
+
+		return path;
+	}
+
+	function createMessagesAlternatives(messages: Message[]): Message["id"][][] {
+		const alternatives = [];
+		for (const message of messages) {
+			if (message.children?.length) {
+				alternatives.push(message.children);
+			}
+		}
+		return alternatives;
+	}
 
 	async function convFromShared() {
 		try {
@@ -38,7 +102,7 @@
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					fromShare: $page.params.id,
+					fromShare: page.params.id,
 					model: data.model,
 				}),
 			});
@@ -61,7 +125,7 @@
 	// this function is used to send new message to the backends
 	async function writeMessage({
 		prompt,
-		messageId = $convTreeStore.leaf ?? undefined,
+		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
 		isContinue = false,
 	}: {
@@ -74,21 +138,15 @@
 			$isAborted = false;
 			loading = true;
 			pending = true;
-
-			const module = await import("browser-image-resizer");
-			// currently, only IDEFICS is supported by TGI
-			// the size of images is hardcoded to 224x224 in TGI
-			// this will need to be configurable when support for more models is added
-			const resizedImages = await Promise.all(
-				files.map(async (file) => {
-					return await module
-						.readAndCompressImage(file, {
-							maxHeight: 224,
-							maxWidth: 224,
-							quality: 1,
-						})
-						.then(async (el) => await file2base64(el as File));
-				})
+			const base64Files = await Promise.all(
+				(files ?? []).map((file) =>
+					file2base64(file).then((value) => ({
+						type: "base64" as const,
+						value,
+						mime: file.type,
+						name: file.name,
+					}))
+				)
 			);
 
 			let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -120,7 +178,11 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "user", content: prompt },
+						{
+							from: "user",
+							content: prompt,
+							files: messageToRetry.files,
+						},
 						messageId
 					);
 					messageToWriteToId = addChildren(
@@ -128,7 +190,7 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "", files: resizedImages },
+						{ from: "assistant", content: "" },
 						newUserMessageId
 					);
 				} else if (messageToRetry?.from === "assistant") {
@@ -154,7 +216,7 @@
 					{
 						from: "user",
 						content: prompt ?? "",
-						files: resizedImages,
+						files: base64Files,
 						createdAt: new Date(),
 						updatedAt: new Date(),
 					},
@@ -181,24 +243,26 @@
 			}
 
 			messages = [...messages];
+			const userMessage = messages.find((message) => message.id === messageId);
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
 			}
 
 			// disable websearch if assistant is present
-			const hasAssistant = !!$page.data.assistant;
+			const hasAssistant = !!page.data.assistant;
 			const messageUpdatesAbortController = new AbortController();
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				$page.params.id,
+				page.params.id,
 				{
 					base,
 					inputs: prompt,
 					messageId,
 					isRetry,
 					isContinue,
-					webSearch: !hasAssistant && $webSearchParameters.useSearch,
-					files: isRetry ? undefined : resizedImages,
+					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
+					tools: $settings.tools, // preference for tools
+					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -208,48 +272,62 @@
 
 			files = [];
 
-			const messageUpdates: MessageUpdate[] = [];
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
 					messageUpdatesAbortController.abort();
 					return;
 				}
-				if (update.type === "finalAnswer") {
-					loading = false;
-					pending = false;
-					break;
+
+				// Remove null characters added due to remote keylogging prevention
+				// See server code for more details
+				if (update.type === MessageUpdateType.Stream) {
+					update.token = update.token.replaceAll("\0", "");
 				}
 
-				messageUpdates.push(update);
+				messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 
-				if (update.type === "stream") {
-					pending = false;
+				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
 					messageToWriteTo.content += update.token;
+					pending = false;
 					messages = [...messages];
-				} else if (update.type === "webSearch") {
-					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+				} else if (
+					update.type === MessageUpdateType.WebSearch ||
+					update.type === MessageUpdateType.Tool
+				) {
 					messages = [...messages];
-				} else if (update.type === "status") {
-					if (update.status === "title" && update.message) {
-						const convInData = data.conversations.find(({ id }) => id === $page.params.id);
-						if (convInData) {
-							convInData.title = update.message;
+				} else if (
+					update.type === MessageUpdateType.Status &&
+					update.status === MessageUpdateStatus.Error
+				) {
+					$error = update.message ?? "An error has occurred";
+				} else if (update.type === MessageUpdateType.Title) {
+					const convInData = conversations.find(({ id }) => id === page.params.id);
+					if (convInData) {
+						convInData.title = update.title;
 
-							$titleUpdate = {
-								title: update.message,
-								convId: $page.params.id,
-							};
-						}
-					} else if (update.status === "error") {
-						$error = update.message ?? "An error has occurred";
+						$titleUpdate = {
+							title: update.title,
+							convId: page.params.id,
+						};
 					}
-				} else if (update.type === "error") {
-					error.set(update.message);
-					messageUpdatesAbortController.abort();
+				} else if (update.type === MessageUpdateType.File) {
+					messageToWriteTo.files = [
+						...(messageToWriteTo.files ?? []),
+						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
+					];
+					messages = [...messages];
+				} else if (update.type === MessageUpdateType.Reasoning) {
+					if (!messageToWriteTo.reasoning) {
+						messageToWriteTo.reasoning = "";
+					}
+					if (update.subtype === MessageReasoningUpdateType.Stream) {
+						messageToWriteTo.reasoning += update.token;
+					} else {
+						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+					}
+					messages = [...messages];
 				}
 			}
-
-			messageToWriteTo.updates = messageUpdates;
 		} catch (err) {
 			if (err instanceof Error && err.message.includes("overloaded")) {
 				$error = "Too much traffic, please try again.";
@@ -269,7 +347,7 @@
 	}
 
 	async function voteMessage(score: Message["score"], messageId: string) {
-		let conversationId = $page.params.id;
+		let conversationId = page.params.id;
 		let oldScore: Message["score"] | undefined;
 
 		// optimistic update to avoid waiting for the server
@@ -317,6 +395,9 @@
 	}
 
 	async function onRetry(event: CustomEvent<{ id: Message["id"]; content?: string }>) {
+		const lastMsgId = event.detail.id;
+		messagesPath = createMessagesPath(messages, lastMsgId);
+
 		if (!data.shared) {
 			await writeMessage({
 				prompt: event.detail.content,
@@ -340,9 +421,14 @@
 		}
 	}
 
+	async function onShowAlternateMsg(event: CustomEvent<{ id: Message["id"] }>) {
+		const msgId = event.detail.id;
+		messagesPath = createMessagesPath(messages, msgId);
+	}
+
 	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
 		if (!data.shared) {
-			writeMessage({ messageId: event.detail.id, isContinue: true });
+			await writeMessage({ messageId: event.detail.id, isContinue: true });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
@@ -359,10 +445,29 @@
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false), ($convTreeStore.editing = null));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
+	const settings = useSettingsStore();
+	let messages = $state(data.messages);
+	$effect(() => {
+		messages = data.messages;
+	});
 
-	const convTreeStore = createConvTreeStore();
+	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
+	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
+	let messagesPath = $derived(createMessagesPath(messages));
+	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
+
+	$effect(() => {
+		if (browser && messagesPath.at(-1)?.id) {
+			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
+		}
+	});
+
+	run(() => {
+		page.params.id, (($isAborted = true), (loading = false));
+	});
+	let title = $derived(
+		conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title
+	);
 </script>
 
 <svelte:head>
@@ -378,15 +483,17 @@
 <ChatWindow
 	{loading}
 	{pending}
-	{messages}
+	messages={messagesPath}
+	{messagesAlternatives}
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:files
 	on:message={onMessage}
 	on:retry={onRetry}
 	on:continue={onContinue}
+	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation($page.params.id, data.title)}
+	on:share={() => shareConversation(page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}

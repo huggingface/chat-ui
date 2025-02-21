@@ -1,31 +1,36 @@
 <script lang="ts">
-	import { applyAction, enhance } from "$app/forms";
 	import { invalidateAll } from "$app/navigation";
 	import Modal from "$lib/components/Modal.svelte";
 	import { createEventDispatcher } from "svelte";
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 
-	let reason = "";
+	let reason = $state("");
+
+	interface Props {
+		reportUrl: string;
+	}
+
+	let { reportUrl }: Props = $props();
 </script>
 
 <Modal on:close>
 	<form
-		method="POST"
-		action="?/report"
-		use:enhance={() => {
-			return async ({ result }) => {
-				await applyAction(result);
+		onsubmit={() => {
+			fetch(`${reportUrl}`, {
+				method: "POST",
+				body: JSON.stringify({ reason }),
+			}).then(() => {
 				dispatch("close");
 				invalidateAll();
-			};
+			});
 		}}
 		class="w-full min-w-64 p-4"
 	>
-		<span class="mb-1 text-sm font-semibold">Report an assistant</span>
+		<span class="mb-1 text-sm font-semibold">Report content</span>
 
 		<p class="text-sm text-gray-500">
-			Please provide a brief description of why you are reporting this assistant.
+			Please provide a brief description of why you are reporting this content.
 		</p>
 
 		<textarea
@@ -34,13 +39,13 @@
 			placeholder="Reason(s) for the report"
 			maxlength="128"
 			bind:value={reason}
-		/>
+		></textarea>
 
 		<div class="flex w-full flex-row justify-between px-2 pt-4">
 			<button
 				type="button"
 				class="text-sm text-gray-700 hover:underline"
-				on:click={() => dispatch("close")}>Cancel</button
+				onclick={() => dispatch("close")}>Cancel</button
 			>
 
 			<button

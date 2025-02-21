@@ -4,5 +4,5 @@ export interface ConvSidebar {
 	updatedAt: Date;
 	model?: string;
 	assistantId?: string;
-	avatarHash?: string;
+	avatarUrl?: string;
 }
