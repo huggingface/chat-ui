@@ -7,6 +7,7 @@ import { ReviewStatus } from "$lib/types/Review";
 import type { CommunityToolDB } from "$lib/types/Tool.js";
 import type { User } from "$lib/types/User.js";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens.js";
+import { jsonSerialize } from "$lib/utils/serialize";
 import { error } from "@sveltejs/kit";
 import { ObjectId, type Filter } from "mongodb";
 
@@ -89,7 +90,7 @@ export const load = async ({ url, locals }) => {
 		toolFromConfigs.length;
 
 	return {
-		tools: JSON.parse(JSON.stringify(tools)) as CommunityToolDB[],
+		tools: jsonSerialize(tools),
 		numTotalItems,
 		numItemsPerPage: NUM_PER_PAGE,
 		query,

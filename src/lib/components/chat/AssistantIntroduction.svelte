@@ -17,11 +17,11 @@
 	import { share } from "$lib/utils/share";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/state";
-
+	import type { Serialize } from "$lib/utils/serialize";
 	interface Props {
 		models: Model[];
 		assistant: Pick<
-			Assistant,
+			Serialize<Assistant>,
 			| "avatar"
 			| "name"
 			| "rag"

@@ -7,6 +7,7 @@ import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import { error, redirect } from "@sveltejs/kit";
 import type { Filter } from "mongodb";
 import { ReviewStatus } from "$lib/types/Review";
+import { jsonSerialize } from "$lib/utils/serialize";
 const NUM_PER_PAGE = 24;
 
 export const load = async ({ url, locals }) => {
@@ -75,7 +76,7 @@ export const load = async ({ url, locals }) => {
 		.assistants.countDocuments(filter);
 
 	return {
-		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,
+		assistants: jsonSerialize(assistants),
 		selectedModel: modelId ?? "",
 		numTotalItems,
 		numItemsPerPage: NUM_PER_PAGE,

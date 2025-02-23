@@ -7,14 +7,15 @@ import { models } from "$lib/server/models";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Assistant } from "$lib/types/Assistant";
-
+import type { Serialize } from "$lib/utils/serialize";
+import { jsonSerialize } from "$lib/utils/serialize";
 export type GETConversationResponse = Pick<
 	Conversation,
 	"messages" | "title" | "model" | "preprompt" | "rootMessageId" | "updatedAt" | "assistantId"
 > & {
 	shared: boolean;
 	modelTools: boolean;
-	assistant: Assistant | undefined;
+	assistant: Serialize<Assistant> | undefined;
 	id: string;
 	modelId: Conversation["model"];
 };
@@ -98,12 +99,10 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							preprompt: conversation.preprompt,
 							rootMessageId: conversation.rootMessageId,
 							assistant: conversation.assistantId
-								? JSON.parse(
-										JSON.stringify(
-											await collections.assistants.findOne({
-												_id: new ObjectId(conversation.assistantId),
-											})
-										)
+								? jsonSerialize(
+										(await collections.assistants.findOne({
+											_id: new ObjectId(conversation.assistantId),
+										})) ?? undefined
 									)
 								: undefined,
 							id: conversation._id.toString(),

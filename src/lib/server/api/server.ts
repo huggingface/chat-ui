@@ -7,10 +7,11 @@ import { userGroup } from "$lib/server/api/routes/groups/user";
 import { toolGroup } from "$lib/server/api/routes/groups/tools";
 import { swagger } from "@elysiajs/swagger";
 import { models } from "$lib/server/models";
+import { node } from "@elysiajs/node";
 
 const prefix = `${base}/api/v2` as unknown as "";
 
-export const app = new Elysia({ prefix })
+export const app = new Elysia({ prefix, adapter: node() })
 	.use(
 		swagger({
 			documentation: {

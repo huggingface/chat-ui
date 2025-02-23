@@ -13,6 +13,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
 import { base } from "$app/paths";
+import { jsonSerialize } from "../lib/utils/serialize";
 
 export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
@@ -273,7 +274,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 			isAdmin: locals.user.isAdmin ?? false,
 			isEarlyAccess: locals.user.isEarlyAccess ?? false,
 		},
-		assistant: assistant ? JSON.parse(JSON.stringify(assistant)) : null,
+		assistant: assistant ? jsonSerialize(assistant) : undefined,
 		enableAssistants,
 		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
 		enableCommunityTools: env.COMMUNITY_TOOLS === "true",

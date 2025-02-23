@@ -37,6 +37,7 @@
 	import { cubicInOut } from "svelte/easing";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
+	import type { Serialize } from "$lib/utils/serialize";
 
 	interface Props {
 		messages?: Message[];
@@ -46,7 +47,7 @@
 		shared?: boolean;
 		currentModel: Model;
 		models: Model[];
-		assistant?: Assistant | undefined;
+		assistant?: Serialize<Assistant> | undefined;
 		preprompt?: string | undefined;
 		files?: File[];
 	}

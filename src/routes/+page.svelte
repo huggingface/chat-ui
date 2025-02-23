@@ -30,8 +30,8 @@
 			if (validModels.includes($settings.activeModel)) {
 				model = $settings.activeModel;
 			} else {
-				if (validModels.includes(data.assistant?.modelId)) {
-					model = data.assistant?.modelId;
+				if (data.assistant?.modelId && validModels.includes(data.assistant.modelId)) {
+					model = data.assistant.modelId;
 				} else {
 					model = data.models[0].id;
 				}

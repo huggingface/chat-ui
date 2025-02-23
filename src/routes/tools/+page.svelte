@@ -266,15 +266,14 @@
 		<div class="mt-4 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
 				{@const isActive = (page.data.settings?.tools ?? []).includes(tool._id.toString())}
-				{@const isOfficial = !tool.createdByName}
+				{@const isOfficial = tool.type === "config"}
 				<div
 					onclick={() => goto(`${base}/tools/${tool._id.toString()}`)}
 					onkeydown={(e) => e.key === "Enter" && goto(`${base}/tools/${tool._id.toString()}`)}
 					role="button"
 					tabindex="0"
-					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!(
-						tool.review === ReviewStatus.APPROVED
-					) && !isOfficial
+					class="relative flex flex-row items-center gap-4 overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-24 {!isOfficial &&
+					tool.review !== ReviewStatus.APPROVED
 						? ' border-red-500/30'
 						: 'dark:border-gray-800/70'}"
 					class:!border-blue-600={isActive}
@@ -302,7 +301,7 @@
 							{tool.description}
 						</p>
 
-						{#if !isOfficial}
+						{#if !isOfficial && tool.type === "community"}
 							<p class="mt-auto text-xs text-gray-400 dark:text-gray-500">
 								Added by <a
 									class="hover:underline"

@@ -1,5 +1,9 @@
 import { Elysia } from "elysia";
 import { authPlugin } from "$lib/server/api/authPlugin";
+import { collections } from "$lib/server/database";
+import { ObjectId } from "mongodb";
+import { authCondition } from "$lib/server/auth";
+import { jsonSerialize } from "$lib/utils/serialize";
 
 export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", (app) => {
 	return app
@@ -13,11 +17,21 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 		})
 		.group("/:id", (app) => {
 			return app
-				.get("/", () => {
-					// todo: get assistant
-					return "aa";
+				.derive(async ({ params, error }) => {
+					const assistant = await collections.assistants.findOne({
+						_id: new ObjectId(params.id),
+					});
+
+					if (!assistant) {
+						return error(404, "Assistant not found");
+					}
+
+					return { assistant };
 				})
-				.patch("/", () => {
+				.get("", ({ assistant }) => {
+					return jsonSerialize(assistant);
+				})
+				.patch("", () => {
 					// todo: patch assistant
 					return "aa";
 				})
@@ -33,13 +47,34 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 					// todo: review assistant
 					return "aa";
 				})
-				.post("/subscribe", () => {
-					// todo: subscribe to assistant
-					return "aa";
+				.post("/subscribe", async ({ locals, assistant }) => {
+					const result = await collections.settings.updateOne(authCondition(locals), {
+						$addToSet: { assistants: assistant._id },
+						$set: { activeModel: assistant._id.toString() },
+					});
+
+					if (result.modifiedCount > 0) {
+						await collections.assistants.updateOne(
+							{ _id: assistant._id },
+							{ $inc: { userCount: 1 } }
+						);
+					}
+
+					return new Response("Assistant subscribed", { status: 200 });
 				})
-				.delete("/subscribe", () => {
-					// todo: unsubscribe from assistant
-					return "aa";
+				.delete("/subscribe", async ({ locals, assistant }) => {
+					const result = await collections.settings.updateOne(authCondition(locals), {
+						$pull: { assistants: assistant._id },
+					});
+
+					if (result.modifiedCount > 0) {
+						await collections.assistants.updateOne(
+							{ _id: assistant._id },
+							{ $inc: { userCount: -1 } }
+						);
+					}
+
+					return new Response("Assistant unsubscribed", { status: 200 });
 				});
 		});
 });
