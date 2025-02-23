@@ -15,6 +15,7 @@
 	import { error } from "$lib/stores/errors";
 	import { browser } from "$app/environment";
 	import { isDesktop } from "$lib/utils/isDesktop";
+	import { debounce } from "$lib/utils/debounce";
 
 	interface Props {
 		data: LayoutData;
@@ -27,15 +28,26 @@
 	let assistantsSection: HTMLHeadingElement | undefined = $state();
 	let showContent: boolean = $state(false);
 
+	function checkDesktopRedirect() {
+		if (browser && isDesktop(window) && page.url.pathname === `${base}/settings`) {
+			goto(`${base}/settings/application`);
+		}
+	}
+
 	onMount(() => {
 		if (page.params?.assistantId && assistantsSection) {
 			assistantsSection.scrollIntoView();
 		}
-		// Show content by default on desktop
-		showContent = isDesktop(window);
-		// Redirect to application settings by default on desktop
-		if (isDesktop(window) && page.url.pathname === `${base}/settings`) {
-			goto(`${base}/settings/application`);
+		// Show content when not on the root settings page
+		showContent = page.url.pathname !== `${base}/settings`;
+		// Initial desktop redirect check
+		checkDesktopRedirect();
+
+		// Add resize listener for desktop redirect
+		if (browser) {
+			const debouncedCheck = debounce(checkDesktopRedirect, 100);
+			window.addEventListener("resize", debouncedCheck);
+			return () => window.removeEventListener("resize", debouncedCheck);
 		}
 	});
 
@@ -43,14 +55,10 @@
 		if (!from?.url.pathname.includes("settings")) {
 			previousPage = from?.url.toString() || previousPage;
 		}
-		// Show content when navigating to a specific setting on mobile
-		if (window.innerWidth < 768) {
-			showContent = page.url.pathname !== `${base}/settings`;
-		}
-		// Redirect to application settings by default on desktop
-		else if (window.innerWidth >= 768 && page.url.pathname === `${base}/settings`) {
-			goto(`${base}/settings/application`);
-		}
+		// Show content when not on the root settings page
+		showContent = page.url.pathname !== `${base}/settings`;
+		// Check desktop redirect after navigation
+		checkDesktopRedirect();
 	});
 
 	const settings = useSettingsStore();
@@ -60,9 +68,9 @@
 	class="grid h-full w-full grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-4 overflow-hidden p-4 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
 >
 	<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
-		{#if showContent && browser && !isDesktop(window) && page.url.pathname !== `${base}/settings`}
+		{#if showContent && browser}
 			<button
-				class="btn rounded-lg"
+				class="btn rounded-lg md:hidden"
 				aria-label="Back to menu"
 				onclick={() => {
 					showContent = false;
@@ -85,7 +93,7 @@
 	</div>
 	<div
 		class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
-		class:hidden={showContent && browser && !isDesktop(window)}
+		class:max-md:hidden={showContent && browser}
 	>
 		<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1">Models</h3>
 
@@ -241,7 +249,7 @@
 	</div>
 	<div
 		class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
-		class:hidden={!showContent && browser && !isDesktop(window)}
+		class:max-md:hidden={!showContent && browser}
 	>
 		{@render children?.()}
 	</div>
