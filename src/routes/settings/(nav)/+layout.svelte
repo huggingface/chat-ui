@@ -17,6 +17,8 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { debounce } from "$lib/utils/debounce";
 
+	import { fly } from "svelte/transition";
+
 	interface Props {
 		data: LayoutData;
 		children?: import("svelte").Snippet;
@@ -93,182 +95,190 @@
 			<CarbonClose class="text-xl text-gray-900 hover:text-black" />
 		</button>
 	</div>
-	<div
-		class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
-		class:max-md:hidden={showContent && browser}
-	>
-		<!-- Section Headers -->
-		<h3
-			class="px-4 pb-2 pt-3 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
+	{#if !(showContent && browser && !isDesktop(window))}
+		<div
+			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
+			class:max-md:hidden={showContent && browser}
+			in:fly={{ x: -100, duration: 200 }}
+			out:fly={{ x: -100, duration: 200 }}
 		>
-			Models
-		</h3>
-
-		{#each data.models.filter((el) => !el.unlisted) as model}
-			<a
-				href="{base}/settings/{model.id}"
-				class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
-			>
-				<div class="mr-auto truncate">{model.displayName}</div>
-
-				{#if $settings.customPrompts?.[model.id]}
-					<CarbonTextLongParagraph
-						class="size-6 rounded-md border border-gray-300 p-1 text-gray-800"
-					/>
-				{/if}
-				{#if model.id === $settings.activeModel}
-					<div
-						class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
-					>
-						Active
-					</div>
-				{/if}
-			</a>
-		{/each}
-		{#if data.enableAssistants}
+			<!-- Section Headers -->
 			<h3
-				bind:this={assistantsSection}
-				class="mt-6 px-4 pb-2 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
+				class="px-4 pb-2 pt-3 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
 			>
-				Assistants
+				Models
 			</h3>
-			<!-- My Assistants -->
-			<h4
-				class="px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
-			>
-				My Assistants
-			</h4>
 
-			{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
+			{#each data.models.filter((el) => !el.unlisted) as model}
 				<a
-					href="{base}/settings/assistants/{assistant._id.toString()}"
+					href="{base}/settings/{model.id}"
 					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-					{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
-					{#if assistant.avatar}
-						<img
-							src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
-							alt="Avatar"
-							class="h-6 w-6 rounded-full"
+					<div class="mr-auto truncate">{model.displayName}</div>
+
+					{#if $settings.customPrompts?.[model.id]}
+						<CarbonTextLongParagraph
+							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800"
 						/>
-					{:else}
-						<div
-							class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
-						>
-							{assistant.name[0]}
-						</div>
 					{/if}
-					<div class="truncate text-gray-900">{assistant.name}</div>
-					{#if assistant._id.toString() === $settings.activeModel}
+					{#if model.id === $settings.activeModel}
 						<div
-							class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
 						>
 							Active
 						</div>
 					{/if}
 				</a>
 			{/each}
-			{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
-				<a
-					href="{base}/settings/assistants/new"
-					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-					{page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+			{#if data.enableAssistants}
+				<h3
+					bind:this={assistantsSection}
+					class="mt-6 px-4 pb-2 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
 				>
-					<CarbonAdd />
-					<div class="truncate">Create new assistant</div>
+					Assistants
+				</h3>
+				<!-- My Assistants -->
+				<h4
+					class="px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
+				>
+					My Assistants
+				</h4>
+
+				{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
+					<a
+						href="{base}/settings/assistants/{assistant._id.toString()}"
+						class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
+					{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+					>
+						{#if assistant.avatar}
+							<img
+								src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
+								alt="Avatar"
+								class="h-6 w-6 rounded-full"
+							/>
+						{:else}
+							<div
+								class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
+							>
+								{assistant.name[0]}
+							</div>
+						{/if}
+						<div class="truncate text-gray-900">{assistant.name}</div>
+						{#if assistant._id.toString() === $settings.activeModel}
+							<div
+								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							>
+								Active
+							</div>
+						{/if}
+					</a>
+				{/each}
+				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
+					<a
+						href="{base}/settings/assistants/new"
+						class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
+					{page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+					>
+						<CarbonAdd />
+						<div class="truncate">Create new assistant</div>
+					</a>
+				{/if}
+
+				<!-- Other Assistants -->
+				<h4
+					class="mt-4 px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
+				>
+					Other Assistants
+				</h4>
+
+				{#each data.assistants.filter((assistant) => !assistant.createdByMe) as assistant}
+					<a
+						href="{base}/settings/assistants/{assistant._id.toString()}"
+						class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
+						{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
+					>
+						{#if assistant.avatar}
+							<img
+								src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
+								alt="Avatar"
+								class="h-6 w-6 rounded-full"
+							/>
+						{:else}
+							<div
+								class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
+							>
+								{assistant.name[0]}
+							</div>
+						{/if}
+						<div class="truncate">{assistant.name}</div>
+						{#if assistant._id.toString() === $settings.activeModel}
+							<div
+								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							>
+								Active
+							</div>
+						{/if}
+						<button
+							type="submit"
+							aria-label="Remove assistant from your list"
+							class={[
+								"rounded-full p-1 text-xs hover:bg-gray-500 hover:bg-opacity-20",
+								assistant._id.toString() === page.params.assistantId
+									? "block"
+									: "hidden group-hover:block",
+								assistant._id.toString() !== $settings.activeModel && "ml-auto",
+							]}
+							onclick={(event) => {
+								event.stopPropagation();
+								fetch(`${base}/api/assistant/${assistant._id}/subscribe`, {
+									method: "DELETE",
+								}).then((r) => {
+									if (r.ok) {
+										if (assistant._id.toString() === page.params.assistantId) {
+											goto(`${base}/settings`, { invalidateAll: true });
+										} else {
+											invalidateAll();
+										}
+									} else {
+										console.error(r);
+										$error = r.statusText;
+									}
+								});
+							}}
+						>
+							<CarbonClose class="size-4 text-gray-500" />
+						</button>
+					</a>
+				{/each}
+				<a
+					href="{base}/assistants"
+					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3"
+				>
+					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
+					<div class="truncate">Browse Assistants</div>
 				</a>
 			{/if}
 
-			<!-- Other Assistants -->
-			<h4
-				class="mt-4 px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
-			>
-				Other Assistants
-			</h4>
-
-			{#each data.assistants.filter((assistant) => !assistant.createdByMe) as assistant}
-				<a
-					href="{base}/settings/assistants/{assistant._id.toString()}"
-					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-						{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
-				>
-					{#if assistant.avatar}
-						<img
-							src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
-							alt="Avatar"
-							class="h-6 w-6 rounded-full"
-						/>
-					{:else}
-						<div
-							class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
-						>
-							{assistant.name[0]}
-						</div>
-					{/if}
-					<div class="truncate">{assistant.name}</div>
-					{#if assistant._id.toString() === $settings.activeModel}
-						<div
-							class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
-						>
-							Active
-						</div>
-					{/if}
-					<button
-						type="submit"
-						aria-label="Remove assistant from your list"
-						class={[
-							"rounded-full p-1 text-xs hover:bg-gray-500 hover:bg-opacity-20",
-							assistant._id.toString() === page.params.assistantId
-								? "block"
-								: "hidden group-hover:block",
-							assistant._id.toString() !== $settings.activeModel && "ml-auto",
-						]}
-						onclick={(event) => {
-							event.stopPropagation();
-							fetch(`${base}/api/assistant/${assistant._id}/subscribe`, {
-								method: "DELETE",
-							}).then((r) => {
-								if (r.ok) {
-									if (assistant._id.toString() === page.params.assistantId) {
-										goto(`${base}/settings`, { invalidateAll: true });
-									} else {
-										invalidateAll();
-									}
-								} else {
-									console.error(r);
-									$error = r.statusText;
-								}
-							});
-						}}
-					>
-						<CarbonClose class="size-4 text-gray-500" />
-					</button>
-				</a>
-			{/each}
+			<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
 			<a
-				href="{base}/assistants"
-				class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3"
-			>
-				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
-				<div class="truncate">Browse Assistants</div>
-			</a>
-		{/if}
-
-		<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
-		<a
-			href="{base}/settings/application"
-			class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
+				href="{base}/settings/application"
+				class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
 				{page.url.pathname === `${base}/settings/application` ? '!bg-gray-100 !text-gray-800' : ''}"
+			>
+				<UserIcon class="text-sm" />
+				Application Settings
+			</a>
+		</div>
+	{/if}
+	{#if showContent}
+		<div
+			class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
+			class:max-md:hidden={!showContent && browser}
+			in:fly={{ x: 100, duration: 200 }}
+			out:fly={{ x: 100, duration: 200 }}
 		>
-			<UserIcon class="text-sm" />
-			Application Settings
-		</a>
-	</div>
-	<div
-		class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
-		class:max-md:hidden={!showContent && browser}
-	>
-		{@render children?.()}
-	</div>
+			{@render children?.()}
+		</div>
+	{/if}
 </div>
