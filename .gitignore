@@ -4,7 +4,7 @@ node_modules
 /.svelte-kit
 /package
 .env
-.env.*
+.env.live
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 SECRET_CONFIG
