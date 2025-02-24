@@ -17,16 +17,15 @@ ENV HOME=/home/user \
 
 WORKDIR /app
 
-# add a .env.local if the user doesn't bind a volume to it
-RUN touch /app/.env.local
-
-
 RUN npm i --no-package-lock --no-save playwright@1.47.0
 USER root
 RUN apt-get update
 RUN apt-get install gnupg curl -y
 RUN npx playwright install --with-deps chromium
 RUN chown -R 1000:1000 /home/user/.npm
+RUN --mount=type=secret,id=DOTENV_LOCAL \
+    cat /run/secrets/DOTENV_LOCAL > /app/.env.local        
+
 USER user
 
 COPY --chown=1000 .env /app/.env
