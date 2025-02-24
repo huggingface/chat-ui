@@ -4,13 +4,15 @@
 	import { fade, fly } from "svelte/transition";
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
+	import CarbonClose from "~icons/carbon/close";
 
 	interface Props {
 		width?: string;
+		closeButton?: boolean;
 		children?: import("svelte").Snippet;
 	}
 
-	let { width = "max-w-sm", children }: Props = $props();
+	let { width = "max-w-sm", children, closeButton = false }: Props = $props();
 
 	let backdropEl: HTMLDivElement | undefined = $state();
 	let modalEl: HTMLDivElement | undefined = $state();
@@ -56,7 +58,7 @@
 			handleBackdropClick(e);
 		}}
 		transition:fade|local={{ easing: cubicOut, duration: 300 }}
-		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm dark:bg-black/50"
+		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
 	>
 		<div
 			role="dialog"
@@ -65,10 +67,15 @@
 			onkeydown={handleKeydown}
 			in:fly={{ y: 100 }}
 			class={[
-				"max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10",
+				"relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none",
 				width,
 			]}
 		>
+			{#if closeButton}
+				<button class="absolute right-4 top-4 z-50" onclick={() => dispatch("close")}>
+					<CarbonClose class="size-6 text-gray-700" />
+				</button>
+			{/if}
 			{@render children?.()}
 		</div>
 	</div>

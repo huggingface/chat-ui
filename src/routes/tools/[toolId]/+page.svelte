@@ -67,7 +67,7 @@
 	/>
 {/if}
 
-<Modal on:close={() => goto(previousPage)} width="min-w-xl">
+<Modal on:close={() => goto(previousPage)} width="min-w-xl" closeButton>
 	<div class="w-full min-w-64 p-8">
 		<div class="flex h-full flex-col gap-2">
 			<div class="flex flex-col sm:flex-row sm:gap-6">
