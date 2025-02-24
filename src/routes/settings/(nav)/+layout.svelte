@@ -97,12 +97,17 @@
 		class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
 		class:max-md:hidden={showContent && browser}
 	>
-		<h3 class="pb-3 pt-2 text-center text-[.8rem] text-gray-800 md:pl-3 md:text-left">Models</h3>
+		<!-- Section Headers -->
+		<h3
+			class="px-4 pb-2 pt-3 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
+		>
+			Models
+		</h3>
 
 		{#each data.models.filter((el) => !el.unlisted) as model}
 			<a
 				href="{base}/settings/{model.id}"
-				class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
+				class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
 					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 			>
 				<div class="mr-auto truncate">{model.displayName}</div>
@@ -124,19 +129,21 @@
 		{#if data.enableAssistants}
 			<h3
 				bind:this={assistantsSection}
-				class="pt-5 text-center text-[.8rem] text-gray-800 md:pl-3 md:text-left"
+				class="mt-6 px-4 pb-2 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
 			>
 				Assistants
 			</h3>
 			<!-- My Assistants -->
-			<h4 class="py-2 text-center text-[.7rem] text-gray-600 md:pl-5 md:text-left">
+			<h4
+				class="px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
+			>
 				My Assistants
 			</h4>
 
 			{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
-					class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
+					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
 					{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					{#if assistant.avatar}
@@ -165,8 +172,8 @@
 			{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
 				<a
 					href="{base}/settings/assistants/new"
-					class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
-				{page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
+					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
+					{page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					<CarbonAdd />
 					<div class="truncate">Create new assistant</div>
@@ -174,14 +181,16 @@
 			{/if}
 
 			<!-- Other Assistants -->
-			<h4 class="pt-3 text-center text-[.7rem] text-gray-600 md:pl-3 md:text-left">
+			<h4
+				class="mt-4 px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
+			>
 				Other Assistants
 			</h4>
 
 			{#each data.assistants.filter((assistant) => !assistant.createdByMe) as assistant}
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
-					class="group flex h-10 flex-none items-center gap-2 pl-2 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl
+					class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
 						{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
 				>
 					{#if assistant.avatar}
@@ -239,8 +248,9 @@
 			{/each}
 			<a
 				href="{base}/assistants"
-				class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl"
-				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
+				class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3"
+			>
+				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
 				<div class="truncate">Browse Assistants</div>
 			</a>
 		{/if}
@@ -248,7 +258,7 @@
 		<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
 		<a
 			href="{base}/settings/application"
-			class="group flex h-10 flex-none items-center gap-2 pl-3 pr-2 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl
+			class="group flex h-10 flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
 				{page.url.pathname === `${base}/settings/application` ? '!bg-gray-100 !text-gray-800' : ''}"
 		>
 			<UserIcon class="text-sm" />
