@@ -62,7 +62,7 @@
 
 {#if isOpen}
 	<nav
-		use:swipe={() => ({ timeframe: 300, minSwipeDistance: 60 })}
+		use:swipe={() => ({ timeframe: 500, minSwipeDistance: 30 })}
 		onswipe={(ev: SwipeCustomEvent) => {
 			if (ev.detail.direction === "left") {
 				dispatch("toggle", false);
