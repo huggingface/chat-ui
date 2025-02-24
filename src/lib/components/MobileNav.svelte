@@ -8,7 +8,7 @@
 	import { fly } from "svelte/transition";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
-
+	import { swipe, type SwipeCustomEvent } from "svelte-gestures";
 	interface Props {
 		isOpen?: boolean;
 		title: string | undefined;
@@ -62,19 +62,25 @@
 
 {#if isOpen}
 	<nav
+		use:swipe={() => ({ timeframe: 300, minSwipeDistance: 60 })}
+		onswipe={(ev: SwipeCustomEvent) => {
+			if (ev.detail.direction === "left") {
+				dispatch("toggle", false);
+			}
+		}}
 		class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto,auto] bg-white pt-4 dark:bg-gray-900"
 		in:fly={{ x: -window.innerWidth, duration: 250 }}
 		out:fly={{ x: -window.innerWidth, duration: 250 }}
 	>
-		<div class="absolute inset-0 z-10 flex h-12 items-center px-4">
+		{#if page.url.pathname === base + "/"}
 			<button
 				type="button"
-				class="-mr-3 ml-auto flex size-12 items-center justify-center text-lg"
+				class="absolute right-0 top-0 z-10 flex size-12 items-center justify-center text-lg"
 				onclick={() => dispatch("toggle", false)}
 				aria-label="Close menu"
 				bind:this={closeEl}><CarbonClose /></button
 			>
-		</div>
+		{/if}
 		{@render children?.()}
 	</nav>
 {/if}
