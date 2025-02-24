@@ -13,9 +13,8 @@
 </script>
 
 <div class="flex w-full flex-col gap-5">
-	<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
-		<h2>Application Settings</h2>
-		{#if !!envPublic.PUBLIC_COMMIT_SHA}
+	{#if !!envPublic.PUBLIC_COMMIT_SHA}
+		<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 			<a
 				href={`https://github.com/huggingface/chat-ui/commit/${envPublic.PUBLIC_COMMIT_SHA}`}
 				target="_blank"
@@ -26,8 +25,8 @@
 					>{envPublic.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
 				>
 			</a>
-		{/if}
-	</div>
+		</div>
+	{/if}
 	<div class="flex h-full max-w-2xl flex-col gap-2 max-sm:pt-0">
 		{#if envPublic.PUBLIC_APP_DATA_SHARING === "1"}
 			<label class="flex items-center">

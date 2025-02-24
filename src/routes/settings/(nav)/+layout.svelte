@@ -65,9 +65,9 @@
 </script>
 
 <div
-	class="grid h-full w-full grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-4 overflow-hidden p-4 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-8"
+	class="mx-auto grid h-full w-full max-w-[1400px] grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-6 overflow-hidden p-4 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-4"
 >
-	<div class="col-span-1 mb-4 flex items-center justify-between md:col-span-3">
+	<div class="col-span-1 mb-3 flex items-center justify-between md:col-span-3 md:mb-4">
 		{#if showContent && browser}
 			<button
 				class="btn rounded-lg md:hidden"
@@ -80,7 +80,9 @@
 				<CarbonChevronLeft class="text-xl text-gray-900 hover:text-black" />
 			</button>
 		{/if}
-		<h2 class="text-xl font-bold">Settings</h2>
+		<h2 class="absolute left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">
+			Settings
+		</h2>
 		<button
 			class="btn rounded-lg"
 			aria-label="Close settings"
@@ -95,7 +97,7 @@
 		class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
 		class:max-md:hidden={showContent && browser}
 	>
-		<h3 class="pb-3 pl-3 pt-2 text-[.8rem] text-gray-800 sm:pl-1">Models</h3>
+		<h3 class="pb-3 pt-2 text-center text-[.8rem] text-gray-800 md:pl-3 md:text-left">Models</h3>
 
 		{#each data.models.filter((el) => !el.unlisted) as model}
 			<a
@@ -119,13 +121,17 @@
 				{/if}
 			</a>
 		{/each}
-		<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
 		{#if data.enableAssistants}
-			<h3 bind:this={assistantsSection} class="pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
+			<h3
+				bind:this={assistantsSection}
+				class="pt-5 text-center text-[.8rem] text-gray-800 md:pl-3 md:text-left"
+			>
 				Assistants
 			</h3>
 			<!-- My Assistants -->
-			<h4 class="py-2 pl-5 text-[.7rem] text-gray-600 sm:pl-1">My Assistants</h4>
+			<h4 class="py-2 text-center text-[.7rem] text-gray-600 md:pl-5 md:text-left">
+				My Assistants
+			</h4>
 
 			{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
 				<a
@@ -168,7 +174,9 @@
 			{/if}
 
 			<!-- Other Assistants -->
-			<h4 class="pl-3 pt-3 text-[.7rem] text-gray-600 sm:pl-1">Other Assistants</h4>
+			<h4 class="pt-3 text-center text-[.7rem] text-gray-600 md:pl-3 md:text-left">
+				Other Assistants
+			</h4>
 
 			{#each data.assistants.filter((assistant) => !assistant.createdByMe) as assistant}
 				<a
