@@ -99,7 +99,7 @@
 </script>
 
 <form
-	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
+	class="relative flex h-full flex-col overflow-y-auto md:p-8 md:pt-0"
 	enctype="multipart/form-data"
 	onsubmit={async (e) => {
 		e.preventDefault();

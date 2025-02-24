@@ -5,6 +5,7 @@
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 
 	import Modal from "$lib/components/Modal.svelte";
+
 	interface Props {
 		children?: import("svelte").Snippet;
 	}
@@ -24,7 +25,7 @@
 
 <Modal
 	on:close={() => goto(previousPage)}
-	width="!h-[95dvh] !w-[90dvw] overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:!h-[85dvh] xl:!w-[1200px] 2xl:!h-[75dvh]"
+	width="h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[95dvh] xl:w-[1200px] 2xl:h-[75dvh]"
 >
 	{@render children?.()}
 	{#if $settings.recentlySaved}
