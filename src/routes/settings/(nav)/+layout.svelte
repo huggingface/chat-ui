@@ -54,8 +54,8 @@
 	});
 
 	afterNavigate(({ from }) => {
-		if (!from?.url.pathname.includes("settings")) {
-			previousPage = from?.url.toString() || previousPage;
+		if (from?.url && !from.url.pathname.includes("settings")) {
+			previousPage = from.url.toString() || previousPage || base;
 		}
 		// Show content when not on the root settings page
 		showContent = page.url.pathname !== `${base}/settings`;

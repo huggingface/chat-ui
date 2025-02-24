@@ -28,8 +28,8 @@
 	let previousPage: string = $state(base);
 
 	afterNavigate(({ from }) => {
-		if (!from?.url.pathname.includes("tools/")) {
-			previousPage = from?.url.toString() || previousPage;
+		if (from?.url && !from.url.pathname.includes("tools/")) {
+			previousPage = from.url.toString() || previousPage || base;
 		}
 	});
 
