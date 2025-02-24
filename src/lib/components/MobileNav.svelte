@@ -5,6 +5,7 @@
 	import { page } from "$app/state";
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 	import { createEventDispatcher } from "svelte";
+	import { fly } from "svelte/transition";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 
@@ -58,19 +59,22 @@
 		class="-mr-3 flex size-12 shrink-0 items-center justify-center text-lg"><IconNew /></a
 	>
 </nav>
-<nav
-	class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white dark:bg-gray-900 {isOpen
-		? 'block'
-		: 'hidden'}"
->
-	<div class="flex h-12 items-center px-4">
-		<button
-			type="button"
-			class="-mr-3 ml-auto flex size-12 items-center justify-center text-lg"
-			onclick={() => dispatch("toggle", false)}
-			aria-label="Close menu"
-			bind:this={closeEl}><CarbonClose /></button
-		>
-	</div>
-	{@render children?.()}
-</nav>
+
+{#if isOpen}
+	<nav
+		class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white pt-4 dark:bg-gray-900"
+		in:fly={{ x: -window.innerWidth, duration: 250 }}
+		out:fly={{ x: -window.innerWidth, duration: 250 }}
+	>
+		<div class="absolute inset-0 z-10 flex h-12 items-center px-4">
+			<button
+				type="button"
+				class="-mr-3 ml-auto flex size-12 items-center justify-center text-lg"
+				onclick={() => dispatch("toggle", false)}
+				aria-label="Close menu"
+				bind:this={closeEl}><CarbonClose /></button
+			>
+		</div>
+		{@render children?.()}
+	</nav>
+{/if}
