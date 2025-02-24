@@ -52,6 +52,7 @@
 		"prom-client": "^15.1.2",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
+		"svelte-gestures": "^5.1.3",
 		"ts-node": "^10.9.1",
 		"tslib": "^2.4.1",
 		"typescript": "^5.5.0",
