@@ -60,7 +60,7 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 						);
 					}
 
-					return new Response("Assistant subscribed", { status: 200 });
+					return { message: "Assistant subscribed" };
 				})
 				.delete("/subscribe", async ({ locals, assistant }) => {
 					const result = await collections.settings.updateOne(authCondition(locals), {
@@ -74,7 +74,7 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 						);
 					}
 
-					return new Response("Assistant unsubscribed", { status: 200 });
+					return { message: "Assistant unsubscribed" };
 				});
 		});
 });
