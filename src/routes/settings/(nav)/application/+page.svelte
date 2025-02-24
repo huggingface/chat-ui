@@ -13,6 +13,7 @@
 </script>
 
 <div class="flex w-full flex-col gap-5">
+	<h2 class="text-center text-xl font-semibold text-gray-800 md:text-left">Application Settings</h2>
 	{#if !!envPublic.PUBLIC_COMMIT_SHA}
 		<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 			<a
