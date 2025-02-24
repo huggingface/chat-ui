@@ -62,7 +62,7 @@
 
 {#if isOpen}
 	<nav
-		class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,auto,1fr,auto] bg-white pt-4 dark:bg-gray-900"
+		class="fixed inset-0 z-30 grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto,auto] bg-white pt-4 dark:bg-gray-900"
 		in:fly={{ x: -window.innerWidth, duration: 250 }}
 		out:fly={{ x: -window.innerWidth, duration: 250 }}
 	>
