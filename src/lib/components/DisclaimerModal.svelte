@@ -11,7 +11,7 @@
 	const settings = useSettingsStore();
 </script>
 
-<Modal on:close width="max-w-[400px]">
+<Modal on:close width="!max-w-[400px]">
 	<div
 		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center sm:px-6"
 	>
