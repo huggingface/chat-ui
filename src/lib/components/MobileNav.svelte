@@ -67,7 +67,9 @@
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
 	<div class="flex h-full items-center justify-center">
-		<span class="truncate px-4" data-testid="chat-title">{title}</span>
+		{#if page.params?.id}
+			<span class="truncate px-4" data-testid="chat-title">{title}</span>
+		{/if}
 	</div>
 	<a
 		class:invisible={!page.params?.id}
