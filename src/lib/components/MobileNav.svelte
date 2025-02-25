@@ -128,7 +128,7 @@
 	{#if page.url.pathname === base + "/"}
 		<button
 			type="button"
-			class="absolute right-0 top-0 z-10 flex size-12 items-center justify-center text-lg"
+			class="absolute right-0 top-0 z-50 flex size-12 items-center justify-center text-lg"
 			onclick={() => (isOpen = false)}
 			aria-label="Close menu"
 			bind:this={closeEl}><CarbonClose /></button
