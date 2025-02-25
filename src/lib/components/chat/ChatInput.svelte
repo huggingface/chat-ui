@@ -15,7 +15,7 @@
 		webSearchToolId,
 	} from "$lib/utils/toolIds";
 	import type { Assistant } from "$lib/types/Assistant";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import type { ToolFront } from "$lib/types/Tool";
 	import ToolLogo from "../ToolLogo.svelte";
 	import { goto } from "$app/navigation";
@@ -143,7 +143,7 @@
 	);
 
 	let extraTools = $derived(
-		$page.data.tools
+		page.data.tools
 			.filter((t: ToolFront) => $settings.tools?.includes(t._id))
 			.filter(
 				(t: ToolFront) =>
@@ -166,7 +166,7 @@
 		oncompositionend={() => (isCompositionOn = false)}
 		oninput={adjustTextareaHeight}
 		onbeforeinput={(ev) => {
-			if ($page.data.loginRequired) {
+			if (page.data.loginRequired) {
 				ev.preventDefault();
 				$loginModalOpen = true;
 			}

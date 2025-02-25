@@ -8,7 +8,7 @@
 
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
@@ -55,7 +55,7 @@
 		}
 
 		isFilterInPorgress = true;
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { q: value },
 			existingKeys: { behaviour: "delete", keys: ["p"] },
 		});
@@ -72,7 +72,7 @@
 	}, SEARCH_DEBOUNCE_DELAY);
 
 	const sortTools = () => {
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { sort: sortValue },
 			existingKeys: { behaviour: "delete", keys: ["p"] },
 		});
@@ -81,7 +81,7 @@
 
 	const toggleShowUnfeatured = () => {
 		showUnfeatured = !showUnfeatured;
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { showUnfeatured: showUnfeatured ? "true" : undefined },
 			existingKeys: { behaviour: "delete", keys: [] },
 		});
@@ -89,24 +89,24 @@
 	};
 
 	const goToActiveUrl = () => {
-		return getHref($page.url, {
+		return getHref(page.url, {
 			newKeys: { active: "true" },
 			existingKeys: { behaviour: "delete_except", keys: ["active", "sort"] },
 		});
 	};
 
 	const goToCommunity = () => {
-		return getHref($page.url, {
+		return getHref(page.url, {
 			existingKeys: { behaviour: "delete_except", keys: ["sort", "q"] },
 		});
 	};
-	let activeOnly = $derived($page.url.searchParams.get("active") === "true");
+	let activeOnly = $derived(page.url.searchParams.get("active") === "true");
 	let tools = $derived(
 		data.tools.filter((t) =>
 			activeOnly ? data.settings.tools.some((toolId) => toolId === t._id.toString()) : true
 		)
 	);
-	let toolsCreator = $derived($page.url.searchParams.get("user"));
+	let toolsCreator = $derived(page.url.searchParams.get("user"));
 	let createdByMe = $derived(data.user?.username && data.user.username === toolsCreator);
 	let currentModelSupportTools = $derived(
 		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false
@@ -150,7 +150,7 @@
 					Show unfeatured tools
 				</label>
 			{/if}
-			{#if $page.data.loginRequired && !data.user}
+			{#if page.data.loginRequired && !data.user}
 				<button
 					onclick={() => {
 						$loginModalOpen = true;
@@ -176,7 +176,7 @@
 				>
 					{toolsCreator}'s tools
 					<a
-						href={getHref($page.url, {
+						href={getHref(page.url, {
 							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
 						onclick={resetFilter}
@@ -203,7 +203,7 @@
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
 				>
 					<CarbonEarthAmerica class="text-xs" />
-					Active ({$page.data.settings?.tools?.length})
+					Active ({page.data.settings?.tools?.length})
 				</a>
 				<a
 					href={goToCommunity()}
@@ -217,7 +217,7 @@
 				</a>
 				{#if data.user?.username}
 					<a
-						href={getHref($page.url, {
+						href={getHref(page.url, {
 							newKeys: { user: data.user.username },
 							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q", "active"] },
 						})}
@@ -265,7 +265,7 @@
 
 		<div class="mt-4 grid grid-cols-1 gap-3 sm:gap-5 lg:grid-cols-2">
 			{#each tools as tool}
-				{@const isActive = ($page.data.settings?.tools ?? []).includes(tool._id.toString())}
+				{@const isActive = (page.data.settings?.tools ?? []).includes(tool._id.toString())}
 				{@const isOfficial = !tool.createdByName}
 				<div
 					onclick={() => goto(`${base}/tools/${tool._id.toString()}`)}

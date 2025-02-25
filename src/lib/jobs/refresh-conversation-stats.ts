@@ -4,6 +4,17 @@ import { logger } from "$lib/server/logger";
 import type { ObjectId } from "mongodb";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
 
+async function getLastComputationTime(): Promise<Date> {
+	const lastStats = await collections.conversationStats.findOne({}, { sort: { "date.at": -1 } });
+	return lastStats?.date?.at || new Date(0);
+}
+
+async function shouldComputeStats(): Promise<boolean> {
+	const lastComputationTime = await getLastComputationTime();
+	const oneDayAgo = new Date(Date.now() - 24 * 3_600_000);
+	return lastComputationTime < oneDayAgo;
+}
+
 export async function computeAllStats() {
 	for (const span of ["day", "week", "month"] as const) {
 		computeStats({ dateField: "updatedAt", type: "conversation", span }).catch((e) =>
@@ -246,9 +257,15 @@ async function maintainLock() {
 export function refreshConversationStats() {
 	const ONE_HOUR_MS = 3_600_000;
 
-	maintainLock().then(() => {
-		computeAllStats();
+	maintainLock().then(async () => {
+		if (await shouldComputeStats()) {
+			computeAllStats();
+		}
 
-		setInterval(computeAllStats, 12 * ONE_HOUR_MS);
+		setInterval(async () => {
+			if (await shouldComputeStats()) {
+				computeAllStats();
+			}
+		}, 24 * ONE_HOUR_MS);
 	});
 }

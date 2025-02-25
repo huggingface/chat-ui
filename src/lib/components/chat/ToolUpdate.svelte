@@ -8,7 +8,7 @@
 
 	import CarbonTools from "~icons/carbon/tools";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { onDestroy } from "svelte";
 	import { browser } from "$app/environment";
 
@@ -25,7 +25,7 @@
 
 	let eta = $derived(tool.find((el) => el.subtype === MessageToolUpdateType.ETA)?.eta);
 
-	const availableTools: ToolFront[] = $page.data.tools;
+	const availableTools: ToolFront[] = page.data.tools;
 
 	let loadingBarEl: HTMLDivElement | undefined = $state();
 	let animation: Animation | undefined = $state(undefined);

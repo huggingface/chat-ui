@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { applyAction, enhance } from "$app/forms";
 	import { invalidateAll } from "$app/navigation";
 	import Modal from "$lib/components/Modal.svelte";
 	import { createEventDispatcher } from "svelte";
@@ -7,18 +6,24 @@
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	let reason = $state("");
+
+	interface Props {
+		reportUrl: string;
+	}
+
+	let { reportUrl }: Props = $props();
 </script>
 
 <Modal on:close>
 	<form
-		method="POST"
-		action="?/report"
-		use:enhance={() => {
-			return async ({ result }) => {
-				await applyAction(result);
+		onsubmit={() => {
+			fetch(`${reportUrl}`, {
+				method: "POST",
+				body: JSON.stringify({ reason }),
+			}).then(() => {
 				dispatch("close");
 				invalidateAll();
-			};
+			});
 		}}
 		class="w-full min-w-64 p-4"
 	>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { base } from "$app/paths";
 
@@ -9,6 +9,15 @@
 
 	let { classNames = "" }: Props = $props();
 </script>
+
+<svelte:head>
+	<link
+		rel="preload"
+		href="{envPublic.PUBLIC_ORIGIN || page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/logo.svg"
+		as="image"
+		type="image/svg+xml"
+	/>
+</svelte:head>
 
 {#if envPublic.PUBLIC_APP_ASSETS === "chatui"}
 	<svg
@@ -27,6 +36,6 @@
 	<img
 		class={classNames}
 		alt="{envPublic.PUBLIC_APP_NAME} logo"
-		src="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/logo.svg"
+		src="{envPublic.PUBLIC_ORIGIN || page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/logo.svg"
 	/>
 {/if}

@@ -8,33 +8,25 @@
 	import { browser } from "$app/environment";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { colors, icons } from "$lib/utils/tools";
-	import { applyAction, enhance } from "$app/forms";
 	import { getGradioApi } from "$lib/utils/getGradioApi";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import ToolInputComponent from "./ToolInputComponent.svelte";
+	import { error as errorStore } from "$lib/stores/errors";
 
 	import CarbonInformation from "~icons/carbon/information";
-
-	type ActionData = {
-		error?: boolean;
-		errors?: {
-			field: string | number;
-			message: string;
-		}[];
-	} | null;
+	import { page } from "$app/state";
 
 	interface Props {
 		tool?: CommunityToolEditable | undefined;
 		readonly?: boolean;
-		form: ActionData;
 	}
 
-	let { tool = undefined, readonly = false, form = $bindable() }: Props = $props();
+	let errors = $state<{ field: string; message: string }[]>([]);
+	let { tool = undefined, readonly = false }: Props = $props();
 
-	function getError(field: string, returnForm: ActionData) {
-		return returnForm?.errors?.find((error) => error.field === field)?.message ?? "";
+	function getError(field: string) {
+		return errors.find((error) => error.field === field)?.message ?? "";
 	}
 
 	let APIloading = $state(false);
@@ -73,7 +65,6 @@
 			return;
 		}
 
-		form = { error: false, errors: [] };
 		APIloading = true;
 
 		const api = await getGradioApi(editableTool.baseUrl);
@@ -118,17 +109,14 @@
 		if (parsedOutputComponent.success) {
 			editableTool.outputComponent = "0;" + parsedOutputComponent.data;
 		} else {
-			form = {
-				error: true,
-				errors: [
-					{
-						field: "outputComponent",
-						message: `Invalid output component. Type ${
-							api.named_endpoints[editableTool.endpoint].returns?.[0]?.component
-						} is not yet supported. Feel free to report this issue so we can add support for it.`,
-					},
-				],
-			};
+			errors = [
+				{
+					field: "outputComponent",
+					message: `Invalid output component. Type ${
+						api.named_endpoints[editableTool.endpoint].returns?.[0]?.component
+					} is not yet supported. Feel free to report this issue so we can add support for it.`,
+				},
+			];
 			editableTool.outputComponent = null;
 		}
 
@@ -157,33 +145,50 @@
 		}
 	}
 
-	const settings = useSettingsStore();
-
 	let formSubmittable = $derived(
 		editableTool.name && editableTool.baseUrl && editableTool.outputComponent
 	);
 </script>
 
 <form
-	method="POST"
 	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
-	use:enhance={async ({ formData }) => {
+	onsubmit={async (e) => {
+		e.preventDefault();
 		formLoading = true;
+		errors = [];
 
-		formData.append("tool", JSON.stringify(editableTool));
+		try {
+			const body = JSON.stringify(editableTool);
+			let response: Response;
 
-		return async ({ result }) => {
-			if (result.type === "success" && result.data && typeof result.data.toolId === "string") {
-				$settings.tools = [...($settings.tools ?? []), result.data.toolId];
-				await goto(`${base}/tools/${result.data.toolId}`).then(() => {
-					formLoading = false;
+			if (page.params.toolId) {
+				response = await fetch(`${base}/api/tools/${page.params.toolId}`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body,
 				});
 			} else {
-				await applyAction(result).then(() => {
-					formLoading = false;
+				response = await fetch(`${base}/api/tools`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body,
 				});
 			}
-		};
+
+			if (response.ok) {
+				const { toolId } = await response.json();
+				goto(`${base}/tools/${toolId}`, { invalidateAll: true });
+			} else if (response.status === 400) {
+				const data = await response.json();
+				errors = data.errors;
+			} else {
+				$errorStore = response.statusText;
+			}
+		} catch (e) {
+			$errorStore = (e as Error).message;
+		} finally {
+			formLoading = false;
+		}
 	}}
 >
 	{#if tool}
@@ -217,7 +222,7 @@
 						placeholder="Image generator"
 						bind:value={editableTool.displayName}
 					/>
-					<p class="text-xs text-red-500">{getError("displayName", form)}</p>
+					<p class="text-xs text-red-500">{getError("displayName")}</p>
 				</label>
 
 				<div class="flex flex-row gap-4">
@@ -240,7 +245,7 @@
 								<option value={icon}>{icon}</option>
 							{/each}
 						</select>
-						<p class="text-xs text-red-500">{getError("icon", form)}</p>
+						<p class="text-xs text-red-500">{getError("icon")}</p>
 					</label>
 
 					<label class="flex-grow">
@@ -255,7 +260,7 @@
 								<option value={color}>{color}</option>
 							{/each}
 						</select>
-						<p class="text-xs text-red-500">{getError("color", form)}</p>
+						<p class="text-xs text-red-500">{getError("color")}</p>
 					</label>
 				</div>
 
@@ -272,7 +277,7 @@
 						placeholder="This tool lets you generate images using SDXL."
 						bind:value={editableTool.description}
 					></textarea>
-					<p class="text-xs text-red-500">{getError("description", form)}</p>
+					<p class="text-xs text-red-500">{getError("description")}</p>
 				</label>
 
 				<label>
@@ -292,7 +297,7 @@
 						placeholder="ByteDance/Hyper-SDXL-1Step-T2I"
 						bind:value={editableTool.baseUrl}
 					/>
-					<p class="text-xs text-red-500">{getError("spaceUrl", form)}</p>
+					<p class="text-xs text-red-500">{getError("spaceUrl")}</p>
 				</label>
 				<p class="text-justify text-gray-800">
 					Tools allows models that support them to use external application directly via function
@@ -378,7 +383,7 @@
 									</div>
 
 									<p class="text-xs text-red-500">
-										{getError(`inputs`, form)}
+										{getError("inputs")}
 									</p>
 
 									{#each editableTool.inputs as input, inputIdx}
@@ -559,7 +564,7 @@
 												{/if}
 											{/if}
 											<p class="text-xs text-red-500">
-												{getError("outputComponent", form)}
+												{getError("outputComponent")}
 											</p>
 										</label>
 
@@ -578,7 +583,7 @@
 												class="peer rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 											/>
 											<p class="text-xs text-red-500">
-												{getError("showOutput", form)}
+												{getError("showOutput")}
 											</p>
 										</label>
 									</div>

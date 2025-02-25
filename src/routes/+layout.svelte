@@ -23,6 +23,8 @@
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
+	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	let { data = $bindable(), children } = $props();
 
@@ -31,8 +33,9 @@
 		data.conversations && untrack(() => (conversations = data.conversations));
 	});
 
-	let isNavOpen = $state(false);
 	let isNavCollapsed = $state(false);
+
+	let overloadedModalOpen = $state(false);
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | undefined = $state();
@@ -47,6 +50,9 @@
 
 		currentError = $error;
 
+		if (currentError === "Model is overloaded") {
+			overloadedModalOpen = true;
+		}
 		errorToastTimeout = setTimeout(() => {
 			$error = undefined;
 			currentError = undefined;
@@ -235,6 +241,10 @@
 	/>
 {/if}
 
+{#if overloadedModalOpen && isHuggingChat}
+	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
+{/if}
+
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
 		? 'md:grid-cols-[290px,1fr]'
@@ -248,7 +258,7 @@
 			: 'left-0'} *:transition-transform"
 	/>
 
-	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
+	<MobileNav title={mobileNavTitle}>
 		<NavMenu
 			{conversations}
 			user={data.user}

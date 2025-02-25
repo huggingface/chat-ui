@@ -14,7 +14,7 @@
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
@@ -73,7 +73,7 @@
 	let pastedLongContent = $state(false);
 
 	run(() => {
-		$page.params.id && (isSharedRecently = false);
+		page.params.id && (isSharedRecently = false);
 	});
 
 	const dispatch = createEventDispatcher<{
@@ -200,7 +200,7 @@
 	const settings = useSettingsStore();
 
 	let mimeTypesFromActiveTools = $derived(
-		$page.data.tools
+		page.data.tools
 			.filter((tool: ToolFront) => {
 				if (assistant) {
 					return assistant.tools?.includes(tool._id);
@@ -311,7 +311,7 @@
 				<ChatIntroduction
 					{currentModel}
 					on:message={(ev) => {
-						if ($page.data.loginRequired) {
+						if (page.data.loginRequired) {
 							ev.preventDefault();
 							$loginModalOpen = true;
 						} else {
@@ -324,7 +324,7 @@
 					{models}
 					{assistant}
 					on:message={(ev) => {
-						if ($page.data.loginRequired) {
+						if (page.data.loginRequired) {
 							ev.preventDefault();
 							$loginModalOpen = true;
 						} else {
