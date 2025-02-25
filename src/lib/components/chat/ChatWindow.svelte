@@ -425,6 +425,7 @@
 								on:submit={handleSubmit}
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
+								modelHasWebSearch={currentModel.websearch}
 								modelHasTools={currentModel.tools}
 								modelIsMultimodal={currentModel.multimodal}
 							/>
