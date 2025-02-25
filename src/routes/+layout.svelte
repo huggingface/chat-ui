@@ -33,7 +33,6 @@
 		data.conversations && untrack(() => (conversations = data.conversations));
 	});
 
-	let isNavOpen = $state(false);
 	let isNavCollapsed = $state(false);
 
 	let overloadedModalOpen = $state(false);
@@ -259,7 +258,7 @@
 			: 'left-0'} *:transition-transform"
 	/>
 
-	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
+	<MobileNav title={mobileNavTitle}>
 		<NavMenu
 			{conversations}
 			user={data.user}
