@@ -119,9 +119,17 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 };
 
 function escapeHTML(content: string) {
-	return content.replace(/[<>&"']/g, (x) => {
-		return { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&#39;", '"': "&quot;" }[x] || x;
-	});
+	return content.replace(
+		/[<>&"']/g,
+		(x) =>
+			({
+				"<": "&lt;",
+				">": "&gt;",
+				"&": "&amp;",
+				"'": "&#39;",
+				'"': "&quot;",
+			})[x] || x
+	);
 }
 
 function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
