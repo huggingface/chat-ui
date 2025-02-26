@@ -85,7 +85,9 @@
 	});
 </script>
 
-<div class="sticky top-0 flex flex-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0">
+<div
+	class="sticky top-0 flex flex-none touch-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0"
+>
 	<a
 		class="flex items-center rounded-xl text-lg font-semibold"
 		href="{envPublic.PUBLIC_ORIGIN}{base}/"
@@ -104,7 +106,7 @@
 	{/if}
 </div>
 <div
-	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
+	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	{#await groupedConversations}
 		{#if $page.data.nConversations > 0}
@@ -136,7 +138,7 @@
 	{/await}
 </div>
 <div
-	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
+	class="mt-0.5 flex touch-none flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<form
