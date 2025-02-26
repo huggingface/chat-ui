@@ -50,6 +50,13 @@
 			})();
 		}
 	});
+
+	DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+		if (node.tagName === "A") {
+			node.setAttribute("target", "_blank");
+			node.setAttribute("rel", "noreferrer");
+		}
+	});
 </script>
 
 {#each tokens as token}
