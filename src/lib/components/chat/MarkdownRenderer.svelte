@@ -1,33 +1,61 @@
 <script lang="ts">
 	import type { WebSearchSource } from "$lib/types/WebSearch";
-	import { getMarked } from "$lib/utils/getMarked";
+	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
 	import MarkdownWorker from "$lib/workers/markdownWorker?worker";
+	import CodeBlock from "../CodeBlock.svelte";
+	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
+	import { browser } from "$app/environment";
+
+	import DOMPurify from "isomorphic-dompurify";
 
 	interface Props {
 		content: string;
 		sources?: WebSearchSource[];
 	}
 
+	const worker = browser && window.Worker ? new MarkdownWorker() : null;
+
 	let { content, sources = [] }: Props = $props();
 
-	let processedContent = $state([]);
+	let tokens: Token[] = $state(processTokensSync(content, sources));
 
-	function processContent(content: string, sources: WebSearchSource[]) {
-		if (typeof Worker !== "undefined") {
-			const worker = new MarkdownWorker();
-			worker.postMessage({ content, sources });
-			worker.onmessage = (event) => {
-				content = event.data.content;
-			};
+	async function processContent(content: string, sources: WebSearchSource[]): Promise<Token[]> {
+		if (worker) {
+			return new Promise((resolve) => {
+				worker.onmessage = (event: MessageEvent<OutgoingMessage>) => {
+					if (event.data.type !== "processed") {
+						throw new Error("Invalid message type");
+					}
+					resolve(event.data.tokens);
+				};
+				worker.postMessage({ content, sources, type: "process" } as IncomingMessage);
+			});
 		} else {
-			processedContent = getMarked(sources).parse(content);
+			return processTokens(content, sources);
 		}
 	}
+
+	$effect(() => {
+		if (!browser) {
+			tokens = processTokensSync(content, sources);
+		} else {
+			(async () => {
+				if (!browser) {
+					tokens = processTokensSync(content, sources);
+				} else {
+					tokens = await processContent(content, sources);
+				}
+			})();
+		}
+	});
 </script>
 
-{#each processedContent as token}
+{#each tokens as token}
 	{#if token.type === "text"}
-		{@html token.html}
+		{#await token.html then html}
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+			{@html DOMPurify.sanitize(html)}
+		{/await}
 	{:else if token.type === "code"}
 		<CodeBlock lang={token.lang} code={token.code} />
 	{/if}

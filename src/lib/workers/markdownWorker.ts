@@ -1,15 +1,15 @@
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { getMarked } from "$lib/utils/getMarked";
+import { processTokens, type Token } from "$lib/utils/marked";
 
-type IncomingMessage = {
+export type IncomingMessage = {
 	type: "process";
 	content: string;
 	sources: WebSearchSource[];
 };
 
-type OutgoingMessage = {
+export type OutgoingMessage = {
 	type: "processed";
-	content: string;
+	tokens: Token[];
 };
 
 onmessage = async (event) => {
@@ -18,27 +18,10 @@ onmessage = async (event) => {
 	}
 
 	const message = event.data as IncomingMessage;
+
 	const { content, sources } = message;
-	const marked = getMarked(sources);
 
-	const tokens = marked.lexer(content);
-
-	const processedTokens = await Promise.all(
-		tokens.map(async (token) => {
-			if (token.type === "code") {
-				return {
-					type: "code",
-					lang: token.lang,
-					code: token.text,
-				};
-			} else {
-				return {
-					type: "text",
-					html: await marked.parse(token.raw),
-				};
-			}
-		})
-	);
+	const processedTokens = await processTokens(content, sources);
 
 	postMessage({ type: "processed", tokens: processedTokens } satisfies OutgoingMessage);
 };

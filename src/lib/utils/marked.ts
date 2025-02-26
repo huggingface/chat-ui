@@ -1,6 +1,5 @@
 import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
-import DOMPurify from "isomorphic-dompurify";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
 import type { WebSearchSource } from "$lib/types/WebSearch";
@@ -18,13 +17,6 @@ interface katexInlineToken extends Tokens.Generic {
 	text: string;
 	displayMode: false;
 }
-
-DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-	if (node.tagName === "A") {
-		node.setAttribute("rel", "noreferrer");
-		node.setAttribute("target", "_blank");
-	}
-});
 
 export const katexBlockExtension: TokenizerExtension & RendererExtension = {
 	name: "katexBlock",
@@ -152,12 +144,10 @@ function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []
 	});
 }
 
-let markedInstance: Marked | null = null;
-
 function createMarkedInstance(sources: WebSearchSource[]): Marked {
 	return new Marked({
 		hooks: {
-			postprocess: (html) => DOMPurify.sanitize(addInlineCitations(html, sources)),
+			postprocess: (html) => addInlineCitations(html, sources),
 		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
@@ -170,8 +160,53 @@ function createMarkedInstance(sources: WebSearchSource[]): Marked {
 }
 
 export function getMarked(sources: WebSearchSource[]): Marked {
-	if (!markedInstance) {
-		markedInstance = createMarkedInstance(sources);
-	}
-	return markedInstance;
+	return createMarkedInstance(sources);
 }
+
+type CodeToken = {
+	type: "code";
+	lang: string;
+	code: string;
+};
+
+type TextToken = {
+	type: "text";
+	html: string | Promise<string>;
+};
+
+export async function processTokens(content: string, sources: WebSearchSource[]): Promise<Token[]> {
+	const marked = getMarked(sources);
+	const tokens = marked.lexer(content);
+
+	const processedTokens = await Promise.all(
+		tokens.map(async (token) => {
+			if (token.type === "code") {
+				return {
+					type: "code" as const,
+					lang: token.lang,
+					code: token.text,
+				};
+			} else {
+				return {
+					type: "text" as const,
+					html: marked.parse(token.raw),
+				};
+			}
+		})
+	);
+
+	return processedTokens;
+}
+
+export function processTokensSync(content: string, sources: WebSearchSource[]): Token[] {
+	const marked = getMarked(sources);
+	const tokens = marked.lexer(content);
+	return tokens.map((token) => {
+		if (token.type === "code") {
+			return { type: "code" as const, lang: token.lang, code: token.text };
+		}
+		return { type: "text" as const, html: marked.parse(token.raw) };
+	});
+}
+
+export type Token = CodeToken | TextToken;
