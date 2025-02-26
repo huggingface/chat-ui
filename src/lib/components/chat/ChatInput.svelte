@@ -35,6 +35,7 @@
 		assistant?: Assistant | undefined;
 		modelHasTools?: boolean;
 		modelIsMultimodal?: boolean;
+		modelHasWebSearch?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 	}
@@ -49,6 +50,7 @@
 		assistant = undefined,
 		modelHasTools = false,
 		modelIsMultimodal = false,
+		modelHasWebSearch = false,
 		children,
 		onPaste,
 	}: Props = $props();
@@ -175,11 +177,12 @@
 		{disabled}
 	></textarea>
 
+	{#if modelHasWebSearch || modelIsMultimodal || modelHasTools}
 	{#if !assistant}
 		<div
 			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2"
 		>
-			{#if modelHasWebSearch}
+			{#if modelHasWebSearch }
 			<HoverTooltip
 				label="Search the web"
 				position="top"
@@ -346,6 +349,7 @@
 				</HoverTooltip>
 			{/if}
 		</div>
+	{/if}
 	{/if}
 	{@render children?.()}
 </div>

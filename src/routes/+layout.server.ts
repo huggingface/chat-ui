@@ -219,6 +219,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 			parameters: model.parameters,
 			preprompt: model.preprompt,
 			multimodal: model.multimodal,
+			websearch: model.websearch,
 			multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
 			tools: model.tools,
 			unlisted: model.unlisted,

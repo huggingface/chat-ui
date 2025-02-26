@@ -19,5 +19,6 @@ export type Model = Pick<
 	| "multimodalAcceptedMimetypes"
 	| "unlisted"
 	| "tools"
+	| "websearch"
 	| "hasInferenceAPI"
 >;
