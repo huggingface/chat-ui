@@ -156,13 +156,9 @@ function createMarkedInstance(sources: WebSearchSource[]): Marked {
 			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
+		breaks: true,
 	});
 }
-
-export function getMarked(sources: WebSearchSource[]): Marked {
-	return createMarkedInstance(sources);
-}
-
 type CodeToken = {
 	type: "code";
 	lang: string;
@@ -175,7 +171,7 @@ type TextToken = {
 };
 
 export async function processTokens(content: string, sources: WebSearchSource[]): Promise<Token[]> {
-	const marked = getMarked(sources);
+	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
 
 	const processedTokens = await Promise.all(
@@ -199,7 +195,7 @@ export async function processTokens(content: string, sources: WebSearchSource[])
 }
 
 export function processTokensSync(content: string, sources: WebSearchSource[]): Token[] {
-	const marked = getMarked(sources);
+	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {

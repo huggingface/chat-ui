@@ -28,7 +28,9 @@
 					}
 					resolve(event.data.tokens);
 				};
-				worker.postMessage({ content, sources, type: "process" } as IncomingMessage);
+				worker.postMessage(
+					JSON.parse(JSON.stringify({ content, sources, type: "process" })) as IncomingMessage
+				);
 			});
 		} else {
 			return processTokens(content, sources);

@@ -29,7 +29,7 @@ async function processMessage() {
 		try {
 			const { content, sources } = nextMessage;
 			const processedTokens = await processTokens(content, sources);
-			postMessage({ type: "processed", tokens: processedTokens } satisfies OutgoingMessage);
+			postMessage(JSON.parse(JSON.stringify({ type: "processed", tokens: processedTokens })));
 		} finally {
 			isProcessing = false;
 
