@@ -27,6 +27,8 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
 
+	import "katex/dist/katex.min.css";
+
 	let { data = $bindable() } = $props();
 
 	let loading = $state(false);
@@ -472,12 +474,6 @@
 
 <svelte:head>
 	<title>{title}</title>
-	<link
-		rel="stylesheet"
-		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"
-		integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn"
-		crossorigin="anonymous"
-	/>
 </svelte:head>
 
 <ChatWindow
