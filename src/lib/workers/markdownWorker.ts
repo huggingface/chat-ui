@@ -12,16 +12,41 @@ export type OutgoingMessage = {
 	tokens: Token[];
 };
 
-onmessage = async (event) => {
+// Flag to track if the worker is currently processing a message
+let isProcessing = false;
+
+// Buffer to store the latest incoming message
+let latestMessage: IncomingMessage | null = null;
+
+// Helper function to safely handle the latest message
+async function processMessage() {
+	if (latestMessage) {
+		const nextMessage = latestMessage;
+
+		latestMessage = null;
+		isProcessing = true;
+
+		try {
+			const { content, sources } = nextMessage;
+			const processedTokens = await processTokens(content, sources);
+			postMessage({ type: "processed", tokens: processedTokens } satisfies OutgoingMessage);
+		} finally {
+			isProcessing = false;
+
+			// After processing, check if a new message was buffered
+			processMessage();
+		}
+	}
+}
+
+onmessage = (event) => {
 	if (event.data.type !== "process") {
 		return;
 	}
 
-	const message = event.data as IncomingMessage;
+	latestMessage = event.data as IncomingMessage;
 
-	const { content, sources } = message;
-
-	const processedTokens = await processTokens(content, sources);
-
-	postMessage({ type: "processed", tokens: processedTokens } satisfies OutgoingMessage);
+	if (!isProcessing && latestMessage) {
+		processMessage();
+	}
 };
