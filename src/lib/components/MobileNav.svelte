@@ -79,7 +79,7 @@
 </nav>
 
 <nav
-	use:pan={() => ({ delay: 100, preventdefault: true, touchAction: "pan-left" })}
+	use:pan={() => ({ delay: 0, preventdefault: true, touchAction: "pan-left" })}
 	onpanup={(e: GestureCustomEvent) => {
 		if (!panStart || !panStartTime || !panX) {
 			return;
@@ -96,8 +96,7 @@
 		panStart = undefined;
 		panStartTime = undefined;
 
-		console.log(panVelocity, trueX);
-		if (panVelocity < -1 || trueX < 50) {
+		if (panVelocity < -0.5 || trueX < 50) {
 			isOpen = !isOpen;
 		}
 	}}
