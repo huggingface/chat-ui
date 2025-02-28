@@ -42,6 +42,7 @@
 
 	beforeNavigate(() => {
 		isOpen = false;
+		panX = undefined;
 	});
 
 	let shouldFocusClose = $derived(isOpen && closeEl);
