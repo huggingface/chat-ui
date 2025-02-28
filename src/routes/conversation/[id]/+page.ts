@@ -1,21 +1,19 @@
+import { base } from "$app/paths";
 import type { GETConversationResponse } from "$lib/server/api/routes/groups/conversations.js";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { useEdenFetch } from "$lib/utils/api.js";
 import { error } from "@sveltejs/kit";
+
 export const load = async ({ params, depends, fetch }) => {
 	depends(UrlDependency.Conversation);
 
-	const edenFetch = useEdenFetch({ fetch });
+	const r = await fetch(`${base}/api/v2/conversations/${params.id}`);
 
-	const { data, error: e } = await edenFetch("/conversations/:id", {
-		params: {
-			id: params.id,
-		},
-	});
-
-	if (e) {
-		error(e.status, e.message);
+	if (!r.ok) {
+		console.log({ r });
+		error(r.status, "Failed to fetch conversation");
 	}
+
+	const data = await r.json();
 
 	return data as GETConversationResponse;
 };
