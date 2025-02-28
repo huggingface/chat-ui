@@ -1,32 +1,23 @@
-import { useEdenFetch } from "$lib/utils/api";
 import { error } from "@sveltejs/kit";
 import type { Assistant } from "$lib/types/Assistant";
 import type { Serialize } from "$lib/utils/serialize";
+import { base } from "$app/paths";
 
 export async function load({ fetch, params }) {
-	const edenFetch = useEdenFetch({ fetch });
+	const r = await fetch(`${base}/api/v2/assistants/${params.assistantId}`);
 
-	const { data, error: e } = await edenFetch("/assistants/:id", {
-		method: "GET",
-		params: {
-			id: params.assistantId,
-		},
-	});
-
-	if (e) {
-		error(e.status, e.message);
+	if (!r.ok) {
+		error(r.status, r.statusText);
 	}
 
-	const { error: subscribeError } = await edenFetch("/assistants/:id/subscribe", {
+	const data = await r.json();
+
+	const r2 = await fetch(`${base}/api/v2/assistants/${params.assistantId}/subscribe`, {
 		method: "POST",
-		params: {
-			id: params.assistantId,
-		},
 	});
 
-	if (subscribeError) {
-		console.error(subscribeError);
-		error(subscribeError.status, subscribeError.message);
+	if (!r2.ok) {
+		error(r2.status, r2.statusText);
 	}
 
 	return { assistant: data as Serialize<Assistant> };
