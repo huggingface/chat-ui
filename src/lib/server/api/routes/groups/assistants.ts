@@ -3,7 +3,6 @@ import { authPlugin } from "$lib/server/api/authPlugin";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
-import { jsonSerialize } from "$lib/utils/serialize";
 
 export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", (app) => {
 	return app
@@ -29,7 +28,7 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 					return { assistant };
 				})
 				.get("", ({ assistant }) => {
-					return jsonSerialize(assistant);
+					return assistant;
 				})
 				.patch("", () => {
 					// todo: patch assistant
