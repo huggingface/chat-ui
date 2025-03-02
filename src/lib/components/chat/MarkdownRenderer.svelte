@@ -42,11 +42,7 @@
 			tokens = processTokensSync(content, sources);
 		} else {
 			(async () => {
-				if (!browser) {
-					tokens = processTokensSync(content, sources);
-				} else {
-					tokens = await processContent(content, sources);
-				}
+				tokens = await processContent(content, sources);
 			})();
 		}
 	});
