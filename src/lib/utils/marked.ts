@@ -3,6 +3,7 @@ import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
 import type { WebSearchSource } from "$lib/types/WebSearch";
+import hljs from "highlight.js";
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -188,7 +189,7 @@ export async function processTokens(content: string, sources: WebSearchSource[])
 				return {
 					type: "code" as const,
 					lang: token.lang,
-					code: token.text,
+					code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
 				};
 			} else {
 				return {
@@ -207,7 +208,11 @@ export function processTokensSync(content: string, sources: WebSearchSource[]): 
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {
-			return { type: "code" as const, lang: token.lang, code: token.text };
+			return {
+				type: "code" as const,
+				lang: token.lang,
+				code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+			};
 		}
 		return { type: "text" as const, html: marked.parse(token.raw) };
 	});
