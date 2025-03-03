@@ -108,7 +108,6 @@
 		}
 		const formData = new FormData(e.target as HTMLFormElement, e.submitter);
 
-		console.log(formData);
 		loading = true;
 		if (files?.[0] && files[0].size > 0) {
 			formData.set("avatar", files[0]);

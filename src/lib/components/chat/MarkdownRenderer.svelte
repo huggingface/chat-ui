@@ -42,11 +42,7 @@
 			tokens = processTokensSync(content, sources);
 		} else {
 			(async () => {
-				if (!browser) {
-					tokens = processTokensSync(content, sources);
-				} else {
-					tokens = await processContent(content, sources);
-				}
+				tokens = await processContent(content, sources);
 			})();
 		}
 	});
@@ -66,6 +62,6 @@
 			{@html DOMPurify.sanitize(html)}
 		{/await}
 	{:else if token.type === "code"}
-		<CodeBlock lang={token.lang} code={token.code} />
+		<CodeBlock code={token.code} />
 	{/if}
 {/each}
