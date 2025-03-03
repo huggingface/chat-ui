@@ -110,7 +110,7 @@ envVars:
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
         "tools": true,
         "parameters": {
-          "stop": ["<|END_OF_TURN_TOKEN|>"],
+          "stop": ["<|END_OF_TURN_TOKEN|>", <|im_end|>],
           "truncate": 28672,
           "max_new_tokens": 2048,
           "temperature": 0.3
