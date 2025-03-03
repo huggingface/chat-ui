@@ -172,6 +172,7 @@ type CodeToken = {
 	type: "code";
 	lang: string;
 	code: string;
+	rawCode: string;
 };
 
 type TextToken = {
@@ -190,6 +191,7 @@ export async function processTokens(content: string, sources: WebSearchSource[])
 					type: "code" as const,
 					lang: token.lang,
 					code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+					rawCode: token.text,
 				};
 			} else {
 				return {
@@ -212,6 +214,7 @@ export function processTokensSync(content: string, sources: WebSearchSource[]): 
 				type: "code" as const,
 				lang: token.lang,
 				code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+				rawCode: token.text,
 			};
 		}
 		return { type: "text" as const, html: marked.parse(token.raw) };

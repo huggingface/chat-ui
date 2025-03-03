@@ -62,6 +62,6 @@
 			{@html DOMPurify.sanitize(html)}
 		{/await}
 	{:else if token.type === "code"}
-		<CodeBlock code={token.code} />
+		<CodeBlock code={token.code} rawCode={token.rawCode} />
 	{/if}
 {/each}
