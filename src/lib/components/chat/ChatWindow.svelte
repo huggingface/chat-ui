@@ -275,8 +275,8 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col-reverse gap-8 pb-52">
-					{#each messages.toReversed() as message, idx (message.id)}
+				<div class="flex h-max flex-col gap-8 pb-52">
+					{#each messages as message, idx (message.id)}
 						<ChatMessage
 							{loading}
 							{message}
