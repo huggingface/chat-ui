@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { Elysia, error, t } from "elysia";
 import { authPlugin } from "$lib/server/api/authPlugin";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
@@ -10,6 +10,11 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { Serialize } from "$lib/utils/serialize";
 import { jsonSerialize } from "$lib/utils/serialize";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
+
+export type GETConversationsResponse = {
+	conversations: Array<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>;
+	nConversations: number;
+};
 
 export type GETConversationResponse = Pick<
 	Conversation,
@@ -24,43 +29,50 @@ export type GETConversationResponse = Pick<
 
 export const conversationGroup = new Elysia().use(authPlugin).group("/conversations", (app) => {
 	return app
+		.guard({
+			as: "scoped",
+			beforeHandle: async ({ locals }) => {
+				if (!locals.user?._id && !locals.sessionId) {
+					return error(401, "Must have a valid session or user");
+				}
+			},
+		})
 		.get(
 			"",
 			async ({ locals, query }) => {
-				if (locals.user?._id || locals.sessionId) {
-					const convs = await collections.conversations
-						.find({
-							...authCondition(locals),
-						})
-						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>({
-							title: 1,
-							updatedAt: 1,
-							model: 1,
-							assistantId: 1,
-						})
-						.sort({ updatedAt: -1 })
-						.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
-						.limit(CONV_NUM_PER_PAGE)
-						.toArray();
+				const convs = await collections.conversations
+					.find(authCondition(locals))
+					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>({
+						title: 1,
+						updatedAt: 1,
+						model: 1,
+						assistantId: 1,
+					})
+					.sort({ updatedAt: -1 })
+					.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
+					.limit(CONV_NUM_PER_PAGE)
+					.toArray();
 
-					if (convs.length === 0) {
-						return Response.json([]);
-					}
+				const nConversations = await collections.conversations.countDocuments(
+					authCondition(locals)
+				);
 
-					const res = convs.map((conv) => ({
-						_id: conv._id,
-						id: conv._id, // legacy param iOS
-						title: conv.title,
-						updatedAt: conv.updatedAt,
-						model: conv.model,
-						modelId: conv.model, // legacy param iOS
-						assistantId: conv.assistantId,
-						modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
-					}));
-					return Response.json(res);
-				} else {
-					return Response.json({ message: "Must have session cookie" }, { status: 401 });
+				if (convs.length === 0) {
+					return Response.json([]);
 				}
+
+				const res = convs.map((conv) => ({
+					_id: conv._id,
+					id: conv._id, // legacy param iOS
+					title: conv.title,
+					updatedAt: conv.updatedAt,
+					model: conv.model,
+					modelId: conv.model, // legacy param iOS
+					assistantId: conv.assistantId,
+					modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
+				}));
+
+				return { conversations: res, nConversations } satisfies GETConversationsResponse;
 			},
 			{
 				query: t.Object({
@@ -156,13 +168,10 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 						return "aa";
 					})
 					.delete("", async ({ locals }) => {
-						if (locals.user?._id || locals.sessionId) {
-							const res = await collections.conversations.deleteMany({
-								...authCondition(locals),
-							});
-							return res.deletedCount;
-						}
-						return 0;
+						const res = await collections.conversations.deleteMany({
+							...authCondition(locals),
+						});
+						return res.deletedCount;
 					})
 					.get("/output/:sha256", () => {
 						// todo: get output

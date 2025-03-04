@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { toolFromConfigs } from "$lib/server/tools";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import type { Assistant } from "$lib/types/Assistant";
 
 export type UserGETFront = {
 	id: string;
@@ -31,6 +32,10 @@ export type UserGETSettings = {
 	assistants: string[];
 	tools: string[];
 };
+
+export type UserGETAssistants = Array<
+	Assistant & { _id: string; createdById: string; createdByMe: boolean }
+>;
 
 export const userGroup = new Elysia()
 	.use(authPlugin)
@@ -191,7 +196,30 @@ export const userGroup = new Elysia()
 
 				return null;
 			})
-			.get("/assistants", () => {
-				// todo: get user assistants
+			.get("/assistants", async ({ locals }) => {
+				const settings = await collections.settings.findOne(authCondition(locals));
+
+				if (!settings) {
+					return [];
+				}
+
+				const userAssistants =
+					settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
+
+				const assistants = await collections.assistants
+					.find({
+						_id: {
+							$in: [...userAssistants.map((el) => new ObjectId(el))],
+						},
+					})
+					.toArray();
+
+				return assistants.map((el) => ({
+					...el,
+					_id: el._id.toString(),
+					createdById: undefined,
+					createdByMe:
+						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
+				}));
 			});
 	});
