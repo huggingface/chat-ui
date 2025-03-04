@@ -4,7 +4,7 @@ import { ReviewStatus } from "$lib/types/Review";
 import { toolFromConfigs } from "$lib/server/tools";
 import { collections } from "$lib/server/database";
 import { ObjectId, type Filter } from "mongodb";
-import type { CommunityToolDB, Tool, ToolFront, ToolInputFile } from "$lib/types/Tool";
+import type { CommunityToolDB, ConfigTool, ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { MetricsServer } from "$lib/server/metrics";
 import { authCondition } from "$lib/server/auth";
 import { SortKey } from "$lib/types/Assistant";
@@ -17,7 +17,7 @@ const NUM_PER_PAGE = 16;
 
 export type GETToolsResponse = Array<ToolFront>;
 export type GETToolsSearchResponse = {
-	tools: Array<Serialize<Omit<Tool, "call">>>;
+	tools: Array<Serialize<ConfigTool | CommunityToolDB>>;
 	numTotalItems: number;
 	numItemsPerPage: number;
 	query: string | null;
