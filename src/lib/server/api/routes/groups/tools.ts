@@ -12,11 +12,33 @@ export type GETToolsResponse = Array<ToolFront>;
 
 export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 	return app
-		.get("/config", async () => {
+		.get("/active", async ({ locals }) => {
+			const settings = await collections.settings.findOne(authCondition(locals));
+
+			if (!settings) {
+				return [];
+			}
+
 			const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
 
-			return toolFromConfigs
-				.filter((tool) => !tool?.isHidden)
+			const activeCommunityToolIds = settings.tools ?? [];
+
+			const communityTools = await collections.tools
+				.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
+				.toArray()
+				.then((tools) =>
+					tools.map((tool) => ({
+						...tool,
+						isHidden: false,
+						isOnByDefault: true,
+						isLocked: true,
+					}))
+				);
+
+			const fullTools = [...communityTools, ...toolFromConfigs];
+
+			return fullTools
+				.filter((tool) => !tool.isHidden)
 				.map(
 					(tool) =>
 						({
@@ -39,29 +61,6 @@ export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 							icon: tool.icon,
 						}) satisfies ToolFront
 				);
-		})
-		.get("/active", async ({ locals }) => {
-			const settings = await collections.settings.findOne(authCondition(locals));
-
-			if (!settings) {
-				return [];
-			}
-
-			const activeCommunityToolIds = settings.tools ?? [];
-
-			const communityTools = await collections.tools
-				.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
-				.toArray()
-				.then((tools) =>
-					tools.map((tool) => ({
-						...tool,
-						isHidden: false,
-						isOnByDefault: true,
-						isLocked: true,
-					}))
-				);
-
-			return communityTools;
 		})
 		.get("/search", () => {
 			// todo: search tools

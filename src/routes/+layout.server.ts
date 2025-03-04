@@ -6,9 +6,7 @@ import { defaultModel, models } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
-import { toolFromConfigs } from "$lib/server/tools";
-import { MetricsServer } from "$lib/server/metrics";
-import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
+import type { ToolFront } from "$lib/types/Tool";
 import { base } from "$app/paths";
 import { jsonSerialize } from "../lib/utils/serialize";
 import type { FeatureFlags } from "$lib/server/api/routes/groups/misc";
@@ -61,30 +59,6 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 			.toArray()
 	);
 
-	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
-
-	const configToolIds = toolFromConfigs.map((el) => el._id.toString());
-
-	let activeCommunityToolIds = (settings?.tools ?? []).filter(
-		(key) => !configToolIds.includes(key)
-	);
-
-	if (assistant) {
-		activeCommunityToolIds = [...activeCommunityToolIds, ...(assistant.tools ?? [])];
-	}
-
-	const communityTools = await collections.tools
-		.find({ _id: { $in: activeCommunityToolIds.map((el) => new ObjectId(el)) } })
-		.toArray()
-		.then((tools) =>
-			tools.map((tool) => ({
-				...tool,
-				isHidden: false,
-				isOnByDefault: true,
-				isLocked: true,
-			}))
-		);
-
 	return {
 		nConversations,
 		conversations: await conversations.then(
@@ -128,30 +102,9 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 		oldModels: await fetch(`${base}/api/v2/models/old`).then(
 			(res) => res.json() as Promise<GETOldModelsResponse>
 		),
-		tools: [...toolFromConfigs, ...communityTools]
-			.filter((tool) => !tool?.isHidden)
-			.map(
-				(tool) =>
-					({
-						_id: tool._id.toString(),
-						type: tool.type,
-						displayName: tool.displayName,
-						name: tool.name,
-						description: tool.description,
-						mimeTypes: (tool.inputs ?? [])
-							.filter((input): input is ToolInputFile => input.type === "file")
-							.map((input) => (input as ToolInputFile).mimeTypes)
-							.flat(),
-						isOnByDefault: tool.isOnByDefault ?? true,
-						isLocked: tool.isLocked ?? true,
-						timeToUseMS:
-							toolUseDuration.find(
-								(el) => el.labels.tool === tool._id.toString() && el.labels.quantile === 0.9
-							)?.value ?? 15_000,
-						color: tool.color,
-						icon: tool.icon,
-					}) satisfies ToolFront
-			),
+		tools: await fetch(`${base}/api/v2/tools/active`).then(
+			(res) => res.json() as Promise<ToolFront[]>
+		),
 		communityToolCount: await fetch(`${base}/api/v2/tools/count`).then(
 			(res) => res.json() as Promise<number>
 		),
