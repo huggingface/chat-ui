@@ -49,7 +49,7 @@ export const load = async ({ depends, fetch }) => {
 					id: conv._id.toString(),
 					title: conv.title,
 					model: conv.model ?? defaultModel,
-					updatedAt: conv.updatedAt,
+					updatedAt: new Date(conv.updatedAt),
 					...(conv.assistantId
 						? {
 								assistantId: conv.assistantId.toString(),
@@ -76,7 +76,12 @@ export const load = async ({ depends, fetch }) => {
 		tools: await fetchJSON<ToolFront[]>(`${base}/api/v2/tools/active`, { fetch }),
 		communityToolCount: await fetchJSON<number>(`${base}/api/v2/tools/count`, { fetch }),
 		user: await fetchJSON<UserGETFront>(`${base}/api/v2/user`, { fetch }),
-		settings,
+		settings: {
+			...settings,
+			ethicsModalAcceptedAt: settings.ethicsModalAcceptedAt
+				? new Date(settings.ethicsModalAcceptedAt)
+				: null,
+		},
 		...(await fetchJSON<FeatureFlags>(`${base}/api/v2/feature-flags`, { fetch })),
 	};
 };
