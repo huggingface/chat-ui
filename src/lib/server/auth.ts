@@ -81,6 +81,10 @@ export async function findUser(sessionId: string) {
 	return await collections.users.findOne({ _id: session.userId });
 }
 export const authCondition = (locals: App.Locals) => {
+	if (!locals.user && !locals.sessionId) {
+		throw new Error("User or sessionId is required");
+	}
+
 	return locals.user
 		? { userId: locals.user._id }
 		: { sessionId: locals.sessionId, userId: { $exists: false } };

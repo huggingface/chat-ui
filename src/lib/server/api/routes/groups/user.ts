@@ -164,6 +164,18 @@ export const userGroup = new Elysia()
 				// return ok response
 				return new Response();
 			})
+			.get("/reports", async ({ locals }) => {
+				if (!locals.user || !locals.sessionId) {
+					return [];
+				}
+
+				const reports = await collections.reports
+					.find({
+						createdBy: locals.user?._id ?? locals.sessionId,
+					})
+					.toArray();
+				return reports;
+			})
 			.get("/assistant/active", async ({ locals }) => {
 				const settings = await collections.settings.findOne(authCondition(locals));
 
