@@ -1,14 +1,29 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { authPlugin } from "$lib/server/api/authPlugin";
 import { ReviewStatus } from "$lib/types/Review";
 import { toolFromConfigs } from "$lib/server/tools";
 import { collections } from "$lib/server/database";
-import { ObjectId } from "mongodb";
-import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
+import { ObjectId, type Filter } from "mongodb";
+import type { CommunityToolDB, Tool, ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { MetricsServer } from "$lib/server/metrics";
 import { authCondition } from "$lib/server/auth";
+import { SortKey } from "$lib/types/Assistant";
+import type { User } from "$lib/types/User";
+import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens";
+import { env } from "$env/dynamic/private";
+import { jsonSerialize, type Serialize } from "$lib/utils/serialize";
+
+const NUM_PER_PAGE = 16;
 
 export type GETToolsResponse = Array<ToolFront>;
+export type GETToolsSearchResponse = {
+	tools: Array<Serialize<Omit<Tool, "call">>>;
+	numTotalItems: number;
+	numItemsPerPage: number;
+	query: string | null;
+	sort: SortKey;
+	showUnfeatured: boolean;
+};
 
 export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 	return app
@@ -62,10 +77,102 @@ export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 						}) satisfies ToolFront
 				);
 		})
-		.get("/search", () => {
-			// todo: search tools
-			return "aa";
-		})
+		.get(
+			"/search",
+			async ({ query, locals, error }) => {
+				if (env.COMMUNITY_TOOLS !== "true") {
+					error(403, "Community tools are not enabled");
+				}
+
+				const username = query.user;
+				const search = query.q?.trim() ?? null;
+
+				const pageIndex = query.p ?? 0;
+				const sort = query.sort ?? SortKey.TRENDING;
+				const createdByCurrentUser = locals.user?.username && locals.user.username === username;
+				const activeOnly = query.active ?? false;
+				const showUnfeatured = query.showUnfeatured ?? false;
+
+				let user: Pick<User, "_id"> | null = null;
+				if (username) {
+					user = await collections.users.findOne<Pick<User, "_id">>(
+						{ username },
+						{ projection: { _id: 1 } }
+					);
+					if (!user) {
+						error(404, `User "${username}" doesn't exist`);
+					}
+				}
+
+				const settings = await collections.settings.findOne(authCondition(locals));
+
+				if (!settings && activeOnly) {
+					error(404, "No user settings found");
+				}
+
+				const queryTokens = !!search && generateQueryTokens(search);
+
+				const filter: Filter<CommunityToolDB> = {
+					...(!createdByCurrentUser &&
+						!activeOnly &&
+						!(locals.user?.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
+					...(user && { createdById: user._id }),
+					...(queryTokens && { searchTokens: { $all: queryTokens } }),
+					...(activeOnly && {
+						_id: {
+							$in: (settings?.tools ?? []).map((key) => {
+								return new ObjectId(key);
+							}),
+						},
+					}),
+				};
+
+				const communityTools = await collections.tools
+					.find(filter)
+					.skip(NUM_PER_PAGE * pageIndex)
+					.sort({
+						...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
+						useCount: -1,
+					})
+					.limit(NUM_PER_PAGE)
+					.toArray();
+
+				const configTools = toolFromConfigs
+					.filter((tool) => !tool?.isHidden)
+					.filter((tool) => {
+						if (queryTokens) {
+							return generateSearchTokens(tool.displayName).some((token) =>
+								queryTokens.some((queryToken) => queryToken.test(token))
+							);
+						}
+						return true;
+					});
+
+				const tools = [...(pageIndex == 0 && !username ? configTools : []), ...communityTools];
+
+				const numTotalItems =
+					(await collections.tools.countDocuments(filter)) + toolFromConfigs.length;
+
+				return {
+					tools: jsonSerialize(tools),
+					numTotalItems,
+					numItemsPerPage: NUM_PER_PAGE,
+					query: search,
+					sort,
+					showUnfeatured,
+				} satisfies GETToolsSearchResponse;
+			},
+			{
+				query: t.Object({
+					user: t.Optional(t.String()),
+					q: t.Optional(t.String()),
+					sort: t.Optional(t.Enum(SortKey)),
+					p: t.Optional(t.Numeric()),
+					showUnfeatured: t.Optional(t.Boolean()),
+					active: t.Optional(t.Boolean()),
+				}),
+			}
+		)
 		.get("/count", () => {
 			// return community tool count
 			return collections.tools.countDocuments({ type: "community", review: ReviewStatus.APPROVED });
