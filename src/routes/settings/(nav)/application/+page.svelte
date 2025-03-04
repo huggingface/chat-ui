@@ -85,7 +85,7 @@
 					e.preventDefault();
 
 					confirm("Are you sure you want to delete all conversations?") &&
-						(await fetch(`${base}/api/conversations`, {
+						(await fetch(`${base}/api/v2/conversations`, {
 							method: "DELETE",
 						})
 							.then(async () => {

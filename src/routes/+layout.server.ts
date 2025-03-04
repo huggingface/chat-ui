@@ -2,48 +2,22 @@ import type { LayoutServerLoad } from "./$types";
 import { collections } from "$lib/server/database";
 import type { Conversation } from "$lib/types/Conversation";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
-import { authCondition, requiresUser } from "$lib/server/auth";
-import { DEFAULT_SETTINGS } from "$lib/types/Settings";
-import { env } from "$env/dynamic/private";
+import { defaultModel, models } from "$lib/server/models";
+import { authCondition } from "$lib/server/auth";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { toolFromConfigs } from "$lib/server/tools";
 import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
-import { ReviewStatus } from "$lib/types/Review";
 import { base } from "$app/paths";
 import { jsonSerialize } from "../lib/utils/serialize";
-
+import type { FeatureFlags, GETModelsResponse } from "$lib/server/api/routes/groups/misc";
+import type { UserGETFront, UserGETSettings } from "$lib/server/api/routes/groups/user";
+import type { GETOldModelsResponse } from "$lib/server/api/routes/groups/misc";
 export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
 
 	const settings = await collections.settings.findOne(authCondition(locals));
-
-	// If the active model in settings is not valid, set it to the default model. This can happen if model was disabled.
-	if (
-		settings &&
-		!validateModel(models).safeParse(settings?.activeModel).success &&
-		!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
-	) {
-		settings.activeModel = defaultModel.id;
-		await collections.settings.updateOne(authCondition(locals), {
-			$set: { activeModel: defaultModel.id },
-		});
-	}
-
-	// if the model is unlisted, set the active model to the default model
-	if (
-		settings?.activeModel &&
-		models.find((m) => m.id === settings?.activeModel)?.unlisted === true
-	) {
-		settings.activeModel = defaultModel.id;
-		await collections.settings.updateOne(authCondition(locals), {
-			$set: { activeModel: defaultModel.id },
-		});
-	}
-
-	const enableAssistants = env.ENABLE_ASSISTANTS === "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
@@ -58,7 +32,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	const conversations =
 		nConversations === 0
 			? Promise.resolve([])
-			: fetch(`${base}/api/conversations`)
+			: fetch(`${base}/api/v2/conversations`)
 					.then((res) => res.json())
 					.then(
 						(
@@ -85,35 +59,6 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 			})
 			.toArray()
 	);
-
-	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
-
-	let loginRequired = false;
-
-	if (requiresUser && !locals.user) {
-		if (messagesBeforeLogin === 0) {
-			loginRequired = true;
-		} else if (nConversations >= messagesBeforeLogin) {
-			loginRequired = true;
-		} else {
-			// get the number of messages where `from === "assistant"` across all conversations.
-			const totalMessages =
-				(
-					await collections.conversations
-						.aggregate([
-							{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
-							{ $project: { messages: 1 } },
-							{ $limit: messagesBeforeLogin + 1 },
-							{ $unwind: "$messages" },
-							{ $match: { "messages.from": "assistant" } },
-							{ $count: "messages" },
-						])
-						.toArray()
-				)[0]?.messages ?? 0;
-
-			loginRequired = totalMessages >= messagesBeforeLogin;
-		}
-	}
 
 	const toolUseDuration = (await MetricsServer.getMetrics().tool.toolUseDuration.get()).values;
 
@@ -176,56 +121,12 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 					})
 				)
 		),
-		settings: {
-			searchEnabled: !!(
-				env.SERPAPI_KEY ||
-				env.SERPER_API_KEY ||
-				env.SERPSTACK_API_KEY ||
-				env.SEARCHAPI_KEY ||
-				env.YDC_API_KEY ||
-				env.USE_LOCAL_WEBSEARCH ||
-				env.SEARXNG_QUERY_URL ||
-				env.BING_SUBSCRIPTION_KEY
-			),
-			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
-			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
-			activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
-			hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? false,
-			shareConversationsWithModelAuthors:
-				settings?.shareConversationsWithModelAuthors ??
-				DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
-			customPrompts: settings?.customPrompts ?? {},
-			assistants: userAssistants,
-			tools:
-				settings?.tools ??
-				toolFromConfigs
-					.filter((el) => !el.isHidden && el.isOnByDefault)
-					.map((el) => el._id.toString()),
-			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
-			directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
-		},
-		models: models.map((model) => ({
-			id: model.id,
-			name: model.name,
-			websiteUrl: model.websiteUrl,
-			modelUrl: model.modelUrl,
-			tokenizer: model.tokenizer,
-			datasetName: model.datasetName,
-			datasetUrl: model.datasetUrl,
-			displayName: model.displayName,
-			description: model.description,
-			reasoning: !!model.reasoning,
-			logoUrl: model.logoUrl,
-			promptExamples: model.promptExamples,
-			parameters: model.parameters,
-			preprompt: model.preprompt,
-			multimodal: model.multimodal,
-			multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-			tools: model.tools,
-			unlisted: model.unlisted,
-			hasInferenceAPI: model.hasInferenceAPI,
-		})),
-		oldModels,
+		models: await fetch(`${base}/api/v2/models`).then(
+			(res) => res.json() as Promise<GETModelsResponse>
+		),
+		oldModels: await fetch(`${base}/api/v2/models/old`).then(
+			(res) => res.json() as Promise<GETOldModelsResponse>
+		),
 		tools: [...toolFromConfigs, ...communityTools]
 			.filter((tool) => !tool?.isHidden)
 			.map(
@@ -250,10 +151,9 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 						icon: tool.icon,
 					}) satisfies ToolFront
 			),
-		communityToolCount: await collections.tools.countDocuments({
-			type: "community",
-			review: ReviewStatus.APPROVED,
-		}),
+		communityToolCount: await fetch(`${base}/api/v2/tools/count`).then(
+			(res) => res.json() as Promise<number>
+		),
 		assistants: assistants.then((assistants) =>
 			assistants
 				.filter((el) => userAssistantsSet.has(el._id.toString()))
@@ -265,21 +165,13 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
 				}))
 		),
-		user: locals.user && {
-			id: locals.user._id.toString(),
-			username: locals.user.username,
-			avatarUrl: locals.user.avatarUrl,
-			email: locals.user.email,
-			logoutDisabled: locals.user.logoutDisabled,
-			isAdmin: locals.user.isAdmin ?? false,
-			isEarlyAccess: locals.user.isEarlyAccess ?? false,
-		},
 		assistant: assistant ? jsonSerialize(assistant) : undefined,
-		enableAssistants,
-		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
-		enableCommunityTools: env.COMMUNITY_TOOLS === "true",
-		loginRequired,
-		loginEnabled: requiresUser,
-		guestMode: requiresUser && messagesBeforeLogin > 0,
+		user: await fetch(`${base}/api/v2/user`).then((res) => res.json() as Promise<UserGETFront>),
+		settings: await fetch(`${base}/api/v2/user/settings`).then(
+			(res) => res.json() as Promise<UserGETSettings>
+		),
+		...(await fetch(`${base}/api/v2/feature-flags`).then(
+			(res) => res.json() as Promise<FeatureFlags>
+		)),
 	};
 };

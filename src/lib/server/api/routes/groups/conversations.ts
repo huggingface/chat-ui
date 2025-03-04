@@ -9,6 +9,8 @@ import type { Conversation } from "$lib/types/Conversation";
 import type { Assistant } from "$lib/types/Assistant";
 import type { Serialize } from "$lib/utils/serialize";
 import { jsonSerialize } from "$lib/utils/serialize";
+import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
+
 export type GETConversationResponse = Pick<
 	Conversation,
 	"messages" | "title" | "model" | "preprompt" | "rootMessageId" | "updatedAt" | "assistantId"
@@ -22,14 +24,50 @@ export type GETConversationResponse = Pick<
 
 export const conversationGroup = new Elysia().use(authPlugin).group("/conversations", (app) => {
 	return app
-		.get("", () => {
-			// todo: get conversations
-			return "aa";
-		})
-		.post("", () => {
-			// todo: post new conversation
-			return "aa";
-		})
+		.get(
+			"",
+			async ({ locals, query }) => {
+				if (locals.user?._id || locals.sessionId) {
+					const convs = await collections.conversations
+						.find({
+							...authCondition(locals),
+						})
+						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>({
+							title: 1,
+							updatedAt: 1,
+							model: 1,
+							assistantId: 1,
+						})
+						.sort({ updatedAt: -1 })
+						.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
+						.limit(CONV_NUM_PER_PAGE)
+						.toArray();
+
+					if (convs.length === 0) {
+						return Response.json([]);
+					}
+
+					const res = convs.map((conv) => ({
+						_id: conv._id,
+						id: conv._id, // legacy param iOS
+						title: conv.title,
+						updatedAt: conv.updatedAt,
+						model: conv.model,
+						modelId: conv.model, // legacy param iOS
+						assistantId: conv.assistantId,
+						modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
+					}));
+					return Response.json(res);
+				} else {
+					return Response.json({ message: "Must have session cookie" }, { status: 401 });
+				}
+			},
+			{
+				query: t.Object({
+					p: t.Optional(t.Number()),
+				}),
+			}
+		)
 		.group(
 			"/:id",
 			{
@@ -116,6 +154,15 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					.post("", () => {
 						// todo: post new message
 						return "aa";
+					})
+					.delete("", async ({ locals }) => {
+						if (locals.user?._id || locals.sessionId) {
+							const res = await collections.conversations.deleteMany({
+								...authCondition(locals),
+							});
+							return res.deletedCount;
+						}
+						return 0;
 					})
 					.get("/output/:sha256", () => {
 						// todo: get output

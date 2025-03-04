@@ -57,7 +57,7 @@
 
 	async function handleVisible() {
 		p++;
-		const newConvs = await fetch(`${base}/api/conversations?p=${p}`)
+		const newConvs = await fetch(`${base}/api/v2/conversations?p=${p}`)
 			.then((res) => res.json())
 			.then((convs) =>
 				convs.map(
