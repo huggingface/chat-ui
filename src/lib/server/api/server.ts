@@ -8,6 +8,8 @@ import { toolGroup } from "$lib/server/api/routes/groups/tools";
 import { swagger } from "@elysiajs/swagger";
 import { cors } from "@elysiajs/cors";
 import { misc } from "$lib/server/api/routes/groups/misc";
+import { modelGroup } from "$lib/server/api/routes/groups/models";
+
 const prefix = `${base}/api/v2` as unknown as "";
 
 export const app = new Elysia({ prefix })
@@ -28,6 +30,7 @@ export const app = new Elysia({ prefix })
 	.use(toolGroup)
 	.use(assistantGroup)
 	.use(userGroup)
+	.use(modelGroup)
 	.use(misc);
 
 export type App = typeof app;

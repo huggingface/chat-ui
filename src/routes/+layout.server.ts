@@ -11,9 +11,10 @@ import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { base } from "$app/paths";
 import { jsonSerialize } from "../lib/utils/serialize";
-import type { FeatureFlags, GETModelsResponse } from "$lib/server/api/routes/groups/misc";
+import type { FeatureFlags } from "$lib/server/api/routes/groups/misc";
 import type { UserGETFront, UserGETSettings } from "$lib/server/api/routes/groups/user";
-import type { GETOldModelsResponse } from "$lib/server/api/routes/groups/misc";
+import type { GETModelsResponse, GETOldModelsResponse } from "$lib/server/api/routes/groups/models";
+
 export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
 

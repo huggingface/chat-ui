@@ -3,7 +3,6 @@ import { authPlugin } from "../../authPlugin";
 import { requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
-import { models, oldModels, type BackendModel } from "$lib/server/models";
 
 export interface FeatureFlags {
 	searchEnabled: boolean;
@@ -14,35 +13,6 @@ export interface FeatureFlags {
 	loginRequired: boolean;
 	guestMode: boolean;
 }
-
-export type GETModelsResponse = Array<{
-	id: string;
-	name: string;
-	websiteUrl?: string;
-	modelUrl?: string;
-	tokenizer?: string | { tokenizerUrl: string; tokenizerConfigUrl: string };
-	datasetName?: string;
-	datasetUrl?: string;
-	displayName: string;
-	description?: string;
-	reasoning: boolean;
-	logoUrl?: string;
-	promptExamples?: { title: string; prompt: string }[];
-	parameters: BackendModel["parameters"];
-	preprompt?: string;
-	multimodal: boolean;
-	multimodalAcceptedMimetypes?: string[];
-	tools: boolean;
-	unlisted: boolean;
-	hasInferenceAPI: boolean;
-}>;
-
-export type GETOldModelsResponse = Array<{
-	id: string;
-	name: string;
-	displayName: string;
-	transferTo?: string;
-}>;
 
 export const misc = new Elysia()
 	.use(authPlugin)
@@ -94,34 +64,6 @@ export const misc = new Elysia()
 			loginRequired,
 			guestMode: requiresUser && messagesBeforeLogin > 0,
 		} satisfies FeatureFlags;
-	})
-	.get("/models", () => {
-		return models
-			.filter((m) => m.unlisted == false)
-			.map((model) => ({
-				id: model.id,
-				name: model.name,
-				websiteUrl: model.websiteUrl,
-				modelUrl: model.modelUrl,
-				tokenizer: model.tokenizer,
-				datasetName: model.datasetName,
-				datasetUrl: model.datasetUrl,
-				displayName: model.displayName,
-				description: model.description,
-				reasoning: !!model.reasoning,
-				logoUrl: model.logoUrl,
-				promptExamples: model.promptExamples,
-				parameters: model.parameters,
-				preprompt: model.preprompt,
-				multimodal: model.multimodal,
-				multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-				tools: model.tools,
-				unlisted: model.unlisted,
-				hasInferenceAPI: model.hasInferenceAPI,
-			})) satisfies GETModelsResponse;
-	})
-	.get("/models/old", () => {
-		return oldModels satisfies GETOldModelsResponse;
 	})
 	.get("/spaces-config", () => {
 		// todo: get spaces config
