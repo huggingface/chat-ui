@@ -253,7 +253,7 @@
 			{#if assistant && !!messages.length}
 				<a
 					class="mx-auto flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 py-1 pl-1 pr-3 text-sm text-gray-800 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-					href="{base}/settings/assistants/{assistant._id}"
+					href="{base}/assistant/{assistant._id}"
 				>
 					{#if assistant.avatar}
 						<img
