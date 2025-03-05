@@ -57,7 +57,6 @@ export const load = async ({ depends, fetch }) => {
 								avatarUrl: fetch(`${base}/api/v2/assistants/${conv.assistantId}`)
 									.then((res) => res.json() as Promise<Serialize<Assistant>>)
 									.then((assistant) => {
-										console.log(assistant);
 										if (!assistant.avatar) {
 											return undefined;
 										}
