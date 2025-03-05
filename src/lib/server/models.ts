@@ -344,9 +344,10 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 
 const inferenceApiIds = isHuggingChat
 	? await fetchJSON<{ id: string }[]>(
-			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
+			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational",
+			{ allowNull: true }
 		)
-			.then((arr) => arr.map((r) => r.id))
+			.then((arr) => arr?.map((r) => r.id) || [])
 			.catch(() => {
 				logger.error("Failed to fetch inference API ids");
 				return [];

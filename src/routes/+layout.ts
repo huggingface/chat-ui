@@ -28,6 +28,7 @@ export const load = async ({ depends, fetch }) => {
 	const assistant = assistantActive
 		? await fetchJSON<Serialize<Assistant>>(`${base}/api/v2/assistants/${settings?.activeModel}`, {
 				fetch,
+				allowNull: true,
 			})
 		: null;
 
@@ -75,7 +76,7 @@ export const load = async ({ depends, fetch }) => {
 		oldModels: await fetchJSON<GETOldModelsResponse>(`${base}/api/v2/models/old`, { fetch }),
 		tools: await fetchJSON<ToolFront[]>(`${base}/api/v2/tools/active`, { fetch }),
 		communityToolCount: await fetchJSON<number>(`${base}/api/v2/tools/count`, { fetch }),
-		user: await fetchJSON<UserGETFront>(`${base}/api/v2/user`, { fetch }),
+		user: await fetchJSON<UserGETFront>(`${base}/api/v2/user`, { fetch, allowNull: true }),
 		settings: {
 			...settings,
 			ethicsModalAcceptedAt: settings.ethicsModalAcceptedAt
