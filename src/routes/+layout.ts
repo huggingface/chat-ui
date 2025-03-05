@@ -56,10 +56,14 @@ export const load = async ({ depends, fetch }) => {
 								assistantId: conv.assistantId.toString(),
 								avatarUrl: fetch(`${base}/api/v2/assistants/${conv.assistantId}`)
 									.then((res) => res.json() as Promise<Serialize<Assistant>>)
-									.then(
-										(assistant) =>
-											`/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${assistant.avatar}`
-									),
+									.then((assistant) => {
+										console.log(assistant);
+										if (!assistant.avatar) {
+											return undefined;
+										}
+
+										return `/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${assistant.avatar}`;
+									}),
 							}
 						: {}),
 				} satisfies ConvSidebar;

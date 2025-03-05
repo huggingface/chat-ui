@@ -40,11 +40,13 @@
 		{/if}
 		{#if conv.avatarUrl}
 			{#await conv.avatarUrl then avatarUrl}
-				<img
-					src="{base}{avatarUrl}"
-					alt="Assistant avatar"
-					class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
-				/>
+				{#if avatarUrl}
+					<img
+						src="{base}{avatarUrl}"
+						alt="Assistant avatar"
+						class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
+					/>
+				{/if}
 			{/await}
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else if conv.assistantId}
