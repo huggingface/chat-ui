@@ -55,20 +55,25 @@
 				{/if}
 			</button>
 			{#if page.data.loginEnabled}
-				<form action="{base}/login" target="_parent" method="POST" class="w-full">
-					<button
-						type="submit"
-						class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
-					>
-						Sign in
-						{#if envPublic.PUBLIC_APP_NAME === "HuggingChat"}
-							<span class="flex items-center">
-								&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging
-								Face
-							</span>
-						{/if}
-					</button>
-				</form>
+				<button
+					onclick={async () => {
+						const response = await fetch(`${base}/login`, {
+							method: "POST",
+						});
+						if (response.ok) {
+							window.location.href = await response.text();
+						}
+					}}
+					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+				>
+					Sign in
+					{#if envPublic.PUBLIC_APP_NAME === "HuggingChat"}
+						<span class="flex items-center">
+							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging
+							Face
+						</span>
+					{/if}
+				</button>
 			{/if}
 		</div>
 	</div>
