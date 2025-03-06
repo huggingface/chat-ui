@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import type { GETConversationResponse } from "$lib/server/api/routes/groups/conversations.js";
+import type { GETConversationResponse } from "$api/routes/groups/conversations";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { fetchJSON } from "$lib/utils/fetchJSON.js";
 import { redirect } from "@sveltejs/kit";

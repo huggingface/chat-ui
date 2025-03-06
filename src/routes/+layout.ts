@@ -3,15 +3,11 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import type { ToolFront } from "$lib/types/Tool";
 import { base } from "$app/paths";
 import { jsonSerialize, type Serialize } from "../lib/utils/serialize";
-import type { FeatureFlags } from "$lib/server/api/routes/groups/misc";
-import type {
-	UserGETAssistants,
-	UserGETFront,
-	UserGETSettings,
-} from "$lib/server/api/routes/groups/user";
-import type { GETModelsResponse, GETOldModelsResponse } from "$lib/server/api/routes/groups/models";
+import type { FeatureFlags } from "$api/routes/groups/misc";
+import type { UserGETAssistants, UserGETFront, UserGETSettings } from "$api/routes/groups/user";
+import type { GETModelsResponse, GETOldModelsResponse } from "$api/routes/groups/models";
 import type { Assistant } from "$lib/types/Assistant";
-import type { GETConversationsResponse } from "$lib/server/api/routes/groups/conversations";
+import type { GETConversationsResponse } from "$api/routes/groups/conversations";
 import { fetchJSON } from "$lib/utils/fetchJSON";
 
 export const load = async ({ depends, fetch }) => {

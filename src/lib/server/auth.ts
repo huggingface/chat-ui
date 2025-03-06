@@ -171,6 +171,7 @@ export async function validateAndParseCsrfToken(
 				signature: z.string().length(64),
 			})
 			.parse(JSON.parse(token));
+
 		const reconstructSign = await sha256(JSON.stringify(data) + "##" + sessionId);
 
 		if (data.expiration > Date.now() && signature === reconstructSign) {

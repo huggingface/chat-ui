@@ -1,5 +1,5 @@
-import { Elysia } from "elysia";
-import { authPlugin } from "$lib/server/api/authPlugin";
+import { Elysia, t } from "elysia";
+import { authPlugin } from "$api/authPlugin";
 import { defaultModel } from "$lib/server/models";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
@@ -221,5 +221,18 @@ export const userGroup = new Elysia()
 					createdByMe:
 						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
 				}));
-			});
+			})
+			.get(
+				"/foo",
+				() => {
+					return {
+						name: "bar",
+					};
+				},
+				{
+					response: t.Object({
+						name: t.String(),
+					}),
+				}
+			);
 	});

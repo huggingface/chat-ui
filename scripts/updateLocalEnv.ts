@@ -30,5 +30,8 @@ full_config = full_config.replaceAll(
 	"https://api-inference.huggingface.co"
 );
 
+full_config = full_config.replaceAll("COOKIE_SECURE=`true`", "COOKIE_SECURE=`false`");
+full_config = full_config.replaceAll("COOKIE_SAMESITE=`lax`", "COOKIE_SAMESITE=`none`");
+
 // Write full_config to .env.local
 fs.writeFileSync(".env.local", full_config);

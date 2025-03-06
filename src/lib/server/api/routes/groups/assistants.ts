@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { authPlugin } from "$lib/server/api/authPlugin";
+import { authPlugin } from "$api/authPlugin";
 import { collections } from "$lib/server/database";
 import { ObjectId, type Filter } from "mongodb";
 import { authCondition } from "$lib/server/auth";

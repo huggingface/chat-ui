@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { authPlugin } from "$lib/server/api/authPlugin";
+import { authPlugin } from "$api/authPlugin";
 import { ReviewStatus } from "$lib/types/Review";
 import { toolFromConfigs } from "$lib/server/tools";
 import { collections } from "$lib/server/database";

@@ -1,5 +1,5 @@
 import { base } from "$app/paths";
-import type { GETAssistantsSearchResponse } from "$lib/server/api/routes/groups/assistants";
+import type { GETAssistantsSearchResponse } from "$api/routes/groups/assistants";
 import { error } from "@sveltejs/kit";
 
 export const load = async ({ url, fetch }) => {

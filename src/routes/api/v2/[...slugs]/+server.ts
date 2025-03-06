@@ -1,4 +1,4 @@
-import { app } from "$lib/server/api/server";
+import { app } from "$api";
 
 type RequestHandler = (v: { request: Request; locals: App.Locals }) => Response | Promise<Response>;
 
