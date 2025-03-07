@@ -5,68 +5,36 @@ import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 import { smallModel } from "$lib/server/models";
 import type { Tool } from "$lib/types/Tool";
-import { extractJson } from "../../tools/utils";
-import { externalToToolCall } from "$lib/server/textGeneration/tools";
-import { logger } from "$lib/server/logger";
+import { getToolOutput } from "$lib/server/tools/getToolOutput";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
 
-	try {
-		if (smallModel.tools) {
-			const webSearchTool = {
-				name: "web_search",
-				description: "Search the web for information",
-				inputs: [
-					{
-						name: "query",
-						type: "str",
-						description: "The query to search the web for",
-						paramType: "required",
-					},
-				],
-			} as unknown as Tool; // TODO: remove the casting like this
-
-			const endpoint = await smallModel.getEndpoint();
-			const stream = await endpoint({
-				messages,
-				tools: [webSearchTool],
-				generateSettings: {
-					max_new_tokens: 64,
+	if (smallModel.tools) {
+		const webSearchTool = {
+			name: "web_search",
+			description: "Search the web for information",
+			inputs: [
+				{
+					name: "query",
+					type: "str",
+					description: "The query to search the web for",
+					paramType: "required",
 				},
-			});
+			],
+		} as unknown as Tool;
 
-			const calls = [];
+		const endpoint = await smallModel.getEndpoint();
+		const query = await getToolOutput({
+			messages,
+			preprompt: `The user wants you to search the web for information. Give a relevant google search query to answer the question. Answer with only the query. Today is ${currentDate}`,
+			tool: webSearchTool,
+			endpoint,
+		});
 
-			for await (const output of stream) {
-				if (output.token.toolCalls) {
-					calls.push(...output.token.toolCalls);
-				}
-				if (output.generated_text) {
-					console.log("output.generated_text", output.generated_text);
-					const extractedCalls = await extractJson(output.generated_text).then((calls) =>
-						calls
-							.map((call) => externalToToolCall(call, [webSearchTool]))
-							.filter((call) => call !== undefined)
-					);
-					calls.push(...extractedCalls);
-				}
-			}
-
-			console.log("calls", calls);
-
-			if (calls.length > 0) {
-				// Find the web search tool call
-				const webSearchCall = calls.find((call) => call.name === "web_search");
-
-				// If we found a web search call, extract the query parameter
-				if (webSearchCall && webSearchCall.parameters && "query" in webSearchCall.parameters) {
-					return webSearchCall.parameters.query.toString();
-				}
-			}
+		if (query) {
+			return query;
 		}
-	} catch (error) {
-		logger.error("Error generating query using tools", error);
 	}
 
 	const userMessages = messages.filter(({ from }) => from === "user");
