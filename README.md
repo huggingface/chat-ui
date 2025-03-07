@@ -924,7 +924,7 @@ Example configuration for DeepSeek R1 (token-based):
 
 ```json
 {
-	"name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+	"name": "deepseek-ai/DeepSeek-R1",
 	// ...
 	"reasoning": {
 		"type": "tokens",
