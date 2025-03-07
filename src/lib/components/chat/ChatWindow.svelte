@@ -134,7 +134,9 @@
 				return activeMimeTypes.some((mimeType: string) => {
 					const [type, subtype] = mimeType.split("/");
 					const [fileType, fileSubtype] = file.type.split("/");
-					return type === fileType && (subtype === "*" || fileSubtype === subtype);
+					return (
+						(type === "*" || fileType === type) && (subtype === "*" || fileSubtype === subtype)
+					);
 				});
 			});
 
