@@ -3,9 +3,61 @@ import { format } from "date-fns";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
+import { smallModel } from "$lib/server/models";
+import type { Tool } from "$lib/types/Tool";
+import { extractJson } from "../../tools/utils";
+import { externalToToolCall } from "$lib/server/textGeneration/tools";
 
 export async function generateQuery(messages: Message[]) {
 	const currentDate = format(new Date(), "MMMM d, yyyy");
+
+	if (smallModel.tools) {
+		const webSearchTool = {
+			name: "web_search",
+			description: "Search the web for information",
+			inputs: [
+				{
+					name: "query",
+					type: "str",
+					description: "The query to search the web for",
+					paramType: "required",
+				},
+			],
+		} as unknown as Tool; // TODO: remove the casting like this
+
+		const endpoint = await smallModel.getEndpoint();
+		const stream = await endpoint({
+			messages,
+			tools: [webSearchTool],
+		});
+
+		const calls = [];
+
+		for await (const output of stream) {
+			if (output.token.toolCalls) {
+				calls.push(...output.token.toolCalls);
+			}
+			if (output.generated_text) {
+				const extractedCalls = await extractJson(output.generated_text).then((calls) =>
+					calls
+						.map((call) => externalToToolCall(call, [webSearchTool]))
+						.filter((call) => call !== undefined)
+				);
+				calls.push(...extractedCalls);
+			}
+		}
+
+		if (calls.length > 0) {
+			// Find the web search tool call
+			const webSearchCall = calls.find((call) => call.name === "web_search");
+
+			// If we found a web search call, extract the query parameter
+			if (webSearchCall && webSearchCall.parameters && "query" in webSearchCall.parameters) {
+				return webSearchCall.parameters.query.toString();
+			}
+		}
+	} // otherwise we fallback to the old method
+
 	const userMessages = messages.filter(({ from }) => from === "user");
 	const previousUserMessages = userMessages.slice(0, -1);
 
@@ -66,7 +118,7 @@ Current Question: Where is it being hosted?`,
 	const webQuery = await getReturnFromGenerator(
 		generateFromDefaultEndpoint({
 			messages: convQuery,
-			preprompt: `You are tasked with generating web search queries. Give me an appropriate query to answer my question for google search. Answer with only the query. Today is ${currentDate}`,
+			preprompt: `The user wants you to search the web for information. Give a relevant google search query to answer the question. Answer with only the query. Today is ${currentDate}`,
 			generateSettings: {
 				max_new_tokens: 30,
 			},
