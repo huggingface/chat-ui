@@ -132,10 +132,10 @@ envVars:
       },
       {
         "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-        "modelUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        "modelUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1",
         "websiteUrl": "https://deepseek.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/deepseek-logo.png",
-        "description": "The first reasoning model from DeepSeek, distilled into a 32B dense model. Outperforms o1-mini on multiple benchmarks.",
+        "description": "The largest AI model DeepSeek. Its advanced reasoning capabilities topple many of OpenAI's top models like GPT-4o or o3-mini.",
         "reasoning": {
           "type": "tokens",
           "beginToken": "",
@@ -158,7 +158,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1/v1"
           }
         ]
       },
