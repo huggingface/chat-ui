@@ -380,6 +380,7 @@ envVars:
       },
       {
         "name": "meta-llama/Llama-3.1-8B-Instruct",
+        "tools": true,
         "parameters": {
           "temperature": 0.6,
           "stop": ["<|endoftext|>", "<|eot_id|>"]
