@@ -15,8 +15,7 @@ export async function generateSummaryOfReasoning(buffer: string): Promise<string
 	];
 
 	const preprompt = `You are tasked with submitting a summary of the latest reasoning steps into a tool. Never describe results of the reasoning, only the process. Remain vague in your summary.
-The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. 
-Example: "Thinking about life...", "Summarizing the results...", "Processing the input...". `;
+The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. The reasoning follows: \n`;
 
 	if (smallModel.tools) {
 		const summaryTool = {

@@ -59,7 +59,7 @@ export async function generateQuery(messages: Message[]) {
 	const webQuery = await getReturnFromGenerator(
 		generateFromDefaultEndpoint({
 			messages: convQuery,
-			preprompt: `The user wants you to search the web for information. Give a relevant google search query to answer the question. Answer with only the query. Today is ${currentDate}`,
+			preprompt: `The user wants you to search the web for information. Give a relevant google search query to answer the question. Answer with only the query. Today is ${currentDate}. The conversation follows: \n`,
 			generateSettings: {
 				max_new_tokens: 30,
 			},
