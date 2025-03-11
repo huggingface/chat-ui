@@ -3,15 +3,15 @@
 	import { getHref } from "$lib/utils/getHref";
 	import PaginationArrow from "./PaginationArrow.svelte";
 
-	export let classNames = "";
-	export let numItemsPerPage: number;
-	export let numTotalItems: number;
+	interface Props {
+		classNames?: string;
+		numItemsPerPage: number;
+		numTotalItems: number;
+	}
+
+	let { classNames = "", numItemsPerPage, numTotalItems }: Props = $props();
 
 	const ELLIPSIS_IDX = -1 as const;
-
-	$: numTotalPages = Math.ceil(numTotalItems / numItemsPerPage);
-	$: pageIndex = parseInt($page.url.searchParams.get("p") ?? "0");
-	$: pageIndexes = getPageIndexes(pageIndex, numTotalPages);
 
 	function getPageIndexes(pageIdx: number, nTotalPages: number) {
 		let pageIdxs: number[] = [];
@@ -52,6 +52,9 @@
 		}
 		return pageIdxs;
 	}
+	let numTotalPages = $derived(Math.ceil(numTotalItems / numItemsPerPage));
+	let pageIndex = $derived(parseInt($page.url.searchParams.get("p") ?? "0"));
+	let pageIndexes = $derived(getPageIndexes(pageIndex, numTotalPages));
 </script>
 
 {#if numTotalPages > 1}

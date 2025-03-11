@@ -1,13 +1,16 @@
 <script lang="ts">
-	export let src: string;
-	export let name: string;
-
 	import CarbonPause from "~icons/carbon/pause";
 	import CarbonPlay from "~icons/carbon/play";
+	interface Props {
+		src: string;
+		name: string;
+	}
 
-	let time = 0;
-	let duration = 0;
-	let paused = true;
+	let { src, name }: Props = $props();
+
+	let time = $state(0);
+	let duration = $state(0);
+	let paused = $state(true);
 
 	function format(time: number) {
 		if (isNaN(time)) return "...";
@@ -39,15 +42,15 @@
 		bind:duration
 		bind:paused
 		preload="metadata"
-		on:ended={() => {
+		onended={() => {
 			time = 0;
 		}}
-	/>
+	></audio>
 
 	<button
 		class="mx-auto my-auto aspect-square size-8 rounded-full border border-gray-400 bg-gray-100 dark:border-gray-800 dark:bg-gray-700"
 		aria-label={paused ? "play" : "pause"}
-		on:click={() => (paused = !paused)}
+		onclick={() => (paused = !paused)}
 	>
 		{#if paused}
 			<CarbonPlay class="mx-auto my-auto text-gray-600 dark:text-gray-300" />
@@ -62,15 +65,15 @@
 				<span class="text-xs">{format(time)}</span>
 				<div
 					class="relative h-2 flex-1 rounded-full bg-gray-200 dark:bg-gray-700"
-					on:pointerdown={() => {
+					onpointerdown={() => {
 						paused = true;
 					}}
-					on:pointerup={seek}
+					onpointerup={seek}
 				>
 					<div
 						class="absolute inset-0 h-full bg-gray-400 dark:bg-gray-600"
 						style="width: {(time / duration) * 100}%"
-					/>
+					></div>
 				</div>
 				<span class="text-xs">{duration ? format(duration) : "--:--"}</span>
 			</div>

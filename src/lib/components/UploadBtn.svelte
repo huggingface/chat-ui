@@ -1,9 +1,13 @@
 <script lang="ts">
 	import CarbonUpload from "~icons/carbon/upload";
 
-	export let classNames = "";
-	export let files: File[];
-	export let mimeTypes: string[];
+	interface Props {
+		classNames?: string;
+		files: File[];
+		mimeTypes: string[];
+	}
+
+	let { classNames = "", files = $bindable(), mimeTypes }: Props = $props();
 
 	/**
 	 * Due to a bug with Svelte, we cannot use bind:files with multiple
@@ -23,7 +27,7 @@
 		class="absolute w-full cursor-pointer opacity-0"
 		aria-label="Upload file"
 		type="file"
-		on:change={onFileChange}
+		onchange={onFileChange}
 		accept={mimeTypes.join(",")}
 	/>
 	<CarbonUpload class="mr-2 text-xxs" /> Upload file

@@ -8,64 +8,63 @@
 	import { browser } from "$app/environment";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { colors, icons } from "$lib/utils/tools";
-	import { applyAction, enhance } from "$app/forms";
 	import { getGradioApi } from "$lib/utils/getGradioApi";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import ToolInputComponent from "./ToolInputComponent.svelte";
+	import { error as errorStore } from "$lib/stores/errors";
 
 	import CarbonInformation from "~icons/carbon/information";
+	import { page } from "$app/state";
 
-	type ActionData = {
-		error?: boolean;
-		errors?: {
-			field: string | number;
-			message: string;
-		}[];
-	} | null;
-
-	export let tool: CommunityToolEditable | undefined = undefined;
-	export let readonly = false;
-	export let form: ActionData;
-
-	function getError(field: string, returnForm: ActionData) {
-		return returnForm?.errors?.find((error) => error.field === field)?.message ?? "";
+	interface Props {
+		tool?: CommunityToolEditable | undefined;
+		readonly?: boolean;
 	}
 
-	let APIloading = false;
-	let formLoading = false;
+	let errors = $state<{ field: string; message: string }[]>([]);
+	let { tool = undefined, readonly = false }: Props = $props();
+
+	function getError(field: string) {
+		return errors.find((error) => error.field === field)?.message ?? "";
+	}
+
+	let APIloading = $state(false);
+	let formLoading = $state(false);
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	onMount(async () => {
 		await updateConfig();
 	});
 
-	let spaceUrl = tool?.baseUrl ?? "";
+	let spaceUrl = $state(tool?.baseUrl ?? "");
 
-	let editableTool: CommunityToolEditable = tool ?? {
-		displayName: "",
-		description: "",
-		// random color & icon for new tools
-		color: colors[Math.floor(Math.random() * colors.length)],
-		icon: icons[Math.floor(Math.random() * icons.length)],
-		baseUrl: "",
-		endpoint: "",
-		name: "",
-		inputs: [],
-		outputComponent: null,
-		outputComponentIdx: 0,
-		showOutput: true,
-	};
+	let editableTool: CommunityToolEditable = $state(
+		tool ?? {
+			displayName: "",
+			description: "",
+			// random color & icon for new tools
+			color: colors[Math.floor(Math.random() * colors.length)],
+			icon: icons[Math.floor(Math.random() * icons.length)],
+			baseUrl: "",
+			endpoint: "",
+			name: "",
+			inputs: [],
+			outputComponent: null,
+			outputComponentIdx: 0,
+			showOutput: true,
+		}
+	);
 
-	$: editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
+	$effect(() => {
+		editableTool.baseUrl && (spaceUrl = editableTool.baseUrl);
+	});
 
 	async function updateConfig() {
 		if (!browser || !editableTool.baseUrl || !editableTool.endpoint) {
 			return;
 		}
 
-		form = { error: false, errors: [] };
 		APIloading = true;
 
 		const api = await getGradioApi(editableTool.baseUrl);
@@ -110,17 +109,14 @@
 		if (parsedOutputComponent.success) {
 			editableTool.outputComponent = "0;" + parsedOutputComponent.data;
 		} else {
-			form = {
-				error: true,
-				errors: [
-					{
-						field: "outputComponent",
-						message: `Invalid output component. Type ${
-							api.named_endpoints[editableTool.endpoint].returns?.[0]?.component
-						} is not yet supported. Feel free to report this issue so we can add support for it.`,
-					},
-				],
-			};
+			errors = [
+				{
+					field: "outputComponent",
+					message: `Invalid output component. Type ${
+						api.named_endpoints[editableTool.endpoint].returns?.[0]?.component
+					} is not yet supported. Feel free to report this issue so we can add support for it.`,
+				},
+			];
 			editableTool.outputComponent = null;
 		}
 
@@ -149,31 +145,50 @@
 		}
 	}
 
-	const settings = useSettingsStore();
-
-	$: formSubmittable = editableTool.name && editableTool.baseUrl && editableTool.outputComponent;
+	let formSubmittable = $derived(
+		editableTool.name && editableTool.baseUrl && editableTool.outputComponent
+	);
 </script>
 
 <form
-	method="POST"
 	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
-	use:enhance={async ({ formData }) => {
+	onsubmit={async (e) => {
+		e.preventDefault();
 		formLoading = true;
+		errors = [];
 
-		formData.append("tool", JSON.stringify(editableTool));
+		try {
+			const body = JSON.stringify(editableTool);
+			let response: Response;
 
-		return async ({ result }) => {
-			if (result.type === "success" && result.data && typeof result.data.toolId === "string") {
-				$settings.tools = [...($settings.tools ?? []), result.data.toolId];
-				await goto(`${base}/tools/${result.data.toolId}`).then(() => {
-					formLoading = false;
+			if (page.params.toolId) {
+				response = await fetch(`${base}/api/tools/${page.params.toolId}`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body,
 				});
 			} else {
-				await applyAction(result).then(() => {
-					formLoading = false;
+				response = await fetch(`${base}/api/tools`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body,
 				});
 			}
-		};
+
+			if (response.ok) {
+				const { toolId } = await response.json();
+				goto(`${base}/tools/${toolId}`, { invalidateAll: true });
+			} else if (response.status === 400) {
+				const data = await response.json();
+				errors = data.errors;
+			} else {
+				$errorStore = response.statusText;
+			}
+		} catch (e) {
+			$errorStore = (e as Error).message;
+		} finally {
+			formLoading = false;
+		}
 	}}
 >
 	{#if tool}
@@ -207,7 +222,7 @@
 						placeholder="Image generator"
 						bind:value={editableTool.displayName}
 					/>
-					<p class="text-xs text-red-500">{getError("displayName", form)}</p>
+					<p class="text-xs text-red-500">{getError("displayName")}</p>
 				</label>
 
 				<div class="flex flex-row gap-4">
@@ -229,8 +244,8 @@
 							{#each icons as icon}
 								<option value={icon}>{icon}</option>
 							{/each}
-							<p class="text-xs text-red-500">{getError("icon", form)}</p>
 						</select>
+						<p class="text-xs text-red-500">{getError("icon")}</p>
 					</label>
 
 					<label class="flex-grow">
@@ -244,8 +259,8 @@
 							{#each colors as color}
 								<option value={color}>{color}</option>
 							{/each}
-							<p class="text-xs text-red-500">{getError("color", form)}</p>
 						</select>
+						<p class="text-xs text-red-500">{getError("color")}</p>
 					</label>
 				</div>
 
@@ -261,8 +276,8 @@
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						placeholder="This tool lets you generate images using SDXL."
 						bind:value={editableTool.description}
-					/>
-					<p class="text-xs text-red-500">{getError("description", form)}</p>
+					></textarea>
+					<p class="text-xs text-red-500">{getError("description")}</p>
 				</label>
 
 				<label>
@@ -282,7 +297,7 @@
 						placeholder="ByteDance/Hyper-SDXL-1Step-T2I"
 						bind:value={editableTool.baseUrl}
 					/>
-					<p class="text-xs text-red-500">{getError("spaceUrl", form)}</p>
+					<p class="text-xs text-red-500">{getError("spaceUrl")}</p>
 				</label>
 				<p class="text-justify text-gray-800">
 					Tools allows models that support them to use external application directly via function
@@ -313,7 +328,7 @@
 									<input
 										type="radio"
 										disabled={readonly}
-										on:input={onEndpointChange}
+										oninput={onEndpointChange}
 										bind:group={editableTool.endpoint}
 										value={name}
 										name="endpoint"
@@ -368,7 +383,7 @@
 									</div>
 
 									<p class="text-xs text-red-500">
-										{getError(`inputs`, form)}
+										{getError("inputs")}
 									</p>
 
 									{#each editableTool.inputs as input, inputIdx}
@@ -438,7 +453,7 @@
 													placeholder="This is the description of the input."
 													bind:value={input.description}
 													disabled={readonly}
-												/>
+												></textarea>
 											</label>
 										{/if}
 										{#if input.paramType === "optional" || input.paramType === "fixed"}
@@ -497,7 +512,7 @@
 										<!-- divider -->
 										<div
 											class="flex w-full flex-row flex-nowrap gap-2 border-b border-gray-200 pt-2"
-										/>
+										></div>
 									{/each}
 
 									<div class="flex flex-col gap-4">
@@ -549,7 +564,7 @@
 												{/if}
 											{/if}
 											<p class="text-xs text-red-500">
-												{getError("outputComponent", form)}
+												{getError("outputComponent")}
 											</p>
 										</label>
 
@@ -568,7 +583,7 @@
 												class="peer rounded-lg border-2 border-gray-200 bg-gray-100 p-1"
 											/>
 											<p class="text-xs text-red-500">
-												{getError("showOutput", form)}
+												{getError("showOutput")}
 											</p>
 										</label>
 									</div>
@@ -590,7 +605,7 @@
 				<button
 					type="button"
 					class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
-					on:click={() => dispatch("close")}
+					onclick={() => dispatch("close")}
 				>
 					Cancel
 				</button>

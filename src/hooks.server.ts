@@ -36,6 +36,12 @@ if (!building) {
 
 	// Init AbortedGenerations refresh process
 	AbortedGenerations.getInstance();
+
+	if (env.EXPOSE_API) {
+		logger.warn(
+			"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
+		);
+	}
 }
 
 export const handleError: HandleServerError = async ({ error, event, status, message }) => {
@@ -78,10 +84,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		params: event.params,
 		request: event.request,
 	});
-
-	if (event.url.pathname.startsWith(`${base}/api/`) && env.EXPOSE_API !== "true") {
-		return new Response("API is disabled", { status: 403 });
-	}
 
 	function errorResponse(status: number, message: string) {
 		const sendJson =

@@ -9,7 +9,11 @@
 	import { base } from "$app/paths";
 	import JSON5 from "json5";
 
-	export let currentModel: Model;
+	interface Props {
+		currentModel: Model;
+	}
+
+	let { currentModel }: Props = $props();
 
 	const announcementBanners = envPublic.PUBLIC_ANNOUNCEMENT_BANNERS
 		? JSON5.parse(envPublic.PUBLIC_ANNOUNCEMENT_BANNERS)
@@ -58,7 +62,9 @@
 								alt=""
 							/>
 						{:else}
-							<div class="size-4 rounded border border-transparent bg-gray-300 dark:bg-gray-800" />
+							<div
+								class="size-4 rounded border border-transparent bg-gray-300 dark:bg-gray-800"
+							></div>
 						{/if}
 						{currentModel.displayName}
 					</div>
@@ -81,12 +87,12 @@
 					<button
 						type="button"
 						class="rounded-xl border bg-gray-50 p-3 text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 max-xl:text-sm xl:p-3.5"
-						on:click={() => dispatch("message", example.prompt)}
+						onclick={() => dispatch("message", example.prompt)}
 					>
 						{example.title}
 					</button>
 				{/each}
 			</div>
 		</div>{/if}
-	<div class="h-40 sm:h-24" />
+	<div class="h-40 sm:h-24"></div>
 </div>

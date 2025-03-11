@@ -2,11 +2,15 @@
 	import { onMount, createEventDispatcher } from "svelte";
 
 	const dispatch = createEventDispatcher();
-	let loader: HTMLDivElement;
+	let loader: HTMLDivElement | undefined = $state();
 	let observer: IntersectionObserver;
 	let intervalId: ReturnType<typeof setInterval> | undefined;
 
 	onMount(() => {
+		if (!loader) {
+			return;
+		}
+
 		observer = new IntersectionObserver((entries) => {
 			entries.forEach((entry) => {
 				if (entry.isIntersecting) {
@@ -40,7 +44,7 @@
 </script>
 
 <div bind:this={loader} class="flex animate-pulse flex-col gap-4">
-	<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700" />
-	<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700" />
-	<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700" />
+	<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+	<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+	<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700"></div>
 </div>

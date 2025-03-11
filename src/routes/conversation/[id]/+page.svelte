@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
@@ -25,31 +27,26 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
 
-	export let data;
+	import "katex/dist/katex.min.css";
 
-	$: ({ messages } = data);
+	let { data = $bindable() } = $props();
 
-	let loading = false;
-	let pending = false;
+	let loading = $state(false);
+	let pending = $state(false);
 	let initialRun = true;
 
-	$: activeModel = findCurrentModel([...data.models, ...data.oldModels], data.model);
+	let files: File[] = $state([]);
 
-	let files: File[] = [];
-
-	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
-	$: messagesPath = createMessagesPath(messages);
-	$: messagesAlternatives = createMessagesAlternatives(messages);
-
-	$: if (browser && messagesPath.at(-1)?.id) {
-		localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
-	}
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		conversations = data.conversations;
+	});
 
 	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
 		if (initialRun) {
-			if (!msgId && $page.url.searchParams.get("leafId")) {
-				msgId = $page.url.searchParams.get("leafId") as string;
-				$page.url.searchParams.delete("leafId");
+			if (!msgId && page.url.searchParams.get("leafId")) {
+				msgId = page.url.searchParams.get("leafId") as string;
+				page.url.searchParams.delete("leafId");
 			}
 			if (!msgId && browser && localStorage.getItem("leafId")) {
 				msgId = localStorage.getItem("leafId") as string;
@@ -107,7 +104,7 @@
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					fromShare: $page.params.id,
+					fromShare: page.params.id,
 					model: data.model,
 				}),
 			});
@@ -255,10 +252,10 @@
 			}
 
 			// disable websearch if assistant is present
-			const hasAssistant = !!$page.data.assistant;
+			const hasAssistant = !!page.data.assistant;
 			const messageUpdatesAbortController = new AbortController();
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				$page.params.id,
+				page.params.id,
 				{
 					base,
 					inputs: prompt,
@@ -306,13 +303,13 @@
 				) {
 					$error = update.message ?? "An error has occurred";
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = data.conversations.find(({ id }) => id === $page.params.id);
+					const convInData = conversations.find(({ id }) => id === page.params.id);
 					if (convInData) {
 						convInData.title = update.title;
 
 						$titleUpdate = {
 							title: update.title,
-							convId: $page.params.id,
+							convId: page.params.id,
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
@@ -352,7 +349,7 @@
 	}
 
 	async function voteMessage(score: Message["score"], messageId: string) {
-		let conversationId = $page.params.id;
+		let conversationId = page.params.id;
 		let oldScore: Message["score"] | undefined;
 
 		// optimistic update to avoid waiting for the server
@@ -450,22 +447,33 @@
 		}
 	}
 
-	$: $page.params.id, (($isAborted = true), (loading = false));
-	$: title = data.conversations.find((conv) => conv.id === $page.params.id)?.title ?? data.title;
-
 	const settings = useSettingsStore();
+	let messages = $state(data.messages);
+	$effect(() => {
+		messages = data.messages;
+	});
+
+	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
+	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
+	let messagesPath = $derived(createMessagesPath(messages));
+	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
+
+	$effect(() => {
+		if (browser && messagesPath.at(-1)?.id) {
+			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
+		}
+	});
+
+	run(() => {
+		page.params.id, (($isAborted = true), (loading = false));
+	});
+	let title = $derived(
+		conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title
+	);
 </script>
 
 <svelte:head>
-	{#await title then title}
-		<title>{title}</title>
-	{/await}
-	<link
-		rel="stylesheet"
-		href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"
-		integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn"
-		crossorigin="anonymous"
-	/>
+	<title>{title}</title>
 </svelte:head>
 
 <ChatWindow
@@ -481,7 +489,7 @@
 	on:continue={onContinue}
 	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation($page.params.id, data.title)}
+	on:share={() => shareConversation(page.params.id, data.title)}
 	on:stop={() => (($isAborted = true), (loading = false))}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}

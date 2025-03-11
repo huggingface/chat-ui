@@ -1,14 +1,21 @@
 <script lang="ts">
 	import { createEventDispatcher, onDestroy, onMount } from "svelte";
 	import { cubicOut } from "svelte/easing";
-	import { fade } from "svelte/transition";
+	import { fade, fly } from "svelte/transition";
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
+	import CarbonClose from "~icons/carbon/close";
 
-	export let width = "max-w-sm";
+	interface Props {
+		width?: string;
+		closeButton?: boolean;
+		children?: import("svelte").Snippet;
+	}
 
-	let backdropEl: HTMLDivElement;
-	let modalEl: HTMLDivElement;
+	let { width = "max-w-sm", children, closeButton = false }: Props = $props();
+
+	let backdropEl: HTMLDivElement | undefined = $state();
+	let modalEl: HTMLDivElement | undefined = $state();
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 
@@ -31,36 +38,45 @@
 
 	onMount(() => {
 		document.getElementById("app")?.setAttribute("inert", "true");
-		modalEl.focus();
+		modalEl?.focus();
 	});
 
 	onDestroy(() => {
 		if (!browser) return;
-		// remove inert attribute if this is the last modal
-		if (document.querySelectorAll('[role="dialog"]:not(#app *)').length === 1) {
-			document.getElementById("app")?.removeAttribute("inert");
-		}
+		document.getElementById("app")?.removeAttribute("inert");
 	});
 </script>
 
 <Portal>
-	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		role="presentation"
 		tabindex="-1"
 		bind:this={backdropEl}
-		on:click|stopPropagation={handleBackdropClick}
+		onclick={(e) => {
+			e.stopPropagation();
+			handleBackdropClick(e);
+		}}
 		transition:fade|local={{ easing: cubicOut, duration: 300 }}
-		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm dark:bg-black/50"
+		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm dark:bg-black/50"
 	>
 		<div
 			role="dialog"
 			tabindex="-1"
 			bind:this={modalEl}
-			on:keydown={handleKeydown}
-			class="max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none sm:-mt-10 {width}"
+			onkeydown={handleKeydown}
+			in:fly={{ y: 100 }}
+			class={[
+				"relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none",
+				width,
+			]}
 		>
-			<slot />
+			{#if closeButton}
+				<button class="absolute right-4 top-4 z-50" onclick={() => dispatch("close")}>
+					<CarbonClose class="size-6 text-gray-700" />
+				</button>
+			{/if}
+			{@render children?.()}
 		</div>
 	</div>
 </Portal>

@@ -1,7 +1,12 @@
 <script lang="ts">
-	export let label = "";
-	export let position: "top" | "bottom" | "left" | "right" = "bottom";
-	export let TooltipClassNames = "";
+	interface Props {
+		label?: string;
+		position?: "top" | "bottom" | "left" | "right";
+		TooltipClassNames?: string;
+		children?: import("svelte").Snippet;
+	}
+
+	let { label = "", position = "bottom", TooltipClassNames = "", children }: Props = $props();
 
 	const positionClasses = {
 		top: "bottom-full mb-2",
@@ -12,7 +17,7 @@
 </script>
 
 <div class="group/tooltip inline-block md:relative">
-	<slot />
+	{@render children?.()}
 
 	<div
 		class="

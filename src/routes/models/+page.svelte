@@ -5,13 +5,17 @@
 	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonTools from "~icons/carbon/tools";
 	import CarbonImage from "~icons/carbon/image";
 	import { useSettingsStore } from "$lib/stores/settings";
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	const settings = useSettingsStore();
 </script>
@@ -22,7 +26,7 @@
 		<meta property="og:title" content="HuggingChat - Models" />
 		<meta property="og:type" content="link" />
 		<meta property="og:description" content="Browse HuggingChat available models" />
-		<meta property="og:url" content={$page.url.href} />
+		<meta property="og:url" content={page.url.href} />
 	{/if}
 </svelte:head>
 
@@ -54,7 +58,7 @@
 						href="{base}/models/{model.id}"
 						class="absolute inset-0 z-10"
 						aria-label="View details for {model.displayName}"
-					/>
+					></a>
 					<div class="flex items-center justify-between gap-1">
 						{#if model.logoUrl}
 							<img
@@ -66,7 +70,7 @@
 							<div
 								class="size-6 rounded border border-transparent bg-gray-300 dark:bg-gray-800"
 								aria-hidden="true"
-							/>
+							></div>
 						{/if}
 						{#if model.tools}
 							<span
@@ -129,9 +133,3 @@
 		</div>
 	</div>
 </div>
-
-<style lang="postcss">
-	.active-model {
-		@apply border-blue-500 bg-blue-500/5 hover:bg-blue-500/10;
-	}
-</style>

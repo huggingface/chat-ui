@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
@@ -10,13 +10,13 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 
-	export let data;
+	let { data } = $props();
 
-	let loading = false;
-	let files: File[] = [];
+	let loading = $state(false);
+	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
-	const modelId = $page.params.model;
+	const modelId = page.params.model;
 
 	async function createConversation(message: string) {
 		try {
@@ -62,7 +62,7 @@
 			activeModel: modelId,
 		});
 
-		const query = $page.url.searchParams.get("q");
+		const query = page.url.searchParams.get("q");
 		if (query) createConversation(query);
 	});
 </script>
@@ -76,10 +76,10 @@
 	/>
 	<meta
 		property="og:image"
-		content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/assistant/{data.assistant
+		content="{envPublic.PUBLIC_ORIGIN || page.url.origin}{base}/assistant/{data.assistant
 			._id}/thumbnail.png"
 	/>
-	<meta property="og:url" content={$page.url.href} />
+	<meta property="og:url" content={page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 

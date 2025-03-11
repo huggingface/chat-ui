@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { run } from "svelte/legacy";
+
 	import "../styles/main.css";
 
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
@@ -21,29 +23,40 @@
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
+	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
+	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
-	export let data;
+	let { data = $bindable(), children } = $props();
 
-	let isNavOpen = false;
-	let isNavCollapsed = false;
+	let conversations = $state(data.conversations);
+	$effect(() => {
+		data.conversations && untrack(() => (conversations = data.conversations));
+	});
+
+	let isNavCollapsed = $state(false);
+
+	let overloadedModalOpen = $state(false);
 
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
-	let currentError: string | null;
+	let currentError: string | undefined = $state();
 
 	async function onError() {
 		// If a new different error comes, wait for the current error to hide first
 		if ($error && currentError && $error !== currentError) {
 			clearTimeout(errorToastTimeout);
-			currentError = null;
+			currentError = undefined;
 			await new Promise((resolve) => setTimeout(resolve, 300));
 		}
 
 		currentError = $error;
 
+		if (currentError === "Model is overloaded") {
+			overloadedModalOpen = true;
+		}
 		errorToastTimeout = setTimeout(() => {
-			$error = null;
-			currentError = null;
-		}, 3000);
+			$error = undefined;
+			currentError = undefined;
+		}, 10000);
 	}
 
 	async function deleteConversation(id: string) {
@@ -60,7 +73,7 @@
 				return;
 			}
 
-			data.conversations = data.conversations.filter((conv) => conv.id !== id);
+			conversations = conversations.filter((conv) => conv.id !== id);
 
 			if ($page.params.id === id) {
 				await goto(`${base}/`, { invalidateAll: true });
@@ -86,9 +99,7 @@
 				return;
 			}
 
-			data.conversations = data.conversations.map((conv) =>
-				conv.id === id ? { ...conv, title } : conv
-			);
+			conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
 		} catch (err) {
 			console.error(err);
 			$error = String(err);
@@ -99,17 +110,21 @@
 		clearTimeout(errorToastTimeout);
 	});
 
-	$: if ($error) onError();
+	run(() => {
+		if ($error) onError();
+	});
 
-	$: if ($titleUpdate) {
-		const convIdx = data.conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
+	run(() => {
+		if ($titleUpdate) {
+			const convIdx = conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-		if (convIdx != -1) {
-			data.conversations[convIdx].title = $titleUpdate?.title ?? data.conversations[convIdx].title;
+			if (convIdx != -1) {
+				conversations[convIdx].title = $titleUpdate?.title ?? conversations[convIdx].title;
+			}
+
+			$titleUpdate = null;
 		}
-
-		$titleUpdate = null;
-	}
+	});
 
 	const settings = createSettingsStore(data.settings);
 
@@ -145,17 +160,18 @@
 		}
 	});
 
-	$: mobileNavTitle = ["/models", "/assistants", "/privacy", "/tools"].includes(
-		$page.route.id ?? ""
-	)
-		? ""
-		: data.conversations.find((conv) => conv.id === $page.params.id)?.title;
+	let mobileNavTitle = $derived(
+		["/models", "/assistants", "/privacy", "/tools"].includes($page.route.id ?? "")
+			? ""
+			: conversations.find((conv) => conv.id === $page.params.id)?.title
+	);
 
-	$: showDisclaimer =
+	let showDisclaimer = $derived(
 		!$settings.ethicsModalAccepted &&
-		$page.url.pathname !== `${base}/privacy` &&
-		envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
-		!($page.data.shared === true);
+			$page.url.pathname !== `${base}/privacy` &&
+			envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
+			!($page.data.shared === true)
+	);
 </script>
 
 <svelte:head>
@@ -225,6 +241,10 @@
 	/>
 {/if}
 
+{#if overloadedModalOpen && isHuggingChat}
+	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
+{/if}
+
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
 		? 'md:grid-cols-[290px,1fr]'
@@ -232,15 +252,15 @@
 >
 	<ExpandNavigation
 		isCollapsed={isNavCollapsed}
-		on:click={() => (isNavCollapsed = !isNavCollapsed)}
+		onClick={() => (isNavCollapsed = !isNavCollapsed)}
 		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
 			? 'left-[290px]'
 			: 'left-0'} *:transition-transform"
 	/>
 
-	<MobileNav isOpen={isNavOpen} on:toggle={(ev) => (isNavOpen = ev.detail)} title={mobileNavTitle}>
+	<MobileNav title={mobileNavTitle}>
 		<NavMenu
-			conversations={data.conversations}
+			{conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
@@ -252,7 +272,7 @@
 		class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
 	>
 		<NavMenu
-			conversations={data.conversations}
+			{conversations}
 			user={data.user}
 			canLogin={data.user === undefined && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
@@ -263,5 +283,5 @@
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
-	<slot />
+	{@render children?.()}
 </div>

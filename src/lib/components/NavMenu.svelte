@@ -14,13 +14,16 @@
 	import type { Conversation } from "$lib/types/Conversation";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
-	export let conversations: ConvSidebar[];
-	export let canLogin: boolean;
-	export let user: LayoutData["user"];
+	interface Props {
+		conversations: ConvSidebar[];
+		canLogin: boolean;
+		user: LayoutData["user"];
+		p?: number;
+	}
 
-	export let p = 0;
+	let { conversations = $bindable(), canLogin, user, p = $bindable(0) }: Props = $props();
 
-	let hasMore = true;
+	let hasMore = $state(true);
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -32,7 +35,7 @@
 		new Date().setMonth(new Date().getMonth() - 1),
 	];
 
-	$: groupedConversations = {
+	let groupedConversations = $derived({
 		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
 		week: conversations.filter(
 			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
@@ -41,7 +44,7 @@
 			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
 		),
 		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
-	};
+	});
 
 	const titles: { [key: string]: string } = {
 		today: "Today",
@@ -73,14 +76,18 @@
 		conversations = [...conversations, ...newConvs];
 	}
 
-	$: if (conversations.length <= CONV_NUM_PER_PAGE) {
-		// reset p to 0 if there's only one page of content
-		// that would be caused by a data loading invalidation
-		p = 0;
-	}
+	$effect(() => {
+		if (conversations.length <= CONV_NUM_PER_PAGE) {
+			// reset p to 0 if there's only one page of content
+			// that would be caused by a data loading invalidation
+			p = 0;
+		}
+	});
 </script>
 
-<div class="sticky top-0 flex flex-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0">
+<div
+	class="sticky top-0 flex flex-none touch-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0"
+>
 	<a
 		class="flex items-center rounded-xl text-lg font-semibold"
 		href="{envPublic.PUBLIC_ORIGIN}{base}/"
@@ -88,24 +95,26 @@
 		<Logo classNames="mr-1" />
 		{envPublic.PUBLIC_APP_NAME}
 	</a>
-	<a
-		href={`${base}/`}
-		on:click={handleNewChatClick}
-		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
-	>
-		New Chat
-	</a>
+	{#if $page.url.pathname !== base + "/"}
+		<a
+			href={`${base}/`}
+			onclick={handleNewChatClick}
+			class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
+		>
+			New Chat
+		</a>
+	{/if}
 </div>
 <div
-	class="scrollbar-custom flex flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
+	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	{#await groupedConversations}
 		{#if $page.data.nConversations > 0}
 			<div class="overflow-y-hidden">
 				<div class="flex animate-pulse flex-col gap-4">
-					<div class="h-4 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+					<div class="h-4 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
 					{#each Array(100) as _}
-						<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700" />
+						<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700"></div>
 					{/each}
 				</div>
 			</div>
@@ -129,7 +138,7 @@
 	{/await}
 </div>
 <div
-	class="mt-0.5 flex flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
+	class="mt-0.5 flex touch-none flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<form
@@ -162,7 +171,7 @@
 		</form>
 	{/if}
 	<button
-		on:click={switchTheme}
+		onclick={switchTheme}
 		type="button"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>

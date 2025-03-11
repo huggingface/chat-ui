@@ -42,3 +42,13 @@ export async function GET({ locals, url }) {
 		return Response.json({ message: "Must have session cookie" }, { status: 401 });
 	}
 }
+
+export async function DELETE({ locals }) {
+	if (locals.user?._id || locals.sessionId) {
+		await collections.conversations.deleteMany({
+			...authCondition(locals),
+		});
+	}
+
+	return new Response();
+}

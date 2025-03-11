@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { env as envPublic } from "$env/dynamic/public";
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
@@ -11,7 +11,7 @@
 	const settings = useSettingsStore();
 </script>
 
-<Modal on:close>
+<Modal on:close width="!max-w-[400px] !m-4">
 	<div
 		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center"
 	>
@@ -27,12 +27,12 @@
 		</p>
 
 		<form
-			action="{base}/{$page.data.loginRequired ? 'login' : 'settings'}"
+			action="{base}/{page.data.loginRequired ? 'login' : 'settings'}"
 			target="_parent"
 			method="POST"
 			class="flex w-full flex-col items-center gap-2"
 		>
-			{#if $page.data.loginRequired}
+			{#if page.data.loginRequired}
 				<button
 					type="submit"
 					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
@@ -47,7 +47,7 @@
 			{:else}
 				<button
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
-					on:click={(e) => {
+					onclick={(e) => {
 						if (!cookiesAreEnabled()) {
 							e.preventDefault();
 							window.open(window.location.href, "_blank");

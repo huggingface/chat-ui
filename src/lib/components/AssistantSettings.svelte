@@ -1,11 +1,9 @@
 <script lang="ts">
-	import type { readAndCompressImage } from "browser-image-resizer";
 	import type { Model } from "$lib/types/Model";
 	import type { Assistant } from "$lib/types/Assistant";
 
 	import { onMount } from "svelte";
-	import { applyAction, enhance } from "$app/forms";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
@@ -20,47 +18,43 @@
 	import HoverTooltip from "./HoverTooltip.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import AssistantToolPicker from "./AssistantToolPicker.svelte";
-
-	type ActionData = {
-		error: boolean;
-		errors: {
-			field: string | number;
-			message: string;
-		}[];
-	} | null;
+	import { error } from "$lib/stores/errors";
+	import { goto } from "$app/navigation";
 
 	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
 
-	export let form: ActionData;
-	export let assistant: AssistantFront | undefined = undefined;
-	export let models: Model[] = [];
+	interface Props {
+		assistant?: AssistantFront | undefined;
+		models?: Model[];
+	}
 
-	let files: FileList | null = null;
+	let errors = $state<
+		{
+			field: string;
+			message: string;
+		}[]
+	>([]);
+
+	let { assistant = undefined, models = [] }: Props = $props();
+
+	let files: FileList | null = $state(null);
 	const settings = useSettingsStore();
-	let modelId = "";
-	let systemPrompt = assistant?.preprompt ?? "";
-	let dynamicPrompt = assistant?.dynamicPrompt ?? false;
-	let showModelSettings = Object.values(assistant?.generateSettings ?? {}).some((v) => !!v);
-
-	let compress: typeof readAndCompressImage | null = null;
+	let modelId = $state("");
+	let systemPrompt = $state(assistant?.preprompt ?? "");
+	let dynamicPrompt = $state(assistant?.dynamicPrompt ?? false);
+	let showModelSettings = $state(Object.values(assistant?.generateSettings ?? {}).some((v) => !!v));
 
 	onMount(async () => {
-		const module = await import("browser-image-resizer");
-		compress = module.readAndCompressImage;
-
 		modelId = findCurrentModel(models, assistant ? assistant.modelId : $settings.activeModel).id;
 	});
 
-	let inputMessage1 = assistant?.exampleInputs[0] ?? "";
-	let inputMessage2 = assistant?.exampleInputs[1] ?? "";
-	let inputMessage3 = assistant?.exampleInputs[2] ?? "";
-	let inputMessage4 = assistant?.exampleInputs[3] ?? "";
+	let inputMessage1 = $state(assistant?.exampleInputs[0] ?? "");
+	let inputMessage2 = $state(assistant?.exampleInputs[1] ?? "");
+	let inputMessage3 = $state(assistant?.exampleInputs[2] ?? "");
+	let inputMessage4 = $state(assistant?.exampleInputs[3] ?? "");
 
 	function resetErrors() {
-		if (form) {
-			form.errors = [];
-			form.error = false;
-		}
+		errors = [];
 	}
 
 	function onFilesChange(e: Event) {
@@ -70,7 +64,7 @@
 				inputEl.files = null;
 				files = null;
 
-				form = { error: true, errors: [{ field: "avatar", message: "Only images are allowed" }] };
+				errors = [{ field: "avatar", message: "Only images are allowed" }];
 				return;
 			}
 			files = inputEl.files;
@@ -79,43 +73,44 @@
 		}
 	}
 
-	function getError(field: string, returnForm: ActionData) {
-		return returnForm?.errors.find((error) => error.field === field)?.message ?? "";
+	function getError(field: string) {
+		return errors.find((error) => error.field === field)?.message ?? "";
 	}
 
-	let deleteExistingAvatar = false;
+	let deleteExistingAvatar = $state(false);
 
-	let loading = false;
+	let loading = $state(false);
 
-	let ragMode: false | "links" | "domains" | "all" = assistant?.rag?.allowAllDomains
-		? "all"
-		: assistant?.rag?.allowedLinks?.length ?? 0 > 0
-		? "links"
-		: (assistant?.rag?.allowedDomains?.length ?? 0) > 0
-		? "domains"
-		: false;
+	let ragMode: false | "links" | "domains" | "all" = $state(
+		assistant?.rag?.allowAllDomains
+			? "all"
+			: (assistant?.rag?.allowedLinks?.length ?? 0 > 0)
+				? "links"
+				: (assistant?.rag?.allowedDomains?.length ?? 0) > 0
+					? "domains"
+					: false
+	);
 
-	let tools = assistant?.tools ?? [];
+	let tools = $state(assistant?.tools ?? []);
 	const regex = /{{\s?(get|post|url|today)(=.*?)?\s?}}/g;
 
-	$: templateVariables = [...systemPrompt.matchAll(regex)];
-	$: selectedModel = models.find((m) => m.id === modelId);
+	let templateVariables = $derived([...systemPrompt.matchAll(regex)]);
+	let selectedModel = $derived(models.find((m) => m.id === modelId));
 </script>
 
 <form
-	method="POST"
-	class="relative flex h-full flex-col overflow-y-auto p-4 md:p-8"
+	class="relative flex h-full flex-col overflow-y-auto md:p-8 md:pt-0"
 	enctype="multipart/form-data"
-	use:enhance={async ({ formData }) => {
+	onsubmit={async (e) => {
+		e.preventDefault();
+		if (!e.target) {
+			return;
+		}
+		const formData = new FormData(e.target as HTMLFormElement, e.submitter);
+
 		loading = true;
-		if (files?.[0] && files[0].size > 0 && compress) {
-			await compress(files[0], {
-				maxWidth: 500,
-				maxHeight: 500,
-				quality: 1,
-			}).then((resizedImage) => {
-				formData.set("avatar", resizedImage);
-			});
+		if (files?.[0] && files[0].size > 0) {
+			formData.set("avatar", files[0]);
 		}
 
 		if (deleteExistingAvatar === true) {
@@ -134,7 +129,7 @@
 
 		formData.delete("ragMode");
 
-		if (ragMode === false || !$page.data.enableAssistantsRAG) {
+		if (ragMode === false || !page.data.enableAssistantsRAG) {
 			formData.set("ragAllowAll", "false");
 			formData.set("ragLinkList", "");
 			formData.set("ragDomainList", "");
@@ -152,10 +147,40 @@
 
 		formData.set("tools", tools.join(","));
 
-		return async ({ result }) => {
-			loading = false;
-			await applyAction(result);
-		};
+		let response: Response;
+		if (assistant?._id) {
+			response = await fetch(`${base}/api/assistant/${assistant._id}`, {
+				method: "PATCH",
+				body: formData,
+			});
+			if (response.ok) {
+				goto(`${base}/settings/assistants/${assistant?._id}`, { invalidateAll: true });
+			} else {
+				if (response.status === 400) {
+					const data = await response.json();
+					errors = data.errors;
+				} else {
+					$error = response.statusText;
+				}
+			}
+		} else {
+			response = await fetch(`${base}/api/assistant`, {
+				method: "POST",
+				body: formData,
+			});
+
+			if (response.ok) {
+				const { assistantId } = await response.json();
+				goto(`${base}/settings/assistants/${assistantId}`, { invalidateAll: true });
+			} else {
+				if (response.status === 400) {
+					const data = await response.json();
+					errors = data.errors;
+				} else {
+					$error = response.statusText;
+				}
+			}
+		}
 	}}
 >
 	{#if assistant}
@@ -184,7 +209,7 @@
 					name="avatar"
 					id="avatar"
 					class="hidden"
-					on:change={onFilesChange}
+					onchange={onFilesChange}
 				/>
 
 				{#if (files && files[0]) || (assistant?.avatar && !deleteExistingAvatar)}
@@ -213,7 +238,9 @@
 					<div class="mx-auto w-max pt-1">
 						<button
 							type="button"
-							on:click|stopPropagation|preventDefault={() => {
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
 								files = null;
 								deleteExistingAvatar = true;
 							}}
@@ -232,7 +259,7 @@
 						</label>
 					</div>
 				{/if}
-				<p class="text-xs text-red-500">{getError("avatar", form)}</p>
+				<p class="text-xs text-red-500">{getError("avatar")}</p>
 			</div>
 
 			<label>
@@ -243,7 +270,7 @@
 					placeholder="Assistant Name"
 					value={assistant?.name ?? ""}
 				/>
-				<p class="text-xs text-red-500">{getError("name", form)}</p>
+				<p class="text-xs text-red-500">{getError("name")}</p>
 			</label>
 
 			<label>
@@ -253,8 +280,8 @@
 					class="h-15 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="It knows everything about python"
 					value={assistant?.description ?? ""}
-				/>
-				<p class="text-xs text-red-500">{getError("description", form)}</p>
+				></textarea>
+				<p class="text-xs text-red-500">{getError("description")}</p>
 			</label>
 
 			<label>
@@ -268,14 +295,14 @@
 						{#each models.filter((model) => !model.unlisted) as model}
 							<option value={model.id}>{model.displayName}</option>
 						{/each}
-						<p class="text-xs text-red-500">{getError("modelId", form)}</p>
 					</select>
+					<p class="text-xs text-red-500">{getError("modelId")}</p>
 					<button
 						type="button"
 						class="flex aspect-square items-center gap-2 whitespace-nowrap rounded-lg border px-3 {showModelSettings
 							? 'border-blue-500/20 bg-blue-50 text-blue-600'
 							: ''}"
-						on:click={() => (showModelSettings = !showModelSettings)}
+						onclick={() => (showModelSettings = !showModelSettings)}
 						><CarbonSettingsAdjust class="text-xs" /></button
 					>
 				</div>
@@ -283,7 +310,7 @@
 					class="mt-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-2 py-0.5"
 					class:hidden={!showModelSettings}
 				>
-					<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
+					<p class="text-xs text-red-500">{getError("inputMessage1")}</p>
 					<div class="my-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:grid-rows-2">
 						<label for="temperature" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
@@ -407,7 +434,7 @@
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
 				</div>
-				<p class="text-xs text-red-500">{getError("inputMessage1", form)}</p>
+				<p class="text-xs text-red-500">{getError("inputMessage1")}</p>
 			</label>
 			{#if selectedModel?.tools}
 				<div>
@@ -424,7 +451,7 @@
 				</div>
 				<AssistantToolPicker bind:toolIds={tools} />
 			{/if}
-			{#if $page.data.enableAssistantsRAG}
+			{#if page.data.enableAssistantsRAG}
 				<div class="flex flex-col flex-nowrap pb-4">
 					<span class="mt-2 text-smd font-semibold"
 						>Internet access
@@ -443,7 +470,7 @@
 					<label class="mt-1">
 						<input
 							checked={!ragMode}
-							on:change={() => (ragMode = false)}
+							onchange={() => (ragMode = false)}
 							type="radio"
 							name="ragMode"
 							value={false}
@@ -460,7 +487,7 @@
 					<label class="mt-1">
 						<input
 							checked={ragMode === "all"}
-							on:change={() => (ragMode = "all")}
+							onchange={() => (ragMode = "all")}
 							type="radio"
 							name="ragMode"
 							value={"all"}
@@ -476,7 +503,7 @@
 					<label class="mt-1">
 						<input
 							checked={ragMode === "domains"}
-							on:change={() => (ragMode = "domains")}
+							onchange={() => (ragMode = "domains")}
 							type="radio"
 							name="ragMode"
 							value={false}
@@ -496,13 +523,13 @@
 							placeholder="wikipedia.org,bbc.com"
 							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
 						/>
-						<p class="text-xs text-red-500">{getError("ragDomainList", form)}</p>
+						<p class="text-xs text-red-500">{getError("ragDomainList")}</p>
 					{/if}
 
 					<label class="mt-1">
 						<input
 							checked={ragMode === "links"}
-							on:change={() => (ragMode = "links")}
+							onchange={() => (ragMode = "links")}
 							type="radio"
 							name="ragMode"
 							value={false}
@@ -522,7 +549,7 @@
 							placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
 							value={assistant?.rag?.allowedLinks.join(",") ?? ""}
 						/>
-						<p class="text-xs text-red-500">{getError("ragLinkList", form)}</p>
+						<p class="text-xs text-red-500">{getError("ragLinkList")}</p>
 					{/if}
 				</div>
 			{/if}
@@ -576,7 +603,7 @@
 					class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
 					bind:value={systemPrompt}
-				/>
+				></textarea>
 				{#if modelId}
 					{@const model = models.find((_model) => _model.id === modelId)}
 					{#if model?.tokenizer && systemPrompt}
@@ -589,7 +616,7 @@
 					{/if}
 				{/if}
 
-				<p class="text-xs text-red-500">{getError("preprompt", form)}</p>
+				<p class="text-xs text-red-500">{getError("preprompt")}</p>
 			</div>
 			<div class="absolute bottom-6 flex w-full justify-end gap-2 md:right-0 md:w-fit">
 				<a

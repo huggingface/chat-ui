@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { afterNavigate, goto } from "$app/navigation";
+	import { afterNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import Modal from "$lib/components/Modal.svelte";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { env as envPublic } from "$env/dynamic/public";
@@ -9,7 +9,7 @@
 	import { ReviewStatus } from "$lib/types/Review";
 
 	import ReportModal from "../../settings/(nav)/assistants/[assistantId]/ReportModal.svelte";
-	import { applyAction, enhance } from "$app/forms";
+	import { enhance } from "$app/forms";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 
 	import CarbonPen from "~icons/carbon/pen";
@@ -19,41 +19,62 @@
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonStar from "~icons/carbon/star";
 	import CarbonLock from "~icons/carbon/locked";
+	import { error } from "$lib/stores/errors";
 
-	export let data;
+	let { data } = $props();
 
 	const settings = useSettingsStore();
 
-	let previousPage: string = base;
+	let previousPage: string = $state(base);
 
 	afterNavigate(({ from }) => {
-		if (!from?.url.pathname.includes("tools/")) {
-			previousPage = from?.url.toString() || previousPage;
+		if (from?.url && !from.url.pathname.includes("tools/")) {
+			previousPage = from.url.toString() || previousPage || base;
 		}
 	});
 
 	const prefix =
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || $page.url.origin}${base}`;
+		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
-	$: shareUrl = `${prefix}/tools/${data.tool?._id}`;
-	$: isActive = $settings.tools?.includes(data.tool?._id.toString());
+	let shareUrl = $derived(`${prefix}/tools/${data.tool?._id}`);
+	let isActive = $derived($settings.tools?.includes(data.tool?._id.toString()));
 
-	let displayReportModal = false;
+	let displayReportModal = $state(false);
 
-	$: currentModelSupportTools =
-		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false;
+	let currentModelSupportTools = $derived(
+		data.models.find((m) => m.id === $settings.activeModel)?.tools ?? false
+	);
+
+	function setFeatured(status: ReviewStatus) {
+		fetch(`${base}/api/tools/${data.tool?._id}/review`, {
+			method: "PATCH",
+			body: JSON.stringify({ status }),
+		}).then((r) => {
+			if (r.ok) {
+				invalidateAll();
+			} else {
+				console.error(r);
+				$error = r.statusText;
+			}
+		});
+	}
 </script>
 
 {#if displayReportModal}
-	<ReportModal on:close={() => (displayReportModal = false)} />
+	<ReportModal
+		on:close={() => (displayReportModal = false)}
+		reportUrl={`${base}/api/tools/${data.tool?._id}/report`}
+	/>
 {/if}
 
-<Modal on:close={() => goto(previousPage)} width="min-w-xl">
+<Modal on:close={() => goto(previousPage)} width="min-w-xl" closeButton>
 	<div class="w-full min-w-64 p-8">
 		<div class="flex h-full flex-col gap-2">
 			<div class="flex flex-col sm:flex-row sm:gap-6">
 				<div class="mb-4 flex justify-center sm:mb-0">
-					<ToolLogo color={data.tool.color} icon={data.tool.icon} size="lg" />
+					{#key data.tool.color + data.tool.icon}
+						<ToolLogo color={data.tool.color} icon={data.tool.icon} size="lg" />
+					{/key}
 				</div>
 
 				<div class="flex-1">
@@ -107,7 +128,8 @@
 										? 'bg-gray-100 text-gray-800'
 										: 'bg-black !text-white'} mx-auto my-2 flex w-min items-center justify-center rounded-full px-3 py-1 text-base"
 									name="Activate model"
-									on:click|stopPropagation={() => {
+									onclick={(e) => {
+										e.stopPropagation();
 										if (isActive) {
 											settings.instantSet({
 												tools: ($settings?.tools ?? []).filter((t) => t !== data.tool._id),
@@ -135,23 +157,23 @@
 								><CarbonPen class="mr-1.5 inline text-xs" />Edit
 							</a>
 							<form
-								method="POST"
-								action="?/delete"
-								use:enhance={async () => {
-									return async ({ result }) => {
-										if (result.type === "success") {
-											$settings.tools = ($settings?.tools ?? []).filter((t) => t !== data.tool._id);
+								onsubmit={() => {
+									fetch(`${base}/api/tools/${data.tool?._id}`, {
+										method: "DELETE",
+									}).then((r) => {
+										if (r.ok) {
 											goto(`${base}/tools`, { invalidateAll: true });
 										} else {
-											await applyAction(result);
+											console.error(r);
+											$error = r.statusText;
 										}
-									};
+									});
 								}}
 							>
 								<button
 									type="submit"
 									class="flex items-center underline"
-									on:click={(event) => {
+									onclick={(event) => {
 										if (!confirm("Are you sure you want to delete this tool?")) {
 											event.preventDefault();
 										}
@@ -172,7 +194,7 @@
 							{#if !data.tool?.reported}
 								<button
 									type="button"
-									on:click={() => {
+									onclick={() => {
 										displayReportModal = true;
 									}}
 									class="underline"
@@ -191,11 +213,24 @@
 							>
 
 							{#if !data.tool?.createdByMe}
-								<form method="POST" action="?/delete" use:enhance>
+								<form
+									onsubmit={() => {
+										fetch(`${base}/api/tools/${data.tool?._id}`, {
+											method: "DELETE",
+										}).then((r) => {
+											if (r.ok) {
+												goto(`${base}/tools`, { invalidateAll: true });
+											} else {
+												console.error(r);
+												$error = r.statusText;
+											}
+										});
+									}}
+								>
 									<button
 										type="submit"
 										class="flex items-center text-red-600 underline"
-										on:click={(event) => {
+										onclick={(event) => {
 											if (!confirm("Are you sure you want to delete this tool?")) {
 												event.preventDefault();
 											}
@@ -206,19 +241,19 @@
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.PRIVATE}
-								<form method="POST" action="?/approve" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.APPROVED)}>
 									<button type="submit" class="flex items-center text-green-600 underline">
 										<CarbonStar class="mr-1.5 inline text-xs" />Force feature</button
 									>
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.PENDING}
-								<form method="POST" action="?/approve" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.APPROVED)}>
 									<button type="submit" class="flex items-center text-green-600 underline">
 										<CarbonStar class="mr-1.5 inline text-xs" />Approve</button
 									>
 								</form>
-								<form method="POST" action="?/deny" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.DENIED)}>
 									<button type="submit" class="flex items-center text-red-600">
 										<span class="mr-1.5 font-light no-underline">X</span>
 										<span class="underline">Deny</span>
@@ -226,7 +261,7 @@
 								</form>
 							{/if}
 							{#if data.tool?.review === ReviewStatus.APPROVED || data.tool?.review === ReviewStatus.DENIED}
-								<form method="POST" action="?/unrequest" use:enhance>
+								<form onsubmit={() => setFeatured(ReviewStatus.PRIVATE)}>
 									<button type="submit" class="flex items-center text-red-600 underline">
 										<CarbonLock class="mr-1.5 inline text-xs " />Reset review</button
 									>
@@ -235,15 +270,16 @@
 						{/if}
 						{#if data.tool?.createdByMe && data.tool?.review === ReviewStatus.PRIVATE}
 							<form
-								method="POST"
-								action="?/request"
-								use:enhance={async ({ cancel }) => {
+								onsubmit={() => {
 									const confirmed = confirm(
 										"Are you sure you want to request this tool to be featured? Make sure you have tried the tool and that it works as expected. We will review your request once submitted."
 									);
+
 									if (!confirmed) {
-										cancel();
+										return;
 									}
+
+									setFeatured(ReviewStatus.PENDING);
 								}}
 							>
 								<button type="submit" class="flex items-center underline">
