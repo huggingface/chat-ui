@@ -42,6 +42,10 @@ export async function getToolOutput<T = string>({
 				);
 				calls.push(...extractedCalls);
 			}
+
+			if (calls.length > 0) {
+				break;
+			}
 		}
 
 		if (calls.length > 0) {
@@ -52,7 +56,9 @@ export async function getToolOutput<T = string>({
 			if (toolCall?.parameters) {
 				// Get the first parameter value since most tools have a single main parameter
 				const firstParamValue = Object.values(toolCall.parameters)[0];
-				return firstParamValue as T;
+				if (typeof firstParamValue === "string") {
+					return firstParamValue as T;
+				}
 			}
 		}
 
