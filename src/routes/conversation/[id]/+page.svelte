@@ -476,7 +476,7 @@
 <ChatWindow
 	{loading}
 	{pending}
-	messages={messagesPath}
+	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}
 	preprompt={data.preprompt}
