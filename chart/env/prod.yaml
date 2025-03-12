@@ -375,11 +375,17 @@ envVars:
         ]
       },
       {
-        "name": "meta-llama/Llama-3.1-8B-Instruct",
-        "tools": true,
+        "name": "internal/task",
+        "tokenizer" : "NousResearch/Hermes-3-Llama-3.1-8B",
         "unlisted": true,
+        "tools" : true,
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/NousResearch/Hermes-3-Llama-3.1-8B/v1"
+          }
+        ],
         "parameters": {
-          "stop": ["<|eot_id|>", "<|im_end|>"],
           "temperature": 0.1,
           "max_new_tokens": 256
         }
@@ -456,7 +462,7 @@ envVars:
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  TASK_MODEL: "meta-llama/Llama-3.1-8B-Instruct"
+  TASK_MODEL: "internal/task"
   TEXT_EMBEDDING_MODELS: >
     [{
       "name": "bge-base-en-v1-5-sxa",
