@@ -54,32 +54,25 @@ export async function GET({ params, locals }) {
 		return "Prompt generation failed";
 	});
 
-	return new Response(
-		JSON.stringify(
-			{
-				prompt,
-				model: model.name,
-				assistant: assistant?.name,
-				parameters: {
-					...model.parameters,
-					...(assistant?.generateSettings || {}),
-					return_full_text: false,
-				},
-				messages: messagesUpTo.map((msg) => ({
-					role: msg.from,
-					content: msg.content,
-					createdAt: msg.createdAt,
-					updatedAt: msg.updatedAt,
-					reasoning: msg.reasoning,
-					updates: msg.updates?.filter(
-						(u) => (u.type === "webSearch" && u.subtype === "sources") || u.type === "title"
-					),
-					files: msg.files,
-				})),
-			},
-			null,
-			2
-		),
-		{ headers: { "Content-Type": "application/json" } }
-	);
+	return Response.json({
+		prompt,
+		model: model.name,
+		assistant: assistant?.name,
+		parameters: {
+			...model.parameters,
+			...(assistant?.generateSettings || {}),
+			return_full_text: false,
+		},
+		messages: messagesUpTo.map((msg) => ({
+			role: msg.from,
+			content: msg.content,
+			createdAt: msg.createdAt,
+			updatedAt: msg.updatedAt,
+			reasoning: msg.reasoning,
+			updates: msg.updates?.filter(
+				(u) => (u.type === "webSearch" && u.subtype === "sources") || u.type === "title"
+			),
+			files: msg.files,
+		})),
+	});
 }
