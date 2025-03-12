@@ -69,9 +69,13 @@ export async function* openAIChatToTextGenerationStream(
 			};
 			return;
 		}
+
 		// weird bug where the parameters are streamed in like this
 		if (choices[0]?.delta?.tool_calls) {
-			const calls = choices[0].delta.tool_calls;
+			const calls = Array.isArray(choices[0].delta.tool_calls)
+				? choices[0].delta.tool_calls
+				: [choices[0].delta.tool_calls];
+
 			if (
 				calls.length === 1 &&
 				calls[0].index === 0 &&
@@ -81,6 +85,7 @@ export async function* openAIChatToTextGenerationStream(
 				calls[0].function.name === null
 			) {
 				toolBuffer += calls[0].function.arguments;
+				continue;
 			}
 		}
 
