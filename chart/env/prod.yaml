@@ -266,7 +266,7 @@ envVars:
         "name": "google/gemma-3-27b-it",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
         "multimodal": true,
-        "description": "Google's latest open model with great multilingual performance.",
+        "description": "Google's latest open model with great multilingual performance, supports image inputs natively.",
         "websiteUrl": "https://blog.google/technology/developers/gemma-3/",
         "endpoints": [
           {
