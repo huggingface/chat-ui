@@ -482,6 +482,29 @@ MODELS=`[{
 }]`
 ```
 
+_Non-streaming endpoints_
+
+For endpoints that don´t support streaming like o1 on Azure, you can pass `streamingSupported: false` in your endpoint config:
+
+```
+MODELS=`[{
+  "id": "o1-preview",
+  "name": "o1-preview",
+  "displayName": "o1-preview",
+  "systemRoleSupported": false,
+  "endpoints": [
+    {
+      "type": "openai",
+      "baseURL": "https://my-deployment.openai.azure.com/openai/deployments/o1-preview",
+      "defaultHeaders": {
+        "api-key": "$SECRET"
+      },
+      "streamingSupported": false,
+    }
+  ]
+}]`
+```
+
 ##### Llama.cpp API server
 
 chat-ui also supports the llama.cpp API server directly without the need for an adapter. You can do this using the `llamacpp` endpoint type.
