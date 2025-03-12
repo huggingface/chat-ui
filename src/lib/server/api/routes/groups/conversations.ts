@@ -17,7 +17,7 @@ export type GETConversationsResponse = {
 };
 
 export type GETConversationResponse = Pick<
-	Conversation,
+	Serialize<Conversation>,
 	"messages" | "title" | "model" | "preprompt" | "rootMessageId" | "updatedAt" | "assistantId"
 > & {
 	shared: boolean;
@@ -142,7 +142,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 						return { conversation: convertedConv };
 					})
 					.get("", async ({ conversation }) => {
-						return {
+						return jsonSerialize({
 							messages: conversation.messages,
 							title: conversation.title,
 							model: conversation.model,
@@ -161,7 +161,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							assistantId: conversation.assistantId,
 							modelTools: models.find((m) => m.id == conversation.model)?.tools ?? false,
 							shared: conversation.shared,
-						} satisfies GETConversationResponse;
+						}) satisfies GETConversationResponse;
 					})
 					.post("", () => {
 						// todo: post new message
