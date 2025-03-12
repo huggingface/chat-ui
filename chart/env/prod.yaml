@@ -263,6 +263,28 @@ envVars:
         ]
       },
       {
+        "name": "google/gemma-3-27b-it",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
+        "multimodal": true,
+        "description": "Google's latest open model with great multilingual performance, supports image inputs natively.",
+        "websiteUrl": "https://blog.google/technology/developers/gemma-3/",
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://wp0d3hn6s3k8jk22.us-east-1.aws.endpoints.huggingface.cloud/v1",
+            "multimodal": {
+              "image": {
+                "maxSizeInMB": 10,
+                "maxWidth": 560,
+                "maxHeight": 560,
+                "supportedMimeTypes": ["image/jpeg"],
+                "preferredMimeType": "image/jpeg"
+              }
+            }
+          }
+        ]
+      },
+      {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "description": "The latest multimodal model from Meta! Supports image inputs natively.",
@@ -382,7 +404,13 @@ envVars:
           "stop": ["<|eot_id|>", "<|im_end|>"],
           "temperature": 0.1,
           "max_new_tokens": 256
-        }
+        },
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct/v1"
+          }
+        ]
       }
     ]
 
