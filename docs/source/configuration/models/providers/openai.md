@@ -146,9 +146,36 @@ MODELS=`[{
 }]`
 ```
 
+_Non-streaming endpoints_
+
+For endpoints that don´t support streaming like o1 on Azure, you can pass `streamingSupported: false` in your endpoint config:
+
+```
+MODELS=`[{
+  "id": "o1-preview",
+  "name": "o1-preview",
+  "displayName": "o1-preview",
+  "systemRoleSupported": false,
+  "endpoints": [
+    {
+      "type": "openai",
+      "baseURL": "https://my-deployment.openai.azure.com/openai/deployments/o1-preview",
+      "defaultHeaders": {
+        "api-key": "$SECRET"
+      },
+      "streamingSupported": false,
+    }
+  ]
+}]`
+```
+
 ## Other
 
 Some other providers and their `baseURL` for reference.
 
 [Groq](https://groq.com/): https://api.groq.com/openai/v1
 [Fireworks](https://fireworks.ai/): https://api.fireworks.ai/inference/v1
+
+```
+
+```

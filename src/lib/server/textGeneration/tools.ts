@@ -260,7 +260,7 @@ export async function* runTools(
 	return toolResults.filter((result): result is ToolResult => result !== undefined);
 }
 
-function externalToToolCall(call: unknown, tools: Tool[]): ToolCall | undefined {
+export function externalToToolCall(call: unknown, tools: Tool[]): ToolCall | undefined {
 	// Early return if invalid input
 	if (!isValidCallObject(call)) {
 		return undefined;

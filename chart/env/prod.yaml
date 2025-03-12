@@ -164,7 +164,6 @@ envVars:
       },
       {
         "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
-        "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "websiteUrl": "https://www.nvidia.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
@@ -197,23 +196,16 @@ envVars:
         ]
       },
       {
-        "name": "Qwen/QwQ-32B-Preview",
+        "name": "Qwen/QwQ-32B",
         "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
-        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B-Preview",
-        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b-preview/",
+        "modelUrl": "https://huggingface.co/Qwen/QwQ-32B",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
-        "description": "QwQ is an experiment model from the Qwen Team with advanced reasoning capabilities.",
+        "description": "QwQ is the latest reasoning model released by the Qwen team, approaching the capabilities of R1 in benchmarks.",
         "reasoning": {
-          "type": "summarize"
-        },
-        "parameters": {
-          "stop": ["<|im_end|>"],
-          "truncate": 12288,
-          "max_new_tokens": 4096,
-          "temperature": 0.7,
-          "top_k": 20,
-          "top_p": 0.8,
-          "repetition_penalty": 1.05
+          "type": "tokens",
+          "beginToken": "",
+          "endToken": "</think>"
         },
         "promptExamples": [
           {
@@ -227,6 +219,12 @@ envVars:
           {
             "title": "Measuring 6 liters",
             "prompt": "I have a 6- and a 12-liter jug. I want to measure exactly 6 liters."
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/QwQ-32B/v1"
           }
         ]
       },
@@ -298,7 +296,6 @@ envVars:
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
         "websiteUrl": "https://nousresearch.com/",
         "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
-        "tokenizer": "NousResearch/Hermes-3-Llama-3.1-8B",
         "promptExamples": [
           {
             "title": "Write an email from bullet list",
@@ -322,7 +319,6 @@ envVars:
       },
       {
         "name": "mistralai/Mistral-Nemo-Instruct-2407",
-        "tokenizer": "mistralai/Mistral-Nemo-Instruct-2407",
         "displayName": "mistralai/Mistral-Nemo-Instruct-2407",
         "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
@@ -352,7 +348,6 @@ envVars:
       },
       {
         "name": "microsoft/Phi-3.5-mini-instruct",
-        "tokenizer": "microsoft/Phi-3.5-mini-instruct",
         "description": "One of the best small models (3.8B parameters), super fast for simple tasks.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
         "modelUrl": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct",
@@ -381,11 +376,13 @@ envVars:
       },
       {
         "name": "meta-llama/Llama-3.1-8B-Instruct",
+        "tools": true,
+        "unlisted": true,
         "parameters": {
-          "temperature": 0.6,
-          "stop": ["<|endoftext|>", "<|eot_id|>"]
-        },
-        "unlisted": true
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.1,
+          "max_new_tokens": 256
+        }
       }
     ]
 
@@ -433,6 +430,10 @@ envVars:
       {
         "name": "meta-llama/Meta-Llama-3.1-70B-Instruct",
         "transferTo": "meta-llama/Llama-3.3-70B-Instruct"
+      },
+      {
+        "name": "Qwen/QwQ-32B-Preview",
+        "transferTo": "Qwen/QwQ-32B"
       }
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
