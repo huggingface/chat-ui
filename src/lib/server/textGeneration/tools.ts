@@ -314,6 +314,22 @@ function isValidCallObject(call: unknown): call is Record<string, unknown> {
 }
 
 function parseExternalCall(callObj: Record<string, unknown>) {
+	let toolCall = callObj;
+	if (
+		isValidCallObject(callObj) &&
+		"function" in callObj &&
+		isValidCallObject(callObj.function) &&
+		"_name" in callObj.function
+	) {
+		toolCall = {
+			tool_name: callObj["function"]["_name"],
+			parameters: {
+				...callObj["function"],
+				_name: undefined,
+			},
+		};
+	}
+
 	const nameFields = ["tool_name", "name"] as const;
 	const parametersFields = ["parameters", "arguments", "parameter_definitions"] as const;
 
@@ -323,14 +339,14 @@ function parseExternalCall(callObj: Record<string, unknown>) {
 	};
 
 	for (const name of nameFields) {
-		if (callObj[name]) {
-			groupedCall.tool_name = callObj[name] as string;
+		if (toolCall[name]) {
+			groupedCall.tool_name = toolCall[name] as string;
 		}
 	}
 
 	for (const name of parametersFields) {
-		if (callObj[name]) {
-			groupedCall.parameters = callObj[name] as Record<string, string>;
+		if (toolCall[name]) {
+			groupedCall.parameters = toolCall[name] as Record<string, string>;
 		}
 	}
 
