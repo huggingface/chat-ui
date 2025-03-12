@@ -164,7 +164,6 @@ envVars:
       },
       {
         "name": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
-        "tokenizer": "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "modelUrl": "https://huggingface.co/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
         "websiteUrl": "https://www.nvidia.com/",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nvidia-logo.png",
@@ -297,7 +296,6 @@ envVars:
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
         "websiteUrl": "https://nousresearch.com/",
         "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
-        "tokenizer": "NousResearch/Hermes-3-Llama-3.1-8B",
         "promptExamples": [
           {
             "title": "Write an email from bullet list",
@@ -321,7 +319,6 @@ envVars:
       },
       {
         "name": "mistralai/Mistral-Nemo-Instruct-2407",
-        "tokenizer": "mistralai/Mistral-Nemo-Instruct-2407",
         "displayName": "mistralai/Mistral-Nemo-Instruct-2407",
         "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
@@ -351,7 +348,6 @@ envVars:
       },
       {
         "name": "microsoft/Phi-3.5-mini-instruct",
-        "tokenizer": "microsoft/Phi-3.5-mini-instruct",
         "description": "One of the best small models (3.8B parameters), super fast for simple tasks.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
         "modelUrl": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct",
@@ -382,12 +378,11 @@ envVars:
         "name": "meta-llama/Llama-3.1-8B-Instruct",
         "tools": true,
         "unlisted": true,
-        "endpoints": [
-          {
-            "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct/v1"
-          }
-        ]
+        "parameters": {
+          "stop": ["<|eot_id|>", "<|im_end|>"],
+          "temperature": 0.1,
+          "max_new_tokens": 256
+        }
       }
     ]
 
