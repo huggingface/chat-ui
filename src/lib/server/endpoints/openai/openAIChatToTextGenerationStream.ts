@@ -61,13 +61,14 @@ export async function* openAIChatToTextGenerationStream(
 			yield {
 				token: {
 					id: tokenId++,
-					content: "",
 					special: true,
 					logprob: 0,
+					text: "",
 				},
 				generated_text: toolBuffer,
-			};
-			return;
+				details: null,
+			} as TextGenerationStreamOutput;
+			break;
 		}
 
 		// weird bug where the parameters are streamed in like this
