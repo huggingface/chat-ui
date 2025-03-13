@@ -43,7 +43,7 @@ export async function generateTitle(prompt: string) {
 					name: "title",
 					type: "str",
 					description:
-						"The title for the conversation. It should be a single short sentence of four words or less and start with a unicode emoji relevant to the conversation.",
+						"The title for the conversation. It should be 5 words or less and start with a unicode emoji relevant to the query.",
 				},
 			],
 		} as unknown as Tool;
@@ -57,7 +57,7 @@ export async function generateTitle(prompt: string) {
 				},
 			],
 			preprompt:
-				"You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence. Here is the user message: \n",
+				"The task is to generate conversation titles based on text snippets. You'll never answer the provided question directly, but instead summarize the user's request into a short title.",
 			tool: titleTool,
 			endpoint,
 		});
@@ -76,7 +76,7 @@ export async function generateTitle(prompt: string) {
 			preprompt:
 				"You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it, only summarize the user's query. Always start your answer with an emoji relevant to the summary",
 			generateSettings: {
-				max_new_tokens: 15,
+				max_new_tokens: 30,
 			},
 		})
 	)

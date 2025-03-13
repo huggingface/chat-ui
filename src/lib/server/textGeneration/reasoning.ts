@@ -3,6 +3,7 @@ import { smallModel } from "../models";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 import { getToolOutput } from "../tools/getToolOutput";
 import type { Tool } from "$lib/types/Tool";
+import { logger } from "../logger";
 
 export async function generateSummaryOfReasoning(buffer: string): Promise<string> {
 	let summary: string | undefined;
@@ -10,12 +11,12 @@ export async function generateSummaryOfReasoning(buffer: string): Promise<string
 	const messages = [
 		{
 			from: "user" as const,
-			content: buffer.slice(-200),
+			content: buffer.slice(-300),
 		},
 	];
 
 	const preprompt = `You are tasked with submitting a summary of the latest reasoning steps into a tool. Never describe results of the reasoning, only the process. Remain vague in your summary.
-The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. The reasoning follows: \n`;
+The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. The sentence must be very short, ideally 5 words or less.`;
 
 	if (smallModel.tools) {
 		const summaryTool = {
@@ -25,7 +26,8 @@ The text might be incomplete, try your best to summarize it in one very short se
 				{
 					name: "summary",
 					type: "str",
-					description: "The short summary of the reasoning steps",
+					description:
+						"The short summary of the reasoning steps. 5 words or less. Must start with a gerund.",
 					paramType: "required",
 				},
 			],
@@ -37,6 +39,9 @@ The text might be incomplete, try your best to summarize it in one very short se
 			preprompt,
 			tool: summaryTool,
 			endpoint,
+		}).catch(() => {
+			logger.warn("Error getting tool output");
+			return undefined;
 		});
 	}
 
@@ -46,7 +51,7 @@ The text might be incomplete, try your best to summarize it in one very short se
 				messages: [
 					{
 						from: "user",
-						content: buffer.slice(-200),
+						content: buffer.slice(-300),
 					},
 				],
 				preprompt: `You are tasked with summarizing the latest reasoning steps. Never describe results of the reasoning, only the process. Remain vague in your summary.
