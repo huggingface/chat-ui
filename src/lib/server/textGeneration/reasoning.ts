@@ -3,6 +3,7 @@ import { smallModel } from "../models";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 import { getToolOutput } from "../tools/getToolOutput";
 import type { Tool } from "$lib/types/Tool";
+import { logger } from "../logger";
 
 export async function generateSummaryOfReasoning(buffer: string): Promise<string> {
 	let summary: string | undefined;
@@ -38,6 +39,9 @@ The text might be incomplete, try your best to summarize it in one very short se
 			preprompt,
 			tool: summaryTool,
 			endpoint,
+		}).catch(() => {
+			logger.warn("Error getting tool output");
+			return undefined;
 		});
 	}
 
@@ -47,7 +51,7 @@ The text might be incomplete, try your best to summarize it in one very short se
 				messages: [
 					{
 						from: "user",
-						content: buffer.slice(-200),
+						content: buffer.slice(-400),
 					},
 				],
 				preprompt: `You are tasked with summarizing the latest reasoning steps. Never describe results of the reasoning, only the process. Remain vague in your summary.
