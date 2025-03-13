@@ -11,7 +11,7 @@ export async function generateSummaryOfReasoning(buffer: string): Promise<string
 	const messages = [
 		{
 			from: "user" as const,
-			content: buffer.slice(-200),
+			content: buffer.slice(-300),
 		},
 	];
 
@@ -51,7 +51,7 @@ The text might be incomplete, try your best to summarize it in one very short se
 				messages: [
 					{
 						from: "user",
-						content: buffer.slice(-400),
+						content: buffer.slice(-300),
 					},
 				],
 				preprompt: `You are tasked with summarizing the latest reasoning steps. Never describe results of the reasoning, only the process. Remain vague in your summary.
