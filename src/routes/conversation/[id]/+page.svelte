@@ -27,6 +27,7 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
 
+	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 
 	let { data = $bindable() } = $props();
@@ -42,7 +43,7 @@
 		conversations = data.conversations;
 	});
 
-	function createMessagesPath(messages: Message[], msgId?: Message["id"]): Message[] {
+	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
 			if (!msgId && page.url.searchParams.get("leafId")) {
 				msgId = page.url.searchParams.get("leafId") as string;
@@ -85,7 +86,7 @@
 		return path;
 	}
 
-	function createMessagesAlternatives(messages: Message[]): Message["id"][][] {
+	function createMessagesAlternatives<T>(messages: TreeNode<T>[]): TreeId[][] {
 		const alternatives = [];
 		for (const message of messages) {
 			if (message.children?.length) {
@@ -219,8 +220,6 @@
 						from: "user",
 						content: prompt ?? "",
 						files: base64Files,
-						createdAt: new Date(),
-						updatedAt: new Date(),
 					},
 					messageId
 				);
@@ -237,8 +236,6 @@
 					{
 						from: "assistant",
 						content: "",
-						createdAt: new Date(),
-						updatedAt: new Date(),
 					},
 					newUserMessageId
 				);
@@ -479,7 +476,7 @@
 <ChatWindow
 	{loading}
 	{pending}
-	messages={messagesPath}
+	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}
 	preprompt={data.preprompt}

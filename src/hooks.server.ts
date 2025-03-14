@@ -3,9 +3,8 @@ import { env as envPublic } from "$env/dynamic/public";
 import type { Handle, HandleServerError } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
-import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building } from "$app/environment";
@@ -13,7 +12,6 @@ import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
 import { initExitHandler } from "$lib/server/exitHandler";
-import { ObjectId } from "mongodb";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 
@@ -109,105 +107,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const token = event.cookies.get(env.COOKIE_NAME);
+	const auth = await authenticateRequest(
+		{ type: "svelte", value: event.request.headers },
+		{ type: "svelte", value: event.cookies }
+	);
 
-	// if the trusted email header is set we use it to get the user email
-	const email = env.TRUSTED_EMAIL_HEADER
-		? event.request.headers.get(env.TRUSTED_EMAIL_HEADER)
-		: null;
-
-	let secretSessionId: string | null = null;
-	let sessionId: string | null = null;
-
-	if (email) {
-		secretSessionId = sessionId = await sha256(email);
-
-		event.locals.user = {
-			// generate id based on email
-			_id: new ObjectId(sessionId.slice(0, 24)),
-			name: email,
-			email,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			hfUserId: email,
-			avatarUrl: "",
-			logoutDisabled: true,
-		};
-	} else if (token) {
-		secretSessionId = token;
-		sessionId = await sha256(token);
-
-		const user = await findUser(sessionId);
-
-		if (user) {
-			event.locals.user = user;
-		}
-	} else if (event.url.pathname.startsWith(`${base}/api/`) && env.USE_HF_TOKEN_IN_API === "true") {
-		// if the request goes to the API and no user is available in the header
-		// check if a bearer token is available in the Authorization header
-
-		const authorization = event.request.headers.get("Authorization");
-
-		if (authorization && authorization.startsWith("Bearer ")) {
-			const token = authorization.slice(7);
-
-			const hash = await sha256(token);
-
-			sessionId = secretSessionId = hash;
-
-			// check if the hash is in the DB and get the user
-			// else check against https://huggingface.co/api/whoami-v2
-
-			const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
-
-			if (cacheHit) {
-				const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
-
-				if (!user) {
-					return errorResponse(500, "User not found");
-				}
-
-				event.locals.user = user;
-			} else {
-				const response = await fetch("https://huggingface.co/api/whoami-v2", {
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				});
-
-				if (!response.ok) {
-					return errorResponse(401, "Unauthorized");
-				}
-
-				const data = await response.json();
-				const user = await collections.users.findOne({ hfUserId: data.id });
-
-				if (!user) {
-					return errorResponse(500, "User not found");
-				}
-
-				await collections.tokenCaches.insertOne({
-					tokenHash: hash,
-					userId: data.id,
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				});
-
-				event.locals.user = user;
-			}
-		}
-	}
-
-	if (!sessionId || !secretSessionId) {
-		secretSessionId = crypto.randomUUID();
-		sessionId = await sha256(secretSessionId);
-
-		if (await collections.sessions.findOne({ sessionId })) {
-			return errorResponse(500, "Session ID collision");
-		}
-	}
-
-	event.locals.sessionId = sessionId;
+	event.locals.user = auth.user || undefined;
+	event.locals.sessionId = auth.sessionId;
 
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
@@ -239,10 +145,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (event.request.method === "POST") {
 		// if the request is a POST request we refresh the cookie
-		refreshSessionCookie(event.cookies, secretSessionId);
+		refreshSessionCookie(event.cookies, auth.secretSessionId);
 
 		await collections.sessions.updateOne(
-			{ sessionId },
+			{ sessionId: auth.sessionId },
 			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
 		);
 	}
@@ -291,6 +197,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 			replaced = true;
 
 			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
+		},
+		filterSerializedResponseHeaders: (header) => {
+			return header.includes("content-type");
 		},
 	});
 

@@ -274,7 +274,7 @@
 		<NavMenu
 			{conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.loginEnabled}
+			canLogin={!data.user && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
