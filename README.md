@@ -314,6 +314,9 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 {{assistantMessageToken}}
 ```
 
+> [!INFO]
+> We also support Jinja2 templates for the `chatPromptTemplate` in addition to Handlebars templates. On startup we first try to compile with Jinja and if that fails we fall back to interpreting `chatPromptTemplate` as handlebars.
+
 #### Multi modal model
 
 We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on TGI), OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](#openai-api-compatible-models). For Anthropic, see the [Anthropic section](#anthropic).
