@@ -1,6 +1,5 @@
 import ModelThumbnail from "./ModelThumbnail.svelte";
 import { redirect, type RequestHandler } from "@sveltejs/kit";
-import type { SvelteComponent } from "svelte";
 
 import { Resvg } from "@resvg/resvg-js";
 import satori from "satori";
@@ -10,6 +9,7 @@ import InterRegular from "$lib/server/fonts/Inter-Regular.ttf";
 import InterBold from "$lib/server/fonts/Inter-Bold.ttf";
 import { base } from "$app/paths";
 import { models } from "$lib/server/models";
+import { render } from "svelte/server";
 
 export const GET: RequestHandler = (async ({ params }) => {
 	const model = models.find(({ id }) => id === params.model);
@@ -17,14 +17,14 @@ export const GET: RequestHandler = (async ({ params }) => {
 	if (!model || model.unlisted) {
 		redirect(302, `${base}/`);
 	}
-	const renderedComponent = (ModelThumbnail as unknown as SvelteComponent).render({
-		name: model.name,
-		logoUrl: model.logoUrl,
+	const renderedComponent = render(ModelThumbnail, {
+		props: {
+			name: model.name,
+			logoUrl: model.logoUrl,
+		},
 	});
 
-	const reactLike = html(
-		"<style>" + renderedComponent.css.code + "</style>" + renderedComponent.html
-	);
+	const reactLike = html("<style>" + renderedComponent.head + "</style>" + renderedComponent.body);
 
 	const svg = await satori(reactLike, {
 		width: 1200,

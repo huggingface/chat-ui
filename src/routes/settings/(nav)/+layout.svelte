@@ -31,7 +31,12 @@
 	let showContent: boolean = $state(false);
 
 	function checkDesktopRedirect() {
-		if (browser && isDesktop(window) && page.url.pathname === `${base}/settings`) {
+		if (
+			browser &&
+			isDesktop(window) &&
+			page.url.pathname === `${base}/settings` &&
+			!page.url.pathname.endsWith("/application")
+		) {
 			goto(`${base}/settings/application`);
 		}
 	}

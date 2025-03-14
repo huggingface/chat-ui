@@ -9,9 +9,15 @@
 	}
 
 	let { summary, content, loading = false }: Props = $props();
+	let isOpen = $state(loading);
+
+	$effect(() => {
+		isOpen = loading;
+	});
 </script>
 
 <details
+	bind:open={isOpen}
 	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary
