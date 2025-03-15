@@ -1,3 +1,4 @@
+import { env } from "$env/dynamic/private";
 import type { ToolResult, Tool } from "$lib/types/Tool";
 import {
 	MessageReasoningUpdateType,
@@ -172,9 +173,11 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			if (new Date().getTime() - lastReasoningUpdate.getTime() > 4000) {
 				lastReasoningUpdate = new Date();
 				try {
-					generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
-						status = summary;
-					});
+					if (env.EnableReasoningSummary === "true") {
+						generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
+							status = summary;
+						});
+					}
 				} catch (e) {
 					logger.error(e);
 				}
