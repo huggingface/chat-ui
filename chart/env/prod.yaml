@@ -268,6 +268,20 @@ envVars:
         "multimodal": true,
         "description": "Google's latest open model with great multilingual performance, supports image inputs natively.",
         "websiteUrl": "https://blog.google/technology/developers/gemma-3/",
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
         "endpoints": [
           {
             "type": "openai",
@@ -296,6 +310,20 @@ envVars:
           "truncate": 14336,
           "max_new_tokens": 1536
         },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
         "endpoints": [
           {
             "type": "openai",
