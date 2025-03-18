@@ -224,7 +224,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/QwQ-32B/v1"
+            "baseURL": "https://atv7xs1nxxtx2wl0.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
       },
