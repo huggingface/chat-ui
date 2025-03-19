@@ -34,6 +34,7 @@ async function processMessage() {
 			isProcessing = false;
 
 			// After processing, check if a new message was buffered
+			await new Promise((resolve) => setTimeout(resolve, 100));
 			processMessage();
 		}
 	}
