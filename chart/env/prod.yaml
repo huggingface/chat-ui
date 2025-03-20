@@ -224,7 +224,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/QwQ-32B/v1"
+            "baseURL": "https://atv7xs1nxxtx2wl0.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
       },
@@ -263,6 +263,42 @@ envVars:
         ]
       },
       {
+        "name": "google/gemma-3-27b-it",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
+        "multimodal": true,
+        "description": "Google's latest open model with great multilingual performance, supports image inputs natively.",
+        "websiteUrl": "https://blog.google/technology/developers/gemma-3/",
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://wp0d3hn6s3k8jk22.us-east-1.aws.endpoints.huggingface.cloud/v1",
+            "multimodal": {
+              "image": {
+                "maxSizeInMB": 10,
+                "maxWidth": 560,
+                "maxHeight": 560,
+                "supportedMimeTypes": ["image/jpeg"],
+                "preferredMimeType": "image/jpeg"
+              }
+            }
+          }
+        ]
+      },
+      {
         "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
         "description": "The latest multimodal model from Meta! Supports image inputs natively.",
@@ -274,6 +310,20 @@ envVars:
           "truncate": 14336,
           "max_new_tokens": 1536
         },
+        "promptExamples": [
+          {
+            "title": "Write an email from bullet list",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a snake game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Assist in a task",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
         "endpoints": [
           {
             "type": "openai",
@@ -388,7 +438,7 @@ envVars:
         "parameters": {
           "temperature": 0.1,
           "max_new_tokens": 256
-        }
+        },
       }
     ]
 
