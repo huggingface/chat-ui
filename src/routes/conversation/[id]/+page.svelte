@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { goto, invalidateAll } from "$app/navigation";
+	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -464,9 +462,13 @@
 		}
 	});
 
-	run(() => {
-		page.params.id, (($isAborted = true), (loading = false));
+	beforeNavigate(() => {
+		if (page.params.id) {
+			$isAborted = true;
+			loading = false;
+		}
 	});
+
 	let title = $derived(
 		conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title
 	);
