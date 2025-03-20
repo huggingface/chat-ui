@@ -21,6 +21,10 @@ import { Message } from "../src/lib/types/Message.ts";
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
 import { generateSearchTokens } from "../src/lib/utils/searchTokens.ts";
 import { ReviewStatus } from "../src/lib/types/Review.ts";
+import fs from "fs";
+import path from "path";
+import { MessageUpdateType } from "../src/lib/types/MessageUpdate.ts";
+import { MessageReasoningUpdateType } from "../src/lib/types/MessageUpdate.ts";
 
 const rl = readline.createInterface({
 	input: process.stdin,
@@ -30,6 +34,8 @@ const rl = readline.createInterface({
 rl.on("close", function () {
 	process.exit(0);
 });
+
+const samples = fs.readFileSync(path.join(__dirname, "samples.txt"), "utf8").split("\n---\n");
 
 const possibleFlags = ["reset", "all", "users", "settings", "assistants", "conversations", "tools"];
 const argv = minimist(process.argv.slice(2));
@@ -55,6 +61,7 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 		const convLength = faker.number.int({ min: 1, max: 25 }) * 2; // must always be even
 
 		for (let i = 0; i < convLength; i++) {
+			const hasReasoning = Math.random() < 0.2;
 			lastId = addChildren(
 				{
 					messages,
@@ -62,13 +69,28 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 				},
 				{
 					from: isUser ? "user" : "assistant",
-					content: faker.lorem.sentence({
-						min: 10,
-						max: isUser ? 50 : 200,
-					}),
+					content:
+						faker.lorem.sentence({
+							min: 10,
+							max: isUser ? 50 : 200,
+						}) +
+						(!isUser && Math.random() < 0.1
+							? "\n```\n" + faker.helpers.arrayElement(samples) + "\n```\n"
+							: ""),
 					createdAt: faker.date.recent({ days: 30 }),
 					updatedAt: faker.date.recent({ days: 30 }),
-					interrupted: i === convLength - 1 && isInterrupted,
+					reasoning: hasReasoning ? faker.lorem.paragraphs(2) : undefined,
+					updates: hasReasoning
+						? [
+								{
+									type: MessageUpdateType.Reasoning,
+									subtype: MessageReasoningUpdateType.Status,
+									uuid: crypto.randomUUID(),
+									status: "thinking",
+								},
+							]
+						: [],
+					interrupted: !isUser && i === convLength - 1 && isInterrupted,
 				},
 				lastId
 			);
@@ -78,6 +100,7 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 		const convLength = faker.number.int({ min: 2, max: 200 });
 
 		for (let i = 0; i < convLength; i++) {
+			const hasReasoning = Math.random() < 0.2;
 			addChildren(
 				{
 					messages,
@@ -85,13 +108,28 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 				},
 				{
 					from: isUser ? "user" : "assistant",
-					content: faker.lorem.sentence({
-						min: 10,
-						max: isUser ? 50 : 200,
-					}),
+					content:
+						faker.lorem.sentence({
+							min: 10,
+							max: isUser ? 50 : 200,
+						}) +
+						(!isUser && Math.random() < 0.1
+							? "\n```\n" + faker.helpers.arrayElement(samples) + "\n```\n"
+							: ""),
+					reasoning: hasReasoning ? faker.lorem.paragraphs(2) : undefined,
+					updates: hasReasoning
+						? [
+								{
+									type: MessageUpdateType.Reasoning,
+									subtype: MessageReasoningUpdateType.Status,
+									uuid: crypto.randomUUID(),
+									status: "thinking",
+								},
+							]
+						: [],
 					createdAt: faker.date.recent({ days: 30 }),
 					updatedAt: faker.date.recent({ days: 30 }),
-					interrupted: i === convLength - 1 && isInterrupted,
+					interrupted: !isUser && i === convLength - 1 && isInterrupted,
 				},
 				faker.helpers.arrayElement([
 					messages[0].id,

@@ -314,6 +314,9 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 {{assistantMessageToken}}
 ```
 
+> [!INFO]
+> We also support Jinja2 templates for the `chatPromptTemplate` in addition to Handlebars templates. On startup we first try to compile with Jinja and if that fails we fall back to interpreting `chatPromptTemplate` as handlebars.
+
 #### Multi modal model
 
 We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on TGI), OpenAI and Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](#openai-api-compatible-models). For Anthropic, see the [Anthropic section](#anthropic).
@@ -478,6 +481,29 @@ MODELS=`[{
           "baseURL": "https://api.deepinfra.com/v1/openai",
           "apiKey": "abc...xyz"
       }
+  ]
+}]`
+```
+
+_Non-streaming endpoints_
+
+For endpoints that don´t support streaming like o1 on Azure, you can pass `streamingSupported: false` in your endpoint config:
+
+```
+MODELS=`[{
+  "id": "o1-preview",
+  "name": "o1-preview",
+  "displayName": "o1-preview",
+  "systemRoleSupported": false,
+  "endpoints": [
+    {
+      "type": "openai",
+      "baseURL": "https://my-deployment.openai.azure.com/openai/deployments/o1-preview",
+      "defaultHeaders": {
+        "api-key": "$SECRET"
+      },
+      "streamingSupported": false,
+    }
   ]
 }]`
 ```
@@ -1055,7 +1081,7 @@ npm run populate users settings assistants conversations
 
 to populate the database with fake data, including fake conversations and assistants for your user.
 
-### Building the docker images locally
+## Building the docker images locally
 
 You can build the docker images locally using the following commands:
 
@@ -1063,4 +1089,14 @@ You can build the docker images locally using the following commands:
 docker build -t chat-ui-db:latest --build-arg INCLUDE_DB=true .
 docker build -t chat-ui:latest --build-arg INCLUDE_DB=false .
 docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_BASE=/chat --build-arg PUBLIC_APP_COLOR=yellow .
+```
+
+If you want to run the images with your local .env.local you have two options
+
+```bash
+DOTENV_LOCAL=$(<.env.local)  docker run --rm --network=host -e DOTENV_LOCAL -p 3000:3000 chat-ui
+```
+
+```bash
+docker run --rm --network=host --mount type=bind,source="$(pwd)/.env.local",target=/app/.env.local -p 3000:3000 chat-ui
 ```
