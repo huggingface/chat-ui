@@ -24,10 +24,11 @@ spec:
   template:
     metadata:
       labels: {{ include "labels.standard" . | nindent 8 }}
-      {{- if $.Values.envVars.NODE_LOG_STRUCTURED_DATA }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+        {{- if $.Values.envVars.NODE_LOG_STRUCTURED_DATA }}
         co.elastic.logs/json.expand_keys: "true"
-      {{- end }}
+        {{- end }}
     spec:
       {{- if .Values.serviceAccount.enabled }}
       serviceAccountName: "{{ .Values.serviceAccount.name | default (include "name" .) }}"
