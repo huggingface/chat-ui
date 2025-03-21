@@ -150,6 +150,14 @@
 					![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
 			) satisfies ToolFront[]
 	);
+
+	let showWebSearch = $derived(!assistant);
+	let showImageGen = $derived(modelHasTools && !assistant);
+	let showFileUpload = $derived((modelIsMultimodal || modelHasTools) && mimeTypes.length > 0);
+	let showExtraTools = $derived(modelHasTools && !assistant);
+
+	let showNoTools = $derived(!showWebSearch && !showImageGen && !showFileUpload && !showExtraTools);
+	
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
@@ -175,10 +183,13 @@
 		{disabled}
 	></textarea>
 
-	{#if !assistant}
-		<div
-			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2"
-		>
+	{#if !showNoTools}
+	<div
+		class={[
+			"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2",
+		]}
+	>
+		{#if showWebSearch}
 			<HoverTooltip
 				label="Search the web"
 				position="top"
@@ -215,135 +226,134 @@
 					{/if}
 				</button>
 			</HoverTooltip>
-			{#if modelHasTools}
+		{/if}
+		{#if showImageGen}
+			<HoverTooltip
+				label="Generate	images"
+				position="top"
+				TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {imageGenIsOn
+					? 'hidden'
+					: ''}"
+			>
+				<button
+					class="base-tool"
+					class:active-tool={imageGenIsOn}
+					disabled={loading}
+					onclick={async (e) => {
+						e.preventDefault();
+						if (modelHasTools) {
+							if (imageGenIsOn) {
+								await settings.instantSet({
+									tools: ($settings.tools ?? []).filter((t) => t !== imageGenToolId),
+								});
+							} else {
+								await settings.instantSet({
+									tools: [...($settings.tools ?? []), imageGenToolId],
+								});
+							}
+						}
+					}}
+				>
+					<IconImageGen classNames="text-xl" />
+					{#if imageGenIsOn}
+						Image Gen
+					{/if}
+				</button>
+			</HoverTooltip>
+		{/if}
+		{#if showFileUpload}
+			{@const mimeTypesString = mimeTypes
+				.map((m) => {
+					// if the mime type ends in *, grab the first part so image/* becomes image
+					if (m.endsWith("*")) {
+						return m.split("/")[0];
+					}
+					// otherwise, return the second part for example application/pdf becomes pdf
+					return m.split("/")[1];
+				})
+				.join(", ")}
+			<div class="flex items-center">
 				<HoverTooltip
-					label="Generate	images"
+					label={mimeTypesString.includes("*")
+						? "Upload any file"
+						: `Upload ${mimeTypesString} files`}
 					position="top"
-					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {imageGenIsOn
-						? 'hidden'
-						: ''}"
+					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
+				>
+					<label class="base-tool relative" class:active-tool={documentParserIsOn}>
+						<input
+							disabled={loading}
+							class="absolute hidden size-0"
+							aria-label="Upload file"
+							type="file"
+							onchange={onFileChange}
+							accept={mimeTypes.join(",")}
+						/>
+						<IconPaperclip classNames="text-xl" />
+						{#if documentParserIsOn}
+							Document Parser
+						{/if}
+					</label>
+				</HoverTooltip>
+			</div>
+			{#if mimeTypes.includes("image/*")}
+				<HoverTooltip
+					label="Capture screenshot"
+					position="top"
+					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
 				>
 					<button
 						class="base-tool"
-						class:active-tool={imageGenIsOn}
-						disabled={loading}
 						onclick={async (e) => {
 							e.preventDefault();
-							if (modelHasTools) {
-								if (imageGenIsOn) {
-									await settings.instantSet({
-										tools: ($settings.tools ?? []).filter((t) => t !== imageGenToolId),
-									});
-								} else {
-									await settings.instantSet({
-										tools: [...($settings.tools ?? []), imageGenToolId],
-									});
-								}
-							}
+							const screenshot = await captureScreen();
+
+							// Convert base64 to blob
+							const base64Response = await fetch(screenshot);
+							const blob = await base64Response.blob();
+
+							// Create a File object from the blob
+							const file = new File([blob], "screenshot.png", { type: "image/png" });
+
+							files = [...files, file];
 						}}
 					>
-						<IconImageGen classNames="text-xl" />
-						{#if imageGenIsOn}
-							Image Gen
-						{/if}
+						<IconScreenshot classNames="text-xl" />
 					</button>
 				</HoverTooltip>
 			{/if}
-			{#if modelIsMultimodal || modelHasTools}
-				{@const mimeTypesString = mimeTypes
-					.map((m) => {
-						// if the mime type ends in *, grab the first part so image/* becomes image
-						if (m.endsWith("*")) {
-							return m.split("/")[0];
-						}
-						// otherwise, return the second part for example application/pdf becomes pdf
-						return m.split("/")[1];
-					})
-					.join(", ")}
-				<div class="flex items-center">
-					<HoverTooltip
-						label={mimeTypesString.includes("*")
-							? "Upload any file"
-							: `Upload ${mimeTypesString} files`}
-						position="top"
-						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
-					>
-						<label class="base-tool relative" class:active-tool={documentParserIsOn}>
-							<input
-								disabled={loading}
-								class="absolute hidden size-0"
-								aria-label="Upload file"
-								type="file"
-								onchange={onFileChange}
-								accept={mimeTypes.join(",")}
-							/>
-							<IconPaperclip classNames="text-xl" />
-							{#if documentParserIsOn}
-								Document Parser
-							{/if}
-						</label>
-					</HoverTooltip>
-				</div>
-				{#if mimeTypes.includes("image/*")}
-					<HoverTooltip
-						label="Capture screenshot"
-						position="top"
-						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
-					>
-						<button
-							class="base-tool"
-							onclick={async (e) => {
-								e.preventDefault();
-								const screenshot = await captureScreen();
-
-								// Convert base64 to blob
-								const base64Response = await fetch(screenshot);
-								const blob = await base64Response.blob();
-
-								// Create a File object from the blob
-								const file = new File([blob], "screenshot.png", { type: "image/png" });
-
-								files = [...files, file];
-							}}
-						>
-							<IconScreenshot classNames="text-xl" />
-						</button>
-					</HoverTooltip>
-				{/if}
-			{/if}
-			{#if modelHasTools}
-				{#each extraTools as tool}
-					<button
-						class="active-tool base-tool"
-						disabled={loading}
-						onclick={async (e) => {
-							e.preventDefault();
-							goto(`${base}/tools/${tool._id}`);
-						}}
-					>
-						{#key tool.icon + tool.color}
-							<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
-						{/key}
-						{tool.displayName}
-					</button>
-				{/each}
-			{/if}
-			{#if modelHasTools}
-				<HoverTooltip
-					label="Browse more tools"
-					position="right"
-					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 max-sm:hidden"
+		{/if}
+		{#if showExtraTools}
+			{#each extraTools as tool}
+				<button
+					class="active-tool base-tool"
+					disabled={loading}
+					onclick={async (e) => {
+						e.preventDefault();
+						goto(`${base}/tools/${tool._id}`);
+					}}
 				>
-					<a
-						class="base-tool flex !size-[20px] items-center justify-center rounded-full border !border-gray-200 !bg-white !transition-none dark:!border-gray-500 dark:!bg-transparent"
-						href={`${base}/tools`}
-						title="Browse more tools"
-					>
-						<IconAdd class="text-sm" />
-					</a>
-				</HoverTooltip>
-			{/if}
-		</div>
+					{#key tool.icon + tool.color}
+						<ToolLogo icon={tool.icon} color={tool.color} size="xs" />
+					{/key}
+					{tool.displayName}
+				</button>
+			{/each}
+			<HoverTooltip
+				label="Browse more tools"
+				position="right"
+				TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 max-sm:hidden"
+			>
+				<a
+					class="base-tool flex !size-[20px] items-center justify-center rounded-full border !border-gray-200 !bg-white !transition-none dark:!border-gray-500 dark:!bg-transparent"
+					href={`${base}/tools`}
+					title="Browse more tools"
+				>
+					<IconAdd class="text-sm" />
+				</a>
+			</HoverTooltip>
+		{/if}
+	</div>
 	{/if}
 	{@render children?.()}
 </div>
