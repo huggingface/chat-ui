@@ -39,7 +39,7 @@ export type UserGETAssistants = Array<
 
 export const userGroup = new Elysia()
 	.use(authPlugin)
-	.post("/login", () => {
+	.get("/login", () => {
 		// todo: login
 		return "aa";
 	})

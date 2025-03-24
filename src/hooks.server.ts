@@ -143,8 +143,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	if (event.request.method === "POST") {
-		// if the request is a POST request we refresh the cookie
+	if (
+		event.request.method === "POST" ||
+		event.url.pathname.startsWith(`${base}/login`) ||
+		event.url.pathname.startsWith(`${base}/login/callback`)
+	) {
+		// if the request is a POST request or login-related we refresh the cookie
 		refreshSessionCookie(event.cookies, auth.secretSessionId);
 
 		await collections.sessions.updateOne(
@@ -206,6 +210,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
 	if (env.ALLOW_IFRAME !== "true") {
 		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
+	}
+
+	if (
+		event.url.pathname.startsWith(`${base}/login/callback`) ||
+		event.url.pathname.startsWith(`${base}/login`)
+	) {
+		logger.info("LOL LOL");
+		response.headers.append("Cache-Control", "no-store");
 	}
 
 	return response;

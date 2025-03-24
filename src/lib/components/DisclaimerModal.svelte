@@ -55,15 +55,8 @@
 				{/if}
 			</button>
 			{#if page.data.loginEnabled}
-				<button
-					onclick={async () => {
-						const response = await fetch(`${base}/login`, {
-							method: "POST",
-						});
-						if (response.ok) {
-							window.location.href = await response.text();
-						}
-					}}
+				<a
+					href="{base}/login"
 					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 				>
 					Sign in
@@ -73,7 +66,7 @@
 							Face
 						</span>
 					{/if}
-				</button>
+				</a>
 			{/if}
 		</div>
 	</div>

@@ -26,20 +26,10 @@
 			{envPublic.PUBLIC_APP_GUEST_MESSAGE}
 		</p>
 
-		<form
-			class="flex w-full flex-col items-center gap-2"
-			onsubmit={async () => {
-				const response = await fetch(`${base}/login`, {
-					method: "POST",
-				});
-				if (response.ok) {
-					window.location.href = await response.text();
-				}
-			}}
-		>
+		<div class="flex w-full flex-col items-center gap-2">
 			{#if page.data.loginRequired}
-				<button
-					type="submit"
+				<a
+					href="{base}/login"
 					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 				>
 					Sign in
@@ -48,7 +38,7 @@
 							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 						</span>
 					{/if}
-				</button>
+				</a>
 			{:else}
 				<button
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
@@ -63,6 +53,6 @@
 					Start chatting
 				</button>
 			{/if}
-		</form>
+		</div>
 	</div>
 </Modal>

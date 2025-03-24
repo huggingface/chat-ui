@@ -165,20 +165,12 @@
 		</button>
 	{/if}
 	{#if canLogin}
-		<button
-			onclick={async () => {
-				const response = await fetch(`${base}/login`, {
-					method: "POST",
-					credentials: "include",
-				});
-				if (response.ok) {
-					window.location.href = await response.text();
-				}
-			}}
+		<a
+			href="{base}/login"
 			class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			Login
-		</button>
+		</a>
 	{/if}
 	<button
 		onclick={switchTheme}

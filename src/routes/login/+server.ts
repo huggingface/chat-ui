@@ -1,8 +1,7 @@
 import { getOIDCAuthorizationUrl } from "$lib/server/auth";
 import { base } from "$app/paths";
 import { env } from "$env/dynamic/private";
-
-export async function POST({ request, url, locals }) {
+export async function GET({ request, url, locals }) {
 	const referer = request.headers.get("referer");
 	let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
 
@@ -20,9 +19,10 @@ export async function POST({ request, url, locals }) {
 		{ sessionId: locals.sessionId }
 	);
 
-	return new Response(authorizationUrl, {
+	return new Response(null, {
+		status: 302,
 		headers: {
-			"Content-Type": "text/html",
+			Location: authorizationUrl,
 		},
 	});
 }
