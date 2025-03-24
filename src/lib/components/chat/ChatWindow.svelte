@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { run, createBubbler } from "svelte/legacy";
+	import { createBubbler } from "svelte/legacy";
 
 	const bubble = createBubbler();
 	import type { Message, MessageFile } from "$lib/types/Message";
@@ -38,6 +38,7 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import type { Serialize } from "$lib/utils/serialize";
+	import { beforeNavigate } from "$app/navigation";
 
 	interface Props {
 		messages?: Message[];
@@ -73,8 +74,10 @@
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
-	run(() => {
-		page.params.id && (isSharedRecently = false);
+	beforeNavigate(() => {
+		if (page.params.id) {
+			isSharedRecently = false;
+		}
 	});
 
 	const dispatch = createEventDispatcher<{
@@ -194,7 +197,7 @@
 	}
 
 	// If last message is from user, scroll to bottom
-	run(() => {
+	$effect(() => {
 		if (lastMessage && lastMessage.from === "user") {
 			scrollToBottom();
 		}

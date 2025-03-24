@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { goto, invalidateAll } from "$app/navigation";
+	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -241,7 +239,6 @@
 				);
 			}
 
-			messages = [...messages];
 			const userMessage = messages.find((message) => message.id === messageId);
 			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 			if (!messageToWriteTo) {
@@ -283,17 +280,24 @@
 					update.token = update.token.replaceAll("\0", "");
 				}
 
-				messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+				// dont write updates for reasoning stream and normal stream to reduce render load
+				// but handle the rest
+
+				// Skip storing high-frequency updates to reduce render load
+				const isHighFrequencyUpdate =
+					(update.type === MessageUpdateType.Reasoning &&
+						update.subtype === MessageReasoningUpdateType.Stream) ||
+					update.type === MessageUpdateType.Stream ||
+					(update.type === MessageUpdateType.Status &&
+						update.status === MessageUpdateStatus.KeepAlive);
+
+				if (!isHighFrequencyUpdate) {
+					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+				}
 
 				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
 					messageToWriteTo.content += update.token;
 					pending = false;
-					messages = [...messages];
-				} else if (
-					update.type === MessageUpdateType.WebSearch ||
-					update.type === MessageUpdateType.Tool
-				) {
-					messages = [...messages];
 				} else if (
 					update.type === MessageUpdateType.Status &&
 					update.status === MessageUpdateStatus.Error
@@ -314,17 +318,13 @@
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
 					];
-					messages = [...messages];
 				} else if (update.type === MessageUpdateType.Reasoning) {
 					if (!messageToWriteTo.reasoning) {
 						messageToWriteTo.reasoning = "";
 					}
 					if (update.subtype === MessageReasoningUpdateType.Stream) {
 						messageToWriteTo.reasoning += update.token;
-					} else {
-						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 					}
-					messages = [...messages];
 				}
 			}
 		} catch (err) {
@@ -461,9 +461,13 @@
 		}
 	});
 
-	run(() => {
-		page.params.id, (($isAborted = true), (loading = false));
+	beforeNavigate(() => {
+		if (page.params.id) {
+			$isAborted = true;
+			loading = false;
+		}
 	});
+
 	let title = $derived(
 		conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title
 	);
