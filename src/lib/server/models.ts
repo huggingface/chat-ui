@@ -14,6 +14,7 @@ import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { fetchJSON } from "$lib/utils/fetchJSON";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -342,13 +343,13 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 });
 
 const inferenceApiIds = isHuggingChat
-	? await fetch(
-			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
+	? await fetchJSON<{ id: string }[]>(
+			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational",
+			{ allowNull: true }
 		)
-			.then((r) => r.json())
-			.then((json) => json.map((r: { id: string }) => r.id))
-			.catch((err) => {
-				logger.error(err, "Failed to fetch inference API ids");
+			.then((arr) => arr?.map((r) => r.id) || [])
+			.catch(() => {
+				logger.error("Failed to fetch inference API ids");
 				return [];
 			})
 	: [];

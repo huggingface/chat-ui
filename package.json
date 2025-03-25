@@ -17,6 +17,9 @@
 		"prepare": "husky"
 	},
 	"devDependencies": {
+		"@elysiajs/cors": "^1.2.0",
+		"@elysiajs/eden": "^1.2.0",
+		"@elysiajs/node": "^1.2.5",
 		"@faker-js/faker": "^8.4.1",
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
@@ -39,6 +42,7 @@
 		"@typescript-eslint/eslint-plugin": "^6.x",
 		"@typescript-eslint/parser": "^6.x",
 		"dompurify": "^3.2.4",
+		"elysia": "^1.2.12",
 		"eslint": "^8.28.0",
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.45.1",
@@ -65,6 +69,7 @@
 	"dependencies": {
 		"@aws-sdk/credential-providers": "^3.592.0",
 		"@cliqz/adblocker-playwright": "^1.27.2",
+		"@elysiajs/swagger": "^1.2.0",
 		"@gradio/client": "^1.8.0",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.8.1",
