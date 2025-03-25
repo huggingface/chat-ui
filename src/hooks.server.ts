@@ -216,7 +216,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.url.pathname.startsWith(`${base}/login/callback`) ||
 		event.url.pathname.startsWith(`${base}/login`)
 	) {
-		logger.info("LOL LOL");
 		response.headers.append("Cache-Control", "no-store");
 	}
 
