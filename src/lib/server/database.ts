@@ -49,7 +49,11 @@ export class Database {
 		this.client.on("open", () => this.initDatabase());
 
 		// Disconnect DB on exit
-		onExit(() => this.client?.close(true));
+		onExit(async () => {
+			logger.info("Closing database connection");
+			await this.client?.close(true);
+			await this.mongoServer?.stop();
+		});
 	}
 
 	public static async getInstance(): Promise<Database> {
