@@ -14,7 +14,7 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import type { CommunityToolDB } from "$lib/types/Tool";
-
+import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
@@ -23,20 +23,23 @@ import { onExit } from "./exitHandler";
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
 export class Database {
-	private client: MongoClient;
+	private client?: MongoClient;
+	private mongoServer?: MongoMemoryServer;
 
 	private static instance: Database;
 
-	private constructor() {
+	private async init() {
 		if (!env.MONGODB_URL) {
-			throw new Error(
-				"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
-			);
+			logger.warn("No MongoDB URL found, using in-memory server");
+			this.mongoServer = await MongoMemoryServer.create();
+			this.client = new MongoClient(this.mongoServer.getUri(), {
+				directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
+			});
+		} else {
+			this.client = new MongoClient(env.MONGODB_URL, {
+				directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
+			});
 		}
-
-		this.client = new MongoClient(env.MONGODB_URL, {
-			directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
-		});
 
 		this.client.connect().catch((err) => {
 			logger.error(err, "Connection error");
@@ -46,12 +49,13 @@ export class Database {
 		this.client.on("open", () => this.initDatabase());
 
 		// Disconnect DB on exit
-		onExit(() => this.client.close(true));
+		onExit(() => this.client?.close(true));
 	}
 
-	public static getInstance(): Database {
+	public static async getInstance(): Promise<Database> {
 		if (!Database.instance) {
 			Database.instance = new Database();
+			await Database.instance.init();
 		}
 
 		return Database.instance;
@@ -61,6 +65,10 @@ export class Database {
 	 * Return mongoClient
 	 */
 	public getClient(): MongoClient {
+		if (!this.client) {
+			throw new Error("Database not initialized");
+		}
+
 		return this.client;
 	}
 
@@ -68,6 +76,10 @@ export class Database {
 	 * Return map of database's collections
 	 */
 	public getCollections() {
+		if (!this.client) {
+			throw new Error("Database not initialized");
+		}
+
 		const db = this.client.db(
 			env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
 		);
@@ -247,4 +259,4 @@ export class Database {
 
 export const collections = building
 	? ({} as unknown as ReturnType<typeof Database.prototype.getCollections>)
-	: Database.getInstance().getCollections();
+	: await Database.getInstance().then((db) => db.getCollections());
