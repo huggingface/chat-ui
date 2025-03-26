@@ -14,29 +14,69 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import type { CommunityToolDB } from "$lib/types/Tool";
-
+import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
 import { onExit } from "./exitHandler";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { existsSync, mkdirSync } from "fs";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
+function findRepoRoot(startPath: string): string {
+	let currentPath = startPath;
+	while (currentPath !== "/") {
+		if (existsSync(join(currentPath, "package.json"))) {
+			return currentPath;
+		}
+		currentPath = dirname(currentPath);
+	}
+	throw new Error("Could not find repository root (no package.json found)");
+}
+
 export class Database {
-	private client: MongoClient;
+	private client?: MongoClient;
+	private mongoServer?: MongoMemoryServer;
 
 	private static instance: Database;
 
-	private constructor() {
+	private async init() {
 		if (!env.MONGODB_URL) {
-			throw new Error(
-				"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
-			);
-		}
+			logger.warn("No MongoDB URL found, using in-memory server");
 
-		this.client = new MongoClient(env.MONGODB_URL, {
-			directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
-		});
+			// Find repo root by looking for package.json
+			const currentFilePath = fileURLToPath(import.meta.url);
+			const repoRoot = findRepoRoot(dirname(currentFilePath));
+
+			// Use MONGO_STORAGE_PATH from env if set, otherwise use db/ in repo root
+			const dbPath = env.MONGO_STORAGE_PATH || join(repoRoot, "db");
+
+			logger.info(`Using database path: ${dbPath}`);
+			// Create db directory if it doesn't exist
+			if (!existsSync(dbPath)) {
+				logger.info(`Creating database directory at ${dbPath}`);
+				mkdirSync(dbPath, { recursive: true });
+			}
+
+			this.mongoServer = await MongoMemoryServer.create({
+				instance: {
+					dbName: env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""),
+					dbPath,
+				},
+				binary: {
+					version: "7.0.18",
+				},
+			});
+			this.client = new MongoClient(this.mongoServer.getUri(), {
+				directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
+			});
+		} else {
+			this.client = new MongoClient(env.MONGODB_URL, {
+				directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
+			});
+		}
 
 		this.client.connect().catch((err) => {
 			logger.error(err, "Connection error");
@@ -46,12 +86,17 @@ export class Database {
 		this.client.on("open", () => this.initDatabase());
 
 		// Disconnect DB on exit
-		onExit(() => this.client.close(true));
+		onExit(async () => {
+			logger.info("Closing database connection");
+			await this.client?.close(true);
+			await this.mongoServer?.stop();
+		});
 	}
 
-	public static getInstance(): Database {
+	public static async getInstance(): Promise<Database> {
 		if (!Database.instance) {
 			Database.instance = new Database();
+			await Database.instance.init();
 		}
 
 		return Database.instance;
@@ -61,6 +106,10 @@ export class Database {
 	 * Return mongoClient
 	 */
 	public getClient(): MongoClient {
+		if (!this.client) {
+			throw new Error("Database not initialized");
+		}
+
 		return this.client;
 	}
 
@@ -68,6 +117,10 @@ export class Database {
 	 * Return map of database's collections
 	 */
 	public getCollections() {
+		if (!this.client) {
+			throw new Error("Database not initialized");
+		}
+
 		const db = this.client.db(
 			env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
 		);
@@ -247,4 +300,4 @@ export class Database {
 
 export const collections = building
 	? ({} as unknown as ReturnType<typeof Database.prototype.getCollections>)
-	: Database.getInstance().getCollections();
+	: await Database.getInstance().then((db) => db.getCollections());

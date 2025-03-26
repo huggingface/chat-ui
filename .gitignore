@@ -12,3 +12,4 @@ SECRET_CONFIG
 !.env.ci
 !.env
 gcp-*.json
+db
