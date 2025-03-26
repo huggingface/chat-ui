@@ -13,7 +13,7 @@ export async function checkAndRunMigrations() {
 	}
 
 	// check if all migrations have already been run
-	const migrationResults = await Database.getInstance()
+	const migrationResults = await (await Database.getInstance())
 		.getCollections()
 		.migrationResults.find()
 		.toArray();
@@ -21,7 +21,7 @@ export async function checkAndRunMigrations() {
 	logger.info("[MIGRATIONS] Begin check...");
 
 	// connect to the database
-	const connectedClient = await Database.getInstance().getClient().connect();
+	const connectedClient = await (await Database.getInstance()).getClient().connect();
 
 	const lockId = await acquireLock(LOCK_KEY);
 
@@ -74,25 +74,23 @@ export async function checkAndRunMigrations() {
 				}. Applying...`
 			);
 
-			await Database.getInstance()
-				.getCollections()
-				.migrationResults.updateOne(
-					{ _id: migration._id },
-					{
-						$set: {
-							name: migration.name,
-							status: "ongoing",
-						},
+			await (await Database.getInstance()).getCollections().migrationResults.updateOne(
+				{ _id: migration._id },
+				{
+					$set: {
+						name: migration.name,
+						status: "ongoing",
 					},
-					{ upsert: true }
-				);
+				},
+				{ upsert: true }
+			);
 
 			const session = connectedClient.startSession();
 			let result = false;
 
 			try {
 				await session.withTransaction(async () => {
-					result = await migration.up(Database.getInstance());
+					result = await migration.up(await Database.getInstance());
 				});
 			} catch (e) {
 				logger.info(`[MIGRATIONS]  "${migration.name}" failed!`);
@@ -101,18 +99,16 @@ export async function checkAndRunMigrations() {
 				await session.endSession();
 			}
 
-			await Database.getInstance()
-				.getCollections()
-				.migrationResults.updateOne(
-					{ _id: migration._id },
-					{
-						$set: {
-							name: migration.name,
-							status: result ? "success" : "failure",
-						},
+			await (await Database.getInstance()).getCollections().migrationResults.updateOne(
+				{ _id: migration._id },
+				{
+					$set: {
+						name: migration.name,
+						status: result ? "success" : "failure",
 					},
-					{ upsert: true }
-				);
+				},
+				{ upsert: true }
+			);
 		}
 	}
 

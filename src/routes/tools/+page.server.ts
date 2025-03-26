@@ -1,6 +1,6 @@
 import { env } from "$env/dynamic/private";
 import { authCondition } from "$lib/server/auth.js";
-import { Database, collections } from "$lib/server/database.js";
+import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { SortKey } from "$lib/types/Assistant.js";
 import { ReviewStatus } from "$lib/types/Review";
@@ -60,9 +60,8 @@ export const load = async ({ url, locals }) => {
 		}),
 	};
 
-	const communityTools = await Database.getInstance()
-		.getCollections()
-		.tools.find(filter)
+	const communityTools = await collections.tools
+		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
@@ -84,9 +83,7 @@ export const load = async ({ url, locals }) => {
 
 	const tools = [...(pageIndex == 0 && !username ? configTools : []), ...communityTools];
 
-	const numTotalItems =
-		(await Database.getInstance().getCollections().tools.countDocuments(filter)) +
-		toolFromConfigs.length;
+	const numTotalItems = (await collections.tools.countDocuments(filter)) + toolFromConfigs.length;
 
 	return {
 		tools: JSON.parse(JSON.stringify(tools)) as CommunityToolDB[],
