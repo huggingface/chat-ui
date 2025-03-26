@@ -19,7 +19,9 @@ import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
 import { onExit } from "./exitHandler";
-
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { existsSync, mkdirSync } from "fs";
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
 export class Database {
@@ -31,7 +33,26 @@ export class Database {
 	private async init() {
 		if (!env.MONGODB_URL) {
 			logger.warn("No MongoDB URL found, using in-memory server");
-			this.mongoServer = await MongoMemoryServer.create();
+			// Get the directory path for the current module
+			const currentFilePath = fileURLToPath(import.meta.url);
+			const currentDir = dirname(currentFilePath);
+			const dbPath = join(currentDir, "..", "..", "..", "..", "db");
+
+			// Create db directory if it doesn't exist
+			if (!existsSync(dbPath)) {
+				logger.info(`Creating database directory at ${dbPath}`);
+				mkdirSync(dbPath, { recursive: true });
+			}
+
+			this.mongoServer = await MongoMemoryServer.create({
+				instance: {
+					dbName: env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""),
+					dbPath,
+				},
+				binary: {
+					version: "7.0.18",
+				},
+			});
 			this.client = new MongoClient(this.mongoServer.getUri(), {
 				directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
 			});
