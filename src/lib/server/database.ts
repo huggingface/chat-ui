@@ -22,19 +22,9 @@ import { onExit } from "./exitHandler";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { existsSync, mkdirSync } from "fs";
+import { findRepoRoot } from "./findRepoRoot";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
-
-function findRepoRoot(startPath: string): string {
-	let currentPath = startPath;
-	while (currentPath !== "/") {
-		if (existsSync(join(currentPath, "package.json"))) {
-			return currentPath;
-		}
-		currentPath = dirname(currentPath);
-	}
-	throw new Error("Could not find repository root (no package.json found)");
-}
 
 export class Database {
 	private client?: MongoClient;

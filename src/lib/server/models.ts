@@ -305,6 +305,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				switch (args.type) {
 					case "tgi":
 						return endpoints.tgi(args);
+					case "local":
+						return endpoints.local(args);
 					case "anthropic":
 						return endpoints.anthropic(args);
 					case "anthropic-vertex":
