@@ -12,11 +12,12 @@ import {
 	type ImageProcessor,
 } from "../images";
 
-import { getLlama, LlamaCompletion, resolveModelFile } from "node-llama-cpp";
+import { LlamaCompletion, LlamaContextSequence, resolveModelFile } from "node-llama-cpp";
 import { findRepoRoot } from "$lib/server/findRepoRoot";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { logger } from "$lib/server/logger";
+import { LlamaManager } from "./utilsLocal";
 
 export const endpointLocalParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -40,26 +41,25 @@ export const endpointLocalParametersSchema = z.object({
 export async function endpointLocal(
 	input: z.input<typeof endpointLocalParametersSchema>
 ): Promise<Endpoint> {
+	// Parse and validate input
 	const { modelPath, multimodal, model } = endpointLocalParametersSchema.parse(input);
 
+	// Setup model path and folder
 	const path = modelPath ?? `hf:${model.id ?? model.name}`;
-
 	const modelFolder =
 		env.MODELS_STORAGE_PATH ||
 		join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
-	const llama = await getLlama();
+	// Initialize Llama model
+	const llama = await LlamaManager.getLlama();
 	const modelLoaded = await llama.loadModel({
 		modelPath: await resolveModelFile(path, modelFolder),
 	});
-
-	const context = await modelLoaded.createContext({
-		sequences: 4,
-	});
-
+	// Create context and image processor
+	const context = await modelLoaded.createContext({ sequences: 1 });
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
-	return async ({
+	return async function ({
 		messages,
 		preprompt,
 		continueMessage,
@@ -67,13 +67,14 @@ export async function endpointLocal(
 		tools,
 		toolResults,
 		isMultimodal,
-	}) => {
-		const messagesWithResizedFiles = await Promise.all(
-			messages.map((message) => prepareMessage(Boolean(isMultimodal), message, imageProcessor))
+	}) {
+		// Process messages and build prompt
+		const processedMessages = await Promise.all(
+			messages.map((msg) => prepareMessage(Boolean(isMultimodal), msg, imageProcessor))
 		);
 
 		const prompt = await buildPrompt({
-			messages: messagesWithResizedFiles,
+			messages: processedMessages,
 			preprompt,
 			model,
 			continueMessage,
@@ -81,66 +82,53 @@ export async function endpointLocal(
 			toolResults,
 		});
 
+		let sequence: LlamaContextSequence;
+		try {
+			sequence = context.getSequence();
+		} catch (error) {
+			logger.error(`Error getting sequence: ${error}`);
+			await LlamaManager.disposeLlama();
+			throw error;
+		}
+		// Setup completion
 		const completion = new LlamaCompletion({
-			contextSequence: context.getSequence(),
+			contextSequence: sequence,
 		});
 
-		return (async function* () {
+		async function* generateTokens(): AsyncGenerator<TextGenerationStreamOutputWithToolsAndWebSources> {
 			let tokenId = 0;
-			let resolver: (() => void) | null = null;
+			let fullText = "";
+			// A simple queue for tokens that have been produced
 			const queue: TextGenerationStreamOutputWithToolsAndWebSources[] = [];
-			let isCompleted = false;
-			let emptyTokenCount = 0;
-			const EMPTY_TOKEN_THRESHOLD = 3;
-			let generatedText = "";
-			let endedEarly = false;
-			const maxTokens = generateSettings?.max_new_tokens ?? 1000;
+			let waitingResolve:
+				| ((value: TextGenerationStreamOutputWithToolsAndWebSources | null) => void)
+				| null = null;
+			let generationCompleted = false;
 
-			completion
+			// Helper function to push tokens to the queue
+			function pushOutput(output: TextGenerationStreamOutputWithToolsAndWebSources) {
+				if (waitingResolve) {
+					waitingResolve(output);
+					waitingResolve = null;
+				} else {
+					queue.push(output);
+				}
+			}
+
+			// Start the token generation process
+			const generationPromise = completion
 				.generateCompletion(prompt, {
-					maxTokens,
+					maxTokens: generateSettings?.max_new_tokens ?? 1000,
 					temperature: generateSettings?.temperature,
 					topP: generateSettings?.top_p,
 					topK: generateSettings?.top_k,
+					// onToken: (tokens) => {
+					// 	// console.log(modelLoaded.detokenize(tokens));
+					// },
 					onTextChunk: (text) => {
-						if (endedEarly) {
-							return;
-						}
-
-						if (text === "") {
-							emptyTokenCount++;
-
-							if (emptyTokenCount >= EMPTY_TOKEN_THRESHOLD && !isCompleted) {
-								endedEarly = true;
-								isCompleted = true;
-
-								queue.push({
-									token: {
-										id: tokenId++,
-										text: "",
-										logprob: 0,
-										special: true,
-									},
-									generated_text: generatedText,
-									details: null,
-								});
-
-								if (resolver) {
-									const r = resolver;
-									resolver = null;
-									r();
-								}
-
-								return;
-							}
-
-							return;
-						} else {
-							emptyTokenCount = 0;
-						}
-
-						generatedText += text;
-
+						if (!text) return;
+						// console.log(text);
+						fullText += text;
 						const output: TextGenerationStreamOutputWithToolsAndWebSources = {
 							token: {
 								id: tokenId++,
@@ -151,70 +139,74 @@ export async function endpointLocal(
 							generated_text: null,
 							details: null,
 						};
-
-						queue.push(output);
-
-						if (resolver) {
-							const r = resolver;
-							resolver = null;
-							r();
-						}
+						// Instead of returning the token, push it into our queue.
+						pushOutput(output);
 					},
 				})
 				.then(() => {
-					if (!endedEarly && !isCompleted) {
-						isCompleted = true;
-
-						queue.push({
-							token: {
-								id: tokenId++,
-								text: "",
-								logprob: 0,
-								special: true,
-							},
-							generated_text: generatedText,
-							details: null,
-						});
-
-						if (resolver) {
-							const r = resolver;
-							resolver = null;
-							r();
-						}
+					generationCompleted = true;
+					// Resolve any pending waiters so the loop can end.
+					if (waitingResolve) {
+						waitingResolve(null);
+						waitingResolve = null;
 					}
+					sequence.dispose();
 				})
-				.catch((err) => {
-					logger.error(`Completion error: ${err}`);
-					if (!isCompleted) {
-						isCompleted = true;
-						if (resolver) {
-							const r = resolver;
-							resolver = null;
-							r();
-						}
+				.catch((error) => {
+					generationCompleted = true;
+					if (waitingResolve) {
+						waitingResolve(null);
+						waitingResolve = null;
 					}
+
+					sequence.dispose();
+					throw error;
 				});
 
 			try {
-				while (!isCompleted || queue.length > 0) {
-					if (queue.length > 0) {
-						const chunk = queue.shift();
-						if (chunk) {
-							yield chunk;
+				// Yield tokens as they become available
+				while (!generationCompleted || queue.length > 0) {
+					if (queue.length === 0) {
+						const output =
+							await new Promise<TextGenerationStreamOutputWithToolsAndWebSources | null>(
+								(resolve) => (waitingResolve = resolve)
+							);
+						// When output is null, it indicates generation completion.
+						if (output === null) break;
+						if (model.parameters.stop_sequences?.includes(output.token.text)) {
+							console.log("Stop sequence detected");
+							break;
 						}
-					} else if (!isCompleted) {
-						await new Promise<void>((r) => {
-							resolver = r;
-						});
+						yield output;
+					} else {
+						const output = queue.shift();
+						if (output) yield output;
 					}
 				}
+
+				// Wait for the generation process to complete (and catch errors if any)
+				await generationPromise;
+
+				// Yield a final token that contains the full generated text.
+				yield {
+					token: {
+						id: tokenId,
+						text: "",
+						logprob: 0,
+						special: true,
+					},
+					generated_text: fullText,
+					details: null,
+				};
 			} catch (error) {
-				logger.error(`Error in generator: ${error}`);
+				logger.error(`Generation error: ${error}`);
 				throw error;
 			} finally {
-				await context.dispose();
+				sequence.dispose();
 			}
-		})();
+		}
+
+		return generateTokens();
 	};
 }
 
