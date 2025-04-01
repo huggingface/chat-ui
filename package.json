@@ -121,5 +121,8 @@
 		"aws4fetch": "^1.0.17",
 		"cohere-ai": "^7.9.0",
 		"openai": "^4.44.0"
+	},
+	"overrides": {
+		"@reflink/reflink": "file:stub/@reflink/reflink"
 	}
 }
