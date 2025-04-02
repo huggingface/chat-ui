@@ -14,6 +14,11 @@ import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { join, dirname } from "path";
+import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
+import { fileURLToPath } from "url";
+import { findRepoRoot } from "./findRepoRoot";
+import { Template } from "@huggingface/jinja";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -93,6 +98,29 @@ const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
 async function getChatPromptRender(
 	m: z.infer<typeof modelConfig>
 ): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
+	if (m.endpoints?.some((e) => e.type === "local")) {
+		const endpoint = m.endpoints?.find((e) => e.type === "local");
+		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
+
+		const modelFolder =
+			env.MODELS_STORAGE_PATH ||
+			join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
+
+		const modelPath = await resolveModelFile(path, modelFolder);
+
+		const info = await readGgufFileInfo(modelPath, {
+			readTensorInfo: false,
+		});
+
+		if (info.metadata.tokenizer.chat_template) {
+			// compile with jinja
+			const jinjaTemplate = new Template(info.metadata.tokenizer.chat_template);
+			return (inputs: ChatTemplateInput) => {
+				return jinjaTemplate.render({ ...m, ...inputs });
+			};
+		}
+	}
+
 	if (m.chatPromptTemplate) {
 		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
 	}

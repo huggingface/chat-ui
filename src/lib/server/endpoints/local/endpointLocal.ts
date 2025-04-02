@@ -42,18 +42,23 @@ export async function endpointLocal(
 	input: z.input<typeof endpointLocalParametersSchema>
 ): Promise<Endpoint> {
 	// Parse and validate input
-	const { modelPath, multimodal, model } = endpointLocalParametersSchema.parse(input);
+	const {
+		modelPath: modelPathInput,
+		multimodal,
+		model,
+	} = endpointLocalParametersSchema.parse(input);
 
 	// Setup model path and folder
-	const path = modelPath ?? `hf:${model.id ?? model.name}`;
+	const path = modelPathInput ?? `hf:${model.id ?? model.name}`;
 	const modelFolder =
 		env.MODELS_STORAGE_PATH ||
 		join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 	// Initialize Llama model
 	const llama = await LlamaManager.getLlama();
+	const modelPath = await resolveModelFile(path, modelFolder);
 	const modelLoaded = await llama.loadModel({
-		modelPath: await resolveModelFile(path, modelFolder),
+		modelPath,
 	});
 	// Create context and image processor
 	const context = await modelLoaded.createContext({ sequences: 1 });
@@ -143,24 +148,15 @@ export async function endpointLocal(
 						pushOutput(output);
 					},
 				})
-				.then(() => {
+				.finally(() => {
 					generationCompleted = true;
 					// Resolve any pending waiters so the loop can end.
 					if (waitingResolve) {
 						waitingResolve(null);
 						waitingResolve = null;
 					}
-					sequence.dispose();
-				})
-				.catch((error) => {
-					generationCompleted = true;
-					if (waitingResolve) {
-						waitingResolve(null);
-						waitingResolve = null;
-					}
 
 					sequence.dispose();
-					throw error;
 				});
 
 			try {
@@ -200,6 +196,10 @@ export async function endpointLocal(
 				};
 			} catch (error) {
 				logger.error(`Generation error: ${error}`);
+				// Ensure we clean up the LlamaManager in case of errors
+				await LlamaManager.disposeLlama().catch((e) =>
+					logger.error(`Error disposing LlamaManager during error handling: ${e}`)
+				);
 				throw error;
 			} finally {
 				sequence.dispose();

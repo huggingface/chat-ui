@@ -56,6 +56,7 @@ export class LlamaManager {
 		if (LlamaManager.llamaInstance) {
 			try {
 				await LlamaManager.llamaInstance.dispose();
+				LlamaManager.initializationPromise = null;
 				logger.info("Llama instance successfully disposed");
 			} catch (error) {
 				logger.error(`Error disposing Llama instance: ${error}`);
