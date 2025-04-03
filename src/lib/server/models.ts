@@ -19,6 +19,10 @@ import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { findRepoRoot } from "./findRepoRoot";
 import { Template } from "@huggingface/jinja";
+import { readdirSync } from "fs";
+
+export const MODELS_FOLDER =
+	env.MODELS_STORAGE_PATH || join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -93,7 +97,28 @@ const modelConfig = z.object({
 	reasoning: reasoningSchema.optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+const ggufModelsConfig = await Promise.all(
+	readdirSync(MODELS_FOLDER)
+		.filter((f) => f.endsWith(".gguf"))
+		.map(async (f) => {
+			return {
+				name: f.replace(".gguf", ""),
+				endpoints: [
+					{
+						type: "local" as const,
+						modelPath: f,
+					},
+				],
+			};
+		})
+);
+
+let modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS ?? "[]"));
+
+if (env.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
+	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
+	modelsRaw = [...modelsRaw, ...parsedGgufModels];
+}
 
 async function getChatPromptRender(
 	m: z.infer<typeof modelConfig>
@@ -102,11 +127,7 @@ async function getChatPromptRender(
 		const endpoint = m.endpoints?.find((e) => e.type === "local");
 		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
 
-		const modelFolder =
-			env.MODELS_STORAGE_PATH ||
-			join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
-
-		const modelPath = await resolveModelFile(path, modelFolder);
+		const modelPath = await resolveModelFile(path, MODELS_FOLDER);
 
 		const info = await readGgufFileInfo(modelPath, {
 			readTensorInfo: false,
