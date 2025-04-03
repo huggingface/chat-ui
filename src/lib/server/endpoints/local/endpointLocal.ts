@@ -1,5 +1,4 @@
 import { env } from "$env/dynamic/private";
-import { buildPrompt } from "$lib/buildPrompt";
 import type {
 	Endpoint,
 	EndpointMessage,
@@ -12,7 +11,7 @@ import {
 	type ImageProcessor,
 } from "../images";
 
-import { LlamaCompletion, LlamaContextSequence, resolveModelFile } from "node-llama-cpp";
+import { LlamaChatSession, LlamaContextSequence, resolveModelFile } from "node-llama-cpp";
 import { findRepoRoot } from "$lib/server/findRepoRoot";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -69,23 +68,14 @@ export async function endpointLocal(
 		preprompt,
 		continueMessage,
 		generateSettings,
-		tools,
-		toolResults,
+		// tools,
+		// toolResults,
 		isMultimodal,
 	}) {
 		// Process messages and build prompt
 		const processedMessages = await Promise.all(
 			messages.map((msg) => prepareMessage(Boolean(isMultimodal), msg, imageProcessor))
 		);
-
-		const prompt = await buildPrompt({
-			messages: processedMessages,
-			preprompt,
-			model,
-			continueMessage,
-			tools,
-			toolResults,
-		});
 
 		let sequence: LlamaContextSequence;
 		try {
@@ -95,10 +85,33 @@ export async function endpointLocal(
 			await LlamaManager.disposeLlama();
 			throw error;
 		}
-		// Setup completion
-		const completion = new LlamaCompletion({
+
+		const chatSession = new LlamaChatSession({
 			contextSequence: sequence,
+			systemPrompt: preprompt,
 		});
+
+		chatSession.setChatHistory(
+			messages.slice(0, -1).map((message) => {
+				switch (message.from) {
+					case "user":
+						return {
+							type: "user",
+							text: message.content,
+						};
+					case "assistant":
+						return {
+							type: "model",
+							response: [message.content],
+						};
+					case "system":
+						return {
+							type: "system",
+							text: message.content,
+						};
+				}
+			})
+		);
 
 		async function* generateTokens(): AsyncGenerator<TextGenerationStreamOutputWithToolsAndWebSources> {
 			let tokenId = 0;
@@ -120,44 +133,44 @@ export async function endpointLocal(
 				}
 			}
 
-			// Start the token generation process
-			const generationPromise = completion
-				.generateCompletion(prompt, {
-					maxTokens: generateSettings?.max_new_tokens ?? 1000,
-					temperature: generateSettings?.temperature,
-					topP: generateSettings?.top_p,
-					topK: generateSettings?.top_k,
-					// onToken: (tokens) => {
-					// 	// console.log(modelLoaded.detokenize(tokens));
-					// },
-					onTextChunk: (text) => {
-						if (!text) return;
-						// console.log(text);
-						fullText += text;
-						const output: TextGenerationStreamOutputWithToolsAndWebSources = {
-							token: {
-								id: tokenId++,
-								text,
-								logprob: 0,
-								special: false,
-							},
-							generated_text: null,
-							details: null,
-						};
-						// Instead of returning the token, push it into our queue.
-						pushOutput(output);
-					},
-				})
-				.finally(() => {
-					generationCompleted = true;
-					// Resolve any pending waiters so the loop can end.
-					if (waitingResolve) {
-						waitingResolve(null);
-						waitingResolve = null;
-					}
+			const options = {
+				maxTokens: generateSettings?.max_new_tokens,
+				temperature: generateSettings?.temperature ?? 0.2,
+				topP: generateSettings?.top_p ?? 0.9,
+				topK: generateSettings?.top_k ?? 40,
+				// onToken: (tokens) => {
+				// 	// console.log(modelLoaded.detokenize(tokens));
+				// },
+				onTextChunk: (text: string) => {
+					fullText += text;
+					const output: TextGenerationStreamOutputWithToolsAndWebSources = {
+						token: {
+							id: tokenId++,
+							text,
+							logprob: 0,
+							special: false,
+						},
+						generated_text: null,
+						details: null,
+					};
+					// Instead of returning the token, push it into our queue.
+					pushOutput(output);
+				},
+			};
 
-					sequence.dispose();
-				});
+			let generationPromise;
+			if (!continueMessage)
+				// Start the token generation process
+				generationPromise = chatSession.prompt(
+					processedMessages[processedMessages.length - 1].content,
+					options
+				);
+			else {
+				generationPromise = chatSession.completePrompt(
+					processedMessages[processedMessages.length - 1].content,
+					options
+				);
+			}
 
 			try {
 				// Yield tokens as they become available
@@ -167,10 +180,10 @@ export async function endpointLocal(
 							await new Promise<TextGenerationStreamOutputWithToolsAndWebSources | null>(
 								(resolve) => (waitingResolve = resolve)
 							);
+
 						// When output is null, it indicates generation completion.
-						if (output === null) break;
+						if (output === null || !output.token.text) break;
 						if (model.parameters.stop_sequences?.includes(output.token.text)) {
-							console.log("Stop sequence detected");
 							break;
 						}
 						yield output;
@@ -181,7 +194,16 @@ export async function endpointLocal(
 				}
 
 				// Wait for the generation process to complete (and catch errors if any)
-				await generationPromise;
+				await generationPromise.finally(() => {
+					generationCompleted = true;
+					// Resolve any pending waiters so the loop can end.
+					if (waitingResolve) {
+						waitingResolve(null);
+						waitingResolve = null;
+					}
+
+					sequence.dispose();
+				});
 
 				// Yield a final token that contains the full generated text.
 				yield {
