@@ -5,10 +5,11 @@ import { describe, expect, it } from "vitest";
 import { insertLegacyConversation, insertSideBranchesConversation } from "./treeHelpers.spec";
 import type { Message } from "$lib/types/Message";
 import { addSibling } from "./addSibling";
+import type { Conversation } from "$lib/types/Conversation";
 
-const newMessage: Omit<Message, "id"> = {
+const newMessage = {
 	content: "new message",
-	from: "user",
+	from: "user" as const,
 };
 
 Object.freeze(newMessage);
@@ -18,8 +19,8 @@ describe("addSibling", async () => {
 		const conv = {
 			_id: new ObjectId(),
 			rootMessageId: undefined,
-			messages: [],
-		};
+			messages: [] as Message[],
+		} satisfies Pick<Conversation, "_id" | "rootMessageId" | "messages">;
 
 		expect(() => addSibling(conv, newMessage, "not-a-real-id-test")).toThrow(
 			"Cannot add a sibling to an empty conversation"

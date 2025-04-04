@@ -39,11 +39,15 @@
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
 		{#if conv.avatarUrl}
-			<img
-				src="{base}{conv.avatarUrl}"
-				alt="Assistant avatar"
-				class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
-			/>
+			{#await conv.avatarUrl then avatarUrl}
+				{#if avatarUrl}
+					<img
+						src="{base}{avatarUrl}"
+						alt="Assistant avatar"
+						class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
+					/>
+				{/if}
+			{/await}
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else if conv.assistantId}
 			<div
