@@ -58,7 +58,7 @@
 		"tslib": "^2.4.1",
 		"typescript": "^5.5.0",
 		"unplugin-icons": "^0.16.1",
-		"vite": "^6.2.4",
+		"vite": "^6.2.5",
 		"vite-node": "^3.0.9",
 		"vitest": "^3.0.9"
 	},
