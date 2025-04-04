@@ -16,7 +16,7 @@ import { findRepoRoot } from "$lib/server/findRepoRoot";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { logger } from "$lib/server/logger";
-import { LlamaManager } from "./utilsLocal";
+import { llama } from "./utilsLocal";
 
 export const endpointLocalParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -54,7 +54,7 @@ export async function endpointLocal(
 		join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 	// Initialize Llama model
-	const llama = await LlamaManager.getLlama();
+
 	const modelPath = await resolveModelFile(path, modelFolder);
 	const modelLoaded = await llama.loadModel({
 		modelPath,
@@ -81,8 +81,7 @@ export async function endpointLocal(
 		try {
 			sequence = context.getSequence();
 		} catch (error) {
-			logger.error(`Error getting sequence: ${error}`);
-			await LlamaManager.disposeLlama();
+			logger.error(error, `Error getting sequence`);
 			throw error;
 		}
 
@@ -138,9 +137,6 @@ export async function endpointLocal(
 				temperature: generateSettings?.temperature ?? 0.2,
 				topP: generateSettings?.top_p ?? 0.9,
 				topK: generateSettings?.top_k ?? 40,
-				// onToken: (tokens) => {
-				// 	// console.log(modelLoaded.detokenize(tokens));
-				// },
 				onTextChunk: (text: string) => {
 					fullText += text;
 					const output: TextGenerationStreamOutputWithToolsAndWebSources = {
@@ -201,8 +197,6 @@ export async function endpointLocal(
 						waitingResolve(null);
 						waitingResolve = null;
 					}
-
-					sequence.dispose();
 				});
 
 				// Yield a final token that contains the full generated text.
@@ -217,14 +211,9 @@ export async function endpointLocal(
 					details: null,
 				};
 			} catch (error) {
-				logger.error(`Generation error: ${error}`);
+				logger.error(error, `Generation error`);
 				// Ensure we clean up the LlamaManager in case of errors
-				await LlamaManager.disposeLlama().catch((e) =>
-					logger.error(`Error disposing LlamaManager during error handling: ${e}`)
-				);
 				throw error;
-			} finally {
-				sequence.dispose();
 			}
 		}
 
