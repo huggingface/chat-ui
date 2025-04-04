@@ -46,6 +46,7 @@
 		"js-yaml": "^4.1.0",
 		"minimist": "^1.2.8",
 		"mongodb-memory-server": "^10.1.2",
+		"node-llama-cpp": "^3.6.0",
 		"prettier": "^3.1.0",
 		"prettier-plugin-svelte": "^3.2.6",
 		"prettier-plugin-tailwindcss": "^0.6.11",
@@ -116,9 +117,12 @@
 		"@anthropic-ai/vertex-sdk": "^0.4.1",
 		"@aws-sdk/client-bedrock-runtime": "^3.631.0",
 		"@google-cloud/vertexai": "^1.1.0",
-		"@google/generative-ai": "^0.14.1",
+		"@google/generative-ai": "^0.24.0",
 		"aws4fetch": "^1.0.17",
 		"cohere-ai": "^7.9.0",
 		"openai": "^4.44.0"
+	},
+	"overrides": {
+		"@reflink/reflink": "file:stub/@reflink/reflink"
 	}
 }

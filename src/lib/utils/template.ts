@@ -1,6 +1,7 @@
 import type { Message } from "$lib/types/Message";
 import Handlebars from "handlebars";
 import { Template } from "@huggingface/jinja";
+import { logger } from "$lib/server/logger";
 
 // Register Handlebars helpers
 Handlebars.registerHelper("ifUser", function (this: Pick<Message, "from" | "content">, options) {
@@ -24,6 +25,7 @@ export function compileTemplate<T>(
 		// Try to compile with Jinja
 		jinjaTemplate = new Template(input);
 	} catch (e) {
+		logger.error(e, "Could not compile with Jinja");
 		// Could not compile with Jinja
 		jinjaTemplate = undefined;
 	}
@@ -41,6 +43,7 @@ export function compileTemplate<T>(
 			try {
 				return jinjaTemplate.render({ ...model, ...inputs });
 			} catch (e) {
+				logger.error(e, "Could not render with Jinja");
 				// Fallback to Handlebars if Jinja rendering fails
 				return hbTemplate({ ...model, ...inputs });
 			}

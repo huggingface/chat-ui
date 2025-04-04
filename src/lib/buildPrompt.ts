@@ -24,7 +24,10 @@ export async function buildPrompt({
 
 	let prompt = model
 		.chatPromptRender({
-			messages: filteredMessages,
+			messages: filteredMessages.map((m) => ({
+				...m,
+				role: m.from,
+			})),
 			preprompt,
 			tools,
 			toolResults,
