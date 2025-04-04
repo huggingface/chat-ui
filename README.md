@@ -1005,6 +1005,8 @@ Create a `DOTENV_LOCAL` secret to your HF space with the content of your .env.lo
 
 ## Building
 
+### Local
+
 To create a production version of your app:
 
 ```bash
@@ -1014,6 +1016,21 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+
+### Docker Compose
+
+If `.env.local` is not present, remove the volume in `compose.yaml` as follows to avoid errors.
+
+```diff
+-     volumes:
+-      - .env.local:/app/.env.local
+```
+
+Start the app with Docker Compose:
+
+```bash
+docker compose --env-file /dev/null up --build
+```
 
 ## Config changes for HuggingChat
 
