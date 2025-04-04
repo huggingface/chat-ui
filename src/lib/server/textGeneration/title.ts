@@ -4,7 +4,7 @@ import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
-import { smallModel } from "../models";
+import { taskModel } from "../models";
 import type { Tool } from "$lib/types/Tool";
 import { getToolOutput } from "../tools/getToolOutput";
 
@@ -33,7 +33,7 @@ export async function generateTitle(prompt: string) {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
-	if (smallModel.tools) {
+	if (taskModel.tools) {
 		const titleTool = {
 			name: "title",
 			description:
@@ -48,7 +48,7 @@ export async function generateTitle(prompt: string) {
 			],
 		} as unknown as Tool;
 
-		const endpoint = await smallModel.getEndpoint();
+		const endpoint = await taskModel.getEndpoint();
 		const title = await getToolOutput({
 			messages: [
 				{
