@@ -24,18 +24,36 @@ async function runExitHandler(handler: ExitHandler): Promise<void> {
 export function initExitHandler() {
 	let signalCount = 0;
 	const exitHandler = async () => {
-		signalCount++;
 		if (signalCount === 1) {
 			logger.info("Received signal... Exiting");
 			await Promise.all(Array.from(listeners.values()).map(runExitHandler));
 			logger.info("All exit handlers ran... Waiting for svelte server to exit");
 		}
-		if (signalCount === 3) {
-			logger.warn("Received 3 signals... Exiting immediately");
-			process.exit(1);
-		}
 	};
 
-	process.on("SIGINT", exitHandler);
-	process.on("SIGTERM", exitHandler);
+	process.on("SIGINT", () => {
+		signalCount++;
+
+		if (signalCount >= 2) {
+			process.kill(process.pid, "SIGKILL");
+		} else {
+			exitHandler().catch((err) => {
+				logger.error("Exit handler error:", err);
+				process.kill(process.pid, "SIGKILL");
+			});
+		}
+	});
+
+	process.on("SIGTERM", () => {
+		signalCount++;
+
+		if (signalCount >= 2) {
+			process.kill(process.pid, "SIGKILL");
+		} else {
+			exitHandler().catch((err) => {
+				logger.error("Exit handler error:", err);
+				process.kill(process.pid, "SIGKILL");
+			});
+		}
+	});
 }

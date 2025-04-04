@@ -13,3 +13,5 @@ SECRET_CONFIG
 !.env
 gcp-*.json
 db
+models/*
+!models/add-your-models-here.txt
