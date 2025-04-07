@@ -24,8 +24,9 @@ RUN touch /app/.env.local
 RUN npm i --no-package-lock --no-save playwright@1.47.0
 USER root
 RUN apt-get update
-RUN apt-get install gnupg curl -y
+RUN apt-get install gnupg curl git make g++ -y
 RUN npx playwright install --with-deps chromium
+RUN npx --yes node-llama-cpp source download
 RUN chown -R 1000:1000 /home/user/.npm
 USER user
 
@@ -91,5 +92,6 @@ ENV BODY_SIZE_LIMIT=15728640
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
+COPY --from=builder --chown=1000 /app/node_modules/node-llama-cpp/llama /app/build/server/llama
 
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]
