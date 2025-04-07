@@ -71,9 +71,11 @@ COPY --from=mongo /usr/bin/mongo* /usr/bin/
 ENV MONGODB_URL=mongodb://localhost:27017
 USER root
 RUN mkdir -p /data/db
-RUN mkdir -p /app/models
+RUN mkdir -p /data/models
 
 RUN chown -R 1000:1000 /data/db
+RUN chown -R 1000:1000 /data/models
+
 USER user
 # final image
 FROM local_db_${INCLUDE_DB} AS final
@@ -89,6 +91,8 @@ ARG PUBLIC_APP_COLOR=blue
 ARG PUBLIC_COMMIT_SHA=
 ENV PUBLIC_COMMIT_SHA=${PUBLIC_COMMIT_SHA}
 ENV BODY_SIZE_LIMIT=15728640
+ENV MODELS_STORAGE_PATH=/data/models
+
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
