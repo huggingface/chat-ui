@@ -24,9 +24,8 @@ RUN touch /app/.env.local
 RUN npm i --no-package-lock --no-save playwright@1.47.0
 USER root
 RUN apt-get update
-RUN apt-get install gnupg curl git make g++ -y
+RUN apt-get install gnupg curl git cmake clang libgomp1 -y
 RUN npx playwright install --with-deps chromium
-RUN npx --yes node-llama-cpp source download
 RUN chown -R 1000:1000 /home/user/.npm
 USER user
 
@@ -37,7 +36,6 @@ COPY --chown=1000 package.json /app/package.json
 COPY --chown=1000 package-lock.json /app/package-lock.json
 
 RUN chmod +x /app/entrypoint.sh
-
 
 FROM node:20 AS builder
 
@@ -73,6 +71,8 @@ COPY --from=mongo /usr/bin/mongo* /usr/bin/
 ENV MONGODB_URL=mongodb://localhost:27017
 USER root
 RUN mkdir -p /data/db
+RUN mkdir -p /app/models
+
 RUN chown -R 1000:1000 /data/db
 USER user
 # final image
