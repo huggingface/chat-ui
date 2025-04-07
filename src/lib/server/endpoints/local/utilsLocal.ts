@@ -1,6 +1,6 @@
 import { getLlama } from "node-llama-cpp";
 import { logger } from "$lib/server/logger";
-import { building } from "$app/environment";
+
 export const llama = await getLlama({
 	logger: (level, message) => {
 		// Log messages based on their level
@@ -28,10 +28,11 @@ export const llama = await getLlama({
 				break;
 		}
 	},
-	build: building ? "try" : "never",
+	build: "never",
+}).catch((e) => {
+	logger.warn(
+		e,
+		"Failed to initialize llama.cpp. This won't break anything if you're not using the \"local\" endpoint."
+	);
+	return undefined;
 });
-
-if (building) {
-	// lazy load llama
-	llama.getSwapState();
-}
