@@ -24,7 +24,7 @@ RUN touch /app/.env.local
 RUN npm i --no-package-lock --no-save playwright@1.47.0
 USER root
 RUN apt-get update
-RUN apt-get install gnupg curl -y
+RUN apt-get install gnupg curl git cmake clang libgomp1 -y
 RUN npx playwright install --with-deps chromium
 RUN chown -R 1000:1000 /home/user/.npm
 USER user
@@ -36,7 +36,6 @@ COPY --chown=1000 package.json /app/package.json
 COPY --chown=1000 package-lock.json /app/package-lock.json
 
 RUN chmod +x /app/entrypoint.sh
-
 
 FROM node:20 AS builder
 
@@ -72,7 +71,11 @@ COPY --from=mongo /usr/bin/mongo* /usr/bin/
 ENV MONGODB_URL=mongodb://localhost:27017
 USER root
 RUN mkdir -p /data/db
+RUN mkdir -p /data/models
+
 RUN chown -R 1000:1000 /data/db
+RUN chown -R 1000:1000 /data/models
+
 USER user
 # final image
 FROM local_db_${INCLUDE_DB} AS final
@@ -88,8 +91,11 @@ ARG PUBLIC_APP_COLOR=blue
 ARG PUBLIC_COMMIT_SHA=
 ENV PUBLIC_COMMIT_SHA=${PUBLIC_COMMIT_SHA}
 ENV BODY_SIZE_LIMIT=15728640
+ENV MODELS_STORAGE_PATH=/data/models
+
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
+COPY --from=builder --chown=1000 /app/node_modules/node-llama-cpp/llama /app/build/server/llama
 
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]
