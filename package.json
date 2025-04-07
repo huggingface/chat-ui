@@ -12,7 +12,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test": "vitest",
-		"updateLocalEnv": "node --loader ts-node/esm scripts/updateLocalEnv.ts",
+		"updateLocalEnv": "vite-node --options.transformMode.ssr='/.*/' scripts/updateLocalEnv.ts",
 		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts",
 		"prepare": "husky"
 	},
