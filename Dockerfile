@@ -22,12 +22,21 @@ RUN touch /app/.env.local
 
 
 RUN npm i --no-package-lock --no-save playwright@1.47.0
+
 USER root
+
+RUN mkdir -p /data/models
+RUN chown -R 1000:1000 /data/models
+
 RUN apt-get update
 RUN apt-get install gnupg curl git cmake clang libgomp1 -y
+
 RUN npx playwright install --with-deps chromium
+
 RUN chown -R 1000:1000 /home/user/.npm
+
 USER user
+
 
 COPY --chown=1000 .env /app/.env
 COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
@@ -71,11 +80,7 @@ COPY --from=mongo /usr/bin/mongo* /usr/bin/
 ENV MONGODB_URL=mongodb://localhost:27017
 USER root
 RUN mkdir -p /data/db
-RUN mkdir -p /data/models
-
 RUN chown -R 1000:1000 /data/db
-RUN chown -R 1000:1000 /data/models
-
 USER user
 # final image
 FROM local_db_${INCLUDE_DB} AS final
