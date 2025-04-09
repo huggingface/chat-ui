@@ -2,7 +2,7 @@
 	import "../styles/main.css";
 
 	import { onDestroy, onMount, untrack } from "svelte";
-	import { goto, invalidateAll } from "$app/navigation";
+	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
@@ -160,17 +160,12 @@
 		if ($page.url.searchParams.has("token")) {
 			const token = $page.url.searchParams.get("token");
 
-			const res = await fetch(`${base}/api/user/validate-token`, {
+			await fetch(`${base}/api/user/validate-token`, {
 				method: "POST",
 				body: JSON.stringify({ token }),
+			}).then(() => {
+				goto(`${base}/`, { invalidateAll: true });
 			});
-
-			if (!res.ok) {
-				$error = "Invalid token";
-				return;
-			}
-
-			await invalidateAll();
 		}
 	});
 

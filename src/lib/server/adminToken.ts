@@ -1,7 +1,6 @@
 import { env } from "$env/dynamic/private";
 import { PUBLIC_ORIGIN } from "$env/static/public";
 import type { Session } from "$lib/types/Session";
-import { requiresUser } from "./auth";
 import { logger } from "./logger";
 import { v4 } from "uuid";
 
@@ -12,7 +11,7 @@ class AdminTokenManager {
 
 	public get enabled() {
 		// if open id is configured, disable the feature
-		return !requiresUser && env.ADMIN_CLI_LOGIN === "true";
+		return env.ADMIN_CLI_LOGIN === "true";
 	}
 	public isAdmin(sessionId: Session["sessionId"]) {
 		if (!this.enabled) return false;
