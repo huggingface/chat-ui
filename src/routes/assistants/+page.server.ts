@@ -36,7 +36,7 @@ export const load = async ({ url, locals }) => {
 	// if we require featured assistants, that we are not on a user page and we are not an admin who wants to see unfeatured assistants, we show featured assistants
 	let shouldBeFeatured = {};
 
-	if (env.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.user?.isAdmin && showUnfeatured)) {
+	if (env.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.isAdmin && showUnfeatured)) {
 		if (!user) {
 			// only show featured assistants on the community page
 			shouldBeFeatured = { review: ReviewStatus.APPROVED };
