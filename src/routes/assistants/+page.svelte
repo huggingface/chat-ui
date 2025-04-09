@@ -151,7 +151,7 @@
 					<option value={model.name}>{model.name}</option>
 				{/each}
 			</select>
-			{#if data.user?.isAdmin}
+			{#if data.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
 					<input type="checkbox" checked={showUnfeatured} onchange={toggleShowUnfeatured} />
 					Show unfeatured assistants
@@ -266,7 +266,7 @@
 
 				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8
-					{!(assistant.review === ReviewStatus.APPROVED) && !createdByMe && data.user?.isAdmin
+					{!(assistant.review === ReviewStatus.APPROVED) && !createdByMe && data.isAdmin
 						? 'border !border-red-500/30'
 						: ''}"
 					onclick={() => {

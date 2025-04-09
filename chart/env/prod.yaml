@@ -30,6 +30,7 @@ ingress:
 
 envVars:
   ADDRESS_HEADER: 'X-Forwarded-For'
+  ADMIN_CLI_LOGIN: "false"
   ALTERNATIVE_REDIRECT_URLS: '["huggingchat://login/callback"]'
   APP_BASE: "/chat"
   ALLOW_IFRAME: "false"
