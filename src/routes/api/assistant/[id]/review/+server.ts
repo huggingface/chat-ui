@@ -30,7 +30,7 @@ export async function PATCH({ params, request, locals, url }) {
 
 	if (
 		!locals.user ||
-		(!locals.user.isAdmin && assistant.createdById.toString() !== locals.user._id.toString())
+		(!locals.isAdmin && assistant.createdById.toString() !== locals.user._id.toString())
 	) {
 		return error(403, "Permission denied");
 	}
@@ -43,7 +43,7 @@ export async function PATCH({ params, request, locals, url }) {
 			status === ReviewStatus.DENIED ||
 			assistant.review === ReviewStatus.APPROVED ||
 			assistant.review === ReviewStatus.DENIED) &&
-		!locals.user?.isAdmin
+		!locals.isAdmin
 	) {
 		return error(403, "Permission denied");
 	}

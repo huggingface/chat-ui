@@ -113,7 +113,7 @@ export async function DELETE({ params, locals }) {
 
 	if (
 		tool.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString() &&
-		!locals.user?.isAdmin
+		!locals.isAdmin
 	) {
 		return new Response("You are not the creator of this tool", { status: 403 });
 	}

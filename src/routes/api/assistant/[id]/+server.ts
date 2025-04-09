@@ -148,7 +148,7 @@ export async function DELETE({ params, locals }) {
 
 	if (
 		assistant.createdById.toString() !== (locals.user?._id ?? locals.sessionId).toString() &&
-		!locals.user?.isAdmin
+		!locals.isAdmin
 	) {
 		return error(403, "You are not the author of this assistant");
 	}

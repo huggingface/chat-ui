@@ -48,7 +48,7 @@ export const load = async ({ url, locals }) => {
 	const filter: Filter<CommunityToolDB> = {
 		...(!createdByCurrentUser &&
 			!activeOnly &&
-			!(locals.user?.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
+			!(locals.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
 		...(user && { createdById: user._id }),
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {
