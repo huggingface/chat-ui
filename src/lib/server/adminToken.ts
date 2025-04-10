@@ -38,9 +38,23 @@ class AdminTokenManager {
 		// if admin token is set, don't display it
 		if (!this.enabled || env.ADMIN_TOKEN) return;
 
-		const port = import.meta.env.PORT ?? 5173;
+		let port = process.argv.includes("--port")
+			? parseInt(process.argv[process.argv.indexOf("--port") + 1])
+			: undefined;
+
+		if (!port) {
+			const mode = process.argv.find((arg) => arg === "preview" || arg === "dev");
+			if (mode === "preview") {
+				port = 4173;
+			} else if (mode === "dev") {
+				port = 5173;
+			} else {
+				port = 3000;
+			}
+		}
+
 		const url = (PUBLIC_ORIGIN || `http://localhost:${port}`) + "?token=";
-		logger.info(`[ADMIN] You can login with ${url + this.token} on port ${port}.`);
+		logger.info(`[ADMIN] You can login with ${url + this.token}`);
 	}
 }
 
