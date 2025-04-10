@@ -248,7 +248,7 @@
 <div class="relative min-h-0 min-w-0">
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
-		use:snapScrollToBottom={messages.length ? [...messages] : false}
+		use:snapScrollToBottom={messages.map((message) => message.content)}
 		bind:this={chatContainer}
 	>
 		<div
