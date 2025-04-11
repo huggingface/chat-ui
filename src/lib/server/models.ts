@@ -113,7 +113,31 @@ const ggufModelsConfig = await Promise.all(
 		})
 );
 
-let modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS ?? "[]"));
+const turnStringIntoLocalModel = z.preprocess((obj: unknown) => {
+	if (typeof obj !== "string") return obj;
+
+	const name = obj.startsWith("hf:") ? obj.split(":")[1] : obj;
+	const displayName = obj.startsWith("hf:")
+		? obj.split(":")[1].split("/").slice(0, 2).join("/")
+		: obj.endsWith(".gguf")
+			? obj.replace(".gguf", "")
+			: obj;
+
+	const modelPath = obj.includes("/") && !obj.startsWith("hf:") ? `hf:${obj}` : obj;
+
+	return {
+		name,
+		displayName,
+		endpoints: [
+			{
+				type: "local",
+				modelPath,
+			},
+		],
+	} satisfies z.input<typeof modelConfig>;
+}, modelConfig);
+
+let modelsRaw = z.array(turnStringIntoLocalModel).parse(JSON5.parse(env.MODELS ?? "[]"));
 
 if (env.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
 	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
