@@ -116,19 +116,22 @@ const ggufModelsConfig = await Promise.all(
 const turnStringIntoLocalModel = z.preprocess((obj: unknown) => {
 	if (typeof obj !== "string") return obj;
 
+	const name = obj.startsWith("hf:") ? obj.split(":")[1] : obj;
 	const displayName = obj.startsWith("hf:")
 		? obj.split(":")[1].split("/").slice(0, 2).join("/")
 		: obj.endsWith(".gguf")
 			? obj.replace(".gguf", "")
 			: obj;
 
+	const modelPath = obj.includes("/") && !obj.startsWith("hf:") ? `hf:${obj}` : obj;
+
 	return {
-		name: obj,
+		name,
 		displayName,
 		endpoints: [
 			{
 				type: "local",
-				modelPath: obj,
+				modelPath,
 			},
 		],
 	} satisfies z.input<typeof modelConfig>;
