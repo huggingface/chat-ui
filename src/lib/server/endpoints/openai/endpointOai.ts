@@ -198,25 +198,42 @@ export async function endpointOai(
 			toolResults,
 			conversationId,
 		}) => {
+			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
 				await prepareMessages(messages, imageProcessor, !model.tools && model.multimodal);
 
-			if (messagesOpenAI?.[0]?.role !== "system") {
-				messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
+			// Check if a system message already exists as the first message
+			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
+
+			if (hasSystemMessage) {
+				// System message exists - preserve user configuration
+				if (preprompt !== undefined) {
+					// Prepend preprompt to existing system message if preprompt exists
+					const userSystemPrompt = messagesOpenAI[0].content || "";
+					messagesOpenAI[0].content =
+						preprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
+				}
+				// If no preprompt, user's system message remains unchanged
+			} else {
+				// No system message exists - create a new one with preprompt or empty string
+				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
 			}
 
-			if (messagesOpenAI?.[0]) {
-				messagesOpenAI[0].content = preprompt ?? "";
-			}
-
-			// if system role is not supported, convert first message to a user message.
-			if (!model.systemRoleSupported && messagesOpenAI?.[0]?.role === "system") {
+			// Handle models that don't support system role by converting to user message
+			// This maintains compatibility with older or non-standard models
+			if (
+				!model.systemRoleSupported &&
+				messagesOpenAI.length > 0 &&
+				messagesOpenAI[0]?.role === "system"
+			) {
 				messagesOpenAI[0] = {
 					...messagesOpenAI[0],
 					role: "user",
 				};
 			}
 
+			// Format tool results for the API to provide context for follow-up tool calls
+			// This creates the full conversation flow needed for multi-step tool interactions
 			if (toolResults && toolResults.length > 0) {
 				const toolCallRequests: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam = {
 					role: "assistant",
@@ -253,12 +270,14 @@ export async function endpointOai(
 				messagesOpenAI.push(...responses);
 			}
 
+			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
 			const toolCallChoices = createChatCompletionToolsArray(tools);
 			const body = {
 				model: model.id ?? model.name,
 				messages: messagesOpenAI,
 				stream: streamingSupported,
+				// Support two different ways of specifying token limits depending on the model
 				...(useCompletionTokens
 					? { max_completion_tokens: parameters?.max_new_tokens }
 					: { max_tokens: parameters?.max_new_tokens }),
@@ -267,9 +286,11 @@ export async function endpointOai(
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
 				presence_penalty: parameters?.presence_penalty,
+				// Only include tool configuration if tools are provided
 				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
 			};
 
+			// Handle both streaming and non-streaming responses with appropriate processors
 			if (streamingSupported) {
 				const openChatAICompletion = await openai.chat.completions.create(
 					body as ChatCompletionCreateParamsStreaming,
