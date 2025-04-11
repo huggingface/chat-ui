@@ -12,6 +12,7 @@ export interface FeatureFlags {
 	loginEnabled: boolean;
 	loginRequired: boolean;
 	guestMode: boolean;
+	isAdmin: boolean;
 }
 
 export const misc = new Elysia()
@@ -63,6 +64,7 @@ export const misc = new Elysia()
 			loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
 			loginRequired,
 			guestMode: requiresUser && messagesBeforeLogin > 0,
+			isAdmin: locals.isAdmin,
 		} satisfies FeatureFlags;
 	})
 	.get("/spaces-config", () => {
