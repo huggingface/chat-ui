@@ -299,14 +299,6 @@ MODELS=`[
 
 You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
 
-### Enabling/Disabling Reasoning Summary
-
-To control this feature, use the `EnableReasoningSummary` environment variable in your `.env.local` file:
-
-```env
-EnableReasoningSummary=true  # Set to 'true' to enable reasoning summary
-```
-
 #### chatPromptTemplate
 
 When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
@@ -997,6 +989,14 @@ In some cases, the final answer can be extracted from the model output using a r
 		"regex": "\\\\boxed\\{(.+?)\\}"
 	}
 }
+```
+
+#### Enabling/Disabling Reasoning Summary
+
+You can toggle the summaries that are displayed alongside the CoT by changing the `REASONING_SUMMARY` env variable.
+
+```env
+REASONING_SUMMARY=false
 ```
 
 ## Common issues

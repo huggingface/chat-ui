@@ -170,14 +170,15 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			}
 
 			// create a new status every 5 seconds
-			if (new Date().getTime() - lastReasoningUpdate.getTime() > 4000) {
+			if (
+				env.REASONING_SUMMARY === "true" &&
+				new Date().getTime() - lastReasoningUpdate.getTime() > 4000
+			) {
 				lastReasoningUpdate = new Date();
 				try {
-					if (env.EnableReasoningSummary === "true") {
-						generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
-							status = summary;
-						});
-					}
+					generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
+						status = summary;
+					});
 				} catch (e) {
 					logger.error(e);
 				}
