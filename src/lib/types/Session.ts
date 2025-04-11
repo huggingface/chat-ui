@@ -9,4 +9,5 @@ export interface Session extends Timestamps {
 	userAgent?: string;
 	ip?: string;
 	expiresAt: Date;
+	admin?: boolean;
 }

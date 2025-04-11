@@ -210,7 +210,8 @@ export async function endpointOai(
 				if (preprompt !== undefined) {
 					// Prepend preprompt to existing system message if preprompt exists
 					const userSystemPrompt = messagesOpenAI[0].content || "";
-					messagesOpenAI[0].content = preprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
+					messagesOpenAI[0].content =
+						preprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
 				}
 				// If no preprompt, user's system message remains unchanged
 			} else {
@@ -220,7 +221,11 @@ export async function endpointOai(
 
 			// Handle models that don't support system role by converting to user message
 			// This maintains compatibility with older or non-standard models
-			if (!model.systemRoleSupported && messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system") {
+			if (
+				!model.systemRoleSupported &&
+				messagesOpenAI.length > 0 &&
+				messagesOpenAI[0]?.role === "system"
+			) {
 				messagesOpenAI[0] = {
 					...messagesOpenAI[0],
 					role: "user",
@@ -239,8 +244,7 @@ export async function endpointOai(
 				const responses: Array<OpenAI.Chat.Completions.ChatCompletionToolMessageParam> = [];
 
 				for (const result of toolResults) {
-					// Generate unique IDs to correlate tool calls with their responses
-					const id = uuidv4();
+					const id = result?.call?.toolId || uuidv4();
 
 					const toolCallResult: OpenAI.Chat.Completions.ChatCompletionMessageToolCall = {
 						type: "function",

@@ -26,49 +26,49 @@ async function refreshAssistantsCountsHelper() {
 	}
 
 	try {
-		await Database.getInstance()
-			.getClient()
-			.withSession((session) =>
-				session.withTransaction(async () => {
+		await (await Database.getInstance()).getClient().withSession((session) =>
+			session.withTransaction(async () => {
+				await (
 					await Database.getInstance()
-						.getCollections()
-						.assistants.aggregate([
-							{ $project: { _id: 1 } },
-							{ $set: { last24HoursCount: 0 } },
-							{
-								$unionWith: {
-									coll: "assistants.stats",
-									pipeline: [
-										{
-											$match: { "date.at": { $gte: subDays(new Date(), 1) }, "date.span": "hour" },
+				)
+					.getCollections()
+					.assistants.aggregate([
+						{ $project: { _id: 1 } },
+						{ $set: { last24HoursCount: 0 } },
+						{
+							$unionWith: {
+								coll: "assistants.stats",
+								pipeline: [
+									{
+										$match: { "date.at": { $gte: subDays(new Date(), 1) }, "date.span": "hour" },
+									},
+									{
+										$group: {
+											_id: "$assistantId",
+											last24HoursCount: { $sum: "$count" },
 										},
-										{
-											$group: {
-												_id: "$assistantId",
-												last24HoursCount: { $sum: "$count" },
-											},
-										},
-									],
-								},
+									},
+								],
 							},
-							{
-								$group: {
-									_id: "$_id",
-									last24HoursCount: { $sum: "$last24HoursCount" },
-								},
+						},
+						{
+							$group: {
+								_id: "$_id",
+								last24HoursCount: { $sum: "$last24HoursCount" },
 							},
-							{
-								$merge: {
-									into: "assistants",
-									on: "_id",
-									whenMatched: "merge",
-									whenNotMatched: "discard",
-								},
+						},
+						{
+							$merge: {
+								into: "assistants",
+								on: "_id",
+								whenMatched: "merge",
+								whenNotMatched: "discard",
 							},
-						])
-						.next();
-				})
-			);
+						},
+					])
+					.next();
+			})
+		);
 	} catch (e) {
 		logger.error(e, "Refresh assistants counter failed!");
 	}

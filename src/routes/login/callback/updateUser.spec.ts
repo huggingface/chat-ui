@@ -19,6 +19,7 @@ Object.freeze(userData);
 const locals = {
 	userId: "1234567890",
 	sessionId: "1234567890",
+	isAdmin: false,
 };
 
 // @ts-expect-error SvelteKit cookies dumb mock

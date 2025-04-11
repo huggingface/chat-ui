@@ -1,6 +1,6 @@
 import { base } from "$app/paths";
 import { env } from "$env/dynamic/private";
-import { Database, collections } from "$lib/server/database.js";
+import { collections } from "$lib/server/database.js";
 import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
@@ -36,7 +36,7 @@ export const load = async ({ url, locals }) => {
 	// if we require featured assistants, that we are not on a user page and we are not an admin who wants to see unfeatured assistants, we show featured assistants
 	let shouldBeFeatured = {};
 
-	if (env.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.user?.isAdmin && showUnfeatured)) {
+	if (env.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.isAdmin && showUnfeatured)) {
 		if (!user) {
 			// only show featured assistants on the community page
 			shouldBeFeatured = { review: ReviewStatus.APPROVED };
@@ -58,9 +58,8 @@ export const load = async ({ url, locals }) => {
 		...shouldBeFeatured,
 	};
 
-	const assistants = await Database.getInstance()
-		.getCollections()
-		.assistants.find(filter)
+	const assistants = await collections.assistants
+		.find(filter)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursCount: -1 }),
 			userCount: -1,
@@ -70,9 +69,7 @@ export const load = async ({ url, locals }) => {
 		.limit(NUM_PER_PAGE)
 		.toArray();
 
-	const numTotalItems = await Database.getInstance()
-		.getCollections()
-		.assistants.countDocuments(filter);
+	const numTotalItems = await collections.assistants.countDocuments(filter);
 
 	return {
 		assistants: JSON.parse(JSON.stringify(assistants)) as Array<Assistant>,
