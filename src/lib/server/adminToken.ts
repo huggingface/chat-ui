@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { PUBLIC_ORIGIN } from "$env/static/public";
+import { env as envPublic } from "$env/dynamic/public";
 import type { Session } from "$lib/types/Session";
 import { logger } from "./logger";
 import { v4 } from "uuid";
@@ -53,7 +53,7 @@ class AdminTokenManager {
 			}
 		}
 
-		const url = (PUBLIC_ORIGIN || `http://localhost:${port}`) + "?token=";
+		const url = (envPublic.PUBLIC_ORIGIN || `http://localhost:${port}`) + "?token=";
 		logger.info(`[ADMIN] You can login with ${url + this.token}`);
 	}
 }
