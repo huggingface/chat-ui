@@ -14,6 +14,15 @@ import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
 import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { join, dirname } from "path";
+import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
+import { fileURLToPath } from "url";
+import { findRepoRoot } from "./findRepoRoot";
+import { Template } from "@huggingface/jinja";
+import { readdirSync } from "fs";
+
+export const MODELS_FOLDER =
+	env.MODELS_STORAGE_PATH || join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -88,11 +97,51 @@ const modelConfig = z.object({
 	reasoning: reasoningSchema.optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+const ggufModelsConfig = await Promise.all(
+	readdirSync(MODELS_FOLDER)
+		.filter((f) => f.endsWith(".gguf"))
+		.map(async (f) => {
+			return {
+				name: f.replace(".gguf", ""),
+				endpoints: [
+					{
+						type: "local" as const,
+						modelPath: f,
+					},
+				],
+			};
+		})
+);
+
+let modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS ?? "[]"));
+
+if (env.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
+	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
+	modelsRaw = [...modelsRaw, ...parsedGgufModels];
+}
 
 async function getChatPromptRender(
 	m: z.infer<typeof modelConfig>
 ): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
+	if (m.endpoints?.some((e) => e.type === "local")) {
+		const endpoint = m.endpoints?.find((e) => e.type === "local");
+		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
+
+		const modelPath = await resolveModelFile(path, MODELS_FOLDER);
+
+		const info = await readGgufFileInfo(modelPath, {
+			readTensorInfo: false,
+		});
+
+		if (info.metadata.tokenizer.chat_template) {
+			// compile with jinja
+			const jinjaTemplate = new Template(info.metadata.tokenizer.chat_template);
+			return (inputs: ChatTemplateInput) => {
+				return jinjaTemplate.render({ ...m, ...inputs });
+			};
+		}
+	}
+
 	if (m.chatPromptTemplate) {
 		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
 	}
@@ -305,6 +354,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				switch (args.type) {
 					case "tgi":
 						return endpoints.tgi(args);
+					case "local":
+						return endpoints.local(args);
 					case "anthropic":
 						return endpoints.anthropic(args);
 					case "anthropic-vertex":
@@ -393,13 +444,13 @@ export const validateModel = (_models: BackendModel[]) => {
 
 // if `TASK_MODEL` is string & name of a model in `MODELS`, then we use `MODELS[TASK_MODEL]`, else we try to parse `TASK_MODEL` as a model config itself
 
-export const smallModel = env.TASK_MODEL
-	? ((models.find((m) => m.name === env.TASK_MODEL) ||
-			(await processModel(modelConfig.parse(JSON5.parse(env.TASK_MODEL))).then((m) =>
-				addEndpoint(m)
-			))) ??
-		defaultModel)
-	: defaultModel;
+export const taskModel = addEndpoint(
+	env.TASK_MODEL
+		? ((models.find((m) => m.name === env.TASK_MODEL) ||
+				(await processModel(modelConfig.parse(JSON5.parse(env.TASK_MODEL))))) ??
+				defaultModel)
+		: defaultModel
+);
 
 export type BackendModel = Optional<
 	typeof defaultModel,

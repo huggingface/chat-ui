@@ -150,6 +150,13 @@
 					![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
 			) satisfies ToolFront[]
 	);
+
+	let showWebSearch = $derived(!assistant);
+	let showImageGen = $derived(modelHasTools && !assistant);
+	let showFileUpload = $derived((modelIsMultimodal || modelHasTools) && mimeTypes.length > 0);
+	let showExtraTools = $derived(modelHasTools && !assistant);
+
+	let showNoTools = $derived(!showWebSearch && !showImageGen && !showFileUpload && !showExtraTools);
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
@@ -175,47 +182,51 @@
 		{disabled}
 	></textarea>
 
-	{#if !assistant}
+	{#if !showNoTools}
 		<div
-			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2"
+			class={[
+				"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2",
+			]}
 		>
-			<HoverTooltip
-				label="Search the web"
-				position="top"
-				TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
-					? 'hidden'
-					: ''}"
-			>
-				<button
-					class="base-tool"
-					class:active-tool={webSearchIsOn}
-					disabled={loading}
-					onclick={async (e) => {
-						e.preventDefault();
-						if (modelHasTools) {
-							if (webSearchIsOn) {
-								await settings.instantSet({
-									tools: ($settings.tools ?? []).filter(
-										(t) => t !== webSearchToolId && t !== fetchUrlToolId
-									),
-								});
-							} else {
-								await settings.instantSet({
-									tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
-								});
-							}
-						} else {
-							$webSearchParameters.useSearch = !webSearchIsOn;
-						}
-					}}
+			{#if showWebSearch}
+				<HoverTooltip
+					label="Search the web"
+					position="top"
+					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
+						? 'hidden'
+						: ''}"
 				>
-					<IconInternet classNames="text-xl" />
-					{#if webSearchIsOn}
-						Search
-					{/if}
-				</button>
-			</HoverTooltip>
-			{#if modelHasTools}
+					<button
+						class="base-tool"
+						class:active-tool={webSearchIsOn}
+						disabled={loading}
+						onclick={async (e) => {
+							e.preventDefault();
+							if (modelHasTools) {
+								if (webSearchIsOn) {
+									await settings.instantSet({
+										tools: ($settings.tools ?? []).filter(
+											(t) => t !== webSearchToolId && t !== fetchUrlToolId
+										),
+									});
+								} else {
+									await settings.instantSet({
+										tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
+									});
+								}
+							} else {
+								$webSearchParameters.useSearch = !webSearchIsOn;
+							}
+						}}
+					>
+						<IconInternet classNames="text-xl" />
+						{#if webSearchIsOn}
+							Search
+						{/if}
+					</button>
+				</HoverTooltip>
+			{/if}
+			{#if showImageGen}
 				<HoverTooltip
 					label="Generate	images"
 					position="top"
@@ -249,7 +260,7 @@
 					</button>
 				</HoverTooltip>
 			{/if}
-			{#if modelIsMultimodal || modelHasTools}
+			{#if showFileUpload}
 				{@const mimeTypesString = mimeTypes
 					.map((m) => {
 						// if the mime type ends in *, grab the first part so image/* becomes image
@@ -311,7 +322,7 @@
 					</HoverTooltip>
 				{/if}
 			{/if}
-			{#if modelHasTools}
+			{#if showExtraTools}
 				{#each extraTools as tool}
 					<button
 						class="active-tool base-tool"
@@ -327,8 +338,6 @@
 						{tool.displayName}
 					</button>
 				{/each}
-			{/if}
-			{#if modelHasTools}
 				<HoverTooltip
 					label="Browse more tools"
 					position="right"

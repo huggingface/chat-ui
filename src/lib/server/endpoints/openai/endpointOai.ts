@@ -227,7 +227,7 @@ export async function endpointOai(
 				const responses: Array<OpenAI.Chat.Completions.ChatCompletionToolMessageParam> = [];
 
 				for (const result of toolResults) {
-					const id = uuidv4();
+					const id = result?.call?.toolId || uuidv4();
 
 					const toolCallResult: OpenAI.Chat.Completions.ChatCompletionMessageToolCall = {
 						type: "function",

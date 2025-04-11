@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import type { Message } from "$lib/types/Message";
 	import { createEventDispatcher, tick } from "svelte";
 	import { page } from "$app/state";
@@ -109,15 +107,17 @@
 				update.subtype === MessageWebSearchUpdateType.Sources
 		)?.sources
 	);
-	run(() => {
+
+	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
 				isCopied = false;
 			}, 1000);
 		}
 	});
+
 	let editMode = $derived(editMsdgId === message.id);
-	run(() => {
+	$effect(() => {
 		if (editMode) {
 			tick();
 			if (editContentEl) {

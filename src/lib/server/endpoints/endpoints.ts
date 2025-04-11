@@ -30,6 +30,7 @@ import endpointLangserve, {
 
 import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
 import type { ObjectId } from "mongodb";
+import { endpointLocal, endpointLocalParametersSchema } from "./local/endpointLocal";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -75,6 +76,7 @@ export const endpoints = {
 	cloudflare: endpointCloudflare,
 	cohere: endpointCohere,
 	langserve: endpointLangserve,
+	local: endpointLocal,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -91,5 +93,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointCloudflareParametersSchema,
 	endpointCohereParametersSchema,
 	endpointLangserveParametersSchema,
+	endpointLocalParametersSchema,
 ]);
 export default endpoints;

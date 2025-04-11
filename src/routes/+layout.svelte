@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import "../styles/main.css";
 
 	import { onDestroy, onMount, untrack } from "svelte";
@@ -110,11 +108,11 @@
 		clearTimeout(errorToastTimeout);
 	});
 
-	run(() => {
+	$effect(() => {
 		if ($error) onError();
 	});
 
-	run(() => {
+	$effect(() => {
 		if ($titleUpdate) {
 			const convIdx = conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
@@ -157,6 +155,17 @@
 						invalidateAll: true,
 					});
 				});
+		}
+
+		if ($page.url.searchParams.has("token")) {
+			const token = $page.url.searchParams.get("token");
+
+			await fetch(`${base}/api/user/validate-token`, {
+				method: "POST",
+				body: JSON.stringify({ token }),
+			}).then(() => {
+				goto(`${base}/`, { invalidateAll: true });
+			});
 		}
 	});
 
