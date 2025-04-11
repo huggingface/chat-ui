@@ -991,6 +991,14 @@ In some cases, the final answer can be extracted from the model output using a r
 }
 ```
 
+#### Enabling/Disabling Reasoning Summary
+
+You can toggle the summaries that are displayed alongside the CoT by changing the `REASONING_SUMMARY` env variable.
+
+```env
+REASONING_SUMMARY=false
+```
+
 ## Common issues
 
 ### 403：You don't have access to this conversation
