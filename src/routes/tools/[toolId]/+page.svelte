@@ -25,11 +25,11 @@
 
 	const settings = useSettingsStore();
 
-	let previousPage: string = $state(base);
+	let previousPage: string = $state(base || "/");
 
 	afterNavigate(({ from }) => {
 		if (from?.url && !from.url.pathname.includes("tools/")) {
-			previousPage = from.url.toString() || previousPage || base;
+			previousPage = from.url.toString() || previousPage || base || "/";
 		}
 	});
 
