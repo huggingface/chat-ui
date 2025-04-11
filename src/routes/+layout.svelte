@@ -156,6 +156,17 @@
 					});
 				});
 		}
+
+		if ($page.url.searchParams.has("token")) {
+			const token = $page.url.searchParams.get("token");
+
+			await fetch(`${base}/api/user/validate-token`, {
+				method: "POST",
+				body: JSON.stringify({ token }),
+			}).then(() => {
+				goto(`${base}/`, { invalidateAll: true });
+			});
+		}
 	});
 
 	let mobileNavTitle = $derived(

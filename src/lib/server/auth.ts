@@ -16,6 +16,7 @@ import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
 import { ObjectId } from "mongodb";
 import type { Cookie } from "elysia";
+import { adminTokenManager } from "./adminToken";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -230,6 +231,7 @@ export async function authenticateRequest(
 			},
 			sessionId,
 			secretSessionId,
+			isAdmin: adminTokenManager.isAdmin(sessionId),
 		};
 	}
 
@@ -237,7 +239,12 @@ export async function authenticateRequest(
 		secretSessionId = token;
 		sessionId = await sha256(token);
 		const user = await findUser(sessionId);
-		return { user: user ?? undefined, sessionId, secretSessionId };
+		return {
+			user: user ?? undefined,
+			sessionId,
+			secretSessionId,
+			isAdmin: user?.isAdmin || adminTokenManager.isAdmin(sessionId),
+		};
 	}
 
 	if (isApi) {
@@ -256,7 +263,12 @@ export async function authenticateRequest(
 				if (!user) {
 					throw new Error("User not found");
 				}
-				return { user, sessionId, secretSessionId };
+				return {
+					user,
+					sessionId,
+					secretSessionId,
+					isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
+				};
 			}
 
 			const response = await fetch("https://huggingface.co/api/whoami-v2", {
@@ -284,6 +296,7 @@ export async function authenticateRequest(
 				user,
 				sessionId,
 				secretSessionId,
+				isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
 			};
 		}
 	}
@@ -296,5 +309,5 @@ export async function authenticateRequest(
 		throw new Error("Session ID collision");
 	}
 
-	return { user: undefined, sessionId, secretSessionId };
+	return { user: undefined, sessionId, secretSessionId, isAdmin: false };
 }

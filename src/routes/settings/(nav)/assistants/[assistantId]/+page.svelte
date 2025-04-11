@@ -212,7 +212,7 @@
 						>
 					{/if}
 				{/if}
-				{#if data?.user?.isAdmin}
+				{#if data?.isAdmin}
 					<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
 						>{assistant?.review?.toLocaleUpperCase()}</span
 					>

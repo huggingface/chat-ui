@@ -144,7 +144,7 @@
 			>
 		</h3>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
-			{#if data.user?.isAdmin}
+			{#if data.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
 					<input type="checkbox" checked={showUnfeatured} onchange={toggleShowUnfeatured} />
 					Show unfeatured tools

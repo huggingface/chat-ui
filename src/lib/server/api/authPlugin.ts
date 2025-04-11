@@ -18,6 +18,7 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
 			locals: {
 				user: auth?.user,
 				sessionId: auth?.sessionId,
+				isAdmin: auth?.isAdmin,
 			},
 		};
 	}

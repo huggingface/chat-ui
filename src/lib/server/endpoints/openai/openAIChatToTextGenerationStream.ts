@@ -115,6 +115,7 @@ export async function* openAIChatToTextGenerationStream(
 					toolCall: {
 						name: tool.function.name,
 						parameters: {},
+						toolId: tool.id,
 					},
 					parameterJsonString: "",
 				};

@@ -14,6 +14,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { initExitHandler } from "$lib/server/exitHandler";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
+import { adminTokenManager } from "$lib/server/adminToken";
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
@@ -34,6 +35,8 @@ if (!building) {
 
 	// Init AbortedGenerations refresh process
 	AbortedGenerations.getInstance();
+
+	adminTokenManager.displayToken();
 
 	if (env.EXPOSE_API) {
 		logger.warn(
@@ -114,6 +117,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	event.locals.user = auth.user || undefined;
 	event.locals.sessionId = auth.sessionId;
+
+	event.locals.isAdmin =
+		event.locals.user?.isAdmin || adminTokenManager.isAdmin(event.locals.sessionId);
 
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
