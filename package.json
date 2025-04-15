@@ -21,7 +21,7 @@
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^5.2.0",
-		"@sveltejs/kit": "^2.17.1",
+		"@sveltejs/kit": "^2.20.6",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/dompurify": "^3.0.5",
