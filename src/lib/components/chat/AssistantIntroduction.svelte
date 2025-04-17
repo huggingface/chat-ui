@@ -15,7 +15,8 @@
 	import CarbonTools from "~icons/carbon/tools";
 
 	import { share } from "$lib/utils/share";
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import { page } from "$app/state";
 
 	interface Props {
@@ -48,7 +49,7 @@
 	);
 
 	const prefix =
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
+		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 

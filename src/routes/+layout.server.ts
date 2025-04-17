@@ -13,7 +13,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
 import { base } from "$app/paths";
-
+import { config } from "$lib/server/config";
 export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
 
@@ -280,5 +280,6 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
+		publicConfig: config.getPublicConfig(),
 	};
 };

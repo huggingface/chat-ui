@@ -23,6 +23,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { existsSync, mkdirSync } from "fs";
 import { findRepoRoot } from "./findRepoRoot";
+import type { ConfigKey } from "$lib/types/ConfigKey";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
@@ -127,6 +128,7 @@ export class Database {
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const tools = db.collection<CommunityToolDB>("tools");
+		const config = db.collection<ConfigKey>("config");
 
 		return {
 			conversations,
@@ -145,6 +147,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			tools,
+			config,
 		};
 	}
 
@@ -168,6 +171,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			tools,
+			config,
 		} = this.getCollections();
 
 		conversations
@@ -281,6 +285,8 @@ export class Database {
 				sessionId: 1,
 			})
 			.catch((e) => logger.error(e));
+
+		config.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
 	}
 }
 

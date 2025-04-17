@@ -1,8 +1,8 @@
 import { Database } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
 import { logger } from "$lib/server/logger";
+import { config } from "$lib/server/config";
 
 const LOCK_KEY = "migrations";
 
@@ -58,8 +58,8 @@ export async function checkAndRunMigrations() {
 		} else {
 			// check the modifiers to see if some cases match
 			if (
-				(migration.runForHuggingChat === "only" && !isHuggingChat) ||
-				(migration.runForHuggingChat === "never" && isHuggingChat)
+				(migration.runForHuggingChat === "only" && !config.isHuggingChat) ||
+				(migration.runForHuggingChat === "never" && config.isHuggingChat)
 			) {
 				logger.debug(
 					`[MIGRATIONS] "${migration.name}" should not be applied for this run. Skipping...`

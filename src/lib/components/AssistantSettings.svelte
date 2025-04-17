@@ -12,7 +12,7 @@
 	import CarbonTools from "~icons/carbon/tools";
 
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
 	import HoverTooltip from "./HoverTooltip.svelte";
@@ -457,7 +457,7 @@
 						>Internet access
 						<IconInternet classNames="inline text-sm text-blue-600" />
 
-						{#if isHuggingChat}
+						{#if publicConfig.isHuggingChat}
 							<a
 								href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/385"
 								target="_blank"

@@ -2,7 +2,8 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
@@ -90,7 +91,7 @@
 </script>
 
 <svelte:head>
-	<title>{envPublic.PUBLIC_APP_NAME}</title>
+	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 </svelte:head>
 
 <ChatWindow

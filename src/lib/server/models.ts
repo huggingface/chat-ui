@@ -13,13 +13,13 @@ import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
 import { join, dirname } from "path";
 import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { findRepoRoot } from "./findRepoRoot";
 import { Template } from "@huggingface/jinja";
 import { readdirSync } from "fs";
+import { config } from "./config";
 
 export const MODELS_FOLDER =
 	env.MODELS_STORAGE_PATH || join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
@@ -240,7 +240,7 @@ async function getChatPromptRender(
 			// or use the `rag` mode without the citations
 			const id = m.id ?? m.name;
 
-			if (isHuggingChat && id.startsWith("CohereForAI")) {
+			if (config.isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
 						role: "user",
@@ -267,7 +267,7 @@ async function getChatPromptRender(
 					},
 					...formattedMessages,
 				];
-			} else if (isHuggingChat && id.startsWith("meta-llama")) {
+			} else if (config.isHuggingChat && id.startsWith("meta-llama")) {
 				const results = toolResults.flatMap((result) => {
 					if (result.status === ToolResultStatus.Error) {
 						return [
@@ -416,7 +416,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-const inferenceApiIds = isHuggingChat
+const inferenceApiIds = config.isHuggingChat
 	? await fetch(
 			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
 		)

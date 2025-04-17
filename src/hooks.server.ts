@@ -1,5 +1,4 @@
-import { env } from "$env/dynamic/private";
-import { env as envPublic } from "$env/dynamic/public";
+import { config } from "$lib/server/config";
 import type { Handle, HandleServerError } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
@@ -21,13 +20,13 @@ import { adminTokenManager } from "$lib/server/adminToken";
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {
 	// Set HF_TOKEN as a process variable for Transformers.JS to see it
-	process.env.HF_TOKEN ??= env.HF_TOKEN;
+	process.env.HF_TOKEN ??= config.HF_TOKEN;
 
 	logger.info("Starting server...");
 	initExitHandler();
 
 	checkAndRunMigrations();
-	if (env.ENABLE_ASSISTANTS) {
+	if (config.ENABLE_ASSISTANTS) {
 		refreshAssistantsCounts();
 	}
 	refreshConversationStats();
@@ -40,7 +39,7 @@ if (!building) {
 
 	adminTokenManager.displayToken();
 
-	if (env.EXPOSE_API) {
+	if (config.EXPOSE_API) {
 		logger.warn(
 			"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
 		);
@@ -101,7 +100,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
-		const ADMIN_SECRET = env.ADMIN_API_SECRET || env.PARQUET_EXPORT_SECRET;
+		const ADMIN_SECRET = config.ADMIN_API_SECRET || config.PARQUET_EXPORT_SECRET;
 
 		if (!ADMIN_SECRET) {
 			return errorResponse(500, "Admin API is not configured");
@@ -112,11 +111,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const token = event.cookies.get(env.COOKIE_NAME);
+	const token = event.cookies.get(config.COOKIE_NAME);
 
 	// if the trusted email header is set we use it to get the user email
-	const email = env.TRUSTED_EMAIL_HEADER
-		? event.request.headers.get(env.TRUSTED_EMAIL_HEADER)
+	const email = config.TRUSTED_EMAIL_HEADER
+		? event.request.headers.get(config.TRUSTED_EMAIL_HEADER)
 		: null;
 
 	let secretSessionId: string | null = null;
@@ -145,7 +144,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (user) {
 			event.locals.user = user;
 		}
-	} else if (event.url.pathname.startsWith(`${base}/api/`) && env.USE_HF_TOKEN_IN_API === "true") {
+	} else if (
+		event.url.pathname.startsWith(`${base}/api/`) &&
+		config.USE_HF_TOKEN_IN_API === "true"
+	) {
 		// if the request goes to the API and no user is available in the header
 		// check if a bearer token is available in the Authorization header
 
@@ -234,7 +236,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 			const validOrigins = [
 				new URL(event.request.url).host,
-				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).host] : []),
+				...(config.PUBLIC_ORIGIN ? [new URL(config.PUBLIC_ORIGIN).host] : []),
 			];
 
 			if (!validOrigins.includes(new URL(origin).host)) {
@@ -262,7 +264,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!event.locals.user &&
 			requiresUser &&
-			!((env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0) > 0)
+			!((config.MESSAGES_BEFORE_LOGIN ? parseInt(config.MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
@@ -273,7 +275,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!requiresUser &&
 			!event.url.pathname.startsWith(`${base}/settings`) &&
-			envPublic.PUBLIC_APP_DISCLAIMER === "1"
+			config.PUBLIC_APP_DISCLAIMER === "1"
 		) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
@@ -296,12 +298,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 			replaced = true;
 
-			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
+			return chunk.html.replace("%gaId%", config.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
 	});
 
 	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
-	if (env.ALLOW_IFRAME !== "true") {
+	if (config.ALLOW_IFRAME !== "true") {
 		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 	}
 

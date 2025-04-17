@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 
 import { env } from "$env/dynamic/private";
-import { env as envPublic } from "$env/dynamic/public";
+import { config } from "$lib/server/config";
 import { sendSlack } from "$lib/server/sendSlack";
 import type { Tool } from "$lib/types/Tool";
 
@@ -43,8 +43,7 @@ export async function POST({ params, request, locals, url }) {
 	}
 
 	if (env.WEBHOOK_URL_REPORT_ASSISTANT) {
-		const prefixUrl =
-			envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
+		const prefixUrl = config.PUBLIC_SHARE_PREFIX || `${config.PUBLIC_ORIGIN || url.origin}${base}`;
 		const toolUrl = `${prefixUrl}/tools/${params.toolId}`;
 
 		const tool = await collections.tools.findOne<Pick<Tool, "displayName" | "name">>(
