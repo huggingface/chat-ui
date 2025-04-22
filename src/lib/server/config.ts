@@ -23,34 +23,51 @@ class ConfigManager {
 		);
 	}
 
+	get ConfigManagerEnabled() {
+		return serverEnv.ENABLE_CONFIG_MANAGER === "true";
+	}
+
 	get(key: ConfigKey): string {
+		if (!this.ConfigManagerEnabled) {
+			return keysFromEnv[key] || "";
+		}
 		return this.keysFromDB[key] || keysFromEnv[key] || "";
 	}
 
 	async set(key: ConfigKey, value: string) {
+		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
 		await collections.config.updateOne({ key }, { $set: { value } }, { upsert: true });
 		this.keysFromDB[key] = value;
 	}
 
 	async delete(key: ConfigKey) {
+		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
 		await collections.config.deleteOne({ key });
 		delete this.keysFromDB[key];
 	}
 
 	async clear() {
+		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
 		await collections.config.deleteMany({});
 		this.keysFromDB = {};
 	}
 
 	getPublicConfig() {
-		return {
+		let config = {
 			...Object.fromEntries(
 				Object.entries(keysFromEnv).filter(([key]) => key.startsWith("PUBLIC_"))
 			),
-			...Object.fromEntries(
-				Object.entries(this.keysFromDB).filter(([key]) => key.startsWith("PUBLIC_"))
-			),
 		} as Record<PublicConfigKey, string>;
+
+		if (this.ConfigManagerEnabled) {
+			config = {
+				...config,
+				...Object.fromEntries(
+					Object.entries(this.keysFromDB).filter(([key]) => key.startsWith("PUBLIC_"))
+				),
+			};
+		}
+		return config;
 	}
 
 	get isHuggingChat() {
