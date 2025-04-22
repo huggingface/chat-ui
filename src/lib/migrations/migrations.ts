@@ -18,7 +18,7 @@ export async function checkAndRunMigrations() {
 		.migrationResults.find()
 		.toArray();
 
-	logger.info("[MIGRATIONS] Begin check...");
+	logger.debug("[MIGRATIONS] Begin check...");
 
 	// connect to the database
 	const connectedClient = await (await Database.getInstance()).getClient().connect();
@@ -27,7 +27,7 @@ export async function checkAndRunMigrations() {
 
 	if (!lockId) {
 		// another instance already has the lock, so we exit early
-		logger.info(
+		logger.debug(
 			"[MIGRATIONS] Another instance already has the lock. Waiting for DB to be unlocked."
 		);
 
@@ -54,21 +54,21 @@ export async function checkAndRunMigrations() {
 
 		// check if the migration has already been applied
 		if (!shouldRun) {
-			logger.info(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
+			logger.debug(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
 		} else {
 			// check the modifiers to see if some cases match
 			if (
 				(migration.runForHuggingChat === "only" && !isHuggingChat) ||
 				(migration.runForHuggingChat === "never" && isHuggingChat)
 			) {
-				logger.info(
+				logger.debug(
 					`[MIGRATIONS] "${migration.name}" should not be applied for this run. Skipping...`
 				);
 				continue;
 			}
 
 			// otherwise all is good and we can run the migration
-			logger.info(
+			logger.debug(
 				`[MIGRATIONS] "${migration.name}" ${
 					migration.runEveryTime ? "should run every time" : "not applied yet"
 				}. Applying...`
@@ -93,7 +93,7 @@ export async function checkAndRunMigrations() {
 					result = await migration.up(await Database.getInstance());
 				});
 			} catch (e) {
-				logger.info(`[MIGRATIONS]  "${migration.name}" failed!`);
+				logger.debug(`[MIGRATIONS]  "${migration.name}" failed!`);
 				logger.error(e);
 			} finally {
 				await session.endSession();
@@ -112,7 +112,7 @@ export async function checkAndRunMigrations() {
 		}
 	}
 
-	logger.info("[MIGRATIONS] All migrations applied. Releasing lock");
+	logger.debug("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
 	await releaseLock(LOCK_KEY, lockId);

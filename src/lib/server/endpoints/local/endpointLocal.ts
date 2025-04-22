@@ -56,6 +56,9 @@ export async function endpointLocal(
 	// Initialize Llama model
 
 	const modelPath = await resolveModelFile(path, modelFolder);
+	if (!llama) {
+		throw new Error("Failed to initialize llama.cpp build.");
+	}
 	const modelLoaded = await llama.loadModel({
 		modelPath,
 	});

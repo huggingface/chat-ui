@@ -26,7 +26,7 @@
 
 	let { data, children }: Props = $props();
 
-	let previousPage: string = $state(base);
+	let previousPage: string = $state(base || "/");
 	let assistantsSection: HTMLHeadingElement | undefined = $state();
 	let showContent: boolean = $state(false);
 
@@ -60,7 +60,7 @@
 
 	afterNavigate(({ from }) => {
 		if (from?.url && !from.url.pathname.includes("settings")) {
-			previousPage = from.url.toString() || previousPage || base;
+			previousPage = from.url.toString() || previousPage || base || "/";
 		}
 		// Show content when not on the root settings page
 		showContent = page.url.pathname !== `${base}/settings`;
