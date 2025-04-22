@@ -2,7 +2,7 @@ import { env as publicEnv } from "$env/dynamic/public";
 import { env as serverEnv } from "$env/dynamic/private";
 import { collections } from "./database";
 import { publicConfig } from "$lib/utils/PublicConfig.svelte";
-import { logger } from "$lib/server/logger";
+import { building } from "$app/environment";
 
 export type PublicConfigKey = keyof typeof publicEnv;
 
@@ -61,10 +61,11 @@ class ConfigManager {
 // Create the instance and initialize it.
 const configManager = new ConfigManager();
 
-await configManager.init().then(() => {
-	logger.info(configManager.getPublicConfig(), "config manager");
-	publicConfig.init(configManager.getPublicConfig());
-});
+if (!building) {
+	await configManager.init().then(() => {
+		publicConfig.init(configManager.getPublicConfig());
+	});
+}
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey]: string };
 
