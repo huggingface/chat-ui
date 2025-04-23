@@ -301,7 +301,9 @@ You can change things like the parameters, or customize the preprompt to better 
 
 #### chatPromptTemplate
 
-When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
+In 2025 most chat-completion endpoints (local or remotely hosted) support the OpenAI-compatible API and take arrays of messages.
+
+If not, when querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
 The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
 
@@ -344,7 +346,7 @@ We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on T
 
 If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
 
-A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference) endpoint. This is what is done in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
+A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference), or a llama.cpp endpoint. You will find an example for TGI in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
 
 To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
