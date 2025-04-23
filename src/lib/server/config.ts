@@ -1,9 +1,9 @@
 import { env as publicEnv } from "$env/dynamic/public";
 import { env as serverEnv } from "$env/dynamic/private";
-import { collections } from "./database";
 import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 import { building } from "$app/environment";
-
+import type { Collection } from "mongodb";
+import type { ConfigKey as ConfigKeyType } from "$lib/types/ConfigKey";
 export type PublicConfigKey = keyof typeof publicEnv;
 
 const keysFromEnv = { ...publicEnv, ...serverEnv };
@@ -11,9 +11,17 @@ export type ConfigKey = keyof typeof keysFromEnv;
 
 class ConfigManager {
 	private keysFromDB: Partial<Record<ConfigKey, string>> = {};
+	private isInitialized = false;
+	private configCollection: Collection<ConfigKeyType> | undefined;
 
 	async init() {
-		const configs = await collections.config.find({}).toArray();
+		if (this.isInitialized) return;
+
+		// 👉 late import: happens after this module’s exports exist
+		const { collections } = await import("./database");
+		this.configCollection = collections.config;
+
+		const configs = await this.configCollection.find({}).toArray();
 		this.keysFromDB = configs.reduce(
 			(acc, curr) => {
 				acc[curr.key as ConfigKey] = curr.value;
@@ -21,6 +29,7 @@ class ConfigManager {
 			},
 			{} as Record<ConfigKey, string>
 		);
+		this.isInitialized = true;
 	}
 
 	get ConfigManagerEnabled() {
@@ -36,19 +45,19 @@ class ConfigManager {
 
 	async set(key: ConfigKey, value: string) {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
-		await collections.config.updateOne({ key }, { $set: { value } }, { upsert: true });
+		await this.configCollection?.updateOne({ key }, { $set: { value } }, { upsert: true });
 		this.keysFromDB[key] = value;
 	}
 
 	async delete(key: ConfigKey) {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
-		await collections.config.deleteOne({ key });
+		await this.configCollection?.deleteOne({ key });
 		delete this.keysFromDB[key];
 	}
 
 	async clear() {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
-		await collections.config.deleteMany({});
+		await this.configCollection?.deleteMany({});
 		this.keysFromDB = {};
 	}
 
@@ -73,22 +82,18 @@ class ConfigManager {
 	get isHuggingChat() {
 		return this.get("PUBLIC_APP_ASSETS") === "huggingchat";
 	}
-
-	async waitForInit() {
-		while (!this.keysFromDB) {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
-	}
 }
 
 // Create the instance and initialize it.
 const configManager = new ConfigManager();
 
-if (!building) {
-	await configManager.init().then(() => {
-		publicConfig.init(configManager.getPublicConfig());
-	});
-}
+export const ready = (async () => {
+	if (!building) {
+		await configManager.init().then(() => {
+			publicConfig.init(configManager.getPublicConfig());
+		});
+	}
+})();
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey]: string };
 
