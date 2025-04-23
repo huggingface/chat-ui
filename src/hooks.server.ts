@@ -1,4 +1,4 @@
-import { config } from "$lib/server/config";
+import { config, ready } from "$lib/server/config";
 import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
@@ -17,41 +17,39 @@ import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
 
-await config.waitForInit();
-
 export const init: ServerInit = async () => {
 	// Wait for config to be fully loaded
-	await config.waitForInit();
+	await ready;
+
+	// TODO: move this code on a started server hook, instead of using a "building" flag
+	if (!building) {
+		// Set HF_TOKEN as a process variable for Transformers.JS to see it
+		process.env.HF_TOKEN ??= config.HF_TOKEN;
+
+		logger.info("Starting server...");
+		initExitHandler();
+
+		checkAndRunMigrations();
+		if (config.ENABLE_ASSISTANTS) {
+			refreshAssistantsCounts();
+		}
+		refreshConversationStats();
+
+		// Init metrics server
+		MetricsServer.getInstance();
+
+		// Init AbortedGenerations refresh process
+		AbortedGenerations.getInstance();
+
+		adminTokenManager.displayToken();
+
+		if (config.EXPOSE_API) {
+			logger.warn(
+				"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
+			);
+		}
+	}
 };
-
-// TODO: move this code on a started server hook, instead of using a "building" flag
-if (!building) {
-	// Set HF_TOKEN as a process variable for Transformers.JS to see it
-	process.env.HF_TOKEN ??= config.HF_TOKEN;
-
-	logger.info("Starting server...");
-	initExitHandler();
-
-	checkAndRunMigrations();
-	if (config.ENABLE_ASSISTANTS) {
-		refreshAssistantsCounts();
-	}
-	refreshConversationStats();
-
-	// Init metrics server
-	MetricsServer.getInstance();
-
-	// Init AbortedGenerations refresh process
-	AbortedGenerations.getInstance();
-
-	adminTokenManager.displayToken();
-
-	if (config.EXPOSE_API) {
-		logger.warn(
-			"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
-		);
-	}
-}
 
 export const handleError: HandleServerError = async ({ error, event, status, message }) => {
 	// handle 404
@@ -87,6 +85,8 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	await ready;
+
 	logger.debug({
 		locals: event.locals,
 		url: event.url.pathname,
