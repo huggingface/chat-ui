@@ -73,6 +73,12 @@ class ConfigManager {
 	get isHuggingChat() {
 		return this.get("PUBLIC_APP_ASSETS") === "huggingchat";
 	}
+
+	async waitForInit() {
+		while (!this.keysFromDB) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+	}
 }
 
 // Create the instance and initialize it.

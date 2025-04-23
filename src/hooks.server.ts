@@ -1,5 +1,5 @@
 import { config } from "$lib/server/config";
-import type { Handle, HandleServerError } from "@sveltejs/kit";
+import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
@@ -16,6 +16,13 @@ import { ObjectId } from "mongodb";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
+
+await config.waitForInit();
+
+export const init: ServerInit = async () => {
+	// Wait for config to be fully loaded
+	await config.waitForInit();
+};
 
 // TODO: move this code on a started server hook, instead of using a "building" flag
 if (!building) {

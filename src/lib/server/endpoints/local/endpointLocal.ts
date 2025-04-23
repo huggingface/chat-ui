@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type {
 	Endpoint,
 	EndpointMessage,
@@ -50,7 +50,7 @@ export async function endpointLocal(
 	// Setup model path and folder
 	const path = modelPathInput ?? `hf:${model.id ?? model.name}`;
 	const modelFolder =
-		env.MODELS_STORAGE_PATH ||
+		config.MODELS_STORAGE_PATH ||
 		join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 	// Initialize Llama model

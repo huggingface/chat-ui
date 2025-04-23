@@ -12,7 +12,7 @@ import type {
 } from "openai/resources/chat/completions";
 import type { FunctionDefinition, FunctionParameters } from "openai/resources/shared";
 import { buildPrompt } from "$lib/buildPrompt";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
@@ -90,7 +90,7 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	apiKey: z.string().default(env.OPENAI_API_KEY || env.HF_TOKEN || "sk-"),
+	apiKey: z.string().default(config.OPENAI_API_KEY || config.HF_TOKEN || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),

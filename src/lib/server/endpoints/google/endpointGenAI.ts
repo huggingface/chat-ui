@@ -6,13 +6,13 @@ import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { ImageProcessorOptions } from "../images";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 
 export const endpointGenAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("genai"),
-	apiKey: z.string().default(env.GOOGLE_GENAI_API_KEY),
+	apiKey: z.string().default(config.GOOGLE_GENAI_API_KEY),
 	safetyThreshold: z
 		.enum([
 			HarmBlockThreshold.HARM_BLOCK_THRESHOLD_UNSPECIFIED,

@@ -1,5 +1,5 @@
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 
 export default async function search(query: string): Promise<WebSearchSource[]> {
 	// const params = {
@@ -12,7 +12,7 @@ export default async function search(query: string): Promise<WebSearchSource[]> 
 		{
 			method: "GET",
 			headers: {
-				"Ocp-Apim-Subscription-Key": env.BING_SUBSCRIPTION_KEY,
+				"Ocp-Apim-Subscription-Key": config.BING_SUBSCRIPTION_KEY,
 				"Content-type": "application/json",
 			},
 		}
