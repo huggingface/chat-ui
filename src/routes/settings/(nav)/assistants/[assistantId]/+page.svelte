@@ -5,6 +5,7 @@
 	import { goto, invalidateAll } from "$app/navigation";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { useTranslations } from "$lib/stores/translations";
 	import type { PageData } from "./$types";
 
 	import CarbonPen from "~icons/carbon/pen";
@@ -35,6 +36,7 @@
 	);
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	const prefix =
 		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
@@ -106,7 +108,7 @@
 					</span>
 				{/if}
 				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
-					>public</span
+					>{$translations.t("public")}</span
 				>
 			</div>
 
@@ -117,8 +119,9 @@
 			{/if}
 
 			<p class="text-sm text-gray-500">
-				Model: <span class="font-semibold"> {assistant?.modelId} </span>
-				<span class="text-gray-300">•</span> Created by
+				{$translations.t("model_colon")} <span class="font-semibold"> {assistant?.modelId} </span>
+				<span class="text-gray-300">•</span>
+				{$translations.t("created_by")}
 				<a class="underline" href="{base}/assistants?user={assistant?.createdByName}">
 					{assistant?.createdByName}
 				</a>
@@ -139,12 +142,12 @@
 						}}
 					>
 						<CarbonChat class="mr-1.5 text-sm" />
-						New chat
+						{$translations.t("new_chat")}
 					</button>
 				</div>
 				{#if assistant?.createdByMe}
 					<a href="{base}/settings/assistants/{assistant?._id}/edit" class="underline"
-						><CarbonPen class="mr-1.5 inline text-xs" />Edit
+						><CarbonPen class="mr-1.5 inline text-xs" />{$translations.t("edit")}
 					</a>
 					<form
 						onsubmit={() => {
@@ -164,12 +167,12 @@
 							type="submit"
 							class="flex items-center underline"
 							onclick={(event) => {
-								if (!confirm("Are you sure you want to delete this assistant?")) {
+								if (!confirm($translations.t("delete_assistant_confirmation"))) {
 									event.preventDefault();
 								}
 							}}
 						>
-							<CarbonTrash class="mr-1.5 inline text-xs" />Delete
+							<CarbonTrash class="mr-1.5 inline text-xs" />{$translations.t("delete")}
 						</button>
 					</form>
 				{:else}
@@ -188,12 +191,12 @@
 						}}
 					>
 						<button type="submit" class="underline">
-							<CarbonTrash class="mr-1.5 inline text-xs" />Remove</button
+							<CarbonTrash class="mr-1.5 inline text-xs" />{$translations.t("remove")}</button
 						>
 					</form>
 					<form method="POST" action="?/edit" use:enhance class="hidden">
 						<button type="submit" class="underline">
-							<CarbonCopy class="mr-1.5 inline text-xs" />Duplicate</button
+							<CarbonCopy class="mr-1.5 inline text-xs" />{$translations.t("duplicate")}</button
 						>
 					</form>
 					{#if !assistant?.reported}
@@ -204,11 +207,11 @@
 							}}
 							class="underline"
 						>
-							<CarbonFlag class="mr-1.5 inline text-xs" />Report
+							<CarbonFlag class="mr-1.5 inline text-xs" />{$translations.t("report")}
 						</button>
 					{:else}
 						<button type="button" disabled class="text-gray-700">
-							<CarbonFlag class="mr-1.5 inline text-xs" />Reported</button
+							<CarbonFlag class="mr-1.5 inline text-xs" />{$translations.t("reported")}</button
 						>
 					{/if}
 				{/if}
@@ -297,9 +300,9 @@
 	</div>
 
 	<div>
-		<h2 class="text-lg font-semibold">Direct URL</h2>
+		<h2 class="text-lg font-semibold">{$translations.t("direct_url")}</h2>
 
-		<p class="pb-2 text-sm text-gray-500">Share this link for people to use your assistant.</p>
+		<p class="pb-2 text-sm text-gray-500">{$translations.t("share_link_description")}</p>
 
 		<div
 			class="flex flex-row gap-2 rounded-lg border-2 border-gray-200 bg-gray-100 py-2 pl-3 pr-1.5"
@@ -310,7 +313,7 @@
 				classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 			>
 				<div class="flex items-center gap-1.5 text-gray-500 hover:underline">
-					<CarbonLink />Copy
+					<CarbonLink />{$translations.t("copy")}
 				</div>
 			</CopyToClipBoardBtn>
 		</div>
@@ -318,7 +321,7 @@
 
 	<!-- two columns for big screen, single column for small screen -->
 	<div class="mb-12 mt-3">
-		<h2 class="mb-2 inline font-semibold">System Instructions</h2>
+		<h2 class="mb-2 inline font-semibold">{$translations.t("system_instructions")}</h2>
 		<div
 			id="System Instructions"
 			class="overlow-y-auto mt-2 box-border h-fit max-h-[240px] w-full overflow-y-auto whitespace-pre-line rounded-lg border-2 border-gray-200 bg-gray-100 p-2 disabled:cursor-not-allowed 2xl:max-h-[310px]"
@@ -352,10 +355,10 @@
 					>
 						<CarbonTools class="text-xs text-purple-600" />
 					</span>
-					<h2 class="font-semibold">Tools</h2>
+					<h2 class="font-semibold">{$translations.t("tools")}</h2>
 				</div>
 				<p class="w-full text-sm text-gray-500">
-					This Assistant has access to the following tools:
+					{$translations.t("assistant_has_tools")}
 				</p>
 				<ul class="mr-2 mt-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 					{#each assistant.tools as tool}
@@ -373,15 +376,15 @@
 					>
 						<IconInternet classNames="text-sm text-blue-600" />
 					</span>
-					<h2 class=" font-semibold">Internet Access</h2>
+					<h2 class=" font-semibold">{$translations.t("internet_access")}</h2>
 				</div>
 				{#if assistant?.rag?.allowAllDomains}
 					<p class="text-sm text-gray-500">
-						This Assistant uses Web Search to find information on Internet.
+						{$translations.t("assistant_uses_web_search")}
 					</p>
 				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length}
 					<p class="pb-4 text-sm text-gray-500">
-						This Assistant can use Web Search on the following domains:
+						{$translations.t("assistant_can_search_domains")}
 					</p>
 					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedDomains as domain}
@@ -393,7 +396,7 @@
 						{/each}
 					</ul>
 				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length}
-					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following links:</p>
+					<p class="pb-4 text-sm text-gray-500">{$translations.t("assistant_can_browse_links")}</p>
 					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
 						{#each assistant?.rag?.allowedLinks as link}
 							<li
@@ -406,7 +409,7 @@
 				{/if}
 				{#if assistant?.dynamicPrompt}
 					<p class="text-sm text-gray-500">
-						This Assistant has dynamic prompts enabled and can make requests to external services.
+						{$translations.t("assistant_has_dynamic_prompts")}
 					</p>
 				{/if}
 			</div>

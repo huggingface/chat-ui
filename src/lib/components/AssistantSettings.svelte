@@ -20,6 +20,7 @@
 	import AssistantToolPicker from "./AssistantToolPicker.svelte";
 	import { error } from "$lib/stores/errors";
 	import { goto } from "$app/navigation";
+	import { useTranslations } from "$lib/stores/translations";
 
 	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
 
@@ -39,6 +40,7 @@
 
 	let files: FileList | null = $state(null);
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 	let modelId = $state("");
 	let systemPrompt = $state(assistant?.preprompt ?? "");
 	let dynamicPrompt = $state(assistant?.dynamicPrompt ?? false);
@@ -64,7 +66,7 @@
 				inputEl.files = null;
 				files = null;
 
-				errors = [{ field: "avatar", message: "Only images are allowed" }];
+				errors = [{ field: "avatar", message: $translations.t("only_images_allowed") }];
 				return;
 			}
 			files = inputEl.files;
@@ -185,24 +187,23 @@
 >
 	{#if assistant}
 		<h2 class="text-xl font-semibold">
-			Edit Assistant: {assistant?.name ?? "assistant"}
+			{$translations.t("edit_assistant")}: {assistant?.name ?? "assistant"}
 		</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Modifying an existing assistant will propagate the changes to all users.
+			{$translations.t("modify_assistant_description")}
 		</p>
 	{:else}
-		<h2 class="text-xl font-semibold">Create new assistant</h2>
+		<h2 class="text-xl font-semibold">{$translations.t("create_new_assistant")}</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Create and share your own AI Assistant. All assistants are <span
-				class="rounded-full border px-2 py-0.5 leading-none">public</span
-			>
+			{$translations.t("create_assistant_description")}
+			<span class="rounded-full border px-2 py-0.5 leading-none">{$translations.t("public")}</span>
 		</p>
 	{/if}
 
 	<div class="grid h-full w-full flex-1 grid-cols-2 gap-6 text-sm max-sm:grid-cols-1">
 		<div class="col-span-1 flex flex-col gap-4">
 			<div>
-				<div class="mb-1 block pb-2 text-sm font-semibold">Avatar</div>
+				<div class="mb-1 block pb-2 text-sm font-semibold">{$translations.t("avatar")}</div>
 				<input
 					type="file"
 					accept="image/*"
@@ -246,7 +247,7 @@
 							}}
 							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
 						>
-							Delete
+							{$translations.t("delete")}
 						</button>
 					</div>
 				{:else}
@@ -255,7 +256,8 @@
 							for="avatar"
 							class="btn flex h-8 rounded-lg border bg-white px-3 py-1 text-gray-500 shadow-sm transition-all hover:bg-gray-100"
 						>
-							<CarbonUpload class="mr-2 text-xs " /> Upload
+							<CarbonUpload class="mr-2 text-xs " />
+							{$translations.t("upload")}
 						</label>
 					</div>
 				{/if}
@@ -263,29 +265,29 @@
 			</div>
 
 			<label>
-				<div class="mb-1 font-semibold">Name</div>
+				<div class="mb-1 font-semibold">{$translations.t("name")}</div>
 				<input
 					name="name"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					placeholder="Assistant Name"
+					placeholder={$translations.t("assistant_name_placeholder")}
 					value={assistant?.name ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("name")}</p>
 			</label>
 
 			<label>
-				<div class="mb-1 font-semibold">Description</div>
+				<div class="mb-1 font-semibold">{$translations.t("description")}</div>
 				<textarea
 					name="description"
 					class="h-15 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					placeholder="It knows everything about python"
+					placeholder={$translations.t("assistant_description_placeholder")}
 					value={assistant?.description ?? ""}
 				></textarea>
 				<p class="text-xs text-red-500">{getError("description")}</p>
 			</label>
 
 			<label>
-				<div class="mb-1 font-semibold">Model</div>
+				<div class="mb-1 font-semibold">{$translations.t("model")}</div>
 				<div class="flex gap-2">
 					<select
 						name="modelId"
@@ -314,11 +316,9 @@
 					<div class="my-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:grid-rows-2">
 						<label for="temperature" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
-								Temperature
+								{$translations.t("temperature")}
 
-								<HoverTooltip
-									label="Temperature: Controls creativity, higher values allow more variety."
-								>
+								<HoverTooltip label={$translations.t("temperature_tooltip")}>
 									<CarbonHelpFilled
 										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
 									/>
@@ -337,10 +337,8 @@
 						</label>
 						<label for="top_p" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
-								Top P
-								<HoverTooltip
-									label="Top P: Sets word choice boundaries, lower values tighten focus."
-								>
+								{$translations.t("top_p")}
+								<HoverTooltip label={$translations.t("top_p_tooltip")}>
 									<CarbonHelpFilled
 										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
 									/>
@@ -360,10 +358,8 @@
 						</label>
 						<label for="repetition_penalty" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
-								Repetition penalty
-								<HoverTooltip
-									label="Repetition penalty: Prevents reuse, higher values decrease repetition."
-								>
+								{$translations.t("repetition_penalty")}
+								<HoverTooltip label={$translations.t("repetition_penalty_tooltip")}>
 									<CarbonHelpFilled
 										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
 									/>
@@ -382,9 +378,8 @@
 						</label>
 						<label for="top_k" class="flex justify-between">
 							<span class="m-1 ml-0 flex items-center gap-1.5 whitespace-nowrap text-sm">
-								Top K <HoverTooltip
-									label="Top K: Restricts word options, lower values for predictability."
-								>
+								{$translations.t("top_k")}
+								<HoverTooltip label={$translations.t("top_k_tooltip")}>
 									<CarbonHelpFilled
 										class="inline text-xxs text-gray-500 group-hover/tooltip:text-blue-600"
 									/>
@@ -406,30 +401,30 @@
 			</label>
 
 			<label>
-				<div class="mb-1 font-semibold">User start messages</div>
+				<div class="mb-1 font-semibold">{$translations.t("user_start_messages")}</div>
 				<div class="grid gap-1.5 text-sm md:grid-cols-2">
 					<input
 						name="exampleInput1"
-						placeholder="Start Message 1"
+						placeholder={$translations.t("start_message_1")}
 						bind:value={inputMessage1}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
 					<input
 						name="exampleInput2"
-						placeholder="Start Message 2"
+						placeholder={$translations.t("start_message_2")}
 						bind:value={inputMessage2}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
 
 					<input
 						name="exampleInput3"
-						placeholder="Start Message 3"
+						placeholder={$translations.t("start_message_3")}
 						bind:value={inputMessage3}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
 					<input
 						name="exampleInput4"
-						placeholder="Start Message 4"
+						placeholder={$translations.t("start_message_4")}
 						bind:value={inputMessage4}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					/>
@@ -439,14 +434,14 @@
 			{#if selectedModel?.tools}
 				<div>
 					<span class="text-smd font-semibold"
-						>Tools
+						>{$translations.t("tools")}
 						<CarbonTools class="inline text-xs text-purple-600" />
 						<span class="ml-1 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-600"
-							>Experimental</span
+							>{$translations.t("experimental")}</span
 						>
 					</span>
 					<p class="text-xs text-gray-500">
-						Choose up to 3 community tools that will be used with this assistant.
+						{$translations.t("choose_tools_description")}
 					</p>
 				</div>
 				<AssistantToolPicker bind:toolIds={tools} />
@@ -454,7 +449,7 @@
 			{#if page.data.enableAssistantsRAG}
 				<div class="flex flex-col flex-nowrap pb-4">
 					<span class="mt-2 text-smd font-semibold"
-						>Internet access
+						>{$translations.t("internet_access")}
 						<IconInternet classNames="inline text-sm text-blue-600" />
 
 						{#if isHuggingChat}
@@ -462,7 +457,7 @@
 								href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/385"
 								target="_blank"
 								class="ml-0.5 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-700 underline decoration-gray-400"
-								>Give feedback</a
+								>{$translations.t("give_feedback")}</a
 							>
 						{/if}
 					</span>
@@ -475,11 +470,12 @@
 							name="ragMode"
 							value={false}
 						/>
-						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Default </span>
+						<span class="my-2 text-sm" class:font-semibold={!ragMode}>
+							{$translations.t("default")}
+						</span>
 						{#if !ragMode}
 							<span class="block text-xs text-gray-500">
-								Assistant will not use internet to do information retrieval and will respond faster.
-								Recommended for most Assistants.
+								{$translations.t("default_internet_description")}
 							</span>
 						{/if}
 					</label>
@@ -492,10 +488,12 @@
 							name="ragMode"
 							value={"all"}
 						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Web search </span>
+						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}>
+							{$translations.t("web_search")}
+						</span>
 						{#if ragMode === "all"}
 							<span class="block text-xs text-gray-500">
-								Assistant will do a web search on each user request to find information.
+								{$translations.t("web_search_description")}
 							</span>
 						{/if}
 					</label>
@@ -509,12 +507,12 @@
 							value={false}
 						/>
 						<span class="my-2 text-sm" class:font-semibold={ragMode === "domains"}>
-							Domains search
+							{$translations.t("domains_search")}
 						</span>
 					</label>
 					{#if ragMode === "domains"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify domains and URLs that the application can search, separated by commas.
+							{$translations.t("domains_search_description")}
 						</span>
 
 						<input
@@ -535,13 +533,12 @@
 							value={false}
 						/>
 						<span class="my-2 text-sm" class:font-semibold={ragMode === "links"}>
-							Specific Links
+							{$translations.t("specific_links")}
 						</span>
 					</label>
 					{#if ragMode === "links"}
 						<span class="mb-2 text-xs text-gray-500">
-							Specify a maximum of 10 direct URLs that the Assistant will access. HTML & Plain Text
-							only, separated by commas
+							{$translations.t("specific_links_description")}
 						</span>
 						<input
 							name="ragLinkList"
@@ -557,20 +554,20 @@
 
 		<div class="relative col-span-1 flex h-full flex-col">
 			<div class="mb-1 flex justify-between text-sm">
-				<span class="block font-semibold"> Instructions (System Prompt) </span>
+				<span class="block font-semibold"> {$translations.t("instructions_system_prompt")} </span>
 				{#if dynamicPrompt && templateVariables.length}
 					<div class="relative">
 						<button
 							type="button"
 							class="peer rounded bg-blue-500/20 px-1 text-xs text-blue-600 focus:bg-blue-500/30 focus:text-blue-800 sm:text-sm"
 						>
-							{templateVariables.length} template variable{templateVariables.length > 1 ? "s" : ""}
+							{templateVariables.length}
+							{$translations.t("template_variable")}{templateVariables.length > 1 ? "s" : ""}
 						</button>
 						<div
 							class="invisible absolute right-0 top-6 z-10 rounded-lg border bg-white p-2 text-xs shadow-lg peer-focus:visible hover:visible sm:w-96"
 						>
-							Will perform a GET or POST request and inject the response into the prompt. Works
-							better with plain text, csv or json content.
+							{$translations.t("template_variables_description")}
 							{#each templateVariables as match}
 								<div>
 									<a
@@ -588,12 +585,13 @@
 			</div>
 			<label class="pb-2 text-sm has-[:checked]:font-semibold">
 				<input type="checkbox" name="dynamicPrompt" bind:checked={dynamicPrompt} />
-				Dynamic Prompt
+				{$translations.t("dynamic_prompt")}
 				<p class="mb-2 text-xs font-normal text-gray-500">
-					Allow the use of template variables {"{{get=https://example.com/path}}"}
-					to insert dynamic content into your prompt by making GET requests to specified URLs on each
-					inference. You can also send the user's message as the body of a POST request, using {"{{post=https://example.com/path}}"}.
-					Use {"{{today}}"} to include the current date.
+					{$translations.t("dynamic_prompt_description", {
+						get_example: "{{get=https://example.com/path}}",
+						post_example: "{{post=https://example.com/path}}",
+						today_example: "{{today}}",
+					})}
 				</p>
 			</label>
 
@@ -601,7 +599,7 @@
 				<textarea
 					name="preprompt"
 					class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
-					placeholder="You'll act as..."
+					placeholder={$translations.t("system_prompt_placeholder")}
 					bind:value={systemPrompt}
 				></textarea>
 				{#if modelId}
@@ -623,7 +621,7 @@
 					href={assistant ? `${base}/settings/assistants/${assistant?._id}` : `${base}/settings`}
 					class="flex items-center justify-center rounded-full bg-gray-200 px-5 py-2 font-semibold text-gray-600"
 				>
-					Cancel
+					{$translations.t("cancel")}
 				</a>
 				<button
 					type="submit"
@@ -634,7 +632,7 @@
 					class:text-gray-600={loading}
 					class:text-white={!loading}
 				>
-					{assistant ? "Save" : "Create"}
+					{assistant ? $translations.t("save") : $translations.t("create")}
 				</button>
 			</div>
 		</div>

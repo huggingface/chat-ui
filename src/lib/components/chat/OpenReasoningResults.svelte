@@ -1,6 +1,7 @@
 <script lang="ts">
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		summary: string;
@@ -10,6 +11,7 @@
 
 	let { summary, content, loading = false }: Props = $props();
 	let isOpen = $state(loading);
+	const translations = useTranslations();
 
 	$effect(() => {
 		isOpen = loading;
@@ -53,7 +55,7 @@
 			</div>
 		</div>
 		<dl class="leading-4">
-			<dd class="text-sm">Reasoning</dd>
+			<dd class="text-sm">{$translations.t("reasoning")}</dd>
 			<dt
 				class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400"
 				class:animate-pulse={loading}

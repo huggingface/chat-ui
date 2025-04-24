@@ -13,6 +13,7 @@
 	import InfiniteScroll from "./InfiniteScroll.svelte";
 	import type { Conversation } from "$lib/types/Conversation";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -24,6 +25,7 @@
 	let { conversations = $bindable(), canLogin, user, p = $bindable(0) }: Props = $props();
 
 	let hasMore = $state(true);
+	const translations = useTranslations();
 
 	function handleNewChatClick() {
 		isAborted.set(true);
@@ -47,10 +49,10 @@
 	});
 
 	const titles: { [key: string]: string } = {
-		today: "Today",
-		week: "This week",
-		month: "This month",
-		older: "Older",
+		today: "today",
+		week: "this_week",
+		month: "this_month",
+		older: "older",
 	} as const;
 
 	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
@@ -101,7 +103,7 @@
 			onclick={handleNewChatClick}
 			class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
 		>
-			New Chat
+			{$translations.t("new_chat")}
 		</a>
 	{/if}
 </div>
@@ -124,7 +126,7 @@
 			{#each Object.entries(groupedConversations) as [group, convs]}
 				{#if convs.length}
 					<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-						{titles[group]}
+						{$translations.t(titles[group])}
 					</h4>
 					{#each convs as conv}
 						<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
@@ -155,7 +157,7 @@
 					type="submit"
 					class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md border bg-white px-2 text-gray-700 shadow-sm group-hover:flex hover:shadow-none dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
 				>
-					Sign Out
+					{$translations.t("sign_out")}
 				</button>
 			{/if}
 		</form>
@@ -166,7 +168,7 @@
 				type="submit"
 				class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 			>
-				Login
+				{$translations.t("login")}
 			</button>
 		</form>
 	{/if}
@@ -175,14 +177,14 @@
 		type="button"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
-		Theme
+		{$translations.t("theme")}
 	</button>
 	{#if nModels > 1}
 		<a
 			href="{base}/models"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			Models
+			{$translations.t("models")}
 			<span
 				class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
 				>{nModels}</span
@@ -194,7 +196,7 @@
 			href="{base}/assistants"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			Assistants
+			{$translations.t("assistants")}
 		</a>
 	{/if}
 	{#if $page.data.enableCommunityTools}
@@ -202,10 +204,10 @@
 			href="{base}/tools"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			Tools
+			{$translations.t("tools")}
 			<span
 				class="ml-auto rounded-full border border-purple-300 px-2 py-0.5 text-xs text-purple-500 dark:border-purple-500 dark:text-purple-400"
-				>New</span
+				>{$translations.t("new")}</span
 			>
 		</a>
 	{/if}
@@ -214,14 +216,14 @@
 		href="{base}/settings"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
-		Settings
+		{$translations.t("settings")}
 	</a>
 	{#if envPublic.PUBLIC_APP_NAME === "HuggingChat"}
 		<a
 			href="{base}/privacy"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
-			About & Privacy
+			{$translations.t("about_privacy")}
 		</a>
 	{/if}
 </div>

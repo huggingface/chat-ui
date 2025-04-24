@@ -8,12 +8,15 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextAlignJustify from "~icons/carbon/text-align-justify";
 	import { pan, type GestureCustomEvent, type PanCustomEvent } from "svelte-gestures";
+	import { useTranslations } from "$lib/stores/translations";
 	interface Props {
 		title: string | undefined;
 		children?: import("svelte").Snippet;
 	}
 
 	let { title = $bindable(), children }: Props = $props();
+
+	const translations = useTranslations();
 
 	let closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
@@ -37,7 +40,7 @@
 	);
 
 	$effect(() => {
-		title ??= "New Chat";
+		title ??= $translations.t("new_chat");
 	});
 
 	beforeNavigate(() => {
@@ -64,7 +67,7 @@
 		type="button"
 		class="-ml-3 flex size-12 shrink-0 items-center justify-center text-lg"
 		onclick={() => (isOpen = true)}
-		aria-label="Open menu"
+		aria-label={$translations.t("open_menu")}
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
 	<div class="flex h-full items-center justify-center">
@@ -130,7 +133,7 @@
 			type="button"
 			class="absolute right-0 top-0 z-50 flex size-12 items-center justify-center text-lg"
 			onclick={() => (isOpen = false)}
-			aria-label="Close menu"
+			aria-label={$translations.t("close_menu")}
 			bind:this={closeEl}><CarbonClose /></button
 		>
 	{/if}

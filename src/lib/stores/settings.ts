@@ -18,6 +18,7 @@ type SettingsStore = {
 	tools?: Array<string>;
 	disableStream: boolean;
 	directPaste: boolean;
+	language: string;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {

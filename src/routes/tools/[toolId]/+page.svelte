@@ -20,10 +20,12 @@
 	import CarbonStar from "~icons/carbon/star";
 	import CarbonLock from "~icons/carbon/locked";
 	import { error } from "$lib/stores/errors";
+	import { useTranslations } from "$lib/stores/translations";
 
 	let { data } = $props();
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	let previousPage: string = $state(base || "/");
 
@@ -292,12 +294,12 @@
 			</div>
 			{#if !currentModelSupportTools}
 				<span class="relative text-sm text-gray-500">
-					You are currently not using a model that supports tools. Activate one
-					<a href="{base}/models" class="underline">here</a>.
+					{$translations.t("model_not_supporting_tools")}
+					<a href="{base}/models" class="underline">{$translations.t("here")}</a>.
 				</span>
 			{:else}
 				<p class="text-sm max-sm:hidden">
-					Tools are applications that the model can choose to call while you are chatting with it.
+					{$translations.t("tools_description")}
 				</p>
 			{/if}
 			{#if data.tool.description}

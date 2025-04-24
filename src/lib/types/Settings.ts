@@ -2,6 +2,7 @@ import { defaultModel } from "$lib/server/models";
 import type { Assistant } from "./Assistant";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
+import { env } from "$env/dynamic/private";
 
 export interface Settings extends Timestamps {
 	userId?: User["_id"];
@@ -24,6 +25,7 @@ export interface Settings extends Timestamps {
 	tools?: string[];
 	disableStream: boolean;
 	directPaste: boolean;
+	language?: string;
 }
 
 export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "createdAt" | "updatedAt">;
@@ -37,4 +39,5 @@ export const DEFAULT_SETTINGS = {
 	tools: [],
 	disableStream: false,
 	directPaste: false,
+	language: env.DEFAULT_LANGUAGE || "en",
 } satisfies SettingsEditable;

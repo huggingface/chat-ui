@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CarbonUpload from "~icons/carbon/upload";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		classNames?: string;
@@ -8,6 +9,8 @@
 	}
 
 	let { classNames = "", files = $bindable(), mimeTypes }: Props = $props();
+
+	const translations = useTranslations();
 
 	/**
 	 * Due to a bug with Svelte, we cannot use bind:files with multiple
@@ -25,10 +28,11 @@
 >
 	<input
 		class="absolute w-full cursor-pointer opacity-0"
-		aria-label="Upload file"
+		aria-label={$translations.t("upload_file")}
 		type="file"
 		onchange={onFileChange}
 		accept={mimeTypes.join(",")}
 	/>
-	<CarbonUpload class="mr-2 text-xxs" /> Upload file
+	<CarbonUpload class="mr-2 text-xxs" />
+	{$translations.t("upload_file")}
 </button>

@@ -4,6 +4,7 @@
 	import { env as envPublic } from "$env/dynamic/public";
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { useTranslations } from "$lib/stores/translations";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import TokensCounter from "$lib/components/TokensCounter.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
@@ -14,6 +15,7 @@
 	import { goto } from "$app/navigation";
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	$effect(() => {
 		if ($settings.customPrompts[page.params.model] === undefined) {
@@ -55,7 +57,7 @@
 				class="flex items-center truncate underline underline-offset-2"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
-				Model page
+				{$translations.t("model_page")}
 			</a>
 		{/if}
 
@@ -67,7 +69,7 @@
 				class="flex items-center truncate underline underline-offset-2"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
-				Dataset page
+				{$translations.t("dataset_page")}
 			</a>
 		{/if}
 
@@ -79,7 +81,7 @@
 				rel="noreferrer"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
-				Model website
+				{$translations.t("model_website")}
 			</a>
 		{/if}
 
@@ -91,7 +93,7 @@
 				class="flex items-center truncate underline underline-offset-2"
 			>
 				<CarbonCode class="mr-1.5 shrink-0 text-xs " />
-				API Playground
+				{$translations.t("api_playground")}
 			</a>
 		{/if}
 
@@ -100,7 +102,7 @@
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
 			<div class="flex items-center gap-1.5 hover:underline">
-				<CarbonLink />Copy direct link to model
+				<CarbonLink />{$translations.t("copy_direct_link")}
 			</div>
 		</CopyToClipBoardBtn>
 	</div>
@@ -117,12 +119,14 @@
 		}}
 	>
 		<CarbonChat class="mr-1.5 text-sm" />
-		New chat
+		{$translations.t("new_chat")}
 	</button>
 
 	<div class="relative flex w-full flex-col gap-2">
 		<div class="flex w-full flex-row content-between">
-			<h3 class="mb-1.5 text-lg font-semibold text-gray-800">System Prompt</h3>
+			<h3 class="mb-1.5 text-lg font-semibold text-gray-800">
+				{$translations.t("custom_system_prompt")}
+			</h3>
 			{#if hasCustomPreprompt}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
@@ -131,12 +135,12 @@
 						$settings.customPrompts[page.params.model] = model.preprompt;
 					}}
 				>
-					Reset
+					{$translations.t("reset")}
 				</button>
 			{/if}
 		</div>
 		<textarea
-			aria-label="Custom system prompt"
+			aria-label={$translations.t("custom_system_prompt")}
 			rows="10"
 			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
 			bind:value={$settings.customPrompts[page.params.model]}

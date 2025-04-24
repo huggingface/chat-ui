@@ -3,6 +3,7 @@
 	import { getTokenizer } from "$lib/utils/getTokenizer";
 	import type { PreTrainedTokenizer } from "@huggingface/transformers";
 	import { untrack } from "svelte";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		classNames?: string;
@@ -12,6 +13,7 @@
 	}
 
 	let { classNames = "", prompt = "", modelTokenizer, truncate = undefined }: Props = $props();
+	const translations = useTranslations();
 
 	let tokenizer: Promise<PreTrainedTokenizer> = $derived(getTokenizer(modelTokenizer));
 
@@ -39,6 +41,6 @@
 	<div
 		class="invisible absolute -top-6 right-0 whitespace-nowrap rounded bg-black px-1 text-sm text-white peer-hover:visible"
 	>
-		Tokens usage
+		{$translations.t("tokens_usage")}
 	</div>
 </div>

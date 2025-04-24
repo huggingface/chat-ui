@@ -17,6 +17,7 @@
 	import { share } from "$lib/utils/share";
 	import { env as envPublic } from "$env/dynamic/public";
 	import { page } from "$app/state";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		models: Model[];
@@ -55,6 +56,7 @@
 	let isCopied = $state(false);
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 </script>
 
 <div class="flex h-full w-full flex-col content-center items-center justify-center pb-52">
@@ -81,7 +83,7 @@
 			{/if}
 
 			<div class="flex h-full flex-col gap-2 text-balance">
-				<p class="-mb-1">Assistant</p>
+				<p class="-mb-1">{$translations.t("assistant")}</p>
 
 				<p class="text-xl font-bold sm:text-2xl">{assistant.name}</p>
 				{#if assistant.description}
@@ -93,25 +95,25 @@
 				{#if assistant?.tools?.length}
 					<div
 						class="flex h-5 w-fit items-center gap-1 rounded-full bg-purple-500/10 pl-1 pr-2 text-xs"
-						title="This assistant uses the websearch."
+						title={$translations.t("assistant_uses_tools")}
 					>
 						<CarbonTools class="text-sm text-purple-600" />
-						Has tools
+						{$translations.t("has_tools")}
 					</div>
 				{/if}
 				{#if hasRag}
 					<div
 						class="flex h-5 w-fit items-center gap-1 rounded-full bg-blue-500/10 pl-1 pr-2 text-xs"
-						title="This assistant uses the websearch."
+						title={$translations.t("assistant_uses_websearch")}
 					>
 						<IconInternet classNames="text-sm text-blue-600" />
-						Has internet access
+						{$translations.t("has_internet_access")}
 					</div>
 				{/if}
 
 				{#if assistant.createdByName}
 					<div class="pt-1 text-sm text-gray-400 dark:text-gray-500">
-						Created by
+						{$translations.t("created_by")}
 						<a class="hover:underline" href="{base}/assistants?user={assistant.createdByName}">
 							{assistant.createdByName}
 						</a>
@@ -119,9 +121,10 @@
 							<span class="mx-1">·</span>
 							<div
 								class="inline-flex items-baseline gap-1 text-sm text-gray-400 dark:text-gray-500"
-								title="Number of users"
+								title={$translations.t("number_of_users")}
 							>
-								<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)} users
+								<CarbonUserMultiple class="text-xxs" />{formatUserCount(assistant.userCount)}
+								{$translations.t("users")}
 							</div>
 						{/if}
 					</div>
@@ -145,16 +148,16 @@
 				>
 					{#if isCopied}
 						<CarbonCheckmark class="text-xxs text-green-600 max-sm:text-xs" />
-						<span class="text-green-600 max-sm:hidden"> Link copied </span>
+						<span class="text-green-600 max-sm:hidden"> {$translations.t("link_copied")} </span>
 					{:else}
 						<CarbonExport class="text-xxs max-sm:text-xs" />
-						<span class="max-sm:hidden"> Share </span>
+						<span class="max-sm:hidden"> {$translations.t("share")} </span>
 					{/if}
 				</button>
 				<a
 					href="{base}/settings/assistants/{assistant._id.toString()}"
 					class="flex h-7 items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-gray-800 shadow-sm hover:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300/90 dark:hover:bg-gray-800 md:text-sm"
-					><IconGear class="text-xxs" />Settings</a
+					><IconGear class="text-xxs" />{$translations.t("settings")}</a
 				>
 			</div>
 		</div>
@@ -167,7 +170,8 @@
 			}}
 			class="absolute -bottom-6 right-2 inline-flex items-center justify-center text-xs text-gray-600 underline hover:brightness-50 dark:text-gray-400 dark:hover:brightness-110"
 		>
-			<CarbonRenew class="mr-1.5 text-xxs" /> Reset to default model
+			<CarbonRenew class="mr-1.5 text-xxs" />
+			{$translations.t("reset_to_default_model")}
 		</button>
 	</div>
 	{#if assistant.exampleInputs}

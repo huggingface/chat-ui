@@ -3,6 +3,7 @@
 
 	import IconCopy from "./icons/IconCopy.svelte";
 	import Tooltip from "./Tooltip.svelte";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		classNames?: string;
@@ -13,6 +14,7 @@
 
 	let { classNames = "", value, children, onClick }: Props = $props();
 
+	const translations = useTranslations();
 	let isSuccess = $state(false);
 	let timeout: ReturnType<typeof setTimeout>;
 
@@ -62,7 +64,7 @@
 
 <button
 	class={classNames}
-	title={"Copy to clipboard"}
+	title={$translations.t("copy_to_clipboard")}
 	type="button"
 	onclick={() => {
 		onClick?.();

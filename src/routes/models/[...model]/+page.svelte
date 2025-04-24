@@ -7,6 +7,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { useTranslations } from "$lib/stores/translations";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 
@@ -16,6 +17,7 @@
 	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 	const modelId = page.params.model;
 
 	async function createConversation(message: string) {
@@ -34,7 +36,7 @@
 			});
 
 			if (!res.ok) {
-				error.set("Error while creating conversation, try again.");
+				error.set($translations.t("error_creating_conversation"));
 				console.error("Error while creating conversation: " + (await res.text()));
 				return;
 			}

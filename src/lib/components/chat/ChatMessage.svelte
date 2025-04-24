@@ -10,6 +10,7 @@
 
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
+	import { useTranslations } from "$lib/stores/translations";
 
 	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import {
@@ -116,6 +117,8 @@
 		}
 	});
 
+	const translations = useTranslations();
+
 	let editMode = $derived(editMsdgId === message.id);
 	$effect(() => {
 		if (editMode) {
@@ -140,7 +143,7 @@
 		{#if page.data?.assistant?.avatar}
 			<img
 				src="{base}/settings/assistants/{page.data.assistant._id}/avatar.jpg"
-				alt="Avatar"
+				alt={$translations.t("avatar")}
 				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
 			/>
 		{:else}
@@ -203,7 +206,7 @@
 			<!-- Web Search sources -->
 			{#if webSearchSources?.length}
 				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
+					<div class="text-gray-400">{$translations.t("sources")}:</div>
 					{#each webSearchSources as { link, title }}
 						<a
 							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
@@ -225,7 +228,7 @@
 			<!-- Endpoint web sources -->
 			{#if messageFinalAnswer?.webSources && messageFinalAnswer.webSources.length}
 				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
+					<div class="text-gray-400">{$translations.t("sources")}:</div>
 					{#each messageFinalAnswer.webSources as { uri, title }}
 						<a
 							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
@@ -257,7 +260,7 @@
 				{/if}
 				<button
 					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-					title="Retry"
+					title={$translations.t("retry")}
 					type="button"
 					onclick={() => {
 						dispatch("retry", { id: message.id });
@@ -332,7 +335,7 @@
 								"
 								disabled={loading}
 							>
-								Submit
+								{$translations.t("submit")}
 							</button>
 							<button
 								type="button"
@@ -341,7 +344,7 @@
 									editMsdgId = null;
 								}}
 							>
-								Cancel
+								{$translations.t("cancel")}
 							</button>
 						</div>
 					</form>
@@ -358,7 +361,7 @@
 						<div class="mx-auto flex flex-row flex-nowrap gap-2">
 							<a
 								class="rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 max-sm:!hidden md:hidden"
-								title="Download prompt and parameters"
+								title={$translations.t("download_prompt_parameters")}
 								type="button"
 								target="_blank"
 								href={downloadLink}
@@ -368,7 +371,7 @@
 							{#if !readOnly}
 								<button
 									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-									title="Branch"
+									title={$translations.t("branch")}
 									type="button"
 									onclick={() => (editMsdgId = message.id)}
 								>

@@ -25,6 +25,7 @@
 	import { ReviewStatus } from "$lib/types/Review";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { loginModalOpen } from "$lib/stores/loginModal";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		data: PageData;
@@ -33,6 +34,7 @@
 	let { data }: Props = $props();
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
 	let filterInputEl: HTMLInputElement | undefined = $state();
@@ -116,7 +118,7 @@
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
-			<h1 class="text-2xl font-bold">Tools</h1>
+			<h1 class="text-2xl font-bold">{$translations.t("tools")}</h1>
 			{#if isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
@@ -131,23 +133,23 @@
 				</a>
 			{/if}
 		</div>
-		<h2 class="text-gray-500">Popular tools made by the community</h2>
+		<h2 class="text-gray-500">{$translations.t("popular_tools")}</h2>
 		<h3 class="mt-2 w-fit text-purple-700 dark:text-purple-300">
-			This feature is <span
-				class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
-				>experimental</span
-			>. Consider
+			{$translations.t("this_feature_is")}
+			<span class="rounded-lg bg-purple-100 px-2 py-1 font-semibold dark:bg-purple-800/50"
+				>{$translations.t("experimental_feature")}</span
+			>. {$translations.t("consider")}
 			<a
 				class="underline hover:text-purple-500"
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/569"
-				target="_blank">sharing your feedback with us!</a
+				target="_blank">{$translations.t("share_feedback_with_us")}!</a
 			>
 		</h3>
 		<div class="ml-auto mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			{#if data.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
 					<input type="checkbox" checked={showUnfeatured} onchange={toggleShowUnfeatured} />
-					Show unfeatured tools
+					{$translations.t("show_unfeatured_tools")}
 				</label>
 			{/if}
 			{#if page.data.loginRequired && !data.user}
@@ -157,14 +159,14 @@
 					}}
 					class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 				>
-					<CarbonAdd />Create new tool
+					<CarbonAdd />{$translations.t("create_new_tool")}
 				</button>
 			{:else}
 				<a
 					href={`${base}/tools/new`}
 					class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 				>
-					<CarbonAdd />Create new tool
+					<CarbonAdd />{$translations.t("create_new_tool")}
 				</a>
 			{/if}
 		</div>
@@ -203,7 +205,7 @@
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
 				>
 					<CarbonEarthAmerica class="text-xs" />
-					Active ({page.data.settings?.tools?.length})
+					{$translations.t("active_tools")} ({page.data.settings?.tools?.length})
 				</a>
 				<a
 					href={goToCommunity()}
@@ -213,7 +215,7 @@
 						: 'border-transparent text-gray-400 hover:text-gray-800 dark:hover:text-gray-300'}"
 				>
 					<CarbonEarthAmerica class="text-xs" />
-					Community
+					{$translations.t("community_tools")}
 				</a>
 				{#if data.user?.username}
 					<a
@@ -236,7 +238,7 @@
 				<CarbonSearch class="pointer-events-none absolute left-2 text-xs text-gray-400" />
 				<input
 					class="h-[30px] w-full bg-transparent pl-5 focus:outline-none"
-					placeholder="Filter by name"
+					placeholder={$translations.t("filter_tools_by_name")}
 					value={filterValue}
 					oninput={(e) => filterOnName(e.currentTarget.value)}
 					bind:this={filterInputEl}
@@ -251,15 +253,15 @@
 				class="rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 				aria-label="Sort tools"
 			>
-				<option value={SortKey.TRENDING}>{SortKey.TRENDING}</option>
-				<option value={SortKey.POPULAR}>{SortKey.POPULAR}</option>
+				<option value={SortKey.TRENDING}>{$translations.t(SortKey.TRENDING)}</option>
+				<option value={SortKey.POPULAR}>{$translations.t(SortKey.POPULAR)}</option>
 			</select>
 		</div>
 
 		{#if !currentModelSupportTools}
 			<div class="mx-auto text-center text-sm text-purple-700 dark:text-purple-300">
-				You are currently not using a model that supports tools. Activate one
-				<a href="{base}/models" class="underline">here</a>.
+				{$translations.t("model_not_supporting_tools")}
+				<a href="{base}/models" class="underline">{$translations.t("here")}</a>.
 			</div>
 		{/if}
 
@@ -290,12 +292,12 @@
 							{#if isActive}
 								<span
 									class="mx-1.5 inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white"
-									>Active</span
+									>{$translations.t("active_tools")}</span
 								>
 							{/if}
 						</span>
 						<span class="line-clamp-1 font-mono text-xs text-gray-400">
-							{tool.baseUrl ?? "Internal tool"}
+							{tool.baseUrl ?? $translations.t("internal_tool")}
 						</span>
 
 						<p class=" line-clamp-1 w-full text-sm text-gray-600 dark:text-gray-300">
@@ -304,7 +306,8 @@
 
 						{#if !isOfficial}
 							<p class="mt-auto text-xs text-gray-400 dark:text-gray-500">
-								Added by <a
+								{$translations.t("added_by")}
+								<a
 									class="hover:underline"
 									href="{base}/tools?user={tool.createdByName}"
 									onclick={(e) => {
@@ -316,23 +319,23 @@
 								</a>
 								<span class="text-gray-300">•</span>
 								{#if tool.useCount === 1}
-									1 run
+									1 {$translations.t("run")}
 								{:else}
-									{tool.useCount} runs
+									{tool.useCount} {$translations.t("runs")}
 								{/if}
 							</p>
 						{:else}
 							<p class="mt-auto text-xs text-purple-700 dark:text-purple-400">
-								HuggingChat official tool
+								{$translations.t("huggingchat_official_tool")}
 							</p>
 						{/if}
 					</div>
 				</div>
 			{:else}
 				{#if activeOnly}
-					You don't have any active tools.
+					{$translations.t("no_active_tools")}
 				{:else}
-					No tools found
+					{$translations.t("no_tools_found")}
 				{/if}
 			{/each}
 		</div>

@@ -11,6 +11,7 @@
 	import CarbonTools from "~icons/carbon/tools";
 	import CarbonImage from "~icons/carbon/image";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { useTranslations } from "$lib/stores/translations";
 	interface Props {
 		data: PageData;
 	}
@@ -18,12 +19,13 @@
 	let { data }: Props = $props();
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 </script>
 
 <svelte:head>
 	{#if isHuggingChat}
-		<title>HuggingChat - Models</title>
-		<meta property="og:title" content="HuggingChat - Models" />
+		<title>HuggingChat - {$translations.t("models")}</title>
+		<meta property="og:title" content="HuggingChat - {$translations.t('models')}" />
 		<meta property="og:type" content="link" />
 		<meta property="og:description" content="Browse HuggingChat available models" />
 		<meta property="og:url" content={page.url.href} />
@@ -33,7 +35,7 @@
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
-			<h1 class="text-2xl font-bold">Models</h1>
+			<h1 class="text-2xl font-bold">{$translations.t("models")}</h1>
 			{#if isHuggingChat}
 				<a
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/372"
@@ -45,7 +47,10 @@
 				</a>
 			{/if}
 		</div>
-		<h2 class="text-gray-500">All models available on {envPublic.PUBLIC_APP_NAME}</h2>
+		<h2 class="text-gray-500">
+			{$translations.t("all_models_available")}
+			{envPublic.PUBLIC_APP_NAME}
+		</h2>
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
 			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
 				<div
@@ -112,13 +117,13 @@
 							<span
 								class="rounded-full border border-blue-500 bg-blue-500/5 px-2 py-0.5 text-xs text-blue-500 dark:border-blue-500 dark:bg-blue-500/10"
 							>
-								Active
+								{$translations.t("active")}
 							</span>
 						{:else if index === 0}
 							<span
 								class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
 							>
-								Default
+								{$translations.t("default")}
 							</span>
 						{/if}
 					</div>

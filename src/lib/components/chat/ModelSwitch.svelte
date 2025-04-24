@@ -3,6 +3,7 @@
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import type { Model } from "$lib/types/Model";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		models: Model[];
@@ -10,6 +11,7 @@
 	}
 
 	let { models, currentModel }: Props = $props();
+	const translations = useTranslations();
 
 	let selectedModelId = $state(
 		models.map((m) => m.id).includes(currentModel.id) ? currentModel.id : models[0].id
@@ -42,7 +44,7 @@
 	class="mx-auto mt-0 flex w-fit flex-col items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-500/20 p-4 dark:border-gray-800"
 >
 	<span>
-		This model is no longer available. Switch to a new one to continue this conversation:
+		{$translations.t("model_no_longer_available")}
 	</span>
 	<div class="flex items-center space-x-2">
 		<select
@@ -58,7 +60,7 @@
 			disabled={selectedModelId === currentModel.id}
 			class="rounded-md bg-gray-100 px-2 py-1 dark:bg-gray-900"
 		>
-			Accept
+			{$translations.t("accept")}
 		</button>
 	</div>
 </div>

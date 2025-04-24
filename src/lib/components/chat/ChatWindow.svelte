@@ -31,6 +31,7 @@
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { useTranslations } from "$lib/stores/translations";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
 	import { fly } from "svelte/transition";
@@ -167,7 +168,7 @@
 	);
 
 	function onShare() {
-		if (!confirm("Are you sure you want to share this conversation? This cannot be undone.")) {
+		if (!confirm($translations.t("confirm_share"))) {
 			return;
 		}
 
@@ -203,6 +204,7 @@
 	});
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	let mimeTypesFromActiveTools = $derived(
 		page.data.tools
@@ -262,7 +264,7 @@
 					{#if assistant.avatar}
 						<img
 							src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash=${assistant.avatar}"
-							alt="Avatar"
+							alt={$translations.t("avatar")}
 							class="size-5 rounded-full object-cover"
 						/>
 					{:else}
@@ -418,11 +420,13 @@
 						class:paste-glow={pastedLongContent}
 					>
 						{#if lastIsError}
-							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+							<ChatInput value={$translations.t("sorry_error")} disabled={true} />
 						{:else}
 							<ChatInput
 								{assistant}
-								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+								placeholder={isReadOnly
+									? $translations.t("read_only")
+									: $translations.t("ask_anything")}
 								{loading}
 								bind:value={message}
 								bind:files
@@ -447,7 +451,7 @@
 								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black"
 								disabled={!message || isReadOnly}
 								type="submit"
-								aria-label="Send message"
+								aria-label={$translations.t("send_message")}
 								name="submit"
 							>
 								<svg
@@ -473,7 +477,7 @@
 				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
 			>
 				<p>
-					Model:
+					{$translations.t("model")}
 					{#if !assistant}
 						{#if models.find((m) => m.id === currentModel.id)}
 							<a
@@ -500,8 +504,8 @@
 							</span>
 						{/if}
 					{/if}
-					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
-					or false.
+					<span class="max-sm:hidden">·</span><br class="sm:hidden" />
+					{$translations.t("generated_content_warning")}
 				</p>
 				{#if messages.length}
 					<button
@@ -513,10 +517,10 @@
 					>
 						{#if isSharedRecently}
 							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
-							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
+							<div class="text-green-600 max-sm:hidden">{$translations.t("link_copied")}</div>
 						{:else}
 							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
-							<div class="max-sm:hidden">Share this conversation</div>
+							<div class="max-sm:hidden">{$translations.t("share_conversation")}</div>
 						{/if}
 					</button>
 				{/if}

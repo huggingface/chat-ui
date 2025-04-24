@@ -2,6 +2,7 @@
 	import { invalidateAll } from "$app/navigation";
 	import Modal from "$lib/components/Modal.svelte";
 	import { createEventDispatcher } from "svelte";
+	import { useTranslations } from "$lib/stores/translations";
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 
@@ -12,6 +13,8 @@
 	}
 
 	let { reportUrl }: Props = $props();
+
+	const translations = useTranslations();
 </script>
 
 <Modal on:close>
@@ -27,16 +30,16 @@
 		}}
 		class="w-full min-w-64 p-4"
 	>
-		<span class="mb-1 text-sm font-semibold">Report content</span>
+		<span class="mb-1 text-sm font-semibold">{$translations.t("report_content")}</span>
 
 		<p class="text-sm text-gray-500">
-			Please provide a brief description of why you are reporting this content.
+			{$translations.t("report_description")}
 		</p>
 
 		<textarea
 			name="reportReason"
 			class="mt-6 max-h-48 w-full resize-y rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-smd"
-			placeholder="Reason(s) for the report"
+			placeholder={$translations.t("report_reason_placeholder")}
 			maxlength="128"
 			bind:value={reason}
 		></textarea>
@@ -45,7 +48,7 @@
 			<button
 				type="button"
 				class="text-sm text-gray-700 hover:underline"
-				onclick={() => dispatch("close")}>Cancel</button
+				onclick={() => dispatch("close")}>{$translations.t("cancel")}</button
 			>
 
 			<button
@@ -55,7 +58,7 @@
 				class:bg-gray-200={!reason}
 				class:!text-gray-400={!reason}
 			>
-				Submit report
+				{$translations.t("submit_report")}
 			</button>
 		</div>
 	</form>
