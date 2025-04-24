@@ -267,7 +267,7 @@ export class Database {
 		// Unique index for semaphore and migration results
 		semaphores.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
 		semaphores
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+			.createIndex({ deleteAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e));
 		tokenCaches
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })

@@ -1,10 +1,8 @@
 import { Database } from "$lib/server/database";
 import { migrations } from "./routines";
-import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
+import { acquireLock, releaseLock, isDBLocked, refreshLock, Semaphores } from "./lock";
 import { logger } from "$lib/server/logger";
 import { config } from "$lib/server/config";
-
-const LOCK_KEY = "migrations";
 
 export async function checkAndRunMigrations() {
 	// make sure all GUIDs are unique
@@ -23,7 +21,7 @@ export async function checkAndRunMigrations() {
 	// connect to the database
 	const connectedClient = await (await Database.getInstance()).getClient().connect();
 
-	const lockId = await acquireLock(LOCK_KEY);
+	const lockId = await acquireLock(Semaphores.MIGRATION);
 
 	if (!lockId) {
 		// another instance already has the lock, so we exit early
@@ -33,7 +31,7 @@ export async function checkAndRunMigrations() {
 
 		// Todo: is this necessary? Can we just return?
 		// block until the lock is released
-		while (await isDBLocked(LOCK_KEY)) {
+		while (await isDBLocked(Semaphores.MIGRATION)) {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 		return;
@@ -42,7 +40,7 @@ export async function checkAndRunMigrations() {
 	// once here, we have the lock
 	// make sure to refresh it regularly while it's running
 	const refreshInterval = setInterval(async () => {
-		await refreshLock(LOCK_KEY, lockId);
+		await refreshLock(Semaphores.MIGRATION, lockId);
 	}, 1000 * 10);
 
 	// iterate over all migrations
@@ -115,5 +113,5 @@ export async function checkAndRunMigrations() {
 	logger.debug("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
-	await releaseLock(LOCK_KEY, lockId);
+	await releaseLock(Semaphores.MIGRATION, lockId);
 }

@@ -1,9 +1,7 @@
 import { afterEach, assert, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
-import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
+import { acquireLock, isDBLocked, refreshLock, releaseLock, Semaphores } from "./lock";
 import { collections } from "$lib/server/database";
-
-const LOCK_KEY = "migrations.test";
 
 describe(
 	"migrations",
@@ -18,7 +16,9 @@ describe(
 		});
 
 		it("should acquire only one lock on DB", async () => {
-			const results = await Promise.all(new Array(1000).fill(0).map(() => acquireLock(LOCK_KEY)));
+			const results = await Promise.all(
+				new Array(1000).fill(0).map(() => acquireLock(Semaphores.TEST_MIGRATION))
+			);
 			const locks = results.filter((r) => r);
 
 			const semaphores = await collections.semaphores.find({}).toArray();
@@ -26,20 +26,20 @@ describe(
 			expect(locks.length).toBe(1);
 			expect(semaphores).toBeDefined();
 			expect(semaphores.length).toBe(1);
-			expect(semaphores?.[0].key).toBe(LOCK_KEY);
+			expect(semaphores?.[0].key).toBe(Semaphores.TEST_MIGRATION);
 		});
 
 		it("should read the lock correctly", async () => {
-			const lockId = await acquireLock(LOCK_KEY);
+			const lockId = await acquireLock(Semaphores.TEST_MIGRATION);
 			assert(lockId);
-			expect(await isDBLocked(LOCK_KEY)).toBe(true);
-			expect(!!(await acquireLock(LOCK_KEY))).toBe(false);
-			await releaseLock(LOCK_KEY, lockId);
-			expect(await isDBLocked(LOCK_KEY)).toBe(false);
+			expect(await isDBLocked(Semaphores.TEST_MIGRATION)).toBe(true);
+			expect(!!(await acquireLock(Semaphores.TEST_MIGRATION))).toBe(false);
+			await releaseLock(Semaphores.TEST_MIGRATION, lockId);
+			expect(await isDBLocked(Semaphores.TEST_MIGRATION)).toBe(false);
 		});
 
 		it("should refresh the lock", async () => {
-			const lockId = await acquireLock(LOCK_KEY);
+			const lockId = await acquireLock(Semaphores.TEST_MIGRATION);
 
 			assert(lockId);
 
@@ -47,7 +47,7 @@ describe(
 
 			const updatedAtInitially = (await collections.semaphores.findOne({}))?.updatedAt;
 
-			await refreshLock(LOCK_KEY, lockId);
+			await refreshLock(Semaphores.TEST_MIGRATION, lockId);
 
 			const updatedAtAfterRefresh = (await collections.semaphores.findOne({}))?.updatedAt;
 
