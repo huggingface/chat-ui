@@ -27,8 +27,8 @@ class ConfigManager {
 			return;
 		}
 
-		const { collections } = await import("./database");
-
+		const { collections, ready } = await import("./database");
+		await ready;
 		if (!collections) {
 			throw new Error("Database not initialized");
 		}
@@ -175,5 +175,3 @@ export const config: ConfigProxy = new Proxy(configManager, {
 		return false;
 	},
 }) as ConfigProxy;
-
-await ready;

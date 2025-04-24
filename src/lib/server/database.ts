@@ -301,5 +301,3 @@ export const ready = (async () => {
 		collections = {} as unknown as ReturnType<typeof Database.prototype.getCollections>;
 	}
 })();
-
-await ready;
