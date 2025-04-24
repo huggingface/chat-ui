@@ -85,7 +85,9 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
-	await ready;
+	await ready.then(() => {
+		config.checkForUpdates();
+	});
 
 	logger.debug({
 		locals: event.locals,

@@ -2,7 +2,8 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
 import type { ObjectId } from "mongodb";
-import { acquireLock, refreshLock, Semaphores } from "$lib/migrations/lock";
+import { acquireLock, refreshLock } from "$lib/migrations/lock";
+import { Semaphores } from "$lib/types/Semaphore";
 
 async function getLastComputationTime(): Promise<Date> {
 	const lastStats = await collections.conversationStats.findOne({}, { sort: { "date.at": -1 } });

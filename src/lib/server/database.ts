@@ -38,10 +38,6 @@ export class Database {
 			config.MONGO_STORAGE_PATH ||
 			join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "db");
 
-		if (import.meta.env.MODE === "test") {
-			logger.info("Running in test mode");
-		}
-
 		if (!config.MONGODB_URL) {
 			logger.warn("No MongoDB URL found, using in-memory server");
 

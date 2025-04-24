@@ -1,6 +1,7 @@
 import { afterEach, assert, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
-import { acquireLock, isDBLocked, refreshLock, releaseLock, Semaphores } from "./lock";
+import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
+import { Semaphores } from "$lib/types/Semaphore";
 import { collections } from "$lib/server/database";
 
 describe(

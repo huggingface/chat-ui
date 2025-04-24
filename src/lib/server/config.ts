@@ -4,6 +4,8 @@ import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 import { building } from "$app/environment";
 import type { Collection } from "mongodb";
 import type { ConfigKey as ConfigKeyType } from "$lib/types/ConfigKey";
+import type { Semaphore } from "$lib/types/Semaphore";
+import { Semaphores } from "$lib/types/Semaphore";
 
 export type PublicConfigKey = keyof typeof publicEnv;
 const keysFromEnv = { ...publicEnv, ...serverEnv };
@@ -12,7 +14,10 @@ export type ConfigKey = keyof typeof keysFromEnv;
 class ConfigManager {
 	private keysFromDB: Partial<Record<ConfigKey, string>> = {};
 	private isInitialized = false;
+
 	private configCollection: Collection<ConfigKeyType> | undefined;
+	private semaphoreCollection: Collection<Semaphore> | undefined;
+	private lastConfigUpdate: Date | undefined;
 
 	async init() {
 		if (this.isInitialized) return;
@@ -29,8 +34,40 @@ class ConfigManager {
 		}
 
 		this.configCollection = collections.config;
+		this.semaphoreCollection = collections.semaphores;
 
-		const configs = await this.configCollection.find({}).toArray();
+		await this.checkForUpdates().then(() => {
+			this.isInitialized = true;
+		});
+	}
+
+	get ConfigManagerEnabled() {
+		return serverEnv.ENABLE_CONFIG_MANAGER === "true" && import.meta.env.MODE !== "test";
+	}
+
+	get isHuggingChat() {
+		return this.get("PUBLIC_APP_ASSETS") === "huggingchat";
+	}
+
+	async checkForUpdates() {
+		if (await this.isConfigStale()) {
+			await this.updateConfig();
+		}
+	}
+
+	async isConfigStale(): Promise<boolean> {
+		if (!this.lastConfigUpdate || !this.isInitialized) {
+			return true;
+		}
+		const count = await this.semaphoreCollection?.countDocuments({
+			key: Semaphores.CONFIG_UPDATE,
+			updatedAt: { $gt: this.lastConfigUpdate },
+		});
+		return count !== undefined && count > 0;
+	}
+
+	async updateConfig() {
+		const configs = (await this.configCollection?.find({}).toArray()) ?? [];
 		this.keysFromDB = configs.reduce(
 			(acc, curr) => {
 				acc[curr.key as ConfigKey] = curr.value;
@@ -38,11 +75,8 @@ class ConfigManager {
 			},
 			{} as Record<ConfigKey, string>
 		);
-		this.isInitialized = true;
-	}
 
-	get ConfigManagerEnabled() {
-		return serverEnv.ENABLE_CONFIG_MANAGER === "true" && import.meta.env.MODE !== "test";
+		this.lastConfigUpdate = new Date();
 	}
 
 	get(key: ConfigKey): string {
@@ -52,22 +86,40 @@ class ConfigManager {
 		return this.keysFromDB[key] || keysFromEnv[key] || "";
 	}
 
+	async updateSemaphore() {
+		await this.semaphoreCollection?.updateOne(
+			{ key: Semaphores.CONFIG_UPDATE },
+			{
+				$set: {
+					updatedAt: new Date(),
+				},
+				$setOnInsert: {
+					createdAt: new Date(),
+				},
+			},
+			{ upsert: true }
+		);
+	}
+
 	async set(key: ConfigKey, value: string) {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
 		await this.configCollection?.updateOne({ key }, { $set: { value } }, { upsert: true });
 		this.keysFromDB[key] = value;
+		await this.updateSemaphore();
 	}
 
 	async delete(key: ConfigKey) {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
 		await this.configCollection?.deleteOne({ key });
 		delete this.keysFromDB[key];
+		await this.updateSemaphore();
 	}
 
 	async clear() {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
 		await this.configCollection?.deleteMany({});
 		this.keysFromDB = {};
+		await this.updateSemaphore();
 	}
 
 	getPublicConfig() {
@@ -86,10 +138,6 @@ class ConfigManager {
 			};
 		}
 		return config;
-	}
-
-	get isHuggingChat() {
-		return this.get("PUBLIC_APP_ASSETS") === "huggingchat";
 	}
 }
 
@@ -127,3 +175,5 @@ export const config: ConfigProxy = new Proxy(configManager, {
 		return false;
 	},
 }) as ConfigProxy;
+
+await ready;

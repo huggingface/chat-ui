@@ -1,13 +1,7 @@
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
+import type { Semaphores } from "$lib/types/Semaphore";
 
-export enum Semaphores {
-	ASSISTANTS_COUNT = "assistants.count",
-	CONVERSATION_STATS = "conversation.stats",
-	CONFIG_UPDATE = "config.update",
-	MIGRATION = "migration",
-	TEST_MIGRATION = "test.migration",
-}
 /**
  * Returns the lock id if the lock was acquired, false otherwise
  */

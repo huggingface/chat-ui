@@ -1,6 +1,7 @@
 import { Database } from "$lib/server/database";
 import { migrations } from "./routines";
-import { acquireLock, releaseLock, isDBLocked, refreshLock, Semaphores } from "./lock";
+import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
+import { Semaphores } from "$lib/types/Semaphore";
 import { logger } from "$lib/server/logger";
 import { config } from "$lib/server/config";
 

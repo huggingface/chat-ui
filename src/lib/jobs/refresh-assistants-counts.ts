@@ -1,10 +1,10 @@
 import { Database } from "$lib/server/database";
-import { acquireLock, refreshLock, Semaphores } from "$lib/migrations/lock";
+import { acquireLock, refreshLock } from "$lib/migrations/lock";
 import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
 import { logger } from "$lib/server/logger";
 import { collections } from "$lib/server/database";
-
+import { Semaphores } from "$lib/types/Semaphore";
 let hasLock = false;
 let lockId: ObjectId | null = null;
 
