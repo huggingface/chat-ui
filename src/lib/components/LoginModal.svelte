@@ -39,7 +39,7 @@
 					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 				>
 					Sign in
-					{#if publicConfig.PUBLIC_APP_NAME === "HuggingChat"}
+					{#if publicConfig.isHuggingChat}
 						<span class="flex items-center">
 							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 						</span>
