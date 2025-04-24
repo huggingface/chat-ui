@@ -1,10 +1,10 @@
 import sade from "sade";
 
 // @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
-import { config } from "$lib/server/config";
+import { config, ready } from "$lib/server/config";
 
 const prog = sade("config");
-
+await ready;
 prog
 	.command("clear")
 	.describe("Clear all config keys")
