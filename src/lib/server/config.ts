@@ -137,7 +137,12 @@ class ConfigManager {
 				),
 			};
 		}
-		return config;
+
+		const publicEnvKeys = Object.keys(publicEnv);
+
+		return Object.fromEntries(
+			Object.entries(config).filter(([key]) => publicEnvKeys.includes(key))
+		) as Record<PublicConfigKey, string>;
 	}
 }
 
