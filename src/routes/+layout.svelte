@@ -181,8 +181,8 @@
 			!($page.data.shared === true)
 	);
 
-	$effect(() => {
-		() => publicConfig.init(data.publicConfig);
+	$effect.pre(() => {
+		publicConfig.init(data.publicConfig);
 	});
 
 	onMount(() => {
