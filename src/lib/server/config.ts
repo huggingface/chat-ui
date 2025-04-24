@@ -4,8 +4,8 @@ import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 import { building } from "$app/environment";
 import type { Collection } from "mongodb";
 import type { ConfigKey as ConfigKeyType } from "$lib/types/ConfigKey";
-export type PublicConfigKey = keyof typeof publicEnv;
 
+export type PublicConfigKey = keyof typeof publicEnv;
 const keysFromEnv = { ...publicEnv, ...serverEnv };
 export type ConfigKey = keyof typeof keysFromEnv;
 
@@ -17,8 +17,17 @@ class ConfigManager {
 	async init() {
 		if (this.isInitialized) return;
 
-		// 👉 late import: happens after this module’s exports exist
+		if (import.meta.env.MODE === "test") {
+			this.isInitialized = true;
+			return;
+		}
+
 		const { collections } = await import("./database");
+
+		if (!collections) {
+			throw new Error("Database not initialized");
+		}
+
 		this.configCollection = collections.config;
 
 		const configs = await this.configCollection.find({}).toArray();
@@ -33,7 +42,7 @@ class ConfigManager {
 	}
 
 	get ConfigManagerEnabled() {
-		return serverEnv.ENABLE_CONFIG_MANAGER === "true";
+		return serverEnv.ENABLE_CONFIG_MANAGER === "true" && import.meta.env.MODE !== "test";
 	}
 
 	get(key: ConfigKey): string {

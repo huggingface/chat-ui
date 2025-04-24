@@ -27,9 +27,6 @@ import { config } from "$lib/server/config";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
-export const DB_FOLDER =
-	config.MONGO_STORAGE_PATH || join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "db");
-
 export class Database {
 	private client?: MongoClient;
 	private mongoServer?: MongoMemoryServer;
@@ -37,6 +34,14 @@ export class Database {
 	private static instance: Database;
 
 	private async init() {
+		const DB_FOLDER =
+			config.MONGO_STORAGE_PATH ||
+			join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "db");
+
+		if (import.meta.env.MODE === "test") {
+			logger.info("Running in test mode");
+		}
+
 		if (!config.MONGODB_URL) {
 			logger.warn("No MongoDB URL found, using in-memory server");
 
@@ -290,6 +295,15 @@ export class Database {
 	}
 }
 
-export const collections = building
-	? ({} as unknown as ReturnType<typeof Database.prototype.getCollections>)
-	: await Database.getInstance().then((db) => db.getCollections());
+export let collections: ReturnType<typeof Database.prototype.getCollections>;
+
+export const ready = (async () => {
+	if (!building) {
+		await Database.getInstance();
+		collections = await Database.getInstance().then((db) => db.getCollections());
+	} else {
+		collections = {} as unknown as ReturnType<typeof Database.prototype.getCollections>;
+	}
+})();
+
+await ready;
