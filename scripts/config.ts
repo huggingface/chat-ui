@@ -39,6 +39,7 @@ prog
 
 async function clear() {
 	await config.clear();
+	process.exit(0);
 }
 
 async function add(key: string, value: string) {
@@ -47,6 +48,7 @@ async function add(key: string, value: string) {
 		process.exit(1);
 	}
 	await config.set(key as keyof typeof config.keysFromEnv, value);
+	process.exit(0);
 }
 
 async function remove(key: string) {
@@ -55,8 +57,8 @@ async function remove(key: string) {
 		process.exit(1);
 	}
 	await config.delete(key as keyof typeof config.keysFromEnv);
+	process.exit(0);
 }
 
 // Parse arguments and handle help automatically
 prog.parse(process.argv);
-// process.exit(0);
