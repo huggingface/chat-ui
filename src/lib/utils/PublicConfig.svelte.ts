@@ -1,4 +1,4 @@
-import { env as publicEnv } from "$env/dynamic/public";
+import type { env as publicEnv } from "$env/dynamic/public";
 
 type PublicConfigKey = keyof typeof publicEnv;
 
