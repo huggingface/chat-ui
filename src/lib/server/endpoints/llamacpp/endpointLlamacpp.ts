@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { buildPrompt } from "$lib/buildPrompt";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Endpoint } from "../endpoints";
@@ -11,7 +11,7 @@ export const endpointLlamacppParametersSchema = z.object({
 	type: z.literal("llamacpp"),
 	url: z.string().url().default("http://127.0.0.1:8080"), // legacy, feel free to remove in breaking change update
 	baseURL: z.string().url().optional(),
-	accessToken: z.string().default(env.HF_TOKEN ?? env.HF_ACCESS_TOKEN),
+	accessToken: z.string().default(config.HF_TOKEN ?? config.HF_ACCESS_TOKEN),
 });
 
 export function endpointLlamacpp(

@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
 import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
@@ -29,7 +29,7 @@ export async function* generateTitleForConversation(
 }
 
 export async function generateTitle(prompt: string) {
-	if (env.LLM_SUMMARIZATION !== "true") {
+	if (config.LLM_SUMMARIZATION !== "true") {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 

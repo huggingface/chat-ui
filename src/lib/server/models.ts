@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
@@ -13,7 +13,6 @@ import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
 import { join, dirname } from "path";
 import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
 import { fileURLToPath } from "url";
@@ -22,7 +21,8 @@ import { Template } from "@huggingface/jinja";
 import { readdirSync } from "fs";
 
 export const MODELS_FOLDER =
-	env.MODELS_STORAGE_PATH || join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
+	config.MODELS_STORAGE_PATH ||
+	join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -137,9 +137,9 @@ const turnStringIntoLocalModel = z.preprocess((obj: unknown) => {
 	} satisfies z.input<typeof modelConfig>;
 }, modelConfig);
 
-let modelsRaw = z.array(turnStringIntoLocalModel).parse(JSON5.parse(env.MODELS ?? "[]"));
+let modelsRaw = z.array(turnStringIntoLocalModel).parse(JSON5.parse(config.MODELS ?? "[]"));
 
-if (env.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
+if (config.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
 	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
 	modelsRaw = [...modelsRaw, ...parsedGgufModels];
 }
@@ -240,7 +240,7 @@ async function getChatPromptRender(
 			// or use the `rag` mode without the citations
 			const id = m.id ?? m.name;
 
-			if (isHuggingChat && id.startsWith("CohereForAI")) {
+			if (config.isHuggingChat && id.startsWith("CohereForAI")) {
 				formattedMessages = [
 					{
 						role: "user",
@@ -267,7 +267,7 @@ async function getChatPromptRender(
 					},
 					...formattedMessages,
 				];
-			} else if (isHuggingChat && id.startsWith("meta-llama")) {
+			} else if (config.isHuggingChat && id.startsWith("meta-llama")) {
 				const results = toolResults.flatMap((result) => {
 					if (result.status === ToolResultStatus.Error) {
 						return [
@@ -361,8 +361,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		if (!m.endpoints) {
 			return endpointTgi({
 				type: "tgi",
-				url: `${env.HF_API_ROOT}/${m.name}`,
-				accessToken: env.HF_TOKEN ?? env.HF_ACCESS_TOKEN,
+				url: `${config.HF_API_ROOT}/${m.name}`,
+				accessToken: config.HF_TOKEN ?? config.HF_ACCESS_TOKEN,
 				weight: 1,
 				model: m,
 			});
@@ -416,7 +416,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-const inferenceApiIds = isHuggingChat
+const inferenceApiIds = config.isHuggingChat
 	? await fetch(
 			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
 		)
@@ -447,7 +447,7 @@ export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...
 export const defaultModel = models[0];
 
 // Models that have been deprecated
-export const oldModels = env.OLD_MODELS
+export const oldModels = config.OLD_MODELS
 	? z
 			.array(
 				z.object({
@@ -457,7 +457,7 @@ export const oldModels = env.OLD_MODELS
 					transferTo: validModelIdSchema.optional(),
 				})
 			)
-			.parse(JSON5.parse(env.OLD_MODELS))
+			.parse(JSON5.parse(config.OLD_MODELS))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
@@ -469,9 +469,9 @@ export const validateModel = (_models: BackendModel[]) => {
 // if `TASK_MODEL` is string & name of a model in `MODELS`, then we use `MODELS[TASK_MODEL]`, else we try to parse `TASK_MODEL` as a model config itself
 
 export const taskModel = addEndpoint(
-	env.TASK_MODEL
-		? ((models.find((m) => m.name === env.TASK_MODEL) ||
-				(await processModel(modelConfig.parse(JSON5.parse(env.TASK_MODEL))))) ??
+	config.TASK_MODEL
+		? ((models.find((m) => m.name === config.TASK_MODEL) ||
+				(await processModel(modelConfig.parse(JSON5.parse(config.TASK_MODEL))))) ??
 				defaultModel)
 		: defaultModel
 );

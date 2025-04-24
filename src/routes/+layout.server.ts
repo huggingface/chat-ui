@@ -5,7 +5,7 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import { defaultModel, models, oldModels, validateModel } from "$lib/server/models";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { ObjectId } from "mongodb";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { toolFromConfigs } from "$lib/server/tools";
@@ -13,7 +13,6 @@ import { MetricsServer } from "$lib/server/metrics";
 import type { ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { ReviewStatus } from "$lib/types/Review";
 import { base } from "$app/paths";
-
 export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
 
@@ -42,7 +41,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 		});
 	}
 
-	const enableAssistants = env.ENABLE_ASSISTANTS === "true";
+	const enableAssistants = config.ENABLE_ASSISTANTS === "true";
 
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
@@ -85,7 +84,9 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 			.toArray()
 	);
 
-	const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
+	const messagesBeforeLogin = config.MESSAGES_BEFORE_LOGIN
+		? parseInt(config.MESSAGES_BEFORE_LOGIN)
+		: 0;
 
 	let loginRequired = false;
 
@@ -177,14 +178,14 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 		),
 		settings: {
 			searchEnabled: !!(
-				env.SERPAPI_KEY ||
-				env.SERPER_API_KEY ||
-				env.SERPSTACK_API_KEY ||
-				env.SEARCHAPI_KEY ||
-				env.YDC_API_KEY ||
-				env.USE_LOCAL_WEBSEARCH ||
-				env.SEARXNG_QUERY_URL ||
-				env.BING_SUBSCRIPTION_KEY
+				config.SERPAPI_KEY ||
+				config.SERPER_API_KEY ||
+				config.SERPSTACK_API_KEY ||
+				config.SEARCHAPI_KEY ||
+				config.YDC_API_KEY ||
+				config.USE_LOCAL_WEBSEARCH ||
+				config.SEARXNG_QUERY_URL ||
+				config.BING_SUBSCRIPTION_KEY
 			),
 			ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
 			ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
@@ -275,10 +276,11 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 		isAdmin: locals.isAdmin,
 		assistant: assistant ? JSON.parse(JSON.stringify(assistant)) : null,
 		enableAssistants,
-		enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
-		enableCommunityTools: env.COMMUNITY_TOOLS === "true",
+		enableAssistantsRAG: config.ENABLE_ASSISTANTS_RAG === "true",
+		enableCommunityTools: config.COMMUNITY_TOOLS === "true",
 		loginRequired,
 		loginEnabled: requiresUser,
 		guestMode: requiresUser && messagesBeforeLogin > 0,
+		publicConfig: config.getPublicConfig(),
 	};
 };

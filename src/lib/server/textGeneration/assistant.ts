@@ -1,5 +1,5 @@
 import { isURLLocal } from "../isURLLocal";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database";
 import type { Assistant } from "$lib/types/Assistant";
 import type { ObjectId } from "mongodb";
@@ -20,7 +20,7 @@ export async function processPreprompt(preprompt: string, user_message: string |
 		const urlString = match[2];
 		try {
 			const url = new URL(urlString);
-			if ((await isURLLocal(url)) && env.ENABLE_LOCAL_FETCH !== "true") {
+			if ((await isURLLocal(url)) && config.ENABLE_LOCAL_FETCH !== "true") {
 				throw new Error("URL couldn't be fetched, it resolved to a local address.");
 			}
 
@@ -62,7 +62,7 @@ export async function getAssistantById(id?: ObjectId) {
 
 export function assistantHasWebSearch(assistant?: Pick<Assistant, "rag"> | null) {
 	return (
-		env.ENABLE_ASSISTANTS_RAG === "true" &&
+		config.ENABLE_ASSISTANTS_RAG === "true" &&
 		!!assistant?.rag &&
 		(assistant.rag.allowedLinks.length > 0 ||
 			assistant.rag.allowedDomains.length > 0 ||
@@ -71,5 +71,5 @@ export function assistantHasWebSearch(assistant?: Pick<Assistant, "rag"> | null)
 }
 
 export function assistantHasDynamicPrompt(assistant?: Pick<Assistant, "dynamicPrompt">) {
-	return env.ENABLE_ASSISTANTS_RAG === "true" && Boolean(assistant?.dynamicPrompt);
+	return config.ENABLE_ASSISTANTS_RAG === "true" && Boolean(assistant?.dynamicPrompt);
 }

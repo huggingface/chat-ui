@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database";
 import type { Message } from "$lib/types/Message";
 import { error } from "@sveltejs/kit";
@@ -13,7 +13,7 @@ import { logger } from "$lib/server/logger.js";
 // curl -X POST "http://localhost:5173/chat/admin/export" -H "Authorization: Bearer <ADMIN_API_SECRET>" -H "Content-Type: application/json" -d '{"model": "OpenAssistant/oasst-sft-6-llama-30b-xor"}'
 
 export async function POST({ request }) {
-	if (!env.PARQUET_EXPORT_DATASET || !env.PARQUET_EXPORT_HF_TOKEN) {
+	if (!config.PARQUET_EXPORT_DATASET || !config.PARQUET_EXPORT_HF_TOKEN) {
 		error(500, "Parquet export is not configured.");
 	}
 
@@ -144,10 +144,10 @@ export async function POST({ request }) {
 
 	await uploadFile({
 		file: pathToFileURL(fileName) as URL,
-		credentials: { accessToken: env.PARQUET_EXPORT_HF_TOKEN },
+		credentials: { accessToken: config.PARQUET_EXPORT_HF_TOKEN },
 		repo: {
 			type: "dataset",
-			name: env.PARQUET_EXPORT_DATASET,
+			name: config.PARQUET_EXPORT_DATASET,
 		},
 	});
 

@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
 export default async function search(query: string): Promise<WebSearchSource[]> {
@@ -12,7 +12,7 @@ export default async function search(query: string): Promise<WebSearchSource[]> 
 		method: "POST",
 		body: JSON.stringify(params),
 		headers: {
-			"x-api-key": env.SERPER_API_KEY,
+			"x-api-key": config.SERPER_API_KEY,
 			"Content-type": "application/json",
 		},
 	});

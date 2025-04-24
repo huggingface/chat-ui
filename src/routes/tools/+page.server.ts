@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { authCondition } from "$lib/server/auth.js";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
@@ -13,7 +13,7 @@ import { ObjectId, type Filter } from "mongodb";
 const NUM_PER_PAGE = 16;
 
 export const load = async ({ url, locals }) => {
-	if (env.COMMUNITY_TOOLS !== "true") {
+	if (config.COMMUNITY_TOOLS !== "true") {
 		error(403, "Community tools are not enabled");
 	}
 
