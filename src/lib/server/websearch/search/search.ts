@@ -8,13 +8,13 @@ import { isURL } from "$lib/utils/isUrl";
 
 import z from "zod";
 import JSON5 from "json5";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { makeGeneralUpdate } from "../update";
 import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 
 const listSchema = z.array(z.string()).default([]);
-const allowList = listSchema.parse(JSON5.parse(env.WEBSEARCH_ALLOWLIST));
-const blockList = listSchema.parse(JSON5.parse(env.WEBSEARCH_BLOCKLIST));
+const allowList = listSchema.parse(JSON5.parse(config.WEBSEARCH_ALLOWLIST));
+const blockList = listSchema.parse(JSON5.parse(config.WEBSEARCH_BLOCKLIST));
 
 export async function* search(
 	messages: Message[],
@@ -69,7 +69,7 @@ function buildQueryFromSiteFilters(allow: string[], block: string[]) {
 }
 
 async function directLinksToSource(links: string[]): Promise<WebSearchSource[]> {
-	if (env.ENABLE_LOCAL_FETCH !== "true") {
+	if (config.ENABLE_LOCAL_FETCH !== "true") {
 		const localLinks = await Promise.all(links.map(isURLStringLocal));
 		links = links.filter((_, index) => !localLinks[index]);
 	}

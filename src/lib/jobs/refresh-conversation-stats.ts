@@ -3,6 +3,7 @@ import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database
 import { logger } from "$lib/server/logger";
 import type { ObjectId } from "mongodb";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
+import { Semaphores } from "$lib/types/Semaphore";
 
 async function getLastComputationTime(): Promise<Date> {
 	const lastStats = await collections.conversationStats.findOne({}, { sort: { "date.at": -1 } });
@@ -234,20 +235,18 @@ async function computeStats(params: {
 	);
 }
 
-const LOCK_KEY = "conversation.stats";
-
 let hasLock = false;
 let lockId: ObjectId | null = null;
 
 async function maintainLock() {
 	if (hasLock && lockId) {
-		hasLock = await refreshLock(LOCK_KEY, lockId);
+		hasLock = await refreshLock(Semaphores.CONVERSATION_STATS, lockId);
 
 		if (!hasLock) {
 			lockId = null;
 		}
 	} else if (!hasLock) {
-		lockId = (await acquireLock(LOCK_KEY)) || null;
+		lockId = (await acquireLock(Semaphores.CONVERSATION_STATS)) || null;
 		hasLock = !!lockId;
 	}
 

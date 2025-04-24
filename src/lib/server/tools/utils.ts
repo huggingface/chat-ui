@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { Client } from "@gradio/client";
 import { SignJWT } from "jose";
 import JSON5 from "json5";
@@ -28,7 +28,7 @@ export async function* callSpace<TInput extends unknown[], TOutput extends unkno
 	const client = await CustomClient.connect(name, {
 		hf_token: ipToken // dont pass the hf token if we have an ip token
 			? undefined
-			: ((env.HF_TOKEN ?? env.HF_ACCESS_TOKEN) as unknown as `hf_${string}`),
+			: ((config.HF_TOKEN ?? config.HF_ACCESS_TOKEN) as unknown as `hf_${string}`),
 		events: ["status", "data"],
 	});
 
@@ -63,7 +63,7 @@ export async function* callSpace<TInput extends unknown[], TOutput extends unkno
 }
 
 export async function getIpToken(ip: string, username?: string) {
-	const ipTokenSecret = env.IP_TOKEN_SECRET;
+	const ipTokenSecret = config.IP_TOKEN_SECRET;
 	if (!ipTokenSecret) {
 		return;
 	}

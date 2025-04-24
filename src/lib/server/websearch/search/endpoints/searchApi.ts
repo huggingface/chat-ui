@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
 export default async function search(query: string): Promise<WebSearchSource[]> {
@@ -7,7 +7,7 @@ export default async function search(query: string): Promise<WebSearchSource[]> 
 		{
 			method: "GET",
 			headers: {
-				Authorization: `Bearer ${env.SEARCHAPI_KEY}`,
+				Authorization: `Bearer ${config.SEARCHAPI_KEY}`,
 				"Content-type": "application/json",
 			},
 		}

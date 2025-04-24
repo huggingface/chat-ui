@@ -6,7 +6,7 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
@@ -22,7 +22,6 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
 
 	let { data = $bindable(), children } = $props();
 
@@ -178,13 +177,21 @@
 	let showDisclaimer = $derived(
 		!$settings.ethicsModalAccepted &&
 			$page.url.pathname !== `${base}/privacy` &&
-			envPublic.PUBLIC_APP_DISCLAIMER === "1" &&
+			publicConfig.PUBLIC_APP_DISCLAIMER === "1" &&
 			!($page.data.shared === true)
 	);
+
+	$effect(() => {
+		() => publicConfig.init(data.publicConfig);
+	});
+
+	onMount(() => {
+		publicConfig.init(data.publicConfig);
+	});
 </script>
 
 <svelte:head>
-	<title>{envPublic.PUBLIC_APP_NAME}</title>
+	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
@@ -192,49 +199,49 @@
 	<!-- use those meta tags everywhere except on the share assistant page -->
 	<!-- feel free to refacto if there's a better way -->
 	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
-		<meta property="og:title" content={envPublic.PUBLIC_APP_NAME} />
+		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
-		<meta property="og:url" content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}" />
+		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />
 		<meta
 			property="og:image"
-			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/thumbnail.png"
+			content="{publicConfig.PUBLIC_ORIGIN ||
+				$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/thumbnail.png"
 		/>
-		<meta property="og:description" content={envPublic.PUBLIC_APP_DESCRIPTION} />
+		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
 	<link
 		rel="icon"
-		href="{envPublic.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/favicon.ico"
+		href="{publicConfig.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/favicon.ico"
 		sizes="32x32"
 	/>
 	<link
 		rel="icon"
-		href="{envPublic.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/icon.svg"
+		href="{publicConfig.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/icon.svg"
 		type="image/svg+xml"
 	/>
 	<link
 		rel="apple-touch-icon"
-		href="{envPublic.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/apple-touch-icon.png"
+		href="{publicConfig.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/apple-touch-icon.png"
 	/>
 	<link
 		rel="manifest"
-		href="{envPublic.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/manifest.json"
+		href="{publicConfig.PUBLIC_ORIGIN ||
+			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/manifest.json"
 	/>
 
-	{#if envPublic.PUBLIC_PLAUSIBLE_SCRIPT_URL && envPublic.PUBLIC_ORIGIN}
+	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig.PUBLIC_ORIGIN}
 		<script
 			defer
-			data-domain={new URL(envPublic.PUBLIC_ORIGIN).hostname}
-			src={envPublic.PUBLIC_PLAUSIBLE_SCRIPT_URL}
+			data-domain={new URL(publicConfig.PUBLIC_ORIGIN).hostname}
+			src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		></script>
 	{/if}
 
-	{#if envPublic.PUBLIC_APPLE_APP_ID}
-		<meta name="apple-itunes-app" content={`app-id=${envPublic.PUBLIC_APPLE_APP_ID}`} />
+	{#if publicConfig.PUBLIC_APPLE_APP_ID}
+		<meta name="apple-itunes-app" content={`app-id=${publicConfig.PUBLIC_APPLE_APP_ID}`} />
 	{/if}
 </svelte:head>
 
@@ -250,7 +257,7 @@
 	/>
 {/if}
 
-{#if overloadedModalOpen && isHuggingChat}
+{#if overloadedModalOpen && publicConfig.isHuggingChat}
 	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
 

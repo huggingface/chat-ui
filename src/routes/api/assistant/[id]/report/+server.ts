@@ -5,8 +5,7 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
-import { env } from "$env/dynamic/private";
-import { env as envPublic } from "$env/dynamic/public";
+import { config } from "$lib/server/config";
 import { sendSlack } from "$lib/server/sendSlack";
 import type { Assistant } from "$lib/types/Assistant";
 
@@ -42,9 +41,8 @@ export async function POST({ params, request, locals, url }) {
 		return error(500, "Failed to report assistant");
 	}
 
-	if (env.WEBHOOK_URL_REPORT_ASSISTANT) {
-		const prefixUrl =
-			envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
+	if (config.WEBHOOK_URL_REPORT_ASSISTANT) {
+		const prefixUrl = config.PUBLIC_SHARE_PREFIX || `${config.PUBLIC_ORIGIN || url.origin}${base}`;
 		const assistantUrl = `${prefixUrl}/assistant/${params.id}`;
 
 		const assistant = await collections.assistants.findOne<Pick<Assistant, "name">>(

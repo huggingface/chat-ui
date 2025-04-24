@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 
 import { z } from "zod";
 import { sum } from "$lib/utils/sum";
@@ -29,7 +29,7 @@ const modelConfig = z.object({
 
 // Default embedding model for backward compatibility
 const rawEmbeddingModelJSON =
-	env.TEXT_EMBEDDING_MODELS ||
+	config.TEXT_EMBEDDING_MODELS ||
 	`[
 	{
 	  "name": "Xenova/gte-small",

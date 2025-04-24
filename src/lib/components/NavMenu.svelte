@@ -4,7 +4,8 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
@@ -90,10 +91,10 @@
 >
 	<a
 		class="flex items-center rounded-xl text-lg font-semibold"
-		href="{envPublic.PUBLIC_ORIGIN}{base}/"
+		href="{publicConfig.PUBLIC_ORIGIN}{base}/"
 	>
 		<Logo classNames="mr-1" />
-		{envPublic.PUBLIC_APP_NAME}
+		{publicConfig.PUBLIC_APP_NAME}
 	</a>
 	{#if $page.url.pathname !== base + "/"}
 		<a
@@ -216,7 +217,7 @@
 	>
 		Settings
 	</a>
-	{#if envPublic.PUBLIC_APP_NAME === "HuggingChat"}
+	{#if publicConfig.PUBLIC_APP_NAME === "HuggingChat"}
 		<a
 			href="{base}/privacy"
 			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
