@@ -28,7 +28,6 @@ export const llama = await getLlama({
 				break;
 		}
 	},
-	build: "never",
 }).catch((e) => {
 	logger.warn(
 		e,
