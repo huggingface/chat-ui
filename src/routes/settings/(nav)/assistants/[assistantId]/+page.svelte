@@ -3,7 +3,8 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { goto, invalidateAll } from "$app/navigation";
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { useTranslations } from "$lib/stores/translations";
 	import type { PageData } from "./$types";
@@ -39,7 +40,7 @@
 	const translations = useTranslations();
 
 	const prefix =
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
+		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 

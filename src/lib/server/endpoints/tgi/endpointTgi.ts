@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { buildPrompt } from "$lib/buildPrompt";
 import { textGenerationStream } from "@huggingface/inference";
 import type { Endpoint, EndpointMessage } from "../endpoints";
@@ -14,7 +14,7 @@ export const endpointTgiParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("tgi"),
 	url: z.string().url(),
-	accessToken: z.string().default(env.HF_TOKEN ?? env.HF_ACCESS_TOKEN),
+	accessToken: z.string().default(config.HF_TOKEN ?? config.HF_ACCESS_TOKEN),
 	authorization: z.string().optional(),
 	multimodal: z
 		.object({

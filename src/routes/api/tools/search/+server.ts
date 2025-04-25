@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import type { BaseTool, CommunityToolDB } from "$lib/types/Tool.js";
@@ -6,7 +6,7 @@ import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchToke
 import type { Filter } from "mongodb";
 import { ReviewStatus } from "$lib/types/Review";
 export async function GET({ url }) {
-	if (env.COMMUNITY_TOOLS !== "true") {
+	if (config.COMMUNITY_TOOLS !== "true") {
 		return new Response("Community tools are not enabled", { status: 403 });
 	}
 

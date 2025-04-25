@@ -1,8 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { env as envPublic } from "$env/dynamic/public";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
@@ -105,9 +104,9 @@
 </script>
 
 <svelte:head>
-	{#if isHuggingChat}
+	{#if publicConfig.isHuggingChat}
 		<title>HuggingChat - {$translations.t("assistants")}</title>
-		<meta property="og:title" content="HuggingChat - {$translations.t('assistants')}" />
+		<meta property="og:title" content="HuggingChat - Assistants" />
 		<meta property="og:type" content="link" />
 		<meta
 			property="og:description"
@@ -115,8 +114,8 @@
 		/>
 		<meta
 			property="og:image"
-			content="{envPublic.PUBLIC_ORIGIN ||
-				page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+			content="{publicConfig.PUBLIC_ORIGIN ||
+				page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
 		/>
 		<meta property="og:url" content={page.url.href} />
 	{/if}
@@ -126,7 +125,7 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">{$translations.t("assistants")}</h1>
-			{#if isHuggingChat}
+			{#if publicConfig.isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
 				</div>
@@ -195,7 +194,7 @@
 						/></a
 					>
 				</div>
-				{#if isHuggingChat}
+				{#if publicConfig.isHuggingChat}
 					<a
 						href="https://hf.co/{assistantsCreator}"
 						target="_blank"

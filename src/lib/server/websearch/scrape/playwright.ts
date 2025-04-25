@@ -7,16 +7,16 @@ import {
 	type Browser,
 } from "playwright";
 import { PlaywrightBlocker } from "@cliqz/adblocker-playwright";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { onExit } from "$lib/server/exitHandler";
 
 const blocker =
-	env.PLAYWRIGHT_ADBLOCKER === "true"
+	config.PLAYWRIGHT_ADBLOCKER === "true"
 		? await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)
 				.then((blker) => {
 					const mostBlocked = blker.blockFonts().blockMedias().blockFrames().blockImages();
-					if (env.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
+					if (config.WEBSEARCH_JAVASCRIPT === "false") return mostBlocked.blockScripts();
 					return mostBlocked;
 				})
 				.catch((err) => {
@@ -68,7 +68,7 @@ export async function withPage<T>(
 
 	try {
 		const page = await ctx.newPage();
-		if (env.PLAYWRIGHT_ADBLOCKER === "true") {
+		if (config.PLAYWRIGHT_ADBLOCKER === "true") {
 			await blocker.enableBlockingInPage(page);
 		}
 
@@ -82,10 +82,10 @@ export async function withPage<T>(
 		});
 
 		const res = await page
-			.goto(url, { waitUntil: "load", timeout: parseInt(env.WEBSEARCH_TIMEOUT) })
+			.goto(url, { waitUntil: "load", timeout: parseInt(config.WEBSEARCH_TIMEOUT) })
 			.catch(() => {
 				console.warn(
-					`Failed to load page within ${parseInt(env.WEBSEARCH_TIMEOUT) / 1000}s: ${url}`
+					`Failed to load page within ${parseInt(config.WEBSEARCH_TIMEOUT) / 1000}s: ${url}`
 				);
 			});
 

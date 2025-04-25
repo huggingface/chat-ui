@@ -1,8 +1,8 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { Client } from "@gradio/client";
 
 export async function GET({ url }) {
-	if (env.COMMUNITY_TOOLS !== "true") {
+	if (config.COMMUNITY_TOOLS !== "true") {
 		return new Response("Community tools are not enabled", { status: 403 });
 	}
 

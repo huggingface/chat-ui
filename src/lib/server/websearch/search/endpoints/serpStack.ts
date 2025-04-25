@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { isURL } from "$lib/utils/isUrl";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
@@ -13,7 +13,7 @@ type SerpStackResponse = {
 
 export default async function searchSerpStack(query: string): Promise<WebSearchSource[]> {
 	const response = await fetch(
-		`http://api.serpstack.com/search?access_key=${env.SERPSTACK_API_KEY}&query=${query}&hl=en&gl=us`,
+		`http://api.serpstack.com/search?access_key=${config.SERPSTACK_API_KEY}&query=${query}&hl=en&gl=us`,
 		{ headers: { "Content-type": "application/json; charset=UTF-8" } }
 	);
 

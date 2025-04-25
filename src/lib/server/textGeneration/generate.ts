@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { ToolResult, Tool } from "$lib/types/Tool";
 import {
 	MessageReasoningUpdateType,
@@ -171,7 +171,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 
 			// create a new status every 5 seconds
 			if (
-				env.REASONING_SUMMARY === "true" &&
+				config.REASONING_SUMMARY === "true" &&
 				new Date().getTime() - lastReasoningUpdate.getTime() > 4000
 			) {
 				lastReasoningUpdate = new Date();

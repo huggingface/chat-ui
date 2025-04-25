@@ -14,6 +14,7 @@
 		"test": "vitest",
 		"updateLocalEnv": "vite-node --options.transformMode.ssr='/.*/' scripts/updateLocalEnv.ts",
 		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts",
+		"config": "vite-node --options.transformMode.ssr='/.*/' scripts/config.ts",
 		"prepare": "husky"
 	},
 	"devDependencies": {
