@@ -81,7 +81,7 @@
 		"aws-sigv4-fetch": "^4.0.1",
 		"aws4": "^1.13.0",
 		"date-fns": "^2.29.3",
-		"dotenv": "^16.0.3",
+		"dotenv": "^16.5.0",
 		"express": "^4.21.2",
 		"file-type": "^19.4.1",
 		"google-auth-library": "^9.13.0",

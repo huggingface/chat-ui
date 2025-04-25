@@ -1,6 +1,5 @@
 import { getLlama } from "node-llama-cpp";
 import { logger } from "$lib/server/logger";
-import { building } from "$app/environment";
 
 export const llama = await getLlama({
 	logger: (level, message) => {
@@ -29,7 +28,6 @@ export const llama = await getLlama({
 				break;
 		}
 	},
-	build: building ? "forceRebuild" : "never",
 }).catch((e) => {
 	logger.warn(
 		e,
