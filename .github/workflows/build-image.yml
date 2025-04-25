@@ -20,7 +20,7 @@ on:
 jobs:
   build-and-publish-image-with-db:
     runs-on:
-      group: aws-general-8-plus-use1-public-80
+      group: aws-general-8-plus
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -81,7 +81,7 @@ jobs:
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
   build-and-publish-image-nodb:
     runs-on:
-      group: aws-general-8-plus-use1-public-80
+      group: aws-general-8-plus
     steps:
       - name: Checkout
         uses: actions/checkout@v4
