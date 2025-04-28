@@ -193,7 +193,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internalRs in strawberry.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+            "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
       },
