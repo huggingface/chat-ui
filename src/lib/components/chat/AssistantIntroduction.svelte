@@ -58,8 +58,8 @@
 	const settings = useSettingsStore();
 </script>
 
-<div class="my-auto grid gap-8 lg:grid-cols-3">
-	<div class="lg:col-span-1">
+<div class="my-auto grid gap-8 lg:grid-cols-9">
+	<div class="lg:col-span-4">
 		<div>
 			<div class="mb-3 flex items-center">
 				{#if assistant.avatar}
@@ -81,7 +81,7 @@
 					{assistant.name}
 				</div>
 			</div>
-			<p class="line-clamp-5 text-base text-gray-600 dark:text-gray-400">
+			<p class="line-clamp-5 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
 				{assistant.description || "No description provided."}
 			</p>
 
@@ -98,7 +98,7 @@
 			</button>
 		</div>
 	</div>
-	<div class="lg:col-span-2 lg:pl-24">
+	<div class="lg:col-span-5 lg:pl-12">
 		<div class="overflow-hidden rounded-xl border dark:border-gray-800">
 			<div class="flex flex-wrap items-center justify-between gap-2 p-3">
 				<div class="flex flex-wrap items-center gap-2">
@@ -181,7 +181,7 @@
 		</div>
 	</div>
 	{#if assistant.exampleInputs && assistant.exampleInputs.length > 0}
-		<div class="lg:col-span-3 lg:mt-6">
+		<div class="lg:col-span-9 lg:mt-6">
 			<p class="mb-3 text-center text-gray-600 dark:text-gray-300 lg:text-left">Examples</p>
 			<div
 				class="flex max-h-60 gap-2 overflow-x-auto pb-2 text-center scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 lg:grid lg:grid-cols-3 lg:overflow-y-auto lg:text-left"
