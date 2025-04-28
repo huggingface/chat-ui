@@ -24,6 +24,7 @@
 	import { captureScreen } from "$lib/utils/screenshot";
 	import IconScreenshot from "../icons/IconScreenshot.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		files?: File[];
@@ -127,6 +128,7 @@
 	}
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	// tool section
 
@@ -190,7 +192,7 @@
 		>
 			{#if showWebSearch}
 				<HoverTooltip
-					label="Search the web"
+					label={$translations.t("search_the_web")}
 					position="top"
 					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
 						? 'hidden'
@@ -221,14 +223,14 @@
 					>
 						<IconInternet classNames="text-xl" />
 						{#if webSearchIsOn}
-							Search
+							{$translations.t("search")}
 						{/if}
 					</button>
 				</HoverTooltip>
 			{/if}
 			{#if showImageGen}
 				<HoverTooltip
-					label="Generate	images"
+					label={$translations.t("generate_images")}
 					position="top"
 					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {imageGenIsOn
 						? 'hidden'
@@ -255,7 +257,7 @@
 					>
 						<IconImageGen classNames="text-xl" />
 						{#if imageGenIsOn}
-							Image Gen
+							{$translations.t("image_gen")}
 						{/if}
 					</button>
 				</HoverTooltip>
@@ -274,8 +276,8 @@
 				<div class="flex items-center">
 					<HoverTooltip
 						label={mimeTypesString.includes("*")
-							? "Upload any file"
-							: `Upload ${mimeTypesString} files`}
+							? $translations.t("upload_any_file")
+							: $translations.t("upload_files", { types: mimeTypesString })}
 						position="top"
 						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
 					>
@@ -283,21 +285,21 @@
 							<input
 								disabled={loading}
 								class="absolute hidden size-0"
-								aria-label="Upload file"
+								aria-label={$translations.t("upload_file")}
 								type="file"
 								onchange={onFileChange}
 								accept={mimeTypes.join(",")}
 							/>
 							<IconPaperclip classNames="text-xl" />
 							{#if documentParserIsOn}
-								Document Parser
+								{$translations.t("document_parser")}
 							{/if}
 						</label>
 					</HoverTooltip>
 				</div>
 				{#if mimeTypes.includes("image/*")}
 					<HoverTooltip
-						label="Capture screenshot"
+						label={$translations.t("capture_screenshot")}
 						position="top"
 						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
 					>
@@ -339,14 +341,14 @@
 					</button>
 				{/each}
 				<HoverTooltip
-					label="Browse more tools"
+					label={$translations.t("browse_more_tools")}
 					position="right"
 					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 max-sm:hidden"
 				>
 					<a
 						class="base-tool flex !size-[20px] items-center justify-center rounded-full border !border-gray-200 !bg-white !transition-none dark:!border-gray-500 dark:!bg-transparent"
 						href={`${base}/tools`}
-						title="Browse more tools"
+						title={$translations.t("browse_more_tools")}
 					>
 						<IconAdd class="text-sm" />
 					</a>

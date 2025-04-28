@@ -9,12 +9,14 @@
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		webSearchMessages?: MessageWebSearchUpdate[];
 	}
 
 	let { webSearchMessages = [] }: Props = $props();
+	const translations = useTranslations();
 
 	let sources = $derived(webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources);
 	let lastMessage = $derived(
@@ -59,12 +61,12 @@
 			<IconInternet classNames="relative fill-current text-xl" />
 		</div>
 		<dl class="leading-4">
-			<dd class="text-sm">Web Search</dd>
+			<dd class="text-sm">{$translations.t("web_search")}</dd>
 			<dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">
 				{#if sources}
-					Completed
+					{$translations.t("completed")}
 				{:else}
-					{"message" in lastMessage ? lastMessage.message : "An error occurred"}
+					{"message" in lastMessage ? lastMessage.message : $translations.t("an_error_occurred")}
 				{/if}
 			</dt>
 		</dl>

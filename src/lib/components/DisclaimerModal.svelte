@@ -8,8 +8,10 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
+	import { useTranslations } from "$lib/stores/translations";
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 </script>
 
 <Modal on:close width="!max-w-[400px] !m-4">
@@ -47,12 +49,12 @@
 			>
 				{#if page.data.loginEnabled}
 					{#if page.data.guestMode}
-						Continue as guest
+						{$translations.t("continue_as_guest")}
 					{:else}
-						Explore the app
+						{$translations.t("explore_the_app")}
 					{/if}
 				{:else}
-					Start chatting
+					{$translations.t("start_chatting")}
 				{/if}
 			</button>
 			{#if page.data.loginEnabled}
@@ -61,11 +63,11 @@
 						type="submit"
 						class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 					>
-						Sign in
+						{$translations.t("sign_in")}
 						{#if publicConfig.isHuggingChat}
 							<span class="flex items-center">
-								&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging
-								Face
+								&nbsp;{$translations.t("with")}
+								<LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging Face
 							</span>
 						{/if}
 					</button>

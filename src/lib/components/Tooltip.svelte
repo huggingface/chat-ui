@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { useTranslations } from "$lib/stores/translations";
+
 	interface Props {
 		classNames?: string;
 		label?: string;
@@ -7,9 +9,11 @@
 
 	let {
 		classNames = "",
-		label = "Copied",
+		label = "",
 		position = "left-1/2 top-full transform -translate-x-1/2 translate-y-2",
 	}: Props = $props();
+
+	const translations = useTranslations();
 </script>
 
 <div
@@ -26,5 +30,5 @@
 				border-right-color: transparent;
 			"
 	></div>
-	{label}
+	{label || $translations.t("copied")}
 </div>

@@ -4,6 +4,7 @@
 	import { afterNavigate, goto, invalidateAll } from "$app/navigation";
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { useTranslations } from "$lib/stores/translations";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonArrowUpRight from "~icons/carbon/ArrowUpRight";
 	import CarbonAdd from "~icons/carbon/add";
@@ -69,6 +70,7 @@
 	});
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 </script>
 
 <div
@@ -88,7 +90,7 @@
 			</button>
 		{/if}
 		<h2 class="absolute left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">
-			Settings
+			{$translations.t("settings")}
 		</h2>
 		<button
 			class="btn rounded-lg"
@@ -111,7 +113,7 @@
 			<h3
 				class="px-4 pb-2 pt-3 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
 			>
-				Models
+				{$translations.t("models")}
 			</h3>
 
 			{#each data.models.filter((el) => !el.unlisted) as model}
@@ -133,7 +135,7 @@
 						<div
 							class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
 						>
-							Active
+							{$translations.t("default")}
 						</div>
 					{/if}
 				</button>
@@ -143,13 +145,13 @@
 					bind:this={assistantsSection}
 					class="mt-6 px-4 pb-2 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
 				>
-					Assistants
+					{$translations.t("assistants")}
 				</h3>
 				<!-- My Assistants -->
 				<h4
 					class="px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
 				>
-					My Assistants
+					{$translations.t("my_assistants", { my_assistants: "My Assistants" })}
 				</h4>
 
 				{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
@@ -178,7 +180,7 @@
 							<div
 								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
 							>
-								Active
+								{$translations.t("default")}
 							</div>
 						{/if}
 					</button>
@@ -192,7 +194,7 @@
 						aria-label="Create new assistant"
 					>
 						<CarbonAdd />
-						<div class="truncate">Create new assistant</div>
+						<div class="truncate">{$translations.t("create_new_assistant")}</div>
 					</button>
 				{/if}
 
@@ -200,7 +202,7 @@
 				<h4
 					class="mt-4 px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
 				>
-					Other Assistants
+					{$translations.t("other_assistants", { other_assistants: "Other Assistants" })}
 				</h4>
 
 				{#each data.assistants.filter((assistant) => !assistant.createdByMe) as assistant}
@@ -275,7 +277,9 @@
 					aria-label="Browse all assistants"
 				>
 					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
-					<div class="truncate">Browse Assistants</div>
+					<div class="truncate">
+						{$translations.t("browse_assistants", { browse_assistants: "Browse Assistants" })}
+					</div>
 				</button>
 			{/if}
 
@@ -288,7 +292,7 @@
 				aria-label="Configure application settings"
 			>
 				<UserIcon class="text-sm" />
-				Application Settings
+				{$translations.t("application_settings")}
 			</button>
 		</div>
 	{/if}

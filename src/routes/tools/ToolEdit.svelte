@@ -13,9 +13,12 @@
 	import { base } from "$app/paths";
 	import ToolInputComponent from "./ToolInputComponent.svelte";
 	import { error as errorStore } from "$lib/stores/errors";
+	import { useTranslations } from "$lib/stores/translations";
 
 	import CarbonInformation from "~icons/carbon/information";
 	import { page } from "$app/state";
+
+	const translations = useTranslations();
 
 	interface Props {
 		tool?: CommunityToolEditable | undefined;
@@ -193,19 +196,20 @@
 >
 	{#if tool}
 		<h2 class="text-xl font-semibold">
-			{readonly ? "View" : "Edit"} Tool: {tool.displayName}
+			{readonly ? $translations.t("view_tool") : $translations.t("edit_tool")}
+			{$translations.t("tool_colon")}
+			{tool.displayName}
 		</h2>
 		{#if !readonly}
 			<p class="mb-6 text-sm text-gray-500">
-				Modifying an existing tool will propagate the changes to all users.
+				{$translations.t("modify_tool_description")}
 			</p>
 		{/if}
 	{:else}
-		<h2 class="text-xl font-semibold">Create new tool</h2>
+		<h2 class="text-xl font-semibold">{$translations.t("create_new_tool")}</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Create and share your own tools. All tools are <span
-				class="rounded-full border px-2 py-0.5 leading-none">public</span
-			>
+			{$translations.t("create_tool_description")}
+			<span class="rounded-full border px-2 py-0.5 leading-none">{$translations.t("public")}</span>
 		</p>
 	{/if}
 
@@ -213,7 +217,7 @@
 		<div class="col-span-1 flex flex-col gap-4">
 			<div class="flex flex-col gap-4">
 				<label>
-					<div class="mb-1 font-semibold">Tool Display Name</div>
+					<div class="mb-1 font-semibold">{$translations.t("tool_display_name")}</div>
 					<input
 						type="text"
 						name="displayName"
@@ -233,7 +237,7 @@
 					</div>
 
 					<label class="flex-grow">
-						<div class="mb-1 font-semibold">Icon</div>
+						<div class="mb-1 font-semibold">{$translations.t("icon")}</div>
 
 						<select
 							name="icon"
@@ -249,7 +253,7 @@
 					</label>
 
 					<label class="flex-grow">
-						<div class="mb-1 font-semibold">Color scheme</div>
+						<div class="mb-1 font-semibold">{$translations.t("color_scheme")}</div>
 						<select
 							name="color"
 							disabled={readonly}
@@ -265,10 +269,9 @@
 				</div>
 
 				<label>
-					<div class=" font-semibold">Tool Description</div>
+					<div class=" font-semibold">{$translations.t("tool_description")}</div>
 					<p class="mb-1 text-sm text-gray-500">
-						This description will be passed to the model when picking tools. Describe what your tool
-						does and when it is appropriate to use.
+						{$translations.t("tool_description_help")}
 					</p>
 					<textarea
 						name="description"
@@ -281,12 +284,11 @@
 				</label>
 
 				<label>
-					<div class="mb-1 font-semibold">Hugging Face Space URL</div>
+					<div class="mb-1 font-semibold">{$translations.t("huggingface_space_url")}</div>
 					<p class="mb-1 text-sm text-gray-500">
-						Specify the Hugging Face Space where your tool is hosted. <a
-							href="https://huggingface.co/spaces"
-							target="_blank"
-							class="underline">See trending spaces here</a
+						{$translations.t("huggingface_space_url_help")}
+						<a href="https://huggingface.co/spaces" target="_blank" class="underline"
+							>{$translations.t("see_trending_spaces")}</a
 						>.
 					</p>
 					<input
@@ -300,27 +302,25 @@
 					<p class="text-xs text-red-500">{getError("spaceUrl")}</p>
 				</label>
 				<p class="text-justify text-gray-800">
-					Tools allows models that support them to use external application directly via function
-					calling. Tools must use Hugging Face Gradio Spaces as we detect the input and output types
-					automatically from the <a
-						class="underline"
-						href="https://www.gradio.app/guides/sharing-your-app#api-page">Gradio API</a
-					>. For GPU intensive tool consider using a ZeroGPU Space.
+					{$translations.t("tools_explanation")}
+					<a class="underline" href="https://www.gradio.app/guides/sharing-your-app#api-page"
+						>{$translations.t("gradio_api")}</a
+					>. {$translations.t("for_gpu_intensive")}
 				</p>
 			</div>
 		</div>
 		<div class="col-span-1 flex flex-col gap-4">
 			<div class="flex flex-col gap-2">
-				<h3 class="mb-1 font-semibold">Functions</h3>
+				<h3 class="mb-1 font-semibold">{$translations.t("functions")}</h3>
 				{#if editableTool.baseUrl}
-					<p class="text-sm text-gray-500">Choose functions that can be called in your tool.</p>
+					<p class="text-sm text-gray-500">{$translations.t("choose_functions")}</p>
 				{:else}
-					<p class="text-sm text-gray-500">Start by specifying a Hugging Face Space URL.</p>
+					<p class="text-sm text-gray-500">{$translations.t("start_by_specifying")}</p>
 				{/if}
 
 				{#if editableTool.baseUrl}
 					{#await getGradioApi(spaceUrl)}
-						<p class="text-sm text-gray-500">Loading...</p>
+						<p class="text-sm text-gray-500">{$translations.t("loading")}</p>
 					{:then api}
 						<div class="flex flex-row flex-wrap gap-4">
 							{#each Object.keys(api["named_endpoints"] ?? {}) as name}
@@ -354,14 +354,13 @@
 											<span
 												class="group relative flex w-max items-center justify-center text-sm font-semibold text-gray-700"
 											>
-												AI Function Name
+												{$translations.t("ai_function_name")}
 												<CarbonInformation class="m-1 align-middle text-xs text-purple-500" />
 												<div
 													class="pointer-events-none absolute -top-16 right-0 w-max rounded-md bg-gray-100 p-2 opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-800"
 												>
 													<p class="max-w-sm text-sm font-normal text-gray-800 dark:text-gray-200">
-														This is the function name that will be used when prompting the model.
-														Make sure it describes your tool well, is short and unique.
+														{$translations.t("ai_function_name_help")}
 													</p>
 												</div>
 											</span>
@@ -376,9 +375,9 @@
 									</div>
 
 									<div>
-										<h3 class="text-lg font-semibold">Arguments</h3>
+										<h3 class="text-lg font-semibold">{$translations.t("arguments")}</h3>
 										<p class="mb-2 text-sm text-gray-500">
-											Choose parameters that can be passed to your tool.
+											{$translations.t("choose_parameters")}
 										</p>
 									</div>
 
@@ -412,7 +411,7 @@
 															disabled={readonly}
 															bind:group={editableTool.inputs[inputIdx].paramType}
 														/>
-														<span class="text-sm text-gray-500">Required</span>
+														<span class="text-sm text-gray-500">{$translations.t("required")}</span>
 													</label>
 													<label class="ml-auto">
 														<input
@@ -422,7 +421,7 @@
 															disabled={readonly || parameter?.python_type.type === "filepath"}
 															bind:group={editableTool.inputs[inputIdx].paramType}
 														/>
-														<span class="text-sm text-gray-500">Optional</span>
+														<span class="text-sm text-gray-500">{$translations.t("optional")}</span>
 													</label>
 													<label class="ml-auto">
 														<input
@@ -432,7 +431,7 @@
 															disabled={readonly || parameter?.python_type.type === "filepath"}
 															bind:group={editableTool.inputs[inputIdx].paramType}
 														/>
-														<span class="text-sm text-gray-500">Fixed</span>
+														<span class="text-sm text-gray-500">{$translations.t("fixed")}</span>
 													</label>
 												</div>
 											</div>
@@ -517,17 +516,17 @@
 
 									<div class="flex flex-col gap-4">
 										<div>
-											<h3 class="text-lg font-semibold">Output options</h3>
+											<h3 class="text-lg font-semibold">{$translations.t("output_options")}</h3>
 											<p class="mb-2 text-sm text-gray-500">
-												Choose what value your tool will return and how
+												{$translations.t("choose_output_value")}
 											</p>
 										</div>
 
 										<label class="flex flex-col gap-2" for="showOutput">
 											<div class="mb-1 font-semibold">
-												Output component
+												{$translations.t("output_component")}
 												<p class="text-xs font-normal text-gray-500">
-													Pick the gradio output component whose output will be used in the tool.
+													{$translations.t("output_component_help")}
 												</p>
 											</div>
 											{#if editableTool.outputComponent}
@@ -570,10 +569,9 @@
 
 										<label class="flex flex-row gap-2" for="showOutput">
 											<div class="mb-1 font-semibold">
-												Show output to user directly
+												{$translations.t("show_output_directly")}
 												<p class="text-xs font-normal text-gray-500">
-													Some tools return long context that should not be shown to the user
-													directly.
+													{$translations.t("show_output_directly_help")}
 												</p>
 											</div>
 											<input
@@ -590,10 +588,10 @@
 								</div>
 							</div>
 						{:else if APIloading}
-							<p class="text-sm text-gray-500">Loading API...</p>
+							<p class="text-sm text-gray-500">{$translations.t("loading_api")}</p>
 						{:else if !api["named_endpoints"]}
 							<p class="font-medium text-red-800">
-								No endpoints found in this space. Try another one.
+								{$translations.t("no_endpoints_found")}
 							</p>
 						{/if}
 					{:catch error}
@@ -607,7 +605,7 @@
 					class="mt-4 w-fit rounded-full bg-gray-200 px-4 py-2 font-semibold text-gray-700"
 					onclick={() => dispatch("close")}
 				>
-					Cancel
+					{$translations.t("cancel")}
 				</button>
 				{#if !readonly}
 					<button
@@ -618,7 +616,7 @@
 						class:text-gray-300={formLoading || !formSubmittable}
 						class:bg-gray-400={formLoading || !formSubmittable}
 					>
-						{formLoading ? "Saving..." : "Save"}
+						{formLoading ? $translations.t("saving") : $translations.t("save")}
 					</button>
 				{/if}
 			</div>

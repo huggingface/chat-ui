@@ -11,6 +11,7 @@
 	import { page } from "$app/state";
 	import { onDestroy } from "svelte";
 	import { browser } from "$app/environment";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -18,6 +19,7 @@
 	}
 
 	let { tool, loading = false }: Props = $props();
+	const translations = useTranslations();
 
 	const toolFnName = tool.find(isMessageToolCallUpdate)?.call.name;
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
@@ -119,7 +121,12 @@
 			</div>
 
 			<span>
-				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+				{toolError
+					? $translations.t("error_calling")
+					: toolDone
+						? $translations.t("called")
+						: $translations.t("calling")}
+				{$translations.t("tool")}
 				<span class="font-semibold"
 					>{availableTools.find((tool) => tool.name === toolFnName)?.displayName ??
 						toolFnName}</span
@@ -129,7 +136,7 @@
 		{#each tool as toolUpdate}
 			{#if toolUpdate.subtype === MessageToolUpdateType.Call}
 				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm">Parameters</h3>
+					<h3 class="text-sm">{$translations.t("parameters")}</h3>
 					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
 				</div>
 				<ul class="py-1 text-sm">
@@ -144,13 +151,13 @@
 				</ul>
 			{:else if toolUpdate.subtype === MessageToolUpdateType.Error}
 				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm">Error</h3>
+					<h3 class="text-sm">{$translations.t("error")}</h3>
 					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
 				</div>
 				<p class="text-sm">{toolUpdate.message}</p>
 			{:else if isMessageToolResultUpdate(toolUpdate) && toolUpdate.result.status === ToolResultStatus.Success && toolUpdate.result.display}
 				<div class="mt-1 flex items-center gap-2 opacity-80">
-					<h3 class="text-sm">Result</h3>
+					<h3 class="text-sm">{$translations.t("result")}</h3>
 					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
 				</div>
 				<ul class="py-1 text-sm">

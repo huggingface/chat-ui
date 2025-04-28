@@ -8,6 +8,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonEdit from "~icons/carbon/edit";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		conv: ConvSidebar;
@@ -16,6 +17,8 @@
 	let { conv }: Props = $props();
 
 	let confirmDelete = $state(false);
+
+	const translations = useTranslations();
 
 	const dispatch = createEventDispatcher<{
 		deleteConversation: string;
@@ -36,12 +39,12 @@
 >
 	<div class="flex flex-1 items-center truncate">
 		{#if confirmDelete}
-			<span class="mr-1 font-semibold"> Delete </span>
+			<span class="mr-1 font-semibold"> {$translations.t("delete")} </span>
 		{/if}
 		{#if conv.avatarUrl}
 			<img
 				src="{base}{conv.avatarUrl}"
-				alt="Assistant avatar"
+				alt={$translations.t("assistant_avatar")}
 				class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
 			/>
 			{conv.title.replace(/\p{Emoji}/gu, "")}
@@ -59,7 +62,7 @@
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Cancel delete action"
+			title={$translations.t("cancel_delete_action")}
 			onclick={(e) => {
 				e.preventDefault();
 				confirmDelete = false;
@@ -70,7 +73,7 @@
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Confirm delete action"
+			title={$translations.t("confirm_delete_action")}
 			onclick={(e) => {
 				e.preventDefault();
 				confirmDelete = false;
@@ -83,10 +86,10 @@
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Edit conversation title"
+			title={$translations.t("edit_conversation_title")}
 			onclick={(e) => {
 				e.preventDefault();
-				const newTitle = prompt("Edit this conversation title:", conv.title);
+				const newTitle = prompt($translations.t("edit_this_conversation_title"), conv.title);
 				if (!newTitle) return;
 				dispatch("editConversationTitle", { id: conv.id, title: newTitle });
 			}}
@@ -97,7 +100,7 @@
 		<button
 			type="button"
 			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Delete conversation"
+			title={$translations.t("delete_conversation")}
 			onclick={(event) => {
 				event.preventDefault();
 				if (event.shiftKey) {

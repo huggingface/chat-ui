@@ -10,6 +10,7 @@
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import { base } from "$app/paths";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		file: MessageFile;
@@ -17,6 +18,7 @@
 	}
 
 	let { file, canClose = true }: Props = $props();
+	const translations = useTranslations();
 
 	let showModal = $state(false);
 
@@ -62,14 +64,14 @@
 			{#if file.type === "hash"}
 				<img
 					src={urlNotTrailing + "/output/" + file.value}
-					alt="input from user"
+					alt={$translations.t("input_from_user")}
 					class="aspect-auto"
 				/>
 			{:else}
 				<!-- handle the case where this is a base64 encoded image -->
 				<img
 					src={`data:${file.mime};base64,${file.value}`}
-					alt="input from user"
+					alt={$translations.t("input_from_user")}
 					class="aspect-auto"
 				/>
 			{/if}
@@ -78,9 +80,8 @@
 				<h3 class="-mb-4 pt-2 text-xl font-bold">{file.name}</h3>
 				{#if file.mime === "application/vnd.chatui.clipboard"}
 					<p class="text-sm text-gray-500">
-						If you prefer to inject clipboard content directly in the chat, you can disable this
-						feature in the
-						<a href={`${base}/settings`} class="underline">settings page</a>.
+						{$translations.t("clipboard_content_settings_message")}
+						<a href={`${base}/settings`} class="underline">{$translations.t("settings_page")}</a>.
 					</p>
 				{/if}
 				<button
@@ -174,7 +175,7 @@
 						{truncateMiddle(file.name, 28)}
 					</dd>
 					{#if file.mime === "application/vnd.chatui.clipboard"}
-						<dt class="text-xs text-gray-400">Clipboard source</dt>
+						<dt class="text-xs text-gray-400">{$translations.t("clipboard_source")}</dt>
 					{:else}
 						<dt class="text-xs text-gray-400">{file.mime}</dt>
 					{/if}
@@ -194,7 +195,7 @@
 					<dd class="text-sm">
 						{truncateMiddle(file.name, 28)}
 					</dd>
-					<dt class="text-xs text-gray-400">File type could not be determined</dt>
+					<dt class="text-xs text-gray-400">{$translations.t("file_type_not_determined")}</dt>
 				</dl>
 				<a
 					href={file.type === "base64"

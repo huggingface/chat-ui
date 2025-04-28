@@ -5,6 +5,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { documentParserToolId } from "$lib/utils/toolIds";
 	import CarbonImage from "~icons/carbon/image";
+	import { useTranslations } from "$lib/stores/translations";
 
 	interface Props {
 		// import EosIconsLoading from "~icons/eos-icons/loading";
@@ -22,6 +23,7 @@
 	}: Props = $props();
 
 	const settings = useSettingsStore();
+	const translations = useTranslations();
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
@@ -48,9 +50,10 @@
 							})
 						) {
 							setErrorMsg(
-								`Some file type not supported. Only allowed: ${mimeTypes.join(
-									", "
-								)}. Uploaded document is of type ${file.type}`
+								$translations.t("file_type_not_supported", {
+									allowed: mimeTypes.join(", "),
+									type: file.type,
+								})
 							);
 							files = [];
 							return;
@@ -58,7 +61,7 @@
 
 						// if file is bigger than 10MB abort
 						if (file.size > 10 * 1024 * 1024) {
-							setErrorMsg("Some file is too big. (10MB max)");
+							setErrorMsg($translations.t("file_too_big"));
 							files = [];
 							return;
 						}
@@ -97,5 +100,5 @@
 		: 'bg-gray-100 text-gray-500 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-400'}"
 >
 	<CarbonImage class="text-xl" />
-	<p>Drop File to add to chat</p>
+	<p>{$translations.t("drop_file_to_chat")}</p>
 </div>

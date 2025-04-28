@@ -203,6 +203,7 @@ export const load: LayoutServerLoad = async ({ locals, depends, fetch }) => {
 					.map((el) => el._id.toString()),
 			disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 			directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
+			language: settings?.language ?? DEFAULT_SETTINGS.language,
 		},
 		models: models.map((model) => ({
 			id: model.id,

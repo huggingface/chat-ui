@@ -20,6 +20,7 @@ export async function POST({ request, locals }) {
 			tools: z.array(z.string()).optional(),
 			disableStream: z.boolean().default(false),
 			directPaste: z.boolean().default(false),
+			language: z.string().default(String(DEFAULT_SETTINGS.language)),
 		})
 		.parse(body) satisfies SettingsEditable;
 
