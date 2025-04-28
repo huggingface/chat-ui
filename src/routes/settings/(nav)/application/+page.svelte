@@ -85,6 +85,13 @@
 				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
+			{#if publicConfig.isHuggingChat}
+				<a
+					href="{base}/privacy"
+					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> About & Privacy</a
+				>
+			{/if}
 			<button
 				onclick={async (e) => {
 					e.preventDefault();
