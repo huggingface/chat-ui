@@ -23,6 +23,9 @@
 	let panStart: number | undefined = $state(undefined);
 	let panStartTime: number | undefined = undefined;
 
+	// Define the width for the drawer (less than 100% to create the gap)
+	const drawerWidthPercentage = 85;
+
 	const tween = Spring.of(
 		() => {
 			if (panX !== undefined) {
@@ -55,6 +58,12 @@
 			openEl?.focus();
 		}
 	});
+
+	// Function to close the drawer when background is tapped
+	function closeDrawer() {
+		isOpen = false;
+		panX = undefined;
+	}
 </script>
 
 <nav
@@ -79,6 +88,17 @@
 	>
 </nav>
 
+<!-- Mobile drawer overlay - shows when drawer is open -->
+{#if isOpen}
+	<button
+		type="button"
+		class="fixed inset-0 z-20 cursor-default bg-black/30 md:hidden"
+		style="opacity: {Math.max(0, Math.min(1, (100 + tween.current) / 100))};"
+		onclick={closeDrawer}
+		aria-label="Close mobile navigation"
+	></button>
+{/if}
+
 <nav
 	use:pan={() => ({ delay: 0, preventdefault: true, touchAction: "pan-left" })}
 	onpanup={(e: GestureCustomEvent) => {
@@ -86,7 +106,7 @@
 			return;
 		}
 		// measure the pan velocity to determine if the menu should snap open or closed
-		const drawerWidth = window.innerWidth;
+		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
 
 		const trueX = e.detail.x + (panX / 100) * drawerWidth;
 
@@ -113,7 +133,7 @@
 		panStart ??= e.detail.x;
 		panStartTime ??= Date.now();
 
-		const drawerWidth = window.innerWidth;
+		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
 
 		const trueX = e.detail.x + (panX / 100) * drawerWidth;
 		const percentage = ((trueX - panStart) / drawerWidth) * 100;
@@ -121,9 +141,12 @@
 		panX = Math.max(-100, Math.min(0, percentage));
 		tween.set(panX, { instant: true });
 	}}
-	style="transform: translateX({Math.max(-100, Math.min(0, tween.current))}%);"
-	class="fixed inset-0 z-30 grid max-h-screen
-	grid-cols-1 grid-rows-[auto,1fr,auto,auto] bg-white pt-4 dark:bg-gray-900 md:hidden"
+	style="transform: translateX({Math.max(
+		-100,
+		Math.min(0, tween.current)
+	)}%); width: {drawerWidthPercentage}%;"
+	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-screen
+	grid-cols-1 grid-rows-[auto,1fr,auto,auto] bg-white pt-4 shadow-lg dark:bg-gray-900 md:hidden"
 >
 	{#if page.url.pathname === base + "/"}
 		<button
