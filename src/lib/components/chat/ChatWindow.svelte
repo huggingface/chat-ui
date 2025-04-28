@@ -352,15 +352,15 @@
 	</div>
 	<div
 		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
-			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/100
-			to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:via-gray-800/100
-			dark:to-gray-900/0
-			max-sm:border-t-0 max-sm:py-0 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white
+			via-white/100 to-white/0 px-3.5 pt-2 dark:border-gray-800
+			dark:from-gray-900 dark:via-gray-900/100
+			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length && !loading}
 			<div
 				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
-				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl max-md:pb-3"
+				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"
 			>
 				{#each sources as source, index}
 					{#await source then src}
