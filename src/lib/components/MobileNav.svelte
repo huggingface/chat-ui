@@ -67,9 +67,9 @@
 		aria-label="Open menu"
 		bind:this={openEl}><CarbonTextAlignJustify /></button
 	>
-	<div class="flex h-full items-center justify-center">
+	<div class="flex h-full items-center justify-center overflow-hidden">
 		{#if page.params?.id}
-			<span class="truncate px-4" data-testid="chat-title">{title}</span>
+			<span class="max-w-full truncate px-4" data-testid="chat-title">{title}</span>
 		{/if}
 	</div>
 	<a
