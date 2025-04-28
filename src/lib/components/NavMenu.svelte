@@ -139,7 +139,7 @@
 	{/await}
 </div>
 <div
-	class="mt-0.5 flex touch-none flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
+	class="mt-3 flex touch-none flex-col gap-1 rounded-r-xl p-3 text-sm md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
 		<form
@@ -217,12 +217,4 @@
 	>
 		Settings
 	</a>
-	{#if publicConfig.isHuggingChat}
-		<a
-			href="{base}/privacy"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			About & Privacy
-		</a>
-	{/if}
 </div>
