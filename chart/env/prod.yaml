@@ -62,15 +62,15 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
@@ -91,15 +91,15 @@ envVars:
         "tools": true,
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
@@ -119,15 +119,15 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "Generate a mouse portrait",
+            "title": "Generate image",
             "prompt": "Generate the portrait of a scientific mouse in its laboratory."
           },
           {
-            "title": "Review a pull request",
+            "title": "Review code",
             "prompt": "Review this pull request: https://github.com/huggingface/chat-ui/pull/1131/files"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           }
         ]
@@ -193,7 +193,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+            "baseURL": "https://internalRs in strawberry.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
       },
@@ -245,7 +245,7 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "To-do list web app",
+            "title": "Build a webapp",
             "prompt": "Create a simple to-do list application where users can:\n- Add new tasks.\n- Mark tasks as complete.\n- Delete completed tasks.\nThe tasks should persist in the browser's local storage so that they remain available even after a page reload.\n"
           },
           {
@@ -272,15 +272,15 @@ envVars:
         "websiteUrl": "https://blog.google/technology/developers/gemma-3/",
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ],
@@ -314,15 +314,15 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ],
@@ -350,15 +350,15 @@ envVars:
         "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ],
@@ -385,15 +385,15 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
@@ -413,15 +413,15 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "Write an email from bullet list",
+            "title": "Write an email",
             "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
           },
           {
-            "title": "Code a snake game",
+            "title": "Code a game",
             "prompt": "Code a basic snake game in python, give explanations for each step."
           },
           {
-            "title": "Assist in a task",
+            "title": "Recipe help",
             "prompt": "How do I make a delicious lemon cheesecake?"
           }
         ]
