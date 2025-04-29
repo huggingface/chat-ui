@@ -520,9 +520,9 @@ envVars:
   PUBLIC_ANNOUNCEMENT_BANNERS: >
     [
       {
-        "title": "DeepSeek R1 is now available!",
+        "title": "Qwen 3 235B is available!",
         "linkTitle": "Try it out!",
-        "linkHref": "https://huggingface.co/chat/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+        "linkHref": "https://huggingface.co/chat/models/Qwen/Qwen3-235B-A22B"
       }
     ]
   PUBLIC_APP_NAME: "HuggingChat"
