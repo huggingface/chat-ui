@@ -272,7 +272,7 @@ envVars:
         "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
         "websiteUrl": "https://mistral.ai/news/mistral-nemo/",
-        "modelUrl": "https://huggingface.co/mistralai/mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+        "modelUrl": "https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503",
         "preprompt": "",
         "promptExamples": [
           {
@@ -301,6 +301,7 @@ envVars:
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
         "description": "The latest multimodal model from Qwen! Supports image inputs natively.",
         "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-vl/",
+        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct",
         "multimodal": true,
         "promptExamples": [
           {
