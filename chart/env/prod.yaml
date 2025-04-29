@@ -231,40 +231,6 @@ envVars:
         ]
       },
       {
-        "name": "Qwen/Qwen2.5-Coder-32B-Instruct",
-        "description": "Qwen's latest coding model, in its biggest size yet. SOTA on many coding benchmarks.",
-        "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
-        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-coder-family/",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
-        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
-        "parameters": {
-          "stop": ["<|im_end|>", "<|endoftext|>"],
-          "temperature": 0.6,
-          "truncate": 28672,
-          "max_new_tokens": 3072
-        },
-        "promptExamples": [
-          {
-            "title": "Build a webapp",
-            "prompt": "Create a simple to-do list application where users can:\n- Add new tasks.\n- Mark tasks as complete.\n- Delete completed tasks.\nThe tasks should persist in the browser's local storage so that they remain available even after a page reload.\n"
-          },
-          {
-            "title": "Create a REST API",
-            "prompt": "Build a simple REST API using Node.js, TypeScript and Express:\n- POST /items: Accepts a JSON body with name and quantity and adds a new item.\n- GET /items: Returns a list of all items.\n- PUT /items/:id: Updates the name or quantity of an item by its id.\n- DELETE /items/:id: Removes an item by its id.\nUse an in-memory array as the data store (no need for a database). Include basic error handling (e.g., item not found)."
-          },
-          {
-            "title": "Simple website",
-            "prompt": "Generate a snazzy static landing page for a local coffee shop using HTML and CSS. You can use tailwind using <script src='https://cdn.tailwindcss.com'></script>."
-          }
-        ],
-        "endpoints": [
-          {
-            "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1"
-          }
-        ]
-      },
-      {
         "name": "google/gemma-3-27b-it",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
         "multimodal": true,
@@ -331,17 +297,11 @@ envVars:
         ]
       },
       {
-        "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/meta-logo.png",
-        "description": "The latest multimodal model from Meta! Supports image inputs natively.",
-        "websiteUrl": "https://llama.com/",
+        "name": "Qwen/Qwen2.5-VL-32B-Instruct",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "description": "The latest multimodal model from Qwen! Supports image inputs natively.",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-vl/",
         "multimodal": true,
-        "parameters": {
-          "stop": ["<|eot_id|>", "<|im_end|>"],
-          "temperature": 0.6,
-          "truncate": 14336,
-          "max_new_tokens": 1536
-        },
         "promptExamples": [
           {
             "title": "Write an email",
@@ -359,45 +319,18 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1",
+            "baseURL": "https://lf91qeosuambouj4.us-east-1.aws.endpoints.huggingface.cloud/v1",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
-                "maxWidth": 560,
-                "maxHeight": 560,
+                "maxWidth": 1024,
+                "maxHeight": 1024,
                 "supportedMimeTypes": ["image/png", "image/jpeg", "image/webp"],
                 "preferredMimeType": "image/webp"
               }
             }
           }
         ]
-      },
-      {
-        "name": "NousResearch/Hermes-3-Llama-3.1-8B",
-        "description": "Nous Research's latest Hermes 3 release in 8B size. Follows instruction closely.",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
-        "websiteUrl": "https://nousresearch.com/",
-        "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
-        "promptExamples": [
-          {
-            "title": "Write an email",
-            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-          },
-          {
-            "title": "Code a game",
-            "prompt": "Code a basic snake game in python, give explanations for each step."
-          },
-          {
-            "title": "Recipe help",
-            "prompt": "How do I make a delicious lemon cheesecake?"
-          }
-        ],
-        "parameters": {
-          "stop": ["<|im_end|>"],
-          "temperature": 0.6,
-          "truncate": 14336,
-          "max_new_tokens": 1536
-        }
       },
       {
         "name": "microsoft/Phi-4",
@@ -432,6 +365,33 @@ envVars:
             "baseURL": "https://up5ijetg6a2e9zlb.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
+      },
+      {
+        "name": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "description": "Nous Research's latest Hermes 3 release in 8B size. Follows instruction closely.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
+        "websiteUrl": "https://nousresearch.com/",
+        "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
+        "promptExamples": [
+          {
+            "title": "Write an email",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
+          },
+          {
+            "title": "Code a game",
+            "prompt": "Code a basic snake game in python, give explanations for each step."
+          },
+          {
+            "title": "Recipe help",
+            "prompt": "How do I make a delicious lemon cheesecake?"
+          }
+        ],
+        "parameters": {
+          "stop": ["<|im_end|>"],
+          "temperature": 0.6,
+          "truncate": 14336,
+          "max_new_tokens": 1536
+        }
       },
       {
         "name": "internal/task",
@@ -507,6 +467,14 @@ envVars:
       {
         "name": "microsoft/Phi-3.5-mini-instruct",
         "transferTo": "microsoft/Phi-4"
+      },
+      {
+        "name": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "transferTo": "Qwen/QwQ-32B"
+      },
+      {
+        "name": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "transferTo" : "Qwen/Qwen2.5-VL-32B-Instruct"
       }
     ]
   PUBLIC_ORIGIN: "https://huggingface.co"
