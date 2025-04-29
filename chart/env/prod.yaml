@@ -76,6 +76,43 @@ envVars:
         ]
       },
       {
+        "name": "Qwen/Qwen3-235B-A22B",
+        "description": "Qwen's flagship model featuring optional reasoning. Exceptional performance with benchmarks rivaling R1 and o1.",
+        "modelUrl": "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+        "websiteUrl": "https://qwenlm.github.io/blog/qwen3/",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/qwen-logo.png",
+        "preprompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+        "reasoning": {
+          "type": "tokens",
+          "beginToken": "<think>",
+          "endToken": "</think>"
+        },
+        "parameters": {
+          "stop": ["<|endoftext|>", "<|im_end|>"],
+          "temperature": 0.6,
+        },
+        "promptExamples": [
+          {
+            "title": "Write an email",
+            "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12) \nothink"
+          },
+          {
+            "title": "Build a website",
+            "prompt": "Generate a snazzy static landing page for a local coffee shop using HTML and CSS. You can use tailwind using <script src='https://cdn.tailwindcss.com'></script>."
+          },
+          {
+            "title": "Larger number",
+            "prompt": "9.11 or 9.9 which number is larger?"
+          },
+        ],
+        "endpoints": [
+          {
+            "type": "openai",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/Qwen3-235B-A22B/v1"
+          }
+        ]
+      },
+      {
         "name": "Qwen/Qwen2.5-72B-Instruct",
         "description": "The latest Qwen open model with improved role-playing, long text generation and structured data understanding.",
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct",
