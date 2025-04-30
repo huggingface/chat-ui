@@ -69,7 +69,7 @@
 	"type": "module",
 	"dependencies": {
 		"@aws-sdk/credential-providers": "^3.592.0",
-		"@cliqz/adblocker-playwright": "^1.27.2",
+		"@cliqz/adblocker-playwright": "^1.34.0",
 		"@gradio/client": "^1.8.0",
 		"@huggingface/hub": "^0.5.1",
 		"@huggingface/inference": "^2.8.1",
@@ -103,7 +103,7 @@
 		"parquetjs": "^0.11.2",
 		"pino": "^9.0.0",
 		"pino-pretty": "^11.0.0",
-		"playwright": "^1.44.1",
+		"playwright": "^1.52.0",
 		"postcss": "^8.4.31",
 		"saslprep": "^1.0.3",
 		"satori": "^0.10.11",
