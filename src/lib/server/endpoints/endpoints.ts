@@ -31,6 +31,10 @@ import endpointLangserve, {
 import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
 import type { ObjectId } from "mongodb";
 import { endpointLocal, endpointLocalParametersSchema } from "./local/endpointLocal";
+import {
+	endpointHfInference,
+	endpointHfInferenceParametersSchema,
+} from "./hfinference/endpointHfInference";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -77,6 +81,7 @@ export const endpoints = {
 	cohere: endpointCohere,
 	langserve: endpointLangserve,
 	local: endpointLocal,
+	hfinference: endpointHfInference,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -94,5 +99,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointCohereParametersSchema,
 	endpointLangserveParametersSchema,
 	endpointLocalParametersSchema,
+	endpointHfInferenceParametersSchema,
 ]);
 export default endpoints;

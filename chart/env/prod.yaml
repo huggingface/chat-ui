@@ -91,6 +91,7 @@ envVars:
           "stop": ["<|endoftext|>", "<|im_end|>"],
           "temperature": 0.6,
         },
+        "tools": true,
         "promptExamples": [
           {
             "title": "Write an email",
@@ -107,8 +108,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/Qwen3-235B-A22B/v1"
+            "type": "hfinference",
           }
         ]
       },

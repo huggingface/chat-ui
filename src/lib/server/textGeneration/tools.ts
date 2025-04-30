@@ -213,19 +213,13 @@ export async function* runTools(
 		}
 
 		// if we dont see a tool call in the first 25 chars, something is going wrong and we abort
-		if (rawText.length > 100 && !(rawText.includes("```json") || rawText.includes("{"))) {
-			return [];
-		}
-
-		// if we see a directly_answer tool call, we skip the rest
 		if (
-			rawText.includes("directly_answer") ||
-			rawText.includes("directlyAnswer") ||
-			rawText.includes("directly-answer")
+			!ctx.model.reasoning && // let reasoning models think for a bit
+			rawText.length > 100 &&
+			!(rawText.includes("```json") || rawText.includes("{"))
 		) {
 			return [];
 		}
-
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
