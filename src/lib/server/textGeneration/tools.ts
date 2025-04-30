@@ -184,8 +184,6 @@ export async function* runTools(
 		? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
 		: messages;
 
-	let rawText = "";
-
 	const mappedTools = tools.map((tool) => ({
 		...tool,
 		inputs: tool.inputs.map((input) => ({
@@ -204,22 +202,11 @@ export async function* runTools(
 	})) {
 		// model natively supports tool calls
 		if (output.token.toolCalls) {
+			logger.info(output.token.toolCalls);
 			calls.push(...output.token.toolCalls);
 			continue;
 		}
 
-		if (output.token.text) {
-			rawText += output.token.text;
-		}
-
-		// if we dont see a tool call in the first 25 chars, something is going wrong and we abort
-		if (
-			!ctx.model.reasoning && // let reasoning models think for a bit
-			rawText.length > 100 &&
-			!(rawText.includes("```json") || rawText.includes("{"))
-		) {
-			return [];
-		}
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
