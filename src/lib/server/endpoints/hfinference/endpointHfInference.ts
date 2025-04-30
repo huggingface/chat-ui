@@ -205,7 +205,7 @@ export async function endpointHfInference(
 				mappedToolCalls = finalToolCalls.map((tc) => ({
 					id: tc.id,
 					name: tc.function.name ?? "",
-					parameters: JSON.parse(tc.function.arguments + "}"),
+					parameters: JSON.parse(tc.function.arguments),
 				}));
 			} catch (e) {
 				logger.error(e, "error mapping tool calls");
