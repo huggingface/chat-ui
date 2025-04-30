@@ -202,7 +202,6 @@ export async function* runTools(
 	})) {
 		// model natively supports tool calls
 		if (output.token.toolCalls) {
-			logger.info(output.token.toolCalls);
 			calls.push(...output.token.toolCalls);
 			continue;
 		}

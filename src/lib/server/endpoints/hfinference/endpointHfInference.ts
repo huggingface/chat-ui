@@ -142,6 +142,13 @@ export async function endpointHfInference(
 			});
 		}
 
+		if (toolResults) {
+			messagesArray.push({
+				role: "tool",
+				content: JSON.stringify(toolResults),
+				files: undefined,
+			});
+		}
 		const toolCallChoices = createChatCompletionToolsArray(tools);
 
 		const stream = client.chatCompletionStream({
@@ -165,9 +172,6 @@ export async function endpointHfInference(
 			void
 		> {
 			for await (const chunk of stream) {
-				if (finalToolCalls.length > 0) {
-					logger.info(chunk, "chunk");
-				}
 				const token = chunk.choices?.[0]?.delta?.content || "";
 
 				generated_text += token;
