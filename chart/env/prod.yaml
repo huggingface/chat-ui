@@ -60,6 +60,7 @@ envVars:
           "max_new_tokens": 1024,
           "truncate": 7167
         },
+        "endpoints": [{"type" : "hfinference"}],
         "promptExamples": [
           {
             "title": "Write an email",
@@ -126,6 +127,7 @@ envVars:
           "max_new_tokens": 3072
         },
         "tools": true,
+        "endpoints": [{"type" : "hfinference"}],
         "promptExamples": [
           {
             "title": "Write an email",
@@ -154,6 +156,7 @@ envVars:
           "max_new_tokens": 2048,
           "temperature": 0.3
         },
+        "endpoints": [{"type" : "hfinference"}],
         "promptExamples": [
           {
             "title": "Generate image",
@@ -196,7 +199,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
+            "type": "hfinference",
             "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
@@ -229,7 +232,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
+            "type": "hfinference",
             "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
@@ -262,8 +265,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://atv7xs1nxxtx2wl0.us-east-1.aws.endpoints.huggingface.cloud/v1"
+            "type": "hfinference",
           }
         ]
       },
@@ -289,8 +291,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://wp0d3hn6s3k8jk22.us-east-1.aws.endpoints.huggingface.cloud/v1",
+            "type": "hfinference",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
@@ -328,8 +329,7 @@ envVars:
 
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://hkjfqcryevvq9cie.us-east-1.aws.endpoints.huggingface.cloud/v1"
+            "type": "hfinference",
           }
         ]
       },
@@ -356,8 +356,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://lf91qeosuambouj4.us-east-1.aws.endpoints.huggingface.cloud/v1",
+            "type": "hfinference",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
@@ -399,8 +398,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://up5ijetg6a2e9zlb.us-east-1.aws.endpoints.huggingface.cloud/v1"
+            "type": "hfinference",
           }
         ]
       },
@@ -429,23 +427,8 @@ envVars:
           "temperature": 0.6,
           "truncate": 14336,
           "max_new_tokens": 1536
-        }
-      },
-      {
-        "name": "internal/task",
-        "tokenizer" : "NousResearch/Hermes-3-Llama-3.1-8B",
-        "unlisted": true,
-        "tools" : true,
-        "endpoints": [
-          {
-            "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/NousResearch/Hermes-3-Llama-3.1-8B/v1"
-          }
-        ],
-        "parameters": {
-          "temperature": 0.1,
-          "max_new_tokens": 256
         },
+        "endpoints": [{"type" : "hfinference"}]
       }
     ]
 
@@ -535,7 +518,18 @@ envVars:
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  TASK_MODEL: "internal/task"
+  TASK_MODEL: >
+        {
+        "name": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "unlisted": true,
+        "endpoints": [{"type" : "hfinference"}],
+        "parameters": {
+          "temperature": 0.1,
+          "max_new_tokens": 256
+        }
+        }
+      
+
   TEXT_EMBEDDING_MODELS: >
     [{
       "name": "bge-base-en-v1-5-sxa",
