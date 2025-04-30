@@ -14,7 +14,8 @@ function prepareToolCalls(toolCallsWithParameters: ToolCallWithParameters[], tok
 	for (const toolCallWithParameters of toolCallsWithParameters) {
 		// HACK: sometimes gpt4 via azure returns the JSON with literal newlines in it
 		// like {\n "foo": "bar" }
-		const s = toolCallWithParameters.parameterJsonString.replace("\n", "");
+		const s = // TODO: This (replace(/[ ,}\s]+$/, "") + "}") must be remove if vllm gives correct json
+			toolCallWithParameters.parameterJsonString.replace("\n", "").replace(/[ ,}\s]+$/, "") + "}";
 		const params = JSON.parse(s);
 
 		const toolCall = toolCallWithParameters.toolCall;
@@ -71,17 +72,18 @@ export async function* openAIChatToTextGenerationStream(
 		const tools = completion.choices[0]?.delta?.tool_calls || [];
 		for (const tool of tools) {
 			if (tool.id) {
-				if (!tool.function?.name) {
-					throw new Error("Tool call without function name");
+				if (tool.function?.name) {
+					//!tool.function?.name
+					// throw new Error("Tool call without function name");
+					const toolCallWithParameters: ToolCallWithParameters = {
+						toolCall: {
+							name: tool.function.name,
+							parameters: {},
+						},
+						parameterJsonString: "",
+					};
+					toolCalls.push(toolCallWithParameters);
 				}
-				const toolCallWithParameters: ToolCallWithParameters = {
-					toolCall: {
-						name: tool.function.name,
-						parameters: {},
-					},
-					parameterJsonString: "",
-				};
-				toolCalls.push(toolCallWithParameters);
 			}
 
 			if (toolCalls.length > 0 && tool.function?.arguments) {
