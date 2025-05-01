@@ -7,6 +7,7 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { MessageWebSearchUpdate } from "$lib/types/MessageUpdate";
 
 import { search } from "./search/search";
+import { WebSearchProvider } from "$lib/types/WebSearch";
 import { scrape } from "./scrape/scrape";
 import { findContextSources } from "./embed/embed";
 import { removeParents } from "./markdown/tree";
@@ -27,7 +28,8 @@ export async function* runWebSearch(
 	conv: Conversation,
 	messages: Message[],
 	ragSettings?: Assistant["rag"],
-	query?: string
+	query?: string,
+	provider?: WebSearchProvider
 ): AsyncGenerator<MessageWebSearchUpdate, WebSearch, undefined> {
 	const prompt = messages[messages.length - 1].content;
 	const createdAt = new Date();
@@ -43,7 +45,7 @@ export async function* runWebSearch(
 		}
 
 		// Search the web
-		const { searchQuery, pages } = yield* search(messages, ragSettings, query);
+		const { searchQuery, pages } = yield* search(messages, ragSettings, query, provider);
 		if (pages.length === 0) throw Error("No results found for this search query");
 
 		// Scrape pages
