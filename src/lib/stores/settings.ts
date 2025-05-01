@@ -5,6 +5,7 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ObjectId } from "mongodb";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
+import { WebSearchProvider } from "$lib/types/WebSearch";
 
 type SettingsStore = {
 	shareConversationsWithModelAuthors: boolean;
@@ -18,6 +19,7 @@ type SettingsStore = {
 	tools?: Array<string>;
 	disableStream: boolean;
 	directPaste: boolean;
+	preferredWebSearchEngine: WebSearchProvider;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {
@@ -30,6 +32,15 @@ export function useSettingsStore() {
 
 export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlySaved">) {
 	const baseStore = writable({ ...initialValue, recentlySaved: false });
+
+	if (browser && !("preferredWebSearchEngine" in initialValue)) {
+		baseStore.update((s) => ({
+			...s,
+			preferredWebSearchEngine:
+				(localStorage.getItem("preferredWebSearchEngine") as WebSearchProvider) ??
+				WebSearchProvider.GOOGLE,
+		}));
+	}
 
 	let timeoutId: NodeJS.Timeout;
 
