@@ -8,6 +8,7 @@ import type { ChatCompletionStreamOutput } from "@huggingface/tasks";
 import type { FunctionDefinition } from "openai/resources/index.mjs";
 import type { ChatCompletionTool, FunctionParameters } from "openai/resources/index.mjs";
 import { logger } from "$lib/server/logger";
+import type { Message, MessageFile } from "$lib/types/Message";
 
 type DeltaToolCall = NonNullable<
 	ChatCompletionStreamOutput["choices"][number]["delta"]["tool_calls"]
@@ -117,40 +118,66 @@ export async function endpointHfInference(
 
 	const imageProcessor = multimodal.image ? makeImageProcessor(multimodal.image) : undefined;
 
+	async function prepareFiles(files: MessageFile[]) {
+		if (!imageProcessor) {
+			return [];
+		}
+		const processedFiles = await Promise.all(
+			files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
+		);
+		return processedFiles.map((file) => ({
+			type: "image_url" as const,
+			image_url: {
+				url: `data:${file.mime};base64,${file.image.toString("base64")}`,
+			},
+		}));
+	}
+
 	return async ({ messages, generateSettings, tools, toolResults, preprompt }) => {
 		const messagesArray = await Promise.all(
 			messages.map(async (message) => {
-				const files =
-					imageProcessor && message.files
-						? await Promise.all(message.files.map(imageProcessor))
-						: undefined;
 				return {
 					role: message.from,
-					content: message.content,
-					files,
+					content: [
+						...(await prepareFiles(message.files ?? [])),
+						{ type: "text", text: message.content },
+					],
 				};
 			})
 		);
 
-		if (!model.systemRoleSupported) {
-			messagesArray[0].content = preprompt + "\n" + messagesArray[0].content;
+		if (
+			!model.systemRoleSupported &&
+			messagesArray.length > 0 &&
+			messagesArray[0]?.role === "system"
+		) {
+			messagesArray[0].role = "user";
 		} else if (messagesArray[0].role !== "system") {
 			messagesArray.unshift({
 				role: "system",
-				content: preprompt ?? "",
-				files: undefined,
+				content: [
+					{
+						type: "text" as const,
+						text: preprompt ?? "",
+					},
+				],
 			});
 		}
 
 		if (toolResults) {
 			messagesArray.push({
-				role: "tool",
-				content: JSON.stringify(toolResults),
-				files: undefined,
+				role: "tool" as Message["from"],
+				content: [
+					{
+						type: "text" as const,
+						text: JSON.stringify(toolResults),
+					},
+				],
 			});
 		}
 		const toolCallChoices = createChatCompletionToolsArray(tools);
 
+		logger.info(messagesArray);
 		const stream = client.chatCompletionStream({
 			...model.parameters,
 			...generateSettings,
@@ -204,7 +231,6 @@ export async function endpointHfInference(
 			}
 
 			let mappedToolCalls: ToolCall[] | undefined;
-
 			try {
 				mappedToolCalls = finalToolCalls.map((tc) => ({
 					id: tc.id,
@@ -212,6 +238,7 @@ export async function endpointHfInference(
 					parameters: JSON.parse(tc.function.arguments),
 				}));
 			} catch (e) {
+				// logger.info(finalToolCalls);
 				logger.error(e, "error mapping tool calls");
 			}
 

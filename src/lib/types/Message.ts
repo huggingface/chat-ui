@@ -4,7 +4,7 @@ import type { WebSearch } from "./WebSearch";
 import type { v4 } from "uuid";
 
 export type Message = Partial<Timestamps> & {
-	from: "user" | "assistant" | "system" | "tool";
+	from: "user" | "assistant" | "system";
 	id: ReturnType<typeof v4>;
 	content: string;
 	updates?: MessageUpdate[];
