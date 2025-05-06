@@ -134,13 +134,13 @@ export async function endpointHfInference(
 	}
 
 	return async ({ messages, generateSettings, tools, toolResults, preprompt }) => {
-		const messagesArray = await Promise.all(
+		let messagesArray = await Promise.all(
 			messages.map(async (message) => {
 				return {
 					role: message.from,
 					content: [
 						...(await prepareFiles(message.files ?? [])),
-						{ type: "text", text: message.content },
+						{ type: "text" as const, text: message.content },
 					],
 				};
 			})
@@ -164,20 +164,46 @@ export async function endpointHfInference(
 			});
 		}
 
-		if (toolResults) {
-			messagesArray.push({
-				role: "tool" as Message["from"],
-				content: [
+		if (toolResults && toolResults.length > 0) {
+			messagesArray = [
+				...messagesArray,
+				...toolResults.map((toolResult) => ({
+					role: "tool" as Message["from"],
+					content: [
+						{
+							type: "text" as const,
+							text: JSON.stringify(toolResult),
+						},
+					],
+				})),
+			];
+		}
+
+		messagesArray = messagesArray.reduce((acc: typeof messagesArray, current) => {
+			if (acc.length === 0 || current.role !== acc[acc.length - 1].role) {
+				acc.push(current);
+			} else {
+				const prevMessage = acc[acc.length - 1];
+
+				prevMessage.content = [
+					...prevMessage.content.filter((item) => item.type !== "text"),
+					...current.content.filter((item) => item.type !== "text"),
 					{
 						type: "text" as const,
-						text: JSON.stringify(toolResults),
+						text: [
+							...prevMessage.content.filter((item) => item.type === "text"),
+							...current.content.filter((item) => item.type === "text"),
+						]
+							.map((item) => item.text)
+							.join("\n")
+							.replace(/^\n/, ""),
 					},
-				],
-			});
-		}
-		const toolCallChoices = createChatCompletionToolsArray(tools);
+				];
+			}
+			return acc;
+		}, []);
 
-		logger.info(messagesArray);
+		const toolCallChoices = createChatCompletionToolsArray(tools);
 		const stream = client.chatCompletionStream({
 			...model.parameters,
 			...generateSettings,
@@ -206,14 +232,16 @@ export async function endpointHfInference(
 				const toolCalls = chunk.choices?.[0]?.delta?.tool_calls ?? [];
 
 				for (const toolCall of toolCalls) {
-					if (!finalToolCalls[toolCall.index]) {
-						finalToolCalls[toolCall.index] = toolCall;
+					const index = toolCall.index ?? toolCall.id;
+
+					if (!finalToolCalls[index]) {
+						finalToolCalls[index] = toolCall;
 					} else {
-						if (finalToolCalls[toolCall.index].function.arguments === undefined) {
-							finalToolCalls[toolCall.index].function.arguments = "";
+						if (finalToolCalls[index].function.arguments === undefined) {
+							finalToolCalls[index].function.arguments = "";
 						}
 						if (toolCall.function.arguments) {
-							finalToolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+							finalToolCalls[index].function.arguments += toolCall.function.arguments;
 						}
 					}
 				}
@@ -232,13 +260,19 @@ export async function endpointHfInference(
 
 			let mappedToolCalls: ToolCall[] | undefined;
 			try {
-				mappedToolCalls = finalToolCalls.map((tc) => ({
-					id: tc.id,
-					name: tc.function.name ?? "",
-					parameters: JSON.parse(tc.function.arguments),
-				}));
+				if (finalToolCalls.length === 0) {
+					mappedToolCalls = undefined;
+				} else {
+					// Ensure finalToolCalls is an array
+					const toolCallsArray = Array.isArray(finalToolCalls) ? finalToolCalls : [finalToolCalls];
+
+					mappedToolCalls = toolCallsArray.map((tc) => ({
+						id: tc.id,
+						name: tc.function.name ?? "",
+						parameters: JSON.parse(tc.function.arguments || "{}"),
+					}));
+				}
 			} catch (e) {
-				// logger.info(finalToolCalls);
 				logger.error(e, "error mapping tool calls");
 			}
 
