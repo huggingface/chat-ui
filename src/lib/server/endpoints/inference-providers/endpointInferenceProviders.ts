@@ -79,8 +79,8 @@ function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompleti
 	return toolChoices;
 }
 
-export const endpointHfInferenceParametersSchema = z.object({
-	type: z.literal("hfinference"),
+export const endpointInferenceProvidersParametersSchema = z.object({
+	type: z.literal("inference-providers"),
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	provider: z.enum(INFERENCE_PROVIDERS).default("hf-inference" as const),
@@ -106,11 +106,11 @@ export const endpointHfInferenceParametersSchema = z.object({
 		.default({}),
 });
 
-export async function endpointHfInference(
-	input: z.input<typeof endpointHfInferenceParametersSchema>
+export async function endpointInferenceProviders(
+	input: z.input<typeof endpointInferenceProvidersParametersSchema>
 ): Promise<Endpoint> {
 	const { model, provider, modelName, baseURL, multimodal } =
-		endpointHfInferenceParametersSchema.parse(input);
+		endpointInferenceProvidersParametersSchema.parse(input);
 
 	const client = baseURL
 		? new InferenceClient(config.HF_TOKEN).endpoint(baseURL)
@@ -133,7 +133,7 @@ export async function endpointHfInference(
 		}));
 	}
 
-	return async ({ messages, generateSettings, tools, toolResults, preprompt }) => {
+	return async ({ messages, generateSettings, tools, toolResults, preprompt, conversationId }) => {
 		let messagesArray = await Promise.all(
 			messages.map(async (message) => {
 				return {
@@ -204,16 +204,29 @@ export async function endpointHfInference(
 		}, []);
 
 		const toolCallChoices = createChatCompletionToolsArray(tools);
-		const stream = client.chatCompletionStream({
-			...model.parameters,
-			...generateSettings,
-			model: modelName ?? model.id ?? model.name,
-			provider,
-			messages: messagesArray,
-			...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
-			toolResults,
-			use_cache: false,
-		});
+		const stream = client.chatCompletionStream(
+			{
+				...model.parameters,
+				...generateSettings,
+				model: modelName ?? model.id ?? model.name,
+				provider,
+				messages: messagesArray,
+				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
+				toolResults,
+			},
+			{
+				fetch: async (url, options) => {
+					return fetch(url, {
+						...options,
+						headers: {
+							...options?.headers,
+							"X-Use-Cache": "false",
+							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+						},
+					});
+				},
+			}
+		);
 
 		let tokenId = 0;
 		let generated_text = "";
@@ -231,8 +244,12 @@ export async function endpointHfInference(
 
 				const toolCalls = chunk.choices?.[0]?.delta?.tool_calls ?? [];
 
+				if (toolCalls.length > 0) {
+					logger.info(toolCalls, "toolCalls");
+				}
+
 				for (const toolCall of toolCalls) {
-					const index = toolCall.index ?? toolCall.id;
+					const index = toolCall.index ?? 0;
 
 					if (!finalToolCalls[index]) {
 						finalToolCalls[index] = toolCall;

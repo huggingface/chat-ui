@@ -60,7 +60,7 @@ envVars:
           "max_new_tokens": 1024,
           "truncate": 7167
         },
-        "endpoints": [{"type" : "hfinference"}],
+        "endpoints": [{"type" : "inference-providers"}],
         "promptExamples": [
           {
             "title": "Write an email",
@@ -109,7 +109,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
           }
         ]
       },
@@ -127,7 +127,7 @@ envVars:
           "max_new_tokens": 3072
         },
         "tools": true,
-        "endpoints": [{"type" : "hfinference"}],
+        "endpoints": [{"type" : "inference-providers"}],
         "promptExamples": [
           {
             "title": "Write an email",
@@ -156,7 +156,7 @@ envVars:
           "max_new_tokens": 2048,
           "temperature": 0.3
         },
-        "endpoints": [{"type" : "hfinference"}],
+        "endpoints": [{"type" : "inference-providers"}],
         "promptExamples": [
           {
             "title": "Generate image",
@@ -200,7 +200,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
             "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
@@ -233,7 +233,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
             "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
@@ -267,7 +267,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
           }
         ]
       },
@@ -295,7 +295,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
             "baseURL": "https://wp0d3hn6s3k8jk22.us-east-1.aws.endpoints.huggingface.cloud/v1",
             "multimodal": {
               "image": {
@@ -335,7 +335,7 @@ envVars:
 
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
               "baseURL": "https://hkjfqcryevvq9cie.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
@@ -364,7 +364,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
@@ -407,7 +407,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "hfinference",
+            "type": "inference-providers",
             "baseURL": "https://up5ijetg6a2e9zlb.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
@@ -439,7 +439,7 @@ envVars:
           "truncate": 14336,
           "max_new_tokens": 1536
         },
-        "endpoints": [{"type" : "hfinference"}]
+        "endpoints": [{"type" : "inference-providers"}]
       }
     ]
 
@@ -533,7 +533,7 @@ envVars:
         {
         "name": "NousResearch/Hermes-3-Llama-3.1-8B",
         "unlisted": true,
-        "endpoints": [{"type" : "hfinference"}],
+        "endpoints": [{"type" : "inference-providers"}],
         "parameters": {
           "temperature": 0.1,
           "max_new_tokens": 256

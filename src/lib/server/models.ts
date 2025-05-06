@@ -306,7 +306,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.tgi(args);
 					case "local":
 						return endpoints.local(args);
-					case "hfinference":
+					case "inference-providers":
 						return endpoints.hfinference(args);
 					case "anthropic":
 						return endpoints.anthropic(args);
