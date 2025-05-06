@@ -108,7 +108,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/Qwen/Qwen3-235B-A22B/v1"
+            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/Qwen/Qwen3-235B-A22B/v1"
           }
         ]
       },
@@ -197,7 +197,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
       },
@@ -230,7 +230,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
       },
@@ -439,7 +439,7 @@ envVars:
         "endpoints": [
           {
             "type": "openai",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/NousResearch/Hermes-3-Llama-3.1-8B/v1"
+            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/NousResearch/Hermes-3-Llama-3.1-8B/v1"
           }
         ],
         "parameters": {
@@ -676,7 +676,7 @@ envVars:
     ]
   HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
   HF_ORG_EARLY_ACCESS: '5e67bd5b1009063689407478'
-  HF_API_ROOT: 'https://internal.api-inference.huggingface.co/models'
+  HF_API_ROOT: 'https://api-inference.endpoints.huggingface.tech/models'
 infisical:
   enabled: true
   env: "prod-us-east-1"
