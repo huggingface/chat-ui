@@ -353,12 +353,16 @@
 		/>
 	</div>
 	<div
-		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
+			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white
+			via-white/100 to-white/0 px-3.5 pt-2 dark:border-gray-800
+			dark:from-gray-900 dark:via-gray-900/100
+			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length && !loading}
 			<div
 				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
-				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl max-md:pb-3"
+				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"
 			>
 				{#each sources as source, index}
 					{#await source then src}
@@ -446,7 +450,7 @@
 							</button>
 						{:else}
 							<button
-								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black"
+								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:text-gray-400/50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black dark:disabled:text-gray-600/50"
 								disabled={!message || isReadOnly}
 								type="submit"
 								aria-label="Send message"

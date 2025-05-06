@@ -1,13 +1,13 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 
 export async function sendSlack(text: string) {
-	if (!env.WEBHOOK_URL_REPORT_ASSISTANT) {
+	if (!config.WEBHOOK_URL_REPORT_ASSISTANT) {
 		logger.warn("WEBHOOK_URL_REPORT_ASSISTANT is not set, tried to send a slack message.");
 		return;
 	}
 
-	const res = await fetch(env.WEBHOOK_URL_REPORT_ASSISTANT, {
+	const res = await fetch(config.WEBHOOK_URL_REPORT_ASSISTANT, {
 		method: "POST",
 		headers: {
 			"Content-type": "application/json",

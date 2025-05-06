@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { authCondition, requiresUser } from "$lib/server/auth.js";
 import { collections } from "$lib/server/database.js";
 import { editableToolSchema } from "$lib/server/tools/index.js";
@@ -9,7 +9,7 @@ import { error } from "@sveltejs/kit";
 import { usageLimits } from "$lib/server/usageLimits.js";
 
 export async function POST({ request, locals }) {
-	if (env.COMMUNITY_TOOLS !== "true") {
+	if (config.COMMUNITY_TOOLS !== "true") {
 		error(403, "Community tools are not enabled");
 	}
 	const body = await request.json();

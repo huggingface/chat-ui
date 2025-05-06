@@ -1,8 +1,8 @@
 import { base } from "$app/paths";
-import { env as envPublic } from "$env/dynamic/public";
+import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 export function getShareUrl(url: URL, shareId: string): string {
 	return `${
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`
+		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || url.origin}${base}`
 	}/r/${shareId}`;
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconGear from "~icons/bi/gear-fill";
@@ -15,10 +16,6 @@
 
 	let { currentModel }: Props = $props();
 
-	const announcementBanners = envPublic.PUBLIC_ANNOUNCEMENT_BANNERS
-		? JSON5.parse(envPublic.PUBLIC_ANNOUNCEMENT_BANNERS)
-		: [];
-
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
@@ -27,21 +24,21 @@
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 flex-none" />
-				{envPublic.PUBLIC_APP_NAME}
+				{publicConfig.PUBLIC_APP_NAME}
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
-					v{envPublic.PUBLIC_VERSION}
+					v{publicConfig.PUBLIC_VERSION}
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
-				{envPublic.PUBLIC_APP_DESCRIPTION ||
+				{publicConfig.PUBLIC_APP_DESCRIPTION ||
 					"Making the community's best AI chat models available to everyone."}
 			</p>
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		{#each announcementBanners as banner}
+		{#each JSON5.parse(publicConfig.PUBLIC_ANNOUNCEMENT_BANNERS || "[]") as banner}
 			<AnnouncementBanner classNames="mb-4" title={banner.title}>
 				<a
 					target={banner.external ? "_blank" : "_self"}

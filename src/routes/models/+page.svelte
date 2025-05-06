@@ -1,8 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
-
-	import { env as envPublic } from "$env/dynamic/public";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
@@ -21,7 +19,7 @@
 </script>
 
 <svelte:head>
-	{#if isHuggingChat}
+	{#if publicConfig.isHuggingChat}
 		<title>HuggingChat - Models</title>
 		<meta property="og:title" content="HuggingChat - Models" />
 		<meta property="og:type" content="link" />
@@ -34,7 +32,7 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Models</h1>
-			{#if isHuggingChat}
+			{#if publicConfig.isHuggingChat}
 				<a
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/372"
 					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
@@ -45,7 +43,7 @@
 				</a>
 			{/if}
 		</div>
-		<h2 class="text-gray-500">All models available on {envPublic.PUBLIC_APP_NAME}</h2>
+		<h2 class="text-gray-500">All models available on {publicConfig.PUBLIC_APP_NAME}</h2>
 		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
 			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
 				<div
