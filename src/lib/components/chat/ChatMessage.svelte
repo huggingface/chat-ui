@@ -155,7 +155,7 @@
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file}
+					{#each message.files as file (file.value)}
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
@@ -196,7 +196,9 @@
 				<div
 					class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				>
-					<MarkdownRenderer content={message.content} sources={webSearchSources} />
+					{#key message.content}
+						<MarkdownRenderer content={message.content} sources={webSearchSources} />
+					{/key}
 				</div>
 			</div>
 
