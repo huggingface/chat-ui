@@ -66,7 +66,6 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 				accessToken,
 			},
 			{
-				use_cache: false,
 				fetch: async (endpointUrl, info) => {
 					if (info && authorization && !accessToken) {
 						// Set authorization header if it is defined and HF_TOKEN is empty
@@ -74,6 +73,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 							...info.headers,
 							Authorization: authorization,
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+							"X-Use-Cache": "false",
 						};
 					}
 					return fetch(endpointUrl, info);
