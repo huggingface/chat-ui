@@ -110,6 +110,7 @@ envVars:
         "endpoints": [
           {
             "type": "inference-providers",
+            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/Qwen/Qwen3-235B-A22B/v1"
           }
         ]
       },
@@ -144,9 +145,9 @@ envVars:
         ]
       },
       {
-        "name": "CohereForAI/c4ai-command-r-plus-08-2024",
+        "name": "CohereLabs/c4ai-command-r-plus-08-2024",
         "description": "Cohere's largest language model, optimized for conversational interaction and tool use. Now with the 2024 update!",
-        "modelUrl": "https://huggingface.co/CohereForAI/c4ai-command-r-plus-08-2024",
+        "modelUrl": "https://huggingface.co/CohereLabs/c4ai-command-r-plus-08-2024",
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
         "tools": true,
@@ -234,7 +235,7 @@ envVars:
         "endpoints": [
           {
             "type": "inference-providers",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
+            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
       },
@@ -461,12 +462,16 @@ envVars:
       { "name": "meta-llama/Meta-Llama-3-70B-Instruct" },
       { "name": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8" },
       {
+        "name": "CohereForAI/c4ai-command-r-plus-08-2024",
+        "transferTo": "CohereLabs/c4ai-command-r-plus-08-2024"
+      },
+      {
         "name": "CohereForAI/c4ai-command-r-plus",
-        "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"
+        "transferTo": "CohereLabs/c4ai-command-r-plus-08-2024"
       },
       {
         "name": "01-ai/Yi-1.5-34B-Chat",
-        "transferTo": "CohereForAI/c4ai-command-r-plus-08-2024"
+        "transferTo": "CohereLabs/c4ai-command-r-plus-08-2024"
       },
       {
         "name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -681,7 +686,7 @@ envVars:
     ]
   HF_ORG_ADMIN: '644171cfbd0c97265298aa99'
   HF_ORG_EARLY_ACCESS: '5e67bd5b1009063689407478'
-  HF_API_ROOT: 'https://internal.api-inference.huggingface.co/models'
+  HF_API_ROOT: 'https://api-inference.endpoints.huggingface.tech/models'
 infisical:
   enabled: true
   env: "prod-us-east-1"
