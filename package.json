@@ -75,7 +75,7 @@
 		"@huggingface/inference": "^2.8.1",
 		"@huggingface/transformers": "^3.1.1",
 		"@iconify-json/bi": "^1.1.21",
-		"@playwright/browser-chromium": "^1.43.1",
+		"@playwright/browser-chromium": "^1.52.0",
 		"@resvg/resvg-js": "^2.6.2",
 		"autoprefixer": "^10.4.14",
 		"aws-sigv4-fetch": "^4.0.1",
