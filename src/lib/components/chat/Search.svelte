@@ -11,7 +11,51 @@
 		title: string;
 		content?: string;
 	};
+
 	let conversations: Conversation[] = [];
+
+	async function fetchConversations() {
+		try {
+			const response = await fetch(`/api/conversations/${$page.params.userID}`);
+			if (!response.ok) {
+				throw new Error("Failed to fetch conversations");
+			}
+			conversations = await response.json();
+			filterConversations();
+		} catch (err) {
+			error = err instanceof Error ? err.message : "An unknown error occurred";
+		} finally {
+			loading = false;
+		}
+	}
+		function filterConversations() {
+		searchQuery = "";
+		conversations.forEach((conversation) => {
+			for (const message of conversation.messages) {
+				if (message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
+					if (differenceInHours(new Date(), conversation.createdAt) < 24) {
+						todayCons.push({
+							conversationId: conversation._id.toString(),
+							title: conversation.title,
+							content: searchQuery !== "" ? message.content : "",
+						});
+					} else if (differenceInHours(new Date(), conversation.createdAt) < 48) {
+						yesterdayCons.push({
+							conversationId: conversation._id.toString(),
+							title: conversation.title,
+							content: searchQuery !== "" ? message.content : "",
+						});
+					}
+					break;
+				}
+			}
+		});
+	}
+
+	function handleSearch() {
+		filterConversations();
+	}
+	
 	let todayCons: ConversationInfo[] = [
 		{
 			conversationId: "1",
@@ -57,29 +101,6 @@
 				popupWindowContainer.style.display = "none";
 			}
 		}
-	}
-	function handleSearch() {
-		searchQuery = "";
-		conversations.forEach((conversation) => {
-			for (const message of conversation.messages) {
-				if (message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
-					if (differenceInHours(new Date(), conversation.createdAt) < 24) {
-						todayCons.push({
-							conversationId: conversation._id.toString(),
-							title: conversation.title,
-							content: searchQuery !== "" ? message.content : "",
-						});
-					} else if (differenceInHours(new Date(), conversation.createdAt) < 48) {
-						yesterdayCons.push({
-							conversationId: conversation._id.toString(),
-							title: conversation.title,
-							content: searchQuery !== "" ? message.content : "",
-						});
-					}
-					break;
-				}
-			}
-		});
 	}
 
 	onMount(() => {
