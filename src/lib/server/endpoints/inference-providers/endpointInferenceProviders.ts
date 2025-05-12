@@ -10,6 +10,8 @@ import type { ChatCompletionTool, FunctionParameters } from "openai/resources/in
 import { logger } from "$lib/server/logger";
 import type { MessageFile } from "$lib/types/Message";
 import { v4 as uuidv4 } from "uuid";
+import type { Conversation } from "$lib/types/Conversation";
+import { downloadFile } from "$lib/server/files/downloadFile";
 
 type DeltaToolCall = NonNullable<
 	ChatCompletionStreamOutput["choices"][number]["delta"]["tool_calls"]
@@ -122,12 +124,19 @@ export async function endpointInferenceProviders(
 
 	const imageProcessor = multimodal.image ? makeImageProcessor(multimodal.image) : undefined;
 
-	async function prepareFiles(files: MessageFile[]) {
+	async function prepareFiles(files: MessageFile[], conversationId?: Conversation["_id"]) {
 		if (!imageProcessor) {
 			return [];
 		}
 		const processedFiles = await Promise.all(
-			files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
+			files
+				.filter((file) => file.mime.startsWith("image/"))
+				.map(async (file) => {
+					if (file.type === "hash" && conversationId) {
+						file = await downloadFile(file.value, conversationId);
+					}
+					return imageProcessor(file);
+				})
 		);
 		return processedFiles.map((file) => ({
 			type: "image_url" as const,
@@ -144,7 +153,7 @@ export async function endpointInferenceProviders(
 				return {
 					role: message.from,
 					content: [
-						...(await prepareFiles(message.files ?? [])),
+						...(await prepareFiles(message.files ?? [], conversationId)),
 						{ type: "text" as const, text: message.content },
 					],
 				};
