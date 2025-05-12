@@ -82,8 +82,8 @@ function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompleti
 	return toolChoices;
 }
 
-export const endpointInferenceProvidersParametersSchema = z.object({
-	type: z.literal("inference-providers"),
+export const endpointInferenceClientParametersSchema = z.object({
+	type: z.literal("inference-client"),
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	provider: z.enum(INFERENCE_PROVIDERS).default("hf-inference" as const),
@@ -112,11 +112,11 @@ export const endpointInferenceProvidersParametersSchema = z.object({
 		.default({}),
 });
 
-export async function endpointInferenceProviders(
-	input: z.input<typeof endpointInferenceProvidersParametersSchema>
+export async function endpointInferenceClient(
+	input: z.input<typeof endpointInferenceClientParametersSchema>
 ): Promise<Endpoint> {
 	const { model, provider, modelName, baseURL, multimodal } =
-		endpointInferenceProvidersParametersSchema.parse(input);
+		endpointInferenceClientParametersSchema.parse(input);
 
 	const client = baseURL
 		? new InferenceClient(config.HF_TOKEN).endpoint(baseURL)

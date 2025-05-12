@@ -32,9 +32,9 @@ import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
 import type { ObjectId } from "mongodb";
 import { endpointLocal, endpointLocalParametersSchema } from "./local/endpointLocal";
 import {
-	endpointInferenceProviders,
-	endpointInferenceProvidersParametersSchema,
-} from "./inference-providers/endpointInferenceProviders";
+	endpointInferenceClient,
+	endpointInferenceClientParametersSchema,
+} from "./inference-client/endpointInferenceClient";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -81,7 +81,7 @@ export const endpoints = {
 	cohere: endpointCohere,
 	langserve: endpointLangserve,
 	local: endpointLocal,
-	hfinference: endpointInferenceProviders,
+	inferenceClient: endpointInferenceClient,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [
@@ -99,6 +99,6 @@ export const endpointSchema = z.discriminatedUnion("type", [
 	endpointCohereParametersSchema,
 	endpointLangserveParametersSchema,
 	endpointLocalParametersSchema,
-	endpointInferenceProvidersParametersSchema,
+	endpointInferenceClientParametersSchema,
 ]);
 export default endpoints;
