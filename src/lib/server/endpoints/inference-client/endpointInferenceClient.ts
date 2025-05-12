@@ -86,7 +86,7 @@ export const endpointInferenceClientParametersSchema = z.object({
 	type: z.literal("inference-client"),
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
-	provider: z.enum(INFERENCE_PROVIDERS).default("hf-inference" as const),
+	provider: z.enum(INFERENCE_PROVIDERS).optional(),
 	supportedRoles: z
 		.array(z.enum(["user", "assistant", "system", "tool"]))
 		.default(["user", "assistant", "system", "tool"]),
@@ -118,6 +118,9 @@ export async function endpointInferenceClient(
 	const { model, provider, modelName, baseURL, multimodal } =
 		endpointInferenceClientParametersSchema.parse(input);
 
+	if (!!provider && !!baseURL) {
+		throw new Error("provider and baseURL cannot both be provided");
+	}
 	const client = baseURL
 		? new InferenceClient(config.HF_TOKEN, { endpointUrl: baseURL })
 		: new InferenceClient(config.HF_TOKEN);
@@ -242,7 +245,7 @@ export async function endpointInferenceClient(
 				...model.parameters,
 				...generateSettings,
 				model: modelName ?? model.id ?? model.name,
-				provider,
+				provider: baseURL ? undefined : provider || ("hf-inference" as const),
 				messages: messagesArray,
 				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
 				toolResults,
