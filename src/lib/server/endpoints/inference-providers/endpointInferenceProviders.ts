@@ -8,7 +8,8 @@ import type { ChatCompletionStreamOutput } from "@huggingface/tasks";
 import type { FunctionDefinition } from "openai/resources/index.mjs";
 import type { ChatCompletionTool, FunctionParameters } from "openai/resources/index.mjs";
 import { logger } from "$lib/server/logger";
-import type { Message, MessageFile } from "$lib/types/Message";
+import type { MessageFile } from "$lib/types/Message";
+import { v4 as uuidv4 } from "uuid";
 
 type DeltaToolCall = NonNullable<
 	ChatCompletionStreamOutput["choices"][number]["delta"]["tool_calls"]
@@ -84,6 +85,9 @@ export const endpointInferenceProvidersParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	provider: z.enum(INFERENCE_PROVIDERS).default("hf-inference" as const),
+	supportedRoles: z
+		.array(z.enum(["user", "assistant", "system", "tool"]))
+		.default(["user", "assistant", "system", "tool"]),
 	modelName: z.string().optional(),
 	baseURL: z.string().optional(),
 	multimodal: z
@@ -134,7 +138,8 @@ export async function endpointInferenceProviders(
 	}
 
 	return async ({ messages, generateSettings, tools, toolResults, preprompt, conversationId }) => {
-		let messagesArray = await Promise.all(
+		/* eslint-disable @typescript-eslint/no-explicit-any */
+		let messagesArray = (await Promise.all(
 			messages.map(async (message) => {
 				return {
 					role: message.from,
@@ -144,7 +149,7 @@ export async function endpointInferenceProviders(
 					],
 				};
 			})
-		);
+		)) as any[];
 
 		if (
 			!model.systemRoleSupported &&
@@ -155,26 +160,39 @@ export async function endpointInferenceProviders(
 		} else if (messagesArray[0].role !== "system") {
 			messagesArray.unshift({
 				role: "system",
-				content: [
-					{
-						type: "text" as const,
-						text: preprompt ?? "",
-					},
-				],
+				content: preprompt ?? "",
 			});
 		}
 
 		if (toolResults && toolResults.length > 0) {
 			messagesArray = [
 				...messagesArray,
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "text" as const,
+							text: "",
+						},
+					],
+					tool_calls: toolResults.map((toolResult) => ({
+						type: "function",
+						function: {
+							name: toolResult.call.name,
+							arguments: JSON.stringify(toolResult.call.parameters),
+						},
+						id: toolResult?.call?.toolId || uuidv4(),
+					})),
+				},
 				...toolResults.map((toolResult) => ({
-					role: "tool" as Message["from"],
+					role: model.systemRoleSupported ? "tool" : "user",
 					content: [
 						{
 							type: "text" as const,
 							text: JSON.stringify(toolResult),
 						},
 					],
+					tool_call_id: toolResult?.call?.toolId || uuidv4(),
 				})),
 			];
 		}
@@ -186,23 +204,29 @@ export async function endpointInferenceProviders(
 				const prevMessage = acc[acc.length - 1];
 
 				prevMessage.content = [
-					...prevMessage.content.filter((item) => item.type !== "text"),
-					...current.content.filter((item) => item.type !== "text"),
+					...prevMessage.content.filter((item: any) => item.type !== "text"),
+					...current.content.filter((item: any) => item.type !== "text"),
 					{
 						type: "text" as const,
 						text: [
-							...prevMessage.content.filter((item) => item.type === "text"),
-							...current.content.filter((item) => item.type === "text"),
+							...prevMessage.content.filter((item: any) => item.type === "text"),
+							...current.content.filter((item: any) => item.type === "text"),
 						]
-							.map((item) => item.text)
+							.map((item: any) => item.text)
 							.join("\n")
 							.replace(/^\n/, ""),
 					},
 				];
+
+				prevMessage.files = [...(prevMessage?.files ?? []), ...(current?.files ?? [])];
+
+				prevMessage.tool_calls = [
+					...(prevMessage?.tool_calls ?? []),
+					...(current?.tool_calls ?? []),
+				];
 			}
 			return acc;
 		}, []);
-
 		const toolCallChoices = createChatCompletionToolsArray(tools);
 		const stream = client.chatCompletionStream(
 			{
@@ -243,10 +267,6 @@ export async function endpointInferenceProviders(
 				generated_text += token;
 
 				const toolCalls = chunk.choices?.[0]?.delta?.tool_calls ?? [];
-
-				if (toolCalls.length > 0) {
-					logger.info(toolCalls, "toolCalls");
-				}
 
 				for (const toolCall of toolCalls) {
 					const index = toolCall.index ?? 0;

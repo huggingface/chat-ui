@@ -151,6 +151,7 @@ envVars:
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
         "tools": true,
+        "systemRoleSupported": false,
         "parameters": {
           "stop": ["<|END_OF_TURN_TOKEN|>", "<|im_end|>"],
           "truncate": 28672,
@@ -381,6 +382,7 @@ envVars:
       {
         "name": "microsoft/Phi-4",
         "tools": true,
+        "systemRoleSupported": false,
         "description": "One of the best small models, super fast for simple tasks.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
         "modelUrl": "https://huggingface.co/microsoft/Phi-4",

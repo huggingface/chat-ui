@@ -181,7 +181,7 @@ export async function* runTools(
 
 	// put fileMsg before last if files.length > 0
 	formattedMessages = files.length
-		? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
+		? [...formattedMessages.slice(0, 1), fileMsg, ...formattedMessages.slice(1)]
 		: messages;
 
 	const mappedTools = tools.map((tool) => ({
