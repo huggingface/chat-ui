@@ -119,7 +119,7 @@ export async function endpointInferenceClient(
 		endpointInferenceClientParametersSchema.parse(input);
 
 	const client = baseURL
-		? new InferenceClient(config.HF_TOKEN).endpoint(baseURL)
+		? new InferenceClient(config.HF_TOKEN, { endpointUrl: baseURL })
 		: new InferenceClient(config.HF_TOKEN);
 
 	const imageProcessor = multimodal.image ? makeImageProcessor(multimodal.image) : undefined;
