@@ -60,6 +60,7 @@ envVars:
           "max_new_tokens": 1024,
           "truncate": 7167
         },
+        "endpoints": [{"type" : "inference-client"}],
         "promptExamples": [
           {
             "title": "Write an email",
@@ -91,6 +92,7 @@ envVars:
           "stop": ["<|endoftext|>", "<|im_end|>"],
           "temperature": 0.6,
         },
+        "tools": true,
         "promptExamples": [
           {
             "title": "Write an email",
@@ -107,7 +109,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
+            "type": "inference-client",
             "baseURL": "https://api-inference.endpoints.huggingface.tech/models/Qwen/Qwen3-235B-A22B/v1"
           }
         ]
@@ -126,6 +128,7 @@ envVars:
           "max_new_tokens": 3072
         },
         "tools": true,
+        "endpoints": [{"type" : "inference-client"}],
         "promptExamples": [
           {
             "title": "Write an email",
@@ -148,12 +151,14 @@ envVars:
         "websiteUrl": "https://docs.cohere.com/docs/command-r-plus",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/cohere-logo.png",
         "tools": true,
+        "systemRoleSupported": false,
         "parameters": {
           "stop": ["<|END_OF_TURN_TOKEN|>", "<|im_end|>"],
           "truncate": 28672,
           "max_new_tokens": 2048,
           "temperature": 0.3
         },
+        "endpoints": [{"type" : "inference-client"}],
         "promptExamples": [
           {
             "title": "Generate image",
@@ -180,6 +185,7 @@ envVars:
           "beginToken": "",
           "endToken": "</think>"
         },
+        "tools": true,
         "promptExamples": [
           {
             "title": "Rs in strawberry",
@@ -196,8 +202,8 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+            "type": "inference-client",
+            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
           }
         ]
       },
@@ -229,13 +235,14 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
+            "type": "inference-client",
             "baseURL": "https://api-inference.endpoints.huggingface.tech/models/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF/v1"
           }
         ]
       },
       {
         "name": "Qwen/QwQ-32B",
+        "tools": true,
         "preprompt": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step.",
         "modelUrl": "https://huggingface.co/Qwen/QwQ-32B",
         "websiteUrl": "https://qwenlm.github.io/blog/qwq-32b/",
@@ -262,8 +269,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://atv7xs1nxxtx2wl0.us-east-1.aws.endpoints.huggingface.cloud/v1"
+            "type": "inference-client",
           }
         ]
       },
@@ -271,6 +277,8 @@ envVars:
         "name": "google/gemma-3-27b-it",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/google-logo.png",
         "multimodal": true,
+        "tools": true,
+        "systemRoleSupported" : false,
         "description": "Google's latest open model with great multilingual performance, supports image inputs natively.",
         "websiteUrl": "https://blog.google/technology/developers/gemma-3/",
         "promptExamples": [
@@ -289,15 +297,15 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
+            "type": "inference-client",
             "baseURL": "https://wp0d3hn6s3k8jk22.us-east-1.aws.endpoints.huggingface.cloud/v1",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
                 "maxWidth": 560,
                 "maxHeight": 560,
-                "supportedMimeTypes": ["image/jpeg"],
-                "preferredMimeType": "image/jpeg"
+                "supportedMimeTypes": ["image/jpeg", "image/png", "image/webp"],
+                "preferredMimeType": "image/webp"
               }
             }
           }
@@ -305,6 +313,7 @@ envVars:
       },
       {
         "name": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+        "tools": true,
         "displayName": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
         "description": "A small model with good capabilities in language understanding and commonsense reasoning.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/mistral-logo.png",
@@ -328,8 +337,8 @@ envVars:
 
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://hkjfqcryevvq9cie.us-east-1.aws.endpoints.huggingface.cloud/v1"
+            "type": "inference-client",
+              "baseURL": "https://hkjfqcryevvq9cie.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
       },
@@ -356,8 +365,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
-            "baseURL": "https://lf91qeosuambouj4.us-east-1.aws.endpoints.huggingface.cloud/v1",
+            "type": "inference-client",
             "multimodal": {
               "image": {
                 "maxSizeInMB": 10,
@@ -372,6 +380,8 @@ envVars:
       },
       {
         "name": "microsoft/Phi-4",
+        "tools": true,
+        "systemRoleSupported": false,
         "description": "One of the best small models, super fast for simple tasks.",
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/microsoft-logo.png",
         "modelUrl": "https://huggingface.co/microsoft/Phi-4",
@@ -399,7 +409,7 @@ envVars:
         ],
         "endpoints": [
           {
-            "type": "openai",
+            "type": "inference-client",
             "baseURL": "https://up5ijetg6a2e9zlb.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
@@ -407,6 +417,7 @@ envVars:
       {
         "name": "NousResearch/Hermes-3-Llama-3.1-8B",
         "description": "Nous Research's latest Hermes 3 release in 8B size. Follows instruction closely.",
+        "tools": true,
         "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/nous-logo.png",
         "websiteUrl": "https://nousresearch.com/",
         "modelUrl": "https://huggingface.co/NousResearch/Hermes-3-Llama-3.1-8B",
@@ -429,23 +440,8 @@ envVars:
           "temperature": 0.6,
           "truncate": 14336,
           "max_new_tokens": 1536
-        }
-      },
-      {
-        "name": "internal/task",
-        "tokenizer" : "NousResearch/Hermes-3-Llama-3.1-8B",
-        "unlisted": true,
-        "tools" : true,
-        "endpoints": [
-          {
-            "type": "openai",
-            "baseURL": "https://api-inference.endpoints.huggingface.tech/models/NousResearch/Hermes-3-Llama-3.1-8B/v1"
-          }
-        ],
-        "parameters": {
-          "temperature": 0.1,
-          "max_new_tokens": 256
         },
+        "endpoints": [{"type" : "inference-client"}]
       }
     ]
 
@@ -539,7 +535,18 @@ envVars:
   PUBLIC_APP_DISCLAIMER: 1
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   REQUIRE_FEATURED_ASSISTANTS: "true"
-  TASK_MODEL: "internal/task"
+  TASK_MODEL: >
+        {
+        "name": "NousResearch/Hermes-3-Llama-3.1-8B",
+        "unlisted": true,
+        "endpoints": [{"type" : "inference-client"}],
+        "parameters": {
+          "temperature": 0.1,
+          "max_new_tokens": 256
+        }
+        }
+      
+
   TEXT_EMBEDDING_MODELS: >
     [{
       "name": "bge-base-en-v1-5-sxa",
