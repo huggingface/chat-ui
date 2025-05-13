@@ -12,7 +12,7 @@ import type { MessageFile } from "$lib/types/Message";
 import { v4 as uuidv4 } from "uuid";
 import type { Conversation } from "$lib/types/Conversation";
 import { downloadFile } from "$lib/server/files/downloadFile";
-
+import { jsonrepair } from "jsonrepair";
 type DeltaToolCall = NonNullable<
 	ChatCompletionStreamOutput["choices"][number]["delta"]["tool_calls"]
 >[number];
@@ -318,7 +318,7 @@ export async function endpointInferenceClient(
 					mappedToolCalls = toolCallsArray.map((tc) => ({
 						id: tc.id,
 						name: tc.function.name ?? "",
-						parameters: JSON.parse(tc.function.arguments || "{}"),
+						parameters: JSON.parse(jsonrepair(tc.function.arguments || "{}")),
 					}));
 				}
 			} catch (e) {
