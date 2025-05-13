@@ -12,7 +12,7 @@ import type { PreTrainedTokenizer } from "@huggingface/transformers";
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
+import { type ToolInput } from "$lib/types/Tool";
 import { join, dirname } from "path";
 import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
 import { fileURLToPath } from "url";
@@ -195,13 +195,7 @@ async function getChatPromptRender(
 		process.exit();
 	}
 
-	const renderTemplate = ({
-		messages,
-		preprompt,
-		tools,
-		toolResults,
-		continueMessage,
-	}: ChatTemplateInput) => {
+	const renderTemplate = ({ messages, preprompt, tools, continueMessage }: ChatTemplateInput) => {
 		let formattedMessages: {
 			role: string;
 			content: string;
@@ -233,74 +227,6 @@ async function getChatPromptRender(
 				},
 				...formattedMessages,
 			];
-		}
-
-		if (toolResults?.length) {
-			// todo: should update the command r+ tokenizer to support system messages at any location
-			// or use the `rag` mode without the citations
-			const id = m.id ?? m.name;
-
-			if (config.isHuggingChat && id.startsWith("CohereForAI")) {
-				formattedMessages = [
-					{
-						role: "user",
-						content:
-							"\n\n<results>\n" +
-							toolResults
-								.flatMap((result, idx) => {
-									if (result.status === ToolResultStatus.Error) {
-										return (
-											`Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message
-										);
-									}
-									return (
-										`Document: ${idx}\n` +
-										result.outputs
-											.flatMap((output) =>
-												Object.entries(output).map(([title, text]) => `${title}\n${text}`)
-											)
-											.join("\n")
-									);
-								})
-								.join("\n\n") +
-							"\n</results>",
-					},
-					...formattedMessages,
-				];
-			} else if (config.isHuggingChat && id.startsWith("meta-llama")) {
-				const results = toolResults.flatMap((result) => {
-					if (result.status === ToolResultStatus.Error) {
-						return [
-							{
-								tool_call_id: result.call.name,
-								output: "Error: " + result.message,
-							},
-						];
-					} else {
-						return result.outputs.map((output) => ({
-							tool_call_id: result.call.name,
-							output: JSON.stringify(output),
-						}));
-					}
-				});
-
-				formattedMessages = [
-					...formattedMessages,
-					{
-						role: "python",
-						content: JSON.stringify(results),
-					},
-				];
-			} else {
-				formattedMessages = [
-					...formattedMessages,
-					{
-						role: m.systemRoleSupported ? "system" : "user",
-						content: JSON.stringify(toolResults),
-					},
-				];
-			}
-			tools = [];
 		}
 
 		const mappedTools =
@@ -380,6 +306,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 						return endpoints.tgi(args);
 					case "local":
 						return endpoints.local(args);
+					case "inference-client":
+						return endpoints.inferenceClient(args);
 					case "anthropic":
 						return endpoints.anthropic(args);
 					case "anthropic-vertex":
