@@ -349,7 +349,6 @@ envVars:
         "websiteUrl": "https://qwenlm.github.io/blog/qwen2.5-vl/",
         "modelUrl": "https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct",
         "multimodal": true,
-        "tools": true,
         "promptExamples": [
           {
             "title": "Write an email",
