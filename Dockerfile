@@ -13,7 +13,7 @@ RUN useradd -m -u 1000 user
 USER user
 
 ENV HOME=/home/user \
-	PATH=/home/user/.local/bin:$PATH
+    PATH=/home/user/.local/bin:$PATH
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ WORKDIR /app
 RUN touch /app/.env.local
 
 
-RUN npm i --no-package-lock --no-save playwright@1.47.0
+RUN npm i --no-package-lock --no-save playwright@1.52.0
 
 USER root
 
@@ -57,8 +57,8 @@ ARG PUBLIC_APP_COLOR=blue
 ENV BODY_SIZE_LIMIT=15728640
 
 RUN --mount=type=cache,target=/app/.npm \
-        npm set cache /app/.npm && \
-        npm ci
+    npm set cache /app/.npm && \
+    npm ci
 
 COPY --link --chown=1000 . .
 
