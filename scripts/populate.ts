@@ -8,7 +8,8 @@ import { faker } from "@faker-js/faker";
 import { ObjectId } from "mongodb";
 
 // @ts-expect-error: vite-node makes the var available but the typescript compiler doesn't see them
-import { collections } from "$lib/server/database";
+import { ready } from "$lib/server/config";
+import { collections } from "$lib/server/database.ts";
 import { models } from "../src/lib/server/models.ts";
 import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
@@ -30,6 +31,8 @@ const rl = readline.createInterface({
 	input: process.stdin,
 	output: process.stdout,
 });
+
+await ready;
 
 rl.on("close", function () {
 	process.exit(0);

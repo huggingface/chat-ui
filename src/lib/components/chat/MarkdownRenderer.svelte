@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { WebSearchSource } from "$lib/types/WebSearch";
 	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
-	import MarkdownWorker from "$lib/workers/markdownWorker?worker";
+	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import CodeBlock from "../CodeBlock.svelte";
-	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
+	// import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
 	import { browser } from "$app/environment";
 
 	import DOMPurify from "isomorphic-dompurify";
@@ -13,28 +13,28 @@
 		sources?: WebSearchSource[];
 	}
 
-	const worker = browser && window.Worker ? new MarkdownWorker() : null;
+	// const worker = browser && window.Worker ? new MarkdownWorker() : null;
 
 	let { content, sources = [] }: Props = $props();
 
 	let tokens: Token[] = $state(processTokensSync(content, sources));
 
 	async function processContent(content: string, sources: WebSearchSource[]): Promise<Token[]> {
-		if (worker) {
-			return new Promise((resolve) => {
-				worker.onmessage = (event: MessageEvent<OutgoingMessage>) => {
-					if (event.data.type !== "processed") {
-						throw new Error("Invalid message type");
-					}
-					resolve(event.data.tokens);
-				};
-				worker.postMessage(
-					JSON.parse(JSON.stringify({ content, sources, type: "process" })) as IncomingMessage
-				);
-			});
-		} else {
-			return processTokens(content, sources);
-		}
+		// if (worker) {
+		// 	return new Promise((resolve) => {
+		// 		worker.onmessage = (event: MessageEvent<OutgoingMessage>) => {
+		// 			if (event.data.type !== "processed") {
+		// 				throw new Error("Invalid message type");
+		// 			}
+		// 			resolve(event.data.tokens);
+		// 		};
+		// 		worker.postMessage(
+		// 			JSON.parse(JSON.stringify({ content, sources, type: "process" })) as IncomingMessage
+		// 		);
+		// 	});
+		// } else {
+		return processTokens(content, sources);
+		// }
 	}
 
 	$effect(() => {
