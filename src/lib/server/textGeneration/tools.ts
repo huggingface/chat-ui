@@ -3,7 +3,6 @@ import { v4 as uuidV4 } from "uuid";
 import { getCallMethod, toolFromConfigs, type BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
-	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -218,12 +217,6 @@ export async function* runTools(
 				calls.push(...newCalls);
 			} catch (e) {
 				logger.warn({ rawCall: output.generated_text, error: e }, "Error while parsing tool calls");
-				// error parsing the calls
-				yield {
-					type: MessageUpdateType.Status,
-					status: MessageUpdateStatus.Error,
-					message: "Error while parsing tool calls.",
-				};
 			}
 		}
 	}
