@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { page } from "$app/stores";
 	import { base } from "$app/paths";
 	import { differenceInHours } from "date-fns";
 	import type { Conversation } from "$lib/types/Conversation";
@@ -18,6 +17,7 @@
 	};
 	let todayCons: ConversationInfo[] = [];
 	let yesterdayCons: ConversationInfo[] = [];
+	let theRestConversations: ConversationInfo[] = [];
 
 	let conversations: Conversation[] = [];
 
@@ -40,21 +40,24 @@
 		yesterdayCons = [];
 		conversations.forEach((conversation) => {
 			for (const message of conversation.messages) {
-				if (
-					message.content.toLowerCase().includes(searchQuery.toLowerCase()) &&
-					message.content != ""
-				) {
+				if (message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
 					if (differenceInHours(new Date(), new Date(conversation.updatedAt)) < 24) {
 						todayCons.push({
 							conversationId: conversation._id.toString(),
 							title: conversation.title,
-							content: message.content,
+							content: searchQuery !== "" ? message.content.slice(0, 50) + "..." : "",
 						});
 					} else if (differenceInHours(new Date(), conversation.createdAt) < 48) {
 						yesterdayCons.push({
 							conversationId: conversation._id.toString(),
 							title: conversation.title,
-							content: message.content,
+							content: searchQuery !== "" ? message.content.slice(0, 50) + "..." : "",
+						});
+					} else {
+						theRestConversations.push({
+							conversationId: conversation._id.toString(),
+							title: conversation.title,
+							content: searchQuery !== "" ? message.content.slice(0, 50) + "..." : "",
 						});
 					}
 					break;
@@ -105,6 +108,7 @@
 					searchQuery = (e.target as HTMLInputElement).value;
 					todayCons = [];
 					yesterdayCons = [];
+					theRestConversations = [];
 					loading = true;
 					filterConversations(searchQuery);
 				}}
@@ -136,25 +140,25 @@
 				<p>Loading...</p>
 			{:else if error}
 				<p>Error: {error}</p>
-			{:else if yesterdayCons.length > 0 || todayCons.length > 0}
+			{:else if yesterdayCons.length > 0 || todayCons.length > 0 || theRestConversations.length > 0}
 				{#if todayCons.length > 0}
 					<ul class="chats today-chats flex flex-col gap-2">
 						<span class="p-2">Today</span>
 						{#each todayCons as convInfo}
-							<div
-								class="flex cursor-pointer flex-row items-center gap-3 rounded-lg p-2 transition-colors
-                duration-150 ease-in-out hover:bg-slate-800"
+							<button
+								class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors
+								duration-150 ease-in-out hover:bg-slate-800"
 								id={convInfo.conversationId}
 								onclick={() => {
 									window.location.href = `${base}/conversation/${convInfo.conversationId}`;
 								}}
 							>
 								<PopupChatIcon />
-								<div class="flex flex-col">
+								<div class="flex flex-col items-start">
 									<h1>{convInfo.title}</h1>
 									<span>{convInfo.content}</span>
 								</div>
-							</div>
+							</button>
 						{/each}
 					</ul>
 				{/if}
@@ -162,17 +166,41 @@
 					<ui class="chats yesterday-chats flex flex-col gap-2">
 						<span class="p-2">Yesterday</span>
 						{#each yesterdayCons as convInfo}
-							<div
-								class="flex cursor-pointer flex-row items-center gap-3 rounded-lg p-2 transition-colors
-			duration-150 ease-in-out hover:bg-slate-800"
+							<button
+								class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors
+								duration-150 ease-in-out hover:bg-slate-800"
 								id={convInfo.conversationId}
+								onclick={() => {
+									window.location.href = `${base}/conversation/${convInfo.conversationId}`;
+								}}
 							>
 								<PopupChatIcon />
-								<div class="flex flex-col">
+								<div class="flex flex-col items-start">
 									<h1>{convInfo.title}</h1>
 									<span>{convInfo.content}</span>
 								</div>
-							</div>
+							</button>
+						{/each}
+					</ui>
+				{/if}
+				{#if theRestConversations.length > 0}
+					<ui class="chats yesterday-chats flex flex-col gap-2">
+						<span class="p-2">More than 2 days</span>
+						{#each theRestConversations as convInfo}
+							<button
+								class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors
+								duration-150 ease-in-out hover:bg-slate-800"
+								id={convInfo.conversationId}
+								onclick={() => {
+									window.location.href = `${base}/conversation/${convInfo.conversationId}`;
+								}}
+							>
+								<PopupChatIcon />
+								<div class="flex flex-col items-start">
+									<h1>{convInfo.title}</h1>
+									<span>{convInfo.content}</span>
+								</div>
+							</button>
 						{/each}
 					</ui>
 				{/if}
@@ -201,8 +229,5 @@
 		background-color: #5555;
 		margin-block: 1.25em;
 		border-radius: 0.5em;
-	}
-	.chat-container > div,
-	.chats div {
 	}
 </style>
