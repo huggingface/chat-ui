@@ -89,7 +89,7 @@
 		if (!browser) return false;
 
 		// Check for touch capability
-		if (navigator.maxTouchPoints > 0) return true;
+		if (navigator.maxTouchPoints > 0 && screen.width <= 768) return true;
 
 		// Check for touch events
 		if ("ontouchstart" in window) return true;
