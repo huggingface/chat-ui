@@ -26,6 +26,7 @@
 	import { browser } from "$app/environment";
 
 	import "katex/dist/katex.min.css";
+	import { updateDebouncer } from "$lib/utils/updates.js";
 
 	let { data = $bindable() } = $props();
 
@@ -270,6 +271,12 @@
 			if (messageUpdatesIterator === undefined) return;
 
 			files = [];
+			let buffer = "";
+			// Initialize lastUpdateTime outside the loop to persist between updates
+			let lastUpdateTime = new Date();
+
+			let reasoningBuffer = "";
+			let reasoningLastUpdate = new Date();
 
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
@@ -283,10 +290,6 @@
 					update.token = update.token.replaceAll("\0", "");
 				}
 
-				// dont write updates for reasoning stream and normal stream to reduce render load
-				// but handle the rest
-
-				// Skip storing high-frequency updates to reduce render load
 				const isHighFrequencyUpdate =
 					(update.type === MessageUpdateType.Reasoning &&
 						update.subtype === MessageReasoningUpdateType.Stream) ||
@@ -297,9 +300,16 @@
 				if (!isHighFrequencyUpdate) {
 					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
 				}
+				const currentTime = new Date();
 
 				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
-					messageToWriteTo.content += update.token;
+					buffer += update.token;
+					// Check if this is the first update or if enough time has passed
+					if (currentTime.getTime() - lastUpdateTime.getTime() > updateDebouncer.maxUpdateTime) {
+						messageToWriteTo.content += buffer;
+						buffer = "";
+						lastUpdateTime = currentTime;
+					}
 					pending = false;
 				} else if (
 					update.type === MessageUpdateType.Status &&
@@ -326,7 +336,15 @@
 						messageToWriteTo.reasoning = "";
 					}
 					if (update.subtype === MessageReasoningUpdateType.Stream) {
-						messageToWriteTo.reasoning += update.token;
+						reasoningBuffer += update.token;
+						if (
+							currentTime.getTime() - reasoningLastUpdate.getTime() >
+							updateDebouncer.maxUpdateTime
+						) {
+							messageToWriteTo.reasoning += reasoningBuffer;
+							reasoningBuffer = "";
+							reasoningLastUpdate = currentTime;
+						}
 					}
 				}
 			}
