@@ -87,9 +87,6 @@ export const endpointInferenceClientParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	provider: z.enum(INFERENCE_PROVIDERS).optional(),
-	supportedRoles: z
-		.array(z.enum(["user", "assistant", "system", "tool"]))
-		.default(["user", "assistant", "system", "tool"]),
 	modelName: z.string().optional(),
 	baseURL: z.string().optional(),
 	multimodal: z
