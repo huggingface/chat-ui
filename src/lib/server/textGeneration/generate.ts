@@ -193,8 +193,12 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 		}
 
 		// abort check
-		const date = AbortedGenerations.getInstance().getList().get(conv._id.toString());
-		if (date && date > promptedAt) break;
+		const date = AbortedGenerations.getInstance().getAbortTime(conv._id.toString());
+
+		if (date && date > promptedAt) {
+			logger.info(`Aborting generation for conversation ${conv._id}`);
+			break;
+		}
 
 		// no output check
 		if (!output) break;
