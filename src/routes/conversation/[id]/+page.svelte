@@ -520,7 +520,21 @@
 	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:share={() => shareConversation(page.params.id, data.title)}
-	on:stop={() => (($isAborted = true), (loading = false))}
+	on:stop={async () => {
+		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
+			method: "POST",
+		}).then((r) => {
+			if (r.ok) {
+				setTimeout(() => {
+					$isAborted = true;
+					loading = false;
+				}, 3000);
+			} else {
+				$isAborted = true;
+				loading = false;
+			}
+		});
+	}}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
 	assistant={data.assistant}
