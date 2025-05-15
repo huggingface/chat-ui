@@ -27,6 +27,7 @@
 
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
+	import { documentParserToolId } from "$lib/utils/toolIds.js";
 
 	let { data = $bindable() } = $props();
 
@@ -252,6 +253,13 @@
 			// disable websearch if assistant is present
 			const hasAssistant = !!page.data.assistant;
 			const messageUpdatesAbortController = new AbortController();
+
+			let tools = $settings.tools;
+
+			if (!files.some((file) => file.type.startsWith("application/"))) {
+				tools = $settings.tools?.filter((tool) => tool !== documentParserToolId);
+			}
+
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
 				{
@@ -261,7 +269,7 @@
 					isRetry,
 					isContinue,
 					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
-					tools: $settings.tools, // preference for tools
+					tools,
 					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal

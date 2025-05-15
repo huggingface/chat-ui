@@ -4,7 +4,8 @@ import { ObjectId } from "mongodb";
 const directlyAnswer: ConfigTool = {
 	_id: new ObjectId("00000000000000000000000D"),
 	type: "config",
-	description: "Answer the user's query directly",
+	description:
+		"Answer the user's query directly. You must use this tool before you can answer the user's query.",
 	color: "blue",
 	icon: "chat",
 	displayName: "Directly Answer",
