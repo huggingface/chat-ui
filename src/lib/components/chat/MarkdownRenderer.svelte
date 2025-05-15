@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { WebSearchSource } from "$lib/types/WebSearch";
 	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
-	import MarkdownWorker from "$lib/workers/markdownWorker?worker";
+	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import CodeBlock from "../CodeBlock.svelte";
 	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
 	import { browser } from "$app/environment";
@@ -66,7 +66,8 @@
 	});
 
 	onMount(() => {
-		worker = browser && window.Worker ? new MarkdownWorker() : null;
+		// todo: fix worker, seems to be transmitting a lot of data
+		// worker = browser && window.Worker ? new MarkdownWorker() : null;
 
 		DOMPurify.addHook("afterSanitizeAttributes", (node) => {
 			if (node.tagName === "A") {

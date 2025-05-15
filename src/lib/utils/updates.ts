@@ -11,7 +11,11 @@ class UpdateDebouncer {
 		if (this.lastRenderTimes.length === 0) {
 			return 50;
 		}
-		return Math.max(...this.lastRenderTimes) * 3;
+
+		const averageTime =
+			this.lastRenderTimes.reduce((acc, time) => acc + time, 0) / this.lastRenderTimes.length;
+
+		return Math.min(averageTime * 3, 500);
 	}
 
 	public startRender() {
