@@ -14,7 +14,6 @@ import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { type ToolInput } from "$lib/types/Tool";
 import { join, dirname } from "path";
-import { resolveModelFile, readGgufFileInfo } from "node-llama-cpp";
 import { fileURLToPath } from "url";
 import { findRepoRoot } from "./findRepoRoot";
 import { Template } from "@huggingface/jinja";
@@ -150,6 +149,8 @@ async function getChatPromptRender(
 	if (m.endpoints?.some((e) => e.type === "local")) {
 		const endpoint = m.endpoints?.find((e) => e.type === "local");
 		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
+
+		const { resolveModelFile, readGgufFileInfo } = await import("node-llama-cpp");
 
 		const modelPath = await resolveModelFile(path, MODELS_FOLDER);
 
