@@ -3,7 +3,7 @@
 
 	const bubble = createBubbler();
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick } from "svelte";
+	import { createEventDispatcher, onDestroy, tick, onMount } from "svelte";
 
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
@@ -30,6 +30,7 @@
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
+	import Search from "./Search.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
@@ -38,7 +39,6 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import { beforeNavigate } from "$app/navigation";
-
 	interface Props {
 		messages?: Message[];
 		messagesAlternatives?: Message["id"][][];
@@ -230,6 +230,7 @@
 		)
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
+	
 </script>
 
 <svelte:window
@@ -245,7 +246,8 @@
 	}}
 />
 
-<div class="relative min-h-0 min-w-0">
+<Search />
+<div class="relative z-[-1] min-h-0 min-w-0">
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.map((message) => message.content)}
