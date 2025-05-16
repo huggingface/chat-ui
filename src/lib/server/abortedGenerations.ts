@@ -7,11 +7,13 @@ import { onExit } from "./exitHandler";
 export class AbortedGenerations {
 	private static instance: AbortedGenerations;
 
-	private abortedGenerations: Map<string, Date> = new Map();
+	private abortedGenerations: Record<string, Date> = {};
 
 	private constructor() {
-		const interval = setInterval(this.updateList, 1000);
+		const interval = setInterval(() => this.updateList(), 1000);
 		onExit(() => clearInterval(interval));
+
+		this.updateList();
 	}
 
 	public static getInstance(): AbortedGenerations {
@@ -22,16 +24,16 @@ export class AbortedGenerations {
 		return AbortedGenerations.instance;
 	}
 
-	public getList(): Map<string, Date> {
-		return this.abortedGenerations;
+	public getAbortTime(conversationId: string): Date | undefined {
+		return this.abortedGenerations[conversationId];
 	}
 
 	private async updateList() {
 		try {
 			const aborts = await collections.abortedGenerations.find({}).sort({ createdAt: 1 }).toArray();
 
-			this.abortedGenerations = new Map(
-				aborts.map(({ conversationId, createdAt }) => [conversationId.toString(), createdAt])
+			this.abortedGenerations = Object.fromEntries(
+				aborts.map((abort) => [abort.conversationId.toString(), abort.createdAt])
 			);
 		} catch (err) {
 			logger.error(err);
