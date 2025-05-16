@@ -64,7 +64,6 @@ export async function endpointAws(
 				inputs: prompt,
 			},
 			{
-				use_cache: false,
 				fetch: signedFetch,
 			}
 		);

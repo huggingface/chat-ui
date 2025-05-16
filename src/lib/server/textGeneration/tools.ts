@@ -3,7 +3,6 @@ import { v4 as uuidV4 } from "uuid";
 import { getCallMethod, toolFromConfigs, type BackendToolContext } from "../tools";
 import {
 	MessageToolUpdateType,
-	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -181,10 +180,8 @@ export async function* runTools(
 
 	// put fileMsg before last if files.length > 0
 	formattedMessages = files.length
-		? [...formattedMessages.slice(0, -1), fileMsg, ...formattedMessages.slice(-1)]
+		? [...formattedMessages.slice(0, 1), fileMsg, ...formattedMessages.slice(1)]
 		: messages;
-
-	let rawText = "";
 
 	const mappedTools = tools.map((tool) => ({
 		...tool,
@@ -208,24 +205,6 @@ export async function* runTools(
 			continue;
 		}
 
-		if (output.token.text) {
-			rawText += output.token.text;
-		}
-
-		// if we dont see a tool call in the first 25 chars, something is going wrong and we abort
-		if (rawText.length > 100 && !(rawText.includes("```json") || rawText.includes("{"))) {
-			return [];
-		}
-
-		// if we see a directly_answer tool call, we skip the rest
-		if (
-			rawText.includes("directly_answer") ||
-			rawText.includes("directlyAnswer") ||
-			rawText.includes("directly-answer")
-		) {
-			return [];
-		}
-
 		// look for a code blocks of ```json and parse them
 		// if they're valid json, add them to the calls array
 		if (output.generated_text) {
@@ -238,12 +217,6 @@ export async function* runTools(
 				calls.push(...newCalls);
 			} catch (e) {
 				logger.warn({ rawCall: output.generated_text, error: e }, "Error while parsing tool calls");
-				// error parsing the calls
-				yield {
-					type: MessageUpdateType.Status,
-					status: MessageUpdateStatus.Error,
-					message: "Error while parsing tool calls.",
-				};
 			}
 		}
 	}

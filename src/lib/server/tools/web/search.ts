@@ -5,7 +5,7 @@ import { runWebSearch } from "../../websearch/runWebSearch";
 const websearch: ConfigTool = {
 	_id: new ObjectId("00000000000000000000000A"),
 	type: "config",
-	description: "Search the web for answers to the user's query",
+	description: "Search the web for up-to-date answers to the user's query.",
 	color: "blue",
 	icon: "wikis",
 	displayName: "Web Search",
@@ -16,7 +16,7 @@ const websearch: ConfigTool = {
 			name: "query",
 			type: "str",
 			description:
-				"A search query which will be used to fetch the most relevant snippets regarding the user's query",
+				"A search query which will be used to fetch the most relevant snippets regarding the user's query.",
 			paramType: "required",
 		},
 	],
@@ -35,7 +35,12 @@ const websearch: ConfigTool = {
 				{
 					websearch:
 						webSearchContext +
-						"\n\nWhen answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3].",
+						"\n\nWhen answering the question, you must reference the sources you used inline by wrapping the index in brackets like this: [1]. If multiple sources are used, you must reference each one of them without commas like this: [1][2][3]. This information was fetched live from the web, today on " +
+						new Date().toLocaleDateString("en-US", {
+							year: "numeric",
+							month: "long",
+							day: "numeric",
+						}),
 				},
 			],
 			display: false,

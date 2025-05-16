@@ -290,7 +290,7 @@
 						{#if assistant.tools?.length}
 							<div
 								class="grid size-5 place-items-center rounded-full bg-purple-500/10"
-								title="This assistant uses the websearch."
+								title="This assistant can use tools"
 							>
 								<CarbonTools class="text-xs text-purple-600" />
 							</div>
