@@ -54,7 +54,9 @@ COPY --link --chown=1000 package-lock.json package.json ./
 
 ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=blue
+ARG SKIP_LLAMA_CPP_BUILD
 ENV BODY_SIZE_LIMIT=15728640
+ENV SKIP_LLAMA_CPP_BUILD=$SKIP_LLAMA_CPP_BUILD
 
 RUN --mount=type=cache,target=/app/.npm \
     npm set cache /app/.npm && \
