@@ -49,4 +49,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker image
-        run: docker build --secret id=DOTENV_LOCAL,src=.env.ci -t chat-ui:latest .
+        run: docker build --secret id=DOTENV_LOCAL,src=.env.ci --build-arg SKIP_LLAMA_CPP_BUILD=true -t chat-ui:latest .
