@@ -53,7 +53,7 @@ export async function GET({ params, locals }) {
 		console.error(err);
 		return "Prompt generation failed";
 	});
-	console.log(conv);
+
 	return Response.json({
 		prompt,
 		model: model.name,
