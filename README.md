@@ -1104,9 +1104,9 @@ docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_
 If you want to run the images with your local .env.local you have two options
 
 ```bash
-DOTENV_LOCAL=$(<.env.local)  docker run --rm --network=host -e DOTENV_LOCAL -p 3000:3000 chat-ui
+DOTENV_LOCAL=$(<.env.local)  docker run --network=host -e DOTENV_LOCAL chat-ui-db
 ```
 
 ```bash
-docker run --rm --network=host --mount type=bind,source="$(pwd)/.env.local",target=/app/.env.local -p 3000:3000 chat-ui
+docker run --network=host --mount type=bind,source="$(pwd)/.env.local",target=/app/.env.local chat-ui-db
 ```
