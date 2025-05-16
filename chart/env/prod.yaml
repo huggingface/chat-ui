@@ -203,7 +203,7 @@ envVars:
         "endpoints": [
           {
             "type": "inference-client",
-            "baseURL": "https://internal.api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/v1"
+            "baseURL": "https://b8xf586h164t4vk7.us-east-1.aws.endpoints.huggingface.cloud/v1"
           }
         ]
       },
