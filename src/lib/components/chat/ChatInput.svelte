@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
@@ -24,7 +23,7 @@
 	import { captureScreen } from "$lib/utils/screenshot";
 	import IconScreenshot from "../icons/IconScreenshot.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
-
+	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	interface Props {
 		files?: File[];
 		mimeTypes?: string[];
@@ -37,6 +36,7 @@
 		modelIsMultimodal?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
+		focused?: boolean;
 	}
 
 	let {
@@ -51,6 +51,7 @@
 		modelIsMultimodal = false,
 		children,
 		onPaste,
+		focused = $bindable(false),
 	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
@@ -84,21 +85,6 @@
 			formEl?.removeEventListener("submit", onFormSubmit);
 		};
 	});
-
-	function isVirtualKeyboard(): boolean {
-		if (!browser) return false;
-
-		// Check for touch capability
-		if (navigator.maxTouchPoints > 0 && screen.width <= 768) return true;
-
-		// Check for touch events
-		if ("ontouchstart" in window) return true;
-
-		// Fallback to user agent string check
-		const userAgent = navigator.userAgent.toLowerCase();
-
-		return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-	}
 
 	function adjustTextareaHeight() {
 		if (!textareaElement) {
@@ -180,6 +166,8 @@
 		}}
 		{placeholder}
 		{disabled}
+		onfocus={() => (focused = true)}
+		onblur={() => (focused = false)}
 	></textarea>
 
 	{#if !showNoTools}
