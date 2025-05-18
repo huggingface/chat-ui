@@ -141,13 +141,13 @@
 			<img
 				src="{base}/settings/assistants/{page.data.assistant._id}/avatar.jpg"
 				alt="Avatar"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
+				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 			/>
 		{:else}
 			<img
 				alt=""
 				src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
+				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 			/>
 		{/if}
 		<div
