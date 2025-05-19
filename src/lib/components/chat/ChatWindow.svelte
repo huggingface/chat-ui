@@ -39,6 +39,7 @@
 	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import { beforeNavigate } from "$app/navigation";
+	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	interface Props {
 		messages?: Message[];
 		messagesAlternatives?: Message["id"][][];
@@ -230,7 +231,7 @@
 		)
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
-	
+	let focused = $state(false);
 </script>
 
 <svelte:window
@@ -413,8 +414,11 @@
 					e.preventDefault();
 					handleSubmit();
 				}}
-				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-600 dark:bg-gray-700
-            {isReadOnly ? 'opacity-30' : ''}"
+				class={{
+					"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-600 dark:bg-gray-700": true,
+					"opacity-30": isReadOnly,
+					"max-sm:mb-4": focused && isVirtualKeyboard(),
+				}}
 			>
 				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
@@ -438,6 +442,7 @@
 								disabled={isReadOnly || lastIsError}
 								modelHasTools={currentModel.tools}
 								modelIsMultimodal={currentModel.multimodal}
+								bind:focused
 							/>
 						{/if}
 
@@ -476,7 +481,10 @@
 				{/if}
 			</form>
 			<div
-				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
+				class={{
+					"mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+					"max-sm:hidden": focused && isVirtualKeyboard(),
+				}}
 			>
 				<p>
 					Model:
