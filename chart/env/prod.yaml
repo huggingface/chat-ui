@@ -35,7 +35,6 @@ ingressInternal:
     alb.ingress.kubernetes.io/group.name: hub-prod-internal-public
     alb.ingress.kubernetes.io/healthcheck-path: "/healthcheck"
     alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
-    alb.ingress.kubernetes.io/group.order: "60"
     alb.ingress.kubernetes.io/load-balancer-name: hub-prod-internal-public
     alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
     alb.ingress.kubernetes.io/target-node-labels: role-hub-lb=true
