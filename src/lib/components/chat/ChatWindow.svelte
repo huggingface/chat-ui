@@ -3,7 +3,7 @@
 
 	const bubble = createBubbler();
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick, onMount } from "svelte";
+	import { createEventDispatcher, onDestroy, tick} from "svelte";
 
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";

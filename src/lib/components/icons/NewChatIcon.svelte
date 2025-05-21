@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { base } from "$app/paths";
-	import { isAborted } from "$lib/stores/isAborted";
-
 	interface Props {
 		classNames?: string;
 	}
