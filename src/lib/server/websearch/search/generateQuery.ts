@@ -66,5 +66,5 @@ export async function generateQuery(messages: Message[]) {
 		})
 	);
 
-	return webQuery.trim();
+	return webQuery.trim().replace(/^"|"$/g, "");
 }

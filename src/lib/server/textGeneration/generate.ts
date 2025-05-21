@@ -135,11 +135,6 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			if (output.token.text === model.reasoning.beginToken) {
 				reasoning = true;
 				reasoningBuffer += output.token.text;
-				yield {
-					type: MessageUpdateType.Reasoning,
-					subtype: MessageReasoningUpdateType.Status,
-					status: "Started thinking...",
-				};
 				continue;
 			} else if (output.token.text === model.reasoning.endToken) {
 				reasoning = false;
