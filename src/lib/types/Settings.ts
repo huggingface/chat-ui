@@ -24,6 +24,7 @@ export interface Settings extends Timestamps {
 	tools?: string[];
 	disableStream: boolean;
 	directPaste: boolean;
+	preferredSearchEngine?: import("./WebSearch").WebSearchProvider;
 }
 
 export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "createdAt" | "updatedAt">;
