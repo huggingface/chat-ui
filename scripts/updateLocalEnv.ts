@@ -11,7 +11,17 @@ let PUBLIC_CONFIG = "";
 
 Object.entries(vars)
 	// filter keys used in prod with the proxy
-	.filter(([key]) => !["XFF_DEPTH", "ADDRESS_HEADER"].includes(key))
+	.filter(
+		([key]) =>
+			![
+				"XFF_DEPTH",
+				"ADDRESS_HEADER",
+				"APP_BASE",
+				"PUBLIC_ORIGIN",
+				"PUBLIC_SHARE_PREFIX",
+				"ADMIN_CLI_LOGIN",
+			].includes(key)
+	)
 	.forEach(([key, value]) => {
 		PUBLIC_CONFIG += `${key}=\`${value}\`\n`;
 	});

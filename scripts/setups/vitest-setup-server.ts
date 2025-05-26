@@ -6,7 +6,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 
 let mongoServer: MongoMemoryServer;
 // Load the .env file
-const envPath = resolve(__dirname, "../.env");
+const envPath = resolve(__dirname, "../../.env");
 dotenv.config({ path: envPath });
 
 // Read the .env file content
