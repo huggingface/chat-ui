@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	import type { Message } from "$lib/types/Message";
 	import { createEventDispatcher, tick } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
@@ -101,7 +99,7 @@
 				{} as Record<string, MessageToolUpdate[]>
 			)
 	);
-	let urlNotTrailing = $derived($page.url.pathname.replace(/\/$/, ""));
+	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 	let webSearchSources = $derived(
 		searchUpdates?.find(
@@ -109,15 +107,17 @@
 				update.subtype === MessageWebSearchUpdateType.Sources
 		)?.sources
 	);
-	run(() => {
+
+	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
 				isCopied = false;
 			}, 1000);
 		}
 	});
+
 	let editMode = $derived(editMsdgId === message.id);
-	run(() => {
+	$effect(() => {
 		if (editMode) {
 			tick();
 			if (editContentEl) {
@@ -137,25 +137,25 @@
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		{#if $page.data?.assistant?.avatar}
+		{#if page.data?.assistant?.avatar}
 			<img
-				src="{base}/settings/assistants/{$page.data.assistant._id}/avatar.jpg"
+				src="{base}/settings/assistants/{page.data.assistant._id}/avatar.jpg"
 				alt="Avatar"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
+				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 			/>
 		{:else}
 			<img
 				alt=""
 				src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
+				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 			/>
 		{/if}
 		<div
-			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
+			class="relative flex min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file}
+					{#each message.files as file (file.value)}
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
@@ -196,7 +196,9 @@
 				<div
 					class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				>
-					<MarkdownRenderer content={message.content} sources={webSearchSources} />
+					{#key message.content}
+						<MarkdownRenderer content={message.content} sources={webSearchSources} />
+					{/key}
 				</div>
 			</div>
 

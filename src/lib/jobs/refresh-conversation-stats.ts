@@ -3,6 +3,18 @@ import { CONVERSATION_STATS_COLLECTION, collections } from "$lib/server/database
 import { logger } from "$lib/server/logger";
 import type { ObjectId } from "mongodb";
 import { acquireLock, refreshLock } from "$lib/migrations/lock";
+import { Semaphores } from "$lib/types/Semaphore";
+
+async function getLastComputationTime(): Promise<Date> {
+	const lastStats = await collections.conversationStats.findOne({}, { sort: { "date.at": -1 } });
+	return lastStats?.date?.at || new Date(0);
+}
+
+async function shouldComputeStats(): Promise<boolean> {
+	const lastComputationTime = await getLastComputationTime();
+	const oneDayAgo = new Date(Date.now() - 24 * 3_600_000);
+	return lastComputationTime < oneDayAgo;
+}
 
 export async function computeAllStats() {
 	for (const span of ["day", "week", "month"] as const) {
@@ -30,7 +42,7 @@ async function computeStats(params: {
 	// In those cases we need to compute the stats from before the last month as everything is one aggregation
 	const minDate = lastComputed ? lastComputed.date.at : new Date(0);
 
-	logger.info(
+	logger.debug(
 		{ minDate, dateField: params.dateField, span: params.span, type: params.type },
 		"Computing conversation stats"
 	);
@@ -217,26 +229,24 @@ async function computeStats(params: {
 
 	await collections.conversations.aggregate(pipeline, { allowDiskUse: true }).next();
 
-	logger.info(
+	logger.debug(
 		{ minDate, dateField: params.dateField, span: params.span, type: params.type },
 		"Computed conversation stats"
 	);
 }
-
-const LOCK_KEY = "conversation.stats";
 
 let hasLock = false;
 let lockId: ObjectId | null = null;
 
 async function maintainLock() {
 	if (hasLock && lockId) {
-		hasLock = await refreshLock(LOCK_KEY, lockId);
+		hasLock = await refreshLock(Semaphores.CONVERSATION_STATS, lockId);
 
 		if (!hasLock) {
 			lockId = null;
 		}
 	} else if (!hasLock) {
-		lockId = (await acquireLock(LOCK_KEY)) || null;
+		lockId = (await acquireLock(Semaphores.CONVERSATION_STATS)) || null;
 		hasLock = !!lockId;
 	}
 
@@ -246,9 +256,15 @@ async function maintainLock() {
 export function refreshConversationStats() {
 	const ONE_HOUR_MS = 3_600_000;
 
-	maintainLock().then(() => {
-		computeAllStats();
+	maintainLock().then(async () => {
+		if (await shouldComputeStats()) {
+			computeAllStats();
+		}
 
-		setInterval(computeAllStats, 12 * ONE_HOUR_MS);
+		setInterval(async () => {
+			if (await shouldComputeStats()) {
+				computeAllStats();
+			}
+		}, 24 * ONE_HOUR_MS);
 	});
 }

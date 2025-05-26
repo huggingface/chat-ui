@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -16,7 +17,7 @@
 	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
-	const modelId = $page.params.model;
+	const modelId = page.params.model;
 
 	async function createConversation(message: string) {
 		try {
@@ -58,7 +59,7 @@
 	}
 
 	onMount(async () => {
-		const query = $page.url.searchParams.get("q");
+		const query = page.url.searchParams.get("q");
 		if (query) createConversation(query);
 
 		settings.instantSet({ activeModel: modelId });
@@ -66,14 +67,14 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={modelId + " - " + envPublic.PUBLIC_APP_NAME} />
+	<meta property="og:title" content={modelId + " - " + publicConfig.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${modelId} with ${envPublic.PUBLIC_APP_NAME}`} />
+	<meta property="og:description" content={`Use ${modelId} with ${publicConfig.PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{envPublic.PUBLIC_ORIGIN || $page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
-	<meta property="og:url" content={$page.url.href} />
+	<meta property="og:url" content={page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 

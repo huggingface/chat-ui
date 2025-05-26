@@ -1,4 +1,3 @@
-import { env } from "$env/dynamic/private";
 import { GridFSBucket, MongoClient } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
@@ -14,44 +13,78 @@ import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
 import type { CommunityToolDB } from "$lib/types/Tool";
-
+import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
 import { onExit } from "./exitHandler";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { existsSync, mkdirSync } from "fs";
+import { findRepoRoot } from "./findRepoRoot";
+import type { ConfigKey } from "$lib/types/ConfigKey";
+import { config } from "$lib/server/config";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
 export class Database {
-	private client: MongoClient;
+	private client?: MongoClient;
+	private mongoServer?: MongoMemoryServer;
 
 	private static instance: Database;
 
-	private constructor() {
-		if (!env.MONGODB_URL) {
-			throw new Error(
-				"Please specify the MONGODB_URL environment variable inside .env.local. Set it to mongodb://localhost:27017 if you are running MongoDB locally, or to a MongoDB Atlas free instance for example."
-			);
-		}
+	private async init() {
+		const DB_FOLDER =
+			config.MONGO_STORAGE_PATH ||
+			join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "db");
 
-		this.client = new MongoClient(env.MONGODB_URL, {
-			directConnection: env.MONGODB_DIRECT_CONNECTION === "true",
-		});
+		if (!config.MONGODB_URL) {
+			logger.warn("No MongoDB URL found, using in-memory server");
+
+			logger.info(`Using database path: ${DB_FOLDER}`);
+			// Create db directory if it doesn't exist
+			if (!existsSync(DB_FOLDER)) {
+				logger.info(`Creating database directory at ${DB_FOLDER}`);
+				mkdirSync(DB_FOLDER, { recursive: true });
+			}
+
+			this.mongoServer = await MongoMemoryServer.create({
+				instance: {
+					dbName: config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""),
+					dbPath: DB_FOLDER,
+				},
+				binary: {
+					version: "7.0.18",
+				},
+			});
+			this.client = new MongoClient(this.mongoServer.getUri(), {
+				directConnection: config.MONGODB_DIRECT_CONNECTION === "true",
+			});
+		} else {
+			this.client = new MongoClient(config.MONGODB_URL, {
+				directConnection: config.MONGODB_DIRECT_CONNECTION === "true",
+			});
+		}
 
 		this.client.connect().catch((err) => {
 			logger.error(err, "Connection error");
 			process.exit(1);
 		});
-		this.client.db(env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+		this.client.db(config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
 		this.client.on("open", () => this.initDatabase());
 
 		// Disconnect DB on exit
-		onExit(() => this.client.close(true));
+		onExit(async () => {
+			logger.info("Closing database connection");
+			await this.client?.close(true);
+			await this.mongoServer?.stop();
+		});
 	}
 
-	public static getInstance(): Database {
+	public static async getInstance(): Promise<Database> {
 		if (!Database.instance) {
 			Database.instance = new Database();
+			await Database.instance.init();
 		}
 
 		return Database.instance;
@@ -61,6 +94,10 @@ export class Database {
 	 * Return mongoClient
 	 */
 	public getClient(): MongoClient {
+		if (!this.client) {
+			throw new Error("Database not initialized");
+		}
+
 		return this.client;
 	}
 
@@ -68,8 +105,12 @@ export class Database {
 	 * Return map of database's collections
 	 */
 	public getCollections() {
+		if (!this.client) {
+			throw new Error("Database not initialized");
+		}
+
 		const db = this.client.db(
-			env.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
+			config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
 		);
 
 		const conversations = db.collection<Conversation>("conversations");
@@ -88,6 +129,7 @@ export class Database {
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const tools = db.collection<CommunityToolDB>("tools");
+		const configCollection = db.collection<ConfigKey>("config");
 
 		return {
 			conversations,
@@ -106,6 +148,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			tools,
+			config: configCollection,
 		};
 	}
 
@@ -129,6 +172,7 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			tools,
+			config,
 		} = this.getCollections();
 
 		conversations
@@ -219,7 +263,7 @@ export class Database {
 		// Unique index for semaphore and migration results
 		semaphores.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
 		semaphores
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+			.createIndex({ deleteAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e));
 		tokenCaches
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
@@ -242,9 +286,18 @@ export class Database {
 				sessionId: 1,
 			})
 			.catch((e) => logger.error(e));
+
+		config.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
 	}
 }
 
-export const collections = building
-	? ({} as unknown as ReturnType<typeof Database.prototype.getCollections>)
-	: Database.getInstance().getCollections();
+export let collections: ReturnType<typeof Database.prototype.getCollections>;
+
+export const ready = (async () => {
+	if (!building) {
+		await Database.getInstance();
+		collections = await Database.getInstance().then((db) => db.getCollections());
+	} else {
+		collections = {} as unknown as ReturnType<typeof Database.prototype.getCollections>;
+	}
+})();

@@ -3,7 +3,7 @@ import type { Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens } from "$lib/utils/searchTokens.js";
 import type { Filter } from "mongodb";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { ReviewStatus } from "$lib/types/Review";
 
 const NUM_PER_PAGE = 24;
@@ -30,7 +30,7 @@ export async function GET({ url, locals }) {
 	// if we require featured assistants, that we are not on a user page and we are not an admin who wants to see unfeatured assistants, we show featured assistants
 	let shouldBeFeatured = {};
 
-	if (env.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.user?.isAdmin && showUnfeatured)) {
+	if (config.REQUIRE_FEATURED_ASSISTANTS === "true" && !(locals.isAdmin && showUnfeatured)) {
 		if (!user) {
 			// only show featured assistants on the community page
 			shouldBeFeatured = { review: ReviewStatus.APPROVED };

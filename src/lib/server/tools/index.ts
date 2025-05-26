@@ -12,7 +12,7 @@ import type { TextGenerationContext } from "../textGeneration/types";
 
 import { z } from "zod";
 import JSON5 from "json5";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 
 import jp from "jsonpath";
 import calculator from "./calculator";
@@ -306,4 +306,4 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	};
 }
 
-export const toolFromConfigs = configTools.parse(JSON5.parse(env.TOOLS)) satisfies ConfigTool[];
+export const toolFromConfigs = configTools.parse(JSON5.parse(config.TOOLS)) satisfies ConfigTool[];

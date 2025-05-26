@@ -1,12 +1,11 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { env as envPublic } from "$env/dynamic/public";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	import CarbonAdd from "~icons/carbon/add";
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
@@ -34,7 +33,7 @@
 
 	let { data = $bindable() }: Props = $props();
 
-	let assistantsCreator = $derived($page.url.searchParams.get("user"));
+	let assistantsCreator = $derived(page.url.searchParams.get("user"));
 	let createdByMe = $derived(data.user?.username && data.user.username === assistantsCreator);
 
 	const SEARCH_DEBOUNCE_DELAY = 400;
@@ -46,7 +45,7 @@
 
 	const toggleShowUnfeatured = () => {
 		showUnfeatured = !showUnfeatured;
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { showUnfeatured: showUnfeatured ? "true" : undefined },
 			existingKeys: { behaviour: "delete", keys: [] },
 		});
@@ -54,7 +53,7 @@
 	};
 
 	const onModelChange = (e: Event) => {
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { modelId: (e.target as HTMLSelectElement).value },
 			existingKeys: { behaviour: "delete_except", keys: ["user"] },
 		});
@@ -75,7 +74,7 @@
 		}
 
 		isFilterInPorgress = true;
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { q: value },
 			existingKeys: { behaviour: "delete", keys: ["p"] },
 		});
@@ -92,7 +91,7 @@
 	}, SEARCH_DEBOUNCE_DELAY);
 
 	const sortAssistants = () => {
-		const newUrl = getHref($page.url, {
+		const newUrl = getHref(page.url, {
 			newKeys: { sort: sortValue },
 			existingKeys: { behaviour: "delete", keys: ["p"] },
 		});
@@ -103,7 +102,7 @@
 </script>
 
 <svelte:head>
-	{#if isHuggingChat}
+	{#if publicConfig.isHuggingChat}
 		<title>HuggingChat - Assistants</title>
 		<meta property="og:title" content="HuggingChat - Assistants" />
 		<meta property="og:type" content="link" />
@@ -113,10 +112,10 @@
 		/>
 		<meta
 			property="og:image"
-			content="{envPublic.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{envPublic.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
+			content="{publicConfig.PUBLIC_ORIGIN ||
+				page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
 		/>
-		<meta property="og:url" content={$page.url.href} />
+		<meta property="og:url" content={page.url.href} />
 	{/if}
 </svelte:head>
 
@@ -124,7 +123,7 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Assistants</h1>
-			{#if isHuggingChat}
+			{#if publicConfig.isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
 				</div>
@@ -151,13 +150,13 @@
 					<option value={model.name}>{model.name}</option>
 				{/each}
 			</select>
-			{#if data.user?.isAdmin}
+			{#if data.isAdmin}
 				<label class="mr-auto flex items-center gap-1 text-red-500" title="Admin only feature">
 					<input type="checkbox" checked={showUnfeatured} onchange={toggleShowUnfeatured} />
 					Show unfeatured assistants
 				</label>
 			{/if}
-			{#if $page.data.loginRequired && !data.user}
+			{#if page.data.loginRequired && !data.user}
 				<button
 					onclick={() => {
 						$loginModalOpen = true;
@@ -183,7 +182,7 @@
 				>
 					{assistantsCreator}'s Assistants
 					<a
-						href={getHref($page.url, {
+						href={getHref(page.url, {
 							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 						})}
 						onclick={resetFilter}
@@ -193,7 +192,7 @@
 						/></a
 					>
 				</div>
-				{#if isHuggingChat}
+				{#if publicConfig.isHuggingChat}
 					<a
 						href="https://hf.co/{assistantsCreator}"
 						target="_blank"
@@ -204,7 +203,7 @@
 				{/if}
 			{:else}
 				<a
-					href={getHref($page.url, {
+					href={getHref(page.url, {
 						existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
 					})}
 					onclick={resetFilter}
@@ -217,7 +216,7 @@
 				</a>
 				{#if data.user?.username}
 					<a
-						href={getHref($page.url, {
+						href={getHref(page.url, {
 							newKeys: { user: data.user.username },
 							existingKeys: { behaviour: "delete", keys: ["modelId", "p", "q"] },
 						})}
@@ -266,7 +265,7 @@
 
 				<button
 					class="relative flex flex-col items-center justify-center overflow-hidden text-balance rounded-xl border bg-gray-50/50 px-4 py-6 text-center shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40 max-sm:px-4 sm:h-64 sm:pb-4 xl:pt-8
-					{!(assistant.review === ReviewStatus.APPROVED) && !createdByMe && data.user?.isAdmin
+					{!(assistant.review === ReviewStatus.APPROVED) && !createdByMe && data.isAdmin
 						? 'border !border-red-500/30'
 						: ''}"
 					onclick={() => {
@@ -291,7 +290,7 @@
 						{#if assistant.tools?.length}
 							<div
 								class="grid size-5 place-items-center rounded-full bg-purple-500/10"
-								title="This assistant uses the websearch."
+								title="This assistant can use tools"
 							>
 								<CarbonTools class="text-xs text-purple-600" />
 							</div>

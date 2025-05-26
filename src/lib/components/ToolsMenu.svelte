@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
-	import { isHuggingChat } from "$lib/utils/isHuggingChat";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 	import IconTool from "./icons/IconTool.svelte";
 	import CarbonInformation from "~icons/carbon/information";
 	import CarbonGlobe from "~icons/carbon/earth-filled";
@@ -20,7 +20,7 @@
 
 	// active tools are all the checked tools, either from settings or on by default
 	let activeToolCount = $derived(
-		$page.data.tools.filter(
+		page.data.tools.filter(
 			(tool: ToolFront) =>
 				// community tools are always on by default
 				tool.type === "community" || $settings?.tools?.includes(tool._id)
@@ -28,7 +28,7 @@
 	);
 
 	async function setAllTools(value: boolean) {
-		const configToolsIds = $page.data.tools
+		const configToolsIds = page.data.tools
 			.filter((t: ToolFront) => t.type === "config")
 			.map((t: ToolFront) => t._id);
 
@@ -43,9 +43,9 @@
 		}
 	}
 
-	let allToolsEnabled = $derived(activeToolCount === $page.data.tools.length);
+	let allToolsEnabled = $derived(activeToolCount === page.data.tools.length);
 
-	let tools = $derived($page.data.tools);
+	let tools = $derived(page.data.tools);
 </script>
 
 <details
@@ -71,7 +71,7 @@
 		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
 			<div class="col-span-2 flex items-center gap-1.5 text-sm text-gray-500">
 				Available tools
-				{#if isHuggingChat}
+				{#if publicConfig.isHuggingChat}
 					<a
 						href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/470"
 						target="_blank"
@@ -93,7 +93,7 @@
 					{/if}
 				</button>
 			</div>
-			{#if $page.data.enableCommunityTools}
+			{#if page.data.enableCommunityTools}
 				<a
 					href="{base}/tools"
 					class="col-span-2 my-1 h-fit w-fit items-center justify-center rounded-full bg-purple-500/20 px-2.5 py-1.5 text-sm hover:bg-purple-500/30"
@@ -101,7 +101,7 @@
 					<span class="mr-1 rounded-full bg-purple-700 px-1.5 py-1 text-xs font-bold uppercase">
 						new
 					</span>
-					Browse community tools ({$page.data.communityToolCount ?? 0})
+					Browse community tools ({page.data.communityToolCount ?? 0})
 				</a>
 			{/if}
 			{#each tools as tool}

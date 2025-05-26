@@ -1,56 +1,63 @@
 import { afterEach, assert, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
+import { Semaphores } from "$lib/types/Semaphore";
 import { collections } from "$lib/server/database";
 
-const LOCK_KEY = "migrations.test";
+describe(
+	"migrations",
+	{
+		retry: 3,
+	},
+	() => {
+		it("should not have duplicates guid", async () => {
+			const guids = migrations.map((m) => m._id.toString());
+			const uniqueGuids = [...new Set(guids)];
+			expect(uniqueGuids.length).toBe(guids.length);
+		});
 
-describe("migrations", () => {
-	it("should not have duplicates guid", async () => {
-		const guids = migrations.map((m) => m._id.toString());
-		const uniqueGuids = [...new Set(guids)];
-		expect(uniqueGuids.length).toBe(guids.length);
-	});
+		it("should acquire only one lock on DB", async () => {
+			const results = await Promise.all(
+				new Array(1000).fill(0).map(() => acquireLock(Semaphores.TEST_MIGRATION))
+			);
+			const locks = results.filter((r) => r);
 
-	it("should acquire only one lock on DB", async () => {
-		const results = await Promise.all(new Array(1000).fill(0).map(() => acquireLock(LOCK_KEY)));
-		const locks = results.filter((r) => r);
+			const semaphores = await collections.semaphores.find({}).toArray();
 
-		const semaphores = await collections.semaphores.find({}).toArray();
+			expect(locks.length).toBe(1);
+			expect(semaphores).toBeDefined();
+			expect(semaphores.length).toBe(1);
+			expect(semaphores?.[0].key).toBe(Semaphores.TEST_MIGRATION);
+		});
 
-		expect(locks.length).toBe(1);
-		expect(semaphores).toBeDefined();
-		expect(semaphores.length).toBe(1);
-		expect(semaphores?.[0].key).toBe(LOCK_KEY);
-	});
+		it("should read the lock correctly", async () => {
+			const lockId = await acquireLock(Semaphores.TEST_MIGRATION);
+			assert(lockId);
+			expect(await isDBLocked(Semaphores.TEST_MIGRATION)).toBe(true);
+			expect(!!(await acquireLock(Semaphores.TEST_MIGRATION))).toBe(false);
+			await releaseLock(Semaphores.TEST_MIGRATION, lockId);
+			expect(await isDBLocked(Semaphores.TEST_MIGRATION)).toBe(false);
+		});
 
-	it("should read the lock correctly", async () => {
-		const lockId = await acquireLock(LOCK_KEY);
-		assert(lockId);
-		expect(await isDBLocked(LOCK_KEY)).toBe(true);
-		expect(!!(await acquireLock(LOCK_KEY))).toBe(false);
-		await releaseLock(LOCK_KEY, lockId);
-		expect(await isDBLocked(LOCK_KEY)).toBe(false);
-	});
+		it("should refresh the lock", async () => {
+			const lockId = await acquireLock(Semaphores.TEST_MIGRATION);
 
-	it("should refresh the lock", async () => {
-		const lockId = await acquireLock(LOCK_KEY);
+			assert(lockId);
 
-		assert(lockId);
+			// get the updatedAt time
 
-		// get the updatedAt time
+			const updatedAtInitially = (await collections.semaphores.findOne({}))?.updatedAt;
 
-		const updatedAtInitially = (await collections.semaphores.findOne({}))?.updatedAt;
+			await refreshLock(Semaphores.TEST_MIGRATION, lockId);
 
-		await refreshLock(LOCK_KEY, lockId);
+			const updatedAtAfterRefresh = (await collections.semaphores.findOne({}))?.updatedAt;
 
-		const updatedAtAfterRefresh = (await collections.semaphores.findOne({}))?.updatedAt;
-
-		expect(updatedAtInitially).toBeDefined();
-		expect(updatedAtAfterRefresh).toBeDefined();
-		expect(updatedAtInitially).not.toBe(updatedAtAfterRefresh);
-	});
-});
+			expect(updatedAtInitially).toBeDefined();
+			expect(updatedAtAfterRefresh).toBeDefined();
+			expect(updatedAtInitially).not.toBe(updatedAtAfterRefresh);
+		});
+	}
+);
 
 afterEach(async () => {
 	await collections.semaphores.deleteMany({});

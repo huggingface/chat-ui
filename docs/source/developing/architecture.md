@@ -28,7 +28,7 @@ Implements web search querying and RAG. See the [Web Search](../configuration/we
 
 ### `tools`
 
-Provides a common interface for external tools called by LLMs. See the [Tools](../configuration/models/tools) section for more information
+Provides a common interface for external tools called by LLMs. See the [Tools](../configuration/models/tools.md) section for more information
 
 ### `migrations`
 

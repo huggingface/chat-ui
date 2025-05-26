@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from "svelte/legacy";
-
 	interface Props {
 		type: string;
 		value: string | boolean | number;
@@ -26,7 +24,7 @@
 		previousValue = innerValue;
 	});
 
-	run(() => {
+	$effect(() => {
 		value = typeof innerValue === "string" ? innerValue : innerValue.toString();
 	});
 </script>

@@ -3,7 +3,7 @@
 | Feature                     | Available |
 | --------------------------- | --------- |
 | [Tools](../tools)           | No        |
-| [Multimodal](../multimodal) | No        |
+| [Multimodal](../multimodal) | Yes       |
 
 Chat UI can be used with any API server that supports OpenAI API compatibility, for example [text-generation-webui](https://github.com/oobabooga/text-generation-webui/tree/main/extensions/openai), [LocalAI](https://github.com/go-skynet/LocalAI), [FastChat](https://github.com/lm-sys/FastChat/blob/main/docs/openai_api.md), [llama-cpp-python](https://github.com/abetlen/llama-cpp-python), and [ialacol](https://github.com/chenhunghan/ialacol) and [vllm](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
@@ -146,9 +146,36 @@ MODELS=`[{
 }]`
 ```
 
+_Non-streaming endpoints_
+
+For endpoints that don´t support streaming like o1 on Azure, you can pass `streamingSupported: false` in your endpoint config:
+
+```
+MODELS=`[{
+  "id": "o1-preview",
+  "name": "o1-preview",
+  "displayName": "o1-preview",
+  "systemRoleSupported": false,
+  "endpoints": [
+    {
+      "type": "openai",
+      "baseURL": "https://my-deployment.openai.azure.com/openai/deployments/o1-preview",
+      "defaultHeaders": {
+        "api-key": "$SECRET"
+      },
+      "streamingSupported": false,
+    }
+  ]
+}]`
+```
+
 ## Other
 
 Some other providers and their `baseURL` for reference.
 
 [Groq](https://groq.com/): https://api.groq.com/openai/v1
 [Fireworks](https://fireworks.ai/): https://api.fireworks.ai/inference/v1
+
+```
+
+```

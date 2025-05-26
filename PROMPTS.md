@@ -1,5 +1,8 @@
 # Prompt templates
 
+> [!WARNING]
+> We now recommend using the `tokenizer` field to get the chat template directly from the hub. Just set it to your model id on the hub to automatically get the template.
+
 These are the templates used to format the conversation history for different models used in HuggingChat. Set them in your `.env.local` [like so](https://github.com/huggingface/chat-ui#chatprompttemplate).
 
 ## Llama 2

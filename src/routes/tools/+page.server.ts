@@ -1,6 +1,6 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { authCondition } from "$lib/server/auth.js";
-import { Database, collections } from "$lib/server/database.js";
+import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { SortKey } from "$lib/types/Assistant.js";
 import { ReviewStatus } from "$lib/types/Review";
@@ -13,7 +13,7 @@ import { ObjectId, type Filter } from "mongodb";
 const NUM_PER_PAGE = 16;
 
 export const load = async ({ url, locals }) => {
-	if (env.COMMUNITY_TOOLS !== "true") {
+	if (config.COMMUNITY_TOOLS !== "true") {
 		error(403, "Community tools are not enabled");
 	}
 
@@ -48,7 +48,7 @@ export const load = async ({ url, locals }) => {
 	const filter: Filter<CommunityToolDB> = {
 		...(!createdByCurrentUser &&
 			!activeOnly &&
-			!(locals.user?.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
+			!(locals.isAdmin && showUnfeatured) && { review: ReviewStatus.APPROVED }),
 		...(user && { createdById: user._id }),
 		...(queryTokens && { searchTokens: { $all: queryTokens } }),
 		...(activeOnly && {
@@ -60,9 +60,8 @@ export const load = async ({ url, locals }) => {
 		}),
 	};
 
-	const communityTools = await Database.getInstance()
-		.getCollections()
-		.tools.find(filter)
+	const communityTools = await collections.tools
+		.find(filter)
 		.skip(NUM_PER_PAGE * pageIndex)
 		.sort({
 			...(sort === SortKey.TRENDING && { last24HoursUseCount: -1 }),
@@ -84,9 +83,7 @@ export const load = async ({ url, locals }) => {
 
 	const tools = [...(pageIndex == 0 && !username ? configTools : []), ...communityTools];
 
-	const numTotalItems =
-		(await Database.getInstance().getCollections().tools.countDocuments(filter)) +
-		toolFromConfigs.length;
+	const numTotalItems = (await collections.tools.countDocuments(filter)) + toolFromConfigs.length;
 
 	return {
 		tools: JSON.parse(JSON.stringify(tools)) as CommunityToolDB[],

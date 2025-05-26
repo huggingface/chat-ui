@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
@@ -15,7 +14,7 @@
 		webSearchToolId,
 	} from "$lib/utils/toolIds";
 	import type { Assistant } from "$lib/types/Assistant";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import type { ToolFront } from "$lib/types/Tool";
 	import ToolLogo from "../ToolLogo.svelte";
 	import { goto } from "$app/navigation";
@@ -24,7 +23,7 @@
 	import { captureScreen } from "$lib/utils/screenshot";
 	import IconScreenshot from "../icons/IconScreenshot.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
-
+	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	interface Props {
 		files?: File[];
 		mimeTypes?: string[];
@@ -37,6 +36,7 @@
 		modelIsMultimodal?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
+		focused?: boolean;
 	}
 
 	let {
@@ -51,6 +51,7 @@
 		modelIsMultimodal = false,
 		children,
 		onPaste,
+		focused = $bindable(false),
 	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
@@ -84,21 +85,6 @@
 			formEl?.removeEventListener("submit", onFormSubmit);
 		};
 	});
-
-	function isVirtualKeyboard(): boolean {
-		if (!browser) return false;
-
-		// Check for touch capability
-		if (navigator.maxTouchPoints > 0) return true;
-
-		// Check for touch events
-		if ("ontouchstart" in window) return true;
-
-		// Fallback to user agent string check
-		const userAgent = navigator.userAgent.toLowerCase();
-
-		return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-	}
 
 	function adjustTextareaHeight() {
 		if (!textareaElement) {
@@ -143,13 +129,20 @@
 	);
 
 	let extraTools = $derived(
-		$page.data.tools
+		page.data.tools
 			.filter((t: ToolFront) => $settings.tools?.includes(t._id))
 			.filter(
 				(t: ToolFront) =>
 					![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
 			) satisfies ToolFront[]
 	);
+
+	let showWebSearch = $derived(!assistant);
+	let showImageGen = $derived(modelHasTools && !assistant);
+	let showFileUpload = $derived((modelIsMultimodal || modelHasTools) && mimeTypes.length > 0);
+	let showExtraTools = $derived(modelHasTools && !assistant);
+
+	let showNoTools = $derived(!showWebSearch && !showImageGen && !showFileUpload && !showExtraTools);
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
@@ -157,7 +150,7 @@
 		rows="1"
 		tabindex="0"
 		inputmode="text"
-		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-y-auto overflow-x-hidden border-0 bg-transparent px-2.5 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 max-sm:text-[16px] sm:px-3"
+		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-y-auto overflow-x-hidden border-0 bg-transparent px-2.5 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 sm:px-3"
 		class:text-gray-400={disabled}
 		bind:value
 		bind:this={textareaElement}
@@ -166,56 +159,62 @@
 		oncompositionend={() => (isCompositionOn = false)}
 		oninput={adjustTextareaHeight}
 		onbeforeinput={(ev) => {
-			if ($page.data.loginRequired) {
+			if (page.data.loginRequired) {
 				ev.preventDefault();
 				$loginModalOpen = true;
 			}
 		}}
 		{placeholder}
 		{disabled}
+		onfocus={() => (focused = true)}
+		onblur={() => (focused = false)}
 	></textarea>
 
-	{#if !assistant}
+	{#if !showNoTools}
 		<div
-			class="scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2"
+			class={[
+				"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2",
+			]}
 		>
-			<HoverTooltip
-				label="Search the web"
-				position="top"
-				TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
-					? 'hidden'
-					: ''}"
-			>
-				<button
-					class="base-tool"
-					class:active-tool={webSearchIsOn}
-					disabled={loading}
-					onclick={async (e) => {
-						e.preventDefault();
-						if (modelHasTools) {
-							if (webSearchIsOn) {
-								await settings.instantSet({
-									tools: ($settings.tools ?? []).filter(
-										(t) => t !== webSearchToolId && t !== fetchUrlToolId
-									),
-								});
-							} else {
-								await settings.instantSet({
-									tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
-								});
-							}
-						} else {
-							$webSearchParameters.useSearch = !webSearchIsOn;
-						}
-					}}
+			{#if showWebSearch}
+				<HoverTooltip
+					label="Search the web"
+					position="top"
+					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
+						? 'hidden'
+						: ''}"
 				>
-					<IconInternet classNames="text-xl" />
-					{#if webSearchIsOn}
-						Search
-					{/if}
-				</button>
-			</HoverTooltip>
-			{#if modelHasTools}
+					<button
+						class="base-tool"
+						class:active-tool={webSearchIsOn}
+						disabled={loading}
+						onclick={async (e) => {
+							e.preventDefault();
+							if (modelHasTools) {
+								if (webSearchIsOn) {
+									await settings.instantSet({
+										tools: ($settings.tools ?? []).filter(
+											(t) => t !== webSearchToolId && t !== fetchUrlToolId
+										),
+									});
+								} else {
+									await settings.instantSet({
+										tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
+									});
+								}
+							} else {
+								$webSearchParameters.useSearch = !webSearchIsOn;
+							}
+						}}
+					>
+						<IconInternet classNames="text-xl" />
+						{#if webSearchIsOn}
+							Search
+						{/if}
+					</button>
+				</HoverTooltip>
+			{/if}
+			{#if showImageGen}
 				<HoverTooltip
 					label="Generate	images"
 					position="top"
@@ -249,7 +248,7 @@
 					</button>
 				</HoverTooltip>
 			{/if}
-			{#if modelIsMultimodal || modelHasTools}
+			{#if showFileUpload}
 				{@const mimeTypesString = mimeTypes
 					.map((m) => {
 						// if the mime type ends in *, grab the first part so image/* becomes image
@@ -311,7 +310,7 @@
 					</HoverTooltip>
 				{/if}
 			{/if}
-			{#if modelHasTools}
+			{#if showExtraTools}
 				{#each extraTools as tool}
 					<button
 						class="active-tool base-tool"
@@ -327,8 +326,6 @@
 						{tool.displayName}
 					</button>
 				{/each}
-			{/if}
-			{#if modelHasTools}
 				<HoverTooltip
 					label="Browse more tools"
 					position="right"
@@ -354,5 +351,6 @@
 		font-family: inherit;
 		box-sizing: border-box;
 		line-height: 1.5;
+		font-size: 16px;
 	}
 </style>

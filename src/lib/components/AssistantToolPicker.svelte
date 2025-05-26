@@ -115,10 +115,12 @@
 			class:opacity-50={selectedValues.length >= maxValues}
 			class:bg-gray-100={selectedValues.length >= maxValues}
 			placeholder="Type to search tools..."
+			tabindex="0"
 		/>
 		{#if suggestions.length > 0}
 			<div
 				class="invisible absolute z-10 mt-1 w-full rounded border border-gray-300 bg-white shadow-lg group-focus-within:visible"
+				tabindex="-1"
 			>
 				{#if inputValue === ""}
 					<p class="px-3 py-2 text-left text-xs text-gray-500">
@@ -133,6 +135,7 @@
 								addValue(suggestion);
 							}}
 							class="w-full cursor-pointer px-3 py-2 text-left hover:bg-blue-500 hover:text-white"
+							tabindex="0"
 						>
 							{suggestion.displayName}
 							{#if suggestion.createdByName}

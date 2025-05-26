@@ -282,13 +282,13 @@ MODELS=`[
     },
     "promptExamples": [
       {
-        "title": "Write an email from bullet list",
+        "title": "Write an email",
         "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
       }, {
-        "title": "Code a snake game",
+        "title": "Code a game",
         "prompt": "Code a basic snake game in python, give explanations for each step."
       }, {
-        "title": "Assist in a task",
+        "title": "Recipe help",
         "prompt": "How do I make a delicious lemon cheesecake?"
       }
     ]
@@ -301,7 +301,9 @@ You can change things like the parameters, or customize the preprompt to better 
 
 #### chatPromptTemplate
 
-When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
+In 2025 most chat-completion endpoints (local or remotely hosted) support the OpenAI-compatible API and take arrays of messages.
+
+If not, when querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
 The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md).
 
@@ -313,6 +315,9 @@ The following is the default `chatPromptTemplate`, although newlines and indenti
 {{/each}}
 {{assistantMessageToken}}
 ```
+
+> [!INFO]
+> We also support Jinja2 templates for the `chatPromptTemplate` in addition to Handlebars templates. On startup we first try to compile with Jinja and if that fails we fall back to interpreting `chatPromptTemplate` as handlebars.
 
 #### Multi modal model
 
@@ -341,7 +346,7 @@ We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on T
 
 If you want to, instead of hitting models on the Hugging Face Inference API, you can run your own models locally.
 
-A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference) endpoint. This is what is done in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
+A good option is to hit a [text-generation-inference](https://github.com/huggingface/text-generation-inference), or a llama.cpp endpoint. You will find an example for TGI in the official [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template) for instance: both this app and a text-generation-inference server run inside the same container.
 
 To do this, you can add your own endpoints to the `MODELS` variable in `.env.local`, by adding an `"endpoints"` key for each model in `MODELS`.
 
@@ -478,6 +483,29 @@ MODELS=`[{
           "baseURL": "https://api.deepinfra.com/v1/openai",
           "apiKey": "abc...xyz"
       }
+  ]
+}]`
+```
+
+_Non-streaming endpoints_
+
+For endpoints that don´t support streaming like o1 on Azure, you can pass `streamingSupported: false` in your endpoint config:
+
+```
+MODELS=`[{
+  "id": "o1-preview",
+  "name": "o1-preview",
+  "displayName": "o1-preview",
+  "systemRoleSupported": false,
+  "endpoints": [
+    {
+      "type": "openai",
+      "baseURL": "https://my-deployment.openai.azure.com/openai/deployments/o1-preview",
+      "defaultHeaders": {
+        "api-key": "$SECRET"
+      },
+      "streamingSupported": false,
+    }
   ]
 }]`
 ```
@@ -965,6 +993,14 @@ In some cases, the final answer can be extracted from the model output using a r
 }
 ```
 
+#### Enabling/Disabling Reasoning Summary
+
+You can toggle the summaries that are displayed alongside the CoT by changing the `REASONING_SUMMARY` env variable.
+
+```env
+REASONING_SUMMARY=false
+```
+
 ## Common issues
 
 ### 403：You don't have access to this conversation
@@ -1055,12 +1091,22 @@ npm run populate users settings assistants conversations
 
 to populate the database with fake data, including fake conversations and assistants for your user.
 
-### Building the docker images locally
+## Building the docker images locally
 
 You can build the docker images locally using the following commands:
 
 ```bash
 docker build -t chat-ui-db:latest --build-arg INCLUDE_DB=true .
 docker build -t chat-ui:latest --build-arg INCLUDE_DB=false .
-docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_BASE=/chat --build-arg PUBLIC_APP_COLOR=yellow .
+docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_BASE=/chat --build-arg PUBLIC_APP_COLOR=yellow --build-arg SKIP_LLAMA_CPP_BUILD=true .
+```
+
+If you want to run the images with your local .env.local you have two options
+
+```bash
+DOTENV_LOCAL=$(<.env.local)  docker run --network=host -e DOTENV_LOCAL chat-ui-db
+```
+
+```bash
+docker run --network=host --mount type=bind,source="$(pwd)/.env.local",target=/app/.env.local chat-ui-db
 ```

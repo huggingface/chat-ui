@@ -36,33 +36,43 @@ export async function GET({ params, locals }) {
 		error(404, "Conversation model not found");
 	}
 
+	let assistant;
+	if (conv.assistantId) {
+		assistant = await collections.assistants.findOne({
+			_id: new ObjectId(conv.assistantId),
+		});
+	}
+
 	const messagesUpTo = buildSubtree(conv, messageId);
 
 	const prompt = await buildPrompt({
 		preprompt: conv.preprompt,
 		messages: messagesUpTo,
 		model,
+	}).catch((err) => {
+		console.error(err);
+		return "Prompt generation failed";
 	});
 
-	const userMessage = conv.messages[messageIndex];
-	const assistantMessage = conv.messages[messageIndex + 1];
-
-	return new Response(
-		JSON.stringify(
-			{
-				note: "This is a preview of the prompt that will be sent to the model when retrying the message. It may differ from what was sent in the past if the parameters have been updated since",
-				prompt,
-				model: model.name,
-				parameters: {
-					...model.parameters,
-					return_full_text: false,
-				},
-				userMessage,
-				...(assistantMessage ? { assistantMessage } : {}),
-			},
-			null,
-			2
-		),
-		{ headers: { "Content-Type": "application/json" } }
-	);
+	return Response.json({
+		prompt,
+		model: model.name,
+		assistant: assistant?.name,
+		parameters: {
+			...model.parameters,
+			...(assistant?.generateSettings || {}),
+			return_full_text: false,
+		},
+		messages: messagesUpTo.map((msg) => ({
+			role: msg.from,
+			content: msg.content,
+			createdAt: msg.createdAt,
+			updatedAt: msg.updatedAt,
+			reasoning: msg.reasoning,
+			updates: msg.updates?.filter(
+				(u) => (u.type === "webSearch" && u.subtype === "sources") || u.type === "title"
+			),
+			files: msg.files,
+		})),
+	});
 }

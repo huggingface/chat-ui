@@ -31,13 +31,13 @@ MODELS=`[
     },
     "promptExamples": [
       {
-        "title": "Write an email from bullet list",
+        "title": "Write an email",
         "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
       }, {
-        "title": "Code a snake game",
+        "title": "Code a game",
         "prompt": "Code a basic snake game in python, give explanations for each step."
       }, {
-        "title": "Assist in a task",
+        "title": "Recipe help",
         "prompt": "How do I make a delicious lemon cheesecake?"
       }
     ]

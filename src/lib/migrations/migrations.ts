@@ -1,10 +1,9 @@
 import { Database } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { Semaphores } from "$lib/types/Semaphore";
 import { logger } from "$lib/server/logger";
-
-const LOCK_KEY = "migrations";
+import { config } from "$lib/server/config";
 
 export async function checkAndRunMigrations() {
 	// make sure all GUIDs are unique
@@ -13,27 +12,27 @@ export async function checkAndRunMigrations() {
 	}
 
 	// check if all migrations have already been run
-	const migrationResults = await Database.getInstance()
+	const migrationResults = await (await Database.getInstance())
 		.getCollections()
 		.migrationResults.find()
 		.toArray();
 
-	logger.info("[MIGRATIONS] Begin check...");
+	logger.debug("[MIGRATIONS] Begin check...");
 
 	// connect to the database
-	const connectedClient = await Database.getInstance().getClient().connect();
+	const connectedClient = await (await Database.getInstance()).getClient().connect();
 
-	const lockId = await acquireLock(LOCK_KEY);
+	const lockId = await acquireLock(Semaphores.MIGRATION);
 
 	if (!lockId) {
 		// another instance already has the lock, so we exit early
-		logger.info(
+		logger.debug(
 			"[MIGRATIONS] Another instance already has the lock. Waiting for DB to be unlocked."
 		);
 
 		// Todo: is this necessary? Can we just return?
 		// block until the lock is released
-		while (await isDBLocked(LOCK_KEY)) {
+		while (await isDBLocked(Semaphores.MIGRATION)) {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 		return;
@@ -42,7 +41,7 @@ export async function checkAndRunMigrations() {
 	// once here, we have the lock
 	// make sure to refresh it regularly while it's running
 	const refreshInterval = setInterval(async () => {
-		await refreshLock(LOCK_KEY, lockId);
+		await refreshLock(Semaphores.MIGRATION, lockId);
 	}, 1000 * 10);
 
 	// iterate over all migrations
@@ -54,70 +53,66 @@ export async function checkAndRunMigrations() {
 
 		// check if the migration has already been applied
 		if (!shouldRun) {
-			logger.info(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
+			logger.debug(`[MIGRATIONS] "${migration.name}" already applied. Skipping...`);
 		} else {
 			// check the modifiers to see if some cases match
 			if (
-				(migration.runForHuggingChat === "only" && !isHuggingChat) ||
-				(migration.runForHuggingChat === "never" && isHuggingChat)
+				(migration.runForHuggingChat === "only" && !config.isHuggingChat) ||
+				(migration.runForHuggingChat === "never" && config.isHuggingChat)
 			) {
-				logger.info(
+				logger.debug(
 					`[MIGRATIONS] "${migration.name}" should not be applied for this run. Skipping...`
 				);
 				continue;
 			}
 
 			// otherwise all is good and we can run the migration
-			logger.info(
+			logger.debug(
 				`[MIGRATIONS] "${migration.name}" ${
 					migration.runEveryTime ? "should run every time" : "not applied yet"
 				}. Applying...`
 			);
 
-			await Database.getInstance()
-				.getCollections()
-				.migrationResults.updateOne(
-					{ _id: migration._id },
-					{
-						$set: {
-							name: migration.name,
-							status: "ongoing",
-						},
+			await (await Database.getInstance()).getCollections().migrationResults.updateOne(
+				{ _id: migration._id },
+				{
+					$set: {
+						name: migration.name,
+						status: "ongoing",
 					},
-					{ upsert: true }
-				);
+				},
+				{ upsert: true }
+			);
 
 			const session = connectedClient.startSession();
 			let result = false;
 
 			try {
 				await session.withTransaction(async () => {
-					result = await migration.up(Database.getInstance());
+					result = await migration.up(await Database.getInstance());
 				});
 			} catch (e) {
-				logger.info(`[MIGRATIONS]  "${migration.name}" failed!`);
+				logger.debug(`[MIGRATIONS]  "${migration.name}" failed!`);
 				logger.error(e);
 			} finally {
 				await session.endSession();
 			}
 
-			await Database.getInstance()
-				.getCollections()
-				.migrationResults.updateOne(
-					{ _id: migration._id },
-					{
-						$set: {
-							name: migration.name,
-							status: result ? "success" : "failure",
-						},
+			await (await Database.getInstance()).getCollections().migrationResults.updateOne(
+				{ _id: migration._id },
+				{
+					$set: {
+						name: migration.name,
+						status: result ? "success" : "failure",
 					},
-					{ upsert: true }
-				);
+				},
+				{ upsert: true }
+			);
 		}
 	}
 
-	logger.info("[MIGRATIONS] All migrations applied. Releasing lock");
+	logger.debug("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
-	await releaseLock(LOCK_KEY, lockId);
+	await releaseLock(Semaphores.MIGRATION, lockId);
 }

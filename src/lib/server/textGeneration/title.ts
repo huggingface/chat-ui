@@ -1,10 +1,12 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { generateFromDefaultEndpoint } from "$lib/server/generateFromDefaultEndpoint";
-import type { EndpointMessage } from "../endpoints/endpoints";
 import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
+import { taskModel } from "../models";
+import type { Tool } from "$lib/types/Tool";
+import { getToolOutput } from "../tools/getToolOutput";
 
 export async function* generateTitleForConversation(
 	conv: Conversation
@@ -27,42 +29,54 @@ export async function* generateTitleForConversation(
 }
 
 export async function generateTitle(prompt: string) {
-	if (env.LLM_SUMMARIZATION !== "true") {
+	if (config.LLM_SUMMARIZATION !== "true") {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
-	const messages: Array<EndpointMessage> = [
-		{
-			from: "system",
-			content:
-				"You are a summarization AI. You'll never answer a user's question directly, but instead summarize the user's request into a single short sentence of four words or less. Always start your answer with an emoji relevant to the summary",
-		},
-		{ from: "user", content: "Who is the president of Gabon?" },
-		{ from: "assistant", content: "🇬🇦 President of Gabon" },
-		{ from: "user", content: "Who is Julien Chaumond?" },
-		{ from: "assistant", content: "🧑 Julien Chaumond" },
-		{ from: "user", content: "what is 1 + 1?" },
-		{ from: "assistant", content: "🔢 Simple math operation" },
-		{ from: "user", content: "What are the latest news?" },
-		{ from: "assistant", content: "📰 Latest news" },
-		{ from: "user", content: "How to make a great cheesecake?" },
-		{ from: "assistant", content: "🍰 Cheesecake recipe" },
-		{ from: "user", content: "what is your favorite movie? do a short answer." },
-		{ from: "assistant", content: "🎥 Favorite movie" },
-		{ from: "user", content: "Explain the concept of artificial intelligence in one sentence" },
-		{ from: "assistant", content: "🤖 AI definition" },
-		{ from: "user", content: "Draw a cute cat" },
-		{ from: "assistant", content: "🐱 Cute cat drawing" },
-		{ from: "user", content: prompt },
-	];
+	if (taskModel.tools) {
+		const titleTool = {
+			name: "title",
+			description:
+				"Submit a title for the conversation so far. Do not try to answer the user question or the tool will fail.",
+			inputs: [
+				{
+					name: "title",
+					type: "str",
+					description:
+						"The title for the conversation. It should be 5 words or less and start with a unicode emoji relevant to the query.",
+				},
+			],
+		} as unknown as Tool;
+
+		const endpoint = await taskModel.getEndpoint();
+		const title = await getToolOutput({
+			messages: [
+				{
+					from: "user" as const,
+					content: prompt,
+				},
+			],
+			preprompt:
+				"The task is to generate conversation titles based on text snippets. You'll never answer the provided question directly, but instead summarize the user's request into a short title.",
+			tool: titleTool,
+			endpoint,
+		});
+
+		if (title) {
+			if (!/\p{Emoji}/u.test(title.slice(0, 3))) {
+				return "💬 " + title;
+			}
+			return title;
+		}
+	}
 
 	return await getReturnFromGenerator(
 		generateFromDefaultEndpoint({
-			messages,
+			messages: [{ from: "user", content: prompt }],
 			preprompt:
 				"You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it, only summarize the user's query. Always start your answer with an emoji relevant to the summary",
 			generateSettings: {
-				max_new_tokens: 15,
+				max_new_tokens: 30,
 			},
 		})
 	)

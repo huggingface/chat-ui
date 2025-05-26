@@ -9,7 +9,7 @@ import crypto from "crypto";
 import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 
 export async function updateUser(params: {
@@ -89,9 +89,11 @@ export async function updateUser(params: {
 		"user login"
 	);
 	// if using huggingface as auth provider, check orgs for earl access and amin rights
-	const isAdmin = (env.HF_ORG_ADMIN && orgs?.some((org) => org.sub === env.HF_ORG_ADMIN)) || false;
+	const isAdmin =
+		(config.HF_ORG_ADMIN && orgs?.some((org) => org.sub === config.HF_ORG_ADMIN)) || false;
 	const isEarlyAccess =
-		(env.HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === env.HF_ORG_EARLY_ACCESS)) || false;
+		(config.HF_ORG_EARLY_ACCESS && orgs?.some((org) => org.sub === config.HF_ORG_EARLY_ACCESS)) ||
+		false;
 
 	logger.debug(
 		{

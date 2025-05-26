@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { getJson, type GoogleParameters } from "serpapi";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 import { isURL } from "$lib/utils/isUrl";
@@ -15,7 +15,7 @@ export default async function searchWebSerpApi(query: string): Promise<WebSearch
 		hl: "en",
 		gl: "us",
 		google_domain: "google.com",
-		api_key: env.SERPAPI_KEY,
+		api_key: config.SERPAPI_KEY,
 	} satisfies GoogleParameters;
 
 	// Show result as JSON

@@ -6,7 +6,7 @@ import {
 	custom,
 } from "openid-client";
 import { addHours, addWeeks } from "date-fns";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
@@ -32,34 +32,34 @@ const stringWithDefault = (value: string) =>
 
 export const OIDConfig = z
 	.object({
-		CLIENT_ID: stringWithDefault(env.OPENID_CLIENT_ID),
-		CLIENT_SECRET: stringWithDefault(env.OPENID_CLIENT_SECRET),
-		PROVIDER_URL: stringWithDefault(env.OPENID_PROVIDER_URL),
-		SCOPES: stringWithDefault(env.OPENID_SCOPES),
-		NAME_CLAIM: stringWithDefault(env.OPENID_NAME_CLAIM).refine(
+		CLIENT_ID: stringWithDefault(config.OPENID_CLIENT_ID),
+		CLIENT_SECRET: stringWithDefault(config.OPENID_CLIENT_SECRET),
+		PROVIDER_URL: stringWithDefault(config.OPENID_PROVIDER_URL),
+		SCOPES: stringWithDefault(config.OPENID_SCOPES),
+		NAME_CLAIM: stringWithDefault(config.OPENID_NAME_CLAIM).refine(
 			(el) => !["preferred_username", "email", "picture", "sub"].includes(el),
 			{ message: "nameClaim cannot be one of the restricted keys." }
 		),
-		TOLERANCE: stringWithDefault(env.OPENID_TOLERANCE),
-		RESOURCE: stringWithDefault(env.OPENID_RESOURCE),
+		TOLERANCE: stringWithDefault(config.OPENID_TOLERANCE),
+		RESOURCE: stringWithDefault(config.OPENID_RESOURCE),
 		ID_TOKEN_SIGNED_RESPONSE_ALG: z.string().optional(),
 	})
-	.parse(JSON5.parse(env.OPENID_CONFIG || "{}"));
+	.parse(JSON5.parse(config.OPENID_CONFIG || "{}"));
 
 export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
 const sameSite = z
 	.enum(["lax", "none", "strict"])
-	.default(dev || env.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
-	.parse(env.COOKIE_SAMESITE === "" ? undefined : env.COOKIE_SAMESITE);
+	.default(dev || config.ALLOW_INSECURE_COOKIES === "true" ? "lax" : "none")
+	.parse(config.COOKIE_SAMESITE === "" ? undefined : config.COOKIE_SAMESITE);
 
 const secure = z
 	.boolean()
-	.default(!(dev || env.ALLOW_INSECURE_COOKIES === "true"))
-	.parse(env.COOKIE_SECURE === "" ? undefined : env.COOKIE_SECURE === "true");
+	.default(!(dev || config.ALLOW_INSECURE_COOKIES === "true"))
+	.parse(config.COOKIE_SECURE === "" ? undefined : config.COOKIE_SECURE === "true");
 
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
-	cookies.set(env.COOKIE_NAME, sessionId, {
+	cookies.set(config.COOKIE_NAME, sessionId, {
 		path: "/",
 		// So that it works inside the space's iframe
 		sameSite,

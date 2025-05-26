@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
@@ -12,8 +12,16 @@ import type { PreTrainedTokenizer } from "@huggingface/transformers";
 import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { ToolResultStatus, type ToolInput } from "$lib/types/Tool";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { type ToolInput } from "$lib/types/Tool";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { findRepoRoot } from "./findRepoRoot";
+import { Template } from "@huggingface/jinja";
+import { readdirSync } from "fs";
+
+export const MODELS_FOLDER =
+	config.MODELS_STORAGE_PATH ||
+	join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -24,7 +32,7 @@ const reasoningSchema = z.union([
 	}),
 	z.object({
 		type: z.literal("tokens"), // use beginning and end tokens that define the reasoning portion of the answer
-		beginToken: z.string(),
+		beginToken: z.string(), // empty string means the model starts in reasoning mode
 		endToken: z.string(),
 	}),
 	z.object({
@@ -88,11 +96,77 @@ const modelConfig = z.object({
 	reasoning: reasoningSchema.optional(),
 });
 
-const modelsRaw = z.array(modelConfig).parse(JSON5.parse(env.MODELS));
+const ggufModelsConfig = await Promise.all(
+	readdirSync(MODELS_FOLDER)
+		.filter((f) => f.endsWith(".gguf"))
+		.map(async (f) => {
+			return {
+				name: f.replace(".gguf", ""),
+				endpoints: [
+					{
+						type: "local" as const,
+						modelPath: f,
+					},
+				],
+			};
+		})
+);
+
+const turnStringIntoLocalModel = z.preprocess((obj: unknown) => {
+	if (typeof obj !== "string") return obj;
+
+	const name = obj.startsWith("hf:") ? obj.split(":")[1] : obj;
+	const displayName = obj.startsWith("hf:")
+		? obj.split(":")[1].split("/").slice(0, 2).join("/")
+		: obj.endsWith(".gguf")
+			? obj.replace(".gguf", "")
+			: obj;
+
+	const modelPath = obj.includes("/") && !obj.startsWith("hf:") ? `hf:${obj}` : obj;
+
+	return {
+		name,
+		displayName,
+		endpoints: [
+			{
+				type: "local",
+				modelPath,
+			},
+		],
+	} satisfies z.input<typeof modelConfig>;
+}, modelConfig);
+
+let modelsRaw = z.array(turnStringIntoLocalModel).parse(JSON5.parse(config.MODELS ?? "[]"));
+
+if (config.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
+	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
+	modelsRaw = [...modelsRaw, ...parsedGgufModels];
+}
 
 async function getChatPromptRender(
 	m: z.infer<typeof modelConfig>
 ): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
+	if (m.endpoints?.some((e) => e.type === "local")) {
+		const endpoint = m.endpoints?.find((e) => e.type === "local");
+		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
+
+		const { resolveModelFile, readGgufFileInfo } = await import("node-llama-cpp");
+
+		const modelPath = await resolveModelFile(path, MODELS_FOLDER);
+
+		const info = await readGgufFileInfo(modelPath, {
+			readTensorInfo: false,
+		});
+
+		if (info.metadata.tokenizer.chat_template) {
+			// compile with jinja
+			const jinjaTemplate = new Template(info.metadata.tokenizer.chat_template);
+			return (inputs: ChatTemplateInput) => {
+				return jinjaTemplate.render({ ...m, ...inputs });
+			};
+		}
+	}
+
 	if (m.chatPromptTemplate) {
 		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
 	}
@@ -122,13 +196,7 @@ async function getChatPromptRender(
 		process.exit();
 	}
 
-	const renderTemplate = ({
-		messages,
-		preprompt,
-		tools,
-		toolResults,
-		continueMessage,
-	}: ChatTemplateInput) => {
+	const renderTemplate = ({ messages, preprompt, tools, continueMessage }: ChatTemplateInput) => {
 		let formattedMessages: {
 			role: string;
 			content: string;
@@ -160,74 +228,6 @@ async function getChatPromptRender(
 				},
 				...formattedMessages,
 			];
-		}
-
-		if (toolResults?.length) {
-			// todo: should update the command r+ tokenizer to support system messages at any location
-			// or use the `rag` mode without the citations
-			const id = m.id ?? m.name;
-
-			if (isHuggingChat && id.startsWith("CohereForAI")) {
-				formattedMessages = [
-					{
-						role: "user",
-						content:
-							"\n\n<results>\n" +
-							toolResults
-								.flatMap((result, idx) => {
-									if (result.status === ToolResultStatus.Error) {
-										return (
-											`Document: ${idx}\n` + `Tool "${result.call.name}" error\n` + result.message
-										);
-									}
-									return (
-										`Document: ${idx}\n` +
-										result.outputs
-											.flatMap((output) =>
-												Object.entries(output).map(([title, text]) => `${title}\n${text}`)
-											)
-											.join("\n")
-									);
-								})
-								.join("\n\n") +
-							"\n</results>",
-					},
-					...formattedMessages,
-				];
-			} else if (isHuggingChat && id.startsWith("meta-llama")) {
-				const results = toolResults.flatMap((result) => {
-					if (result.status === ToolResultStatus.Error) {
-						return [
-							{
-								tool_call_id: result.call.name,
-								output: "Error: " + result.message,
-							},
-						];
-					} else {
-						return result.outputs.map((output) => ({
-							tool_call_id: result.call.name,
-							output: JSON.stringify(output),
-						}));
-					}
-				});
-
-				formattedMessages = [
-					...formattedMessages,
-					{
-						role: "python",
-						content: JSON.stringify(results),
-					},
-				];
-			} else {
-				formattedMessages = [
-					...formattedMessages,
-					{
-						role: m.systemRoleSupported ? "system" : "user",
-						content: JSON.stringify(toolResults),
-					},
-				];
-			}
-			tools = [];
 		}
 
 		const mappedTools =
@@ -288,8 +288,8 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		if (!m.endpoints) {
 			return endpointTgi({
 				type: "tgi",
-				url: `${env.HF_API_ROOT}/${m.name}`,
-				accessToken: env.HF_TOKEN ?? env.HF_ACCESS_TOKEN,
+				url: `${config.HF_API_ROOT}/${m.name}`,
+				accessToken: config.HF_TOKEN ?? config.HF_ACCESS_TOKEN,
 				weight: 1,
 				model: m,
 			});
@@ -305,6 +305,10 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 				switch (args.type) {
 					case "tgi":
 						return endpoints.tgi(args);
+					case "local":
+						return endpoints.local(args);
+					case "inference-client":
+						return endpoints.inferenceClient(args);
 					case "anthropic":
 						return endpoints.anthropic(args);
 					case "anthropic-vertex":
@@ -341,7 +345,7 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-const inferenceApiIds = isHuggingChat
+const inferenceApiIds = config.isHuggingChat
 	? await fetch(
 			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
 		)
@@ -372,7 +376,7 @@ export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...
 export const defaultModel = models[0];
 
 // Models that have been deprecated
-export const oldModels = env.OLD_MODELS
+export const oldModels = config.OLD_MODELS
 	? z
 			.array(
 				z.object({
@@ -382,7 +386,7 @@ export const oldModels = env.OLD_MODELS
 					transferTo: validModelIdSchema.optional(),
 				})
 			)
-			.parse(JSON5.parse(env.OLD_MODELS))
+			.parse(JSON5.parse(config.OLD_MODELS))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
@@ -393,13 +397,13 @@ export const validateModel = (_models: BackendModel[]) => {
 
 // if `TASK_MODEL` is string & name of a model in `MODELS`, then we use `MODELS[TASK_MODEL]`, else we try to parse `TASK_MODEL` as a model config itself
 
-export const smallModel = env.TASK_MODEL
-	? ((models.find((m) => m.name === env.TASK_MODEL) ||
-			(await processModel(modelConfig.parse(JSON5.parse(env.TASK_MODEL))).then((m) =>
-				addEndpoint(m)
-			))) ??
-		defaultModel)
-	: defaultModel;
+export const taskModel = addEndpoint(
+	config.TASK_MODEL
+		? ((models.find((m) => m.name === config.TASK_MODEL) ||
+				(await processModel(modelConfig.parse(JSON5.parse(config.TASK_MODEL))))) ??
+				defaultModel)
+		: defaultModel
+);
 
 export type BackendModel = Optional<
 	typeof defaultModel,
