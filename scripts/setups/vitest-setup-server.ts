@@ -3,11 +3,10 @@ import dotenv from "dotenv";
 import { resolve } from "path";
 import fs from "fs";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import "@testing-library/jest-dom/vitest";
 
 let mongoServer: MongoMemoryServer;
 // Load the .env file
-const envPath = resolve(__dirname, "../.env");
+const envPath = resolve(__dirname, "../../.env");
 dotenv.config({ path: envPath });
 
 // Read the .env file content

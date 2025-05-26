@@ -2,7 +2,6 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import Icons from "unplugin-icons/vite";
 import { promises } from "fs";
 import { defineConfig } from "vitest/config";
-import { svelteTesting } from "@testing-library/svelte/vite";
 import { resolve } from "path";
 import fs from "fs-extra";
 import { spawn } from "child_process";
@@ -91,35 +90,46 @@ export default defineConfig({
 		}),
 		loadTTFAsArrayBuffer(),
 		...(shouldCopyLlama ? [copyLlamaFiles()] : []),
-		svelteTesting(),
 	],
 	optimizeDeps: {
 		include: ["uuid", "@huggingface/transformers", "sharp", "@gradio/client", "clsx"],
 	},
-	server: {
-		open: "/",
-	},
 	test: {
 		workspace: [
 			{
+				// Client-side tests (Svelte components)
+				extends: "./vite.config.ts",
 				test: {
-					name: "node",
-					include: ["src/**/*.spec.ts"],
-					environment: "node",
-					setupFiles: ["./scripts/setupTest.ts"],
-					deps: { inline: ["@sveltejs/kit"] },
-					globals: true,
+					name: "client",
+					environment: "browser",
+					browser: {
+						enabled: true,
+						provider: "playwright",
+						instances: [{ browser: "chromium", headless: true }],
+					},
+					include: ["src/**/*.svelte.{test,spec}.{js,ts}"],
+					exclude: ["src/lib/server/**", "src/**/*.ssr.{test,spec}.{js,ts}"],
+					setupFiles: ["./scripts/setups/vitest-setup-client.ts"],
 				},
 			},
 			{
+				// SSR tests (Server-side rendering)
+				extends: "./vite.config.ts",
 				test: {
-					name: "jsdom",
-					include: ["src/**/*.svelte.spec.ts"],
-					setupFiles: ["./scripts/setupTest.ts"],
-					deps: { inline: ["@sveltejs/kit"] },
-					globals: true,
-					testTimeout: 10000,
-					environment: "jsdom",
+					name: "ssr",
+					environment: "node",
+					include: ["src/**/*.ssr.{test,spec}.{js,ts}"],
+				},
+			},
+			{
+				// Server-side tests (Node.js utilities)
+				extends: "./vite.config.ts",
+				test: {
+					name: "server",
+					environment: "node",
+					include: ["src/**/*.{test,spec}.{js,ts}"],
+					exclude: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/**/*.ssr.{test,spec}.{js,ts}"],
+					setupFiles: ["./scripts/setups/vitest-setup-server.ts"],
 				},
 			},
 		],
