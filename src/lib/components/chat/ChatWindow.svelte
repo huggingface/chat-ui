@@ -30,7 +30,6 @@
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
-	import Search from "./Search.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
 
@@ -40,6 +39,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import { beforeNavigate } from "$app/navigation";
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+
 	interface Props {
 		messages?: Message[];
 		messagesAlternatives?: Message["id"][][];
