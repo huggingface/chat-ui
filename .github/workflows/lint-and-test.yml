@@ -52,15 +52,18 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            --secret id=DOTENV_LOCAL,src=.env.ci \
             --build-arg INCLUDE_DB=true \
             --build-arg SKIP_LLAMA_CPP_BUILD=true \
             -t chat-ui-test:latest .
 
       - name: Run Docker container
         run: |
-          docker run -d --rm -p 3000:3000 --name chat-ui-test chat-ui-test:latest
-
+          export DOTENV_LOCAL=$(<.env.ci)
+          docker run -d --rm --network=host \
+            --name chat-ui-test \
+            -e DOTENV_LOCAL="$DOTENV_LOCAL" \
+            chat-ui-test:latest
+    
       - name: Wait for server to start
         run: |
           for i in {1..10}; do
