@@ -44,7 +44,8 @@ jobs:
           npm run test
 
   build-check:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: aws-general-8-plus
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
