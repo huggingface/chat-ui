@@ -6,7 +6,6 @@ import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
 export async function GET({ locals, url }) {
 	const p = parseInt(url.searchParams.get("p") ?? "0");
-
 	if (locals.user?._id || locals.sessionId) {
 		const convs = await collections.conversations
 			.find({
@@ -26,7 +25,6 @@ export async function GET({ locals, url }) {
 		if (convs.length === 0) {
 			return Response.json([]);
 		}
-
 		const res = convs.map((conv) => ({
 			_id: conv._id,
 			id: conv._id, // legacy param iOS
