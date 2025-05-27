@@ -51,9 +51,10 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build Docker image
         run: |
-          docker build --secret id=DOTENV_LOCAL,src=.env.ci 
-            --build-arg INCLUDE_DB=true 
-            --build-arg SKIP_LLAMA_CPP_BUILD=true 
+          docker build \
+            --secret id=DOTENV_LOCAL,src=.env.ci \
+            --build-arg INCLUDE_DB=true \
+            --build-arg SKIP_LLAMA_CPP_BUILD=true \
             -t chat-ui-db:latest .
 
       - name: Wait for server to start
