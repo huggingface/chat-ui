@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { buildPrompt } from "$lib/buildPrompt";
 import { textGenerationStream } from "@huggingface/inference";
 import type { Endpoint, EndpointMessage } from "../endpoints";
@@ -14,7 +14,7 @@ export const endpointTgiParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("tgi"),
 	url: z.string().url(),
-	accessToken: z.string().default(env.HF_TOKEN ?? env.HF_ACCESS_TOKEN),
+	accessToken: z.string().default(config.HF_TOKEN ?? config.HF_ACCESS_TOKEN),
 	authorization: z.string().optional(),
 	multimodal: z
 		.object({
@@ -66,7 +66,6 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 				accessToken,
 			},
 			{
-				use_cache: false,
 				fetch: async (endpointUrl, info) => {
 					if (info && authorization && !accessToken) {
 						// Set authorization header if it is defined and HF_TOKEN is empty
@@ -74,6 +73,7 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 							...info.headers,
 							Authorization: authorization,
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+							"X-Use-Cache": "false",
 						};
 					}
 					return fetch(endpointUrl, info);

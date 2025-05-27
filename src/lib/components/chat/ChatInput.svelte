@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
 	import { createEventDispatcher, onMount } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
@@ -26,6 +25,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import type { Serialize } from "$lib/utils/serialize";
 
+	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	interface Props {
 		files?: File[];
 		mimeTypes?: string[];
@@ -38,6 +38,7 @@
 		modelIsMultimodal?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
+		focused?: boolean;
 	}
 
 	let {
@@ -52,6 +53,7 @@
 		modelIsMultimodal = false,
 		children,
 		onPaste,
+		focused = $bindable(false),
 	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
@@ -85,21 +87,6 @@
 			formEl?.removeEventListener("submit", onFormSubmit);
 		};
 	});
-
-	function isVirtualKeyboard(): boolean {
-		if (!browser) return false;
-
-		// Check for touch capability
-		if (navigator.maxTouchPoints > 0) return true;
-
-		// Check for touch events
-		if ("ontouchstart" in window) return true;
-
-		// Fallback to user agent string check
-		const userAgent = navigator.userAgent.toLowerCase();
-
-		return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-	}
 
 	function adjustTextareaHeight() {
 		if (!textareaElement) {
@@ -165,7 +152,7 @@
 		rows="1"
 		tabindex="0"
 		inputmode="text"
-		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-y-auto overflow-x-hidden border-0 bg-transparent px-2.5 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 max-sm:text-[16px] sm:px-3"
+		class="scrollbar-custom max-h-[4lh] w-full resize-none overflow-y-auto overflow-x-hidden border-0 bg-transparent px-2.5 py-2.5 outline-none focus:ring-0 focus-visible:ring-0 sm:px-3"
 		class:text-gray-400={disabled}
 		bind:value
 		bind:this={textareaElement}
@@ -181,6 +168,8 @@
 		}}
 		{placeholder}
 		{disabled}
+		onfocus={() => (focused = true)}
+		onblur={() => (focused = false)}
 	></textarea>
 
 	{#if !showNoTools}
@@ -364,5 +353,6 @@
 		font-family: inherit;
 		box-sizing: border-box;
 		line-height: 1.5;
+		font-size: 16px;
 	}
 </style>

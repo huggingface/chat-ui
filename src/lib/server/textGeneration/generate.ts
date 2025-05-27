@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { ToolResult, Tool } from "$lib/types/Tool";
 import {
 	MessageReasoningUpdateType,
@@ -135,11 +135,6 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			if (output.token.text === model.reasoning.beginToken) {
 				reasoning = true;
 				reasoningBuffer += output.token.text;
-				yield {
-					type: MessageUpdateType.Reasoning,
-					subtype: MessageReasoningUpdateType.Status,
-					status: "Started thinking...",
-				};
 				continue;
 			} else if (output.token.text === model.reasoning.endToken) {
 				reasoning = false;
@@ -171,7 +166,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 
 			// create a new status every 5 seconds
 			if (
-				env.REASONING_SUMMARY === "true" &&
+				config.REASONING_SUMMARY === "true" &&
 				new Date().getTime() - lastReasoningUpdate.getTime() > 4000
 			) {
 				lastReasoningUpdate = new Date();
@@ -193,8 +188,12 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 		}
 
 		// abort check
-		const date = AbortedGenerations.getInstance().getList().get(conv._id.toString());
-		if (date && date > promptedAt) break;
+		const date = AbortedGenerations.getInstance().getAbortTime(conv._id.toString());
+
+		if (date && date > promptedAt) {
+			logger.info(`Aborting generation for conversation ${conv._id}`);
+			break;
+		}
 
 		// no output check
 		if (!output) break;

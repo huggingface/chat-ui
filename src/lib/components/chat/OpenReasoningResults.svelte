@@ -58,7 +58,11 @@
 				class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400"
 				class:animate-pulse={loading}
 			>
-				{summary}
+				{summary.length > 33
+					? summary.substring(0, 33) + "..."
+					: summary.endsWith("...")
+						? summary
+						: summary + "..."}
 			</dt>
 		</dl>
 		<CarbonCaretDown class="size-6 text-gray-400 transition-transform group-open:rotate-180" />
@@ -67,7 +71,9 @@
 	<div
 		class="space-y-4 border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
 	>
-		<MarkdownRenderer {content} />
+		{#key content}
+			<MarkdownRenderer {content} />
+		{/key}
 	</div>
 </details>
 

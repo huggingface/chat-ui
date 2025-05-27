@@ -4,8 +4,7 @@ import type { ObjectId } from "mongodb";
 import { subDays } from "date-fns";
 import { logger } from "$lib/server/logger";
 import { collections } from "$lib/server/database";
-const LOCK_KEY = "assistants.count";
-
+import { Semaphores } from "$lib/types/Semaphore";
 let hasLock = false;
 let lockId: ObjectId | null = null;
 
@@ -76,13 +75,13 @@ async function refreshAssistantsCountsHelper() {
 
 async function maintainLock() {
 	if (hasLock && lockId) {
-		hasLock = await refreshLock(LOCK_KEY, lockId);
+		hasLock = await refreshLock(Semaphores.ASSISTANTS_COUNT, lockId);
 
 		if (!hasLock) {
 			lockId = null;
 		}
 	} else if (!hasLock) {
-		lockId = (await acquireLock(LOCK_KEY)) || null;
+		lockId = (await acquireLock(Semaphores.ASSISTANTS_COUNT)) || null;
 		hasLock = !!lockId;
 	}
 

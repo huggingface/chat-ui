@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
@@ -12,7 +12,7 @@ export const endpointCohereParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("cohere"),
-	apiKey: z.string().default(env.COHERE_API_TOKEN),
+	apiKey: z.string().default(config.COHERE_API_TOKEN),
 	clientName: z.string().optional(),
 	raw: z.boolean().default(false),
 	forceSingleStep: z.boolean().default(true),

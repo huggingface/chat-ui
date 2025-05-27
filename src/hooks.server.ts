@@ -1,6 +1,5 @@
-import { env } from "$env/dynamic/private";
-import { env as envPublic } from "$env/dynamic/public";
-import type { Handle, HandleServerError } from "@sveltejs/kit";
+import { config, ready } from "$lib/server/config";
+import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/server/auth";
@@ -16,34 +15,39 @@ import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
 
-// TODO: move this code on a started server hook, instead of using a "building" flag
-if (!building) {
-	// Set HF_TOKEN as a process variable for Transformers.JS to see it
-	process.env.HF_TOKEN ??= env.HF_TOKEN;
+export const init: ServerInit = async () => {
+	// Wait for config to be fully loaded
+	await ready;
 
-	logger.info("Starting server...");
-	initExitHandler();
+	// TODO: move this code on a started server hook, instead of using a "building" flag
+	if (!building) {
+		// Set HF_TOKEN as a process variable for Transformers.JS to see it
+		process.env.HF_TOKEN ??= config.HF_TOKEN;
 
-	checkAndRunMigrations();
-	if (env.ENABLE_ASSISTANTS) {
-		refreshAssistantsCounts();
+		logger.info("Starting server...");
+		initExitHandler();
+
+		checkAndRunMigrations();
+		if (config.ENABLE_ASSISTANTS) {
+			refreshAssistantsCounts();
+		}
+		refreshConversationStats();
+
+		// Init metrics server
+		MetricsServer.getInstance();
+
+		// Init AbortedGenerations refresh process
+		AbortedGenerations.getInstance();
+
+		adminTokenManager.displayToken();
+
+		if (config.EXPOSE_API) {
+			logger.warn(
+				"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
+			);
+		}
 	}
-	refreshConversationStats();
-
-	// Init metrics server
-	MetricsServer.getInstance();
-
-	// Init AbortedGenerations refresh process
-	AbortedGenerations.getInstance();
-
-	adminTokenManager.displayToken();
-
-	if (env.EXPOSE_API) {
-		logger.warn(
-			"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
-		);
-	}
-}
+};
 
 export const handleError: HandleServerError = async ({ error, event, status, message }) => {
 	// handle 404
@@ -79,6 +83,10 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
+	await ready.then(() => {
+		config.checkForUpdates();
+	});
+
 	logger.debug({
 		locals: event.locals,
 		url: event.url.pathname,
@@ -99,7 +107,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
-		const ADMIN_SECRET = env.ADMIN_API_SECRET || env.PARQUET_EXPORT_SECRET;
+		const ADMIN_SECRET = config.ADMIN_API_SECRET || config.PARQUET_EXPORT_SECRET;
 
 		if (!ADMIN_SECRET) {
 			return errorResponse(500, "Admin API is not configured");
@@ -140,7 +148,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 			const validOrigins = [
 				new URL(event.request.url).host,
-				...(envPublic.PUBLIC_ORIGIN ? [new URL(envPublic.PUBLIC_ORIGIN).host] : []),
+				...(config.PUBLIC_ORIGIN ? [new URL(config.PUBLIC_ORIGIN).host] : []),
 			];
 
 			if (!validOrigins.includes(new URL(origin).host)) {
@@ -172,7 +180,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!event.locals.user &&
 			requiresUser &&
-			!((env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0) > 0)
+			!((config.MESSAGES_BEFORE_LOGIN ? parseInt(config.MESSAGES_BEFORE_LOGIN) : 0) > 0)
 		) {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
@@ -183,7 +191,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (
 			!requiresUser &&
 			!event.url.pathname.startsWith(`${base}/settings`) &&
-			envPublic.PUBLIC_APP_DISCLAIMER === "1"
+			config.PUBLIC_APP_DISCLAIMER === "1"
 		) {
 			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
 				sessionId: event.locals.sessionId,
@@ -206,7 +214,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 			replaced = true;
 
-			return chunk.html.replace("%gaId%", envPublic.PUBLIC_GOOGLE_ANALYTICS_ID);
+			return chunk.html.replace("%gaId%", config.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
 		filterSerializedResponseHeaders: (header) => {
 			return header.includes("content-type");
@@ -214,7 +222,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 
 	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
-	if (env.ALLOW_IFRAME !== "true") {
+	if (config.ALLOW_IFRAME !== "true") {
 		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 	}
 

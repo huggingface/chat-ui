@@ -2,7 +2,7 @@ import { collections } from "$lib/server/database";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { base } from "$app/paths";
-import { env as envPublic } from "$env/dynamic/public";
+import { config } from "$lib/server/config";
 import { ReviewStatus } from "$lib/types/Review";
 import { sendSlack } from "$lib/server/sendSlack";
 import { z } from "zod";
@@ -58,8 +58,7 @@ export async function PATCH({ params, request, locals, url }) {
 	}
 
 	if (status === ReviewStatus.PENDING) {
-		const prefixUrl =
-			envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || url.origin}${base}`;
+		const prefixUrl = config.PUBLIC_SHARE_PREFIX || `${config.PUBLIC_ORIGIN || url.origin}${base}`;
 		const assistantUrl = `${prefixUrl}/assistant/${assistantId}`;
 
 		const username = locals.user?.username;

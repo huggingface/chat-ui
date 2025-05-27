@@ -13,7 +13,7 @@ RUN useradd -m -u 1000 user
 USER user
 
 ENV HOME=/home/user \
-	PATH=/home/user/.local/bin:$PATH
+    PATH=/home/user/.local/bin:$PATH
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ WORKDIR /app
 RUN touch /app/.env.local
 
 
-RUN npm i --no-package-lock --no-save playwright@1.47.0
+RUN npm i --no-package-lock --no-save playwright@1.52.0
 
 USER root
 
@@ -54,11 +54,13 @@ COPY --link --chown=1000 package-lock.json package.json ./
 
 ARG APP_BASE=
 ARG PUBLIC_APP_COLOR=blue
+ARG SKIP_LLAMA_CPP_BUILD
 ENV BODY_SIZE_LIMIT=15728640
+ENV SKIP_LLAMA_CPP_BUILD=$SKIP_LLAMA_CPP_BUILD
 
 RUN --mount=type=cache,target=/app/.npm \
-        npm set cache /app/.npm && \
-        npm ci
+    npm set cache /app/.npm && \
+    npm ci
 
 COPY --link --chown=1000 . .
 
@@ -101,6 +103,5 @@ ENV MODELS_STORAGE_PATH=/data/models
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
-COPY --from=builder --chown=1000 /app/node_modules/node-llama-cpp/llama /app/build/server/llama
 
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]

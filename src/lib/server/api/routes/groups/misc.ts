@@ -3,6 +3,7 @@ import { authPlugin } from "../../authPlugin";
 import { requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
+import { config } from "$lib/server/config";
 
 export interface FeatureFlags {
 	searchEnabled: boolean;
@@ -17,6 +18,7 @@ export interface FeatureFlags {
 
 export const misc = new Elysia()
 	.use(authPlugin)
+	.get("/public-config", async () => config.getPublicConfig())
 	.get("/feature-flags", async ({ locals }) => {
 		let loginRequired = false;
 		const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;

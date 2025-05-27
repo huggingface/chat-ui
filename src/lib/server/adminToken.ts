@@ -1,17 +1,16 @@
-import { env } from "$env/dynamic/private";
-import { env as envPublic } from "$env/dynamic/public";
+import { config } from "$lib/server/config";
 import type { Session } from "$lib/types/Session";
 import { logger } from "./logger";
 import { v4 } from "uuid";
 
 class AdminTokenManager {
-	private token = env.ADMIN_TOKEN || v4();
+	private token = config.ADMIN_TOKEN || v4();
 	// contains all session ids that are currently admin sessions
 	private adminSessions: Array<Session["sessionId"]> = [];
 
 	public get enabled() {
 		// if open id is configured, disable the feature
-		return env.ADMIN_CLI_LOGIN === "true";
+		return config.ADMIN_CLI_LOGIN === "true";
 	}
 	public isAdmin(sessionId: Session["sessionId"]) {
 		if (!this.enabled) return false;
@@ -23,7 +22,7 @@ class AdminTokenManager {
 		if (token === this.token) {
 			logger.info(`[ADMIN] Token validated`);
 			this.adminSessions.push(sessionId);
-			this.token = env.ADMIN_TOKEN || v4();
+			this.token = config.ADMIN_TOKEN || v4();
 			return true;
 		}
 
@@ -36,7 +35,7 @@ class AdminTokenManager {
 
 	public displayToken() {
 		// if admin token is set, don't display it
-		if (!this.enabled || env.ADMIN_TOKEN) return;
+		if (!this.enabled || config.ADMIN_TOKEN) return;
 
 		let port = process.argv.includes("--port")
 			? parseInt(process.argv[process.argv.indexOf("--port") + 1])
@@ -53,7 +52,7 @@ class AdminTokenManager {
 			}
 		}
 
-		const url = (envPublic.PUBLIC_ORIGIN || `http://localhost:${port}`) + "?token=";
+		const url = (config.PUBLIC_ORIGIN || `http://localhost:${port}`) + "?token=";
 		logger.info(`[ADMIN] You can login with ${url + this.token}`);
 	}
 }

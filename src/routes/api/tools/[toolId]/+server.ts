@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database.js";
 import { toolFromConfigs } from "$lib/server/tools/index.js";
 import { ReviewStatus } from "$lib/types/Review";
@@ -10,7 +10,7 @@ import { error } from "@sveltejs/kit";
 import { requiresUser } from "$lib/server/auth";
 
 export async function GET({ params }) {
-	if (env.COMMUNITY_TOOLS !== "true") {
+	if (config.COMMUNITY_TOOLS !== "true") {
 		return new Response("Community tools are not enabled", { status: 403 });
 	}
 

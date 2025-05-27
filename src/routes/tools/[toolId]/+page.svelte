@@ -4,7 +4,8 @@
 	import { page } from "$app/state";
 	import Modal from "$lib/components/Modal.svelte";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
-	import { env as envPublic } from "$env/dynamic/public";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { ReviewStatus } from "$lib/types/Review";
 
@@ -34,7 +35,7 @@
 	});
 
 	const prefix =
-		envPublic.PUBLIC_SHARE_PREFIX || `${envPublic.PUBLIC_ORIGIN || page.url.origin}${base}`;
+		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/tools/${data.tool?._id}`);
 	let isActive = $derived($settings.tools?.includes(data.tool?._id.toString()));

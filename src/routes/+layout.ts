@@ -82,6 +82,10 @@ export const load = async ({ depends, fetch }) => {
 				? new Date(settings.ethicsModalAcceptedAt)
 				: null,
 		},
+		publicConfig: await fetchJSON<Record<`PUBLIC_${string}`, string>>(
+			`${base}/api/v2/public-config`,
+			{ fetch }
+		),
 		...(await fetchJSON<FeatureFlags>(`${base}/api/v2/feature-flags`, { fetch })),
 	};
 };

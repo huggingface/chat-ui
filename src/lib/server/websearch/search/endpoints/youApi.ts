@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import { isURL } from "$lib/utils/isUrl";
 import type { WebSearchSource } from "$lib/types/WebSearch";
 
@@ -18,7 +18,7 @@ export default async function searchWebYouApi(query: string): Promise<WebSearchS
 	const response = await fetch(`https://api.ydc-index.io/search?query=${query}`, {
 		method: "GET",
 		headers: {
-			"X-API-Key": env.YDC_API_KEY,
+			"X-API-Key": config.YDC_API_KEY,
 			"Content-type": "application/json; charset=UTF-8",
 		},
 	});

@@ -1,4 +1,4 @@
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type {
 	Endpoint,
 	EndpointMessage,
@@ -10,14 +10,11 @@ import {
 	makeImageProcessor,
 	type ImageProcessor,
 } from "../images";
-
-import { LlamaChatSession, LlamaContextSequence, resolveModelFile } from "node-llama-cpp";
 import { findRepoRoot } from "$lib/server/findRepoRoot";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { logger } from "$lib/server/logger";
-import { llama } from "./utilsLocal";
-
+import type { LlamaContextSequence } from "node-llama-cpp";
 export const endpointLocalParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
@@ -50,12 +47,42 @@ export async function endpointLocal(
 	// Setup model path and folder
 	const path = modelPathInput ?? `hf:${model.id ?? model.name}`;
 	const modelFolder =
-		env.MODELS_STORAGE_PATH ||
+		config.MODELS_STORAGE_PATH ||
 		join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 	// Initialize Llama model
 
+	const { getLlama, LlamaChatSession, resolveModelFile } = await import("node-llama-cpp");
+
 	const modelPath = await resolveModelFile(path, modelFolder);
+
+	const llama = await getLlama({
+		logger: (level, message) => {
+			switch (level) {
+				case "fatal":
+					logger.fatal(message);
+					break;
+				case "error":
+					logger.error(message);
+					break;
+				case "warn":
+					logger.warn(message);
+					break;
+				case "info":
+					logger.info(message);
+					break;
+				case "log":
+					logger.info(message); // Map 'log' to 'info' since pino doesn't have a 'log' level
+					break;
+				case "debug":
+					logger.debug(message);
+					break;
+				default:
+					break;
+			}
+		},
+	});
+
 	if (!llama) {
 		throw new Error("Failed to initialize llama.cpp build.");
 	}

@@ -1,7 +1,7 @@
 import { collectDefaultMetrics, Registry, Counter, Summary } from "prom-client";
 import express from "express";
 import { logger } from "$lib/server/logger";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import type { Model } from "$lib/types/Model";
 import { onExit } from "./exitHandler";
 import { promisify } from "util";
@@ -41,15 +41,15 @@ export class MetricsServer {
 	private constructor() {
 		const app = express();
 
-		const port = Number(env.METRICS_PORT || "5565");
+		const port = Number(config.METRICS_PORT || "5565");
 		if (isNaN(port) || port < 0 || port > 65535) {
-			logger.warn(`Invalid value for METRICS_PORT: ${env.METRICS_PORT}`);
+			logger.warn(`Invalid value for METRICS_PORT: ${config.METRICS_PORT}`);
 		}
 
-		if (env.METRICS_ENABLED !== "false" && env.METRICS_ENABLED !== "true") {
-			logger.warn(`Invalid value for METRICS_ENABLED: ${env.METRICS_ENABLED}`);
+		if (config.METRICS_ENABLED !== "false" && config.METRICS_ENABLED !== "true") {
+			logger.warn(`Invalid value for METRICS_ENABLED: ${config.METRICS_ENABLED}`);
 		}
-		if (env.METRICS_ENABLED === "true") {
+		if (config.METRICS_ENABLED === "true") {
 			const server = app.listen(port, () => {
 				logger.info(`Metrics server listening on port ${port}`);
 			});

@@ -39,6 +39,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import type { Serialize } from "$lib/utils/serialize";
 	import { beforeNavigate } from "$app/navigation";
+	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 
 	interface Props {
 		messages?: Message[];
@@ -231,6 +232,7 @@
 		)
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
+	let focused = $state(false);
 </script>
 
 <svelte:window
@@ -246,7 +248,7 @@
 	}}
 />
 
-<div class="relative min-h-0 min-w-0">
+<div class="relative z-[-1] min-h-0 min-w-0">
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.map((message) => message.content)}
@@ -352,12 +354,16 @@
 		/>
 	</div>
 	<div
-		class="dark:via-gray-80 pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-white/0 px-3.5 py-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900/0 max-md:border-t max-md:bg-white max-md:dark:bg-gray-900 sm:px-5 md:py-8 xl:max-w-4xl [&>*]:pointer-events-auto"
+		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
+			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white
+			via-white/100 to-white/0 px-3.5 pt-2 dark:border-gray-800
+			dark:from-gray-900 dark:via-gray-900/100
+			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
 		{#if sources?.length && !loading}
 			<div
 				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
-				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl max-md:pb-3"
+				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"
 			>
 				{#each sources as source, index}
 					{#await source then src}
@@ -408,8 +414,11 @@
 					e.preventDefault();
 					handleSubmit();
 				}}
-				class="relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-600 dark:bg-gray-700
-            {isReadOnly ? 'opacity-30' : ''}"
+				class={{
+					"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-600 dark:bg-gray-700": true,
+					"opacity-30": isReadOnly,
+					"max-sm:mb-4": focused && isVirtualKeyboard(),
+				}}
 			>
 				{#if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
@@ -433,6 +442,7 @@
 								disabled={isReadOnly || lastIsError}
 								modelHasTools={currentModel.tools}
 								modelIsMultimodal={currentModel.multimodal}
+								bind:focused
 							/>
 						{/if}
 
@@ -445,7 +455,7 @@
 							</button>
 						{:else}
 							<button
-								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black"
+								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:text-gray-400/50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black dark:disabled:text-gray-600/50"
 								disabled={!message || isReadOnly}
 								type="submit"
 								aria-label="Send message"
@@ -471,7 +481,10 @@
 				{/if}
 			</form>
 			<div
-				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
+				class={{
+					"mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+					"max-sm:hidden": focused && isVirtualKeyboard(),
+				}}
 			>
 				<p>
 					Model:

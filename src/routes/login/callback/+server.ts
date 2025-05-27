@@ -2,7 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import { getOIDCUserData, validateAndParseCsrfToken } from "$lib/server/auth";
 import { z } from "zod";
 import { base } from "$app/paths";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 import JSON5 from "json5";
 import { updateUser } from "./updateUser.js";
 
@@ -10,13 +10,13 @@ const allowedUserEmails = z
 	.array(z.string().email())
 	.optional()
 	.default([])
-	.parse(JSON5.parse(env.ALLOWED_USER_EMAILS));
+	.parse(JSON5.parse(config.ALLOWED_USER_EMAILS));
 
 const allowedUserDomains = z
 	.array(z.string().regex(/\.\w+$/)) // Contains at least a dot
 	.optional()
 	.default([])
-	.parse(JSON5.parse(env.ALLOWED_USER_DOMAINS));
+	.parse(JSON5.parse(config.ALLOWED_USER_DOMAINS));
 
 export async function GET({ url, locals, cookies, request, getClientAddress }) {
 	const { error: errorName, error_description: errorDescription } = z

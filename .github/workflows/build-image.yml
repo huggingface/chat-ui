@@ -19,7 +19,8 @@ on:
 
 jobs:
   build-and-publish-image-with-db:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: aws-general-8-plus
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,7 +80,8 @@ jobs:
             INCLUDE_DB=true
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
   build-and-publish-image-nodb:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: aws-general-8-plus
     steps:
       - name: Checkout
         uses: actions/checkout@v4

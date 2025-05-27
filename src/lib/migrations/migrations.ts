@@ -1,10 +1,9 @@
 import { Database } from "$lib/server/database";
 import { migrations } from "./routines";
 import { acquireLock, releaseLock, isDBLocked, refreshLock } from "./lock";
-import { isHuggingChat } from "$lib/utils/isHuggingChat";
+import { Semaphores } from "$lib/types/Semaphore";
 import { logger } from "$lib/server/logger";
-
-const LOCK_KEY = "migrations";
+import { config } from "$lib/server/config";
 
 export async function checkAndRunMigrations() {
 	// make sure all GUIDs are unique
@@ -23,7 +22,7 @@ export async function checkAndRunMigrations() {
 	// connect to the database
 	const connectedClient = await (await Database.getInstance()).getClient().connect();
 
-	const lockId = await acquireLock(LOCK_KEY);
+	const lockId = await acquireLock(Semaphores.MIGRATION);
 
 	if (!lockId) {
 		// another instance already has the lock, so we exit early
@@ -33,7 +32,7 @@ export async function checkAndRunMigrations() {
 
 		// Todo: is this necessary? Can we just return?
 		// block until the lock is released
-		while (await isDBLocked(LOCK_KEY)) {
+		while (await isDBLocked(Semaphores.MIGRATION)) {
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
 		return;
@@ -42,7 +41,7 @@ export async function checkAndRunMigrations() {
 	// once here, we have the lock
 	// make sure to refresh it regularly while it's running
 	const refreshInterval = setInterval(async () => {
-		await refreshLock(LOCK_KEY, lockId);
+		await refreshLock(Semaphores.MIGRATION, lockId);
 	}, 1000 * 10);
 
 	// iterate over all migrations
@@ -58,8 +57,8 @@ export async function checkAndRunMigrations() {
 		} else {
 			// check the modifiers to see if some cases match
 			if (
-				(migration.runForHuggingChat === "only" && !isHuggingChat) ||
-				(migration.runForHuggingChat === "never" && isHuggingChat)
+				(migration.runForHuggingChat === "only" && !config.isHuggingChat) ||
+				(migration.runForHuggingChat === "never" && config.isHuggingChat)
 			) {
 				logger.debug(
 					`[MIGRATIONS] "${migration.name}" should not be applied for this run. Skipping...`
@@ -115,5 +114,5 @@ export async function checkAndRunMigrations() {
 	logger.debug("[MIGRATIONS] All migrations applied. Releasing lock");
 
 	clearInterval(refreshInterval);
-	await releaseLock(LOCK_KEY, lockId);
+	await releaseLock(Semaphores.MIGRATION, lockId);
 }
