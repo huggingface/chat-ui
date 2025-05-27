@@ -1,4 +1,6 @@
 import type { env as publicEnv } from "$env/dynamic/public";
+import { page } from "$app/state";
+import { base } from "$app/paths";
 
 type PublicConfigKey = keyof typeof publicEnv;
 
@@ -19,6 +21,15 @@ class PublicConfigManager {
 
 	get isHuggingChat() {
 		return this.#configStore.PUBLIC_APP_ASSETS === "huggingchat";
+	}
+
+	get assetPath() {
+		return (
+			(this.#configStore.PUBLIC_ORIGIN || page.url.origin) +
+			base +
+			"/" +
+			this.#configStore.PUBLIC_APP_ASSETS
+		);
 	}
 }
 

@@ -203,35 +203,13 @@
 		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />
-		<meta
-			property="og:image"
-			content="{publicConfig.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/thumbnail.png"
-		/>
+		<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
 		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
-	<link
-		rel="icon"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/favicon.ico"
-		sizes="32x32"
-	/>
-	<link
-		rel="icon"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/icon.svg"
-		type="image/svg+xml"
-	/>
-	<link
-		rel="apple-touch-icon"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/apple-touch-icon.png"
-	/>
-	<link
-		rel="manifest"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/manifest.json"
-	/>
+	<link rel="icon" href="{publicConfig.assetPath}/favicon.ico" sizes="32x32" />
+	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
+	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
+	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig.PUBLIC_ORIGIN}
 		<script

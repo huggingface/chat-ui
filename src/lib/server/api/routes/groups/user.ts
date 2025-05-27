@@ -8,34 +8,6 @@ import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { toolFromConfigs } from "$lib/server/tools";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import type { Assistant } from "$lib/types/Assistant";
-
-export type UserGETFront = {
-	id: string;
-	username?: string;
-	avatarUrl?: string;
-	email?: string;
-	logoutDisabled?: boolean;
-	isAdmin: boolean;
-	isEarlyAccess: boolean;
-} | null;
-
-export type UserGETSettings = {
-	ethicsModalAccepted: boolean;
-	ethicsModalAcceptedAt: Date | null;
-	activeModel: string;
-	hideEmojiOnSidebar: boolean;
-	disableStream: boolean;
-	directPaste: boolean;
-	shareConversationsWithModelAuthors: boolean;
-	customPrompts: Record<string, string>;
-	assistants: string[];
-	tools: string[];
-};
-
-export type UserGETAssistants = Array<
-	Assistant & { _id: string; createdById: string; createdByMe: boolean }
->;
 
 export const userGroup = new Elysia()
 	.use(authPlugin)
@@ -54,19 +26,17 @@ export const userGroup = new Elysia()
 	.group("/user", (app) => {
 		return app
 			.get("/", ({ locals }) => {
-				return (
-					locals.user
-						? {
-								id: locals.user._id.toString(),
-								username: locals.user.username,
-								avatarUrl: locals.user.avatarUrl,
-								email: locals.user.email,
-								logoutDisabled: locals.user.logoutDisabled,
-								isAdmin: locals.user.isAdmin ?? false,
-								isEarlyAccess: locals.user.isEarlyAccess ?? false,
-							}
-						: null
-				) satisfies UserGETFront;
+				return locals.user
+					? {
+							id: locals.user._id.toString(),
+							username: locals.user.username,
+							avatarUrl: locals.user.avatarUrl,
+							email: locals.user.email,
+							logoutDisabled: locals.user.logoutDisabled,
+							isAdmin: locals.user.isAdmin ?? false,
+							isEarlyAccess: locals.user.isEarlyAccess ?? false,
+						}
+					: null;
 			})
 			.get("/settings", async ({ locals }) => {
 				const settings = await collections.settings.findOne(authCondition(locals));
@@ -113,7 +83,7 @@ export const userGroup = new Elysia()
 						toolFromConfigs
 							.filter((el) => !el.isHidden && el.isOnByDefault)
 							.map((el) => el._id.toString()),
-				} satisfies UserGETSettings;
+				};
 			})
 			.post("/settings", async ({ locals, request }) => {
 				const body = await request.json();

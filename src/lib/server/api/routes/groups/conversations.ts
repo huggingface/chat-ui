@@ -6,26 +6,8 @@ import { authCondition } from "$lib/server/auth";
 import { models } from "$lib/server/models";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import type { Conversation } from "$lib/types/Conversation";
-import type { Assistant } from "$lib/types/Assistant";
-import type { Serialize } from "$lib/utils/serialize";
 import { jsonSerialize } from "$lib/utils/serialize";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
-
-export type GETConversationsResponse = {
-	conversations: Array<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>;
-	nConversations: number;
-};
-
-export type GETConversationResponse = Pick<
-	Serialize<Conversation>,
-	"messages" | "title" | "model" | "preprompt" | "rootMessageId" | "updatedAt" | "assistantId"
-> & {
-	shared: boolean;
-	modelTools: boolean;
-	assistant: Serialize<Assistant> | undefined;
-	id: string;
-	modelId: Conversation["model"];
-};
 
 export const conversationGroup = new Elysia().use(authPlugin).group("/conversations", (app) => {
 	return app
@@ -57,10 +39,6 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					authCondition(locals)
 				);
 
-				if (convs.length === 0) {
-					return Response.json([]);
-				}
-
 				const res = convs.map((conv) => ({
 					_id: conv._id,
 					id: conv._id, // legacy param iOS
@@ -72,7 +50,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 				}));
 
-				return { conversations: res, nConversations } satisfies GETConversationsResponse;
+				return { conversations: res, nConversations };
 			},
 			{
 				query: t.Object({
@@ -161,7 +139,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							assistantId: conversation.assistantId,
 							modelTools: models.find((m) => m.id == conversation.model)?.tools ?? false,
 							shared: conversation.shared,
-						}) satisfies GETConversationResponse;
+						});
 					})
 					.post("", () => {
 						// todo: post new message

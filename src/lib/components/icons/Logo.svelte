@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { page } from "$app/state";
 	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	import { base } from "$app/paths";
 
 	interface Props {
 		classNames?: string;
@@ -10,16 +7,6 @@
 
 	let { classNames = "" }: Props = $props();
 </script>
-
-<svelte:head>
-	<link
-		rel="preload"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/logo.svg"
-		as="image"
-		type="image/svg+xml"
-	/>
-</svelte:head>
 
 {#if publicConfig.PUBLIC_APP_ASSETS === "chatui"}
 	<svg
@@ -38,7 +25,6 @@
 	<img
 		class={classNames}
 		alt="{publicConfig.PUBLIC_APP_NAME} logo"
-		src="{publicConfig.PUBLIC_ORIGIN ||
-			page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/logo.svg"
+		src="{publicConfig.assetPath}/logo.svg"
 	/>
 {/if}

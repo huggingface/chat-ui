@@ -110,11 +110,7 @@
 			property="og:description"
 			content="Browse HuggingChat assistants made by the community."
 		/>
-		<meta
-			property="og:image"
-			content="{publicConfig.PUBLIC_ORIGIN ||
-				page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
-		/>
+		<meta property="og:image" content="{publicConfig.assetPath}/assistants-thumbnail.png" />
 		<meta property="og:url" content={page.url.href} />
 	{/if}
 </svelte:head>
