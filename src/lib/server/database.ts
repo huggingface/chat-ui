@@ -198,6 +198,22 @@ export class Database {
 		conversations
 			.createIndex({ "messages.createdAt": 1 }, { sparse: true })
 			.catch((e) => logger.error(e));
+
+		// Text index for searching conversation titles and message content
+		conversations
+			.createIndex(
+				{
+					userId: 1,
+					sessionId: 1,
+					title: "text",
+					"messages.content": "text",
+				},
+				{
+					default_language: "en",
+				}
+			)
+			.catch((e) => logger.error(e));
+
 		// Unique index for stats
 		conversationStats
 			.createIndex(

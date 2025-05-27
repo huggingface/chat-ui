@@ -1,3 +1,11 @@
+<script lang="ts" module>
+	let isOpen = $state(false);
+
+	export function closeMobileNav() {
+		isOpen = false;
+	}
+</script>
+
 <script lang="ts">
 	import { browser } from "$app/environment";
 	import { beforeNavigate } from "$app/navigation";
@@ -18,7 +26,6 @@
 	let closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
 
-	let isOpen = $state(false);
 	let panX: number | undefined = $state(undefined);
 	let panStart: number | undefined = $state(undefined);
 	let panStartTime: number | undefined = undefined;

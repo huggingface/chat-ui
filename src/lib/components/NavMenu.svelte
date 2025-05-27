@@ -1,3 +1,12 @@
+<script lang="ts" module>
+	export const titles: { [key: string]: string } = {
+		today: "Today",
+		week: "This week",
+		month: "This month",
+		older: "Older",
+	} as const;
+</script>
+
 <script lang="ts">
 	import { base } from "$app/paths";
 
@@ -15,6 +24,9 @@
 	import type { Conversation } from "$lib/types/Conversation";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 	import { browser } from "$app/environment";
+	import { toggleSearch } from "./chat/Search.svelte";
+	import CarbonSearch from "~icons/carbon/search";
+	import { closeMobileNav } from "./MobileNav.svelte";
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -47,13 +59,6 @@
 		),
 		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
 	});
-
-	const titles: { [key: string]: string } = {
-		today: "Today",
-		week: "This week",
-		month: "This month",
-		older: "Older",
-	} as const;
 
 	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
 
@@ -112,6 +117,16 @@
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
+	<button
+		class="mx-auto flex w-full flex-row items-center justify-stretch gap-x-2 rounded-xl px-2 py-1 pl-0 align-middle text-gray-600 hover:bg-gray-500/20 dark:text-gray-400"
+		onclick={() => {
+			closeMobileNav();
+			toggleSearch();
+		}}
+	>
+		<CarbonSearch class="text-xs" />
+		<span class="block">Search chats</span></button
+	>
 	{#await groupedConversations}
 		{#if $page.data.nConversations > 0}
 			<div class="overflow-y-hidden">
@@ -220,7 +235,7 @@
 				theme = localStorage.theme;
 			}}
 			aria-label="Toggle theme"
-			class="flex h-9 min-w-[1.5em] flex-none items-center rounded-lg p-2 pr-0 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex h-9 min-w-[1.5em] flex-none items-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			{#if browser}
 				{#if theme === "dark"}
