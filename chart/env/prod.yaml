@@ -337,16 +337,16 @@ envVars:
         },
         "promptExamples": [
           {
-            "title": "Title A",
-            "prompt": "Prompt A"
+            "title": "Startup Ideas",
+            "prompt": "Suggest 3 startup ideas based on daily problems faced by people in Tier-2 cities in India. Keep ideas practical and relevant for small teams."
           },
           {
-            "title": "Title B",
-            "prompt": "Prompt B"
+            "title": "Text Draft",
+            "prompt": "Here's my draft for a website:\n\"Order this delicious masala dosa made with love from Bangalore's best chefs.\"\nIs the tone friendly and professional enough? Suggest 2 better versions."
           },
           {
-            "title": "Title C",
-            "prompt": "Prompt C"
+            "title": "Odia Language",
+            "prompt": "Teach me one Odia word for love and how to use it"
           }
         ],
 
