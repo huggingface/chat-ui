@@ -22,6 +22,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
+	import Search from "$lib/components/chat/Search.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -260,6 +261,8 @@
 {#if overloadedModalOpen && publicConfig.isHuggingChat}
 	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
+
+<Search />
 
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed

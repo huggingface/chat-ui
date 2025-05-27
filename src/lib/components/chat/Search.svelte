@@ -1,233 +1,165 @@
+<script lang="ts" module>
+	export function toggleSearch() {
+		searchOpen = !searchOpen;
+	}
+
+	let searchOpen: boolean = $state(false);
+</script>
+
 <script lang="ts">
-	import { onMount } from "svelte";
 	import { base } from "$app/paths";
-	import { differenceInHours } from "date-fns";
-	import type { Conversation } from "$lib/types/Conversation";
-	import NewChatIcon from "$lib/components/icons/NewChatIcon.svelte";
-	import PopupChatIcon from "$lib/components/icons/PopupChatIcon.svelte";
-	import XIcon from "$lib/components/icons/XIcon.svelte";
-	import { isAborted } from "$lib/stores/isAborted";
-	let searchQuery = "";
-	let loading = false;
-	let error: string = "";
-	type ConversationInfo = {
-		conversationId: string;
-		title: string;
-		content?: string;
-	};
-	let todayCons: ConversationInfo[] = [];
-	let yesterdayCons: ConversationInfo[] = [];
-	let theRestConversations: ConversationInfo[] = [];
 
-	let conversations: Conversation[] = [];
+	import { debounce } from "$lib/utils/debounce";
+	import { onDestroy, onMount } from "svelte";
 
-	async function fetchConversations() {
-		try {
-			const response = await fetch(`${base}/api/conversations`);
-			if (!response.ok) {
-				throw new Error("Failed to fetch conversations");
-			}
-			conversations = await response.json();
-		} catch (err) {
-			error = err instanceof Error ? err.message : "An unknown error occurred";
-		} finally {
-			loading = false;
-		}
-	}
+	import type { GETSearchEndpointReturn } from "../../../routes/api/conversations/search/+server";
+	import NavConversationItem from "../NavConversationItem.svelte";
+	import { titles } from "../NavMenu.svelte";
+	import { beforeNavigate } from "$app/navigation";
+	import { browser } from "$app/environment";
 
-	function filterConversations(searchQuery: string = "") {
-		todayCons = [];
-		yesterdayCons = [];
-		conversations.forEach((conversation) => {
-			for (const message of conversation.messages) {
-				if (message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
-					if (differenceInHours(new Date(), new Date(conversation.updatedAt)) < 24) {
-						todayCons.push({
-							conversationId: conversation._id.toString(),
-							title: conversation.title,
-							content: searchQuery !== "" ? message.content.slice(0, 50) + "..." : "",
-						});
-					} else if (differenceInHours(new Date(), conversation.createdAt) < 48) {
-						yesterdayCons.push({
-							conversationId: conversation._id.toString(),
-							title: conversation.title,
-							content: searchQuery !== "" ? message.content.slice(0, 50) + "..." : "",
-						});
-					} else {
-						theRestConversations.push({
-							conversationId: conversation._id.toString(),
-							title: conversation.title,
-							content: searchQuery !== "" ? message.content.slice(0, 50) + "..." : "",
-						});
-					}
-					break;
+	import CarbonClose from "~icons/carbon/close";
+	import { fly } from "svelte/transition";
+
+	let inputElement: HTMLInputElement | undefined = $state(undefined);
+
+	let searchInput: string = $state("");
+	let debouncedInput: string = $state("");
+
+	let pending: boolean = $state(false);
+
+	let conversations: GETSearchEndpointReturn = $state([]);
+
+	const dateRanges = [
+		new Date().setDate(new Date().getDate() - 1),
+		new Date().setDate(new Date().getDate() - 7),
+		new Date().setMonth(new Date().getMonth() - 1),
+	];
+
+	let groupedConversations = $derived({
+		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
+		week: conversations.filter(
+			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
+		),
+		month: conversations.filter(
+			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
+		),
+		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+	});
+
+	const update = debounce(async (v: string) => {
+		debouncedInput = v;
+		pending = true;
+		await fetch(`${base}/api/conversations/search?q=${v}`)
+			.then(async (r) => {
+				if (r.ok) {
+					conversations = await r.json().then((conversations) =>
+						conversations.map((conv: GETSearchEndpointReturn[number]) => ({
+							...conv,
+							updatedAt: new Date(conv.updatedAt),
+						}))
+					);
+				} else {
+					conversations = [];
 				}
-			}
-		});
-		loading = false;
-	}
+			})
+			.finally(() => {
+				pending = false;
+			});
+	}, 300);
 
-	let popupWindowContainer: HTMLDivElement | null;
+	$effect(() => update(searchInput));
 
-	function showPopup(e: KeyboardEvent) {
-		if (e.ctrlKey && e.key === "k") {
-			e.preventDefault();
-			if (popupWindowContainer && popupWindowContainer.style.display === "none") {
-				popupWindowContainer.style.display = "flex";
-				fetchConversations();
-				filterConversations();
-			} else if (popupWindowContainer) {
-				popupWindowContainer.style.display = "none";
-			}
+	async function openSearchListener(ev: KeyboardEvent) {
+		if (ev.ctrlKey && ev.key === "k") {
+			searchOpen = true;
+			ev.stopPropagation();
+			ev.preventDefault();
 		}
 	}
 
 	onMount(() => {
-		popupWindowContainer = document.querySelector(".popup-window-container");
-		if (popupWindowContainer) {
-			popupWindowContainer.style.display = "none";
+		if (!browser) return;
+		window.addEventListener("keydown", openSearchListener);
+	});
+
+	beforeNavigate(() => {
+		searchOpen = false;
+		searchInput = "";
+	});
+
+	onDestroy(() => {
+		if (!browser) return;
+		window.removeEventListener("keydown", openSearchListener);
+	});
+
+	$effect(() => {
+		if (searchOpen) {
+			inputElement?.focus();
 		}
-		window.addEventListener("keydown", showPopup);
-		fetchConversations();
+	});
+
+	$effect(() => {
+		if (!searchOpen) {
+			searchInput = "";
+		}
 	});
 </script>
 
-<div
-	class="popup-window-container absolute z-10 hidden h-[100%] w-[100%] items-center justify-center"
->
+{#if searchOpen}
 	<div
-		class="popup z-2 w-[40rem] rounded-2xl border border-gray-700 bg-slate-900
-		shadow-xl"
+		class="fixed bottom-0 left-[5%] right-[5%] top-[10%] z-50
+		m-4 mx-auto h-fit max-w-2xl
+		overflow-hidden rounded-xl
+		border border-gray-500/50 bg-gray-200 text-gray-800
+		shadow-[0_10px_40px_rgba(100,100,100,0.2)]
+		dark:bg-gray-800
+		dark:text-gray-200 dark:shadow-[0_10px_40px_rgba(255,255,255,0.1)] lg:top-[20%]"
+		in:fly={{ y: 100 }}
 	>
-		<div class="searchBar-container flex items-center p-5">
-			<input
-				placeholder="Search chats..."
-				class="flex-1 bg-inherit outline-none"
-				bind:value={searchQuery}
-				oninput={(e) => {
-					searchQuery = (e.target as HTMLInputElement).value;
-					todayCons = [];
-					yesterdayCons = [];
-					theRestConversations = [];
-					loading = true;
-					filterConversations(searchQuery);
-				}}
-			/>
-			<button
-				onclick={() => {
-					if (popupWindowContainer) {
-						popupWindowContainer.style.display = "none";
-					}
-				}}
-			>
-				<XIcon classNames="cursor-pointer hover:bg-gray-700 rounded-full" />
-			</button>
-		</div>
-		<div class="border-b-2 border-gray-700"></div>
-		<div class="chat-container relative flex h-[25rem] flex-col gap-2 overflow-y-scroll p-5">
-			<a
-				href={`${base}/`}
-				onclick={() => {
-					isAborted.set(true);
-				}}
-				class="flex cursor-pointer flex-row gap-3 rounded-lg p-2 font-[1rem] text-[#FFFFFF] transition-colors
-			duration-150 ease-in-out hover:bg-slate-800"
-			>
-				<NewChatIcon />
-				<span>New chat</span>
-			</a>
-			{#if loading}
-				<p>Loading...</p>
-			{:else if error}
-				<p>Error: {error}</p>
-			{:else if yesterdayCons.length > 0 || todayCons.length > 0 || theRestConversations.length > 0}
-				{#if todayCons.length > 0}
-					<ul class="chats today-chats flex flex-col gap-2">
-						<span class="p-2">Today</span>
-						{#each todayCons as convInfo}
-							<button
-								class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors
-								duration-150 ease-in-out hover:bg-slate-800"
-								id={convInfo.conversationId}
-								onclick={() => {
-									window.location.href = `${base}/conversation/${convInfo.conversationId}`;
-								}}
-							>
-								<PopupChatIcon />
-								<div class="flex flex-col items-start">
-									<h1>{convInfo.title}</h1>
-									<span>{convInfo.content}</span>
-								</div>
-							</button>
-						{/each}
-					</ul>
+		<button
+			class="absolute right-1 top-2.5 rounded-full p-1 hover:bg-gray-500/50"
+			onclick={toggleSearch}
+		>
+			<CarbonClose class="text-lg text-gray-400/80" />
+		</button>
+		<input
+			bind:value={searchInput}
+			bind:this={inputElement}
+			type="text"
+			name="searchbar"
+			placeholder="Search for chats..."
+			class={{
+				"h-12 w-full p-4 text-lg dark:bg-gray-800 dark:text-gray-200": true,
+				"border-b border-b-gray-500/50": searchInput && searchInput.length >= 3,
+			}}
+		/>
+
+		<div class="max-h-[50dvh] overflow-y-scroll">
+			{#if debouncedInput && debouncedInput.length >= 3}
+				{#if pending}
+					{#each Array(5) as _}
+						<div
+							class="m-2 h-6 w-full animate-pulse gap-5 rounded bg-gray-300 first:mt-4 dark:bg-gray-700"
+						></div>
+					{/each}
+				{:else if conversations.length === 0}
+					<p class="bg-gray-200 p-2 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+						No conversations found matching that query
+					</p>
+				{:else}
+					{#each Object.entries(groupedConversations) as [group, convs]}
+						{#if convs.length}
+							<h4 class="mb-1.5 mt-4 pl-1.5 text-sm text-gray-400 dark:text-gray-500">
+								{titles[group]}
+							</h4>
+							{#each convs as conv}
+								<NavConversationItem {conv} readOnly={true} />
+							{/each}
+						{/if}
+					{/each}
 				{/if}
-				{#if yesterdayCons.length > 0}
-					<ui class="chats yesterday-chats flex flex-col gap-2">
-						<span class="p-2">Yesterday</span>
-						{#each yesterdayCons as convInfo}
-							<button
-								class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors
-								duration-150 ease-in-out hover:bg-slate-800"
-								id={convInfo.conversationId}
-								onclick={() => {
-									window.location.href = `${base}/conversation/${convInfo.conversationId}`;
-								}}
-							>
-								<PopupChatIcon />
-								<div class="flex flex-col items-start">
-									<h1>{convInfo.title}</h1>
-									<span>{convInfo.content}</span>
-								</div>
-							</button>
-						{/each}
-					</ui>
-				{/if}
-				{#if theRestConversations.length > 0}
-					<ui class="chats yesterday-chats flex flex-col gap-2">
-						<span class="p-2">More than 2 days</span>
-						{#each theRestConversations as convInfo}
-							<button
-								class="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors
-								duration-150 ease-in-out hover:bg-slate-800"
-								id={convInfo.conversationId}
-								onclick={() => {
-									window.location.href = `${base}/conversation/${convInfo.conversationId}`;
-								}}
-							>
-								<PopupChatIcon />
-								<div class="flex flex-col items-start">
-									<h1>{convInfo.title}</h1>
-									<span>{convInfo.content}</span>
-								</div>
-							</button>
-						{/each}
-					</ui>
-				{/if}
-			{:else}
-				<p>No conversations found.</p>
 			{/if}
 		</div>
 	</div>
-</div>
-
-<style lang="postcss">
-	.chat-container::-webkit-scrollbar-thumb {
-		background-color: #7775;
-		border-radius: 0.5em;
-	}
-
-	.chat-container::-webkit-scrollbar-thumb:hover {
-		background-color: #777;
-	}
-
-	.chat-container::-webkit-scrollbar {
-		width: 10px;
-	}
-
-	.chat-container::-webkit-scrollbar-track {
-		background-color: #5555;
-		margin-block: 1.25em;
-		border-radius: 0.5em;
-	}
-</style>
+{/if}

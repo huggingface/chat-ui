@@ -247,7 +247,6 @@
 	}}
 />
 
-<Search />
 <div class="relative z-[-1] min-h-0 min-w-0">
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"

@@ -11,9 +11,10 @@
 
 	interface Props {
 		conv: ConvSidebar;
+		readOnly?: true;
 	}
 
-	let { conv }: Props = $props();
+	let { conv, readOnly }: Props = $props();
 
 	let confirmDelete = $state(false);
 
@@ -55,59 +56,65 @@
 		{/if}
 	</div>
 
-	{#if confirmDelete}
-		<button
-			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Cancel delete action"
-			onclick={(e) => {
-				e.preventDefault();
-				confirmDelete = false;
-			}}
-		>
-			<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
-		</button>
-		<button
-			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Confirm delete action"
-			onclick={(e) => {
-				e.preventDefault();
-				confirmDelete = false;
-				dispatch("deleteConversation", conv.id);
-			}}
-		>
-			<CarbonCheckmark class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
-		</button>
-	{:else}
-		<button
-			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Edit conversation title"
-			onclick={(e) => {
-				e.preventDefault();
-				const newTitle = prompt("Edit this conversation title:", conv.title);
-				if (!newTitle) return;
-				dispatch("editConversationTitle", { id: conv.id, title: newTitle });
-			}}
-		>
-			<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
-		</button>
-
-		<button
-			type="button"
-			class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
-			title="Delete conversation"
-			onclick={(event) => {
-				event.preventDefault();
-				if (event.shiftKey) {
+	{#if !readOnly}
+		{#if confirmDelete}
+			<button
+				type="button"
+				class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+				title="Cancel delete action"
+				onclick={(e) => {
+					e.preventDefault();
+					confirmDelete = false;
+				}}
+			>
+				<CarbonClose class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+			</button>
+			<button
+				type="button"
+				class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+				title="Confirm delete action"
+				onclick={(e) => {
+					e.preventDefault();
+					confirmDelete = false;
 					dispatch("deleteConversation", conv.id);
-				} else {
-					confirmDelete = true;
-				}
-			}}
-		>
-			<CarbonTrashCan class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300" />
-		</button>
+				}}
+			>
+				<CarbonCheckmark
+					class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+				/>
+			</button>
+		{:else}
+			<button
+				type="button"
+				class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+				title="Edit conversation title"
+				onclick={(e) => {
+					e.preventDefault();
+					const newTitle = prompt("Edit this conversation title:", conv.title);
+					if (!newTitle) return;
+					dispatch("editConversationTitle", { id: conv.id, title: newTitle });
+				}}
+			>
+				<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
+			</button>
+
+			<button
+				type="button"
+				class="flex h-5 w-5 items-center justify-center rounded md:hidden md:group-hover:flex"
+				title="Delete conversation"
+				onclick={(event) => {
+					event.preventDefault();
+					if (event.shiftKey) {
+						dispatch("deleteConversation", conv.id);
+					} else {
+						confirmDelete = true;
+					}
+				}}
+			>
+				<CarbonTrashCan
+					class="text-xs text-gray-400  hover:text-gray-500 dark:hover:text-gray-300"
+				/>
+			</button>
+		{/if}
 	{/if}
 </a>
