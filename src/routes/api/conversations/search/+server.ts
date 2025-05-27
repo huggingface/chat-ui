@@ -41,8 +41,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			.toArray()
 			.then((convs) =>
 				convs.map((conv) => {
-					// find a snippet of the closest search query match in the string
-
 					return {
 						_id: conv._id,
 						id: conv._id, // legacy param iOS
