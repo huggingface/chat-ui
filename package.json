@@ -22,7 +22,7 @@
 		"@iconify-json/carbon": "^1.1.16",
 		"@iconify-json/eos-icons": "^1.1.6",
 		"@sveltejs/adapter-node": "^5.2.12",
-		"@sveltejs/kit": "^2.20.7",
+		"@sveltejs/kit": "^2.21.1",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
 		"@tailwindcss/typography": "^0.5.9",
 		"@types/dompurify": "^3.0.5",
@@ -56,16 +56,16 @@
 		"prettier-plugin-tailwindcss": "^0.6.11",
 		"prom-client": "^15.1.2",
 		"sade": "^1.8.1",
-		"svelte": "^5.27.2",
+		"svelte": "^5.33.3",
 		"svelte-check": "^4.0.0",
 		"svelte-gestures": "^5.1.3",
 		"ts-node": "^10.9.1",
 		"tslib": "^2.4.1",
 		"typescript": "^5.5.0",
 		"unplugin-icons": "^0.16.1",
-		"vite": "^6.3.4",
+		"vite": "^6.3.5",
 		"vite-node": "^3.0.9",
-		"vitest": "^3.0.9"
+		"vitest": "^3.1.4"
 	},
 	"type": "module",
 	"dependencies": {
