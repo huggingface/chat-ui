@@ -325,6 +325,39 @@ envVars:
         ]
       },
       {
+        "name" : "sarvamai/sarvam-m",
+        "description": "A multilingual model that supports reasoning, trained on Indian languages by Sarvam AI.",
+        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/sarvamai-logo.png",
+        "modelUrl" : "https://huggingface.co/sarvamai/sarvam-m",
+        "websiteUrl": "https://www.sarvam.ai/blogs/sarvam-m",
+        "reasoning": {
+          "type": "tokens",
+          "beginToken": "",
+          "endToken": "</think>"
+        },
+        "promptExamples": [
+          {
+            "title": "Title A",
+            "prompt": "Prompt A"
+          },
+          {
+            "title": "Title B",
+            "prompt": "Prompt B"
+          },
+          {
+            "title": "Title C",
+            "prompt": "Prompt C"
+          }
+        ],
+
+        "endpoints": [
+          {
+            "type": "inference-client",
+            "baseURL": "https://nctwtyxyxabqkmko.us-east-1.aws.endpoints.huggingface.cloud/v1"
+          }
+        ]
+      },
+      {
         "name": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
         "tools": true,
         "displayName": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
