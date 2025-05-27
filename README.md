@@ -847,6 +847,14 @@ MODELS=`[
 
 ```
 
+### Model Context Protocol (MCP) Support (Upcoming)
+
+The project is planning to introduce support for the Model Context Protocol (MCP). MCP is a specification designed to standardize how language models receive and understand context from various sources. This will enable more flexible and powerful integrations, allowing models to seamlessly access and utilize a broader range of information, such as user history, external documents, or real-time data, in a structured way.
+
+This is an upcoming feature, and we believe it will significantly enhance the capabilities and extensibility of Chat UI.
+
+We are actively seeking contributions from the community to help design, implement, and integrate MCP support into Chat UI. If you are interested in shaping the future of how Chat UI handles model context and want to contribute to this exciting development, please look for issues tagged with 'MCP' or 'Model Context Protocol' on our issue tracker. Your expertise and input would be invaluable!
+
 ### Custom endpoint authorization
 
 #### Basic and Bearer
