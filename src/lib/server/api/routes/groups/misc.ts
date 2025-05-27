@@ -1,4 +1,4 @@
-import { Elysia, env } from "elysia";
+import { Elysia } from "elysia";
 import { authPlugin } from "../../authPlugin";
 import { requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -21,7 +21,9 @@ export const misc = new Elysia()
 	.get("/public-config", async () => config.getPublicConfig())
 	.get("/feature-flags", async ({ locals }) => {
 		let loginRequired = false;
-		const messagesBeforeLogin = env.MESSAGES_BEFORE_LOGIN ? parseInt(env.MESSAGES_BEFORE_LOGIN) : 0;
+		const messagesBeforeLogin = config.MESSAGES_BEFORE_LOGIN
+			? parseInt(config.MESSAGES_BEFORE_LOGIN)
+			: 0;
 		const nConversations = await collections.conversations.countDocuments(authCondition(locals));
 
 		if (requiresUser && !locals.user) {
@@ -51,18 +53,18 @@ export const misc = new Elysia()
 
 		return {
 			searchEnabled: !!(
-				env.SERPAPI_KEY ||
-				env.SERPER_API_KEY ||
-				env.SERPSTACK_API_KEY ||
-				env.SEARCHAPI_KEY ||
-				env.YDC_API_KEY ||
-				env.USE_LOCAL_WEBSEARCH ||
-				env.SEARXNG_QUERY_URL ||
-				env.BING_SUBSCRIPTION_KEY
+				config.SERPAPI_KEY ||
+				config.SERPER_API_KEY ||
+				config.SERPSTACK_API_KEY ||
+				config.SEARCHAPI_KEY ||
+				config.YDC_API_KEY ||
+				config.USE_LOCAL_WEBSEARCH ||
+				config.SEARXNG_QUERY_URL ||
+				config.BING_SUBSCRIPTION_KEY
 			),
-			enableAssistants: env.ENABLE_ASSISTANTS === "true",
-			enableAssistantsRAG: env.ENABLE_ASSISTANTS_RAG === "true",
-			enableCommunityTools: env.COMMUNITY_TOOLS === "true",
+			enableAssistants: config.ENABLE_ASSISTANTS === "true",
+			enableAssistantsRAG: config.ENABLE_ASSISTANTS_RAG === "true",
+			enableCommunityTools: config.COMMUNITY_TOOLS === "true",
 			loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
 			loginRequired,
 			guestMode: requiresUser && messagesBeforeLogin > 0,

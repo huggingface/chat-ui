@@ -10,8 +10,8 @@ import { authCondition } from "$lib/server/auth";
 import { SortKey } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens";
-import { env } from "$env/dynamic/private";
 import { jsonSerialize, type Serialize } from "$lib/utils/serialize";
+import { config } from "$lib/server/config";
 
 const NUM_PER_PAGE = 16;
 
@@ -80,7 +80,7 @@ export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 		.get(
 			"/search",
 			async ({ query, locals, error }) => {
-				if (env.COMMUNITY_TOOLS !== "true") {
+				if (config.COMMUNITY_TOOLS !== "true") {
 					error(403, "Community tools are not enabled");
 				}
 

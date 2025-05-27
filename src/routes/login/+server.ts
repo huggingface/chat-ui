@@ -1,6 +1,7 @@
 import { getOIDCAuthorizationUrl } from "$lib/server/auth";
 import { base } from "$app/paths";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
+
 export async function GET({ request, url, locals }) {
 	const referer = request.headers.get("referer");
 	let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
@@ -9,7 +10,7 @@ export async function GET({ request, url, locals }) {
 
 	if (url.searchParams.has("callback")) {
 		const callback = url.searchParams.get("callback") || redirectURI;
-		if (env.ALTERNATIVE_REDIRECT_URLS.includes(callback)) {
+		if (config.ALTERNATIVE_REDIRECT_URLS.includes(callback)) {
 			redirectURI = callback;
 		}
 	}
