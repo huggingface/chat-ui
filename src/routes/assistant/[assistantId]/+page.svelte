@@ -69,15 +69,18 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={data.assistant.name + " - " + publicConfig.PUBLIC_APP_NAME} />
+	<meta
+		property="og:title"
+		content={data.assistant.name + " - " + publicConfig().PUBLIC_APP_NAME}
+	/>
 	<meta property="og:type" content="link" />
 	<meta
 		property="og:description"
-		content={`Use the ${data.assistant.name} assistant inside of ${publicConfig.PUBLIC_APP_NAME}`}
+		content={`Use the ${data.assistant.name} assistant inside of ${publicConfig().PUBLIC_APP_NAME}`}
 	/>
 	<meta
 		property="og:image"
-		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/assistant/{data.assistant
+		content="{publicConfig().PUBLIC_ORIGIN || page.url.origin}{base}/assistant/{data.assistant
 			._id}/thumbnail.png"
 	/>
 	<meta property="og:url" content={page.url.href} />

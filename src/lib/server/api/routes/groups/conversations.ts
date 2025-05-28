@@ -162,35 +162,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					.post("/stop-generating", () => {
 						// todo: stop generating
 						return "aa";
-					})
-					.group(
-						"messages/:messageId",
-						{
-							params: t.Object({
-								id: t.String(),
-								messageId: t.Optional(t.String()),
-							}),
-						},
-						(app) => {
-							return app
-								.get("/", () => {
-									// todo: get message
-									return "aa";
-								})
-								.delete("/", () => {
-									// todo: delete message
-									return "aa";
-								})
-								.get("/prompt", () => {
-									// todo: get message prompt
-									return "aa";
-								})
-								.post("/vote", () => {
-									// todo: vote on message
-									return "aa";
-								});
-						}
-					);
+					});
 			}
 		);
 });

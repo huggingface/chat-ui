@@ -102,7 +102,7 @@
 </script>
 
 <svelte:head>
-	{#if publicConfig.isHuggingChat}
+	{#if publicConfig().isHuggingChat}
 		<title>HuggingChat - Assistants</title>
 		<meta property="og:title" content="HuggingChat - Assistants" />
 		<meta property="og:type" content="link" />
@@ -110,7 +110,7 @@
 			property="og:description"
 			content="Browse HuggingChat assistants made by the community."
 		/>
-		<meta property="og:image" content="{publicConfig.assetPath}/assistants-thumbnail.png" />
+		<meta property="og:image" content="{publicConfig().assetPath}/assistants-thumbnail.png" />
 		<meta property="og:url" content={page.url.href} />
 	{/if}
 </svelte:head>
@@ -119,7 +119,7 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Assistants</h1>
-			{#if publicConfig.isHuggingChat}
+			{#if publicConfig().isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
 				</div>
@@ -188,7 +188,7 @@
 						/></a
 					>
 				</div>
-				{#if publicConfig.isHuggingChat}
+				{#if publicConfig().isHuggingChat}
 					<a
 						href="https://hf.co/{assistantsCreator}"
 						target="_blank"

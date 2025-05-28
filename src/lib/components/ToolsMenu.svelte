@@ -71,7 +71,7 @@
 		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
 			<div class="col-span-2 flex items-center gap-1.5 text-sm text-gray-500">
 				Available tools
-				{#if publicConfig.isHuggingChat}
+				{#if publicConfig().isHuggingChat}
 					<a
 						href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/470"
 						target="_blank"

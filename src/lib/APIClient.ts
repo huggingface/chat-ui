@@ -1,8 +1,8 @@
 import type { App } from "$api";
 import { base } from "$app/paths";
-import { publicConfig } from "./utils/PublicConfig.svelte";
 import { treaty, type Treaty } from "@elysiajs/eden";
 import { browser } from "$app/environment";
+import { serverPublicConfig } from "./utils/PublicConfig.svelte";
 
 export function getAPIClient({ fetch }: { fetch: Treaty.Config["fetcher"] }) {
 	let url;
@@ -20,13 +20,10 @@ export function getAPIClient({ fetch }: { fetch: Treaty.Config["fetcher"] }) {
 				port = 3000;
 			}
 		}
-		url = (publicConfig.PUBLIC_ORIGIN || `http://localhost:${port}`) + base + "/api/v2";
+		url = (serverPublicConfig.PUBLIC_ORIGIN || `http://localhost:${port}`) + base + "/api/v2";
 	} else {
 		url = `${window.location.origin}${base}/api/v2`;
 	}
-
-	console.log(url);
-
 	const app = treaty<App>(url, { fetcher: fetch });
 
 	return app;

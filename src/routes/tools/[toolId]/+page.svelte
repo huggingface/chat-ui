@@ -35,7 +35,8 @@
 	});
 
 	const prefix =
-		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
+		publicConfig().PUBLIC_SHARE_PREFIX ||
+		`${publicConfig().PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/tools/${data.tool?._id}`);
 	let isActive = $derived($settings.tools?.includes(data.tool?._id.toString()));

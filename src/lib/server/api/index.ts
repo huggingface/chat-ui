@@ -25,7 +25,13 @@ export const app = new Elysia({ prefix })
 			provider: "swagger-ui",
 		})
 	)
-	.use(cors())
+	.use(
+		cors({
+			origin: "*",
+			methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+			allowedHeaders: ["Content-Type", "Authorization"],
+		})
+	)
 	.use(authPlugin)
 	.use(conversationGroup)
 	.use(toolGroup)

@@ -1,16 +1,14 @@
-import { base } from "$app/paths";
-import type { GETConversationResponse } from "$api/routes/groups/conversations";
+import { getAPIClient, throwOnError } from "$lib/APIClient";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { fetchJSON } from "$lib/utils/fetchJSON.js";
 import { redirect } from "@sveltejs/kit";
 
 export const load = async ({ params, depends, fetch }) => {
 	depends(UrlDependency.Conversation);
 
+	const client = getAPIClient({ fetch });
+
 	try {
-		return await fetchJSON<GETConversationResponse>(`${base}/api/v2/conversations/${params.id}`, {
-			fetch,
-		});
+		return await client.conversations({ id: params.id }).get().then(throwOnError);
 	} catch {
 		redirect(302, "/");
 	}

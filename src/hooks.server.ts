@@ -233,5 +233,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.append("Cache-Control", "no-store");
 	}
 
+	if (
+		event.url.pathname.startsWith(`${base}/api/`) &&
+		!event.url.pathname.startsWith(`${base}/api/v2`)
+	) {
+		response.headers.append("Access-Control-Allow-Origin", "*");
+	}
+
 	return response;
 };

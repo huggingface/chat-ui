@@ -38,7 +38,8 @@
 	const settings = useSettingsStore();
 
 	const prefix =
-		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
+		publicConfig().PUBLIC_SHARE_PREFIX ||
+		`${publicConfig().PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 

@@ -67,12 +67,15 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={modelId + " - " + publicConfig.PUBLIC_APP_NAME} />
+	<meta property="og:title" content={modelId + " - " + publicConfig().PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta property="og:description" content={`Use ${modelId} with ${publicConfig.PUBLIC_APP_NAME}`} />
+	<meta
+		property="og:description"
+		content={`Use ${modelId} with ${publicConfig().PUBLIC_APP_NAME}`}
+	/>
 	<meta
 		property="og:image"
-		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{publicConfig().PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
 	<meta property="og:url" content={page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />

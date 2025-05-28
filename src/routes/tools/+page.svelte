@@ -117,7 +117,7 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Tools</h1>
-			{#if publicConfig.isHuggingChat}
+			{#if publicConfig().isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
 				</div>
@@ -186,7 +186,7 @@
 						/></a
 					>
 				</div>
-				{#if publicConfig.isHuggingChat}
+				{#if publicConfig().isHuggingChat}
 					<a
 						href="https://hf.co/{toolsCreator}"
 						target="_blank"

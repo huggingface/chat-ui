@@ -96,7 +96,7 @@ export async function fetchMessageUpdates(
 		throw Error("Body not defined");
 	}
 
-	if (!(publicConfig.PUBLIC_SMOOTH_UPDATES === "true")) {
+	if (!(publicConfig().PUBLIC_SMOOTH_UPDATES === "true")) {
 		return endpointStreamToIterator(response, abortController);
 	}
 

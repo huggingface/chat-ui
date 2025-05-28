@@ -5,6 +5,7 @@ import { jsonSerialize, type Serialize } from "../lib/utils/serialize";
 import type { Assistant } from "$lib/types/Assistant";
 import { fetchJSON } from "$lib/utils/fetchJSON";
 import { getAPIClient, throwOnError, throwOnErrorNullable } from "$lib/APIClient";
+import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 
 export const load = async ({ depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
@@ -78,7 +79,7 @@ export const load = async ({ depends, fetch }) => {
 				? new Date(settings.ethicsModalAcceptedAt)
 				: null,
 		},
-		publicConfig: await client["public-config"].get().then(throwOnError),
+		publicConfig: getConfigManager(await client["public-config"].get().then(throwOnError)),
 		...(await client["feature-flags"].get().then(throwOnError)),
 	};
 };

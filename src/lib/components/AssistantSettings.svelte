@@ -457,7 +457,7 @@
 						>Internet access
 						<IconInternet classNames="inline text-sm text-blue-600" />
 
-						{#if publicConfig.isHuggingChat}
+						{#if publicConfig().isHuggingChat}
 							<a
 								href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/385"
 								target="_blank"

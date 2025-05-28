@@ -13,7 +13,6 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
@@ -28,6 +27,7 @@
 	import { toggleSearch } from "./chat/Search.svelte";
 	import CarbonSearch from "~icons/carbon/search";
 	import { closeMobileNav } from "./MobileNav.svelte";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -100,10 +100,10 @@
 >
 	<a
 		class="flex items-center rounded-xl text-lg font-semibold"
-		href="{publicConfig.PUBLIC_ORIGIN}{base}/"
+		href="{publicConfig().PUBLIC_ORIGIN}{base}/"
 	>
 		<Logo classNames="mr-1" />
-		{publicConfig.PUBLIC_APP_NAME}
+		{publicConfig().PUBLIC_APP_NAME}
 	</a>
 	{#if $page.url.pathname !== base + "/"}
 		<a

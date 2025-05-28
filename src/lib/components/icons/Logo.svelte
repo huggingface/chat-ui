@@ -8,7 +8,7 @@
 	let { classNames = "" }: Props = $props();
 </script>
 
-{#if publicConfig.PUBLIC_APP_ASSETS === "chatui"}
+{#if publicConfig().PUBLIC_APP_ASSETS === "chatui"}
 	<svg
 		height="30"
 		width="30"
@@ -24,7 +24,7 @@
 {:else}
 	<img
 		class={classNames}
-		alt="{publicConfig.PUBLIC_APP_NAME} logo"
-		src="{publicConfig.assetPath}/logo.svg"
+		alt="{publicConfig().PUBLIC_APP_NAME} logo"
+		src="{publicConfig().assetPath}/logo.svg"
 	/>
 {/if}
