@@ -224,29 +224,29 @@ export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 				})
 				.post("/", () => {
 					// todo: post new tool
-					return "aa";
+					throw new Error("Not implemented");
 				})
 				.group("/:toolId", (app) => {
 					return app
 						.get("/", () => {
 							// todo: get tool
-							return "aa";
+							throw new Error("Not implemented");
 						})
 						.patch("/", () => {
 							// todo: patch tool
-							return "aa";
+							throw new Error("Not implemented");
 						})
 						.delete("/", () => {
 							// todo: delete tool
-							return "aa";
+							throw new Error("Not implemented");
 						})
 						.post("/report", () => {
 							// todo: report tool
-							return "aa";
+							throw new Error("Not implemented");
 						})
 						.patch("/review", () => {
 							// todo: review tool
-							return "aa";
+							throw new Error("Not implemented");
 						});
 				});
 		});

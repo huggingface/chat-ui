@@ -143,7 +143,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					})
 					.post("", () => {
 						// todo: post new message
-						return "aa";
+						throw new Error("Not implemented");
 					})
 					.delete("", async ({ locals }) => {
 						const res = await collections.conversations.deleteMany({
@@ -153,15 +153,15 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					})
 					.get("/output/:sha256", () => {
 						// todo: get output
-						return "aa";
+						throw new Error("Not implemented");
 					})
 					.post("/share", () => {
 						// todo: share conversation
-						return "aa";
+						throw new Error("Not implemented");
 					})
 					.post("/stop-generating", () => {
 						// todo: stop generating
-						return "aa";
+						throw new Error("Not implemented");
 					});
 			}
 		);

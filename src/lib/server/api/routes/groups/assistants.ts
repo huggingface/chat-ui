@@ -26,11 +26,11 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 	return app
 		.get("/", () => {
 			// todo: get assistants
-			return "aa";
+			throw new Error("Not implemented");
 		})
 		.post("/", () => {
 			// todo: post new assistant
-			return "aa";
+			throw new Error("Not implemented");
 		})
 		.get(
 			"/search",
@@ -133,19 +133,19 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 				})
 				.patch("", () => {
 					// todo: patch assistant
-					return "aa";
+					throw new Error("Not implemented");
 				})
 				.delete("/", () => {
 					// todo: delete assistant
-					return "aa";
+					throw new Error("Not implemented");
 				})
 				.post("/report", () => {
 					// todo: report assistant
-					return "aa";
+					throw new Error("Not implemented");
 				})
 				.patch("/review", () => {
 					// todo: review assistant
-					return "aa";
+					throw new Error("Not implemented");
 				})
 				.post("/subscribe", async ({ locals, assistant }) => {
 					const result = await collections.settings.updateOne(authCondition(locals), {

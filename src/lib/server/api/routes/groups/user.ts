@@ -13,15 +13,15 @@ export const userGroup = new Elysia()
 	.use(authPlugin)
 	.get("/login", () => {
 		// todo: login
-		return "aa";
+		throw new Error("Not implemented");
 	})
 	.get("/login/callback", () => {
 		// todo: login callback
-		return "aa";
+		throw new Error("Not implemented");
 	})
 	.post("/logout", () => {
 		// todo: logout
-		return "aa";
+		throw new Error("Not implemented");
 	})
 	.group("/user", (app) => {
 		return app
