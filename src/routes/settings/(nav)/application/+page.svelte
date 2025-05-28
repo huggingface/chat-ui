@@ -4,28 +4,29 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import Switch from "$lib/components/Switch.svelte";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { goto } from "$app/navigation";
 	import { error } from "$lib/stores/errors";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
+	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
 </script>
 
 <div class="flex w-full flex-col gap-5">
 	<h2 class="text-center text-xl font-semibold text-gray-800 md:text-left">Application Settings</h2>
-	{#if !!publicConfig().PUBLIC_COMMIT_SHA}
+	{#if !!publicConfig.PUBLIC_COMMIT_SHA}
 		<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 			<a
-				href={`https://github.com/huggingface/chat-ui/commit/${publicConfig().PUBLIC_COMMIT_SHA}`}
+				href={`https://github.com/huggingface/chat-ui/commit/${publicConfig.PUBLIC_COMMIT_SHA}`}
 				target="_blank"
 				rel="noreferrer"
 				class="text-sm font-light text-gray-500"
 			>
 				Latest deployment <span class="gap-2 font-mono"
-					>{publicConfig().PUBLIC_COMMIT_SHA.slice(0, 7)}</span
+					>{publicConfig.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
 				>
 			</a>
 		</div>
@@ -34,7 +35,7 @@
 		<p class="text-red-500">You are an admin.</p>
 	{/if}
 	<div class="flex h-full max-w-2xl flex-col gap-2 max-sm:pt-0">
-		{#if publicConfig().PUBLIC_APP_DATA_SHARING === "1"}
+		{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
 			<label class="flex items-center">
 				<Switch
 					name="shareConversationsWithModelAuthors"
@@ -85,7 +86,7 @@
 				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
-			{#if publicConfig().isHuggingChat}
+			{#if publicConfig.isHuggingChat}
 				<a
 					href="{base}/privacy"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"

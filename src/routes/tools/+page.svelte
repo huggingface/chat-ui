@@ -3,9 +3,6 @@
 
 	const bubble = createBubbler();
 	import type { PageData } from "./$types";
-
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
-
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
@@ -25,6 +22,9 @@
 	import { ReviewStatus } from "$lib/types/Review";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { loginModalOpen } from "$lib/stores/loginModal";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	interface Props {
 		data: PageData;
@@ -117,7 +117,7 @@
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
 			<h1 class="text-2xl font-bold">Tools</h1>
-			{#if publicConfig().isHuggingChat}
+			{#if publicConfig.isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
 				</div>
@@ -186,7 +186,7 @@
 						/></a
 					>
 				</div>
-				{#if publicConfig().isHuggingChat}
+				{#if publicConfig.isHuggingChat}
 					<a
 						href="https://hf.co/{toolsCreator}"
 						target="_blank"

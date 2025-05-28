@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -13,7 +12,9 @@
 	import CarbonCode from "~icons/carbon/code";
 
 	import { goto } from "$app/navigation";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
+	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
 
 	$effect(() => {
@@ -97,7 +98,7 @@
 		{/if}
 
 		<CopyToClipBoardBtn
-			value="{publicConfig().PUBLIC_ORIGIN || page.url.origin}{base}/models/{model.id}"
+			value="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{model.id}"
 			classNames="!border-none !shadow-none !py-0 !px-1 !rounded-md"
 		>
 			<div class="flex items-center gap-1.5 hover:underline">

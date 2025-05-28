@@ -75,4 +75,4 @@ export const publicConfigTransporter: Transporter = {
 };
 
 export const serverPublicConfig = getConfigManager();
-export const publicConfig = () => getContext<ConfigProxy>("publicConfig");
+export const usePublicConfig = () => getContext<ConfigProxy>("publicConfig");

@@ -2,7 +2,9 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -91,7 +93,7 @@
 </script>
 
 <svelte:head>
-	<title>{publicConfig().PUBLIC_APP_NAME}</title>
+	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 </svelte:head>
 
 <ChatWindow

@@ -3,7 +3,7 @@
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -18,6 +18,7 @@
 
 	const settings = useSettingsStore();
 	const modelId = page.params.model;
+	const publicConfig = usePublicConfig();
 
 	async function createConversation(message: string) {
 		try {
@@ -67,15 +68,12 @@
 </script>
 
 <svelte:head>
-	<meta property="og:title" content={modelId + " - " + publicConfig().PUBLIC_APP_NAME} />
+	<meta property="og:title" content={modelId + " - " + publicConfig.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
-	<meta
-		property="og:description"
-		content={`Use ${modelId} with ${publicConfig().PUBLIC_APP_NAME}`}
-	/>
+	<meta property="og:description" content={`Use ${modelId} with ${publicConfig.PUBLIC_APP_NAME}`} />
 	<meta
 		property="og:image"
-		content="{publicConfig().PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
+		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{modelId}/thumbnail.png"
 	/>
 	<meta property="og:url" content={page.url.href} />
 	<meta name="twitter:card" content="summary_large_image" />

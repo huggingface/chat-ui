@@ -4,10 +4,12 @@
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 	import IconTool from "./icons/IconTool.svelte";
 	import CarbonInformation from "~icons/carbon/information";
 	import CarbonGlobe from "~icons/carbon/earth-filled";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	interface Props {
 		loading?: boolean;
@@ -71,7 +73,7 @@
 		<div class="grid grid-cols-2 gap-x-6 gap-y-1 p-3">
 			<div class="col-span-2 flex items-center gap-1.5 text-sm text-gray-500">
 				Available tools
-				{#if publicConfig().isHuggingChat}
+				{#if publicConfig.isHuggingChat}
 					<a
 						href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/470"
 						target="_blank"

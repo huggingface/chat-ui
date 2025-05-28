@@ -15,10 +15,13 @@
 	import CarbonTools from "~icons/carbon/tools";
 
 	import { share } from "$lib/utils/share";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { page } from "$app/state";
 	import type { Serialize } from "$lib/utils/serialize";
+
+	const publicConfig = usePublicConfig();
+
 	interface Props {
 		models: Model[];
 		assistant: Pick<
@@ -49,8 +52,7 @@
 	);
 
 	const prefix =
-		publicConfig().PUBLIC_SHARE_PREFIX ||
-		`${publicConfig().PUBLIC_ORIGIN || page.url.origin}${base}`;
+		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
 
 	let shareUrl = $derived(`${prefix}/assistant/${assistant?._id}`);
 

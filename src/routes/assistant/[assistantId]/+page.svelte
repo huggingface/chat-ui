@@ -3,7 +3,9 @@
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -69,18 +71,15 @@
 </script>
 
 <svelte:head>
-	<meta
-		property="og:title"
-		content={data.assistant.name + " - " + publicConfig().PUBLIC_APP_NAME}
-	/>
+	<meta property="og:title" content={data.assistant.name + " - " + publicConfig.PUBLIC_APP_NAME} />
 	<meta property="og:type" content="link" />
 	<meta
 		property="og:description"
-		content={`Use the ${data.assistant.name} assistant inside of ${publicConfig().PUBLIC_APP_NAME}`}
+		content={`Use the ${data.assistant.name} assistant inside of ${publicConfig.PUBLIC_APP_NAME}`}
 	/>
 	<meta
 		property="og:image"
-		content="{publicConfig().PUBLIC_ORIGIN || page.url.origin}{base}/assistant/{data.assistant
+		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/assistant/{data.assistant
 			._id}/thumbnail.png"
 	/>
 	<meta property="og:url" content={page.url.href} />

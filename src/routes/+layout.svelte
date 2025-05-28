@@ -22,11 +22,12 @@
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
 	import Search from "$lib/components/chat/Search.svelte";
 	import { setContext } from "svelte";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	let { data = $bindable(), children } = $props();
 
 	setContext("publicConfig", data.publicConfig);
+
+	const publicConfig = data.publicConfig;
 
 	let conversations = $state(data.conversations);
 	$effect(() => {
@@ -180,13 +181,13 @@
 	let showDisclaimer = $derived(
 		!$settings.ethicsModalAccepted &&
 			$page.url.pathname !== `${base}/privacy` &&
-			publicConfig().PUBLIC_APP_DISCLAIMER === "1" &&
+			publicConfig.PUBLIC_APP_DISCLAIMER === "1" &&
 			!($page.data.shared === true)
 	);
 </script>
 
 <svelte:head>
-	<title>{publicConfig().PUBLIC_APP_NAME}</title>
+	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 	<meta name="description" content="The first open source alternative to ChatGPT. 💪" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
@@ -194,27 +195,27 @@
 	<!-- use those meta tags everywhere except on the share assistant page -->
 	<!-- feel free to refacto if there's a better way -->
 	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
-		<meta property="og:title" content={publicConfig().PUBLIC_APP_NAME} />
+		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
-		<meta property="og:url" content="{publicConfig().PUBLIC_ORIGIN || $page.url.origin}{base}" />
-		<meta property="og:image" content="{publicConfig().assetPath}/thumbnail.png" />
-		<meta property="og:description" content={publicConfig().PUBLIC_APP_DESCRIPTION} />
+		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />
+		<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
+		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
-	<link rel="icon" href="{publicConfig().assetPath}/favicon.ico" sizes="32x32" />
-	<link rel="icon" href="{publicConfig().assetPath}/icon.svg" type="image/svg+xml" />
-	<link rel="apple-touch-icon" href="{publicConfig().assetPath}/apple-touch-icon.png" />
-	<link rel="manifest" href="{publicConfig().assetPath}/manifest.json" />
+	<link rel="icon" href="{publicConfig.assetPath}/favicon.ico" sizes="32x32" />
+	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
+	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
+	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
 
-	{#if publicConfig().PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig().PUBLIC_ORIGIN}
+	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig.PUBLIC_ORIGIN}
 		<script
 			defer
-			data-domain={new URL(publicConfig().PUBLIC_ORIGIN).hostname}
-			src={publicConfig().PUBLIC_PLAUSIBLE_SCRIPT_URL}
+			data-domain={new URL(publicConfig.PUBLIC_ORIGIN).hostname}
+			src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		></script>
 	{/if}
 
-	{#if publicConfig().PUBLIC_APPLE_APP_ID}
-		<meta name="apple-itunes-app" content={`app-id=${publicConfig().PUBLIC_APPLE_APP_ID}`} />
+	{#if publicConfig.PUBLIC_APPLE_APP_ID}
+		<meta name="apple-itunes-app" content={`app-id=${publicConfig.PUBLIC_APPLE_APP_ID}`} />
 	{/if}
 </svelte:head>
 
@@ -230,7 +231,7 @@
 	/>
 {/if}
 
-{#if overloadedModalOpen && publicConfig().isHuggingChat}
+{#if overloadedModalOpen && publicConfig.isHuggingChat}
 	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
 
