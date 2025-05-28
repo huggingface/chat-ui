@@ -7,7 +7,7 @@ Chat UI features a powerful Web Search feature. A high level overview of how it 
 3. Load each search result into playwright and scrape
 4. Convert scraped HTML to Markdown tree with headings as parents
 5. Create embeddings for each Markdown element
-6. Find the embedings clossest to the user query using a vector similarity search (inner product)
+6. Find the embeddings closest to the user query using a vector similarity search (inner product)
 7. Get the corresponding Markdown elements and their parent, up to 8000 characters
 8. Supply the information as context to the model
 
@@ -28,7 +28,7 @@ For locally scraped Google results, put `USE_LOCAL_WEBSEARCH=true` in your `.env
 
 > SearXNG is a free internet metasearch engine which aggregates results from various search services and databases. Users are neither tracked nor profiled.
 
-You may enable support via the `SEARXNG_QUERY_URL` where `<query>` will be replaceed with the query keywords. Please see [the official documentation](https://docs.searxng.org/dev/search_api.html) for more information
+You may enable support via the `SEARXNG_QUERY_URL` where `<query>` will be replaced with the query keywords. Please see [the official documentation](https://docs.searxng.org/dev/search_api.html) for more information
 
 Example: `https://searxng.yourdomain.com/search?q=<query>&engines=duckduckgo,google&format=json`
 
