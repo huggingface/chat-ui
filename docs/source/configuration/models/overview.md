@@ -43,7 +43,7 @@ You can change things like the parameters, or customize the preprompt to better 
 
 When querying the model for a chat response, the `chatPromptTemplate` template is used. `messages` is an array of chat messages, it has the format `[{ content: string }, ...]`. To identify if a message is a user message or an assistant message the `ifUser` and `ifAssistant` block helpers can be used.
 
-The following is the default `chatPromptTemplate`, although newlines and indentiation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md). The templating language used is [Handlebars](https://www.npmjs.com/package/handlebars).
+The following is the default `chatPromptTemplate`, although newlines and indentation have been added for readability. You can find the prompts used in production for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/PROMPTS.md). The templating language used is [Handlebars](https://www.npmjs.com/package/handlebars).
 
 ```handlebars
 {{preprompt}}
