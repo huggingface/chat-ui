@@ -1,11 +1,9 @@
-import type { Report } from "$lib/types/Report";
-import { base } from "$app/paths";
-import type { Serialize } from "$lib/utils/serialize";
+import { getAPIClient, throwOnError } from "$lib/APIClient";
 
-export const load = async ({ parent }) => {
-	const reports = await fetch(`${base}/api/v2/user/reports`)
-		.then((res) => res.json() as Promise<Serialize<Report>[]>)
-		.catch(() => []);
+export const load = async ({ parent, fetch }) => {
+	const client = getAPIClient({ fetch });
+
+	const reports = await client.user.reports.get().then(throwOnError);
 
 	return {
 		assistants: (await parent().then((data) => data.assistants)).map((el) => ({

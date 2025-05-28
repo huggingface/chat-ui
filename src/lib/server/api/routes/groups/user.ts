@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { toolFromConfigs } from "$lib/server/tools";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { jsonSerialize } from "$lib/utils/serialize";
 
 export const userGroup = new Elysia()
 	.use(authPlugin)
@@ -148,7 +149,8 @@ export const userGroup = new Elysia()
 					.find({
 						createdBy: locals.user?._id ?? locals.sessionId,
 					})
-					.toArray();
+					.toArray()
+					.then((el) => el.map((el) => jsonSerialize(el)));
 				return reports;
 			})
 			.get("/assistant/active", async ({ locals }) => {
