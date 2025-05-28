@@ -24,6 +24,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	if (locals.user?._id || locals.sessionId) {
 		const convs = await collections.conversations
 			.find({
+				sessionId: undefined,
 				...authCondition(locals),
 				$text: { $search: searchQuery },
 			})
