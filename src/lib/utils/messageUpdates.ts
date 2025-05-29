@@ -15,7 +15,8 @@ import {
 	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
 
-import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+import { page } from "$app/state";
+
 export const isMessageWebSearchUpdate = (update: MessageUpdate): update is MessageWebSearchUpdate =>
 	update.type === MessageUpdateType.WebSearch;
 export const isMessageWebSearchGeneralUpdate = (
@@ -96,7 +97,7 @@ export async function fetchMessageUpdates(
 		throw Error("Body not defined");
 	}
 
-	if (!(publicConfig.PUBLIC_SMOOTH_UPDATES === "true")) {
+	if (!(page.data.publicConfig.PUBLIC_SMOOTH_UPDATES === "true")) {
 		return endpointStreamToIterator(response, abortController);
 	}
 

@@ -3,7 +3,6 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { goto, invalidateAll } from "$app/navigation";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { PageData } from "./$types";
@@ -24,6 +23,9 @@
 	import ToolBadge from "$lib/components/ToolBadge.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
 	import { error } from "$lib/stores/errors";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	interface Props {
 		data: PageData;

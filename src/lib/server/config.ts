@@ -1,6 +1,6 @@
 import { env as publicEnv } from "$env/dynamic/public";
 import { env as serverEnv } from "$env/dynamic/private";
-import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+import { serverPublicConfig } from "$lib/utils/PublicConfig.svelte";
 import { building } from "$app/environment";
 import type { Collection } from "mongodb";
 import type { ConfigKey as ConfigKeyType } from "$lib/types/ConfigKey";
@@ -152,7 +152,7 @@ const configManager = new ConfigManager();
 export const ready = (async () => {
 	if (!building) {
 		await configManager.init().then(() => {
-			publicConfig.init(configManager.getPublicConfig());
+			serverPublicConfig.init(configManager.getPublicConfig());
 		});
 	}
 })();
