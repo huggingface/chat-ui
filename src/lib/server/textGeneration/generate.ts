@@ -154,6 +154,40 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 		if (reasoning) {
 			reasoningBuffer += output.token.text;
 
+			if (model.reasoning && model.reasoning.type === "tokens") {
+				// split reasoning buffer so that anything that comes after the end token is separated
+				// add it to the normal buffer, and yield two updates, one for the reasoning and one for the normal content
+				// also set reasoning to false
+
+				if (reasoningBuffer.lastIndexOf(model.reasoning.endToken) !== -1) {
+					const endTokenIndex = reasoningBuffer.lastIndexOf(model.reasoning.endToken);
+					const textBuffer = reasoningBuffer.slice(endTokenIndex + model.reasoning.endToken.length);
+					reasoningBuffer = reasoningBuffer.slice(
+						0,
+						endTokenIndex + model.reasoning.endToken.length + 1
+					);
+
+					yield {
+						type: MessageUpdateType.Reasoning,
+						subtype: MessageReasoningUpdateType.Stream,
+						token: output.token.text,
+					};
+
+					yield {
+						type: MessageUpdateType.Stream,
+						token: textBuffer,
+					};
+
+					yield {
+						type: MessageUpdateType.Reasoning,
+						subtype: MessageReasoningUpdateType.Status,
+						status: `Done in ${Math.round((new Date().getTime() - startTime.getTime()) / 1000)}s.`,
+					};
+
+					reasoning = false;
+					continue;
+				}
+			}
 			// yield status update if it has changed
 			if (status !== "") {
 				yield {
