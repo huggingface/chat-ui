@@ -1,6 +1,7 @@
 import { collections } from "$lib/server/database";
 import type { LayoutServerLoad } from "./$types";
 import type { Report } from "$lib/types/Report";
+import { WebSearchProvider } from "$lib/types/WebSearch";
 
 export const load = (async ({ locals, parent }) => {
 	const { assistants } = await parent();
@@ -21,5 +22,6 @@ export const load = (async ({ locals, parent }) => {
 			...el,
 			reported: reportsByUser.includes(el._id),
 		})),
+		websearchProviders: Object.values(WebSearchProvider),
 	};
 }) satisfies LayoutServerLoad;
