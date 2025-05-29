@@ -108,6 +108,7 @@
 			value.trim() !== ""
 		) {
 			event.preventDefault();
+			adjustTextareaHeight();
 			dispatch("submit");
 		}
 	}
