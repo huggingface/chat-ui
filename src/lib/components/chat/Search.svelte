@@ -20,15 +20,19 @@
 
 	import CarbonClose from "~icons/carbon/close";
 	import { fly } from "svelte/transition";
+	import InfiniteScroll from "../InfiniteScroll.svelte";
 
 	let inputElement: HTMLInputElement | undefined = $state(undefined);
 
 	let searchInput: string = $state("");
 	let debouncedInput: string = $state("");
+	let hasMore = $state(true);
 
 	let pending: boolean = $state(false);
 
 	let conversations: GETSearchEndpointReturn = $state([]);
+
+	let page: number = $state(0);
 
 	const dateRanges = [
 		new Date().setDate(new Date().getDate() - 1),
@@ -48,27 +52,47 @@
 	});
 
 	const update = debounce(async (v: string) => {
+		if (debouncedInput !== v) {
+			conversations = [];
+			page = 0;
+			hasMore = true;
+		}
 		debouncedInput = v;
 		pending = true;
-		await fetch(`${base}/api/conversations/search?q=${v}`)
+		try {
+			await handleVisible(v);
+		} finally {
+			pending = false;
+		}
+	}, 300);
+
+	async function handleVisible(v: string) {
+		const newConvs = await fetch(`${base}/api/conversations/search?q=${v}&p=${page++}`)
 			.then(async (r) => {
 				if (r.ok) {
-					conversations = await r.json().then((conversations) =>
+					return await r.json().then((conversations) =>
 						conversations.map((conv: GETSearchEndpointReturn[number]) => ({
 							...conv,
 							updatedAt: new Date(conv.updatedAt),
 						}))
 					);
 				} else {
-					conversations = [];
+					return [];
 				}
 			})
-			.finally(() => {
-				pending = false;
-			});
-	}, 300);
+			.catch(() => []);
 
-	$effect(() => update(searchInput));
+		if (newConvs.length === 0) {
+			hasMore = false;
+		}
+
+		conversations = [...conversations, ...newConvs];
+	}
+
+	$effect(() => {
+		//call update only if searchInput is more that 2 characters
+		if (searchInput.length >= 3) update(searchInput);
+	});
 
 	async function openSearchListener(ev: KeyboardEvent) {
 		if (ev.ctrlKey && ev.key === "k") {
@@ -102,6 +126,7 @@
 	$effect(() => {
 		if (!searchOpen) {
 			searchInput = "";
+			debouncedInput = ""; // reset debouncedInput on search bar close
 		}
 	});
 </script>
@@ -135,7 +160,7 @@
 			}}
 		/>
 
-		<div class="max-h-[50dvh] overflow-y-scroll">
+		<div class="scrollbar-custom max-h-[40dvh] overflow-y-scroll">
 			{#if debouncedInput && debouncedInput.length >= 3}
 				{#if pending}
 					{#each Array(5) as _}
@@ -150,14 +175,22 @@
 				{:else}
 					{#each Object.entries(groupedConversations) as [group, convs]}
 						{#if convs.length}
-							<h4 class="mb-1.5 mt-4 pl-1.5 text-sm text-gray-400 dark:text-gray-500">
+							<h4 class="mb-1.5 mt-4 pl-1.5 text-sm text-gray-700 dark:text-gray-300">
 								{titles[group]}
 							</h4>
 							{#each convs as conv}
-								<NavConversationItem {conv} readOnly={true} />
+								<NavConversationItem
+									{conv}
+									readOnly={true}
+									showDescription={true}
+									description={conv.content}
+								/>
 							{/each}
 						{/if}
 					{/each}
+					{#if hasMore}
+						<InfiniteScroll on:visible={() => handleVisible(searchInput)} />
+					{/if}
 				{/if}
 			{/if}
 		</div>
