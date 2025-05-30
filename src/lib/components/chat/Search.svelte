@@ -89,10 +89,7 @@
 		conversations = [...conversations, ...newConvs];
 	}
 
-	$effect(() => {
-		//call update only if searchInput is more that 2 characters
-		if (searchInput.length >= 3) update(searchInput);
-	});
+	$effect(() => update(searchInput));
 
 	async function openSearchListener(ev: KeyboardEvent) {
 		if (ev.ctrlKey && ev.key === "k") {
@@ -184,6 +181,7 @@
 									readOnly={true}
 									showDescription={true}
 									description={conv.content}
+									{searchInput}
 								/>
 							{/each}
 						{/if}

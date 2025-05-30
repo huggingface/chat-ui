@@ -26,8 +26,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const convs = await collections.conversations
 			.find({
 				sessionId: undefined,
-				userId: undefined,
 				...authCondition(locals),
+				userId: undefined,
 				$text: { $search: searchQuery },
 			})
 			.sort({
@@ -51,21 +51,33 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 						message.content.includes(searchQuery)
 					);
 
-					// First AI Response to searchQueryMatch
-					const assistantResponse =
-						searchQueryMatch >= 0 &&
-						searchQueryMatch < conv.messages.length &&
-						conv.messages[searchQueryMatch].from === "assistant"
-							? conv.messages[searchQueryMatch].content
-							: searchQueryMatch + 1 < conv.messages.length
-								? conv.messages[searchQueryMatch + 1].content
-								: "";
+					let matchedContent = "";
+
+					if (searchQueryMatch !== -1) {
+						const content = conv.messages[searchQueryMatch].content;
+						const queryIndex = content.indexOf(searchQuery);
+
+						// Compute ideal start and end to center the query in the 100 character snippet
+						const halfSnippet = 50; // Half of 100 characters
+						const queryStart = Math.max(
+							0,
+							queryIndex - halfSnippet + Math.floor(searchQuery.length / 2)
+						);
+						const queryEnd = Math.min(content.length, queryStart + 100);
+
+						matchedContent = content.substring(queryStart, queryEnd);
+
+						// Pad if needed (only when content is shorter than 100 chars or too close to start)
+						if (matchedContent.length < 100) {
+							matchedContent = matchedContent.padEnd(100, " ");
+						}
+					}
 
 					return {
 						_id: conv._id,
 						id: conv._id, // legacy param iOS
 						title: conv.title,
-						content: assistantResponse,
+						content: matchedContent,
 						updatedAt: conv.updatedAt,
 						model: conv.model,
 						assistantId: conv.assistantId,
