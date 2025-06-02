@@ -152,28 +152,9 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 						if (bestMatchLength >= 1000) break;
 					}
 
-					// Debug logging
-					console.log("Search query:", searchQuery);
-					console.log("Search variations:", searchVariations);
-					console.log(
-						"Best match found:",
-						bestMatch
-							? {
-									matchedText: bestMatch.matchedText,
-									matchStart: bestMatch.matchStart,
-									matchEnd: bestMatch.matchEnd,
-								}
-							: "None"
-					);
-
 					if (bestMatch) {
 						const { content, matchStart, matchEnd } = bestMatch;
 						matchedText = bestMatch.matchedText;
-
-						// Debug the content extraction
-						console.log("Content length:", content.length);
-						console.log("Match at:", matchStart, "to", matchEnd);
-						console.log("Match text:", bestMatch.matchedText);
 
 						// Create centered context around the match
 						const maxContextLength = 160; // Maximum length of actual content (no padding)
@@ -198,16 +179,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 							}
 						}
 
-						console.log(
-							"Calculated snippet bounds:",
-							snippetStart,
-							"to",
-							snippetEnd,
-							"(length:",
-							snippetEnd - snippetStart,
-							")"
-						);
-
 						// Adjust to word boundaries if possible (but don't move more than 15 chars)
 						const originalStart = snippetStart;
 						const originalEnd = snippetEnd;
@@ -229,14 +200,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 							snippetEnd++;
 						}
 
-						console.log("Word boundary adjusted:", snippetStart, "to", snippetEnd);
-
 						// Extract the content
 						let extractedContent = content.substring(snippetStart, snippetEnd).trim();
-
-						console.log("Extracted content length:", extractedContent.length);
-						console.log("Extracted content preview:", extractedContent.substring(0, 50) + "...");
-
 						// Add ellipsis indicators only
 						if (snippetStart > 0) {
 							extractedContent = "..." + extractedContent;
@@ -246,9 +211,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 						}
 
 						matchedContent = extractedContent;
-
-						console.log("Final content length:", matchedContent.length);
-						console.log("Final content preview:", matchedContent.substring(0, 50) + "...");
 					} else {
 						// Fallback: use beginning of the first message if no match found
 						const firstMessage = conv.messages[0];
