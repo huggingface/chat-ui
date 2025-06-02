@@ -18,16 +18,6 @@
 	}
 
 	let { conv, readOnly, showDescription, description, searchInput }: Props = $props();
-	const htmlFormat = description?.replaceAll(
-		searchInput ?? "",
-		`<bold class='font-bold'>${searchInput ?? ""}</bold>`
-	);
-	let descriptionHTML: HTMLParagraphElement | undefined = $state();
-	$effect(() => {
-		if (descriptionHTML) {
-			descriptionHTML.innerHTML = htmlFormat ?? "";
-		}
-	});
 
 	let confirmDelete = $state(false);
 
@@ -67,8 +57,13 @@
 		{:else}
 			{conv.title}
 		{/if}
-		{#if showDescription}
-			<p class="ml-7 text-sm text-gray-500" bind:this={descriptionHTML}></p>
+		{#if showDescription && description && searchInput}
+			<p class="ml-7 text-sm text-gray-500">
+				{#each description.split(searchInput) as segment, i}{segment}{#if i < description.split(searchInput).length - 1}<strong
+							>{searchInput}</strong
+						>{/if}
+				{/each}
+			</p>
 		{/if}
 	</div>
 
