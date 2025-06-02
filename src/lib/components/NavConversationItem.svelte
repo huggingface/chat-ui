@@ -12,9 +12,12 @@
 	interface Props {
 		conv: ConvSidebar;
 		readOnly?: true;
+		showDescription?: boolean;
+		description?: string;
+		searchInput?: string;
 	}
 
-	let { conv, readOnly }: Props = $props();
+	let { conv, readOnly, showDescription, description, searchInput }: Props = $props();
 
 	let confirmDelete = $state(false);
 
@@ -30,12 +33,12 @@
 		confirmDelete = false;
 	}}
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-10 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 sm:h-[2.35rem] {conv.id ===
-	page.params.id
-		? 'bg-gray-100 dark:bg-gray-700'
-		: ''}"
+	class="group flex h-10 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700
+		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''} 
+		{showDescription ? 'sm:h-[3.5rem]' : 'sm:h-[2.35rem]'}
+	"
 >
-	<div class="flex flex-1 items-center truncate">
+	<div class="my-2 flex flex-1 flex-col items-start truncate">
 		{#if confirmDelete}
 			<span class="mr-1 font-semibold"> Delete </span>
 		{/if}
@@ -53,6 +56,14 @@
 			{conv.title.replace(/\p{Emoji}/gu, "")}
 		{:else}
 			{conv.title}
+		{/if}
+		{#if showDescription && description && searchInput}
+			<p class="ml-7 text-sm text-gray-500">
+				{#each description.split(searchInput) as segment, i}{segment}{#if i < description.split(searchInput).length - 1}<strong
+							>{searchInput}</strong
+						>{/if}
+				{/each}
+			</p>
 		{/if}
 	</div>
 
