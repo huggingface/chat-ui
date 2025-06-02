@@ -181,7 +181,7 @@
 									readOnly={true}
 									showDescription={true}
 									description={conv.content}
-									{searchInput}
+									searchInput={conv.matchedText}
 								/>
 							{/each}
 						{/if}
