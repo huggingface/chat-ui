@@ -325,39 +325,6 @@ envVars:
         ]
       },
       {
-        "name" : "sarvamai/sarvam-m",
-        "description": "A multilingual model that supports reasoning, trained on Indian languages by Sarvam AI.",
-        "logoUrl": "https://huggingface.co/datasets/huggingchat/models-logo/resolve/main/sarvamai-logo.png",
-        "modelUrl" : "https://huggingface.co/sarvamai/sarvam-m",
-        "websiteUrl": "https://www.sarvam.ai/blogs/sarvam-m",
-        "reasoning": {
-          "type": "tokens",
-          "beginToken": "",
-          "endToken": "</think>"
-        },
-        "promptExamples": [
-          {
-            "title": "Startup Ideas",
-            "prompt": "Suggest 3 startup ideas based on daily problems faced by people in Tier-2 cities in India. Keep ideas practical and relevant for small teams."
-          },
-          {
-            "title": "Text Draft",
-            "prompt": "Here's my draft for a website:\n\"Order this delicious masala dosa made with love from Bangalore's best chefs.\"\nIs the tone friendly and professional enough? Suggest 2 better versions."
-          },
-          {
-            "title": "Odia Language",
-            "prompt": "Teach me one Odia word for love and how to use it"
-          }
-        ],
-
-        "endpoints": [
-          {
-            "type": "inference-client",
-            "baseURL": "https://nctwtyxyxabqkmko.us-east-1.aws.endpoints.huggingface.cloud/v1"
-          }
-        ]
-      },
-      {
         "name": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
         "tools": true,
         "displayName": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
