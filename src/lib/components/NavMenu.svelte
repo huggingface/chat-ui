@@ -29,6 +29,8 @@
 	import { closeMobileNav } from "./MobileNav.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
+	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+
 	const publicConfig = usePublicConfig();
 
 	interface Props {
@@ -121,15 +123,20 @@
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
 	<button
-		class="mx-auto flex w-full flex-row items-center justify-stretch gap-x-2 rounded-xl px-2 py-1 pl-0 align-middle text-gray-600 hover:bg-gray-500/20 dark:text-gray-400"
+		class="group mx-auto flex w-full flex-row items-center justify-stretch gap-x-2 rounded-xl px-2 py-1 align-middle text-gray-600 hover:bg-gray-500/20 dark:text-gray-400"
 		onclick={() => {
 			closeMobileNav();
 			toggleSearch();
 		}}
 	>
 		<CarbonSearch class="text-xs" />
-		<span class="block">Search chats</span></button
-	>
+		<span class="block">Search chats</span>
+		{#if !isVirtualKeyboard()}
+			<span class="invisible ml-auto text-xs text-gray-500 group-hover:visible"
+				><kbd>ctrl</kbd>+<kbd>k</kbd></span
+			>
+		{/if}
+	</button>
 	{#await groupedConversations}
 		{#if $page.data.nConversations > 0}
 			<div class="overflow-y-hidden">
