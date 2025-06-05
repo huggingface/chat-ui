@@ -1,26 +1,16 @@
-import { base } from "$app/paths";
-import type { ReviewStatus } from "$lib/types/Review";
-import type { Tool } from "$lib/types/Tool.js";
-import type { Serialize } from "$lib/utils/serialize";
-import { error } from "@sveltejs/kit";
+import { getAPIClient, throwOnError } from "$lib/APIClient";
+import { jsonSerialize } from "$lib/utils/serialize";
 
 export const load = async ({ params, fetch }) => {
-	const r = await fetch(`${base}/api/v2/tools/${params.toolId}`);
+	const client = getAPIClient({ fetch });
 
-	if (!r.ok) {
-		throw error(r.status, r.statusText);
-	}
+	const data = client
+		.tools({
+			id: params.toolId,
+		})
+		.get()
+		.then(throwOnError)
+		.then(jsonSerialize);
 
-	const data = await r.json();
-
-	return {
-		tool: data as Serialize<
-			Tool & {
-				createdById: string | null;
-				createdByMe: boolean;
-				reported: boolean;
-				review: ReviewStatus;
-			}
-		>,
-	};
+	return { tool: await data };
 };
