@@ -23,6 +23,8 @@
 	import { captureScreen } from "$lib/utils/screenshot";
 	import IconScreenshot from "../icons/IconScreenshot.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
+	import type { Serialize } from "$lib/utils/serialize";
+
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	interface Props {
 		files?: File[];
@@ -31,7 +33,7 @@
 		placeholder?: string;
 		loading?: boolean;
 		disabled?: boolean;
-		assistant?: Assistant | undefined;
+		assistant?: Serialize<Assistant> | undefined;
 		modelHasTools?: boolean;
 		modelIsMultimodal?: boolean;
 		children?: import("svelte").Snippet;

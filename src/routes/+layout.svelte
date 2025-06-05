@@ -6,8 +6,6 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/stores";
 
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
-
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 
@@ -23,8 +21,13 @@
 	import LoginModal from "$lib/components/LoginModal.svelte";
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
 	import Search from "$lib/components/chat/Search.svelte";
+	import { setContext } from "svelte";
 
 	let { data = $bindable(), children } = $props();
+
+	setContext("publicConfig", data.publicConfig);
+
+	const publicConfig = data.publicConfig;
 
 	let conversations = $state(data.conversations);
 	$effect(() => {
@@ -181,14 +184,6 @@
 			publicConfig.PUBLIC_APP_DISCLAIMER === "1" &&
 			!($page.data.shared === true)
 	);
-
-	$effect.pre(() => {
-		publicConfig.init(data.publicConfig);
-	});
-
-	onMount(() => {
-		publicConfig.init(data.publicConfig);
-	});
 </script>
 
 <svelte:head>
@@ -203,35 +198,13 @@
 		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />
-		<meta
-			property="og:image"
-			content="{publicConfig.PUBLIC_ORIGIN ||
-				$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/thumbnail.png"
-		/>
+		<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
 		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
-	<link
-		rel="icon"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/favicon.ico"
-		sizes="32x32"
-	/>
-	<link
-		rel="icon"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/icon.svg"
-		type="image/svg+xml"
-	/>
-	<link
-		rel="apple-touch-icon"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/apple-touch-icon.png"
-	/>
-	<link
-		rel="manifest"
-		href="{publicConfig.PUBLIC_ORIGIN ||
-			$page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/manifest.json"
-	/>
+	<link rel="icon" href="{publicConfig.assetPath}/favicon.ico" sizes="32x32" />
+	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
+	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
+	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig.PUBLIC_ORIGIN}
 		<script
@@ -281,7 +254,7 @@
 		<NavMenu
 			{conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.loginEnabled}
+			canLogin={!data.user && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
@@ -293,7 +266,7 @@
 		<NavMenu
 			{conversations}
 			user={data.user}
-			canLogin={data.user === undefined && data.loginEnabled}
+			canLogin={!data.user && data.loginEnabled}
 			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
