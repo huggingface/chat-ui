@@ -6,7 +6,7 @@ import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/se
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
-import { building } from "$app/environment";
+import { building, dev } from "$app/environment";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
@@ -14,6 +14,7 @@ import { initExitHandler } from "$lib/server/exitHandler";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
+import { isHostLocalhost } from "$lib/server/isURLLocal";
 
 export const init: ServerInit = async () => {
 	// Wait for config to be fully loaded
@@ -233,12 +234,31 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.append("Cache-Control", "no-store");
 	}
 
-	if (
-		event.url.pathname.startsWith(`${base}/api/`) &&
-		!event.url.pathname.startsWith(`${base}/api/v2`)
-	) {
-		response.headers.append("Access-Control-Allow-Origin", "*");
-	}
+	if (event.url.pathname.startsWith(`${base}/api/`)) {
+		// get origin from the request
+		const requestOrigin = event.request.headers.get("origin");
 
+		// get origin from the config if its defined
+		let allowedOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : undefined;
+
+		if (
+			dev || // if we're in dev mode
+			!requestOrigin || // or the origin is null (SSR)
+			isHostLocalhost(new URL(requestOrigin).hostname) // or the origin is localhost
+		) {
+			allowedOrigin = "*"; // allow all origins
+		} else if (allowedOrigin === requestOrigin) {
+			allowedOrigin = requestOrigin; // echo back the caller
+		}
+
+		if (allowedOrigin) {
+			response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+			response.headers.set(
+				"Access-Control-Allow-Methods",
+				"GET, POST, PUT, PATCH, DELETE, OPTIONS"
+			);
+			response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+		}
+	}
 	return response;
 };

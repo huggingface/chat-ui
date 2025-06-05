@@ -9,7 +9,6 @@ import { modelGroup } from "$api/routes/groups/models";
 import { Elysia } from "elysia";
 import { base } from "$app/paths";
 import { swagger } from "@elysiajs/swagger";
-import { cors } from "@elysiajs/cors";
 
 const prefix = `${base}/api/v2` as unknown as "";
 
@@ -23,13 +22,6 @@ export const app = new Elysia({ prefix })
 				},
 			},
 			provider: "swagger-ui",
-		})
-	)
-	.use(
-		cors({
-			origin: "*",
-			methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-			allowedHeaders: ["Content-Type", "Authorization"],
 		})
 	)
 	.use(authPlugin)
