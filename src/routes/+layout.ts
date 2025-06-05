@@ -1,9 +1,6 @@
 import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
-import { base } from "$app/paths";
-import { jsonSerialize, type Serialize } from "../lib/utils/serialize";
-import type { Assistant } from "$lib/types/Assistant";
-import { fetchJSON } from "$lib/utils/fetchJSON";
+import { jsonSerialize } from "../lib/utils/serialize";
 import { getAPIClient, throwOnError, throwOnErrorNullable } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 
@@ -21,10 +18,7 @@ export const load = async ({ depends, fetch }) => {
 	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
 	const assistant = assistantActive
-		? await fetchJSON<Serialize<Assistant>>(`${base}/api/v2/assistants/${settings?.activeModel}`, {
-				fetch,
-				allowNull: true,
-			})
+		? await client.assistants({ id: settings?.activeModel }).get().then(throwOnErrorNullable)
 		: null;
 
 	const { conversations, nConversations } = await client.conversations
@@ -49,8 +43,10 @@ export const load = async ({ depends, fetch }) => {
 						...(conv.assistantId
 							? {
 									assistantId: conv.assistantId.toString(),
-									avatarUrl: fetch(`${base}/api/v2/assistants/${conv.assistantId}`)
-										.then((res) => res.json() as Promise<Serialize<Assistant>>)
+									avatarUrl: client
+										.assistants({ id: conv.assistantId.toString() })
+										.get()
+										.then(throwOnErrorNullable)
 										.then((assistant) => {
 											if (!assistant.avatar) {
 												return undefined;
