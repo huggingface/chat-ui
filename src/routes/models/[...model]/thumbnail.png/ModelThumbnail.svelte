@@ -1,8 +1,7 @@
 <script lang="ts">
-	import logo from "../../../../../static/huggingchat/logo.svg?raw";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	const publicConfig = usePublicConfig();
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
+	import logo from "../../../../../static/huggingchat/logo.svg?raw";
 	interface Props {
 		name: string;
 		logoUrl: string | undefined;

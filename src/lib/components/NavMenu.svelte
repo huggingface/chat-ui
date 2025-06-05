@@ -13,6 +13,7 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { switchTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
@@ -20,20 +21,13 @@
 	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/stores";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
+	import type { Conversation } from "$lib/types/Conversation";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
-	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { toggleSearch } from "./chat/Search.svelte";
 	import CarbonSearch from "~icons/carbon/search";
 	import { closeMobileNav } from "./MobileNav.svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
-	import { useAPIClient, throwOnError } from "$lib/APIClient";
-	import { jsonSerialize } from "$lib/utils/serialize";
-
-	const publicConfig = usePublicConfig();
-	const client = useAPIClient();
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -71,18 +65,15 @@
 
 	async function handleVisible() {
 		p++;
-		const newConvs = await client.conversations
-			.get({
-				query: {
-					p,
-				},
-			})
-			.then(throwOnError)
-			.then(({ conversations }) =>
-				conversations.map((conv) => ({
-					...jsonSerialize(conv),
-					updatedAt: new Date(conv.updatedAt),
-				}))
+		const newConvs = await fetch(`${base}/api/conversations?p=${p}`)
+			.then((res) => res.json())
+			.then((convs) =>
+				convs.map(
+					(conv: Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">) => ({
+						...conv,
+						updatedAt: new Date(conv.updatedAt),
+					})
+				)
 			)
 			.catch(() => []);
 
@@ -175,13 +166,9 @@
 	class="flex touch-none flex-col gap-1 rounded-r-xl p-3 text-sm md:mt-3 md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
-		<button
-			onclick={async () => {
-				await fetch(`${base}/logout`, {
-					method: "POST",
-				});
-				await goto(base + "/", { invalidateAll: true });
-			}}
+		<form
+			action="{base}/logout"
+			method="post"
 			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
 			<span
@@ -189,21 +176,24 @@
 				>{user?.username || user?.email}</span
 			>
 			{#if !user.logoutDisabled}
-				<span
+				<button
+					type="submit"
 					class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md border bg-white px-2 text-gray-700 shadow-sm group-hover:flex hover:shadow-none dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
 				>
 					Sign Out
-				</span>
+				</button>
 			{/if}
-		</button>
+		</form>
 	{/if}
 	{#if canLogin}
-		<a
-			href="{base}/login"
-			class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			Login
-		</a>
+		<form action="{base}/login" method="POST" target="_parent">
+			<button
+				type="submit"
+				class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			>
+				Login
+			</button>
+		</form>
 	{/if}
 	{#if nModels > 1}
 		<a

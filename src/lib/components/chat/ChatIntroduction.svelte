@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import { createEventDispatcher } from "svelte";
 	import IconGear from "~icons/bi/gear-fill";
@@ -7,9 +9,6 @@
 	import ModelCardMetadata from "../ModelCardMetadata.svelte";
 	import { base } from "$app/paths";
 	import JSON5 from "json5";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
 
 	interface Props {
 		currentModel: Model;

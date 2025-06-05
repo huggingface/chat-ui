@@ -4,12 +4,10 @@
 	import { clickOutside } from "$lib/actions/clickOutside";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import type { ToolFront } from "$lib/types/Tool";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 	import IconTool from "./icons/IconTool.svelte";
 	import CarbonInformation from "~icons/carbon/information";
 	import CarbonGlobe from "~icons/carbon/earth-filled";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
 
 	interface Props {
 		loading?: boolean;

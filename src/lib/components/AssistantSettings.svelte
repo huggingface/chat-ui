@@ -12,6 +12,7 @@
 	import CarbonTools from "~icons/carbon/tools";
 
 	import { useSettingsStore } from "$lib/stores/settings";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 	import IconInternet from "./icons/IconInternet.svelte";
 	import TokensCounter from "./TokensCounter.svelte";
 	import HoverTooltip from "./HoverTooltip.svelte";
@@ -19,9 +20,6 @@
 	import AssistantToolPicker from "./AssistantToolPicker.svelte";
 	import { error } from "$lib/stores/errors";
 	import { goto } from "$app/navigation";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
 
 	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
 

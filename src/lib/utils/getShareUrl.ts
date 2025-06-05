@@ -1,9 +1,8 @@
 import { base } from "$app/paths";
-import { page } from "$app/state";
+import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 export function getShareUrl(url: URL, shareId: string): string {
 	return `${
-		page.data.publicConfig.PUBLIC_SHARE_PREFIX ||
-		`${page.data.publicConfig.PUBLIC_ORIGIN || url.origin}${base}`
+		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || url.origin}${base}`
 	}/r/${shareId}`;
 }

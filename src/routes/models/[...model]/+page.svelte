@@ -3,7 +3,7 @@
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -18,7 +18,6 @@
 
 	const settings = useSettingsStore();
 	const modelId = page.params.model;
-	const publicConfig = usePublicConfig();
 
 	async function createConversation(message: string) {
 		try {

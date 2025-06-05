@@ -1,10 +1,10 @@
-import { error, redirect } from "@sveltejs/kit";
+import { redirect, error } from "@sveltejs/kit";
 import { getOIDCUserData, validateAndParseCsrfToken } from "$lib/server/auth";
 import { z } from "zod";
 import { base } from "$app/paths";
+import { updateUser } from "./updateUser";
 import { config } from "$lib/server/config";
 import JSON5 from "json5";
-import { updateUser } from "./updateUser.js";
 
 const allowedUserEmails = z
 	.array(z.string().email())
@@ -18,7 +18,7 @@ const allowedUserDomains = z
 	.default([])
 	.parse(JSON5.parse(config.ALLOWED_USER_DOMAINS));
 
-export async function GET({ url, locals, cookies, request, getClientAddress }) {
+export async function load({ url, locals, cookies, request, getClientAddress }) {
 	const { error: errorName, error_description: errorDescription } = z
 		.object({
 			error: z.string().optional(),
@@ -27,7 +27,7 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		.parse(Object.fromEntries(url.searchParams.entries()));
 
 	if (errorName) {
-		throw error(400, errorName + (errorDescription ? ": " + errorDescription : ""));
+		error(400, errorName + (errorDescription ? ": " + errorDescription : ""));
 	}
 
 	const { code, state, iss } = z
@@ -43,7 +43,7 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 	const validatedToken = await validateAndParseCsrfToken(csrfToken, locals.sessionId);
 
 	if (!validatedToken) {
-		throw error(403, "Invalid or expired CSRF token");
+		error(403, "Invalid or expired CSRF token");
 	}
 
 	const { userData } = await getOIDCUserData(
@@ -55,11 +55,11 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 	// Filter by allowed user emails or domains
 	if (allowedUserEmails.length > 0 || allowedUserDomains.length > 0) {
 		if (!userData.email) {
-			throw error(403, "User not allowed: email not returned");
+			error(403, "User not allowed: email not returned");
 		}
 		const emailVerified = userData.email_verified ?? true;
 		if (!emailVerified) {
-			throw error(403, "User not allowed: email not verified");
+			error(403, "User not allowed: email not verified");
 		}
 
 		const emailDomain = userData.email.split("@")[1];
@@ -67,7 +67,7 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		const isDomainAllowed = allowedUserDomains.includes(emailDomain);
 
 		if (!isEmailAllowed && !isDomainAllowed) {
-			throw error(403, "User not allowed");
+			error(403, "User not allowed");
 		}
 	}
 
@@ -79,5 +79,5 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
-	return redirect(302, `${base}/`);
+	redirect(302, `${base}/`);
 }

@@ -1,6 +1,10 @@
-import type { Tree, TreeId, TreeNode } from "./tree";
+import type { Conversation } from "$lib/types/Conversation";
+import type { Message } from "$lib/types/Message";
 
-export function buildSubtree<T>(conv: Tree<T>, id: TreeId): TreeNode<T>[] {
+export function buildSubtree(
+	conv: Pick<Conversation, "messages" | "rootMessageId">,
+	id: Message["id"]
+): Message[] {
 	if (!conv.rootMessageId) {
 		if (conv.messages.length === 0) return [];
 		// legacy conversation slice up to id
