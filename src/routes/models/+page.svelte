@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
@@ -16,8 +16,6 @@
 	let { data }: Props = $props();
 
 	const settings = useSettingsStore();
-
-	const publicConfig = usePublicConfig();
 </script>
 
 <svelte:head>

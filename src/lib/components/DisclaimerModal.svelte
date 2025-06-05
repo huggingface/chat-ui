@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
 
 	const settings = useSettingsStore();
 </script>
@@ -58,18 +56,20 @@
 				{/if}
 			</button>
 			{#if page.data.loginEnabled}
-				<a
-					href="{base}/login"
-					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
-				>
-					Sign in
-					{#if publicConfig.isHuggingChat}
-						<span class="flex items-center">
-							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging
-							Face
-						</span>
-					{/if}
-				</a>
+				<form action="{base}/login" target="_parent" method="POST" class="w-full">
+					<button
+						type="submit"
+						class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
+					>
+						Sign in
+						{#if publicConfig.isHuggingChat}
+							<span class="flex items-center">
+								&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5 flex-none" /> Hugging
+								Face
+							</span>
+						{/if}
+					</button>
+				</form>
 			{/if}
 		</div>
 	</div>

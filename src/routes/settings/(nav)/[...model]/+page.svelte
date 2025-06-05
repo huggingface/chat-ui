@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { base } from "$app/paths";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -12,9 +13,7 @@
 	import CarbonCode from "~icons/carbon/code";
 
 	import { goto } from "$app/navigation";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
-	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
 
 	$effect(() => {

@@ -2,9 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
@@ -33,8 +31,8 @@
 			if (validModels.includes($settings.activeModel)) {
 				model = $settings.activeModel;
 			} else {
-				if (data.assistant?.modelId && validModels.includes(data.assistant.modelId)) {
-					model = data.assistant.modelId;
+				if (validModels.includes(data.assistant?.modelId)) {
+					model = data.assistant?.modelId;
 				} else {
 					model = data.models[0].id;
 				}

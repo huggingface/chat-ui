@@ -4,6 +4,7 @@
 	import { page } from "$app/state";
 	import Modal from "$lib/components/Modal.svelte";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { ReviewStatus } from "$lib/types/Review";
@@ -20,9 +21,6 @@
 	import CarbonStar from "~icons/carbon/star";
 	import CarbonLock from "~icons/carbon/locked";
 	import { error } from "$lib/stores/errors";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
 
 	let { data } = $props();
 

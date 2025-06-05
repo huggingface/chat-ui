@@ -3,9 +3,7 @@
 	import { base } from "$app/paths";
 	import { goto } from "$app/navigation";
 	import { onMount } from "svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { findCurrentModel } from "$lib/utils/models";

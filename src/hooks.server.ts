@@ -2,19 +2,20 @@ import { config, ready } from "$lib/server/config";
 import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import { findUser, refreshSessionCookie, requiresUser } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
+import { sha256 } from "$lib/utils/sha256";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
-import { building, dev } from "$app/environment";
+import { building } from "$app/environment";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { MetricsServer } from "$lib/server/metrics";
 import { initExitHandler } from "$lib/server/exitHandler";
+import { ObjectId } from "mongodb";
 import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
-import { isHostLocalhost } from "$lib/server/isURLLocal";
 
 export const init: ServerInit = async () => {
 	// Wait for config to be fully loaded
@@ -119,13 +120,108 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const auth = await authenticateRequest(
-		{ type: "svelte", value: event.request.headers },
-		{ type: "svelte", value: event.cookies }
-	);
+	const token = event.cookies.get(config.COOKIE_NAME);
 
-	event.locals.user = auth.user || undefined;
-	event.locals.sessionId = auth.sessionId;
+	// if the trusted email header is set we use it to get the user email
+	const email = config.TRUSTED_EMAIL_HEADER
+		? event.request.headers.get(config.TRUSTED_EMAIL_HEADER)
+		: null;
+
+	let secretSessionId: string | null = null;
+	let sessionId: string | null = null;
+
+	if (email) {
+		secretSessionId = sessionId = await sha256(email);
+
+		event.locals.user = {
+			// generate id based on email
+			_id: new ObjectId(sessionId.slice(0, 24)),
+			name: email,
+			email,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			hfUserId: email,
+			avatarUrl: "",
+			logoutDisabled: true,
+		};
+	} else if (token) {
+		secretSessionId = token;
+		sessionId = await sha256(token);
+
+		const user = await findUser(sessionId);
+
+		if (user) {
+			event.locals.user = user;
+		}
+	} else if (
+		event.url.pathname.startsWith(`${base}/api/`) &&
+		config.USE_HF_TOKEN_IN_API === "true"
+	) {
+		// if the request goes to the API and no user is available in the header
+		// check if a bearer token is available in the Authorization header
+
+		const authorization = event.request.headers.get("Authorization");
+
+		if (authorization && authorization.startsWith("Bearer ")) {
+			const token = authorization.slice(7);
+
+			const hash = await sha256(token);
+
+			sessionId = secretSessionId = hash;
+
+			// check if the hash is in the DB and get the user
+			// else check against https://huggingface.co/api/whoami-v2
+
+			const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
+
+			if (cacheHit) {
+				const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
+
+				if (!user) {
+					return errorResponse(500, "User not found");
+				}
+
+				event.locals.user = user;
+			} else {
+				const response = await fetch("https://huggingface.co/api/whoami-v2", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+
+				if (!response.ok) {
+					return errorResponse(401, "Unauthorized");
+				}
+
+				const data = await response.json();
+				const user = await collections.users.findOne({ hfUserId: data.id });
+
+				if (!user) {
+					return errorResponse(500, "User not found");
+				}
+
+				await collections.tokenCaches.insertOne({
+					tokenHash: hash,
+					userId: data.id,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				});
+
+				event.locals.user = user;
+			}
+		}
+	}
+
+	if (!sessionId || !secretSessionId) {
+		secretSessionId = crypto.randomUUID();
+		sessionId = await sha256(secretSessionId);
+
+		if (await collections.sessions.findOne({ sessionId })) {
+			return errorResponse(500, "Session ID collision");
+		}
+	}
+
+	event.locals.sessionId = sessionId;
 
 	event.locals.isAdmin =
 		event.locals.user?.isAdmin || adminTokenManager.isAdmin(event.locals.sessionId);
@@ -158,16 +254,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	if (
-		event.request.method === "POST" ||
-		event.url.pathname.startsWith(`${base}/login`) ||
-		event.url.pathname.startsWith(`${base}/login/callback`)
-	) {
-		// if the request is a POST request or login-related we refresh the cookie
-		refreshSessionCookie(event.cookies, auth.secretSessionId);
+	if (event.request.method === "POST") {
+		// if the request is a POST request we refresh the cookie
+		refreshSessionCookie(event.cookies, secretSessionId);
 
 		await collections.sessions.updateOne(
-			{ sessionId: auth.sessionId },
+			{ sessionId },
 			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
 		);
 	}
@@ -217,9 +309,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 			return chunk.html.replace("%gaId%", config.PUBLIC_GOOGLE_ANALYTICS_ID);
 		},
-		filterSerializedResponseHeaders: (header) => {
-			return header.includes("content-type");
-		},
 	});
 
 	// Add CSP header to disallow framing if ALLOW_IFRAME is not "true"
@@ -227,38 +316,5 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 	}
 
-	if (
-		event.url.pathname.startsWith(`${base}/login/callback`) ||
-		event.url.pathname.startsWith(`${base}/login`)
-	) {
-		response.headers.append("Cache-Control", "no-store");
-	}
-
-	if (event.url.pathname.startsWith(`${base}/api/`)) {
-		// get origin from the request
-		const requestOrigin = event.request.headers.get("origin");
-
-		// get origin from the config if its defined
-		let allowedOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : undefined;
-
-		if (
-			dev || // if we're in dev mode
-			!requestOrigin || // or the origin is null (SSR)
-			isHostLocalhost(new URL(requestOrigin).hostname) // or the origin is localhost
-		) {
-			allowedOrigin = "*"; // allow all origins
-		} else if (allowedOrigin === requestOrigin) {
-			allowedOrigin = requestOrigin; // echo back the caller
-		}
-
-		if (allowedOrigin) {
-			response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
-			response.headers.set(
-				"Access-Control-Allow-Methods",
-				"GET, POST, PUT, PATCH, DELETE, OPTIONS"
-			);
-			response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-		}
-	}
 	return response;
 };

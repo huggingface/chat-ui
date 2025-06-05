@@ -12,13 +12,4 @@
 	let assistant = data.assistants.find((el) => el._id.toString() === page.params.assistantId);
 </script>
 
-<AssistantSettings
-	assistant={assistant
-		? {
-				...assistant,
-				updatedAt: new Date(assistant.updatedAt),
-				createdAt: new Date(assistant.createdAt),
-			}
-		: undefined}
-	models={data.models}
-/>
+<AssistantSettings {assistant} models={data.models} />

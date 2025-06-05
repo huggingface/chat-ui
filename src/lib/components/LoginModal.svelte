@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
-	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
 </script>
 
@@ -28,10 +27,15 @@
 			{publicConfig.PUBLIC_APP_GUEST_MESSAGE}
 		</p>
 
-		<div class="flex w-full flex-col items-center gap-2">
+		<form
+			action="{base}/{page.data.loginRequired ? 'login' : 'settings'}"
+			target="_parent"
+			method="POST"
+			class="flex w-full flex-col items-center gap-2"
+		>
 			{#if page.data.loginRequired}
-				<a
-					href="{base}/login"
+				<button
+					type="submit"
 					class="flex w-full flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
 				>
 					Sign in
@@ -40,7 +44,7 @@
 							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
 						</span>
 					{/if}
-				</a>
+				</button>
 			{:else}
 				<button
 					class="flex w-full items-center justify-center whitespace-nowrap rounded-full border-2 border-black bg-black px-5 py-2 text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900"
@@ -55,6 +59,6 @@
 					Start chatting
 				</button>
 			{/if}
-		</div>
+		</form>
 	</div>
 </Modal>

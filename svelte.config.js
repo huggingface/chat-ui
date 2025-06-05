@@ -40,10 +40,6 @@ const config = {
 				...(process.env.ALLOW_IFRAME === "true" ? {} : { "frame-ancestors": ["'none'"] }),
 			},
 		},
-		alias: {
-			$api: "./src/lib/server/api",
-			"$api/*": "./src/lib/server/api/*",
-		},
 	},
 };
 

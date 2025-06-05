@@ -1,7 +1,12 @@
+import type { Conversation } from "$lib/types/Conversation";
+import type { Message } from "$lib/types/Message";
 import { v4 } from "uuid";
-import type { Tree, TreeId, NewNode, TreeNode } from "./tree";
 
-export function addChildren<T>(conv: Tree<T>, message: NewNode<T>, parentId?: TreeId): TreeId {
+export function addChildren(
+	conv: Pick<Conversation, "messages" | "rootMessageId">,
+	message: Omit<Message, "id">,
+	parentId?: Message["id"]
+): Message["id"] {
 	// if this is the first message we just push it
 	if (conv.messages.length === 0) {
 		const messageId = v4();
@@ -10,7 +15,7 @@ export function addChildren<T>(conv: Tree<T>, message: NewNode<T>, parentId?: Tr
 			...message,
 			ancestors: [],
 			id: messageId,
-		} as TreeNode<T>);
+		});
 		return messageId;
 	}
 
@@ -24,7 +29,7 @@ export function addChildren<T>(conv: Tree<T>, message: NewNode<T>, parentId?: Tr
 		if (!!parentId && parentId !== conv.messages[conv.messages.length - 1].id) {
 			throw new Error("This is a legacy conversation, you can only append to the last message");
 		}
-		conv.messages.push({ ...message, id: messageId } as TreeNode<T>);
+		conv.messages.push({ ...message, id: messageId });
 		return messageId;
 	}
 
@@ -34,7 +39,7 @@ export function addChildren<T>(conv: Tree<T>, message: NewNode<T>, parentId?: Tr
 		ancestors,
 		id: messageId,
 		children: [],
-	} as TreeNode<T>);
+	});
 
 	const parent = conv.messages.find((m) => m.id === parentId);
 
