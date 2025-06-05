@@ -1,15 +1,12 @@
-import { base } from "$app/paths";
-import type { GETAssistantsSearchResponse } from "$api/routes/groups/assistants";
-import { error } from "@sveltejs/kit";
+import { getAPIClient, throwOnError } from "$lib/APIClient";
 
 export const load = async ({ url, fetch }) => {
-	const r = await fetch(`${base}/api/v2/assistants/search?${url.searchParams.toString()}`);
+	const client = getAPIClient({ fetch });
 
-	if (!r.ok) {
-		throw error(r.status, "Failed to fetch assistants");
-	}
-
-	const data = (await r.json()) as GETAssistantsSearchResponse;
+	const data = client.assistants.search
+		.get({ query: Object.fromEntries(url.searchParams.entries()) })
+		.then(throwOnError)
+		.catch(() => []);
 
 	return data;
 };
