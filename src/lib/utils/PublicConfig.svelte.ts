@@ -74,5 +74,4 @@ export const publicConfigTransporter: Transporter = {
 	decode: (value) => getConfigManager(JSON.parse(value)),
 };
 
-export const serverPublicConfig = getConfigManager();
 export const usePublicConfig = () => getContext<ConfigProxy>("publicConfig");
