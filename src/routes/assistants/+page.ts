@@ -5,8 +5,7 @@ export const load = async ({ url, fetch }) => {
 
 	const data = client.assistants.search
 		.get({ query: Object.fromEntries(url.searchParams.entries()) })
-		.then(throwOnError)
-		.catch(() => []);
+		.then(throwOnError);
 
 	return data;
 };
