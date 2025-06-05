@@ -20,7 +20,6 @@
 	import type { Model } from "$lib/types/Model";
 	import { page } from "$app/stores";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
-	import type { Conversation } from "$lib/types/Conversation";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
@@ -30,8 +29,11 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+	import { getAPIClient, throwOnError } from "$lib/APIClient";
+	import { jsonSerialize } from "$lib/utils/serialize";
 
 	const publicConfig = usePublicConfig();
+	const client = getAPIClient();
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -69,15 +71,18 @@
 
 	async function handleVisible() {
 		p++;
-		const newConvs = await fetch(`${base}/api/v2/conversations?p=${p}`)
-			.then((res) => res.json())
-			.then((convs) =>
-				convs.map(
-					(conv: Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">) => ({
-						...conv,
-						updatedAt: new Date(conv.updatedAt),
-					})
-				)
+		const newConvs = await client.conversations
+			.get({
+				query: {
+					p,
+				},
+			})
+			.then(throwOnError)
+			.then(({ conversations }) =>
+				conversations.map((conv) => ({
+					...jsonSerialize(conv),
+					updatedAt: new Date(conv.updatedAt),
+				}))
 			)
 			.catch(() => []);
 

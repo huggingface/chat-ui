@@ -3,8 +3,9 @@ import { base } from "$app/paths";
 import { treaty, type Treaty } from "@elysiajs/eden";
 import { browser } from "$app/environment";
 
-export function getAPIClient({ fetch }: { fetch: Treaty.Config["fetcher"] }) {
+export function getAPIClient({ fetch }: { fetch?: Treaty.Config["fetcher"] } = {}) {
 	let url;
+
 	if (!browser) {
 		let port;
 		if (process.argv.includes("--port")) {
