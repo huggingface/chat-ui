@@ -4,14 +4,18 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import Switch from "$lib/components/Switch.svelte";
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { goto } from "$app/navigation";
 	import { error } from "$lib/stores/errors";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { useAPIClient } from "$lib/APIClient";
 
+	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
+
+	const client = useAPIClient();
 </script>
 
 <div class="flex w-full flex-col gap-5">
@@ -97,16 +101,15 @@
 					e.preventDefault();
 
 					confirm("Are you sure you want to delete all conversations?") &&
-						(await fetch(`${base}/api/conversations`, {
-							method: "DELETE",
-						})
+						client.conversations
+							.delete()
 							.then(async () => {
 								await goto(`${base}/`, { invalidateAll: true });
 							})
 							.catch((err) => {
 								console.error(err);
 								$error = err.message;
-							}));
+							});
 				}}
 				type="submit"
 				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"

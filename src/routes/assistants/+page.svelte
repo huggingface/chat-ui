@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { publicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
@@ -32,6 +32,8 @@
 	}
 
 	let { data = $bindable() }: Props = $props();
+
+	const publicConfig = usePublicConfig();
 
 	let assistantsCreator = $derived(page.url.searchParams.get("user"));
 	let createdByMe = $derived(data.user?.username && data.user.username === assistantsCreator);
@@ -110,11 +112,7 @@
 			property="og:description"
 			content="Browse HuggingChat assistants made by the community."
 		/>
-		<meta
-			property="og:image"
-			content="{publicConfig.PUBLIC_ORIGIN ||
-				page.url.origin}{base}/{publicConfig.PUBLIC_APP_ASSETS}/assistants-thumbnail.png"
-		/>
+		<meta property="og:image" content="{publicConfig.assetPath}/assistants-thumbnail.png" />
 		<meta property="og:url" content={page.url.href} />
 	{/if}
 </svelte:head>
