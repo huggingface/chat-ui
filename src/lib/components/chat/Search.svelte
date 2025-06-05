@@ -10,18 +10,17 @@
 	import { base } from "$app/paths";
 
 	import { debounce } from "$lib/utils/debounce";
-	import { onDestroy, onMount } from "svelte";
 
 	import type { GETSearchEndpointReturn } from "../../../routes/api/conversations/search/+server";
 	import NavConversationItem from "../NavConversationItem.svelte";
 	import { titles } from "../NavMenu.svelte";
 	import { beforeNavigate } from "$app/navigation";
-	import { browser } from "$app/environment";
 
 	import CarbonClose from "~icons/carbon/close";
 	import { fly } from "svelte/transition";
 	import InfiniteScroll from "../InfiniteScroll.svelte";
 
+	let searchContainer: HTMLDivElement | undefined = $state(undefined);
 	let inputElement: HTMLInputElement | undefined = $state(undefined);
 
 	let searchInput: string = $state("");
@@ -66,6 +65,15 @@
 		}
 	}, 300);
 
+	const handleBackdropClick = (event: MouseEvent) => {
+		if (!searchOpen || !searchContainer) return;
+
+		const target = event.target;
+		if (!(target instanceof Node) || !searchContainer.contains(target)) {
+			searchOpen = false;
+		}
+	};
+
 	async function handleVisible(v: string) {
 		const newConvs = await fetch(`${base}/api/conversations/search?q=${v}&p=${page++}`)
 			.then(async (r) => {
@@ -91,27 +99,26 @@
 
 	$effect(() => update(searchInput));
 
-	async function openSearchListener(ev: KeyboardEvent) {
-		if (ev.ctrlKey && ev.key === "k") {
-			searchOpen = true;
-			ev.stopPropagation();
-			ev.preventDefault();
+	function handleKeydown(event: KeyboardEvent) {
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+			if (!searchOpen) {
+				searchOpen = true;
+			}
+			event.preventDefault();
+			event.stopPropagation();
+		}
+
+		if (searchOpen && event.key === "Escape") {
+			if (searchOpen) {
+				searchOpen = false;
+			}
+			event.preventDefault();
 		}
 	}
-
-	onMount(() => {
-		if (!browser) return;
-		window.addEventListener("keydown", openSearchListener);
-	});
 
 	beforeNavigate(() => {
 		searchOpen = false;
 		searchInput = "";
-	});
-
-	onDestroy(() => {
-		if (!browser) return;
-		window.removeEventListener("keydown", openSearchListener);
 	});
 
 	$effect(() => {
@@ -128,8 +135,11 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleKeydown} onmousedown={handleBackdropClick} />
+
 {#if searchOpen}
 	<div
+		bind:this={searchContainer}
 		class="fixed bottom-0 left-[5%] right-[5%] top-[10%] z-50
 		m-4 mx-auto h-fit max-w-2xl
 		overflow-hidden rounded-xl
@@ -151,6 +161,7 @@
 			type="text"
 			name="searchbar"
 			placeholder="Search for chats..."
+			autocomplete="off"
 			class={{
 				"h-12 w-full p-4 text-lg dark:bg-gray-800 dark:text-gray-200": true,
 				"border-b border-b-gray-500/50": searchInput && searchInput.length >= 3,
