@@ -78,7 +78,7 @@ export const load = async ({ depends, fetch }) => {
 					.then(throwOnErrorNullable)
 					.then(jsonSerialize)
 					.catch(() => undefined)
-			: null,
+			: undefined,
 		assistants,
 		models,
 		oldModels,
