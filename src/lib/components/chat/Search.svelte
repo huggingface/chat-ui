@@ -10,13 +10,11 @@
 	import { base } from "$app/paths";
 
 	import { debounce } from "$lib/utils/debounce";
-	import { onDestroy, onMount } from "svelte";
 
 	import type { GETSearchEndpointReturn } from "../../../routes/api/conversations/search/+server";
 	import NavConversationItem from "../NavConversationItem.svelte";
 	import { titles } from "../NavMenu.svelte";
 	import { beforeNavigate } from "$app/navigation";
-	import { browser } from "$app/environment";
 
 	import CarbonClose from "~icons/carbon/close";
 	import { fly } from "svelte/transition";
