@@ -1,5 +1,5 @@
 import { config, ready } from "$lib/server/config";
-import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit";
+import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/server/auth";
@@ -261,4 +261,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 	return response;
+};
+
+export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
+	if (isHostLocalhost(new URL(request.url).hostname)) {
+		const cookieHeader = event.request.headers.get("cookie");
+		if (cookieHeader) {
+			const headers = new Headers(request.headers);
+			headers.set("cookie", cookieHeader);
+
+			return fetch(new Request(request, { headers }));
+		}
+	}
+
+	return fetch(request);
 };
