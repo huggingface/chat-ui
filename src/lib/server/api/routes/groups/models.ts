@@ -81,7 +81,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 				})
 				.use(authPlugin)
 				.post("/subscribe", async ({ locals, model, error }) => {
-					if (!locals.user || !locals.sessionId) {
+					if (!locals.sessionId) {
 						return error(401, "Unauthorized");
 					}
 					await collections.settings.updateOne(
