@@ -147,7 +147,7 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 					// todo: review assistant
 					throw new Error("Not implemented");
 				})
-				.post("/subscribe", async ({ locals, assistant }) => {
+				.post("/follow", async ({ locals, assistant }) => {
 					const result = await collections.settings.updateOne(authCondition(locals), {
 						$addToSet: { assistants: assistant._id },
 						$set: { activeModel: assistant._id.toString() },
@@ -162,7 +162,7 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 
 					return { message: "Assistant subscribed" };
 				})
-				.delete("/subscribe", async ({ locals, assistant }) => {
+				.delete("/follow", async ({ locals, assistant }) => {
 					const result = await collections.settings.updateOne(authCondition(locals), {
 						$pull: { assistants: assistant._id },
 					});

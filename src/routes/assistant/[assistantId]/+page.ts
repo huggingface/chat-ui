@@ -1,24 +1,16 @@
-import { error } from "@sveltejs/kit";
-import type { Assistant } from "$lib/types/Assistant";
-import type { Serialize } from "$lib/utils/serialize";
-import { base } from "$app/paths";
+import { getAPIClient, throwOnError } from "$lib/APIClient";
+import { jsonSerialize } from "$lib/utils/serialize";
 
 export async function load({ fetch, params }) {
-	const r = await fetch(`${base}/api/v2/assistants/${params.assistantId}`);
+	const client = getAPIClient({ fetch });
 
-	if (!r.ok) {
-		error(r.status, r.statusText);
-	}
+	const data = client
+		.assistants({ id: params.assistantId })
+		.get()
+		.then(throwOnError)
+		.then(jsonSerialize);
 
-	const data = await r.json();
+	await client.assistants({ id: params.assistantId }).follow.post();
 
-	const r2 = await fetch(`${base}/api/v2/assistants/${params.assistantId}/subscribe`, {
-		method: "POST",
-	});
-
-	if (!r2.ok) {
-		error(r2.status, r2.statusText);
-	}
-
-	return { assistant: data as Serialize<Assistant> };
+	return { assistant: await data };
 }
