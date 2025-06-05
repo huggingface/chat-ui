@@ -13,6 +13,7 @@ import JSON5 from "json5";
 import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { type ToolInput } from "$lib/types/Tool";
+import { fetchJSON } from "$lib/utils/fetchJSON";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { findRepoRoot } from "./findRepoRoot";
@@ -346,13 +347,12 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 });
 
 const inferenceApiIds = config.isHuggingChat
-	? await fetch(
+	? await fetchJSON<{ id: string }[]>(
 			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
 		)
-			.then((r) => r.json())
-			.then((json) => json.map((r: { id: string }) => r.id))
-			.catch((err) => {
-				logger.error(err, "Failed to fetch inference API ids");
+			.then((arr) => arr?.map((r) => r.id) || [])
+			.catch(() => {
+				logger.error("Failed to fetch inference API ids");
 				return [];
 			})
 	: [];

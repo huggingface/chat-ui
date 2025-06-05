@@ -4,5 +4,5 @@ export interface ConvSidebar {
 	updatedAt: Date;
 	model?: string;
 	assistantId?: string;
-	avatarUrl?: string;
+	avatarUrl?: string | Promise<string | undefined>;
 }

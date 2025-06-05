@@ -23,6 +23,7 @@ export async function POST({ params, locals }) {
 
 	const result = await collections.settings.updateOne(authCondition(locals), {
 		$addToSet: { assistants: assistant._id },
+		$set: { activeModel: assistant._id.toString() },
 	});
 
 	// reduce count only if push succeeded
