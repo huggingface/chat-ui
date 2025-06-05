@@ -58,6 +58,12 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				}),
 			}
 		)
+		.delete("", async ({ locals }) => {
+			const res = await collections.conversations.deleteMany({
+				...authCondition(locals),
+			});
+			return res.deletedCount;
+		})
 		.group(
 			"/:id",
 			{
@@ -145,11 +151,8 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 						// todo: post new message
 						throw new Error("Not implemented");
 					})
-					.delete("", async ({ locals }) => {
-						const res = await collections.conversations.deleteMany({
-							...authCondition(locals),
-						});
-						return res.deletedCount;
+					.delete("", () => {
+						throw new Error("Not implemented");
 					})
 					.get("/output/:sha256", () => {
 						// todo: get output

@@ -1,7 +1,7 @@
-import { getAPIClient, throwOnError } from "$lib/APIClient";
+import { useAPIClient, throwOnError } from "$lib/APIClient";
 
 export const load = async ({ parent, fetch }) => {
-	const client = getAPIClient({ fetch });
+	const client = useAPIClient({ fetch });
 
 	const reports = await client.user.reports.get().then(throwOnError);
 

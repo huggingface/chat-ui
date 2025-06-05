@@ -29,11 +29,11 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
-	import { getAPIClient, throwOnError } from "$lib/APIClient";
+	import { useAPIClient, throwOnError } from "$lib/APIClient";
 	import { jsonSerialize } from "$lib/utils/serialize";
 
 	const publicConfig = usePublicConfig();
-	const client = getAPIClient();
+	const client = useAPIClient();
 
 	interface Props {
 		conversations: ConvSidebar[];

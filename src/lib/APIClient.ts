@@ -3,7 +3,7 @@ import { base } from "$app/paths";
 import { treaty, type Treaty } from "@elysiajs/eden";
 import { browser } from "$app/environment";
 
-export function getAPIClient({ fetch }: { fetch?: Treaty.Config["fetcher"] } = {}) {
+export function useAPIClient({ fetch }: { fetch?: Treaty.Config["fetcher"] } = {}) {
 	let url;
 
 	if (!browser) {

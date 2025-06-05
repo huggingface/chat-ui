@@ -1,13 +1,13 @@
 import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { jsonSerialize } from "../lib/utils/serialize";
-import { getAPIClient, throwOnError, throwOnErrorNullable } from "$lib/APIClient";
+import { useAPIClient, throwOnError, throwOnErrorNullable } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 
 export const load = async ({ depends, fetch }) => {
 	depends(UrlDependency.ConversationList);
 
-	const client = getAPIClient({ fetch });
+	const client = useAPIClient({ fetch });
 
 	const settings = await client.user.settings.get().then(throwOnError);
 	const models = await client.models.get().then(throwOnError);

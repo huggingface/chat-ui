@@ -1,8 +1,8 @@
-import { getAPIClient, throwOnError } from "$lib/APIClient";
+import { useAPIClient, throwOnError } from "$lib/APIClient";
 import { jsonSerialize } from "$lib/utils/serialize";
 
 export async function load({ fetch, params }) {
-	const client = getAPIClient({ fetch });
+	const client = useAPIClient({ fetch });
 
 	const data = client
 		.assistants({ id: params.assistantId })
