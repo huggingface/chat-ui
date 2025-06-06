@@ -8,7 +8,6 @@
 	import { browser } from "$app/environment";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { colors, icons } from "$lib/utils/tools";
-	import { getGradioApi } from "$lib/utils/getGradioApi";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import ToolInputComponent from "./ToolInputComponent.svelte";
@@ -16,6 +15,7 @@
 
 	import CarbonInformation from "~icons/carbon/information";
 	import { page } from "$app/state";
+	import { throwOnError, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		tool?: CommunityToolEditable | undefined;
@@ -31,6 +31,9 @@
 
 	let APIloading = $state(false);
 	let formLoading = $state(false);
+
+	const client = useAPIClient();
+
 	const dispatch = createEventDispatcher<{ close: void }>();
 
 	onMount(async () => {
@@ -67,7 +70,13 @@
 
 		APIloading = true;
 
-		const api = await getGradioApi(editableTool.baseUrl);
+		const api = await client["spaces-config"]
+			.get({
+				query: {
+					space: editableTool.baseUrl,
+				},
+			})
+			.then(throwOnError);
 
 		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
 			if (tool?.inputs[idx]?.name === param.parameter_name) {
@@ -319,7 +328,7 @@
 				{/if}
 
 				{#if editableTool.baseUrl}
-					{#await getGradioApi(spaceUrl)}
+					{#await client["spaces-config"].get({ query: { space: spaceUrl } }).then(throwOnError)}
 						<p class="text-sm text-gray-500">Loading...</p>
 					{:then api}
 						<div class="flex flex-row flex-wrap gap-4">
@@ -596,8 +605,8 @@
 								No endpoints found in this space. Try another one.
 							</p>
 						{/if}
-					{:catch error}
-						<p class="text-sm text-gray-500">{error}</p>
+					{:catch rejected}
+						<p class="text-sm text-gray-500">{JSON.parse(rejected.message).value}</p>
 					{/await}
 				{/if}
 			</div>
