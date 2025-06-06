@@ -2,19 +2,22 @@
 	import ToolLogo from "./ToolLogo.svelte";
 	import { base } from "$app/paths";
 	import { browser } from "$app/environment";
+	import { throwOnError, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		toolId: string;
 	}
 
 	let { toolId }: Props = $props();
+
+	const client = useAPIClient();
 </script>
 
 <div
 	class="relative flex items-center justify-center space-x-2 rounded border border-gray-300 bg-gray-200 px-2 py-1"
 >
 	{#if browser}
-		{#await fetch(`${base}/api/tools/${toolId}`).then((res) => res.json()) then value}
+		{#await client.tools({ id: toolId }).get().then(throwOnError) then value}
 			{#key value.color + value.icon}
 				<ToolLogo color={value.color} icon={value.icon} size="sm" />
 			{/key}
