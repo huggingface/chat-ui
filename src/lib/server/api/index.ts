@@ -9,6 +9,7 @@ import { modelGroup } from "$api/routes/groups/models";
 import { Elysia } from "elysia";
 import { base } from "$app/paths";
 import { swagger } from "@elysiajs/swagger";
+import { config } from "$lib/server/config";
 
 const prefix = `${base}/api/v2` as unknown as "";
 
@@ -17,11 +18,12 @@ export const app = new Elysia({ prefix })
 		swagger({
 			documentation: {
 				info: {
-					title: "Elysia Documentation",
-					version: "1.0.0",
+					title: "chat-ui API",
+					version: config.PUBLIC_VERSION,
 				},
 			},
 			provider: "swagger-ui",
+			path: `swagger`,
 		})
 	)
 	.use(authPlugin)
