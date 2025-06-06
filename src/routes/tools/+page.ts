@@ -1,15 +1,9 @@
-import { base } from "$app/paths";
-import type { GETToolsSearchResponse } from "$api/routes/groups/tools";
-import { error } from "@sveltejs/kit";
+import { throwOnError, useAPIClient } from "$lib/APIClient";
 
 export const load = async ({ url, fetch }) => {
-	const r = await fetch(`${base}/api/v2/tools/search?${url.searchParams.toString()}`);
+	const client = useAPIClient({ fetch });
 
-	if (!r.ok) {
-		throw error(r.status, "Failed to fetch tools");
-	}
-
-	const data = (await r.json()) as GETToolsSearchResponse;
-
-	return data;
+	return client.tools.search
+		.get({ query: Object.fromEntries(url.searchParams.entries()) })
+		.then(throwOnError);
 };
