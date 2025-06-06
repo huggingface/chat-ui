@@ -62,6 +62,7 @@ export const load = async ({ depends, fetch }) => {
 								if (!assistant.avatar) {
 									return undefined;
 								}
+								return `/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${assistant.avatar}`;
 							}),
 					}
 				: {}),
