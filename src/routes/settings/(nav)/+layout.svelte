@@ -18,6 +18,7 @@
 	import { debounce } from "$lib/utils/debounce";
 
 	import { fly } from "svelte/transition";
+	import { throwOnError, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		data: LayoutData;
@@ -29,6 +30,8 @@
 	let previousPage: string = $state(base || "/");
 	let assistantsSection: HTMLHeadingElement | undefined = $state();
 	let showContent: boolean = $state(false);
+
+	const client = useAPIClient();
 
 	function checkDesktopRedirect() {
 		if (
@@ -247,20 +250,23 @@
 								]}
 								onclick={(event) => {
 									event.stopPropagation();
-									fetch(`${base}/api/assistant/${assistant._id}/subscribe`, {
-										method: "DELETE",
-									}).then((r) => {
-										if (r.ok) {
+									client
+										.assistants({
+											id: assistant._id,
+										})
+										.follow.delete()
+										.then(throwOnError)
+										.then(() => {
 											if (assistant._id.toString() === page.params.assistantId) {
 												goto(`${base}/settings`, { invalidateAll: true });
 											} else {
 												invalidateAll();
 											}
-										} else {
-											console.error(r);
-											$error = r.statusText;
-										}
-									});
+										})
+										.catch((err) => {
+											console.error(err);
+											$error = err.message;
+										});
 								}}
 							>
 								<CarbonClose class="size-4 text-gray-500" />
