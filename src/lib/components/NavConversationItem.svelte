@@ -39,28 +39,30 @@
 	"
 >
 	<div class="my-2 flex flex-1 flex-col items-start truncate">
-		{#if confirmDelete}
-			<span class="mr-1 font-semibold"> Delete </span>
-		{/if}
-		{#if conv.avatarUrl}
-			{#await conv.avatarUrl then avatarUrl}
-				{#if avatarUrl}
-					<img
-						src="{base}{avatarUrl}"
-						alt="Assistant avatar"
-						class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
-					/>
-				{/if}
-			{/await}
-			{conv.title.replace(/\p{Emoji}/gu, "")}
-		{:else if conv.assistantId}
-			<div
-				class="mr-1.5 flex size-4 flex-none items-center justify-center rounded-full bg-gray-300 text-xs font-bold uppercase text-gray-500"
-			></div>
-			{conv.title.replace(/\p{Emoji}/gu, "")}
-		{:else}
-			{conv.title}
-		{/if}
+		<span>
+			{#if confirmDelete}
+				<span class="mr-1 font-semibold"> Delete </span>
+			{/if}
+			{#if conv.avatarUrl}
+				{#await conv.avatarUrl then avatarUrl}
+					{#if avatarUrl}
+						<img
+							src="{base}{avatarUrl}"
+							alt="Assistant avatar"
+							class="mr-1.5 inline size-4 flex-none rounded-full object-cover"
+						/>
+					{/if}
+				{/await}
+				{conv.title.replace(/\p{Emoji}/gu, "")}
+			{:else if conv.assistantId}
+				<div
+					class="mr-1.5 flex size-4 flex-none items-center justify-center rounded-full bg-gray-300 text-xs font-bold uppercase text-gray-500"
+				></div>
+				{conv.title.replace(/\p{Emoji}/gu, "")}
+			{:else}
+				{conv.title}
+			{/if}
+		</span>
 		{#if showDescription && description && searchInput}
 			<p class="ml-7 text-sm text-gray-500">
 				{#each description.split(searchInput) as segment, i}{segment}{#if i < description.split(searchInput).length - 1}<strong
