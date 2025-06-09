@@ -3,6 +3,22 @@ import { base } from "$app/paths";
 import { treaty, type Treaty } from "@elysiajs/eden";
 import { browser } from "$app/environment";
 import superjson from "superjson";
+import ObjectId from "bson-objectid";
+
+superjson.registerCustom<ObjectId, string>(
+	{
+		isApplicable: (value): value is ObjectId => {
+			if (ObjectId.isValid(value)) {
+				const str = value.toString();
+				return /^[0-9a-fA-F]{24}$/.test(str);
+			}
+			return false;
+		},
+		serialize: (value) => value.toString(),
+		deserialize: (value) => new ObjectId(value),
+	},
+	"ObjectId"
+);
 
 export function useAPIClient({ fetch }: { fetch?: Treaty.Config["fetcher"] } = {}) {
 	let url;
