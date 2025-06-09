@@ -1,5 +1,4 @@
-import { useAPIClient, throwOnError } from "$lib/APIClient";
-import { jsonSerialize } from "$lib/utils/serialize";
+import { useAPIClient, handleResponse } from "$lib/APIClient";
 
 export const load = async ({ params, fetch }) => {
 	const client = useAPIClient({ fetch });
@@ -9,8 +8,7 @@ export const load = async ({ params, fetch }) => {
 			id: params.toolId,
 		})
 		.get()
-		.then(throwOnError)
-		.then(jsonSerialize);
+		.then(handleResponse);
 
 	return { tool: await data };
 };

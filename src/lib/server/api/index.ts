@@ -11,9 +11,14 @@ import { base } from "$app/paths";
 import { swagger } from "@elysiajs/swagger";
 import { config } from "$lib/server/config";
 
+import superjson from "superjson";
+
 const prefix = `${base}/api/v2` as unknown as "";
 
 export const app = new Elysia({ prefix })
+	.mapResponse(({ response }) => {
+		return new Response(superjson.stringify(response));
+	})
 	.use(
 		swagger({
 			documentation: {

@@ -55,8 +55,8 @@
 	let inputMessage3 = $state(assistant?.exampleInputs[2] ?? "");
 	let inputMessage4 = $state(assistant?.exampleInputs[3] ?? "");
 
-	function resetErrors() {
-		errors = [];
+	function clearError(field: string) {
+		errors = errors.filter((e) => e.field !== field);
 	}
 
 	function onFilesChange(e: Event) {
@@ -70,7 +70,7 @@
 				return;
 			}
 			files = inputEl.files;
-			resetErrors();
+			clearError("avatar");
 			deleteExistingAvatar = false;
 		}
 	}
@@ -164,6 +164,7 @@
 				} else {
 					$error = response.statusText;
 				}
+				loading = false;
 			}
 		} else {
 			response = await fetch(`${base}/api/assistant`, {
@@ -181,6 +182,7 @@
 				} else {
 					$error = response.statusText;
 				}
+				loading = false;
 			}
 		}
 	}}
@@ -245,6 +247,7 @@
 								e.stopPropagation();
 								files = null;
 								deleteExistingAvatar = true;
+								clearError("avatar");
 							}}
 							class="mx-auto w-max text-center text-xs text-gray-600 hover:underline"
 						>
@@ -271,6 +274,7 @@
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="Assistant Name"
 					value={assistant?.name ?? ""}
+					oninput={() => clearError("name")}
 				/>
 				<p class="text-xs text-red-500">{getError("name")}</p>
 			</label>
@@ -282,6 +286,7 @@
 					class="h-15 w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 					placeholder="It knows everything about python"
 					value={assistant?.description ?? ""}
+					oninput={() => clearError("description")}
 				></textarea>
 				<p class="text-xs text-red-500">{getError("description")}</p>
 			</label>
@@ -293,6 +298,7 @@
 						name="modelId"
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 						bind:value={modelId}
+						onchange={() => clearError("modelId")}
 					>
 						{#each models.filter((model) => !model.unlisted) as model}
 							<option value={model.id}>{model.displayName}</option>
@@ -415,12 +421,14 @@
 						placeholder="Start Message 1"
 						bind:value={inputMessage1}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						oninput={() => clearError("inputMessage1")}
 					/>
 					<input
 						name="exampleInput2"
 						placeholder="Start Message 2"
 						bind:value={inputMessage2}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						oninput={() => clearError("inputMessage1")}
 					/>
 
 					<input
@@ -428,12 +436,14 @@
 						placeholder="Start Message 3"
 						bind:value={inputMessage3}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						oninput={() => clearError("inputMessage1")}
 					/>
 					<input
 						name="exampleInput4"
 						placeholder="Start Message 4"
 						bind:value={inputMessage4}
 						class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
+						oninput={() => clearError("inputMessage1")}
 					/>
 				</div>
 				<p class="text-xs text-red-500">{getError("inputMessage1")}</p>
@@ -524,6 +534,7 @@
 							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 							placeholder="wikipedia.org,bbc.com"
 							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
+							oninput={() => clearError("ragDomainList")}
 						/>
 						<p class="text-xs text-red-500">{getError("ragDomainList")}</p>
 					{/if}
@@ -550,6 +561,7 @@
 							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
 							placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
 							value={assistant?.rag?.allowedLinks.join(",") ?? ""}
+							oninput={() => clearError("ragLinkList")}
 						/>
 						<p class="text-xs text-red-500">{getError("ragLinkList")}</p>
 					{/if}
@@ -605,6 +617,7 @@
 					class="min-h-[8lh] flex-1 rounded-lg border-2 border-gray-200 bg-gray-100 p-2 text-sm"
 					placeholder="You'll act as..."
 					bind:value={systemPrompt}
+					oninput={() => clearError("preprompt")}
 				></textarea>
 				{#if modelId}
 					{@const model = models.find((_model) => _model.id === modelId)}
