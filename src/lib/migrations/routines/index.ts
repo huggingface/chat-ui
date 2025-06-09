@@ -10,6 +10,8 @@ import trimMessageUpdates from "./06-trim-message-updates";
 import resetTools from "./07-reset-tools-in-settings";
 import updateFeaturedToReview from "./08-update-featured-to-review";
 import deleteEmptyConversations from "./09-delete-empty-conversations";
+import updateReportsAssistantId from "./10-update-reports-assistantid";
+
 export interface Migration {
 	_id: ObjectId;
 	name: string;
@@ -30,4 +32,5 @@ export const migrations: Migration[] = [
 	resetTools,
 	updateFeaturedToReview,
 	deleteEmptyConversations,
+	updateReportsAssistantId,
 ];
