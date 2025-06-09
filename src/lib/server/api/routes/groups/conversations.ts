@@ -456,6 +456,49 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								model: t.Optional(t.String()),
 							}),
 						}
+					)
+					.delete(
+						"/message/:messageId",
+						async ({ locals, params, conversation }) => {
+							if (!conversation.messages.map((m) => m.id).includes(params.messageId)) {
+								throw new Error("Message not found");
+							}
+
+							const filteredMessages = conversation.messages
+								.filter(
+									(message) =>
+										// not the message AND the message is not in ancestors
+										!(message.id === params.messageId) &&
+										message.ancestors &&
+										!message.ancestors.includes(params.messageId)
+								)
+								.map((message) => {
+									// remove the message from children if it's there
+									if (message.children && message.children.includes(params.messageId)) {
+										message.children = message.children.filter(
+											(child) => child !== params.messageId
+										);
+									}
+									return message;
+								});
+
+							const res = await collections.conversations.updateOne(
+								{ _id: new ObjectId(conversation._id), ...authCondition(locals) },
+								{ $set: { messages: filteredMessages } }
+							);
+
+							if (res.modifiedCount === 0) {
+								throw new Error("Deleting message failed");
+							}
+
+							return { success: true };
+						},
+						{
+							params: t.Object({
+								id: t.String(),
+								messageId: t.String(),
+							}),
+						}
 					);
 			}
 		);

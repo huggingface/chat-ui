@@ -5,11 +5,11 @@
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 
 	import { createEventDispatcher } from "svelte";
-	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { error } from "$lib/stores/errors";
 	import { invalidate } from "$app/navigation";
 	import { UrlDependency } from "$lib/types/UrlDependency";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		message: Message;
@@ -24,6 +24,8 @@
 	const dispatch = createEventDispatcher<{
 		showAlternateMsg: { id: Message["id"] };
 	}>();
+
+	const client = useAPIClient();
 </script>
 
 <div
@@ -54,15 +56,18 @@
 			class="hidden group-hover/navbranch:block"
 			onclick={() => {
 				if (confirm("Are you sure you want to delete this branch?")) {
-					fetch(`${base}/api/conversation/${page.params.id}/message/${message.id}`, {
-						method: "DELETE",
-					}).then(async (r) => {
-						if (r.ok) {
+					client
+						.conversations({ id: page.params.id })
+						.message({ messageId: message.id })
+						.delete()
+						.then(handleResponse)
+						.then(async () => {
 							await invalidate(UrlDependency.Conversation);
-						} else {
-							$error = (await r.json()).message;
-						}
-					});
+						})
+						.catch((err) => {
+							console.error(err);
+							$error = String(err);
+						});
 				}
 			}}
 		>
