@@ -22,12 +22,14 @@
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
 	import Search from "$lib/components/chat/Search.svelte";
 	import { setContext } from "svelte";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	let { data = $bindable(), children } = $props();
 
 	setContext("publicConfig", data.publicConfig);
 
 	const publicConfig = data.publicConfig;
+	const client = useAPIClient();
 
 	let conversations = $state(data.conversations);
 	$effect(() => {
@@ -61,50 +63,35 @@
 	}
 
 	async function deleteConversation(id: string) {
-		try {
-			const res = await fetch(`${base}/conversation/${id}`, {
-				method: "DELETE",
-				headers: {
-					"Content-Type": "application/json",
-				},
+		client
+			.conversations({ id })
+			.delete()
+			.then(handleResponse)
+			.then(async () => {
+				conversations = conversations.filter((conv) => conv.id !== id);
+
+				if ($page.params.id === id) {
+					await goto(`${base}/`, { invalidateAll: true });
+				}
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
 			});
-
-			if (!res.ok) {
-				$error = "Error while deleting conversation, try again.";
-				return;
-			}
-
-			conversations = conversations.filter((conv) => conv.id !== id);
-
-			if ($page.params.id === id) {
-				await goto(`${base}/`, { invalidateAll: true });
-			}
-		} catch (err) {
-			console.error(err);
-			$error = String(err);
-		}
 	}
 
 	async function editConversationTitle(id: string, title: string) {
-		try {
-			const res = await fetch(`${base}/conversation/${id}`, {
-				method: "PATCH",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ title }),
+		client
+			.conversations({ id })
+			.patch({ title })
+			.then(handleResponse)
+			.then(async () => {
+				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
 			});
-
-			if (!res.ok) {
-				$error = "Error while editing title, try again.";
-				return;
-			}
-
-			conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
-		} catch (err) {
-			console.error(err);
-			$error = String(err);
-		}
 	}
 
 	onDestroy(() => {
