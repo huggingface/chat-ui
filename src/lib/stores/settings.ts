@@ -39,9 +39,8 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			...settings,
 		}));
 
-		clearTimeout(timeoutId);
-
 		if (browser) {
+			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
 				await fetch(`${base}/settings`, {
 					method: "POST",
@@ -66,7 +65,6 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 						recentlySaved: false,
 					}));
 				}, 3000);
-				invalidate(UrlDependency.ConversationList);
 			}, 300);
 			// debounce server calls by 300ms
 		}
