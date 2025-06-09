@@ -3,7 +3,7 @@ import { authPlugin } from "$api/authPlugin";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
-import { models } from "$lib/server/models";
+import { models, validModelIdSchema } from "$lib/server/models";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import type { Conversation } from "$lib/types/Conversation";
 
@@ -321,7 +321,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			},
 			(app) => {
 				return app
-					.derive(async ({ locals, params, error }) => {
+					.derive(async ({ locals, params }) => {
 						let conversation;
 						let shared = false;
 
@@ -334,14 +334,14 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							shared = true;
 
 							if (!conversation) {
-								return error(404, "Conversation not found");
+								throw new Error("Conversation not found");
 							}
 						} else {
 							// todo: add validation on params.id
 							try {
 								new ObjectId(params.id);
 							} catch {
-								return error(400, "Invalid conversation ID format");
+								throw new Error("Invalid conversation ID format");
 							}
 							conversation = await collections.conversations.findOne({
 								_id: new ObjectId(params.id),
@@ -355,13 +355,12 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 									})) !== 0;
 
 								if (conversationExists) {
-									return error(
-										403,
+									throw new Error(
 										"You don't have access to this conversation. If someone gave you this link, ask them to use the 'share' feature instead."
 									);
 								}
 
-								return error(404, "Conversation not found.");
+								throw new Error("Conversation not found.");
 							}
 						}
 
@@ -397,8 +396,17 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 						// todo: post new message
 						throw new Error("Not implemented");
 					})
-					.delete("", () => {
-						throw new Error("Not implemented");
+					.delete("", async ({ locals, params }) => {
+						const res = await collections.conversations.deleteOne({
+							_id: new ObjectId(params.id),
+							...authCondition(locals),
+						});
+
+						if (res.deletedCount === 0) {
+							throw new Error("Conversation not found");
+						}
+
+						return { success: true };
 					})
 					.get("/output/:sha256", () => {
 						// todo: get output
@@ -411,7 +419,44 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					.post("/stop-generating", () => {
 						// todo: stop generating
 						throw new Error("Not implemented");
-					});
+					})
+					.patch(
+						"",
+						async ({ locals, params, body }) => {
+							if (body.model) {
+								if (!validModelIdSchema.safeParse(body.model).success) {
+									throw new Error("Invalid model ID");
+								}
+							}
+
+							const res = await collections.conversations.updateOne(
+								{
+									_id: new ObjectId(params.id),
+									...authCondition(locals),
+								},
+								{
+									$set: body,
+								}
+							);
+
+							if (res.modifiedCount === 0) {
+								throw new Error("Conversation not found");
+							}
+
+							return { success: true };
+						},
+						{
+							body: t.Object({
+								title: t.Optional(
+									t.String({
+										minLength: 1,
+										maxLength: 100,
+									})
+								),
+								model: t.Optional(t.String()),
+							}),
+						}
+					);
 			}
 		);
 });
