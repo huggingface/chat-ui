@@ -15,7 +15,7 @@
 
 	import CarbonInformation from "~icons/carbon/information";
 	import { page } from "$app/state";
-	import { throwOnError, useAPIClient } from "$lib/APIClient";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		tool?: CommunityToolEditable | undefined;
@@ -76,7 +76,7 @@
 					space: editableTool.baseUrl,
 				},
 			})
-			.then(throwOnError);
+			.then(handleResponse);
 
 		const newInputs = api.named_endpoints[editableTool.endpoint].parameters.map((param, idx) => {
 			if (tool?.inputs[idx]?.name === param.parameter_name) {
@@ -328,7 +328,7 @@
 				{/if}
 
 				{#if editableTool.baseUrl}
-					{#await client["spaces-config"].get({ query: { space: spaceUrl } }).then(throwOnError)}
+					{#await client["spaces-config"].get({ query: { space: spaceUrl } }).then(handleResponse)}
 						<p class="text-sm text-gray-500">Loading...</p>
 					{:then api}
 						<div class="flex flex-row flex-wrap gap-4">

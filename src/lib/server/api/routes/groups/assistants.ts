@@ -7,18 +7,7 @@ import { SortKey, type Assistant } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { ReviewStatus } from "$lib/types/Review";
 import { generateQueryTokens } from "$lib/utils/searchTokens";
-import { jsonSerialize, type Serialize } from "$lib/utils/serialize";
 import { config } from "$lib/server/config";
-
-export type GETAssistantsSearchResponse = {
-	assistants: Array<Serialize<Assistant>>;
-	selectedModel: string;
-	numTotalItems: number;
-	numItemsPerPage: number;
-	query: string | null;
-	sort: SortKey;
-	showUnfeatured: boolean;
-};
 
 const NUM_PER_PAGE = 24;
 
@@ -95,7 +84,7 @@ export const assistantGroup = new Elysia().use(authPlugin).group("/assistants", 
 				const numTotalItems = await collections.assistants.countDocuments(filter);
 
 				return {
-					assistants: jsonSerialize(assistants),
+					assistants,
 					selectedModel: modelId ?? "",
 					numTotalItems,
 					numItemsPerPage: NUM_PER_PAGE,

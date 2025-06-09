@@ -18,7 +18,7 @@
 	import { debounce } from "$lib/utils/debounce";
 
 	import { fly } from "svelte/transition";
-	import { throwOnError, useAPIClient } from "$lib/APIClient";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		data: LayoutData;
@@ -255,7 +255,7 @@
 											id: assistant._id,
 										})
 										.follow.delete()
-										.then(throwOnError)
+										.then(handleResponse)
 										.then(() => {
 											if (assistant._id.toString() === page.params.assistantId) {
 												goto(`${base}/settings`, { invalidateAll: true });

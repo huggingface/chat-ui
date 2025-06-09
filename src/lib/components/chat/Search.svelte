@@ -7,11 +7,7 @@
 </script>
 
 <script lang="ts">
-	import { base } from "$app/paths";
-
 	import { debounce } from "$lib/utils/debounce";
-
-	import type { GETSearchEndpointReturn } from "../../../routes/api/conversations/search/+server";
 	import NavConversationItem from "../NavConversationItem.svelte";
 	import { titles } from "../NavMenu.svelte";
 	import { beforeNavigate } from "$app/navigation";
@@ -19,6 +15,9 @@
 	import CarbonClose from "~icons/carbon/close";
 	import { fly } from "svelte/transition";
 	import InfiniteScroll from "../InfiniteScroll.svelte";
+	import { handleResponse, useAPIClient, type Success } from "$lib/APIClient";
+
+	const client = useAPIClient();
 
 	let searchContainer: HTMLDivElement | undefined = $state(undefined);
 	let inputElement: HTMLInputElement | undefined = $state(undefined);
@@ -29,7 +28,7 @@
 
 	let pending: boolean = $state(false);
 
-	let conversations: GETSearchEndpointReturn = $state([]);
+	let conversations: NonNullable<Success<typeof client.conversations.search.get>> = $state([]);
 
 	let page: number = $state(0);
 
@@ -75,19 +74,14 @@
 	};
 
 	async function handleVisible(v: string) {
-		const newConvs = await fetch(`${base}/api/conversations/search?q=${v}&p=${page++}`)
-			.then(async (r) => {
-				if (r.ok) {
-					return await r.json().then((conversations) =>
-						conversations.map((conv: GETSearchEndpointReturn[number]) => ({
-							...conv,
-							updatedAt: new Date(conv.updatedAt),
-						}))
-					);
-				} else {
-					return [];
-				}
+		const newConvs = await client.conversations.search
+			.get({
+				query: {
+					q: v,
+					p: page++,
+				},
 			})
+			.then(handleResponse)
 			.catch(() => []);
 
 		if (newConvs.length === 0) {

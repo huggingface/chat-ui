@@ -18,14 +18,13 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { page } from "$app/state";
-	import type { Serialize } from "$lib/utils/serialize";
 
 	const publicConfig = usePublicConfig();
 
 	interface Props {
 		models: Model[];
 		assistant: Pick<
-			Serialize<Assistant>,
+			Assistant,
 			| "avatar"
 			| "name"
 			| "rag"

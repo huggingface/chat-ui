@@ -4,26 +4,15 @@ import { ReviewStatus } from "$lib/types/Review";
 import { toolFromConfigs } from "$lib/server/tools";
 import { collections } from "$lib/server/database";
 import { ObjectId, type Filter } from "mongodb";
-import type { CommunityToolDB, ConfigTool, ToolFront, ToolInputFile } from "$lib/types/Tool";
+import type { CommunityToolDB, ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { MetricsServer } from "$lib/server/metrics";
 import { authCondition } from "$lib/server/auth";
 import { SortKey } from "$lib/types/Assistant";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens";
-import { jsonSerialize, type Serialize } from "$lib/utils/serialize";
 import { config } from "$lib/server/config";
 
 const NUM_PER_PAGE = 16;
-
-export type GETToolsResponse = Array<ToolFront>;
-export type GETToolsSearchResponse = {
-	tools: Array<Serialize<ConfigTool | CommunityToolDB>>;
-	numTotalItems: number;
-	numItemsPerPage: number;
-	query: string | null;
-	sort: SortKey;
-	showUnfeatured: boolean;
-};
 
 export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 	return app
@@ -154,13 +143,13 @@ export const toolGroup = new Elysia().use(authPlugin).group("/tools", (app) => {
 					(await collections.tools.countDocuments(filter)) + toolFromConfigs.length;
 
 				return {
-					tools: jsonSerialize(tools),
+					tools,
 					numTotalItems,
 					numItemsPerPage: NUM_PER_PAGE,
 					query: search,
 					sort,
 					showUnfeatured,
-				} satisfies GETToolsSearchResponse;
+				};
 			},
 			{
 				query: t.Object({

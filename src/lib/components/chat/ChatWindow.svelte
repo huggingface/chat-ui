@@ -37,7 +37,6 @@
 	import { cubicInOut } from "svelte/easing";
 	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
-	import type { Serialize } from "$lib/utils/serialize";
 	import { beforeNavigate } from "$app/navigation";
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 
@@ -49,7 +48,7 @@
 		shared?: boolean;
 		currentModel: Model;
 		models: Model[];
-		assistant?: Serialize<Assistant> | undefined;
+		assistant?: Assistant | undefined;
 		preprompt?: string | undefined;
 		files?: File[];
 	}
