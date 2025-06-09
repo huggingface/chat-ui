@@ -60,6 +60,7 @@
 		"prettier-plugin-tailwindcss": "^0.6.11",
 		"prom-client": "^15.1.2",
 		"sade": "^1.8.1",
+		"superjson": "^2.2.2",
 		"svelte": "^5.33.3",
 		"svelte-check": "^4.0.0",
 		"svelte-gestures": "^5.1.3",

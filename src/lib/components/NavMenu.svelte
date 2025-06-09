@@ -29,8 +29,7 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
-	import { useAPIClient, throwOnError } from "$lib/APIClient";
-	import { jsonSerialize } from "$lib/utils/serialize";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -77,13 +76,8 @@
 					p,
 				},
 			})
-			.then(throwOnError)
-			.then(({ conversations }) =>
-				conversations.map((conv) => ({
-					...jsonSerialize(conv),
-					updatedAt: new Date(conv.updatedAt),
-				}))
-			)
+			.then(handleResponse)
+			.then((r) => r.conversations)
 			.catch(() => []);
 
 		if (newConvs.length === 0) {

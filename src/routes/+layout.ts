@@ -1,7 +1,6 @@
 import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
-import { jsonSerialize } from "../lib/utils/serialize";
-import { useAPIClient, throwOnError, throwOnErrorNullable } from "$lib/APIClient";
+import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 
 export const load = async ({ depends, fetch }) => {
@@ -21,16 +20,16 @@ export const load = async ({ depends, fetch }) => {
 		featureFlags,
 		conversationsData,
 	] = await Promise.all([
-		client.user.settings.get().then(throwOnError),
-		client.models.get().then(throwOnError),
-		client.user.assistants.get().then(throwOnError),
-		client.models.old.get().then(throwOnError),
-		client.tools.active.get().then(throwOnError),
-		client.tools.count.get().then(throwOnError),
-		client.user.get().then(throwOnErrorNullable),
-		client["public-config"].get().then(throwOnError),
-		client["feature-flags"].get().then(throwOnError),
-		client.conversations.get({ query: { p: 0 } }).then(throwOnError),
+		client.user.settings.get().then(handleResponse),
+		client.models.get().then(handleResponse),
+		client.user.assistants.get().then(handleResponse),
+		client.models.old.get().then(handleResponse),
+		client.tools.active.get().then(handleResponse),
+		client.tools.count.get().then(handleResponse),
+		client.user.get().then(handleResponse),
+		client["public-config"].get().then(handleResponse),
+		client["feature-flags"].get().then(handleResponse),
+		client.conversations.get({ query: { p: 0 } }).then(handleResponse),
 	]);
 
 	const defaultModel = models[0];
@@ -57,9 +56,9 @@ export const load = async ({ depends, fetch }) => {
 						avatarUrl: client
 							.assistants({ id: conv.assistantId.toString() })
 							.get()
-							.then(throwOnErrorNullable)
+							.then(handleResponse)
 							.then((assistant) => {
-								if (!assistant.avatar) {
+								if (!assistant || !assistant.avatar) {
 									return undefined;
 								}
 								return `/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${assistant.avatar}`;
@@ -76,8 +75,7 @@ export const load = async ({ depends, fetch }) => {
 			? await client
 					.assistants({ id: settings?.activeModel })
 					.get()
-					.then(throwOnErrorNullable)
-					.then(jsonSerialize)
+					.then(handleResponse)
 					.catch(() => undefined)
 			: undefined,
 		assistants,

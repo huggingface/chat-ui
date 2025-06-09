@@ -93,7 +93,7 @@
 				onclick={(e) => {
 					e.preventDefault();
 					confirmDelete = false;
-					dispatch("deleteConversation", conv.id);
+					dispatch("deleteConversation", conv.id.toString());
 				}}
 			>
 				<CarbonCheckmark
@@ -109,7 +109,7 @@
 					e.preventDefault();
 					const newTitle = prompt("Edit this conversation title:", conv.title);
 					if (!newTitle) return;
-					dispatch("editConversationTitle", { id: conv.id, title: newTitle });
+					dispatch("editConversationTitle", { id: conv.id.toString(), title: newTitle });
 				}}
 			>
 				<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
@@ -122,7 +122,7 @@
 				onclick={(event) => {
 					event.preventDefault();
 					if (event.shiftKey) {
-						dispatch("deleteConversation", conv.id);
+						dispatch("deleteConversation", conv.id.toString());
 					} else {
 						confirmDelete = true;
 					}
