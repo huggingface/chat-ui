@@ -107,12 +107,13 @@ export const endpointInferenceClientParametersSchema = z.object({
 			}),
 		})
 		.default({}),
+	customHeaders: z.record(z.string(), z.string()).default({}),
 });
 
 export async function endpointInferenceClient(
 	input: z.input<typeof endpointInferenceClientParametersSchema>
 ): Promise<Endpoint> {
-	const { model, provider, modelName, baseURL, multimodal } =
+	const { model, provider, modelName, baseURL, multimodal, customHeaders } =
 		endpointInferenceClientParametersSchema.parse(input);
 
 	if (!!provider && !!baseURL) {
@@ -255,6 +256,7 @@ export async function endpointInferenceClient(
 							...options?.headers,
 							"X-Use-Cache": "false",
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+							...customHeaders,
 						},
 					});
 				},
