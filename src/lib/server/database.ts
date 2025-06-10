@@ -66,12 +66,14 @@ export class Database {
 			});
 		}
 
-		this.client.connect().catch((err) => {
+		try {
+			await this.client.connect();
+			this.client.db(config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
+			this.client.on("open", () => this.initDatabase());
+		} catch (err) {
 			logger.error(err, "Connection error");
 			process.exit(1);
-		});
-		this.client.db(config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
-		this.client.on("open", () => this.initDatabase());
+		}
 
 		// Disconnect DB on exit
 		onExit(async () => {
@@ -198,22 +200,6 @@ export class Database {
 		conversations
 			.createIndex({ "messages.createdAt": 1 }, { sparse: true })
 			.catch((e) => logger.error(e));
-
-		// Text index for searching conversation titles and message content
-		conversations
-			.createIndex(
-				{
-					userId: 1,
-					sessionId: 1,
-					title: "text",
-					"messages.content": "text",
-				},
-				{
-					default_language: "en",
-				}
-			)
-			.catch((e) => logger.error(e));
-
 		// Unique index for stats
 		conversationStats
 			.createIndex(
@@ -311,9 +297,19 @@ export let collections: ReturnType<typeof Database.prototype.getCollections>;
 
 export const ready = (async () => {
 	if (!building) {
-		await Database.getInstance();
-		collections = await Database.getInstance().then((db) => db.getCollections());
+		const db = await Database.getInstance();
+		collections = db.getCollections();
 	} else {
 		collections = {} as unknown as ReturnType<typeof Database.prototype.getCollections>;
 	}
 })();
+
+export async function getCollectionsEarly(): Promise<
+	ReturnType<typeof Database.prototype.getCollections>
+> {
+	await ready;
+	if (!collections) {
+		throw new Error("Database not initialized");
+	}
+	return collections;
+}

@@ -26,11 +26,8 @@ class ConfigManager {
 			return;
 		}
 
-		const { collections, ready } = await import("./database");
-		await ready;
-		if (!collections) {
-			throw new Error("Database not initialized");
-		}
+		const { getCollectionsEarly } = await import("./database");
+		const collections = await getCollectionsEarly();
 
 		this.configCollection = collections.config;
 		this.semaphoreCollection = collections.semaphores;
