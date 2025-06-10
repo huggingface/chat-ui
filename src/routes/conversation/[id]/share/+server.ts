@@ -1,13 +1,12 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import type { SharedConversation } from "$lib/types/SharedConversation";
-import { getShareUrl } from "$lib/utils/getShareUrl";
 import { hashConv } from "$lib/utils/hashConv";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { nanoid } from "nanoid";
 
-export async function POST({ params, url, locals }) {
+export async function POST({ params, locals }) {
 	const conversation = await collections.conversations.findOne({
 		_id: new ObjectId(params.id),
 		...authCondition(locals),
@@ -24,7 +23,7 @@ export async function POST({ params, url, locals }) {
 	if (existingShare) {
 		return new Response(
 			JSON.stringify({
-				url: getShareUrl(url, existingShare._id),
+				shareId: existingShare._id,
 			}),
 			{ headers: { "Content-Type": "application/json" } }
 		);
@@ -65,7 +64,7 @@ export async function POST({ params, url, locals }) {
 
 	return new Response(
 		JSON.stringify({
-			url: getShareUrl(url, shared._id),
+			shareId: shared._id,
 		}),
 		{ headers: { "Content-Type": "application/json" } }
 	);
