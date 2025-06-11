@@ -429,13 +429,19 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								}
 							}
 
+							// Only include defined values in the update
+							const updateValues = {
+								...(body.title !== undefined && { title: body.title }),
+								...(body.model !== undefined && { model: body.model }),
+							};
+
 							const res = await collections.conversations.updateOne(
 								{
 									_id: new ObjectId(params.id),
 									...authCondition(locals),
 								},
 								{
-									$set: body,
+									$set: updateValues,
 								}
 							);
 
