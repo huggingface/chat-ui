@@ -8,7 +8,7 @@ import ObjectId from "bson-objectid";
 superjson.registerCustom<ObjectId, string>(
 	{
 		isApplicable: (value): value is ObjectId => {
-			if (ObjectId.isValid(value)) {
+			if (typeof value !== "string" && ObjectId.isValid(value)) {
 				const str = value.toString();
 				return /^[0-9a-fA-F]{24}$/.test(str);
 			}
