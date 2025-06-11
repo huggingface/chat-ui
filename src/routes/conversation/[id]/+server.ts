@@ -555,12 +555,18 @@ export async function PATCH({ request, locals, params }) {
 		error(404, "Conversation not found");
 	}
 
+	// Only include defined values in the update
+	const updateValues = {
+		...(values.title !== undefined && { title: values.title }),
+		...(values.model !== undefined && { model: values.model }),
+	};
+
 	await collections.conversations.updateOne(
 		{
 			_id: convId,
 		},
 		{
-			$set: values,
+			$set: updateValues,
 		}
 	);
 
