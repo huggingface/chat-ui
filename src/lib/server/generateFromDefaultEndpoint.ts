@@ -11,11 +11,10 @@ export async function* generateFromDefaultEndpoint({
 	preprompt?: string;
 	generateSettings?: Record<string, unknown>;
 }): AsyncGenerator<MessageUpdate, string, undefined> {
-	const endpoint = await taskModel.getEndpoint();
-
-	const tokenStream = await endpoint({ messages, preprompt, generateSettings });
-
 	try {
+		const endpoint = await taskModel.getEndpoint();
+		const tokenStream = await endpoint({ messages, preprompt, generateSettings });
+
 		for await (const output of tokenStream) {
 			// if not generated_text is here it means the generation is not done
 			if (output.generated_text) {
