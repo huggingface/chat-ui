@@ -109,7 +109,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		updatedAt: new Date(),
 		userAgent: request.headers.get("User-Agent") ?? undefined,
 		embeddingModel,
-		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
+		...(locals.user
+			? { userId: locals.user._id, userEmail: locals.user.email }
+			: { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
 
