@@ -1,4 +1,4 @@
-import { afterEach, assert, describe, expect, it } from "vitest";
+import { afterEach, assert, beforeAll, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
 import { Semaphores } from "$lib/types/Semaphore";
@@ -10,6 +10,14 @@ describe(
 		retry: 3,
 	},
 	() => {
+		beforeAll(async () => {
+			try {
+				await collections.semaphores.createIndex({ key: 1 }, { unique: true });
+			} catch (e) {
+				// Index might already exist, ignore error
+			}
+		});
+
 		it("should not have duplicates guid", async () => {
 			const guids = migrations.map((m) => m._id.toString());
 			const uniqueGuids = [...new Set(guids)];
@@ -56,10 +64,10 @@ describe(
 			expect(updatedAtAfterRefresh).toBeDefined();
 			expect(updatedAtInitially).not.toBe(updatedAtAfterRefresh);
 		});
+
+		afterEach(async () => {
+			await collections.semaphores.deleteMany({});
+			await collections.migrationResults.deleteMany({});
+		});
 	}
 );
-
-afterEach(async () => {
-	await collections.semaphores.deleteMany({});
-	await collections.migrationResults.deleteMany({});
-});
