@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher, onMount } from "svelte";
+	import { createEventDispatcher, onMount, tick } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconInternet from "$lib/components/icons/IconInternet.svelte";
@@ -110,6 +110,7 @@
 		) {
 			event.preventDefault();
 			adjustTextareaHeight();
+			tick();
 			dispatch("submit");
 		}
 	}
