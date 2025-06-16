@@ -48,6 +48,8 @@ export interface EndpointParameters {
 	toolResults?: ToolResult[];
 	isMultimodal?: boolean;
 	conversationId?: ObjectId;
+	userId?: ObjectId;
+	userEmail?: string;
 }
 
 interface CommonEndpoint {

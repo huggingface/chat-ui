@@ -52,6 +52,8 @@ export async function* generate(
 		toolResults,
 		isMultimodal: model.multimodal,
 		conversationId: conv._id,
+		userId: conv.userId,
+		userEmail: conv.userEmail,
 	})) {
 		// text generation completed
 		if (output.generated_text) {
