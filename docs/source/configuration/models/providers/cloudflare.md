@@ -1,7 +1,7 @@
 # Cloudflare
 
-| Feature                     | Available |
-| --------------------------- | --------- |
+| Feature                        | Available |
+| ------------------------------ | --------- |
 | [Tools](../tools.md)           | No        |
 | [Multimodal](../multimodal.md) | No        |
 
