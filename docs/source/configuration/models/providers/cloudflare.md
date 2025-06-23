@@ -1,9 +1,9 @@
 # Cloudflare
 
-| Feature                     | Available |
-| --------------------------- | --------- |
-| [Tools](../tools)           | No        |
-| [Multimodal](../multimodal) | No        |
+| Feature                        | Available |
+| ------------------------------ | --------- |
+| [Tools](../tools.md)           | No        |
+| [Multimodal](../multimodal.md) | No        |
 
 You may use Cloudflare Workers AI to run your own models with serverless inference.
 
