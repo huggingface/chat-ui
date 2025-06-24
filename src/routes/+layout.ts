@@ -62,7 +62,8 @@ export const load = async ({ depends, fetch }) => {
 									return undefined;
 								}
 								return `/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${assistant.avatar}`;
-							}),
+							})
+							.catch(() => undefined),
 					}
 				: {}),
 		} satisfies ConvSidebar;
