@@ -94,3 +94,5 @@ export const load = async ({ depends, fetch }) => {
 		...featureFlags,
 	};
 };
+
+export const ssr = false;
