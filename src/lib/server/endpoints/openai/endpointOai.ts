@@ -324,6 +324,8 @@ export async function endpointOai(
 						body: { ...body, ...extraBody },
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+							"ChatUI-User-Id": userId?.toString() ?? "",
+							"ChatUI-User-Email": userEmail,
 							"X-use-cache": "false",
 						},
 					}
