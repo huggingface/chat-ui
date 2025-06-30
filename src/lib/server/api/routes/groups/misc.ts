@@ -161,6 +161,13 @@ export const misc = new Elysia()
 								messages: conversation.messages.map((message) => {
 									return {
 										...message,
+										webSearch: message.webSearch
+											? {
+													prompt: message.webSearch?.prompt,
+													searchQuery: message.webSearch?.searchQuery,
+													results: message.webSearch?.results.map((result) => result.link),
+												}
+											: undefined,
 										files: filenames,
 										updates: undefined,
 									};
