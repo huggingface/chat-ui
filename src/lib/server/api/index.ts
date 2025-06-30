@@ -16,7 +16,11 @@ import superjson from "superjson";
 const prefix = `${base}/api/v2` as unknown as "";
 
 export const app = new Elysia({ prefix })
-	.mapResponse(({ response }) => {
+	.mapResponse(({ response, request }) => {
+		// Skip the /export endpoint
+		if (request.url.endsWith("/export")) {
+			return response as unknown as Response;
+		}
 		return new Response(superjson.stringify(response), {
 			headers: {
 				"Content-Type": "application/json",

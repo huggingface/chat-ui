@@ -5,6 +5,9 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 import { Client } from "@gradio/client";
+import yazl from "yazl";
+import { downloadFile } from "$lib/server/files/downloadFile";
+import mimeTypes from "mime-types";
 
 export interface FeatureFlags {
 	searchEnabled: boolean;
@@ -103,4 +106,133 @@ export const misc = new Elysia()
 		} catch (e) {
 			throw new Error("Error fetching space API. Is the name correct?");
 		}
+	})
+	.get("/export", async ({ locals }) => {
+		if (!locals.user) {
+			throw new Error("Not logged in");
+		}
+
+		if (!locals.isAdmin) {
+			throw new Error("Not admin");
+		}
+
+		const zipfile = new yazl.ZipFile();
+
+		const promises = [
+			collections.conversations
+				.find({ ...authCondition(locals) })
+				.toArray()
+				.then(async (conversations) => {
+					const formattedConversations = await Promise.all(
+						conversations.map(async (conversation) => {
+							const hashes: string[] = [];
+							conversation.messages.forEach(async (message) => {
+								if (message.files) {
+									message.files.forEach((file) => {
+										hashes.push(file.value);
+									});
+								}
+							});
+							const files = await Promise.all(
+								hashes.map(async (hash) => {
+									const fileData = await downloadFile(hash, conversation._id);
+									return fileData;
+								})
+							);
+
+							const filenames: string[] = [];
+							files.forEach((file) => {
+								const extension = mimeTypes.extension(file.mime) || "bin";
+								const convId = conversation._id.toString();
+								const fileId = file.name.split("-")[1].slice(0, 8);
+								const fileName = `file-${convId}-${fileId}.${extension}`;
+								filenames.push(fileName);
+								zipfile.addBuffer(Buffer.from(file.value, "base64"), fileName);
+							});
+
+							return {
+								...conversation,
+								messages: conversation.messages.map((message) => {
+									return {
+										...message,
+										files: filenames,
+										updates: undefined,
+									};
+								}),
+							};
+						})
+					);
+
+					zipfile.addBuffer(
+						Buffer.from(JSON.stringify(formattedConversations, null, 2)),
+						"conversations.json"
+					);
+				}),
+			collections.assistants
+				.find({ createdById: locals.user._id })
+				.toArray()
+				.then(async (assistants) => {
+					const formattedAssistants = await Promise.all(
+						assistants.map(async (assistant) => {
+							if (assistant.avatar) {
+								const fileId = collections.bucket.find({ filename: assistant._id.toString() });
+
+								const content = await fileId.next().then(async (file) => {
+									if (!file?._id) return;
+
+									const fileStream = collections.bucket.openDownloadStream(file?._id);
+
+									const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+										const chunks: Uint8Array[] = [];
+										fileStream.on("data", (chunk) => chunks.push(chunk));
+										fileStream.on("error", reject);
+										fileStream.on("end", () => resolve(Buffer.concat(chunks)));
+									});
+
+									return fileBuffer;
+								});
+
+								if (!content) return;
+
+								zipfile.addBuffer(content, `avatar-${assistant._id.toString()}.jpg`);
+							}
+
+							return {
+								_id: assistant._id.toString(),
+								name: assistant.name,
+								createdById: assistant.createdById.toString(),
+								createdByName: assistant.createdByName,
+								avatar: `avatar-${assistant._id.toString()}.jpg`,
+								modelId: assistant.modelId,
+								preprompt: assistant.preprompt,
+								description: assistant.description,
+								dynamicPrompt: assistant.dynamicPrompt,
+								exampleInputs: assistant.exampleInputs,
+								rag: assistant.rag,
+								tools: assistant.tools,
+								generateSettings: assistant.generateSettings,
+								createdAt: assistant.createdAt.toISOString(),
+								updatedAt: assistant.updatedAt.toISOString(),
+							};
+						})
+					);
+
+					zipfile.addBuffer(
+						Buffer.from(JSON.stringify(formattedAssistants, null, 2)),
+						"assistants.json"
+					);
+				}),
+		];
+
+		await Promise.all(promises);
+
+		zipfile.end();
+
+		// @ts-expect-error - zipfile.outputStream is not typed correctly
+		return new Response(zipfile.outputStream, {
+			headers: {
+				"Content-Type": "application/zip",
+				"Content-Disposition": 'attachment; filename="export.zip"',
+			},
+		});
 	});

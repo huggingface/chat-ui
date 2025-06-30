@@ -41,6 +41,7 @@
 		"@types/parquetjs": "^0.10.3",
 		"@types/sbd": "^1.0.5",
 		"@types/uuid": "^9.0.8",
+		"@types/yazl": "^3.3.0",
 		"@typescript-eslint/eslint-plugin": "^6.x",
 		"@typescript-eslint/parser": "^6.x",
 		"bson-objectid": "^2.0.4",
@@ -71,7 +72,8 @@
 		"unplugin-icons": "^0.16.1",
 		"vite": "^6.3.5",
 		"vite-node": "^3.0.9",
-		"vitest": "^3.1.4"
+		"vitest": "^3.1.4",
+		"yazl": "^3.3.1"
 	},
 	"type": "module",
 	"dependencies": {
