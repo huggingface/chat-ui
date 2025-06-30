@@ -116,6 +116,10 @@ export const misc = new Elysia()
 			throw new Error("Not admin");
 		}
 
+		if (config.ENABLE_DATA_EXPORT !== "true") {
+			throw new Error("Data export is not enabled");
+		}
+
 		const zipfile = new yazl.ZipFile();
 
 		const promises = [
