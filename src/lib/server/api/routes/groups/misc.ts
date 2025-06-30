@@ -135,13 +135,19 @@ export const misc = new Elysia()
 							});
 							const files = await Promise.all(
 								hashes.map(async (hash) => {
-									const fileData = await downloadFile(hash, conversation._id);
-									return fileData;
+									try {
+										const fileData = await downloadFile(hash, conversation._id);
+										return fileData;
+									} catch {
+										return null;
+									}
 								})
 							);
 
 							const filenames: string[] = [];
 							files.forEach((file) => {
+								if (!file) return;
+
 								const extension = mimeTypes.extension(file.mime) || "bin";
 								const convId = conversation._id.toString();
 								const fileId = file.name.split("-")[1].slice(0, 8);
