@@ -113,10 +113,6 @@ export const misc = new Elysia()
 			throw new Error("Not logged in");
 		}
 
-		if (!locals.isAdmin) {
-			throw new Error("Not admin");
-		}
-
 		if (config.ENABLE_DATA_EXPORT !== "true") {
 			throw new Error("Data export is not enabled");
 		}
