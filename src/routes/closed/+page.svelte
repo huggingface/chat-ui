@@ -98,7 +98,7 @@
 			<span class="text-nowrap">please stay tuned...</span>
 		</p>
 
-		<!-- <div class="mt-6 flex flex-col items-center space-y-4 text-center">
+		<div class="mt-6 flex flex-col items-center space-y-4 text-center">
 			{#if data.nextExport !== Infinity}
 				{#if seconds <= 0}
 					<button
@@ -143,7 +143,7 @@
 				</a>
 				<p class="text-sm text-gray-500 dark:text-gray-400">to export your existing data.</p>
 			{/if}
-		</div> -->
+		</div>
 		<a
 			class="mt-10"
 			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/747"
