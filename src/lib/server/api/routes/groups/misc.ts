@@ -8,6 +8,7 @@ import { Client } from "@gradio/client";
 import yazl from "yazl";
 import { downloadFile } from "$lib/server/files/downloadFile";
 import mimeTypes from "mime-types";
+import { logger } from "$lib/server/logger";
 
 export interface FeatureFlags {
 	searchEnabled: boolean;
@@ -120,6 +121,32 @@ export const misc = new Elysia()
 			throw new Error("Data export is not enabled");
 		}
 
+		const nExports = await collections.messageEvents.countDocuments({
+			userId: locals.user._id,
+			type: "export",
+			expiresAt: { $gt: new Date() },
+		});
+
+		if (nExports >= 1) {
+			throw new Error(
+				"You have already exported your data recently. Please wait 1 hour before exporting again."
+			);
+		}
+
+		const stats: {
+			nConversations: number;
+			nMessages: number;
+			nAssistants: number;
+			nAvatars: number;
+			nFiles: number;
+		} = {
+			nConversations: 0,
+			nMessages: 0,
+			nFiles: 0,
+			nAssistants: 0,
+			nAvatars: 0,
+		};
+
 		const zipfile = new yazl.ZipFile();
 
 		const promises = [
@@ -129,8 +156,10 @@ export const misc = new Elysia()
 				.then(async (conversations) => {
 					const formattedConversations = await Promise.all(
 						conversations.map(async (conversation) => {
+							stats.nConversations++;
 							const hashes: string[] = [];
 							conversation.messages.forEach(async (message) => {
+								stats.nMessages++;
 								if (message.files) {
 									message.files.forEach((file) => {
 										hashes.push(file.value);
@@ -152,12 +181,13 @@ export const misc = new Elysia()
 							files.forEach((file) => {
 								if (!file) return;
 
-								const extension = mimeTypes.extension(file.mime) || "bin";
+								const extension = mimeTypes.extension(file.mime) || null;
 								const convId = conversation._id.toString();
 								const fileId = file.name.split("-")[1].slice(0, 8);
-								const fileName = `file-${convId}-${fileId}.${extension}`;
+								const fileName = `file-${convId}-${fileId}` + (extension ? `.${extension}` : "");
 								filenames.push(fileName);
 								zipfile.addBuffer(Buffer.from(file.value, "base64"), fileName);
+								stats.nFiles++;
 							});
 
 							return {
@@ -212,7 +242,10 @@ export const misc = new Elysia()
 								if (!content) return;
 
 								zipfile.addBuffer(content, `avatar-${assistant._id.toString()}.jpg`);
+								stats.nAvatars++;
 							}
+
+							stats.nAssistants++;
 
 							return {
 								_id: assistant._id.toString(),
@@ -241,9 +274,24 @@ export const misc = new Elysia()
 				}),
 		];
 
-		await Promise.all(promises);
-
-		zipfile.end();
+		Promise.all(promises).then(async () => {
+			logger.info(
+				{
+					userId: locals.user?._id,
+					...stats,
+				},
+				"Exported user data"
+			);
+			zipfile.end();
+			if (locals.user?._id) {
+				await collections.messageEvents.insertOne({
+					userId: locals.user?._id,
+					type: "export",
+					createdAt: new Date(),
+					expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
+				});
+			}
+		});
 
 		// @ts-expect-error - zipfile.outputStream is not typed correctly
 		return new Response(zipfile.outputStream, {
