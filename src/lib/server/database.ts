@@ -241,6 +241,7 @@ export class Database {
 			.catch((e) => logger.error(e));
 		// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
 		users.createIndex({ username: 1 }).catch((e) => logger.error(e));
+		messageEvents.createIndex({ userId: 1, type: 1 }).catch((e) => logger.error(e));
 		messageEvents
 			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 1 })
 			.catch((e) => logger.error(e));
