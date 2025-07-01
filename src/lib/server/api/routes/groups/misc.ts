@@ -109,6 +109,8 @@ export const misc = new Elysia()
 		}
 	})
 	.get("/export", async ({ locals }) => {
+		throw new Error("Disabled temporarily");
+
 		if (!locals.user) {
 			throw new Error("Not logged in");
 		}
