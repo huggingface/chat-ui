@@ -74,8 +74,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// register the event for ratelimiting
 	await collections.messageEvents.insertOne({
+		type: "message",
 		userId,
 		createdAt: new Date(),
+		expiresAt: new Date(Date.now() + 60_000),
 		ip: getClientAddress(),
 	});
 
@@ -103,17 +105,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			error(429, "Exceeded number of messages before login");
 		}
 	}
-
 	if (usageLimits?.messagesPerMinute) {
 		// check if the user is rate limited
 		const nEvents = Math.max(
 			await collections.messageEvents.countDocuments({
 				userId,
-				createdAt: { $gte: new Date(Date.now() - 60_000) },
+				type: "message",
+				expiresAt: { $gt: new Date() },
 			}),
 			await collections.messageEvents.countDocuments({
 				ip: getClientAddress(),
-				createdAt: { $gte: new Date(Date.now() - 60_000) },
+				type: "message",
+				expiresAt: { $gt: new Date() },
 			})
 		);
 		if (nEvents > usageLimits.messagesPerMinute) {
