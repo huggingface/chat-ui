@@ -129,6 +129,13 @@ export const misc = new Elysia()
 			);
 		}
 
+		await collections.messageEvents.insertOne({
+			userId: locals.user?._id,
+			type: "export",
+			createdAt: new Date(),
+			expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
+		});
+
 		const stats: {
 			nConversations: number;
 			nMessages: number;
@@ -279,14 +286,6 @@ export const misc = new Elysia()
 				"Exported user data"
 			);
 			zipfile.end();
-			if (locals.user?._id) {
-				await collections.messageEvents.insertOne({
-					userId: locals.user?._id,
-					type: "export",
-					createdAt: new Date(),
-					expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
-				});
-			}
 		});
 
 		// @ts-expect-error - zipfile.outputStream is not typed correctly
