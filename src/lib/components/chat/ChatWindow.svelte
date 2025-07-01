@@ -39,6 +39,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import { beforeNavigate } from "$app/navigation";
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	interface Props {
 		messages?: Message[];
@@ -65,6 +66,8 @@
 		preprompt = undefined,
 		files = $bindable([]),
 	}: Props = $props();
+
+	const publicConfig = usePublicConfig();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
 
@@ -428,6 +431,8 @@
 					>
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+						{:else if publicConfig.isClosed}
+							<ChatInput placeholder="This conversation is read-only." disabled={true} />
 						{:else}
 							<ChatInput
 								{assistant}

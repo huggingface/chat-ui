@@ -37,7 +37,12 @@ export const load = async ({ depends, fetch, url }) => {
 	const publicConfig = getConfigManager(publicConfigRaw);
 
 	const allowedPaths = ["/closed", "/login", "/login/callback", "/logout"];
-	if (publicConfig.isClosed && !allowedPaths.some((path) => url.pathname === base + path)) {
+	if (
+		publicConfig.isClosed &&
+		!allowedPaths.some((path) => url.pathname === base + path) &&
+		!url.pathname.startsWith(`${base}/conversation`) &&
+		!url.pathname.startsWith(`${base}/r`)
+	) {
 		throw redirect(302, base + "/closed");
 	}
 
