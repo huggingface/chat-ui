@@ -107,6 +107,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
+	const isClosed = config.PUBLIC_CLOSED === "true";
+
+	// if server is in closed mode, only allow GET calls and POST to /login, /login/callback, /logout
+	if (isClosed) {
+		const allowedPaths = ["/login", "/login/callback", "/logout"];
+
+		const isAllowedPath = allowedPaths.some((path) => event.url.pathname === `${base}${path}`);
+
+		if (!isAllowedPath) {
+			const isGetRequest = event.request.method === "GET";
+
+			if (!isGetRequest) {
+				return errorResponse(403, "This server is closed");
+			}
+		}
+	}
+
 	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
 		const ADMIN_SECRET = config.ADMIN_API_SECRET || config.PARQUET_EXPORT_SECRET;
 

@@ -546,6 +546,7 @@ envVars:
   PUBLIC_APP_GUEST_MESSAGE: "Sign in with a free Hugging Face account to continue using HuggingChat."
   PUBLIC_APP_DATA_SHARING: 0
   PUBLIC_APP_DISCLAIMER: 1
+  PUBLIC_CLOSED: true
   PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
   REQUIRE_FEATURED_ASSISTANTS: "true"
   TASK_MODEL: >

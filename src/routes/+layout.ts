@@ -2,8 +2,10 @@ import { UrlDependency } from "$lib/types/UrlDependency";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
+import { redirect } from "@sveltejs/kit";
+import { base } from "$app/paths";
 
-export const load = async ({ depends, fetch }) => {
+export const load = async ({ depends, fetch, url }) => {
 	depends(UrlDependency.ConversationList);
 
 	const client = useAPIClient({ fetch });
@@ -16,7 +18,7 @@ export const load = async ({ depends, fetch }) => {
 		tools,
 		communityToolCount,
 		user,
-		publicConfig,
+		publicConfigRaw,
 		featureFlags,
 		conversationsData,
 	] = await Promise.all([
@@ -31,6 +33,13 @@ export const load = async ({ depends, fetch }) => {
 		client["feature-flags"].get().then(handleResponse),
 		client.conversations.get({ query: { p: 0 } }).then(handleResponse),
 	]);
+
+	const publicConfig = getConfigManager(publicConfigRaw);
+
+	const allowedPaths = ["/closed", "/login", "/login/callback", "/logout"];
+	if (publicConfig.isClosed && !allowedPaths.some((path) => url.pathname === base + path)) {
+		throw redirect(302, base + "/closed");
+	}
 
 	const defaultModel = models[0];
 
@@ -91,7 +100,7 @@ export const load = async ({ depends, fetch }) => {
 				? new Date(settings.ethicsModalAcceptedAt)
 				: null,
 		},
-		publicConfig: getConfigManager(publicConfig),
+		publicConfig,
 		...featureFlags,
 	};
 };

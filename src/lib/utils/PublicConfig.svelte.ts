@@ -30,6 +30,10 @@ class PublicConfigManager {
 		return this.#configStore;
 	}
 
+	get isClosed() {
+		return this.#configStore.PUBLIC_CLOSED === "true";
+	}
+
 	get isHuggingChat() {
 		return this.#configStore.PUBLIC_APP_ASSETS === "huggingchat";
 	}

@@ -191,5 +191,27 @@ export const userGroup = new Elysia()
 					createdByMe:
 						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
 				}));
+			})
+			.get("/next-export", async ({ locals }) => {
+				if (!locals.user) return Infinity;
+
+				const lastExport = await collections.messageEvents.findOne(
+					{
+						userId: locals.user._id,
+						type: "export",
+					},
+					{
+						sort: {
+							expiresAt: -1,
+						},
+					}
+				);
+
+				if (!lastExport) return 0;
+
+				const expiresAt = lastExport.expiresAt.getTime();
+				const now = Date.now();
+
+				return Math.max(0, Math.floor((expiresAt - now) / 1000));
 			});
 	});

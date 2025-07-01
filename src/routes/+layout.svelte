@@ -206,61 +206,65 @@
 	{/if}
 </svelte:head>
 
-{#if showDisclaimer}
-	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
-{/if}
-
-{#if $loginModalOpen}
-	<LoginModal
-		on:close={() => {
-			$loginModalOpen = false;
-		}}
-	/>
-{/if}
-
-{#if overloadedModalOpen && publicConfig.isHuggingChat}
-	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
-{/if}
-
-<Search />
-
-<div
-	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[290px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
->
-	<ExpandNavigation
-		isCollapsed={isNavCollapsed}
-		onClick={() => (isNavCollapsed = !isNavCollapsed)}
-		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-			? 'left-[290px]'
-			: 'left-0'} *:transition-transform"
-	/>
-
-	<MobileNav title={mobileNavTitle}>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			canLogin={!data.user && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
-			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
-		/>
-	</MobileNav>
-	<nav
-		class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
-	>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			canLogin={!data.user && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
-			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
-		/>
-	</nav>
-	{#if currentError}
-		<Toast message={currentError} />
-	{/if}
+{#if publicConfig.isClosed}
 	{@render children?.()}
-</div>
+{:else}
+	{#if showDisclaimer}
+		<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
+	{/if}
+
+	{#if $loginModalOpen}
+		<LoginModal
+			on:close={() => {
+				$loginModalOpen = false;
+			}}
+		/>
+	{/if}
+
+	{#if overloadedModalOpen && publicConfig.isHuggingChat}
+		<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
+	{/if}
+
+	<Search />
+
+	<div
+		class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
+			? 'md:grid-cols-[290px,1fr]'
+			: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
+	>
+		<ExpandNavigation
+			isCollapsed={isNavCollapsed}
+			onClick={() => (isNavCollapsed = !isNavCollapsed)}
+			classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
+				? 'left-[290px]'
+				: 'left-0'} *:transition-transform"
+		/>
+
+		<MobileNav title={mobileNavTitle}>
+			<NavMenu
+				{conversations}
+				user={data.user}
+				canLogin={!data.user && data.loginEnabled}
+				on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
+				on:deleteConversation={(ev) => deleteConversation(ev.detail)}
+				on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			/>
+		</MobileNav>
+		<nav
+			class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
+		>
+			<NavMenu
+				{conversations}
+				user={data.user}
+				canLogin={!data.user && data.loginEnabled}
+				on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
+				on:deleteConversation={(ev) => deleteConversation(ev.detail)}
+				on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			/>
+		</nav>
+		{#if currentError}
+			<Toast message={currentError} />
+		{/if}
+		{@render children?.()}
+	</div>
+{/if}
