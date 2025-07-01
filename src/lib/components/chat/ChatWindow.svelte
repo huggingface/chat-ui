@@ -40,6 +40,7 @@
 	import { beforeNavigate } from "$app/navigation";
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import Logo from "../icons/Logo.svelte";
 
 	interface Props {
 		messages?: Message[];
@@ -249,6 +250,23 @@
 		onDrag = false;
 	}}
 />
+
+{#if publicConfig.isClosed && shared}
+	<div
+		class="fixed left-0 right-0 top-0 z-40 bg-gradient-to-b from-white via-white/80 to-transparent pb-12 pt-2 dark:from-gray-900 dark:via-gray-900/80"
+	>
+		<div class="flex justify-center">
+			<a
+				class="flex items-center rounded-xl text-lg font-semibold text-gray-800 dark:text-gray-200"
+				href="{publicConfig.PUBLIC_ORIGIN}{base}/"
+			>
+				<Logo classNames="mr-1" />
+				{publicConfig.PUBLIC_APP_NAME}
+			</a>
+		</div>
+	</div>
+	<div class="h-8"></div>
+{/if}
 
 <div class="relative z-[-1] min-h-0 min-w-0">
 	<div
