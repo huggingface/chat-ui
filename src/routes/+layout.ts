@@ -36,7 +36,7 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const publicConfig = getConfigManager(publicConfigRaw);
 
-	const allowedPaths = ["/closed", "/login", "/login/callback", "/logout"];
+	const allowedPaths = ["/closed", "/login", "/login/callback", "/logout", "/privacy"];
 	if (
 		publicConfig.isClosed &&
 		!allowedPaths.some((path) => url.pathname === base + path) &&

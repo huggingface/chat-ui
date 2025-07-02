@@ -98,7 +98,7 @@
 			<span class="text-nowrap">please stay tuned...</span>
 		</p>
 
-		<div class="mt-6 flex flex-col items-center space-y-4 text-center">
+		<div class="mt-6 flex min-h-max flex-col items-center space-y-4 text-center">
 			{#if data.nextExport !== Infinity}
 				{#if seconds <= 0}
 					<button
@@ -122,7 +122,12 @@
 					</p>
 				{/if}
 
-				<form action="{base}/logout" method="POST" class="w-full">
+				<form action="{base}/logout" method="POST" class="w-full pt-4">
+					{#if data?.user?.username}
+						<span class="text-sm text-gray-500 dark:text-gray-400">
+							Logged in as {data.user.username} •
+						</span>
+					{/if}
 					<button
 						type="submit"
 						class="text-sm text-gray-500 underline hover:underline dark:text-gray-400"
@@ -220,6 +225,10 @@
 				</defs>
 			</svg>
 		</a>
+
+		<a href="{base}/privacy" class="mt-10 text-sm text-gray-500 underline dark:text-gray-400"
+			>Privacy Policy</a
+		>
 	</div>
 </div>
 
