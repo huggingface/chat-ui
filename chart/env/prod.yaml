@@ -707,7 +707,7 @@ infisical:
 
 autoscaling:
   enabled: true
-  minReplicas: 12
+  minReplicas: 2
   maxReplicas: 30
   targetMemoryUtilizationPercentage: "50"
   targetCPUUtilizationPercentage: "50"
