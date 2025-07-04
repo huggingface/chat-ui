@@ -38,10 +38,7 @@
 
 	let files: File[] = $state([]);
 
-	let conversations = $state(data.conversations);
-	$effect(() => {
-		conversations = data.conversations;
-	});
+	let conversations = $derived(data.conversations);
 
 	function createMessagesPath<T>(messages: TreeNode<T>[], msgId?: TreeId): TreeNode<T>[] {
 		if (initialRun) {
