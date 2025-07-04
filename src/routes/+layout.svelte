@@ -31,10 +31,7 @@
 	const publicConfig = data.publicConfig;
 	const client = useAPIClient();
 
-	let conversations = $state(data.conversations);
-	$effect(() => {
-		data.conversations && untrack(() => (conversations = data.conversations));
-	});
+	let conversations = $derived(data.conversations);
 
 	let isNavCollapsed = $state(false);
 
