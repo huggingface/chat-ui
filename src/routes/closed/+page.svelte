@@ -1,24 +1,5 @@
 <script lang="ts">
 	import { base } from "$app/paths";
-	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { SvelteDate } from "svelte/reactivity";
-
-	const publicConfig = usePublicConfig();
-
-	let { data } = $props();
-
-	let nextExportTime = SvelteDate.now() + (data.nextExport || 0) * 1000;
-
-	let seconds = $state(Math.max(0, Math.ceil((nextExportTime - SvelteDate.now()) / 1000)));
-
-	$effect(() => {
-		const interval = setInterval(() => {
-			seconds = Math.max(0, Math.ceil((nextExportTime - SvelteDate.now()) / 1000));
-		}, 1000);
-
-		return () => clearInterval(interval);
-	});
 </script>
 
 <div
@@ -98,57 +79,6 @@
 			<span class="text-nowrap">please stay tuned...</span>
 		</p>
 
-		<div class="mt-6 flex min-h-max flex-col items-center space-y-4 text-center">
-			{#if data.nextExport !== Infinity}
-				{#if seconds <= 0}
-					<button
-						onclick={() => {
-							window.open(`${base}/api/v2/export`, "_blank");
-							nextExportTime = SvelteDate.now() + 3600 * 1000;
-							seconds = 3600;
-						}}
-						class="flex flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-white transition-colors hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-300"
-						>Export your data</button
-					>
-				{:else}
-					<button
-						disabled
-						class="flex cursor-not-allowed flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-gray-400 px-5 py-2 text-center text-lg font-semibold text-gray-300 opacity-50 dark:bg-gray-600 dark:text-gray-500"
-						>Export your data</button
-					>
-					<p class="text-sm text-gray-500 dark:text-gray-400">
-						You can export your data again in {seconds}
-						{seconds === 1 ? "second" : "seconds"}.
-					</p>
-				{/if}
-
-				<form action="{base}/logout" method="POST" class="w-full pt-4">
-					{#if data?.user?.username}
-						<span class="text-sm text-gray-500 dark:text-gray-400">
-							Logged in as {data.user.username} •
-						</span>
-					{/if}
-					<button
-						type="submit"
-						class="text-sm text-gray-500 underline hover:underline dark:text-gray-400"
-						>Log out</button
-					>
-				</form>
-			{:else}
-				<a
-					href="{base}/login"
-					class="mt-10 flex w-full max-w-xs flex-wrap items-center justify-center whitespace-nowrap rounded-full bg-black px-5 py-2 text-center text-lg font-semibold text-gray-100 transition-colors hover:bg-gray-900 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-				>
-					Sign in
-					{#if publicConfig.isHuggingChat}
-						<span class="flex items-center">
-							&nbsp;with <LogoHuggingFaceBorderless classNames="text-xl mr-1 ml-1.5" /> Hugging Face
-						</span>
-					{/if}
-				</a>
-				<p class="text-sm text-gray-500 dark:text-gray-400">to export your existing data.</p>
-			{/if}
-		</div>
 		<a
 			class="mt-10"
 			href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/747"
