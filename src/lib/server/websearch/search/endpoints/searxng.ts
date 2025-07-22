@@ -18,6 +18,10 @@ export default async function searchSearxng(query: string): Promise<WebSearchSou
 	// Call the URL to return JSON data
 	const jsonResponse = await fetch(url, {
 		signal: abortController.signal,
+		headers: {
+			Authorization: env.HF_TOKEN ? "Bearer " + env.HF_TOKEN : "",
+			"Content-Type": "application/json", // optional, depending on the API
+		},
 	})
 		.then((response) => response.json() as Promise<{ results: { url: string }[] }>)
 		.catch((error) => {
