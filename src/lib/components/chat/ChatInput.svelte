@@ -109,9 +109,10 @@
 			value.trim() !== ""
 		) {
 			event.preventDefault();
-			adjustTextareaHeight();
-			tick();
 			dispatch("submit");
+			tick().then(() => {
+				adjustTextareaHeight();
+			});
 		}
 	}
 
