@@ -15,7 +15,11 @@
 		"updateLocalEnv": "vite-node --options.transformMode.ssr='/.*/' scripts/updateLocalEnv.ts",
 		"populate": "vite-node --options.transformMode.ssr='/.*/' scripts/populate.ts",
 		"config": "vite-node --options.transformMode.ssr='/.*/' scripts/config.ts",
-		"prepare": "husky"
+		"prepare": "husky",
+		"local-start": "bash scripts/local_start.sh",
+		"local-stop": "bash scripts/local_stop.sh",
+		"local-force-kill": "bash scripts/local_force_kill.sh",
+		"local-force-wipe": "bash scripts/local_force_wipe.sh"
 	},
 	"devDependencies": {
 		"@elysiajs/cors": "^1.3.3",

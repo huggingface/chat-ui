@@ -15,3 +15,6 @@ gcp-*.json
 db
 models/*
 !models/add-your-models-here.txt
+
+.env
+.env.local
