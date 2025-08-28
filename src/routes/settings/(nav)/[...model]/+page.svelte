@@ -35,10 +35,10 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<div class="mb-5 flex flex-col gap-1.5">
-		<h2 class="text-lg font-semibold md:text-xl">
-			{page.params.model}
-		</h2>
+    <div class="mb-4 flex flex-col gap-1">
+        <h2 class="text-base font-semibold md:text-lg">
+            {page.params.model}
+        </h2>
 
 		{#if model.description}
 			<p class="whitespace-pre-wrap text-gray-600">
@@ -106,9 +106,9 @@
 		</CopyToClipBoardBtn>
 	</div>
 
-	<button
-		class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1 text-base !text-white"
-		name="Activate model"
+    <button
+        class="my-2 flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm !text-white shadow-sm hover:bg-black/90"
+        name="Activate model"
 		onclick={(e) => {
 			e.stopPropagation();
 			settings.instantSet({
@@ -121,9 +121,9 @@
 		New chat
 	</button>
 
-	<div class="relative flex w-full flex-col gap-2">
-		<div class="flex w-full flex-row content-between">
-			<h3 class="mb-1.5 text-lg font-semibold text-gray-800">System Prompt</h3>
+    <div class="relative flex w-full flex-col gap-2">
+        <div class="flex w-full flex-row content-between">
+            <h3 class="mb-1 text-[15px] font-semibold text-gray-800">System Prompt</h3>
 			{#if hasCustomPreprompt}
 				<button
 					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700"
@@ -136,12 +136,14 @@
 				</button>
 			{/if}
 		</div>
-		<textarea
-			aria-label="Custom system prompt"
-			rows="10"
-			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
-			bind:value={$settings.customPrompts[page.params.model]}
-		></textarea>
+        <div class="rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+            <textarea
+                aria-label="Custom system prompt"
+                rows="8"
+                class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px]"
+                bind:value={$settings.customPrompts[page.params.model]}
+            ></textarea>
+        </div>
 		<!-- Tokenizer-based token counting disabled in this build -->
 	</div>
 </div>
