@@ -1,28 +1,13 @@
 import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
-import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
-import { endpointTgi } from "./endpoints/tgi/endpointTgi";
-import { sum } from "$lib/utils/sum";
 import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
 
-import type { PreTrainedTokenizer } from "@huggingface/transformers";
-
 import JSON5 from "json5";
-import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
 import { type ToolInput } from "$lib/types/Tool";
 import { fetchJSON } from "$lib/utils/fetchJSON";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { findRepoRoot } from "./findRepoRoot";
-import { Template } from "@huggingface/jinja";
-import { readdirSync } from "fs";
-
-export const MODELS_FOLDER =
-	config.MODELS_STORAGE_PATH ||
-	join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -51,20 +36,14 @@ const modelConfig = z.object({
 	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
-	tokenizer: z
-		.union([
-			z.string(),
-			z.object({
-				tokenizerUrl: z.string().url(),
-				tokenizerConfigUrl: z.string().url(),
-			}),
-		])
-		.optional(),
+	// tokenizer removed in this build
+	tokenizer: z.never().optional(),
 	datasetName: z.string().min(1).optional(),
 	datasetUrl: z.string().url().optional(),
 	preprompt: z.string().default(""),
 	prepromptUrl: z.string().url().optional(),
-	chatPromptTemplate: z.string().optional(),
+	// chatPromptTemplate removed in this build (OpenAI chat API is used)
+	chatPromptTemplate: z.never().optional(),
 	promptExamples: z
 		.array(
 			z.object({
@@ -97,181 +76,105 @@ const modelConfig = z.object({
 	reasoning: reasoningSchema.optional(),
 });
 
-const ggufModelsConfig = await Promise.all(
-	readdirSync(MODELS_FOLDER)
-		.filter((f) => f.endsWith(".gguf"))
-		.map(async (f) => {
-			return {
-				name: f.replace(".gguf", ""),
-				endpoints: [
-					{
-						type: "local" as const,
-						modelPath: f,
-					},
-				],
-			};
-		})
-);
+// Local GGUF discovery and string shorthand removed in this build
+const ggufModelsConfig: Array<z.infer<typeof modelConfig>> = [];
 
-const turnStringIntoLocalModel = z.preprocess((obj: unknown) => {
-	if (typeof obj !== "string") return obj;
+// If OPENAI_BASE_URL (preferred) or OPENAI_MODEL_LIST_URL (legacy) is defined,
+// source models exclusively from that OpenAI-compatible endpoint.
+// Otherwise, fall back to MODELS env and optional GGUF auto-discovery.
+let modelsRaw: z.infer<typeof modelConfig>[] = [];
 
-	const name = obj.startsWith("hf:") ? obj.split(":")[1] : obj;
-	const displayName = obj.startsWith("hf:")
-		? obj.split(":")[1].split("/").slice(0, 2).join("/")
-		: obj.endsWith(".gguf")
-			? obj.replace(".gguf", "")
-			: obj;
+// Prefer explicit base URL, then fall back to a full list URL
+const openaiBaseUrl = (() => {
+    if (config.OPENAI_BASE_URL) {
+        return config.OPENAI_BASE_URL.replace(/\/$/, "");
+    }
+    if (config.OPENAI_MODEL_LIST_URL) {
+        try {
+            const listUrl = new URL(config.OPENAI_MODEL_LIST_URL);
+            const basePath = listUrl.pathname.replace(/\/?models\/?$/, "");
+            return `${listUrl.origin}${basePath}`.replace(/\/$/, "");
+        } catch (e) {
+            logger.error(e, "Invalid OPENAI_MODEL_LIST_URL provided");
+        }
+    }
+    return undefined;
+})();
 
-	const modelPath = obj.includes("/") && !obj.startsWith("hf:") ? `hf:${obj}` : obj;
+if (openaiBaseUrl) {
+    try {
+        const baseURL = openaiBaseUrl;
+        const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
 
-	return {
-		name,
-		displayName,
-		endpoints: [
-			{
-				type: "local",
-				modelPath,
-			},
-		],
-	} satisfies z.input<typeof modelConfig>;
-}, modelConfig);
+        // Try unauthenticated request first (many model lists are public, e.g. HF router)
+        let response = await fetch(`${baseURL}/models`);
+        if (response.status === 401 || response.status === 403) {
+            // Retry with Authorization header if available
+            response = await fetch(`${baseURL}/models`, {
+                headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+            });
+        }
+        if (!response.ok) {
+            throw new Error(
+                `Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
+            );
+        }
+        const json = await response.json();
 
-let modelsRaw = z.array(turnStringIntoLocalModel).parse(JSON5.parse(config.MODELS ?? "[]"));
+		const listSchema = z.object({
+			data: z.array(
+				z.object({
+					id: z.string(),
+					providers: z
+						.array(
+							z.object({ supports_tools: z.boolean().optional() }).passthrough()
+						)
+						.optional(),
+				})
+			),
+		}).passthrough();
 
-if (config.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
-	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
-	modelsRaw = [...modelsRaw, ...parsedGgufModels];
+        const parsed = listSchema.parse(json);
+
+        modelsRaw = parsed.data.map((m) => ({
+            id: m.id,
+            name: m.id,
+            displayName: m.id,
+            tools: m.providers?.some((p) => p.supports_tools === true) ?? false,
+            endpoints: [
+                {
+                    type: "openai" as const,
+                    baseURL,
+                    // apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+                },
+            ],
+        })) as z.infer<typeof modelConfig>[];
+    } catch (e) {
+        logger.error(e, "Failed to load models from OpenAI base URL");
+        throw e;
+    }
+} else {
+    logger.error(
+        "OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
+    );
+    throw new Error("OPENAI_BASE_URL not set");
 }
 
-async function getChatPromptRender(
-	m: z.infer<typeof modelConfig>
-): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
-	if (m.endpoints?.some((e) => e.type === "local")) {
-		const endpoint = m.endpoints?.find((e) => e.type === "local");
-		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
-
-		const { resolveModelFile, readGgufFileInfo } = await import("node-llama-cpp");
-
-		const modelPath = await resolveModelFile(path, MODELS_FOLDER);
-
-		const info = await readGgufFileInfo(modelPath, {
-			readTensorInfo: false,
-		});
-
-		if (info.metadata.tokenizer.chat_template) {
-			// compile with jinja
-			const jinjaTemplate = new Template(info.metadata.tokenizer.chat_template);
-			return (inputs: ChatTemplateInput) => {
-				return jinjaTemplate.render({ ...m, ...inputs });
-			};
-		}
-	}
-
-	if (m.chatPromptTemplate) {
-		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
-	}
-	let tokenizer: PreTrainedTokenizer;
-
-	try {
-		tokenizer = await getTokenizer(m.tokenizer ?? m.id ?? m.name);
-	} catch (e) {
-		// if fetching the tokenizer fails but it wasnt manually set, use the default template
-		if (!m.tokenizer) {
-			logger.warn(
-				`No tokenizer found for model ${m.name}, using default template. Consider setting tokenizer manually or making sure the model is available on the hub.`,
-				m
-			);
-			return compileTemplate<ChatTemplateInput>(
-				"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
-				m
-			);
-		}
-
-		logger.error(
-			e,
-			`Failed to load tokenizer ${
-				m.tokenizer ?? m.id ?? m.name
-			} make sure the model is available on the hub and you have access to any gated models.`
-		);
-		process.exit();
-	}
-
-	const renderTemplate = ({ messages, preprompt, tools, continueMessage }: ChatTemplateInput) => {
-		let formattedMessages: {
-			role: string;
-			content: string;
-			tool_calls?: { id: string; tool_call_id: string; output: string }[];
-		}[] = messages.map((message) => ({
-			content: message.content,
-			role: message.from,
-		}));
-
-		if (!m.systemRoleSupported) {
-			const firstSystemMessage = formattedMessages.find((msg) => msg.role === "system");
-			formattedMessages = formattedMessages.filter((msg) => msg.role !== "system");
-
-			if (
-				firstSystemMessage &&
-				formattedMessages.length > 0 &&
-				formattedMessages[0].role === "user"
-			) {
-				formattedMessages[0].content =
-					firstSystemMessage.content + "\n" + formattedMessages[0].content;
-			}
-		}
-
-		if (preprompt && formattedMessages[0].role !== "system") {
-			formattedMessages = [
-				{
-					role: m.systemRoleSupported ? "system" : "user",
-					content: preprompt,
-				},
-				...formattedMessages,
-			];
-		}
-
-		const mappedTools =
-			tools?.map((tool) => {
-				const inputs: Record<
-					string,
-					{
-						type: ToolInput["type"];
-						description: string;
-						required: boolean;
-					}
-				> = {};
-
-				for (const value of tool.inputs) {
-					if (value.paramType !== "fixed") {
-						inputs[value.name] = {
-							type: value.type,
-							description: value.description ?? "",
-							required: value.paramType === "required",
-						};
-					}
-				}
-
-				return {
-					name: tool.name,
-					description: tool.description,
-					parameter_definitions: inputs,
-				};
-			}) ?? [];
-
-		const output = tokenizer.apply_chat_template(formattedMessages, {
-			tokenize: false,
-			add_generation_prompt: !continueMessage,
-			tools: mappedTools.length ? mappedTools : undefined,
-		});
-
-		if (typeof output !== "string") {
-			throw new Error("Failed to apply chat template, the output is not a string");
-		}
-
-		return output;
-	};
-	return renderTemplate;
+function getChatPromptRender(
+    m: z.infer<typeof modelConfig>
+): (inputs: ChatTemplateInput) => string {
+    // Minimal template to support legacy "completions" flow if ever used.
+    // We avoid any tokenizer/Jinja usage in this build.
+    return ({ messages, preprompt }) => {
+        const parts: string[] = [];
+        if (preprompt) parts.push(`[SYSTEM]\n${preprompt}`);
+        for (const msg of messages) {
+            const role = msg.from === "assistant" ? "ASSISTANT" : msg.from.toUpperCase();
+            parts.push(`[${role}]\n${msg.content}`);
+        }
+        parts.push(`[ASSISTANT]`);
+        return parts.join("\n\n");
+    };
 }
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
@@ -286,76 +189,21 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	...m,
 	getEndpoint: async (): Promise<Endpoint> => {
-		if (!m.endpoints) {
-			return endpointTgi({
-				type: "tgi",
-				url: `${config.HF_API_ROOT}/${m.name}`,
-				accessToken: config.HF_TOKEN ?? config.HF_ACCESS_TOKEN,
-				weight: 1,
-				model: m,
-			});
-		}
-		const totalWeight = sum(m.endpoints.map((e) => e.weight));
-
-		let random = Math.random() * totalWeight;
-
-		for (const endpoint of m.endpoints) {
-			if (random < endpoint.weight) {
-				const args = { ...endpoint, model: m };
-
-				switch (args.type) {
-					case "tgi":
-						return endpoints.tgi(args);
-					case "local":
-						return endpoints.local(args);
-					case "inference-client":
-						return endpoints.inferenceClient(args);
-					case "anthropic":
-						return endpoints.anthropic(args);
-					case "anthropic-vertex":
-						return endpoints.anthropicvertex(args);
-					case "bedrock":
-						return endpoints.bedrock(args);
-					case "aws":
-						return await endpoints.aws(args);
-					case "openai":
-						return await endpoints.openai(args);
-					case "llamacpp":
-						return endpoints.llamacpp(args);
-					case "ollama":
-						return endpoints.ollama(args);
-					case "vertex":
-						return await endpoints.vertex(args);
-					case "genai":
-						return await endpoints.genai(args);
-					case "cloudflare":
-						return await endpoints.cloudflare(args);
-					case "cohere":
-						return await endpoints.cohere(args);
-					case "langserve":
-						return await endpoints.langserve(args);
-					default:
-						// for legacy reason
-						return endpoints.tgi(args);
-				}
-			}
-			random -= endpoint.weight;
+		if (!m.endpoints || m.endpoints.length === 0) {
+			throw new Error("No endpoints configured. This build requires OpenAI-compatible endpoints.");
 		}
 
-		throw new Error(`Failed to select endpoint`);
+		// Only support OpenAI-compatible endpoints in this build
+		const endpoint = m.endpoints[0];
+		if (endpoint.type !== "openai") {
+			throw new Error("Only 'openai' endpoint type is supported in this build");
+		}
+		return await endpoints.openai({ ...endpoint, model: m });
 	},
 });
 
-const inferenceApiIds = config.isHuggingChat
-	? await fetchJSON<{ id: string }[]>(
-			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
-		)
-			.then((arr) => arr?.map((r) => r.id) || [])
-			.catch(() => {
-				logger.error("Failed to fetch inference API ids");
-				return [];
-			})
-	: [];
+// Inference API ids check removed in this build
+const inferenceApiIds: string[] = [];
 
 export const models = await Promise.all(
 	modelsRaw.map((e) =>
@@ -399,9 +247,7 @@ export const validateModel = (_models: BackendModel[]) => {
 
 export const taskModel = addEndpoint(
 	config.TASK_MODEL
-		? ((models.find((m) => m.name === config.TASK_MODEL) ||
-				(await processModel(modelConfig.parse(JSON5.parse(config.TASK_MODEL))))) ??
-				defaultModel)
+		? models.find((m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL) ?? defaultModel
 		: defaultModel
 );
 
