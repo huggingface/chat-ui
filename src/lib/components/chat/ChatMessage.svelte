@@ -18,7 +18,6 @@
 		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
-	// Tools feature removed
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -62,8 +61,6 @@
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
 	let editFormEl: HTMLFormElement | undefined = $state();
 
-	// web search updates removed
-
 	let reasoningUpdates = $derived(
 		(message.updates?.filter(({ type }) => type === MessageUpdateType.Reasoning) ??
 			[]) as MessageReasoningUpdate[]
@@ -74,10 +71,8 @@
 			({ type }) => type === MessageUpdateType.FinalAnswer
 		) as MessageFinalAnswerUpdate
 	);
-	// Tools removed
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
-	// web search sources removed
 
 	$effect(() => {
 		if (isCopied) {
