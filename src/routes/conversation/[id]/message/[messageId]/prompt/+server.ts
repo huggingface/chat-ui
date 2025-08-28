@@ -69,9 +69,7 @@ export async function GET({ params, locals }) {
 			createdAt: msg.createdAt,
 			updatedAt: msg.updatedAt,
 			reasoning: msg.reasoning,
-			updates: msg.updates?.filter(
-				(u) => (u.type === "webSearch" && u.subtype === "sources") || u.type === "title"
-			),
+			updates: msg.updates?.filter((u) => u.type === "title"),
 			files: msg.files,
 		})),
 	});

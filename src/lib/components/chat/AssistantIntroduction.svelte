@@ -7,7 +7,6 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { formatUserCount } from "$lib/utils/formatUserCount";
 	import IconGear from "~icons/bi/gear-fill";
-	import IconInternet from "../icons/IconInternet.svelte";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonRenew from "~icons/carbon/renew";
@@ -21,14 +20,13 @@
 
 	const publicConfig = usePublicConfig();
 
-	interface Props {
+    interface Props {
 		models: Model[];
 		assistant: Pick<
 			Assistant,
 			| "avatar"
 			| "name"
-			| "rag"
-			| "dynamicPrompt"
+            | "dynamicPrompt"
 			| "modelId"
 			| "createdByName"
 			| "exampleInputs"
@@ -43,12 +41,7 @@
 
 	const dispatch = createEventDispatcher<{ message: string }>();
 
-	let hasRag = $derived(
-		assistant?.rag?.allowAllDomains ||
-			(assistant?.rag?.allowedDomains?.length ?? 0) > 0 ||
-			(assistant?.rag?.allowedLinks?.length ?? 0) > 0 ||
-			assistant?.dynamicPrompt
-	);
+// Internet Access (RAG) removed in this build
 
 	const prefix =
 		publicConfig.PUBLIC_SHARE_PREFIX || `${publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`;
@@ -149,15 +142,6 @@
 			</div>
 			<div class="grid gap-3 bg-gray-50 p-3 text-sm dark:bg-gray-800/70">
 				<div class="flex flex-wrap gap-2">
-					{#if hasRag}
-						<div
-							class="flex h-6 items-center gap-1 rounded-full bg-blue-500/10 pl-1.5 pr-2.5 text-xs"
-							title="This assistant uses web search"
-						>
-							<IconInternet classNames="text-sm text-blue-600" />
-							Internet access
-						</div>
-					{/if}
 
 					{#if assistant?.tools?.length}
 						<div

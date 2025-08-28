@@ -27,7 +27,7 @@ export async function GET({ locals, params }) {
 					id: message.id,
 					createdAt: message.createdAt,
 					updatedAt: message.updatedAt,
-					webSearch: message.webSearch,
+					// websearch removed
 					files: message.files,
 					updates: message.updates,
 					reasoning: message.reasoning,

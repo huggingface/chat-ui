@@ -1,10 +1,10 @@
 # 🤗 Chat UI
 
-Open source chat interface with support for tools, web search, multimodal and many API providers. The app uses MongoDB and SvelteKit behind the scenes. Try the live version of the app called [HuggingChat on hf.co/chat](https://huggingface.co/chat) or [setup your own instance](./installation/spaces).
+Open source chat interface with support for tools, multimodal and many API providers. The app uses MongoDB and SvelteKit behind the scenes. Try the live version of the app called [HuggingChat on hf.co/chat](https://huggingface.co/chat) or [setup your own instance](./installation/spaces).
 
 🔧 **[Tools](./configuration/models/tools)**: Function calling with custom tools and support for [Zero GPU spaces](https://huggingface.co/spaces/enzostvs/zero-gpu-spaces)
 
-🔍 **[Web Search](./configuration/web-search)**: Automated web search, scraping and RAG for all models
+🔍 Web Search: Removed in this build
 
 🐙 **[Multimodal](./configuration/models/multimodal)**: Accepts image file uploads on supported providers
 
@@ -23,8 +23,7 @@ Tools
 <div>
 Web Search
 <div class="flex justify-center">
-<img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-light.png" height="auto"/>
-<img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/websearch-dark.png" height="auto"/>
+
 </div>
 </div>
 

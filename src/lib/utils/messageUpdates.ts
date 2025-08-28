@@ -5,32 +5,14 @@ import {
 	type MessageToolCallUpdate,
 	MessageToolUpdateType,
 	MessageUpdateType,
-	type MessageToolUpdate,
-	type MessageWebSearchUpdate,
-	type MessageWebSearchGeneralUpdate,
-	type MessageWebSearchSourcesUpdate,
-	type MessageWebSearchErrorUpdate,
-	MessageWebSearchUpdateType,
+	type MessageToolUpdate
 	type MessageToolErrorUpdate,
 	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
 
 import { page } from "$app/state";
 
-export const isMessageWebSearchUpdate = (update: MessageUpdate): update is MessageWebSearchUpdate =>
-	update.type === MessageUpdateType.WebSearch;
-export const isMessageWebSearchGeneralUpdate = (
-	update: MessageUpdate
-): update is MessageWebSearchGeneralUpdate =>
-	isMessageWebSearchUpdate(update) && update.subtype === MessageWebSearchUpdateType.Update;
-export const isMessageWebSearchSourcesUpdate = (
-	update: MessageUpdate
-): update is MessageWebSearchSourcesUpdate =>
-	isMessageWebSearchUpdate(update) && update.subtype === MessageWebSearchUpdateType.Sources;
-export const isMessageWebSearchErrorUpdate = (
-	update: MessageUpdate
-): update is MessageWebSearchErrorUpdate =>
-	isMessageWebSearchUpdate(update) && update.subtype === MessageWebSearchUpdateType.Error;
+// Web search updates removed
 
 export const isMessageToolUpdate = (update: MessageUpdate): update is MessageToolUpdate =>
 	update.type === MessageUpdateType.Tool;
@@ -44,14 +26,13 @@ export const isMessageToolErrorUpdate = (update: MessageUpdate): update is Messa
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
 
 type MessageUpdateRequestOptions = {
-	base: string;
-	inputs?: string;
-	messageId?: string;
-	isRetry: boolean;
-	isContinue: boolean;
-	webSearch: boolean;
-	tools?: Array<string>;
-	files?: MessageFile[];
+    base: string;
+    inputs?: string;
+    messageId?: string;
+    isRetry: boolean;
+    isContinue: boolean;
+    tools?: Array<string>;
+    files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -63,14 +44,13 @@ export async function fetchMessageUpdates(
 
 	const form = new FormData();
 
-	const optsJSON = JSON.stringify({
-		inputs: opts.inputs,
-		id: opts.messageId,
-		is_retry: opts.isRetry,
-		is_continue: opts.isContinue,
-		web_search: opts.webSearch,
-		tools: opts.tools,
-	});
+    const optsJSON = JSON.stringify({
+        inputs: opts.inputs,
+        id: opts.messageId,
+        is_retry: opts.isRetry,
+        is_continue: opts.isContinue,
+        tools: opts.tools,
+    });
 
 	opts.files?.forEach((file) => {
 		const name = file.type + ";" + file.name;

@@ -31,17 +31,16 @@ export async function GET({ url }) {
 		.limit(5)
 		.toArray();
 
-	const matchingConfigTools = toolFromConfigs
-		.filter((tool) => !tool?.isHidden)
-		.filter((tool) => tool.name !== "websearch") // filter out websearch tool from config tools since its added separately
-		.filter((tool) => {
-			if (queryTokens) {
-				return generateSearchTokens(tool.displayName).some((token) =>
-					queryTokens.some((queryToken) => queryToken.test(token))
-				);
-			}
-			return true;
-		})
+    const matchingConfigTools = toolFromConfigs
+        .filter((tool) => !tool?.isHidden)
+        .filter((tool) => {
+            if (queryTokens) {
+                return generateSearchTokens(tool.displayName).some((token) =>
+                    queryTokens.some((queryToken) => queryToken.test(token))
+                );
+            }
+            return true;
+        })
 		.map((tool) => ({
 			_id: tool._id,
 			displayName: tool.displayName,

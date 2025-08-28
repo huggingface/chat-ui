@@ -1,6 +1,5 @@
 <script lang="ts">
-	import type { WebSearchSource } from "$lib/types/WebSearch";
-	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
+		import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
 	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import CodeBlock from "../CodeBlock.svelte";
 	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
@@ -12,7 +11,7 @@
 
 	interface Props {
 		content: string;
-		sources?: WebSearchSource[];
+		sources?: any[];
 	}
 
 	let worker: Worker | null = null;

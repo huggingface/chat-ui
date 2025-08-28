@@ -17,8 +17,7 @@ import { config } from "$lib/server/config";
 import jp from "jsonpath";
 import calculator from "./calculator";
 import directlyAnswer from "./directlyAnswer";
-import fetchUrl from "./web/url";
-import websearch from "./web/search";
+// web tools removed
 import { callSpace, getIpToken } from "./utils";
 import { uploadFile } from "../files/uploadFile";
 import type { MessageFile } from "$lib/types/Message";
@@ -127,7 +126,7 @@ export const configTools = z
 			}))
 	)
 	// add the extra hardcoded tools
-	.transform((val) => [...val, calculator, directlyAnswer, fetchUrl, websearch]);
+	.transform((val) => [...val, calculator, directlyAnswer]);
 
 export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	return async function* (params, ctx, uuid) {

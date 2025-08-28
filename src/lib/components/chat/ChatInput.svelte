@@ -2,16 +2,13 @@
 	import { createEventDispatcher, onMount, tick } from "svelte";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
-	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import IconImageGen from "$lib/components/icons/IconImageGen.svelte";
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import {
 		documentParserToolId,
 		fetchUrlToolId,
 		imageGenToolId,
-		webSearchToolId,
 	} from "$lib/utils/toolIds";
 	import type { Assistant } from "$lib/types/Assistant";
 	import { page } from "$app/state";
@@ -119,12 +116,6 @@
 
 	// tool section
 
-	let webSearchIsOn = $derived(
-		modelHasTools
-			? ($settings.tools?.includes(webSearchToolId) ?? false) ||
-					($settings.tools?.includes(fetchUrlToolId) ?? false)
-			: $webSearchParameters.useSearch
-	);
 	let imageGenIsOn = $derived($settings.tools?.includes(imageGenToolId) ?? false);
 
 	let documentParserIsOn = $derived(
@@ -136,16 +127,15 @@
 			.filter((t: ToolFront) => $settings.tools?.includes(t._id))
 			.filter(
 				(t: ToolFront) =>
-					![documentParserToolId, imageGenToolId, webSearchToolId, fetchUrlToolId].includes(t._id)
+					![documentParserToolId, imageGenToolId, fetchUrlToolId].includes(t._id)
 			) satisfies ToolFront[]
 	);
 
-	let showWebSearch = $derived(!assistant);
 	let showImageGen = $derived(modelHasTools && !assistant);
 	let showFileUpload = $derived((modelIsMultimodal || modelHasTools) && mimeTypes.length > 0);
 	let showExtraTools = $derived(modelHasTools && !assistant);
 
-	let showNoTools = $derived(!showWebSearch && !showImageGen && !showFileUpload && !showExtraTools);
+	let showNoTools = $derived(!showImageGen && !showFileUpload && !showExtraTools);
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
@@ -179,44 +169,6 @@
 				"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2",
 			]}
 		>
-			{#if showWebSearch}
-				<HoverTooltip
-					label="Search the web"
-					position="top"
-					TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden {webSearchIsOn
-						? 'hidden'
-						: ''}"
-				>
-					<button
-						class="base-tool"
-						class:active-tool={webSearchIsOn}
-						disabled={loading}
-						onclick={async (e) => {
-							e.preventDefault();
-							if (modelHasTools) {
-								if (webSearchIsOn) {
-									await settings.instantSet({
-										tools: ($settings.tools ?? []).filter(
-											(t) => t !== webSearchToolId && t !== fetchUrlToolId
-										),
-									});
-								} else {
-									await settings.instantSet({
-										tools: [...($settings.tools ?? []), webSearchToolId, fetchUrlToolId],
-									});
-								}
-							} else {
-								$webSearchParameters.useSearch = !webSearchIsOn;
-							}
-						}}
-					>
-						<IconInternet classNames="text-xl" />
-						{#if webSearchIsOn}
-							Search
-						{/if}
-					</button>
-				</HoverTooltip>
-			{/if}
 			{#if showImageGen}
 				<HoverTooltip
 					label="Generate	images"
