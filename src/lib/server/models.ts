@@ -2,7 +2,7 @@ import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
-import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
+// embeddings removed in this build
 
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
@@ -70,7 +70,8 @@ const modelConfig = z.object({
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
 	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
-	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	// embedding model removed in this build
+	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
 	reasoning: reasoningSchema.optional(),

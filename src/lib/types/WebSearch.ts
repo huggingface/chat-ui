@@ -1,7 +1,7 @@
 import type { ObjectId } from "mongodb";
 import type { Conversation } from "./Conversation";
 import type { Timestamps } from "./Timestamps";
-import type { HeaderElement } from "$lib/server/websearch/markdown/types";
+// websearch removed; use any for markdown tree
 
 export interface WebSearch extends Timestamps {
 	_id?: ObjectId;
@@ -28,7 +28,7 @@ export interface WebSearchPage {
 	description?: string;
 	createdAt?: string;
 	modifiedAt?: string;
-	markdownTree: HeaderElement;
+	markdownTree: any;
 }
 
 export interface WebSearchUsedSource extends WebSearchScrapedSource {

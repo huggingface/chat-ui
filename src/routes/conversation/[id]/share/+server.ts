@@ -38,7 +38,7 @@ export async function POST({ params, locals }) {
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,
-		embeddingModel: conversation.embeddingModel,
+		// embedding model removed in this build
 		preprompt: conversation.preprompt,
 		assistantId: conversation.assistantId,
 	};

@@ -91,9 +91,9 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 		...(shouldCopyLlama ? [copyLlamaFiles()] : []),
 	],
-	optimizeDeps: {
-		include: ["uuid", "@huggingface/transformers", "sharp", "@gradio/client", "clsx"],
-	},
+    optimizeDeps: {
+        include: ["uuid", "sharp", "@gradio/client", "clsx"],
+    },
 	test: {
 		workspace: [
 			{

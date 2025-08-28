@@ -16,7 +16,6 @@ import type { Assistant } from "../src/lib/types/Assistant";
 import type { Conversation } from "../src/lib/types/Conversation";
 import type { Settings } from "../src/lib/types/Settings";
 import type { CommunityToolDB, ToolLogoColor, ToolLogoIcon } from "../src/lib/types/Tool";
-import { defaultEmbeddingModel } from "../src/lib/server/embeddingModels.ts";
 import { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
@@ -272,7 +271,7 @@ async function seed() {
 							updatedAt: faker.date.recent({ days: 145 }),
 							model: faker.helpers.arrayElement(modelIds),
 							title: faker.internet.emoji() + " " + faker.hacker.phrase(),
-							embeddingModel: defaultEmbeddingModel.id,
+                            // embeddings removed in this build
 							messages,
 							rootMessageId: messages[0].id,
 						} satisfies Conversation;

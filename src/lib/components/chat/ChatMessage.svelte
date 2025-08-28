@@ -11,13 +11,9 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
 
-	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import {
 		MessageUpdateType,
-		MessageWebSearchUpdateType,
 		type MessageToolUpdate,
-		type MessageWebSearchSourcesUpdate,
-		type MessageWebSearchUpdate,
 		type MessageFinalAnswerUpdate,
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
@@ -67,10 +63,7 @@
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
 	let editFormEl: HTMLFormElement | undefined = $state();
 
-	let searchUpdates = $derived(
-		(message.updates?.filter(({ type }) => type === MessageUpdateType.WebSearch) ??
-			[]) as MessageWebSearchUpdate[]
-	);
+	// web search updates removed
 
 	let reasoningUpdates = $derived(
 		(message.updates?.filter(({ type }) => type === MessageUpdateType.Reasoning) ??
@@ -101,12 +94,7 @@
 	);
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
-	let webSearchSources = $derived(
-		searchUpdates?.find(
-			(update): update is MessageWebSearchSourcesUpdate =>
-				update.subtype === MessageWebSearchUpdateType.Sources
-		)?.sources
-	);
+	// web search sources removed
 
 	$effect(() => {
 		if (isCopied) {
@@ -160,9 +148,7 @@
 					{/each}
 				</div>
 			{/if}
-			{#if searchUpdates && searchUpdates.length > 0}
-				<OpenWebSearchResults webSearchMessages={searchUpdates} />
-			{/if}
+
 			{#if reasoningUpdates && reasoningUpdates.length > 0 && message.reasoning && message.reasoning.trim().length > 0}
 				{@const summaries = reasoningUpdates
 					.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
@@ -185,10 +171,7 @@
 				{/each}
 			{/if}
 
-			<div
-				bind:this={contentEl}
-				class:mt-2={reasoningUpdates.length > 0 || searchUpdates.length > 0}
-			>
+				<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
@@ -196,53 +179,11 @@
 				<div
 					class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				>
-					<MarkdownRenderer content={message.content} sources={webSearchSources} />
+					<MarkdownRenderer content={message.content} />
 				</div>
 			</div>
 
-			<!-- Web Search sources -->
-			{#if webSearchSources?.length}
-				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
-					{#each webSearchSources as { link, title }}
-						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-							href={link}
-							target="_blank"
-						>
-							<img
-								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname ||
-									'placeholder'}"
-								alt="{title} favicon"
-							/>
-							<div>{new URL(link).hostname.replace(/^www\./, "")}</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
 
-			<!-- Endpoint web sources -->
-			{#if messageFinalAnswer?.webSources && messageFinalAnswer.webSources.length}
-				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
-					{#each messageFinalAnswer.webSources as { uri, title }}
-						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-							href={uri}
-							target="_blank"
-						>
-							<img
-								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(uri).hostname ||
-									'placeholder'}"
-								alt="{title} favicon"
-							/>
-							<div>{title}</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
 		</div>
 
 		{#if !loading && (message.content || toolUpdates)}

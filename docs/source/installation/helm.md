@@ -23,7 +23,7 @@ resources:
     cpu: 100m
     memory: 2Gi
   limits:
-    # Recommended to use large limits when web search is enabled
+    # Web search removed in this build; adjust limits per your needs
     cpu: "4"
     memory: 6Gi
 

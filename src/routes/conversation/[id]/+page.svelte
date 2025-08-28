@@ -9,7 +9,6 @@
 	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
 	import {
 		MessageReasoningUpdateType,
@@ -247,9 +246,7 @@
 				throw new Error("Message to write to not found");
 			}
 
-			// disable websearch if assistant is present
-			const hasAssistant = !!page.data.assistant;
-			const messageUpdatesAbortController = new AbortController();
+					const messageUpdatesAbortController = new AbortController();
 
 			let tools = $settings.tools;
 
@@ -265,8 +262,7 @@
 					messageId,
 					isRetry,
 					isContinue,
-					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
-					tools,
+						tools,
 					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
