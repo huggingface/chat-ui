@@ -6,7 +6,6 @@
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import CarbonExport from "~icons/carbon/export";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -26,6 +25,7 @@
 	import { browser } from "$app/environment";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
+	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -35,7 +35,7 @@
 	import { cubicInOut } from "svelte/easing";
 	// Tools feature removed
 	import { loginModalOpen } from "$lib/stores/loginModal";
-	import { beforeNavigate } from "$app/navigation";
+
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 
 	interface Props {
@@ -65,20 +65,13 @@
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
 
 	let message: string = $state("");
-	let timeout: ReturnType<typeof setTimeout>;
-	let isSharedRecently = $state(false);
+	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
-	beforeNavigate(() => {
-		if (page.params.id) {
-			isSharedRecently = false;
-		}
-	});
 
 	const dispatch = createEventDispatcher<{
 		message: string;
-		share: void;
 		stop: void;
 		retry: { id: Message["id"]; content?: string };
 		continue: { id: Message["id"] };
@@ -164,25 +157,10 @@
 	);
 
 	function onShare() {
-		if (!confirm("Are you sure you want to share this conversation? This cannot be undone.")) {
-			return;
-		}
-
-		dispatch("share");
-		isSharedRecently = true;
-		if (timeout) {
-			clearTimeout(timeout);
-		}
-		timeout = setTimeout(() => {
-			isSharedRecently = false;
-		}, 2000);
+		shareModalOpen = true;
 	}
 
-	onDestroy(() => {
-		if (timeout) {
-			clearTimeout(timeout);
-		}
-	});
+	onDestroy(() => {});
 
 	let chatContainer: HTMLElement | undefined = $state();
 
@@ -228,6 +206,9 @@
 />
 
 <div class="relative z-[-1] min-h-0 min-w-0">
+	{#if shareModalOpen}
+		<ShareConversationModal open={shareModalOpen} on:close={() => (shareModalOpen = false)} />
+	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.map((message) => message.content)}
@@ -449,17 +430,10 @@
 					<button
 						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
-						class:hover:underline={!isSharedRecently}
 						onclick={onShare}
-						disabled={isSharedRecently}
 					>
-						{#if isSharedRecently}
-							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
-							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
-						{:else}
-							<CarbonExport class="text-[.6rem] text-black dark:text-white sm:mr-1.5" />
-							<div class="max-sm:hidden">Share this conversation</div>
-						{/if}
+						<CarbonExport class="text-[.6rem] text-black dark:text-white sm:mr-1.5" />
+						<div class="max-sm:hidden">Share this conversation</div>
 					</button>
 				{/if}
 			</div>
