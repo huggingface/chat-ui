@@ -6,12 +6,10 @@ import type { Settings } from "$lib/types/Settings";
 import type { User } from "$lib/types/User";
 import type { MessageEvent } from "$lib/types/MessageEvent";
 import type { Session } from "$lib/types/Session";
-import type { Assistant } from "$lib/types/Assistant";
 import type { Report } from "$lib/types/Report";
 import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
-import type { AssistantStats } from "$lib/types/AssistantStats";
 // Tools feature removed
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
@@ -117,8 +115,6 @@ export class Database {
 
 		const conversations = db.collection<Conversation>("conversations");
 		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
-		const assistants = db.collection<Assistant>("assistants");
-		const assistantStats = db.collection<AssistantStats>("assistants.stats");
 		const reports = db.collection<Report>("reports");
 		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
 		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
@@ -130,14 +126,11 @@ export class Database {
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
-		const tools = db.collection("tools");
 		const configCollection = db.collection<ConfigKey>("config");
 
 		return {
 			conversations,
 			conversationStats,
-			assistants,
-			assistantStats,
 			reports,
 			sharedConversations,
 			abortedGenerations,
@@ -149,7 +142,6 @@ export class Database {
 			migrationResults,
 			semaphores,
 			tokenCaches,
-			tools,
 			config: configCollection,
 		};
 	}
@@ -162,8 +154,6 @@ export class Database {
 		const {
 			conversations,
 			conversationStats,
-			assistants,
-			assistantStats,
 			reports,
 			sharedConversations,
 			abortedGenerations,
@@ -173,7 +163,6 @@ export class Database {
 			messageEvents,
 			semaphores,
 			tokenCaches,
-			tools,
 			config,
 		} = this.getCollections();
 
@@ -234,7 +223,6 @@ export class Database {
 		settings
 			.createIndex({ userId: 1 }, { unique: true, sparse: true })
 			.catch((e) => logger.error(e));
-		settings.createIndex({ assistants: 1 }).catch((e) => logger.error(e));
 		users.createIndex({ hfUserId: 1 }, { unique: true }).catch((e) => logger.error(e));
 		users
 			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
@@ -246,21 +234,6 @@ export class Database {
 			.catch((e) => logger.error(e));
 		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch((e) => logger.error(e));
 		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch((e) => logger.error(e));
-		assistants.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ review: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
-		assistants
-			.createIndex({ last24HoursUseCount: -1, useCount: -1, _id: 1 })
-			.catch((e) => logger.error(e));
-		assistantStats
-			// Order of keys is important for the queries
-			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-			.catch((e) => logger.error(e));
-		reports.createIndex({ assistantId: 1 }).catch((e) => logger.error(e));
-		reports.createIndex({ createdBy: 1, assistantId: 1 }).catch((e) => logger.error(e));
 
 		// Unique index for semaphore and migration results
 		semaphores.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));

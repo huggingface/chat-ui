@@ -40,11 +40,14 @@
 	onMount(() => {
 		document.getElementById("app")?.setAttribute("inert", "true");
 		modalEl?.focus();
+		// Ensure Escape closes even if focus isn't within modal
+		window.addEventListener("keydown", handleKeydown, { capture: true });
 	});
 
 	onDestroy(() => {
 		if (!browser) return;
 		document.getElementById("app")?.removeAttribute("inert");
+		window.removeEventListener("keydown", handleKeydown, { capture: true } as EventListenerOptions);
 	});
 </script>
 
