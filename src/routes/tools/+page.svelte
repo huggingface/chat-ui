@@ -17,7 +17,7 @@
 	import { getHref } from "$lib/utils/getHref";
 	import { debounce } from "$lib/utils/debounce";
 	import { isDesktop } from "$lib/utils/isDesktop";
-	import { SortKey } from "$lib/types/Assistant";
+import { SortKey } from "$lib/types/SortKey";
 	import ToolLogo from "$lib/components/ToolLogo.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
 	import { useSettingsStore } from "$lib/stores/settings";

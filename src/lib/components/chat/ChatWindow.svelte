@@ -18,10 +18,8 @@
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
-	import type { Assistant } from "$lib/types/Assistant";
 	import { base } from "$app/paths";
 	import ContinueBtn from "../ContinueBtn.svelte";
-	import AssistantIntroduction from "./AssistantIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
@@ -48,7 +46,6 @@
 		shared?: boolean;
 		currentModel: Model;
 		models: Model[];
-		assistant?: Assistant | undefined;
 		preprompt?: string | undefined;
 		files?: File[];
 	}
@@ -61,7 +58,6 @@
 		shared = false,
 		currentModel,
 		models,
-		assistant = undefined,
 		preprompt = undefined,
 		files = $bindable([]),
 	}: Props = $props();
@@ -207,23 +203,15 @@
 
 	let mimeTypesFromActiveTools = $derived(
 		page.data.tools
-			.filter((tool: ToolFront) => {
-				if (assistant) {
-					return assistant.tools?.includes(tool._id);
-				}
-				if (currentModel.tools) {
-					return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
-				}
-				return false;
-			})
+			.filter((tool: ToolFront) => (currentModel.tools ? ($settings?.tools?.includes(tool._id) ?? tool.isOnByDefault) : false))
 			.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
 	);
 
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...mimeTypesFromActiveTools, // fetch mime types from active tools either from tool settings or active assistant
-				...(currentModel.tools && !assistant ? ["application/pdf"] : []), // if its a tool model, we can always enable document parser so we always accept pdfs
+				...mimeTypesFromActiveTools, // fetch mime types from active tools
+				...(currentModel.tools ? ["application/pdf"] : []), // tool models can enable document parser; accept pdfs
 				...(currentModel.multimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"])
 					: []), // if its a multimodal model, we always accept images
@@ -256,28 +244,7 @@
 		<div
 			class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
 		>
-			{#if assistant && !!messages.length}
-				<a
-					class="mx-auto flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 py-1 pl-1 pr-3 text-sm text-gray-800 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-					href="{base}/assistant/{assistant._id}"
-				>
-					{#if assistant.avatar}
-						<img
-							src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash=${assistant.avatar}"
-							alt="Avatar"
-							class="size-5 rounded-full object-cover"
-						/>
-					{:else}
-						<div
-							class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
-						>
-							{assistant.name[0]}
-						</div>
-					{/if}
-
-					{assistant.name}
-				</a>
-			{:else if preprompt && preprompt != currentModel.preprompt}
+			{#if preprompt && preprompt != currentModel.preprompt}
 				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 
@@ -314,22 +281,9 @@
 					isAuthor={!shared}
 					readOnly={isReadOnly}
 				/>
-			{:else if !assistant}
+			{:else}
 				<ChatIntroduction
 					{currentModel}
-					on:message={(ev) => {
-						if (page.data.loginRequired) {
-							ev.preventDefault();
-							$loginModalOpen = true;
-						} else {
-							dispatch("message", ev.detail);
-						}
-					}}
-				/>
-			{:else}
-				<AssistantIntroduction
-					{models}
-					{assistant}
 					on:message={(ev) => {
 						if (page.data.loginRequired) {
 							ev.preventDefault();
@@ -430,7 +384,6 @@
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
-								{assistant}
 								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
 								{loading}
 								bind:value={message}
@@ -487,7 +440,6 @@
 			>
 				<p>
 					Model:
-					{#if !assistant}
 						{#if models.find((m) => m.id === currentModel.id)}
 							<a
 								href="{base}/settings/{currentModel.id}"
@@ -499,20 +451,6 @@
 								{currentModel.id}
 							</span>
 						{/if}
-					{:else}
-						{@const model = models.find((m) => m.id === assistant?.modelId)}
-						{#if model}
-							<a
-								href="{base}/settings/assistants/{assistant._id}"
-								class="inline-flex items-center border-b hover:text-gray-600 dark:border-gray-700 dark:hover:text-gray-300"
-								>{model?.displayName}<CarbonCaretDown class="text-xxs" /></a
-							>
-						{:else}
-							<span class="inline-flex items-center line-through dark:border-gray-700">
-								{currentModel.id}
-							</span>
-						{/if}
-					{/if}
 					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 					or false.
 				</p>

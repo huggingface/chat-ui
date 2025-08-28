@@ -8,7 +8,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { ReviewStatus } from "$lib/types/Review";
 
-	import ReportModal from "../../settings/(nav)/assistants/[assistantId]/ReportModal.svelte";
+	import ReportModal from "$lib/components/ReportModal.svelte";
 	import { enhance } from "$app/forms";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 

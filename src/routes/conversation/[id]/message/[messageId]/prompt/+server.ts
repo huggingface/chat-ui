@@ -36,12 +36,6 @@ export async function GET({ params, locals }) {
 		error(404, "Conversation model not found");
 	}
 
-	let assistant;
-	if (conv.assistantId) {
-		assistant = await collections.assistants.findOne({
-			_id: new ObjectId(conv.assistantId),
-		});
-	}
 
 	const messagesUpTo = buildSubtree(conv, messageId);
 
@@ -57,10 +51,8 @@ export async function GET({ params, locals }) {
 	return Response.json({
 		prompt,
 		model: model.name,
-		assistant: assistant?.name,
 		parameters: {
 			...model.parameters,
-			...(assistant?.generateSettings || {}),
 			return_full_text: false,
 		},
 		messages: messagesUpTo.map((msg) => ({

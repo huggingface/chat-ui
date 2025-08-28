@@ -501,13 +501,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		},
 	});
 
-	if (conv.assistantId) {
-		await collections.assistantStats.updateOne(
-			{ assistantId: conv.assistantId, "date.at": startOfHour(new Date()), "date.span": "hour" },
-			{ $inc: { count: 1 } },
-			{ upsert: true }
-		);
-	}
+	// Assistants feature removed; do not write assistant stats
 
 	const metrics = MetricsServer.getMetrics();
 	metrics.model.messagesTotal.inc({ model: model?.id });

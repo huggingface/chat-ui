@@ -5,8 +5,7 @@
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
-	import CarbonArrowUpRight from "~icons/carbon/ArrowUpRight";
-	import CarbonAdd from "~icons/carbon/add";
+	// removed Assistants feature imports
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 
@@ -28,7 +27,6 @@
 	let { data, children }: Props = $props();
 
 	let previousPage: string = $state(base || "/");
-	let assistantsSection: HTMLHeadingElement | undefined = $state();
 	let showContent: boolean = $state(false);
 
 	const client = useAPIClient();
@@ -45,9 +43,6 @@
 	}
 
 	onMount(() => {
-		if (page.params?.assistantId && assistantsSection) {
-			assistantsSection.scrollIntoView();
-		}
 		// Show content when not on the root settings page
 		showContent = page.url.pathname !== `${base}/settings`;
 		// Initial desktop redirect check
@@ -141,149 +136,7 @@
 					{/if}
 				</button>
 			{/each}
-			{#if data.enableAssistants}
-				<h3
-					bind:this={assistantsSection}
-					class="mt-6 px-4 pb-2 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
-				>
-					Assistants
-				</h3>
-				<!-- My Assistants -->
-				<h4
-					class="px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
-				>
-					My Assistants
-				</h4>
-
-				{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
-					<button
-						type="button"
-						onclick={() => goto(`${base}/settings/assistants/${assistant._id.toString()}`)}
-						class="group flex h-10 w-full flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-						{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
-						aria-label="Configure {assistant.name} assistant"
-					>
-						{#if assistant.avatar}
-							<img
-								src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
-								alt="Avatar"
-								class="h-6 w-6 rounded-full"
-							/>
-						{:else}
-							<div
-								class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
-							>
-								{assistant.name[0]}
-							</div>
-						{/if}
-						<div class="truncate text-gray-900">{assistant.name}</div>
-						{#if assistant._id.toString() === $settings.activeModel}
-							<div
-								class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
-							>
-								Active
-							</div>
-						{/if}
-					</button>
-				{/each}
-				{#if !data.loginEnabled || (data.loginEnabled && !!data.user)}
-					<button
-						type="button"
-						onclick={() => goto(`${base}/settings/assistants/new`)}
-						class="group flex h-10 w-full flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-						{page.url.pathname === `${base}/settings/assistants/new` ? '!bg-gray-100 !text-gray-800' : ''}"
-						aria-label="Create new assistant"
-					>
-						<CarbonAdd />
-						<div class="truncate">Create new assistant</div>
-					</button>
-				{/if}
-
-				<!-- Other Assistants -->
-				<h4
-					class="mt-4 px-4 pb-1 pt-2 text-center text-[.7rem] font-medium text-gray-600 md:px-3 md:text-left"
-				>
-					Other Assistants
-				</h4>
-
-				{#each data.assistants.filter((assistant) => !assistant.createdByMe) as assistant}
-					<div class="group relative">
-						<button
-							type="button"
-							onclick={() => goto(`${base}/settings/assistants/${assistant._id.toString()}`)}
-							class="group flex h-10 w-full flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
-							{assistant._id.toString() === page.params.assistantId ? '!bg-gray-100 !text-gray-800' : ''}"
-							aria-label="Configure {assistant.name} assistant"
-						>
-							{#if assistant.avatar}
-								<img
-									src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash={assistant.avatar}"
-									alt="Avatar"
-									class="h-6 w-6 rounded-full"
-								/>
-							{:else}
-								<div
-									class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
-								>
-									{assistant.name[0]}
-								</div>
-							{/if}
-							<div class="truncate">{assistant.name}</div>
-							{#if assistant._id.toString() === $settings.activeModel}
-								<div
-									class="ml-auto rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
-								>
-									Active
-								</div>
-							{/if}
-						</button>
-						<div class="absolute right-2 top-1/2 -translate-y-1/2">
-							<button
-								type="button"
-								aria-label="Remove assistant from your list"
-								class={[
-									"rounded-full p-1 text-xs hover:bg-gray-500 hover:bg-opacity-20",
-									assistant._id.toString() === page.params.assistantId
-										? "block"
-										: "hidden group-hover:block",
-									assistant._id.toString() !== $settings.activeModel && "ml-auto",
-								]}
-								onclick={(event) => {
-									event.stopPropagation();
-									client
-										.assistants({
-											id: assistant._id,
-										})
-										.follow.delete()
-										.then(handleResponse)
-										.then(() => {
-											if (assistant._id.toString() === page.params.assistantId) {
-												goto(`${base}/settings`, { invalidateAll: true });
-											} else {
-												invalidateAll();
-											}
-										})
-										.catch((err) => {
-											console.error(err);
-											$error = err.message;
-										});
-								}}
-							>
-								<CarbonClose class="size-4 text-gray-500" />
-							</button>
-						</div>
-					</div>
-				{/each}
-				<button
-					type="button"
-					onclick={() => goto(`${base}/assistants`)}
-					class="group flex h-10 w-full flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3"
-					aria-label="Browse all assistants"
-				>
-					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
-					<div class="truncate">Browse Assistants</div>
-				</button>
-			{/if}
+			<!-- Assistants feature removed -->
 
 			<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
 			<button
