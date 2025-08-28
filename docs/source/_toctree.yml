@@ -18,8 +18,6 @@
       title: Theming
     - local: configuration/open-id
       title: OpenID
-    - local: configuration/metrics
-      title: Metrics
     - title: Models
       sections:
         - local: configuration/models/overview

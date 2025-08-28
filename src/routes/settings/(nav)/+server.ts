@@ -2,7 +2,6 @@ import { collections } from "$lib/server/database";
 import { z } from "zod";
 import { authCondition } from "$lib/server/auth";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
-// Tools feature removed
 import { ObjectId } from "mongodb";
 
 export async function POST({ request, locals }) {
@@ -21,8 +20,6 @@ export async function POST({ request, locals }) {
 			directPaste: z.boolean().default(false),
 		})
 		.parse(body) satisfies SettingsEditable;
-
-	// Tools removed: ignore posted tools
 
 	await collections.settings.updateOne(
 		authCondition(locals),

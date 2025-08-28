@@ -9,7 +9,6 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 
-	import { shareConversation } from "$lib/shareConversation";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -130,8 +129,6 @@
 				});
 		}
 
-		// Tools feature removed: ignore tools query param
-
 		if ($page.url.searchParams.has("token")) {
 			const token = $page.url.searchParams.get("token");
 
@@ -226,7 +223,6 @@
 			{conversations}
 			user={data.user}
 			canLogin={!data.user && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
@@ -238,7 +234,6 @@
 			{conversations}
 			user={data.user}
 			canLogin={!data.user && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>

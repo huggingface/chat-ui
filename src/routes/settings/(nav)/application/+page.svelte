@@ -18,8 +18,8 @@
 	const client = useAPIClient();
 </script>
 
-<div class="flex w-full flex-col gap-5">
-	<h2 class="text-center text-xl font-semibold text-gray-800 md:text-left">Application Settings</h2>
+<div class="flex w-full flex-col gap-4">
+	<h2 class="text-center text-lg font-semibold text-gray-800 md:text-left">Application Settings</h2>
 	{#if !!publicConfig.PUBLIC_COMMIT_SHA}
 		<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 			<a
@@ -35,53 +35,55 @@
 		</div>
 	{/if}
 	{#if page.data.isAdmin}
-		<p class="text-red-500">You are an admin.</p>
+		<p class="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700">Admin mode</p>
 	{/if}
-	<div class="flex h-full max-w-2xl flex-col gap-2 max-sm:pt-0">
-		{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
-			<label class="flex items-center">
-				<Switch
-					name="shareConversationsWithModelAuthors"
-					bind:checked={$settings.shareConversationsWithModelAuthors}
-				/>
-				<div class="inline cursor-pointer select-none items-center gap-2 pl-2">
-					Share conversations with model authors
+	<div class="flex h-full flex-col gap-4 max-sm:pt-0">
+		<div class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm">
+			<div class="divide-y divide-gray-200">
+				{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800">Share with model authors</div>
+							<p class="text-[12px] text-gray-500">
+								Sharing your data helps improve open models over time.
+							</p>
+						</div>
+						<Switch
+							name="shareConversationsWithModelAuthors"
+							bind:checked={$settings.shareConversationsWithModelAuthors}
+						/>
+					</div>
+				{/if}
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800">Hide emoticons in topics</div>
+						<p class="text-[12px] text-gray-500">Hide emojis shown in the conversation list.</p>
+					</div>
+					<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
 				</div>
-			</label>
 
-			<p class="text-sm text-gray-500">
-				Sharing your data will help improve the training data and make open models better over time.
-			</p>
-		{/if}
-		<label class="mt-6 flex items-center">
-			<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
-				Hide emoticons in conversation topics
-				<p class="text-sm font-normal text-gray-500">
-					Emoticons are shown in the sidebar by default, enable this to hide them.
-				</p>
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800">Disable streaming tokens</div>
+						<p class="text-[12px] text-gray-500">Show responses only when complete.</p>
+					</div>
+					<Switch name="disableStream" bind:checked={$settings.disableStream} />
+				</div>
+
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800">Paste text directly</div>
+						<p class="text-[12px] text-gray-500">
+							Paste long text directly into chat instead of a file.
+						</p>
+					</div>
+					<Switch name="directPaste" bind:checked={$settings.directPaste} />
+				</div>
 			</div>
-		</label>
+		</div>
 
-		<label class="mt-6 flex items-center">
-			<Switch name="disableStream" bind:checked={$settings.disableStream} />
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
-				Disable streaming tokens
-			</div>
-		</label>
-
-		<label class="mt-6 flex items-center">
-			<Switch name="directPaste" bind:checked={$settings.directPaste} />
-			<div class="inline cursor-pointer select-none items-center gap-2 pl-2 font-semibold">
-				Paste text directly into chat
-				<p class="text-sm font-normal text-gray-500">
-					By default, when pasting long text into the chat, we treat it as a plaintext file. Enable
-					this to paste directly into the chat instead.
-				</p>
-			</div>
-		</label>
-
-		<div class="mt-12 flex flex-col gap-3">
+		<div class="mt-6 flex flex-col gap-2 text-[13px]">
 			<a
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
 				target="_blank"
@@ -112,7 +114,7 @@
 							});
 				}}
 				type="submit"
-				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+				class="flex items-center underline decoration-red-200 underline-offset-2 hover:decoration-red-500"
 				><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
 			>
 		</div>

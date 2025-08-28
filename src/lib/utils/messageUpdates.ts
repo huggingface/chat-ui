@@ -7,17 +7,12 @@ import {
 
 import { page } from "$app/state";
 
-// Web search updates removed
-
-// Tools feature removed: no tool update helpers
-
 type MessageUpdateRequestOptions = {
 	base: string;
 	inputs?: string;
 	messageId?: string;
 	isRetry: boolean;
 	isContinue: boolean;
-	// tools removed
 	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(

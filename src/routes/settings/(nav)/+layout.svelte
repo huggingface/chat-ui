@@ -1,23 +1,18 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
-	import { afterNavigate, goto, invalidateAll } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
-	// removed Assistants feature imports
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 
 	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
-	import { error } from "$lib/stores/errors";
 	import { browser } from "$app/environment";
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { debounce } from "$lib/utils/debounce";
-
-	import { fly } from "svelte/transition";
-	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		data: LayoutData;
@@ -28,8 +23,6 @@
 
 	let previousPage: string = $state(base || "/");
 	let showContent: boolean = $state(false);
-
-	const client = useAPIClient();
 
 	function checkDesktopRedirect() {
 		if (
@@ -102,12 +95,10 @@
 		<div
 			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
 			class:max-md:hidden={showContent && browser}
-			in:fly={{ x: -100, duration: 200 }}
-			out:fly={{ x: -100, duration: 200 }}
 		>
 			<!-- Section Headers -->
 			<h3
-				class="px-4 pb-2 pt-3 text-center text-[.8rem] font-medium text-gray-800 md:px-3 md:text-left"
+				class="px-3 pb-1 pt-2 text-center text-xs font-semibold tracking-wide text-gray-600 md:text-left"
 			>
 				Models
 			</h3>
@@ -116,7 +107,8 @@
 				<button
 					type="button"
 					onclick={() => goto(`${base}/settings/${model.id}`)}
-					class="group flex h-10 w-full flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 md:rounded-xl md:px-3
+					class="group flex h-9 w-full flex-none items-center gap-2 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100
+					md:rounded-xl md:px-3
 					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 					aria-label="Configure {model.displayName}"
 				>
@@ -129,20 +121,19 @@
 					{/if}
 					{#if model.id === $settings.activeModel}
 						<div
-							class="rounded-lg bg-black px-2 py-1.5 text-xs font-semibold leading-none text-white"
+							class="rounded-md bg-black/90 px-2 py-1 text-[10px] font-semibold leading-none text-white"
 						>
 							Active
 						</div>
 					{/if}
 				</button>
 			{/each}
-			<!-- Assistants feature removed -->
 
 			<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
 			<button
 				type="button"
 				onclick={() => goto(`${base}/settings/application`)}
-				class="group flex h-10 w-full flex-none items-center gap-2 px-4 text-sm text-gray-500 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
+				class="group flex h-9 w-full flex-none items-center gap-2 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
 				{page.url.pathname === `${base}/settings/application` ? '!bg-gray-100 !text-gray-800' : ''}"
 				aria-label="Configure application settings"
 			>
@@ -155,8 +146,6 @@
 		<div
 			class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
 			class:max-md:hidden={!showContent && browser}
-			in:fly={{ x: 100, duration: 200 }}
-			out:fly={{ x: 100, duration: 200 }}
 		>
 			{@render children?.()}
 		</div>
