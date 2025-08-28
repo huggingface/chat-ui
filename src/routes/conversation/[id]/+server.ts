@@ -24,7 +24,6 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
-// Tools feature removed
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -191,8 +190,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			})
 	);
 
-	// Tools removed: no document parser auto-activation
-
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		error(400, "Message too long.");
 	}
@@ -342,7 +339,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messageToWriteTo.content += event.token;
 
 
-					// Metrics removed: no token/latency tracking
 					if (!lastTokenTimestamp) {
 						lastTokenTimestamp = new Date();
 					}
@@ -368,8 +364,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
-
-					// Metrics removed: no latency tracking
 				}
 
 				// Add file
@@ -472,9 +466,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		},
 	});
 
-	// Assistants feature removed; do not write assistant stats
-
-	// Metrics removed: no message counters
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
 		headers: {

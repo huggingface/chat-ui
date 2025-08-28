@@ -68,10 +68,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		rootMessageId = conversation.rootMessageId ?? rootMessageId;
 		values.model = conversation.model;
 		values.preprompt = conversation.preprompt;
-		// embeddings and websearch removed; ignore embeddingModel from shares
 	}
-
-	// embeddings removed; no embedding model is tracked
 
 	if (model.unlisted) {
 		error(400, "Can't start a conversation with an unlisted model");
@@ -97,8 +94,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
-
-	// Metrics removed: no conversation counters
 
 	return new Response(
 		JSON.stringify({
