@@ -3,10 +3,10 @@ import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 
-export const load = async ({ depends, fetch }) => {
+export const load = async ({ depends, fetch, url }) => {
 	depends(UrlDependency.ConversationList);
 
-	const client = useAPIClient({ fetch });
+	const client = useAPIClient({ fetch, origin: url.origin });
 
 	const [
 		settings,
