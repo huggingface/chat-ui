@@ -53,11 +53,6 @@ spec:
             - containerPort: {{ $.Values.envVars.APP_PORT | default 3000 | int }}
               name: http
               protocol: TCP
-            {{- if $.Values.monitoring.enabled }}
-            - containerPort: {{ $.Values.envVars.METRICS_PORT | default 5565 | int }}
-              name: metrics
-              protocol: TCP
-            {{- end }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
           {{- with $.Values.extraEnv }}
           env:
