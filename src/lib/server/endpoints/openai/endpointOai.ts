@@ -90,7 +90,9 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	apiKey: z.string().default(config.OPENAI_API_KEY || config.HF_TOKEN || "sk-"),
+    // Prefer HF_TOKEN when available (works with Hugging Face router's OpenAI-compatible API),
+    // otherwise fall back to OPENAI_API_KEY for OpenAI and other providers.
+    apiKey: z.string().default(config.HF_TOKEN || config.OPENAI_API_KEY || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
