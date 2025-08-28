@@ -24,8 +24,9 @@
 </script>
 
 <Modal
-	on:close={() => goto(previousPage)}
-	width="h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[95dvh] xl:w-[1200px] 2xl:h-[75dvh]"
+    on:close={() => goto(previousPage)}
+    disableFly={true}
+    width="h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[95dvh] xl:w-[1200px] 2xl:h-[75dvh]"
 >
 	{@render children?.()}
 	{#if $settings.recentlySaved}
