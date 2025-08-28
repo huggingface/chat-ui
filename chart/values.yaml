@@ -70,5 +70,4 @@ autoscaling:
   targetMemoryUtilizationPercentage: ""
   targetCPUUtilizationPercentage: ""
 
-monitoring:
-  enabled: false
+## Metrics removed; monitoring configuration no longer used
