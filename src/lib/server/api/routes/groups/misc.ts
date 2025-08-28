@@ -11,11 +11,11 @@ import mimeTypes from "mime-types";
 import { logger } from "$lib/server/logger";
 
 export interface FeatureFlags {
-    enableAssistants: boolean;
-    loginEnabled: boolean;
-    loginRequired: boolean;
-    guestMode: boolean;
-    isAdmin: boolean;
+	enableAssistants: boolean;
+	loginEnabled: boolean;
+	loginRequired: boolean;
+	guestMode: boolean;
+	isAdmin: boolean;
 }
 
 export type ApiReturnType = Awaited<ReturnType<typeof Client.prototype.view_api>>;
@@ -55,13 +55,13 @@ export const misc = new Elysia()
 			}
 		}
 
-        return {
-            enableAssistants: config.ENABLE_ASSISTANTS === "true",
-            loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
-            loginRequired,
-            guestMode: requiresUser && messagesBeforeLogin > 0,
-            isAdmin: locals.isAdmin,
-        } satisfies FeatureFlags;
+		return {
+			enableAssistants: config.ENABLE_ASSISTANTS === "true",
+			loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
+			loginRequired,
+			guestMode: requiresUser && messagesBeforeLogin > 0,
+			isAdmin: locals.isAdmin,
+		} satisfies FeatureFlags;
 	})
 	.get("/spaces-config", async ({ query }) => {
 		if (config.COMMUNITY_TOOLS !== "true") {
@@ -170,11 +170,11 @@ export const misc = new Elysia()
 							return {
 								...conversation,
 								messages: conversation.messages.map((message) => {
-                            return {
-                                ...message,
-                                files: filenames,
-                                updates: undefined,
-                            };
+									return {
+										...message,
+										files: filenames,
+										updates: undefined,
+									};
 								}),
 							};
 						})
@@ -217,21 +217,21 @@ export const misc = new Elysia()
 
 							stats.nAssistants++;
 
-                        return {
-                            _id: assistant._id.toString(),
-                            name: assistant.name,
-                            createdById: assistant.createdById.toString(),
-                            createdByName: assistant.createdByName,
-                            avatar: `avatar-${assistant._id.toString()}.jpg`,
-                            modelId: assistant.modelId,
-                            preprompt: assistant.preprompt,
-                            description: assistant.description,
-                            dynamicPrompt: assistant.dynamicPrompt,
-                            exampleInputs: assistant.exampleInputs,
-                            generateSettings: assistant.generateSettings,
-                            createdAt: assistant.createdAt.toISOString(),
-                            updatedAt: assistant.updatedAt.toISOString(),
-                        };
+							return {
+								_id: assistant._id.toString(),
+								name: assistant.name,
+								createdById: assistant.createdById.toString(),
+								createdByName: assistant.createdByName,
+								avatar: `avatar-${assistant._id.toString()}.jpg`,
+								modelId: assistant.modelId,
+								preprompt: assistant.preprompt,
+								description: assistant.description,
+								dynamicPrompt: assistant.dynamicPrompt,
+								exampleInputs: assistant.exampleInputs,
+								generateSettings: assistant.generateSettings,
+								createdAt: assistant.createdAt.toISOString(),
+								updatedAt: assistant.updatedAt.toISOString(),
+							};
 						})
 					);
 

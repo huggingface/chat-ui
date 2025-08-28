@@ -14,8 +14,8 @@ import { logger } from "../logger";
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
 export async function* generate(
-    { model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
-    preprompt?: string
+	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
+	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
 	// reasoning mode is false by default
 	let reasoning = false;
@@ -41,13 +41,13 @@ export async function* generate(
 	}
 
 	for await (const output of await endpoint({
-        messages,
-        preprompt,
-        continueMessage: isContinue,
-        generateSettings: assistant?.generateSettings,
-        isMultimodal: model.multimodal,
-        conversationId: conv._id,
-    })) {
+		messages,
+		preprompt,
+		continueMessage: isContinue,
+		generateSettings: assistant?.generateSettings,
+		isMultimodal: model.multimodal,
+		conversationId: conv._id,
+	})) {
 		// text generation completed
 		if (output.generated_text) {
 			let interrupted =

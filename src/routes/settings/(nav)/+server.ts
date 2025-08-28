@@ -16,13 +16,13 @@ export async function POST({ request, locals }) {
 			hideEmojiOnSidebar: z.boolean().default(DEFAULT_SETTINGS.hideEmojiOnSidebar),
 			ethicsModalAccepted: z.boolean().optional(),
 			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
-    customPrompts: z.record(z.string()).default({}),
+			customPrompts: z.record(z.string()).default({}),
 			disableStream: z.boolean().default(false),
 			directPaste: z.boolean().default(false),
 		})
 		.parse(body) satisfies SettingsEditable;
 
-    // Tools removed: ignore posted tools
+	// Tools removed: ignore posted tools
 
 	await collections.settings.updateOne(
 		authCondition(locals),

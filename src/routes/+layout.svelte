@@ -116,7 +116,7 @@
 
 	const settings = createSettingsStore(data.settings);
 
-		onMount(async () => {
+	onMount(async () => {
 		if ($page.url.searchParams.has("model")) {
 			await settings
 				.instantSet({

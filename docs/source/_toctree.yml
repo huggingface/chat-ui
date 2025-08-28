@@ -30,26 +30,8 @@
           title: Tools
         - title: Providers
           sections:
-            - local: configuration/models/providers/anthropic
-              title: Anthropic
-            - local: configuration/models/providers/aws
-              title: AWS
-            - local: configuration/models/providers/cloudflare
-              title: Cloudflare
-            - local: configuration/models/providers/cohere
-              title: Cohere
-            - local: configuration/models/providers/google
-              title: Google
-            - local: configuration/models/providers/langserve
-              title: Langserve
-            - local: configuration/models/providers/llamacpp
-              title: Llama.cpp
-            - local: configuration/models/providers/ollama
-              title: Ollama
             - local: configuration/models/providers/openai
-              title: OpenAI
-            - local: configuration/models/providers/tgi
-              title: TGI
+              title: OpenAI (compatible)
     - local: configuration/common-issues
       title: Common Issues
 - title: Developing

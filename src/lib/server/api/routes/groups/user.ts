@@ -71,7 +71,7 @@ export const userGroup = new Elysia()
 						settings?.shareConversationsWithModelAuthors ??
 						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
-                    customPrompts: settings?.customPrompts ?? {},
+					customPrompts: settings?.customPrompts ?? {},
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {
@@ -123,5 +123,5 @@ export const userGroup = new Elysia()
 					})
 					.toArray();
 				return reports;
-			})
+			});
 	});

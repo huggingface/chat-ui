@@ -7,16 +7,16 @@ import { onExit } from "./exitHandler";
 import { promisify } from "util";
 
 interface Metrics {
-    model: {
-        conversationsTotal: Counter<Model["id"]>;
-        messagesTotal: Counter<Model["id"]>;
-        tokenCountTotal: Counter<Model["id"]>;
-        timePerOutputToken: Summary<Model["id"]>;
-        timeToFirstToken: Summary<Model["id"]>;
-        latency: Summary<Model["id"]>;
-        votesPositive: Counter<Model["id"]>;
-        votesNegative: Counter<Model["id"]>;
-    };
+	model: {
+		conversationsTotal: Counter<Model["id"]>;
+		messagesTotal: Counter<Model["id"]>;
+		tokenCountTotal: Counter<Model["id"]>;
+		timePerOutputToken: Summary<Model["id"]>;
+		timeToFirstToken: Summary<Model["id"]>;
+		latency: Summary<Model["id"]>;
+		votesPositive: Counter<Model["id"]>;
+		votesNegative: Counter<Model["id"]>;
+	};
 }
 
 export class MetricsServer {
@@ -106,8 +106,8 @@ export class MetricsServer {
 					registers: [register],
 				}),
 			},
-            // webSearch metrics removed, tools removed
-        };
+			// webSearch metrics removed, tools removed
+		};
 
 		app.get("/metrics", (req, res) => {
 			register.metrics().then((metrics) => {

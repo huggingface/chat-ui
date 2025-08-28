@@ -15,7 +15,7 @@ export interface Assistant extends Timestamps {
 	preprompt: string;
 	userCount?: number;
 	review: ReviewStatus;
-    // Web search / RAG removed in this build
+	// Web search / RAG removed in this build
 	generateSettings?: {
 		temperature?: number;
 		top_p?: number;

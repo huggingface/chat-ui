@@ -246,7 +246,7 @@
 				throw new Error("Message to write to not found");
 			}
 
-					const messageUpdatesAbortController = new AbortController();
+			const messageUpdatesAbortController = new AbortController();
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,

@@ -2,14 +2,29 @@ import type { Migration } from ".";
 import { collections } from "$lib/server/database";
 import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
-import type { WebSearchSource } from "$lib/types/WebSearch";
+// Simple type to replace removed WebSearchSource for migration compatibility
+type WebSearchSource = {
+	title?: string;
+	link: string;
+};
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
-	MessageWebSearchUpdateType,
 	type MessageUpdate,
-	type MessageWebSearchFinishedUpdate,
 } from "$lib/types/MessageUpdate";
+
+// Legacy types for migration compatibility
+enum MessageWebSearchUpdateType {
+	Update = "update",
+	Error = "error",
+	Sources = "sources",
+	Finished = "finished",
+}
+
+type MessageWebSearchFinishedUpdate = {
+	type: "webSearch";
+	subtype: MessageWebSearchUpdateType.Finished;
+};
 import type { Message } from "$lib/types/Message";
 // isMessageWebSearchSourcesUpdate removed from utils; use inline predicate
 
@@ -166,7 +181,7 @@ const updateMessageUpdates: Migration = {
 						(u) =>
 							u.type === MessageUpdateType.WebSearch &&
 							u.subtype === MessageWebSearchUpdateType.Sources
-						) ?? -1;
+					) ?? -1;
 				if (message.webSearch && updates && webSearchSourcesUpdateIndex !== -1) {
 					const webSearchFinishedUpdate: MessageWebSearchFinishedUpdate = {
 						type: MessageUpdateType.WebSearch,

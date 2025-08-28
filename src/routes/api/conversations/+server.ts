@@ -24,14 +24,14 @@ export async function GET({ locals, url }) {
 		if (convs.length === 0) {
 			return Response.json([]);
 		}
-        const res = convs.map((conv) => ({
-            _id: conv._id,
-            id: conv._id, // legacy param iOS
-            title: conv.title,
-            updatedAt: conv.updatedAt,
-            model: conv.model,
-            modelId: conv.model, // legacy param iOS
-        }));
+		const res = convs.map((conv) => ({
+			_id: conv._id,
+			id: conv._id, // legacy param iOS
+			title: conv.title,
+			updatedAt: conv.updatedAt,
+			model: conv.model,
+			modelId: conv.model, // legacy param iOS
+		}));
 		return Response.json(res);
 	} else {
 		return Response.json({ message: "Must have session cookie" }, { status: 401 });

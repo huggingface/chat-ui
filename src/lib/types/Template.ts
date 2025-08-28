@@ -1,7 +1,7 @@
 import type { Message } from "./Message";
 
 export type ChatTemplateInput = {
-    messages: Pick<Message, "from" | "content" | "files">[];
-    preprompt?: string;
-    continueMessage?: boolean;
+	messages: Pick<Message, "from" | "content" | "files">[];
+	preprompt?: string;
+	continueMessage?: boolean;
 };
