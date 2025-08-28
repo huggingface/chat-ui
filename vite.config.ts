@@ -91,6 +91,10 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 		...(shouldCopyLlama ? [copyLlamaFiles()] : []),
 	],
+	// Allow external access via ngrok tunnel host
+	server: {
+		allowedHosts: ["a0c2b59c6b70.ngrok-free.app"],
+	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "@gradio/client", "clsx"],
 	},
