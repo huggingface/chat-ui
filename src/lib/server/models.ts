@@ -106,7 +106,8 @@ if (openaiBaseUrl) {
 	try {
 		const baseURL = openaiBaseUrl;
 		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
-		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
+        // Prefer HF_TOKEN for Hugging Face router compatibility; otherwise use OPENAI_API_KEY
+        const authToken = config.HF_TOKEN || config.OPENAI_API_KEY || "";
 
 		// Try unauthenticated request first (many model lists are public, e.g. HF router)
 		let response = await fetch(`${baseURL}/models`);
