@@ -43,8 +43,4 @@
 	});
 </script>
 
-<div bind:this={loader} class="flex animate-pulse flex-col gap-4">
-	<div class="w-5/5 ml-2 h-5 gap-5 rounded bg-gray-300 dark:bg-gray-700"></div>
-	<div class="w-5/5 ml-2 h-5 gap-5 rounded bg-gray-300 dark:bg-gray-700"></div>
-	<div class="w-5/5 ml-2 h-5 gap-5 rounded bg-gray-300 dark:bg-gray-700"></div>
-</div>
+<div bind:this={loader} class="h-2"></div>
