@@ -2,11 +2,9 @@ import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
-// embeddings removed in this build
 
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
-// Tools feature removed
 import { fetchJSON } from "$lib/utils/fetchJSON";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
@@ -36,13 +34,11 @@ const modelConfig = z.object({
 	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
-	// tokenizer removed in this build
 	tokenizer: z.never().optional(),
 	datasetName: z.string().min(1).optional(),
 	datasetUrl: z.string().url().optional(),
 	preprompt: z.string().default(""),
 	prepromptUrl: z.string().url().optional(),
-	// chatPromptTemplate removed in this build (OpenAI chat API is used)
 	chatPromptTemplate: z.never().optional(),
 	promptExamples: z
 		.array(
@@ -68,16 +64,13 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
-	// tools removed
 	unlisted: z.boolean().default(false),
-	// embedding model removed in this build
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
 	reasoning: reasoningSchema.optional(),
 });
 
-// Local GGUF discovery and string shorthand removed in this build
 const ggufModelsConfig: Array<z.infer<typeof modelConfig>> = [];
 
 // If OPENAI_BASE_URL (preferred) or OPENAI_MODEL_LIST_URL (legacy) is defined,
@@ -209,7 +202,6 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
-// Inference API ids check removed in this build
 const inferenceApiIds: string[] = [];
 
 export const models = await Promise.all(
