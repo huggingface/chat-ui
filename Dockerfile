@@ -2,7 +2,6 @@
 ARG INCLUDE_DB=false
 
 FROM node:20-slim AS base
-ENV PLAYWRIGHT_SKIP_BROWSER_GC=1
 
 # install dotenv-cli
 RUN npm install -g dotenv-cli
@@ -21,7 +20,6 @@ WORKDIR /app
 RUN touch /app/.env.local
 
 
-RUN npm i --no-package-lock --no-save playwright@1.52.0
 
 USER root
 
@@ -31,7 +29,6 @@ RUN chown -R 1000:1000 /data/models
 RUN apt-get update
 RUN apt-get install gnupg curl git cmake clang libgomp1 -y
 
-RUN npx playwright install --with-deps chromium
 
 RUN chown -R 1000:1000 /home/user/.npm
 
