@@ -12,7 +12,6 @@ import { logger } from "$lib/server/logger";
 
 export interface FeatureFlags {
     enableAssistants: boolean;
-    enableCommunityTools: boolean;
     loginEnabled: boolean;
     loginRequired: boolean;
     guestMode: boolean;
@@ -58,7 +57,6 @@ export const misc = new Elysia()
 
         return {
             enableAssistants: config.ENABLE_ASSISTANTS === "true",
-            enableCommunityTools: config.COMMUNITY_TOOLS === "true",
             loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
             loginRequired,
             guestMode: requiresUser && messagesBeforeLogin > 0,
@@ -230,7 +228,6 @@ export const misc = new Elysia()
                             description: assistant.description,
                             dynamicPrompt: assistant.dynamicPrompt,
                             exampleInputs: assistant.exampleInputs,
-                            tools: assistant.tools,
                             generateSettings: assistant.generateSettings,
                             createdAt: assistant.createdAt.toISOString(),
                             updatedAt: assistant.updatedAt.toISOString(),

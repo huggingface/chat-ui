@@ -15,12 +15,12 @@ export async function GET({ locals, params }) {
 		});
 
 		if (conv) {
-			const res = {
-				id: conv._id,
-				title: conv.title,
-				updatedAt: conv.updatedAt,
-				modelId: conv.model,
-				messages: conv.messages.map((message) => ({
+            const res = {
+                id: conv._id,
+                title: conv.title,
+                updatedAt: conv.updatedAt,
+                modelId: conv.model,
+                messages: conv.messages.map((message) => ({
 					content: message.content,
 					from: message.from,
 					id: message.id,
@@ -30,9 +30,8 @@ export async function GET({ locals, params }) {
 					files: message.files,
 					updates: message.updates,
 					reasoning: message.reasoning,
-				})),
-				modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
-			};
+                })),
+            };
 			return Response.json(res);
 		} else {
 			return Response.json({ message: "Conversation not found" }, { status: 404 });

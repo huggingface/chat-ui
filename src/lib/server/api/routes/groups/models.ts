@@ -5,24 +5,23 @@ import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 
 export type GETModelsResponse = Array<{
-	id: string;
-	name: string;
-	websiteUrl?: string;
-	modelUrl?: string;
-	datasetName?: string;
-	datasetUrl?: string;
-	displayName: string;
-	description?: string;
-	reasoning: boolean;
-	logoUrl?: string;
-	promptExamples?: { title: string; prompt: string }[];
-	parameters: BackendModel["parameters"];
-	preprompt?: string;
-	multimodal: boolean;
-	multimodalAcceptedMimetypes?: string[];
-	tools: boolean;
-	unlisted: boolean;
-	hasInferenceAPI: boolean;
+    id: string;
+    name: string;
+    websiteUrl?: string;
+    modelUrl?: string;
+    datasetName?: string;
+    datasetUrl?: string;
+    displayName: string;
+    description?: string;
+    reasoning: boolean;
+    logoUrl?: string;
+    promptExamples?: { title: string; prompt: string }[];
+    parameters: BackendModel["parameters"];
+    preprompt?: string;
+    multimodal: boolean;
+    multimodalAcceptedMimetypes?: string[];
+    unlisted: boolean;
+    hasInferenceAPI: boolean;
 }>;
 
 export type GETOldModelsResponse = Array<{
@@ -55,7 +54,6 @@ export const modelGroup = new Elysia().group("/models", (app) =>
                         preprompt: model.preprompt,
                         multimodal: model.multimodal,
                         multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-                        tools: model.tools,
                         unlisted: model.unlisted,
                         hasInferenceAPI: model.hasInferenceAPI,
                     })) satisfies GETModelsResponse;

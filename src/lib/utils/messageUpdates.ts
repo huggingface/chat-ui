@@ -1,29 +1,11 @@
 import type { MessageFile } from "$lib/types/Message";
-import {
-	type MessageUpdate,
-	type MessageStreamUpdate,
-	type MessageToolCallUpdate,
-	MessageToolUpdateType,
-	MessageUpdateType,
-	type MessageToolUpdate,
-	type MessageToolErrorUpdate,
-	type MessageToolResultUpdate,
-} from "$lib/types/MessageUpdate";
+import { type MessageUpdate, type MessageStreamUpdate, MessageUpdateType } from "$lib/types/MessageUpdate";
 
 import { page } from "$app/state";
 
 // Web search updates removed
 
-export const isMessageToolUpdate = (update: MessageUpdate): update is MessageToolUpdate =>
-	update.type === MessageUpdateType.Tool;
-export const isMessageToolCallUpdate = (update: MessageUpdate): update is MessageToolCallUpdate =>
-	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Call;
-export const isMessageToolResultUpdate = (
-	update: MessageUpdate
-): update is MessageToolResultUpdate =>
-	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Result;
-export const isMessageToolErrorUpdate = (update: MessageUpdate): update is MessageToolErrorUpdate =>
-	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
+// Tools feature removed: no tool update helpers
 
 type MessageUpdateRequestOptions = {
     base: string;
@@ -31,7 +13,7 @@ type MessageUpdateRequestOptions = {
     messageId?: string;
     isRetry: boolean;
     isContinue: boolean;
-    tools?: Array<string>;
+    // tools removed
     files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
@@ -49,7 +31,6 @@ export async function fetchMessageUpdates(
         id: opts.messageId,
         is_retry: opts.isRetry,
         is_continue: opts.isContinue,
-        tools: opts.tools,
     });
 
 	opts.files?.forEach((file) => {

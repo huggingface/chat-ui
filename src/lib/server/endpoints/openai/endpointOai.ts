@@ -5,85 +5,16 @@ import {
 	openAIChatToTextGenerationStream,
 } from "./openAIChatToTextGenerationStream";
 import type { CompletionCreateParamsStreaming } from "openai/resources/completions";
-import type {
-	ChatCompletionCreateParamsNonStreaming,
-	ChatCompletionCreateParamsStreaming,
-	ChatCompletionTool,
-} from "openai/resources/chat/completions";
-import type { FunctionDefinition, FunctionParameters } from "openai/resources/shared";
+import type { ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
+// Tools feature removed: no function/tool schema needed
 import { buildPrompt } from "$lib/buildPrompt";
 import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { MessageFile } from "$lib/types/Message";
-import { type Tool } from "$lib/types/Tool";
 import type { EndpointMessage } from "../endpoints";
-import { v4 as uuidv4 } from "uuid";
-function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompletionTool[] {
-	const toolChoices = [] as ChatCompletionTool[];
-	if (tools === undefined) {
-		return toolChoices;
-	}
-
-	for (const t of tools) {
-		const requiredProperties = [] as string[];
-
-		const properties = {} as Record<string, unknown>;
-		for (const idx in t.inputs) {
-			const parameterDefinition = t.inputs[idx];
-
-			const parameter = {} as Record<string, unknown>;
-			switch (parameterDefinition.type) {
-				case "str":
-					parameter.type = "string";
-					break;
-				case "float":
-				case "int":
-					parameter.type = "number";
-					break;
-				case "bool":
-					parameter.type = "boolean";
-					break;
-				case "file":
-					throw new Error("File type's currently not supported");
-				default:
-					throw new Error(`Unknown tool IO type: ${t}`);
-			}
-
-			if ("description" in parameterDefinition) {
-				parameter.description = parameterDefinition.description;
-			}
-
-			if (parameterDefinition.paramType == "required") {
-				requiredProperties.push(t.inputs[idx].name);
-			}
-
-			properties[t.inputs[idx].name] = parameter;
-		}
-
-		const functionParameters: FunctionParameters = {
-			type: "object",
-			...(requiredProperties.length > 0 ? { required: requiredProperties } : {}),
-			properties,
-		};
-
-		const functionDefinition: FunctionDefinition = {
-			name: t.name,
-			description: t.description,
-			parameters: functionParameters,
-		};
-
-		const toolDefinition: ChatCompletionTool = {
-			type: "function",
-			function: functionDefinition,
-		};
-
-		toolChoices.push(toolDefinition);
-	}
-
-	return toolChoices;
-}
+// uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -154,12 +85,7 @@ export async function endpointOai(
 
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
-	if (completion === "completions") {
-		if (model.tools) {
-			throw new Error(
-				"Tools are not supported for 'completions' mode, switch to 'chat_completions' instead"
-			);
-		}
+    if (completion === "completions") {
 		return async ({ messages, preprompt, continueMessage, generateSettings, conversationId }) => {
 			const prompt = await buildPrompt({
 				messages,
@@ -192,17 +118,10 @@ export async function endpointOai(
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
 	} else if (completion === "chat_completions") {
-		return async ({
-			messages,
-			preprompt,
-			generateSettings,
-			tools,
-			toolResults,
-			conversationId,
-		}) => {
+    return async ({ messages, preprompt, generateSettings, conversationId }) => {
 			// Format messages for the chat API, handling multimodal content if supported
-			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor, !model.tools && model.multimodal);
+            let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+                await prepareMessages(messages, imageProcessor, model.multimodal);
 
 			// Check if a system message already exists as the first message
 			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
@@ -236,61 +155,26 @@ export async function endpointOai(
 
 			// Format tool results for the API to provide context for follow-up tool calls
 			// This creates the full conversation flow needed for multi-step tool interactions
-			if (toolResults && toolResults.length > 0) {
-				const toolCallRequests: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam = {
-					role: "assistant",
-					content: null,
-					tool_calls: [],
-				};
-
-				const responses: Array<OpenAI.Chat.Completions.ChatCompletionToolMessageParam> = [];
-
-				for (const result of toolResults) {
-					const id = result?.call?.toolId || uuidv4();
-
-					const toolCallResult: OpenAI.Chat.Completions.ChatCompletionMessageToolCall = {
-						type: "function",
-						function: {
-							name: result.call.name,
-							arguments: JSON.stringify(result.call.parameters),
-						},
-						id,
-					};
-
-					toolCallRequests.tool_calls?.push(toolCallResult);
-					const toolCallResponse: OpenAI.Chat.Completions.ChatCompletionToolMessageParam = {
-						role: "tool",
-						content: "",
-						tool_call_id: id,
-					};
-					if ("outputs" in result) {
-						toolCallResponse.content = JSON.stringify(result.outputs);
-					}
-					responses.push(toolCallResponse);
-				}
-				messagesOpenAI.push(toolCallRequests);
-				messagesOpenAI.push(...responses);
+            if (false && Array.isArray(undefined)) {
+                // Tools integration removed
 			}
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
-			const toolCallChoices = createChatCompletionToolsArray(tools);
-			const body = {
-				model: model.id ?? model.name,
-				messages: messagesOpenAI,
-				stream: streamingSupported,
-				// Support two different ways of specifying token limits depending on the model
-				...(useCompletionTokens
-					? { max_completion_tokens: parameters?.max_new_tokens }
-					: { max_tokens: parameters?.max_new_tokens }),
-				stop: parameters?.stop,
-				temperature: parameters?.temperature,
-				top_p: parameters?.top_p,
-				frequency_penalty: parameters?.repetition_penalty,
-				presence_penalty: parameters?.presence_penalty,
-				// Only include tool configuration if tools are provided
-				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
-			};
+            const body = {
+                model: model.id ?? model.name,
+                messages: messagesOpenAI,
+                stream: streamingSupported,
+                // Support two different ways of specifying token limits depending on the model
+                ...(useCompletionTokens
+                    ? { max_completion_tokens: parameters?.max_new_tokens }
+                    : { max_tokens: parameters?.max_new_tokens }),
+                stop: parameters?.stop,
+                temperature: parameters?.temperature,
+                top_p: parameters?.top_p,
+                frequency_penalty: parameters?.repetition_penalty,
+                presence_penalty: parameters?.presence_penalty,
+            };
 
 			// Handle both streaming and non-streaming responses with appropriate processors
 			if (streamingSupported) {

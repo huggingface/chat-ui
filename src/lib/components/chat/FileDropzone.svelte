@@ -3,7 +3,6 @@
 
 	const bubble = createBubbler();
 	import { useSettingsStore } from "$lib/stores/settings";
-	import { documentParserToolId } from "$lib/utils/toolIds";
 	import CarbonImage from "~icons/carbon/image";
 
 	interface Props {
@@ -66,9 +65,7 @@
 						// add the file to the files array
 						files = [...files, file];
 
-						settings.instantSet({
-							tools: [...($settings.tools ?? []), documentParserToolId],
-						});
+						// Tools removed: no settings update for document parser
 					}
 				}
 				onDrag = false;
