@@ -21,7 +21,6 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
-import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
@@ -342,23 +341,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					if (event.token === "") return;
 					messageToWriteTo.content += event.token;
 
-					// add to token total
-					MetricsServer.getMetrics().model.tokenCountTotal.inc({ model: model?.id });
 
-					// if this is the first token, add to time to first token
+					// Metrics removed: no token/latency tracking
 					if (!lastTokenTimestamp) {
-						MetricsServer.getMetrics().model.timeToFirstToken.observe(
-							{ model: model?.id },
-							Date.now() - promptedAt.getTime()
-						);
 						lastTokenTimestamp = new Date();
 					}
-
-					// add to time per token
-					MetricsServer.getMetrics().model.timePerOutputToken.observe(
-						{ model: model?.id },
-						Date.now() - (lastTokenTimestamp ?? promptedAt).getTime()
-					);
 					lastTokenTimestamp = new Date();
 				} else if (
 					event.type === MessageUpdateType.Reasoning &&
@@ -382,11 +369,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
 
-					// add to latency
-					MetricsServer.getMetrics().model.latency.observe(
-						{ model: model?.id },
-						Date.now() - promptedAt.getTime()
-					);
+					// Metrics removed: no latency tracking
 				}
 
 				// Add file
@@ -491,8 +474,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 	// Assistants feature removed; do not write assistant stats
 
-	const metrics = MetricsServer.getMetrics();
-	metrics.model.messagesTotal.inc({ model: model?.id });
+	// Metrics removed: no message counters
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
 		headers: {
