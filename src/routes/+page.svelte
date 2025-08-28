@@ -14,6 +14,8 @@
 	import { onMount } from "svelte";
 
 	let { data } = $props();
+
+	let hasModels = $derived(Boolean(data.models?.length));
 	let loading = $state(false);
 	let files: File[] = $state([]);
 
@@ -86,10 +88,20 @@
 	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 </svelte:head>
 
-<ChatWindow
-	on:message={(ev) => createConversation(ev.detail)}
-	{loading}
-	{currentModel}
-	models={data.models}
-	bind:files
-/>
+{#if hasModels}
+	<ChatWindow
+		on:message={(ev) => createConversation(ev.detail)}
+		{loading}
+		{currentModel}
+		models={data.models}
+		bind:files
+	/>
+{:else}
+	<div class="mx-auto my-20 max-w-xl rounded-xl border p-6 text-center dark:border-gray-700">
+		<h2 class="mb-2 text-xl font-semibold">No models available</h2>
+		<p class="text-gray-600 dark:text-gray-300">
+			No chat models are configured. Set `OPENAI_BASE_URL` (or `OPENAI_MODEL_LIST_URL`) and ensure the server can
+			reach the endpoint, then reload.
+		</p>
+	</div>
+{/if}
