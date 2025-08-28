@@ -19,7 +19,6 @@
 
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import ReportModal from "./ReportModal.svelte";
-	import IconInternet from "$lib/components/icons/IconInternet.svelte";
 	import ToolBadge from "$lib/components/ToolBadge.svelte";
 	import { ReviewStatus } from "$lib/types/Review";
 	import { error } from "$lib/stores/errors";
@@ -46,12 +45,7 @@
 
 	let displayReportModal = $state(false);
 
-	let hasRag = $derived(
-		assistant?.rag?.allowAllDomains ||
-			!!assistant?.rag?.allowedDomains?.length ||
-			!!assistant?.rag?.allowedLinks?.length ||
-			!!assistant?.dynamicPrompt
-	);
+// Internet Access (RAG) removed in this build
 
 	let prepromptTags = $derived(assistant?.preprompt?.split(/(\{\{[^{}]*\}\})/) ?? []);
 
@@ -100,14 +94,7 @@
 					{assistant?.name}
 				</h1>
 
-				{#if hasRag}
-					<span
-						class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
-						title="This assistant uses the websearch."
-					>
-						<IconInternet classNames="text-sm text-blue-600" />
-					</span>
-				{/if}
+            
 				<span class="rounded-full border px-2 py-0.5 text-sm leading-none text-gray-500"
 					>public</span
 				>
@@ -351,7 +338,7 @@
 				<div class="mb-1 flex items-center gap-1">
 					<span
 						class="inline-grid size-5 place-items-center rounded-full bg-purple-500/10"
-						title="This assistant uses the websearch."
+						
 					>
 						<CarbonTools class="text-xs text-purple-600" />
 					</span>
@@ -367,52 +354,6 @@
 				</ul>
 			</div>
 		{/if}
-		{#if hasRag}
-			<div class="mt-4">
-				<div class="mb-1 flex items-center gap-1">
-					<span
-						class="inline-grid size-5 place-items-center rounded-full bg-blue-500/10"
-						title="This assistant uses the websearch."
-					>
-						<IconInternet classNames="text-sm text-blue-600" />
-					</span>
-					<h2 class=" font-semibold">Internet Access</h2>
-				</div>
-				{#if assistant?.rag?.allowAllDomains}
-					<p class="text-sm text-gray-500">
-						This Assistant uses Web Search to find information on Internet.
-					</p>
-				{:else if !!assistant?.rag?.allowedDomains && assistant?.rag?.allowedDomains.length}
-					<p class="pb-4 text-sm text-gray-500">
-						This Assistant can use Web Search on the following domains:
-					</p>
-					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
-						{#each assistant?.rag?.allowedDomains as domain}
-							<li
-								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight decoration-gray-400"
-							>
-								<a target="_blank" class="underline" href={domain}>{domain}</a>
-							</li>
-						{/each}
-					</ul>
-				{:else if !!assistant?.rag?.allowedLinks && assistant?.rag?.allowedLinks.length}
-					<p class="pb-4 text-sm text-gray-500">This Assistant can browse the following links:</p>
-					<ul class="mr-2 flex flex-wrap gap-2.5 text-sm text-gray-800">
-						{#each assistant?.rag?.allowedLinks as link}
-							<li
-								class="break-all rounded-lg border border-gray-200 bg-gray-100 px-2 py-0.5 leading-tight decoration-gray-400"
-							>
-								<a target="_blank" class="underline" href={link}>{link}</a>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				{#if assistant?.dynamicPrompt}
-					<p class="text-sm text-gray-500">
-						This Assistant has dynamic prompts enabled and can make requests to external services.
-					</p>
-				{/if}
-			</div>
-		{/if}
+        
 	</div>
 </div>

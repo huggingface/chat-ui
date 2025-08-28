@@ -104,24 +104,19 @@ export async function PATCH({ request, locals, params }) {
 			_id: assistant._id,
 		},
 		{
-			$set: {
-				name: parse.data.name,
-				description: parse.data.description,
-				modelId: parse.data.modelId,
-				preprompt: parse.data.preprompt,
-				exampleInputs,
-				avatar: deleteAvatar ? undefined : (hash ?? assistant.avatar),
-				updatedAt: new Date(),
-				rag: {
-					allowedLinks: parse.data.ragLinkList,
-					allowedDomains: parse.data.ragDomainList,
-					allowAllDomains: parse.data.ragAllowAll,
-				},
-				tools: parse.data.tools,
-				dynamicPrompt: parse.data.dynamicPrompt,
-				searchTokens: generateSearchTokens(parse.data.name),
-				generateSettings: {
-					temperature: parse.data.temperature,
+            $set: {
+                name: parse.data.name,
+                description: parse.data.description,
+                modelId: parse.data.modelId,
+                preprompt: parse.data.preprompt,
+                exampleInputs,
+                avatar: deleteAvatar ? undefined : (hash ?? assistant.avatar),
+                updatedAt: new Date(),
+                tools: parse.data.tools,
+                dynamicPrompt: parse.data.dynamicPrompt,
+                searchTokens: generateSearchTokens(parse.data.name),
+                generateSettings: {
+                    temperature: parse.data.temperature,
 					top_p: parse.data.top_p,
 					repetition_penalty: parse.data.repetition_penalty,
 					top_k: parse.data.top_k,

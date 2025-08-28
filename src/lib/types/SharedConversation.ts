@@ -1,14 +1,13 @@
 import type { Conversation } from "./Conversation";
 
 export type SharedConversation = Pick<
-	Conversation,
-	| "model"
-	| "embeddingModel"
-	| "title"
-	| "rootMessageId"
-	| "messages"
-	| "preprompt"
-	| "assistantId"
+    Conversation,
+    | "model"
+    | "title"
+    | "rootMessageId"
+    | "messages"
+    | "preprompt"
+    | "assistantId"
 	| "createdAt"
 	| "updatedAt"
 > & {

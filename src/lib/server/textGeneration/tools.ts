@@ -9,7 +9,6 @@ import {
 import type { TextGenerationContext } from "./types";
 
 import directlyAnswer from "../tools/directlyAnswer";
-import websearch from "../tools/web/search";
 import { z } from "zod";
 import { logger } from "../logger";
 import { extractJson, toolHasName } from "../tools/utils";
@@ -20,25 +19,17 @@ import { collections } from "../database";
 import { ObjectId } from "mongodb";
 import type { Message } from "$lib/types/Message";
 import type { Assistant } from "$lib/types/Assistant";
-import { assistantHasWebSearch } from "./assistant";
 
 export async function getTools(
-	toolsPreference: Array<string>,
-	assistant: Pick<Assistant, "rag" | "tools"> | undefined
+    toolsPreference: Array<string>,
+    assistant: Pick<Assistant, "tools"> | undefined
 ): Promise<Tool[]> {
 	let preferences = toolsPreference;
 
 	if (assistant) {
 		if (assistant?.tools?.length) {
 			preferences = assistant.tools;
-
-			if (assistantHasWebSearch(assistant)) {
-				preferences.push(websearch._id.toString());
-			}
 		} else {
-			if (assistantHasWebSearch(assistant)) {
-				return [websearch, directlyAnswer];
-			}
 			return [directlyAnswer];
 		}
 	}

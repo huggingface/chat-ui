@@ -70,7 +70,7 @@ export async function POST({ request, locals }) {
 		hash = await uploadAssistantAvatar(new File([image], "avatar.jpg"), newAssistantId);
 	}
 
-	const { insertedId } = await collections.assistants.insertOne({
+    const { insertedId } = await collections.assistants.insertOne({
 		_id: newAssistantId,
 		createdById,
 		createdByName: locals.user?.username ?? locals.user?.name,
@@ -82,12 +82,7 @@ export async function POST({ request, locals }) {
 		updatedAt: new Date(),
 		userCount: 1,
 		review: ReviewStatus.PRIVATE,
-		rag: {
-			allowedLinks: parse.data.ragLinkList,
-			allowedDomains: parse.data.ragDomainList,
-			allowAllDomains: parse.data.ragAllowAll,
-		},
-		dynamicPrompt: parse.data.dynamicPrompt,
+        dynamicPrompt: parse.data.dynamicPrompt,
 		searchTokens: generateSearchTokens(parse.data.name),
 		last24HoursCount: 0,
 		generateSettings: {

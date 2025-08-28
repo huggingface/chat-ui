@@ -18,13 +18,7 @@ interface Metrics {
 		votesNegative: Counter<Model["id"]>;
 	};
 
-	webSearch: {
-		requestCount: Counter;
-		pageFetchCount: Counter;
-		pageFetchCountError: Counter;
-		pageFetchDuration: Summary;
-		embeddingDuration: Summary;
-	};
+	// webSearch metrics removed
 
 	tool: {
 		toolUseCount: Counter<string>;
@@ -121,37 +115,7 @@ export class MetricsServer {
 					registers: [register],
 				}),
 			},
-			webSearch: {
-				requestCount: new Counter({
-					name: "web_search_request_count",
-					help: "Total number of web search requests",
-					registers: [register],
-				}),
-				pageFetchCount: new Counter({
-					name: "web_search_page_fetch_count",
-					help: "Total number of web search page fetches",
-					registers: [register],
-				}),
-				pageFetchCountError: new Counter({
-					name: "web_search_page_fetch_count_error",
-					help: "Total number of web search page fetch errors",
-					registers: [register],
-				}),
-				pageFetchDuration: new Summary({
-					name: "web_search_page_fetch_duration_ms",
-					help: "Web search page fetch duration",
-					registers: [register],
-					maxAgeSeconds: 5 * 60,
-					ageBuckets: 5,
-				}),
-				embeddingDuration: new Summary({
-					name: "web_search_embedding_duration_ms",
-					help: "Web search embedding duration",
-					registers: [register],
-					maxAgeSeconds: 5 * 60,
-					ageBuckets: 5,
-				}),
-			},
+			// webSearch metrics removed
 			tool: {
 				toolUseCount: new Counter({
 					name: "tool_use_count",

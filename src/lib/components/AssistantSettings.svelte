@@ -3,7 +3,7 @@
 	import type { Assistant } from "$lib/types/Assistant";
 
 	import { onMount } from "svelte";
-	import { page } from "$app/state";
+// import { page } from "$app/state";
 	import { base } from "$app/paths";
 	import CarbonPen from "~icons/carbon/pen";
 	import CarbonUpload from "~icons/carbon/upload";
@@ -11,16 +11,12 @@
 	import CarbonSettingsAdjust from "~icons/carbon/settings-adjust";
 	import CarbonTools from "~icons/carbon/tools";
 
-	import { useSettingsStore } from "$lib/stores/settings";
-	import IconInternet from "./icons/IconInternet.svelte";
-	import HoverTooltip from "./HoverTooltip.svelte";
+import { useSettingsStore } from "$lib/stores/settings";
+import HoverTooltip from "./HoverTooltip.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import AssistantToolPicker from "./AssistantToolPicker.svelte";
 	import { error } from "$lib/stores/errors";
-	import { goto } from "$app/navigation";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
+import { goto } from "$app/navigation";
 
 	type AssistantFront = Omit<Assistant, "_id" | "createdById"> & { _id: string };
 
@@ -82,15 +78,7 @@
 
 	let loading = $state(false);
 
-	let ragMode: false | "links" | "domains" | "all" = $state(
-		assistant?.rag?.allowAllDomains
-			? "all"
-			: (assistant?.rag?.allowedLinks?.length ?? 0 > 0)
-				? "links"
-				: (assistant?.rag?.allowedDomains?.length ?? 0) > 0
-					? "domains"
-					: false
-	);
+// Web search / RAG removed in this build
 
 	let tools = $state(assistant?.tools ?? []);
 	const regex = /{{\s?(get|post|url|today)(=.*?)?\s?}}/g;
@@ -128,23 +116,7 @@
 			}
 		}
 
-		formData.delete("ragMode");
-
-		if (ragMode === false || !page.data.enableAssistantsRAG) {
-			formData.set("ragAllowAll", "false");
-			formData.set("ragLinkList", "");
-			formData.set("ragDomainList", "");
-		} else if (ragMode === "all") {
-			formData.set("ragAllowAll", "true");
-			formData.set("ragLinkList", "");
-			formData.set("ragDomainList", "");
-		} else if (ragMode === "links") {
-			formData.set("ragAllowAll", "false");
-			formData.set("ragDomainList", "");
-		} else if (ragMode === "domains") {
-			formData.set("ragAllowAll", "false");
-			formData.set("ragLinkList", "");
-		}
+        // Web search / RAG removed: no rag form fields
 
 		formData.set("tools", tools.join(","));
 
@@ -462,110 +434,7 @@
 				</div>
 				<AssistantToolPicker bind:toolIds={tools} />
 			{/if}
-			{#if page.data.enableAssistantsRAG}
-				<div class="flex flex-col flex-nowrap pb-4">
-					<span class="mt-2 text-smd font-semibold"
-						>Internet access
-						<IconInternet classNames="inline text-sm text-blue-600" />
-
-						{#if publicConfig.isHuggingChat}
-							<a
-								href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/385"
-								target="_blank"
-								class="ml-0.5 rounded bg-gray-100 px-1 py-0.5 text-xxs font-normal text-gray-700 underline decoration-gray-400"
-								>Give feedback</a
-							>
-						{/if}
-					</span>
-
-					<label class="mt-1">
-						<input
-							checked={!ragMode}
-							onchange={() => (ragMode = false)}
-							type="radio"
-							name="ragMode"
-							value={false}
-						/>
-						<span class="my-2 text-sm" class:font-semibold={!ragMode}> Default </span>
-						{#if !ragMode}
-							<span class="block text-xs text-gray-500">
-								Assistant will not use internet to do information retrieval and will respond faster.
-								Recommended for most Assistants.
-							</span>
-						{/if}
-					</label>
-
-					<label class="mt-1">
-						<input
-							checked={ragMode === "all"}
-							onchange={() => (ragMode = "all")}
-							type="radio"
-							name="ragMode"
-							value={"all"}
-						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "all"}> Web search </span>
-						{#if ragMode === "all"}
-							<span class="block text-xs text-gray-500">
-								Assistant will do a web search on each user request to find information.
-							</span>
-						{/if}
-					</label>
-
-					<label class="mt-1">
-						<input
-							checked={ragMode === "domains"}
-							onchange={() => (ragMode = "domains")}
-							type="radio"
-							name="ragMode"
-							value={false}
-						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "domains"}>
-							Domains search
-						</span>
-					</label>
-					{#if ragMode === "domains"}
-						<span class="mb-2 text-xs text-gray-500">
-							Specify domains and URLs that the application can search, separated by commas.
-						</span>
-
-						<input
-							name="ragDomainList"
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-							placeholder="wikipedia.org,bbc.com"
-							value={assistant?.rag?.allowedDomains?.join(",") ?? ""}
-							oninput={() => clearError("ragDomainList")}
-						/>
-						<p class="text-xs text-red-500">{getError("ragDomainList")}</p>
-					{/if}
-
-					<label class="mt-1">
-						<input
-							checked={ragMode === "links"}
-							onchange={() => (ragMode = "links")}
-							type="radio"
-							name="ragMode"
-							value={false}
-						/>
-						<span class="my-2 text-sm" class:font-semibold={ragMode === "links"}>
-							Specific Links
-						</span>
-					</label>
-					{#if ragMode === "links"}
-						<span class="mb-2 text-xs text-gray-500">
-							Specify a maximum of 10 direct URLs that the Assistant will access. HTML & Plain Text
-							only, separated by commas
-						</span>
-						<input
-							name="ragLinkList"
-							class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-							placeholder="https://raw.githubusercontent.com/huggingface/chat-ui/main/README.md"
-							value={assistant?.rag?.allowedLinks.join(",") ?? ""}
-							oninput={() => clearError("ragLinkList")}
-						/>
-						<p class="text-xs text-red-500">{getError("ragLinkList")}</p>
-					{/if}
-				</div>
-			{/if}
+            <!-- Internet Access (RAG) removed in this build -->
 		</div>
 
 		<div class="relative col-span-1 flex h-full flex-col">
