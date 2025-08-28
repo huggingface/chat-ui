@@ -128,20 +128,28 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 			};
 		}
 
-		// Web Search - convert to status updates since WebSearch type was removed
+		// Web Search
 		else if (update.type === "webSearch") {
-			if (update.messageType === "error") {
+			if (update.messageType === "update") {
 				return {
-					type: MessageUpdateType.Status,
-					status: MessageUpdateStatus.Error,
+					type: MessageUpdateType.WebSearch,
+					subtype: MessageWebSearchUpdateType.Update,
 					message: update.message,
+					args: update.args,
 				};
-			} else {
-				// Convert other web search updates to general status updates
+			} else if (update.messageType === "error") {
 				return {
-					type: MessageUpdateType.Status,
-					status: MessageUpdateStatus.Started,
+					type: MessageUpdateType.WebSearch,
+					subtype: MessageWebSearchUpdateType.Error,
 					message: update.message,
+					args: update.args,
+				};
+			} else if (update.messageType === "sources") {
+				return {
+					type: MessageUpdateType.WebSearch,
+					subtype: MessageWebSearchUpdateType.Sources,
+					message: update.message,
+					sources: update.sources ?? [],
 				};
 			}
 		}
@@ -167,7 +175,20 @@ const updateMessageUpdates: Migration = {
 					?.map((update) => convertMessageUpdate(message, update as OldMessageUpdate))
 					.filter((update): update is MessageUpdate => Boolean(update));
 
-				// Web search functionality removed - skip web search specific updates
+				// Add the new web search finished update if the sources update exists and webSearch is defined
+				const webSearchSourcesUpdateIndex =
+					updates?.findIndex(
+						(u) =>
+							u.type === MessageUpdateType.WebSearch &&
+							u.subtype === MessageWebSearchUpdateType.Sources
+					) ?? -1;
+				if (message.webSearch && updates && webSearchSourcesUpdateIndex !== -1) {
+					const webSearchFinishedUpdate: MessageWebSearchFinishedUpdate = {
+						type: MessageUpdateType.WebSearch,
+						subtype: MessageWebSearchUpdateType.Finished,
+					};
+					updates.splice(webSearchSourcesUpdateIndex + 1, 0, webSearchFinishedUpdate);
+				}
 				return { ...message, updates };
 			});
 
