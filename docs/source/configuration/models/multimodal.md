@@ -1,11 +1,13 @@
 # Multimodal
 
-We currently support [IDEFICS](https://huggingface.co/blog/idefics) (hosted on [TGI](./providers/tgi)), OpenAI and Anthropic Claude 3 as multimodal models. You can enable it by setting `multimodal: true` in your `MODELS` configuration. For IDEFICS, you must have a [PRO HF Api token](https://huggingface.co/settings/tokens). For OpenAI, see the [OpenAI section](./providers/openai). For Anthropic, see the [Anthropic section](./providers/anthropic).
+Note: This build supports only OpenAI-compatible endpoints. References to TGI/IDEFICS or Anthropic do not apply.
+
+OpenAI multimodal models are supported when exposed via an OpenAI-compatible API. Enable multimodal by setting `multimodal: true` in your model configuration.
 
 ```ini
 MODELS=`[
   {
-    "name": "HuggingFaceM4/idefics-80b-instruct",
+    "name": "gpt-4o-mini",  
     "multimodal" : true,
     "description": "IDEFICS is the new multimodal model by Hugging Face.",
     "preprompt": "",

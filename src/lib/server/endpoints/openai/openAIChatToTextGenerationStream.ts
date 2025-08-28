@@ -6,11 +6,11 @@ import type { Stream } from "openai/streaming";
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
  */
 export async function* openAIChatToTextGenerationStream(
-    completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>
+	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>
 ) {
-    let generatedText = "";
-    let tokenId = 0;
-    let toolBuffer = ""; // legacy hack kept harmless
+	let generatedText = "";
+	let tokenId = 0;
+	let toolBuffer = ""; // legacy hack kept harmless
 
 	for await (const completion of completionStream) {
 		const { choices } = completion;
@@ -66,8 +66,8 @@ export async function* openAIChatToTextGenerationStream(
 		};
 		yield output;
 
-        // Tools removed: ignore tool_calls deltas
-    }
+		// Tools removed: ignore tool_calls deltas
+	}
 }
 
 /**

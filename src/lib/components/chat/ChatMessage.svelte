@@ -11,9 +11,14 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
 
-import { MessageUpdateType, type MessageFinalAnswerUpdate, type MessageReasoningUpdate, MessageReasoningUpdateType } from "$lib/types/MessageUpdate";
+	import {
+		MessageUpdateType,
+		type MessageFinalAnswerUpdate,
+		type MessageReasoningUpdate,
+		MessageReasoningUpdateType,
+	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
-// Tools feature removed
+	// Tools feature removed
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -69,7 +74,7 @@ import { MessageUpdateType, type MessageFinalAnswerUpdate, type MessageReasoning
 			({ type }) => type === MessageUpdateType.FinalAnswer
 		) as MessageFinalAnswerUpdate
 	);
-    // Tools removed
+	// Tools removed
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 	// web search sources removed
@@ -131,9 +136,7 @@ import { MessageUpdateType, type MessageFinalAnswerUpdate, type MessageReasoning
 				/>
 			{/if}
 
-            
-
-				<div bind:this={contentEl}>
+			<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
@@ -144,8 +147,6 @@ import { MessageUpdateType, type MessageFinalAnswerUpdate, type MessageReasoning
 					<MarkdownRenderer content={message.content} />
 				</div>
 			</div>
-
-
 		</div>
 
 		{#if !loading && message.content}

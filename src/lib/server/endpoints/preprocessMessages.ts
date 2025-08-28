@@ -5,12 +5,12 @@ import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";
 
 export async function preprocessMessages(
-    messages: Message[],
-    convId: ObjectId
+	messages: Message[],
+	convId: ObjectId
 ): Promise<EndpointMessage[]> {
-    return Promise.resolve(messages)
-        .then((msgs) => downloadFiles(msgs, convId))
-        .then((msgs) => injectClipboardFiles(msgs));
+	return Promise.resolve(messages)
+		.then((msgs) => downloadFiles(msgs, convId))
+		.then((msgs) => injectClipboardFiles(msgs));
 }
 
 async function downloadFiles(messages: Message[], convId: ObjectId): Promise<EndpointMessage[]> {

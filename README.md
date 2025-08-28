@@ -29,11 +29,13 @@ You can deploy a chat-ui instance in a single command using the docker image. Ge
 docker run -p 3000 -e HF_TOKEN=hf_*** -v db:/data ghcr.io/huggingface/chat-ui-db:latest
 ```
 
-Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) and the readme to see all the environment variables that you can set. We have endpoint support for all OpenAI API compatible local services as well as many other providers like Anthropic, Cloudflare, Google Vertex AI, etc.
+Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) and the readme to see all the environment variables that you can set. In this build, only OpenAI-compatible endpoints are supported via `OPENAI_BASE_URL` and `OPENAI_API_KEY` (or `HF_TOKEN`). Other providers are not available.
 
 ### Local setup
 
-You can quickly start a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+Note: This build is OpenAI-compatible only. Local llama.cpp, TGI, Ollama and other provider endpoints are disabled.
+
+You can quickly start a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp) — not applicable in this build.
 
 **Step 1 (Start llama.cpp server):**
 

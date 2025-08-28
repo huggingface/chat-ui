@@ -5,7 +5,10 @@ import {
 	openAIChatToTextGenerationStream,
 } from "./openAIChatToTextGenerationStream";
 import type { CompletionCreateParamsStreaming } from "openai/resources/completions";
-import type { ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
+import type {
+	ChatCompletionCreateParamsNonStreaming,
+	ChatCompletionCreateParamsStreaming,
+} from "openai/resources/chat/completions";
 // Tools feature removed: no function/tool schema needed
 import { buildPrompt } from "$lib/buildPrompt";
 import { config } from "$lib/server/config";
@@ -21,9 +24,9 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-    // Prefer HF_TOKEN when available (works with Hugging Face router's OpenAI-compatible API),
-    // otherwise fall back to OPENAI_API_KEY for OpenAI and other providers.
-    apiKey: z.string().default(config.HF_TOKEN || config.OPENAI_API_KEY || "sk-"),
+	// Prefer HF_TOKEN when available (works with Hugging Face router's OpenAI-compatible API),
+	// otherwise fall back to OPENAI_API_KEY for OpenAI and other providers.
+	apiKey: z.string().default(config.HF_TOKEN || config.OPENAI_API_KEY || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
@@ -85,7 +88,7 @@ export async function endpointOai(
 
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
-    if (completion === "completions") {
+	if (completion === "completions") {
 		return async ({ messages, preprompt, continueMessage, generateSettings, conversationId }) => {
 			const prompt = await buildPrompt({
 				messages,
@@ -118,10 +121,10 @@ export async function endpointOai(
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
 	} else if (completion === "chat_completions") {
-    return async ({ messages, preprompt, generateSettings, conversationId }) => {
+		return async ({ messages, preprompt, generateSettings, conversationId }) => {
 			// Format messages for the chat API, handling multimodal content if supported
-            let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-                await prepareMessages(messages, imageProcessor, model.multimodal);
+			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+				await prepareMessages(messages, imageProcessor, model.multimodal);
 
 			// Check if a system message already exists as the first message
 			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
@@ -155,26 +158,26 @@ export async function endpointOai(
 
 			// Format tool results for the API to provide context for follow-up tool calls
 			// This creates the full conversation flow needed for multi-step tool interactions
-            if (false && Array.isArray(undefined)) {
-                // Tools integration removed
+			if (false && Array.isArray(undefined)) {
+				// Tools integration removed
 			}
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
-            const body = {
-                model: model.id ?? model.name,
-                messages: messagesOpenAI,
-                stream: streamingSupported,
-                // Support two different ways of specifying token limits depending on the model
-                ...(useCompletionTokens
-                    ? { max_completion_tokens: parameters?.max_new_tokens }
-                    : { max_tokens: parameters?.max_new_tokens }),
-                stop: parameters?.stop,
-                temperature: parameters?.temperature,
-                top_p: parameters?.top_p,
-                frequency_penalty: parameters?.repetition_penalty,
-                presence_penalty: parameters?.presence_penalty,
-            };
+			const body = {
+				model: model.id ?? model.name,
+				messages: messagesOpenAI,
+				stream: streamingSupported,
+				// Support two different ways of specifying token limits depending on the model
+				...(useCompletionTokens
+					? { max_completion_tokens: parameters?.max_new_tokens }
+					: { max_tokens: parameters?.max_new_tokens }),
+				stop: parameters?.stop,
+				temperature: parameters?.temperature,
+				top_p: parameters?.top_p,
+				frequency_penalty: parameters?.repetition_penalty,
+				presence_penalty: parameters?.presence_penalty,
+			};
 
 			// Handle both streaming and non-streaming responses with appropriate processors
 			if (streamingSupported) {

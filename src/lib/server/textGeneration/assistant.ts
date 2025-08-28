@@ -53,14 +53,13 @@ export async function processPreprompt(preprompt: string, user_message: string |
 }
 
 export async function getAssistantById(id?: ObjectId) {
-    return collections.assistants
-        .findOne<Pick<Assistant, "dynamicPrompt" | "generateSettings">>(
-            { _id: id },
-            { projection: { dynamicPrompt: 1, generateSettings: 1 } }
-        )
-        .then((a) => a ?? undefined);
+	return collections.assistants
+		.findOne<
+			Pick<Assistant, "dynamicPrompt" | "generateSettings">
+		>({ _id: id }, { projection: { dynamicPrompt: 1, generateSettings: 1 } })
+		.then((a) => a ?? undefined);
 }
 
 export function assistantHasDynamicPrompt(assistant?: Pick<Assistant, "dynamicPrompt">) {
-    return Boolean(assistant?.dynamicPrompt);
+	return Boolean(assistant?.dynamicPrompt);
 }

@@ -41,7 +41,7 @@ export const app = new Elysia({ prefix })
 	)
 	.use(authPlugin)
 	.use(conversationGroup)
-    .use(userGroup)
+	.use(userGroup)
 	.use(modelGroup)
 	.use(misc)
 	.use(debugGroup);

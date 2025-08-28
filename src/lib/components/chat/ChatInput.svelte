@@ -17,7 +17,7 @@
 		placeholder?: string;
 		loading?: boolean;
 		disabled?: boolean;
-        // tools removed
+		// tools removed
 		modelIsMultimodal?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
@@ -31,7 +31,7 @@
 		placeholder = "",
 		loading = false,
 		disabled = false,
-        
+
 		modelIsMultimodal = false,
 		children,
 		onPaste,
@@ -94,9 +94,8 @@
 
 	const settings = useSettingsStore();
 
-
 	// Tools removed; only show file upload and screenshot when applicable
-    let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
+	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
 	let showNoTools = $derived(!showFileUpload);
 </script>
 
@@ -131,7 +130,6 @@
 				"scrollbar-custom -ml-0.5 flex max-w-[calc(100%-40px)] flex-wrap items-center justify-start gap-2.5 px-3 pb-2.5 pt-1.5 text-gray-500 dark:text-gray-400 max-md:flex-nowrap max-md:overflow-x-auto sm:gap-2",
 			]}
 		>
-
 			{#if showFileUpload}
 				{@const mimeTypesString = mimeTypes
 					.map((m) => {
@@ -160,7 +158,7 @@
 								onchange={onFileChange}
 								accept={mimeTypes.join(",")}
 							/>
-                            <IconPaperclip classNames="text-xl" />
+							<IconPaperclip classNames="text-xl" />
 						</label>
 					</HoverTooltip>
 				</div>
@@ -191,7 +189,6 @@
 					</HoverTooltip>
 				{/if}
 			{/if}
-
 		</div>
 	{/if}
 	{@render children?.()}

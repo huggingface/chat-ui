@@ -35,20 +35,20 @@ export async function* textGeneration(ctx: TextGenerationContext) {
 }
 
 async function* textGenerationWithoutTitle(
-    ctx: TextGenerationContext,
-    done: AbortController
+	ctx: TextGenerationContext,
+	done: AbortController
 ): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	yield {
 		type: MessageUpdateType.Status,
 		status: MessageUpdateStatus.Started,
 	};
 
-    const { model, conv, messages, assistant, isContinue } = ctx;
-    const convId = conv._id;
+	const { model, conv, messages, assistant, isContinue } = ctx;
+	const convId = conv._id;
 
-    let preprompt = conv.preprompt;
+	let preprompt = conv.preprompt;
 
-    const processedMessages = await preprocessMessages(messages, convId);
-    yield* generate({ ...ctx, messages: processedMessages }, preprompt);
-    done.abort();
+	const processedMessages = await preprocessMessages(messages, convId);
+	yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+	done.abort();
 }

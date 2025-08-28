@@ -26,7 +26,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			async ({ locals, query }) => {
 				const convs = await collections.conversations
 					.find(authCondition(locals))
-					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" >>({
+					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
 						title: 1,
 						updatedAt: 1,
 						model: 1,
@@ -40,14 +40,14 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					authCondition(locals)
 				);
 
-                const res = convs.map((conv) => ({
-                    _id: conv._id,
-                    id: conv._id, // legacy param iOS
-                    title: conv.title,
-                    updatedAt: conv.updatedAt,
-                    model: conv.model,
-                    modelId: conv.model, // legacy param iOS
-                }));
+				const res = convs.map((conv) => ({
+					_id: conv._id,
+					id: conv._id, // legacy param iOS
+					title: conv.title,
+					updatedAt: conv.updatedAt,
+					model: conv.model,
+					modelId: conv.model, // legacy param iOS
+				}));
 
 				return { conversations: res, nConversations };
 			},
@@ -86,7 +86,9 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					.sort({
 						updatedAt: -1, // Sort by date updated in descending order
 					})
-					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "messages" | "userId">>({
+					.project<
+						Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "messages" | "userId">
+					>({
 						title: 1,
 						updatedAt: 1,
 						model: 1,
@@ -280,15 +282,15 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								}
 							}
 
-                            return {
-                                _id: conv._id,
-                                id: conv._id,
-                                title: conv.title,
-                                content: matchedContent,
-                                matchedText,
-                                updatedAt: conv.updatedAt,
-                                model: conv.model,
-                            };
+							return {
+								_id: conv._id,
+								id: conv._id,
+								title: conv.title,
+								content: matchedContent,
+								matchedText,
+								updatedAt: conv.updatedAt,
+								model: conv.model,
+							};
 						})
 					);
 

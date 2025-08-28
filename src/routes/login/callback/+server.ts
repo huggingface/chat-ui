@@ -7,9 +7,9 @@ import JSON5 from "json5";
 import { updateUser } from "./updateUser.js";
 
 const sanitizeJSONEnv = (val: string, fallback: string) => {
-    const raw = (val ?? "").trim();
-    const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
-    return unquoted || fallback;
+	const raw = (val ?? "").trim();
+	const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
+	return unquoted || fallback;
 };
 
 const allowedUserEmails = z

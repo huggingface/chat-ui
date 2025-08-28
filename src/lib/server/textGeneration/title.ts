@@ -32,7 +32,7 @@ export async function generateTitle(prompt: string) {
 		return prompt.split(/\s+/g).slice(0, 5).join(" ");
 	}
 
-    // Tools removed: no tool-based title path
+	// Tools removed: no tool-based title path
 
 	return await getReturnFromGenerator(
 		generateFromDefaultEndpoint({

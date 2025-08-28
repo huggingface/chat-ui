@@ -13,8 +13,8 @@ type SettingsStore = {
 	activeModel: string;
 	customPrompts: Record<string, string>;
 	recentlySaved: boolean;
-    disableStream: boolean;
-    directPaste: boolean;
+	disableStream: boolean;
+	directPaste: boolean;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {

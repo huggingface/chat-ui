@@ -19,17 +19,17 @@ export interface Settings extends Timestamps {
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 
-    disableStream: boolean;
-    directPaste: boolean;
+	disableStream: boolean;
+	directPaste: boolean;
 }
 
 export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "createdAt" | "updatedAt">;
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
-    shareConversationsWithModelAuthors: true,
-    activeModel: defaultModel.id,
-    hideEmojiOnSidebar: false,
-    customPrompts: {},
-    disableStream: false,
-    directPaste: false,
+	shareConversationsWithModelAuthors: true,
+	activeModel: defaultModel.id,
+	hideEmojiOnSidebar: false,
+	customPrompts: {},
+	disableStream: false,
+	directPaste: false,
 } satisfies SettingsEditable;

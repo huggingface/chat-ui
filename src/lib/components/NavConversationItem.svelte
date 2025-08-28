@@ -43,7 +43,7 @@
 			{#if confirmDelete}
 				<span class="mr-1 font-semibold"> Delete </span>
 			{/if}
-		{conv.title}
+			{conv.title}
 		</span>
 		{#if showDescription && description && searchInput}
 			<p class="ml-7 text-sm text-gray-500">
