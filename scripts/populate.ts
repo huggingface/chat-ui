@@ -12,6 +12,7 @@ import { ready } from "$lib/server/config";
 import { collections } from "$lib/server/database.ts";
 import { models } from "../src/lib/server/models.ts";
 import type { User } from "../src/lib/types/User";
+import type { Assistant } from "../src/lib/types/Assistant";
 import type { Conversation } from "../src/lib/types/Conversation";
 import type { Settings } from "../src/lib/types/Settings";
 import { Message } from "../src/lib/types/Message.ts";
@@ -37,7 +38,7 @@ rl.on("close", function () {
 
 const samples = fs.readFileSync(path.join(__dirname, "samples.txt"), "utf8").split("\n---\n");
 
-const possibleFlags = ["reset", "all", "users", "settings", "conversations"];
+const possibleFlags = ["reset", "all", "users", "settings", "assistants", "conversations"];
 const argv = minimist(process.argv.slice(2));
 const flags = argv["_"].filter((flag) => possibleFlags.includes(flag));
 
@@ -151,6 +152,7 @@ async function seed() {
 		console.log("Starting reset of DB");
 		await collections.users.deleteMany({});
 		await collections.settings.deleteMany({});
+		await collections.assistants.deleteMany({});
 		await collections.conversations.deleteMany({});
 		await collections.migrationResults.deleteMany({});
 		await collections.semaphores.deleteMany({});
@@ -188,6 +190,7 @@ async function seed() {
 				disableStream: faker.datatype.boolean(0.25),
 				directPaste: faker.datatype.boolean(0.25),
 				customPrompts: {},
+				assistants: [],
 			};
 			await collections.settings.updateOne(
 				{ userId: user._id },
@@ -198,6 +201,42 @@ async function seed() {
 		console.log("Done updating settings.");
 	}
 
+	if (flags.includes("assistants") || flags.includes("all")) {
+		console.log("Creating assistants for all users");
+		await Promise.all(
+			users.map(async (user) => {
+				const name = faker.animal.insect();
+				const assistants = faker.helpers.multiple<Assistant>(
+					() => ({
+						_id: new ObjectId(),
+						name,
+						createdById: user._id,
+						createdByName: user.username,
+						createdAt: faker.date.recent({ days: 30 }),
+						updatedAt: faker.date.recent({ days: 30 }),
+						userCount: faker.number.int({ min: 1, max: 100000 }),
+						review: faker.helpers.enumValue(ReviewStatus),
+						modelId: faker.helpers.arrayElement(modelIds),
+						description: faker.lorem.sentence(),
+						preprompt: faker.hacker.phrase(),
+						exampleInputs: faker.helpers.multiple(() => faker.lorem.sentence(), {
+							count: faker.number.int({ min: 0, max: 4 }),
+						}),
+						searchTokens: generateSearchTokens(name),
+						last24HoursCount: faker.number.int({ min: 0, max: 1000 }),
+					}),
+					{ count: faker.number.int({ min: 3, max: 10 }) }
+				);
+				await collections.assistants.insertMany(assistants);
+				await collections.settings.updateOne(
+					{ userId: user._id },
+					{ $set: { assistants: assistants.map((a) => a._id.toString()) } },
+					{ upsert: true }
+				);
+			})
+		);
+		console.log("Done creating assistants.");
+	}
 
 	if (flags.includes("conversations") || flags.includes("all")) {
 		console.log("Creating conversations for all users");
@@ -207,13 +246,24 @@ async function seed() {
 					async () => {
 						const settings = await collections.settings.findOne<Settings>({ userId: user._id });
 
-						const preprompt = faker.helpers.maybe(() => faker.hacker.phrase(), { probability: 0.5 }) ?? "";
+						const assistantId =
+							settings?.assistants && settings.assistants.length > 0 && faker.datatype.boolean(0.1)
+								? faker.helpers.arrayElement<ObjectId>(settings.assistants)
+								: undefined;
+
+						const preprompt =
+							(assistantId
+								? await collections.assistants
+										.findOne({ _id: assistantId })
+										.then((assistant: Assistant) => assistant?.preprompt ?? "")
+								: faker.helpers.maybe(() => faker.hacker.phrase(), { probability: 0.5 })) ?? "";
 
 						const messages = await generateMessages(preprompt);
 
 						const conv = {
 							_id: new ObjectId(),
 							userId: user._id,
+							assistantId,
 							preprompt,
 							createdAt: faker.date.recent({ days: 145 }),
 							updatedAt: faker.date.recent({ days: 145 }),
