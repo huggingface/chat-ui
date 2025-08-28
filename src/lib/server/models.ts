@@ -225,6 +225,12 @@ export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...
 export const defaultModel = models[0];
 
 // Models that have been deprecated
+const sanitizeJSONEnv = (val: string, fallback: string) => {
+    const raw = (val ?? "").trim();
+    const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
+    return unquoted || fallback;
+};
+
 export const oldModels = config.OLD_MODELS
 	? z
 			.array(
@@ -235,7 +241,7 @@ export const oldModels = config.OLD_MODELS
 					transferTo: validModelIdSchema.optional(),
 				})
 			)
-			.parse(JSON5.parse(config.OLD_MODELS))
+			.parse(JSON5.parse(sanitizeJSONEnv(config.OLD_MODELS, "[]")))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
