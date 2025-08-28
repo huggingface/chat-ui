@@ -128,28 +128,20 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 			};
 		}
 
-		// Web Search
+		// Web Search - convert to status updates since WebSearch type was removed
 		else if (update.type === "webSearch") {
-			if (update.messageType === "update") {
+			if (update.messageType === "error") {
 				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Update,
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Error,
 					message: update.message,
-					args: update.args,
 				};
-			} else if (update.messageType === "error") {
+			} else {
+				// Convert other web search updates to general status updates
 				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Error,
+					type: MessageUpdateType.Status,
+					status: MessageUpdateStatus.Started,
 					message: update.message,
-					args: update.args,
-				};
-			} else if (update.messageType === "sources") {
-				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Sources,
-					message: update.message,
-					sources: update.sources ?? [],
 				};
 			}
 		}
@@ -175,20 +167,7 @@ const updateMessageUpdates: Migration = {
 					?.map((update) => convertMessageUpdate(message, update as OldMessageUpdate))
 					.filter((update): update is MessageUpdate => Boolean(update));
 
-				// Add the new web search finished update if the sources update exists and webSearch is defined
-				const webSearchSourcesUpdateIndex =
-					updates?.findIndex(
-						(u) =>
-							u.type === MessageUpdateType.WebSearch &&
-							u.subtype === MessageWebSearchUpdateType.Sources
-					) ?? -1;
-				if (message.webSearch && updates && webSearchSourcesUpdateIndex !== -1) {
-					const webSearchFinishedUpdate: MessageWebSearchFinishedUpdate = {
-						type: MessageUpdateType.WebSearch,
-						subtype: MessageWebSearchUpdateType.Finished,
-					};
-					updates.splice(webSearchSourcesUpdateIndex + 1, 0, webSearchFinishedUpdate);
-				}
+				// Web search functionality removed - skip web search specific updates
 				return { ...message, updates };
 			});
 
