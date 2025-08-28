@@ -54,9 +54,9 @@ export async function processPreprompt(preprompt: string, user_message: string |
 
 export async function getAssistantById(id?: ObjectId) {
     return collections.assistants
-        .findOne<Pick<Assistant, "dynamicPrompt" | "generateSettings" | "tools">>(
+        .findOne<Pick<Assistant, "dynamicPrompt" | "generateSettings">>(
             { _id: id },
-            { projection: { dynamicPrompt: 1, generateSettings: 1, tools: 1 } }
+            { projection: { dynamicPrompt: 1, generateSettings: 1 } }
         )
         .then((a) => a ?? undefined);
 }

@@ -7,25 +7,16 @@ import { onExit } from "./exitHandler";
 import { promisify } from "util";
 
 interface Metrics {
-	model: {
-		conversationsTotal: Counter<Model["id"]>;
-		messagesTotal: Counter<Model["id"]>;
-		tokenCountTotal: Counter<Model["id"]>;
-		timePerOutputToken: Summary<Model["id"]>;
-		timeToFirstToken: Summary<Model["id"]>;
-		latency: Summary<Model["id"]>;
-		votesPositive: Counter<Model["id"]>;
-		votesNegative: Counter<Model["id"]>;
-	};
-
-	// webSearch metrics removed
-
-	tool: {
-		toolUseCount: Counter<string>;
-		toolUseCountError: Counter<string>;
-		toolUseDuration: Summary<string>;
-		timeToChooseTools: Summary;
-	};
+    model: {
+        conversationsTotal: Counter<Model["id"]>;
+        messagesTotal: Counter<Model["id"]>;
+        tokenCountTotal: Counter<Model["id"]>;
+        timePerOutputToken: Summary<Model["id"]>;
+        timeToFirstToken: Summary<Model["id"]>;
+        latency: Summary<Model["id"]>;
+        votesPositive: Counter<Model["id"]>;
+        votesNegative: Counter<Model["id"]>;
+    };
 }
 
 export class MetricsServer {
@@ -115,38 +106,8 @@ export class MetricsServer {
 					registers: [register],
 				}),
 			},
-			// webSearch metrics removed
-			tool: {
-				toolUseCount: new Counter({
-					name: "tool_use_count",
-					help: "Total number of tool uses",
-					labelNames: ["tool"],
-					registers: [register],
-				}),
-				toolUseCountError: new Counter({
-					name: "tool_use_count_error",
-					help: "Total number of tool use errors",
-					labelNames: ["tool"],
-					registers: [register],
-				}),
-				toolUseDuration: new Summary({
-					name: "tool_use_duration_ms",
-					help: "Tool use duration",
-					labelNames: ["tool"],
-					registers: [register],
-					maxAgeSeconds: 30 * 60, // longer duration since we use this to give feedback to the user
-					ageBuckets: 5,
-				}),
-				timeToChooseTools: new Summary({
-					name: "time_to_choose_tools_ms",
-					help: "Time to choose tools",
-					labelNames: ["model"],
-					registers: [register],
-					maxAgeSeconds: 5 * 60,
-					ageBuckets: 5,
-				}),
-			},
-		};
+            // webSearch metrics removed, tools removed
+        };
 
 		app.get("/metrics", (req, res) => {
 			register.metrics().then((metrics) => {

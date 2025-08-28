@@ -28,8 +28,7 @@ export const endpointVertexParametersSchema = z.object({
 			HarmBlockThreshold.BLOCK_ONLY_HIGH,
 		])
 		.optional(),
-	tools: z.array(z.any()).optional(),
-	multimodal: z
+    multimodal: z
 		.object({
 			image: createImageProcessorOptionsValidator({
 				supportedMimeTypes: [
@@ -54,8 +53,8 @@ export const endpointVertexParametersSchema = z.object({
 });
 
 export function endpointVertex(input: z.input<typeof endpointVertexParametersSchema>): Endpoint {
-	const { project, location, model, apiEndpoint, safetyThreshold, tools, multimodal, extraBody } =
-		endpointVertexParametersSchema.parse(input);
+    const { project, location, model, apiEndpoint, safetyThreshold, multimodal, extraBody } =
+        endpointVertexParametersSchema.parse(input);
 
 	const vertex_ai = new VertexAI({
 		project,
@@ -63,13 +62,13 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 		apiEndpoint,
 	});
 
-	return async ({ messages, preprompt, generateSettings }) => {
+    return async ({ messages, preprompt, generateSettings }) => {
 		const parameters = { ...model.parameters, ...generateSettings };
 
 		const hasFiles = messages.some((message) => message.files && message.files.length > 0);
 
-		const generativeModel = vertex_ai.getGenerativeModel({
-			model: extraBody?.model_version ?? model.id ?? model.name,
+        const generativeModel = vertex_ai.getGenerativeModel({
+            model: extraBody?.model_version ?? model.id ?? model.name,
 			safetySettings: safetyThreshold
 				? [
 						{
@@ -99,9 +98,7 @@ export function endpointVertex(input: z.input<typeof endpointVertexParametersSch
 				stopSequences: parameters?.stop,
 				temperature: parameters?.temperature ?? 1,
 			},
-			// tools and multimodal are mutually exclusive
-			tools: !hasFiles ? tools : undefined,
-		});
+        });
 
 		// Preprompt is the same as the first system message.
 		let systemMessage = preprompt;

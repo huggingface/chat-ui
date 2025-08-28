@@ -25,7 +25,6 @@ export interface Assistant extends Timestamps {
 	dynamicPrompt?: boolean;
 	searchTokens: string[];
 	last24HoursCount: number;
-	tools?: string[];
 }
 
 // eslint-disable-next-line no-shadow

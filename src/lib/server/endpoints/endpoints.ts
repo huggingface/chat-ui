@@ -26,7 +26,7 @@ import endpointLangserve, {
 	endpointLangserveParametersSchema,
 } from "./langserve/endpointLangserve";
 
-import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
+// Tools feature removed
 import type { ObjectId } from "mongodb";
 import { endpointLocal, endpointLocalParametersSchema } from "./local/endpointLocal";
 import {
@@ -38,22 +38,20 @@ export type EndpointMessage = Omit<Message, "id">;
 
 // parameters passed when generating text
 export interface EndpointParameters {
-	messages: EndpointMessage[];
-	preprompt?: Conversation["preprompt"];
-	continueMessage?: boolean; // used to signal that the last message will be extended
-	generateSettings?: Partial<Model["parameters"]>;
-	tools?: Tool[];
-	toolResults?: ToolResult[];
-	isMultimodal?: boolean;
-	conversationId?: ObjectId;
+    messages: EndpointMessage[];
+    preprompt?: Conversation["preprompt"];
+    continueMessage?: boolean; // used to signal that the last message will be extended
+    generateSettings?: Partial<Model["parameters"]>;
+    isMultimodal?: boolean;
+    conversationId?: ObjectId;
 }
 
 interface CommonEndpoint {
 	weight: number;
 }
 export type TextGenerationStreamOutputWithToolsAndWebSources = TextGenerationStreamOutput & {
-	token: TextGenerationStreamToken & { toolCalls?: ToolCall[] };
-	webSources?: { uri: string; title: string }[];
+    token: TextGenerationStreamToken;
+    webSources?: { uri: string; title: string }[];
 };
 // type signature for the endpoint
 export type Endpoint = (

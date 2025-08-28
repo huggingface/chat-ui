@@ -40,15 +40,14 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					authCondition(locals)
 				);
 
-				const res = convs.map((conv) => ({
-					_id: conv._id,
-					id: conv._id, // legacy param iOS
-					title: conv.title,
-					updatedAt: conv.updatedAt,
-					model: conv.model,
-					modelId: conv.model, // legacy param iOS
-					modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
-				}));
+                const res = convs.map((conv) => ({
+                    _id: conv._id,
+                    id: conv._id, // legacy param iOS
+                    title: conv.title,
+                    updatedAt: conv.updatedAt,
+                    model: conv.model,
+                    modelId: conv.model, // legacy param iOS
+                }));
 
 				return { conversations: res, nConversations };
 			},
@@ -281,16 +280,15 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								}
 							}
 
-							return {
-								_id: conv._id,
-								id: conv._id,
-								title: conv.title,
-								content: matchedContent,
-								matchedText,
-								updatedAt: conv.updatedAt,
-								model: conv.model,
-								modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
-							};
+                            return {
+                                _id: conv._id,
+                                id: conv._id,
+                                title: conv.title,
+                                content: matchedContent,
+                                matchedText,
+                                updatedAt: conv.updatedAt,
+                                model: conv.model,
+                            };
 						})
 					);
 
@@ -373,7 +371,6 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							id: conversation._id.toString(),
 							updatedAt: conversation.updatedAt,
 							modelId: conversation.model,
-							modelTools: models.find((m) => m.id == conversation.model)?.tools ?? false,
 							shared: conversation.shared,
 						};
 					})

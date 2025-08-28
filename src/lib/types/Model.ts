@@ -1,7 +1,7 @@
 import type { BackendModel } from "$lib/server/models";
 
 export type Model = Pick<
-	BackendModel,
+    BackendModel,
 	| "id"
 	| "name"
 	| "displayName"
@@ -16,7 +16,6 @@ export type Model = Pick<
 	| "preprompt"
 	| "multimodal"
 	| "multimodalAcceptedMimetypes"
-	| "unlisted"
-	| "tools"
-	| "hasInferenceAPI"
+    | "unlisted"
+    | "hasInferenceAPI"
 >;

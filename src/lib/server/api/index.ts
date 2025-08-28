@@ -1,7 +1,7 @@
 import { authPlugin } from "$api/authPlugin";
 import { conversationGroup } from "$api/routes/groups/conversations";
 import { userGroup } from "$api/routes/groups/user";
-import { toolGroup } from "$api/routes/groups/tools";
+// Tools feature removed
 import { misc } from "$api/routes/groups/misc";
 import { modelGroup } from "$api/routes/groups/models";
 import { debugGroup } from "$api/routes/groups/debug";
@@ -41,8 +41,7 @@ export const app = new Elysia({ prefix })
 	)
 	.use(authPlugin)
 	.use(conversationGroup)
-	.use(toolGroup)
-	.use(userGroup)
+    .use(userGroup)
 	.use(modelGroup)
 	.use(misc)
 	.use(debugGroup);
