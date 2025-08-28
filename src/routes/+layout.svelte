@@ -130,8 +130,6 @@
 				});
 		}
 
-		// Tools feature removed: ignore tools query param
-
 		if ($page.url.searchParams.has("token")) {
 			const token = $page.url.searchParams.get("token");
 
