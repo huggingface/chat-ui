@@ -87,95 +87,100 @@ let modelsRaw: z.infer<typeof modelConfig>[] = [];
 
 // Prefer explicit base URL, then fall back to a full list URL
 const openaiBaseUrl = (() => {
-    if (config.OPENAI_BASE_URL) {
-        return config.OPENAI_BASE_URL.replace(/\/$/, "");
-    }
-    if (config.OPENAI_MODEL_LIST_URL) {
-        try {
-            const listUrl = new URL(config.OPENAI_MODEL_LIST_URL);
-            const basePath = listUrl.pathname.replace(/\/?models\/?$/, "");
-            return `${listUrl.origin}${basePath}`.replace(/\/$/, "");
-        } catch (e) {
-            logger.error(e, "Invalid OPENAI_MODEL_LIST_URL provided");
-        }
-    }
-    return undefined;
+	if (config.OPENAI_BASE_URL) {
+		return config.OPENAI_BASE_URL.replace(/\/$/, "");
+	}
+	if (config.OPENAI_MODEL_LIST_URL) {
+		try {
+			const listUrl = new URL(config.OPENAI_MODEL_LIST_URL);
+			const basePath = listUrl.pathname.replace(/\/?models\/?$/, "");
+			return `${listUrl.origin}${basePath}`.replace(/\/$/, "");
+		} catch (e) {
+			logger.error(e, "Invalid OPENAI_MODEL_LIST_URL provided");
+		}
+	}
+	return undefined;
 })();
 
 if (openaiBaseUrl) {
-    try {
-        const baseURL = openaiBaseUrl;
-        const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
+	try {
+		const baseURL = openaiBaseUrl;
+		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
+		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
 
-        // Try unauthenticated request first (many model lists are public, e.g. HF router)
-        let response = await fetch(`${baseURL}/models`);
-        if (response.status === 401 || response.status === 403) {
-            // Retry with Authorization header if available
-            response = await fetch(`${baseURL}/models`, {
-                headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
-            });
-        }
-        if (!response.ok) {
-            throw new Error(
-                `Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
-            );
-        }
-        const json = await response.json();
+		// Try unauthenticated request first (many model lists are public, e.g. HF router)
+		let response = await fetch(`${baseURL}/models`);
+		logger.info({ status: response.status }, "[models] First fetch status");
+		if (response.status === 401 || response.status === 403) {
+			// Retry with Authorization header if available
+			response = await fetch(`${baseURL}/models`, {
+				headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+			});
+			logger.info({ status: response.status }, "[models] Retried fetch status");
+		}
+		if (!response.ok) {
+			throw new Error(
+				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
+			);
+		}
+		const json = await response.json();
+		logger.info({ keys: Object.keys(json || {}) }, "[models] Response keys");
 
-		const listSchema = z.object({
-			data: z.array(
-				z.object({
-					id: z.string(),
-					providers: z
-						.array(
-							z.object({ supports_tools: z.boolean().optional() }).passthrough()
-						)
-						.optional(),
-				})
-			),
-		}).passthrough();
+		const listSchema = z
+			.object({
+				data: z.array(
+					z.object({
+						id: z.string(),
+						providers: z
+							.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+							.optional(),
+					})
+				),
+			})
+			.passthrough();
 
-        const parsed = listSchema.parse(json);
+		const parsed = listSchema.parse(json);
+		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
 
-        modelsRaw = parsed.data.map((m) => ({
-            id: m.id,
-            name: m.id,
-            displayName: m.id,
-            tools: m.providers?.some((p) => p.supports_tools === true) ?? false,
-            endpoints: [
-                {
-                    type: "openai" as const,
-                    baseURL,
-                    // apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
-                },
-            ],
-        })) as z.infer<typeof modelConfig>[];
-    } catch (e) {
-        logger.error(e, "Failed to load models from OpenAI base URL");
-        throw e;
-    }
+		modelsRaw = parsed.data.map((m) => ({
+			id: m.id,
+			name: m.id,
+			displayName: m.id,
+			tools: m.providers?.some((p) => p.supports_tools === true) ?? false,
+			endpoints: [
+				{
+					type: "openai" as const,
+					baseURL,
+					// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+				},
+			],
+		})) as z.infer<typeof modelConfig>[];
+	} catch (e) {
+		logger.error(e, "Failed to load models from OpenAI base URL");
+		throw e;
+	}
 } else {
-    logger.error(
-        "OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
-    );
-    throw new Error("OPENAI_BASE_URL not set");
+	logger.error(
+		"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
+	);
+	throw new Error("OPENAI_BASE_URL not set");
 }
 
 function getChatPromptRender(
-    m: z.infer<typeof modelConfig>
+	m: z.infer<typeof modelConfig>
 ): (inputs: ChatTemplateInput) => string {
-    // Minimal template to support legacy "completions" flow if ever used.
-    // We avoid any tokenizer/Jinja usage in this build.
-    return ({ messages, preprompt }) => {
-        const parts: string[] = [];
-        if (preprompt) parts.push(`[SYSTEM]\n${preprompt}`);
-        for (const msg of messages) {
-            const role = msg.from === "assistant" ? "ASSISTANT" : msg.from.toUpperCase();
-            parts.push(`[${role}]\n${msg.content}`);
-        }
-        parts.push(`[ASSISTANT]`);
-        return parts.join("\n\n");
-    };
+	// Minimal template to support legacy "completions" flow if ever used.
+	// We avoid any tokenizer/Jinja usage in this build.
+	return ({ messages, preprompt }) => {
+		const parts: string[] = [];
+		if (preprompt) parts.push(`[SYSTEM]\n${preprompt}`);
+		for (const msg of messages) {
+			const role = msg.from === "assistant" ? "ASSISTANT" : msg.from.toUpperCase();
+			parts.push(`[${role}]\n${msg.content}`);
+		}
+		parts.push(`[ASSISTANT]`);
+		return parts.join("\n\n");
+	};
 }
 
 const processModel = async (m: z.infer<typeof modelConfig>) => ({
@@ -185,6 +190,7 @@ const processModel = async (m: z.infer<typeof modelConfig>) => ({
 	displayName: m.displayName || m.name,
 	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
+	unlisted: m.unlisted ?? false,
 });
 
 const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
@@ -226,9 +232,9 @@ export const defaultModel = models[0];
 
 // Models that have been deprecated
 const sanitizeJSONEnv = (val: string, fallback: string) => {
-    const raw = (val ?? "").trim();
-    const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
-    return unquoted || fallback;
+	const raw = (val ?? "").trim();
+	const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
+	return unquoted || fallback;
 };
 
 export const oldModels = config.OLD_MODELS
@@ -254,7 +260,8 @@ export const validateModel = (_models: BackendModel[]) => {
 
 export const taskModel = addEndpoint(
 	config.TASK_MODEL
-		? models.find((m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL) ?? defaultModel
+		? (models.find((m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL) ??
+				defaultModel)
 		: defaultModel
 );
 

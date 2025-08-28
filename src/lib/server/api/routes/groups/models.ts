@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { models, oldModels, type BackendModel } from "$lib/server/models";
+import type { BackendModel } from "$lib/server/models";
 import { authPlugin } from "../../authPlugin";
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
@@ -33,50 +33,66 @@ export type GETOldModelsResponse = Array<{
 }>;
 
 export const modelGroup = new Elysia().group("/models", (app) =>
-	app
-		.get("/", () => {
-			return models
-				.filter((m) => m.unlisted == false)
-				.map((model) => ({
-					id: model.id,
-					name: model.name,
-					websiteUrl: model.websiteUrl,
-					modelUrl: model.modelUrl,
-					datasetName: model.datasetName,
-					datasetUrl: model.datasetUrl,
-					displayName: model.displayName,
-					description: model.description,
-					reasoning: !!model.reasoning,
-					logoUrl: model.logoUrl,
-					promptExamples: model.promptExamples,
-					parameters: model.parameters,
-					preprompt: model.preprompt,
-					multimodal: model.multimodal,
-					multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
-					tools: model.tools,
-					unlisted: model.unlisted,
-					hasInferenceAPI: model.hasInferenceAPI,
-				})) satisfies GETModelsResponse;
-		})
-		.get("/old", () => {
-			return oldModels satisfies GETOldModelsResponse;
-		})
-		.group("/:namespace/:model?", (app) =>
-			app
-				.derive(async ({ params, error }) => {
-					let modelId: string = params.namespace;
-					if (params.model) {
-						modelId += "/" + params.model;
-					}
-					const model = models.find((m) => m.id === modelId);
-					if (!model || model.unlisted) {
-						return error(404, "Model not found");
-					}
-					return { model };
-				})
-				.get("/", ({ model }) => {
-					return model;
-				})
+    app
+        .get("/", async () => {
+            try {
+                const { models } = await import("$lib/server/models");
+                return models
+                    .filter((m) => m.unlisted == false)
+                    .map((model) => ({
+                        id: model.id,
+                        name: model.name,
+                        websiteUrl: model.websiteUrl,
+                        modelUrl: model.modelUrl,
+                        datasetName: model.datasetName,
+                        datasetUrl: model.datasetUrl,
+                        displayName: model.displayName,
+                        description: model.description,
+                        reasoning: !!model.reasoning,
+                        logoUrl: model.logoUrl,
+                        promptExamples: model.promptExamples,
+                        parameters: model.parameters,
+                        preprompt: model.preprompt,
+                        multimodal: model.multimodal,
+                        multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+                        tools: model.tools,
+                        unlisted: model.unlisted,
+                        hasInferenceAPI: model.hasInferenceAPI,
+                    })) satisfies GETModelsResponse;
+            } catch (e) {
+                // Return empty list instead of crashing the whole page
+                return [] as GETModelsResponse;
+            }
+        })
+        .get("/old", async () => {
+            try {
+                const { oldModels } = await import("$lib/server/models");
+                return oldModels satisfies GETOldModelsResponse;
+            } catch (e) {
+                return [] as GETOldModelsResponse;
+            }
+        })
+        .group("/:namespace/:model?", (app) =>
+            app
+                .derive(async ({ params, error }) => {
+                    let modelId: string = params.namespace;
+                    if (params.model) {
+                        modelId += "/" + params.model;
+                    }
+                    try {
+                        const { models } = await import("$lib/server/models");
+                        const model = models.find((m) => m.id === modelId);
+                        if (!model || model.unlisted) {
+                            return error(404, "Model not found");
+                        }
+                        return { model };
+                    } catch (e) {
+                        return error(500, "Models not available");
+                    }
+                })
+                .get("/", ({ model }) => {
+                    return model;
+                })
 				.use(authPlugin)
 				.post("/subscribe", async ({ locals, model, error }) => {
 					if (!locals.sessionId) {
