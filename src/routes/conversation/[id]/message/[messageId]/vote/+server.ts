@@ -24,8 +24,6 @@ export async function POST({ params, request, locals }) {
 		)
 		.then((c) => c?.model);
 
-    // Metrics removed: no vote counters
-
 	const document = await collections.conversations.updateOne(
 		{
 			_id: conversationId,
