@@ -204,7 +204,7 @@
 				theme = localStorage.theme;
 			}}
 			aria-label="Toggle theme"
-			class="flex h-9 min-w-[1.5em] flex-none items-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex size-9 min-w-[1.5em] flex-none items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			{#if browser}
 				{#if theme === "dark"}
