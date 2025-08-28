@@ -21,21 +21,21 @@ superjson.registerCustom<ObjectId, string>(
 );
 
 export function useAPIClient({
-    fetch,
-    origin,
+	fetch,
+	origin,
 }: {
-    fetch?: Treaty.Config["fetcher"];
-    origin?: string;
+	fetch?: Treaty.Config["fetcher"];
+	origin?: string;
 } = {}) {
-    // On the server, use the current request origin when available to avoid
-    // incorrect port guessing and ensure cookies are forwarded properly.
-    // Fall back to a sane default in dev if origin is missing.
-    const url = browser
-        ? `${window.location.origin}${base}/api/v2`
-        : `${origin ?? `http://localhost:5173`}${base}/api/v2`;
+	// On the server, use the current request origin when available to avoid
+	// incorrect port guessing and ensure cookies are forwarded properly.
+	// Fall back to a sane default in dev if origin is missing.
+	const url = browser
+		? `${window.location.origin}${base}/api/v2`
+		: `${origin ?? `http://localhost:5173`}${base}/api/v2`;
 
-    const app = treaty<App>(url, { fetcher: fetch });
-    return app;
+	const app = treaty<App>(url, { fetcher: fetch });
+	return app;
 }
 
 export function handleResponse<T extends Record<number, unknown>>(

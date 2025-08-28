@@ -1,5 +1,9 @@
 import type { MessageFile } from "$lib/types/Message";
-import { type MessageUpdate, type MessageStreamUpdate, MessageUpdateType } from "$lib/types/MessageUpdate";
+import {
+	type MessageUpdate,
+	type MessageStreamUpdate,
+	MessageUpdateType,
+} from "$lib/types/MessageUpdate";
 
 import { page } from "$app/state";
 
@@ -8,13 +12,13 @@ import { page } from "$app/state";
 // Tools feature removed: no tool update helpers
 
 type MessageUpdateRequestOptions = {
-    base: string;
-    inputs?: string;
-    messageId?: string;
-    isRetry: boolean;
-    isContinue: boolean;
-    // tools removed
-    files?: MessageFile[];
+	base: string;
+	inputs?: string;
+	messageId?: string;
+	isRetry: boolean;
+	isContinue: boolean;
+	// tools removed
+	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -26,12 +30,12 @@ export async function fetchMessageUpdates(
 
 	const form = new FormData();
 
-    const optsJSON = JSON.stringify({
-        inputs: opts.inputs,
-        id: opts.messageId,
-        is_retry: opts.isRetry,
-        is_continue: opts.isContinue,
-    });
+	const optsJSON = JSON.stringify({
+		inputs: opts.inputs,
+		id: opts.messageId,
+		is_retry: opts.isRetry,
+		is_continue: opts.isContinue,
+	});
 
 	opts.files?.forEach((file) => {
 		const name = file.type + ";" + file.name;

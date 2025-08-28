@@ -31,7 +31,9 @@ Web Search
 
 ## Quickstart
 
-You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp).
+Note: This build supports only OpenAI-compatible API endpoints via `OPENAI_BASE_URL`. Local llama.cpp/TGI/Ollama and other provider integrations are disabled.
+
+You can quickly have a locally running chat-ui & LLM text-generation server thanks to chat-ui's [llama.cpp server support](https://huggingface.co/docs/chat-ui/configuration/models/providers/llamacpp) — not applicable in this build.
 
 **Step 1 (Start llama.cpp server):**
 

@@ -212,7 +212,6 @@
 		</a>
 	{/if}
 
-
 	<span class="flex flex-row-reverse gap-1 md:flex-row">
 		<a
 			href="{base}/settings"

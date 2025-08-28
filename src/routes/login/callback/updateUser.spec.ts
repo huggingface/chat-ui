@@ -47,7 +47,7 @@ const insertRandomConversations = async (count: number) => {
 			title: "random title",
 			messages: [],
 			model: defaultModel.id,
-    // embedding model removed in this build
+			// embedding model removed in this build
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			sessionId: locals.sessionId,

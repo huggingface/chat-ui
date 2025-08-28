@@ -5,13 +5,13 @@ import type { Message } from "$lib/types/Message";
 import type { Assistant } from "$lib/types/Assistant";
 
 export interface TextGenerationContext {
-    model: ProcessedModel;
-    endpoint: Endpoint;
-    conv: Conversation;
-    messages: Message[];
-    assistant?: Pick<Assistant, "dynamicPrompt" | "generateSettings">;
-    isContinue: boolean;
-    promptedAt: Date;
-    ip: string;
-    username?: string;
+	model: ProcessedModel;
+	endpoint: Endpoint;
+	conv: Conversation;
+	messages: Message[];
+	assistant?: Pick<Assistant, "dynamicPrompt" | "generateSettings">;
+	isContinue: boolean;
+	promptedAt: Date;
+	ip: string;
+	username?: string;
 }

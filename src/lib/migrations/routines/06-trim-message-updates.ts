@@ -2,11 +2,15 @@ import type { Migration } from ".";
 import { collections } from "$lib/server/database";
 import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
-import {
-	MessageUpdateType,
-	MessageWebSearchUpdateType,
-	type MessageUpdate,
-} from "$lib/types/MessageUpdate";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+
+// Legacy types for migration compatibility
+enum MessageWebSearchUpdateType {
+	Update = "update",
+	Error = "error",
+	Sources = "sources",
+	Finished = "finished",
+}
 import type { Message } from "$lib/types/Message";
 import { logger } from "$lib/server/logger";
 

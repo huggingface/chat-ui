@@ -36,7 +36,6 @@ export async function GET({ params, locals }) {
 		error(404, "Conversation model not found");
 	}
 
-
 	const messagesUpTo = buildSubtree(conv, messageId);
 
 	const prompt = await buildPrompt({

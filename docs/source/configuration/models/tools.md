@@ -1,13 +1,15 @@
 # Tools
 
-Tool calling instructs the model to generate an output matching a user-defined schema, which may be parsed for invoking external tools. The model simply chooses the tools and their parameters. Currently, only `TGI` and `Cohere` with `Command R+` are supported.
+Note: Tools are disabled in this build and non-OpenAI endpoints are not supported.
+
+Tool calling instructs the model to generate an output matching a user-defined schema, which may be parsed for invoking external tools. In OpenAI-compatible setups, follow the provider's native tool/function calling documentation. The examples below for TGI/Cohere do not apply to this build.
 
 <div class="flex justify-center">
 <img class="block dark:hidden" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-light.png" height="auto"/>
 <img class="hidden dark:block" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/tools-dark.png" height="auto"/>
 </div>
 
-## TGI Configuration
+## TGI Configuration (not applicable in this build)
 
 A custom tokenizer is required for prompting the model for generating tool calls, as well as prompting with the results. The expected format for these tools and the resulting tool calls are hard coded for TGI, so it's likely that only the following configuration will work:
 
@@ -32,7 +34,7 @@ MODELS=`[
 ]`
 ```
 
-## Cohere Configuration
+## Cohere Configuration (not applicable in this build)
 
 The Cohere provider supports the endpoint native method of tool calling. Refer to the `endpoints/cohere` for implementation details.
 
@@ -59,4 +61,4 @@ Tool implementations are placed in `src/lib/server/tools`, with helpers availabl
 
 ## Adding Support for Additional Models
 
-The TGI implementation uses a custom tokenizer and hard coded schema for supporting tools. The Cohere implementation, on the other hand, uses the native support in the SDK to emit tool calls. This is the recommended way to add support for more models. Please see the `endpoints/cohere` section of the code for implementation details.
+This build targets OpenAI-compatible endpoints only. Non-OpenAI providers are out of scope.

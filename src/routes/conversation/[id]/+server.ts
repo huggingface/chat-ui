@@ -147,26 +147,26 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(400, "Invalid request");
 	}
 
-    const {
-        inputs: newPrompt,
-        id: messageId,
-        is_retry: isRetry,
-        is_continue: isContinue,
-    } = z
-        .object({
-            id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
-            inputs: z.optional(
-                z
-                    .string()
-                    .min(1)
-                    .transform((s) => s.replace(/\r\n/g, "\n"))
-            ),
-            is_retry: z.optional(z.boolean()),
-            is_continue: z.optional(z.boolean()),
-            files: z.optional(
-                z.array(
-                    z.object({
-                        type: z.literal("base64").or(z.literal("hash")),
+	const {
+		inputs: newPrompt,
+		id: messageId,
+		is_retry: isRetry,
+		is_continue: isContinue,
+	} = z
+		.object({
+			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
+			inputs: z.optional(
+				z
+					.string()
+					.min(1)
+					.transform((s) => s.replace(/\r\n/g, "\n"))
+			),
+			is_retry: z.optional(z.boolean()),
+			is_continue: z.optional(z.boolean()),
+			files: z.optional(
+				z.array(
+					z.object({
+						type: z.literal("base64").or(z.literal("hash")),
 						name: z.string(),
 						value: z.string(),
 						mime: z.string(),
@@ -192,7 +192,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			})
 	);
 
-    // Tools removed: no document parser auto-activation
+	// Tools removed: no document parser auto-activation
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		error(400, "Message too long.");
@@ -438,17 +438,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const initialMessageContent = messageToWriteTo.content;
 
 			try {
-            const ctx: TextGenerationContext = {
-                model,
-                endpoint: await model.getEndpoint(),
-                conv,
-                messages: messagesForPrompt,
-                assistant: undefined,
-                isContinue: isContinue ?? false,
-                promptedAt,
-                ip: getClientAddress(),
-                username: locals.user?.username,
-            };
+				const ctx: TextGenerationContext = {
+					model,
+					endpoint: await model.getEndpoint(),
+					conv,
+					messages: messagesForPrompt,
+					assistant: undefined,
+					isContinue: isContinue ?? false,
+					promptedAt,
+					ip: getClientAddress(),
+					username: locals.user?.username,
+				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
 			} catch (e) {

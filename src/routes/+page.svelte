@@ -100,8 +100,8 @@
 	<div class="mx-auto my-20 max-w-xl rounded-xl border p-6 text-center dark:border-gray-700">
 		<h2 class="mb-2 text-xl font-semibold">No models available</h2>
 		<p class="text-gray-600 dark:text-gray-300">
-			No chat models are configured. Set `OPENAI_BASE_URL` (or `OPENAI_MODEL_LIST_URL`) and ensure the server can
-			reach the endpoint, then reload.
+			No chat models are configured. Set `OPENAI_BASE_URL` (or `OPENAI_MODEL_LIST_URL`) and ensure
+			the server can reach the endpoint, then reload.
 		</p>
 	</div>
 {/if}

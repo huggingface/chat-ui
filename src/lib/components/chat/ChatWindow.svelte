@@ -383,10 +383,10 @@
 								mimeTypes={activeMimeTypes}
 								on:submit={handleSubmit}
 								{onPaste}
-                            disabled={isReadOnly || lastIsError}
-                            modelIsMultimodal={currentModel.multimodal}
-                            bind:focused
-                        />
+								disabled={isReadOnly || lastIsError}
+								modelIsMultimodal={currentModel.multimodal}
+								bind:focused
+							/>
 						{/if}
 
 						{#if loading}
@@ -431,17 +431,17 @@
 			>
 				<p>
 					Model:
-						{#if models.find((m) => m.id === currentModel.id)}
-							<a
-								href="{base}/settings/{currentModel.id}"
-								class="inline-flex items-center hover:underline"
-								>{currentModel.displayName}<CarbonCaretDown class="text-xxs" /></a
-							>
-						{:else}
-							<span class="inline-flex items-center line-through dark:border-gray-700">
-								{currentModel.id}
-							</span>
-						{/if}
+					{#if models.find((m) => m.id === currentModel.id)}
+						<a
+							href="{base}/settings/{currentModel.id}"
+							class="inline-flex items-center hover:underline"
+							>{currentModel.displayName}<CarbonCaretDown class="text-xxs" /></a
+						>
+					{:else}
+						<span class="inline-flex items-center line-through dark:border-gray-700">
+							{currentModel.id}
+						</span>
+					{/if}
 					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 					or false.
 				</p>

@@ -1,10 +1,14 @@
-import type { WebSearchSource } from "$lib/types/WebSearch";
+// Simple type to replace removed WebSearchSource
+type SimpleSource = {
+	title?: string;
+	link: string;
+};
 import { processTokens, type Token } from "$lib/utils/marked";
 
 export type IncomingMessage = {
 	type: "process";
 	content: string;
-	sources: WebSearchSource[];
+	sources: SimpleSource[];
 };
 
 export type OutgoingMessage = {

@@ -1,5 +1,5 @@
 <script lang="ts">
-		import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
+	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
 	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import CodeBlock from "../CodeBlock.svelte";
 	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
@@ -11,7 +11,7 @@
 
 	interface Props {
 		content: string;
-		sources?: any[];
+		sources?: { title?: string; link: string }[];
 	}
 
 	let worker: Worker | null = null;
@@ -20,7 +20,7 @@
 
 	let tokens: Token[] = $state(processTokensSync(content, sources));
 
-	async function processContent(content: string, sources: WebSearchSource[]): Promise<Token[]> {
+	async function processContent(content: string, sources: { title?: string; link: string }[]): Promise<Token[]> {
 		if (worker) {
 			return new Promise((resolve) => {
 				if (!worker) {

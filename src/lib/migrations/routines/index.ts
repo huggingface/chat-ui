@@ -21,12 +21,12 @@ export interface Migration {
 }
 
 export const migrations: Migration[] = [
-    updateSearchAssistant,
-    updateAssistantsModels,
-    updateMessageUpdates,
-    updateMessageFiles,
-    trimMessageUpdates,
-    updateFeaturedToReview,
-    deleteEmptyConversations,
-    updateReportsAssistantId,
+	updateSearchAssistant,
+	updateAssistantsModels,
+	updateMessageUpdates,
+	updateMessageFiles,
+	trimMessageUpdates,
+	updateFeaturedToReview,
+	deleteEmptyConversations,
+	updateReportsAssistantId,
 ];

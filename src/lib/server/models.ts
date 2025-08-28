@@ -68,7 +68,7 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
-    // tools removed
+	// tools removed
 	unlisted: z.boolean().default(false),
 	// embedding model removed in this build
 	embeddingModel: z.never().optional(),
@@ -106,8 +106,8 @@ if (openaiBaseUrl) {
 	try {
 		const baseURL = openaiBaseUrl;
 		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
-        // Prefer HF_TOKEN for Hugging Face router compatibility; otherwise use OPENAI_API_KEY
-        const authToken = config.HF_TOKEN || config.OPENAI_API_KEY || "";
+		// Prefer HF_TOKEN for Hugging Face router compatibility; otherwise use OPENAI_API_KEY
+		const authToken = config.HF_TOKEN || config.OPENAI_API_KEY || "";
 
 		// Try unauthenticated request first (many model lists are public, e.g. HF router)
 		let response = await fetch(`${baseURL}/models`);
@@ -143,18 +143,18 @@ if (openaiBaseUrl) {
 		const parsed = listSchema.parse(json);
 		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
 
-        modelsRaw = parsed.data.map((m) => ({
-            id: m.id,
-            name: m.id,
-            displayName: m.id,
-            endpoints: [
-                {
-                    type: "openai" as const,
-                    baseURL,
-                    // apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
-                },
-            ],
-        })) as z.infer<typeof modelConfig>[];
+		modelsRaw = parsed.data.map((m) => ({
+			id: m.id,
+			name: m.id,
+			displayName: m.id,
+			endpoints: [
+				{
+					type: "openai" as const,
+					baseURL,
+					// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+				},
+			],
+		})) as z.infer<typeof modelConfig>[];
 	} catch (e) {
 		logger.error(e, "Failed to load models from OpenAI base URL");
 		throw e;
@@ -266,6 +266,6 @@ export const taskModel = addEndpoint(
 );
 
 export type BackendModel = Optional<
-    typeof defaultModel,
-    "preprompt" | "parameters" | "multimodal" | "unlisted" | "hasInferenceAPI"
+	typeof defaultModel,
+	"preprompt" | "parameters" | "multimodal" | "unlisted" | "hasInferenceAPI"
 >;

@@ -130,7 +130,7 @@ export class Database {
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
-        const tools = db.collection("tools");
+		const tools = db.collection("tools");
 		const configCollection = db.collection<ConfigKey>("config");
 
 		return {
@@ -149,7 +149,7 @@ export class Database {
 			migrationResults,
 			semaphores,
 			tokenCaches,
-            tools,
+			tools,
 			config: configCollection,
 		};
 	}
@@ -271,7 +271,7 @@ export class Database {
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
 			.catch((e) => logger.error(e));
 		tokenCaches.createIndex({ tokenHash: 1 }).catch((e) => logger.error(e));
-        // Tools removed: skipping tools indexes
+		// Tools removed: skipping tools indexes
 
 		conversations
 			.createIndex({

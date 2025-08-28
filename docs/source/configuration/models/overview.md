@@ -1,5 +1,7 @@
 # Models Overview
 
+Note: This build is OpenAI-compatible only. Examples for non-OpenAI providers are not applicable.
+
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
 ```ini
@@ -55,7 +57,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenta
 {{assistantMessageToken}}
 ```
 
-## Custom endpoint authorization
+## Custom endpoint authorization (OpenAI-compatible servers)
 
 ### Basic and Bearer
 
