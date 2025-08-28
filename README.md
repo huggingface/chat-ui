@@ -17,6 +17,8 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 8. [Deploying to a HF Space](#deploying-to-a-hf-space)
 9. [Building](#building)
 
+> Note on models in this build: This configuration only supports sourcing models from an OpenAI-compatible API using `OPENAI_BASE_URL` and the `/models` endpoint. The legacy `MODELS` env var, GGUF discovery, and provider-specific endpoint configuration are disabled.
+
 ## Quickstart
 
 ### Docker image
@@ -258,46 +260,11 @@ You can also simply enable the local google websearch by setting `USE_LOCAL_WEBS
 
 You can enable javascript when parsing webpages to improve compatibility with `WEBSEARCH_JAVASCRIPT=true` at the cost of increased CPU usage. You'll want at least 4 cores when enabling.
 
-### Custom models
+### Custom models (disabled in this build)
 
-You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
+This build does not use the `MODELS` env var or GGUF discovery. Configure models via `OPENAI_BASE_URL` only; Chat UI will fetch `${OPENAI_BASE_URL}/models` and populate the list automatically.
 
-```env
-MODELS=`[
-  {
-    "name": "mistralai/Mistral-7B-Instruct-v0.2",
-    "displayName": "mistralai/Mistral-7B-Instruct-v0.2",
-    "description": "Mistral 7B is a new Apache 2.0 model, released by Mistral AI that outperforms Llama2 13B in benchmarks.",
-    "websiteUrl": "https://mistral.ai/news/announcing-mistral-7b/",
-    "preprompt": "",
-    "chatPromptTemplate" : "<s>{{#each messages}}{{#ifUser}}[INST] {{#if @first}}{{#if @root.preprompt}}{{@root.preprompt}}\n{{/if}}{{/if}}{{content}} [/INST]{{/ifUser}}{{#ifAssistant}}{{content}}</s>{{/ifAssistant}}{{/each}}",
-    "parameters": {
-      "temperature": 0.3,
-      "top_p": 0.95,
-      "repetition_penalty": 1.2,
-      "top_k": 50,
-      "truncate": 3072,
-      "max_new_tokens": 1024,
-      "stop": ["</s>"]
-    },
-    "promptExamples": [
-      {
-        "title": "Write an email",
-        "prompt": "As a restaurant owner, write a professional email to the supplier to get these products every week: \n\n- Wine (x10)\n- Eggs (x24)\n- Bread (x12)"
-      }, {
-        "title": "Code a game",
-        "prompt": "Code a basic snake game in python, give explanations for each step."
-      }, {
-        "title": "Recipe help",
-        "prompt": "How do I make a delicious lemon cheesecake?"
-      }
-    ]
-  }
-]`
-
-```
-
-You can change things like the parameters, or customize the preprompt to better suit your needs. You can also add more models by adding more objects to the array, with different preprompts for example.
+You can’t add or edit models via `MODELS` in this build.
 
 #### chatPromptTemplate
 
@@ -414,6 +381,17 @@ MODELS=`[{
       }]
 }]`
 ```
+
+###### Use an OpenAI Base URL (auto-list models)
+
+Instead of curating `MODELS`, point Chat UI to an OpenAI-compatible API base URL and it will fetch the list from `${OPENAI_BASE_URL}/models` automatically. Set this in `.env.local`:
+
+```env
+OPENAI_BASE_URL=https://router.huggingface.co/v1
+# Authorization will use OPENAI_API_KEY (or HF_TOKEN) if set
+```
+
+When `OPENAI_BASE_URL` is set, Chat UI ignores `MODELS` and GGUF discovery and builds models dynamically with an `openai` endpoint for that base URL. A legacy `OPENAI_MODEL_LIST_URL` is also supported but not recommended.
 
 You may also consume any model provider that provides compatible OpenAI API endpoint. For example, you may self-host [Portkey](https://github.com/Portkey-AI/gateway) gateway and experiment with Claude or GPTs offered by Azure OpenAI. Example for Claude from Anthropic:
 

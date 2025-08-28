@@ -9,7 +9,6 @@ export type GETModelsResponse = Array<{
 	name: string;
 	websiteUrl?: string;
 	modelUrl?: string;
-	tokenizer?: string | { tokenizerUrl: string; tokenizerConfigUrl: string };
 	datasetName?: string;
 	datasetUrl?: string;
 	displayName: string;
@@ -43,7 +42,6 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 					name: model.name,
 					websiteUrl: model.websiteUrl,
 					modelUrl: model.modelUrl,
-					tokenizer: model.tokenizer,
 					datasetName: model.datasetName,
 					datasetUrl: model.datasetUrl,
 					displayName: model.displayName,

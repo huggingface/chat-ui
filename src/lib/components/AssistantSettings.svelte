@@ -13,7 +13,6 @@
 
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconInternet from "./icons/IconInternet.svelte";
-	import TokensCounter from "./TokensCounter.svelte";
 	import HoverTooltip from "./HoverTooltip.svelte";
 	import { findCurrentModel } from "$lib/utils/models";
 	import AssistantToolPicker from "./AssistantToolPicker.svelte";
@@ -621,14 +620,7 @@
 				></textarea>
 				{#if modelId}
 					{@const model = models.find((_model) => _model.id === modelId)}
-					{#if model?.tokenizer && systemPrompt}
-						<TokensCounter
-							classNames="absolute bottom-4 right-4"
-							prompt={systemPrompt}
-							modelTokenizer={model.tokenizer}
-							truncate={model?.parameters?.truncate}
-						/>
-					{/if}
+					<!-- Tokenizer-based token counting disabled in this build -->
 				{/if}
 
 				<p class="text-xs text-red-500">{getError("preprompt")}</p>
