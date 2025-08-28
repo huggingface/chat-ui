@@ -1,22 +1,18 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
-	import { afterNavigate, goto, invalidateAll } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonClose from "~icons/carbon/close";
-	// removed Assistants feature imports
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 
 	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
-	import { error } from "$lib/stores/errors";
 	import { browser } from "$app/environment";
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { debounce } from "$lib/utils/debounce";
-
-	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		data: LayoutData;
@@ -27,8 +23,6 @@
 
 	let previousPage: string = $state(base || "/");
 	let showContent: boolean = $state(false);
-
-	const client = useAPIClient();
 
 	function checkDesktopRedirect() {
 		if (
@@ -134,7 +128,6 @@
 					{/if}
 				</button>
 			{/each}
-			<!-- Assistants feature removed -->
 
 			<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
 			<button
