@@ -11,7 +11,6 @@ export const load = async ({ depends, fetch }) => {
 	const [
 		settings,
 		models,
-		assistants,
 		oldModels,
 		tools,
 		communityToolCount,
@@ -22,7 +21,6 @@ export const load = async ({ depends, fetch }) => {
 	] = await Promise.all([
 		client.user.settings.get().then(handleResponse),
 		client.models.get().then(handleResponse),
-		client.user.assistants.get().then(handleResponse),
 		client.models.old.get().then(handleResponse),
 		client.tools.active.get().then(handleResponse),
 		client.tools.count.get().then(handleResponse),
@@ -33,8 +31,6 @@ export const load = async ({ depends, fetch }) => {
 	]);
 
 	const defaultModel = models[0];
-
-	const assistantActive = !models.map(({ id }) => id).includes(settings?.activeModel ?? "");
 
 	const { conversations: rawConversations, nConversations } = conversationsData;
 	const conversations = rawConversations.map((conv) => {
@@ -50,36 +46,12 @@ export const load = async ({ depends, fetch }) => {
 			title: conv.title,
 			model: conv.model ?? defaultModel,
 			updatedAt: new Date(conv.updatedAt),
-			...(conv.assistantId
-				? {
-						assistantId: conv.assistantId.toString(),
-						avatarUrl: client
-							.assistants({ id: conv.assistantId.toString() })
-							.get()
-							.then(handleResponse)
-							.then((assistant) => {
-								if (!assistant || !assistant.avatar) {
-									return undefined;
-								}
-								return `/settings/assistants/${conv.assistantId}/avatar.jpg?hash=${assistant.avatar}`;
-							})
-							.catch(() => undefined),
-					}
-				: {}),
 		} satisfies ConvSidebar;
 	});
 
 	return {
 		nConversations,
 		conversations,
-		assistant: assistantActive
-			? await client
-					.assistants({ id: settings?.activeModel })
-					.get()
-					.then(handleResponse)
-					.catch(() => undefined)
-			: undefined,
-		assistants,
 		models,
 		oldModels,
 		tools,

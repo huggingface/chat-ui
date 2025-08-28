@@ -1,7 +1,7 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
-import { assistantHasDynamicPrompt, getAssistantById, processPreprompt } from "./assistant";
+// Assistants feature removed: no dynamic prompt or assistant lookup
 import { getTools, runTools } from "./tools";
 import {
 	type MessageUpdate,
@@ -46,15 +46,10 @@ async function* textGenerationWithoutTitle(
 		status: MessageUpdateStatus.Started,
 	};
 
-	ctx.assistant ??= await getAssistantById(ctx.conv.assistantId);
     const { model, conv, messages, assistant, isContinue, toolsPreference } = ctx;
     const convId = conv._id;
 
 	let preprompt = conv.preprompt;
-	if (assistantHasDynamicPrompt(assistant) && preprompt) {
-		preprompt = await processPreprompt(preprompt, messages.at(-1)?.content);
-		if (messages[0].from === "system") messages[0].content = preprompt;
-	}
 
 	let toolResults: ToolResult[] = [];
 	let tools = model.tools ? await getTools(toolsPreference, ctx.assistant) : undefined;

@@ -120,18 +120,10 @@ export const misc = new Elysia()
 			);
 		}
 
-		const stats: {
-			nConversations: number;
-			nMessages: number;
-			nAssistants: number;
-			nAvatars: number;
-			nFiles: number;
-		} = {
+		const stats: { nConversations: number; nMessages: number; nFiles: number } = {
 			nConversations: 0,
 			nMessages: 0,
 			nFiles: 0,
-			nAssistants: 0,
-			nAvatars: 0,
 		};
 
 		const zipfile = new yazl.ZipFile();

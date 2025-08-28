@@ -41,11 +41,7 @@ export const userGroup = new Elysia()
 			.get("/settings", async ({ locals }) => {
 				const settings = await collections.settings.findOne(authCondition(locals));
 
-				if (
-					settings &&
-					!validateModel(models).safeParse(settings?.activeModel).success &&
-					!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
-				) {
+				if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
 					settings.activeModel = defaultModel.id;
 					await collections.settings.updateOne(authCondition(locals), {
 						$set: { activeModel: defaultModel.id },
@@ -77,7 +73,6 @@ export const userGroup = new Elysia()
 						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
 					customPrompts: settings?.customPrompts ?? {},
-					assistants: settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [],
 					tools:
 						settings?.tools ??
 						toolFromConfigs
@@ -151,45 +146,5 @@ export const userGroup = new Elysia()
 					.toArray();
 				return reports;
 			})
-			.get("/assistant/active", async ({ locals }) => {
-				const settings = await collections.settings.findOne(authCondition(locals));
-
-				if (!settings) {
-					return null;
-				}
-
-				if (settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)) {
-					return await collections.assistants.findOne({
-						_id: new ObjectId(settings.activeModel),
-					});
-				}
-
-				return null;
-			})
-			.get("/assistants", async ({ locals }) => {
-				const settings = await collections.settings.findOne(authCondition(locals));
-
-				if (!settings) {
-					return [];
-				}
-
-				const userAssistants =
-					settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
-
-				const assistants = await collections.assistants
-					.find({
-						_id: {
-							$in: [...userAssistants.map((el) => new ObjectId(el))],
-						},
-					})
-					.toArray();
-
-				return assistants.map((el) => ({
-					...el,
-					_id: el._id.toString(),
-					createdById: undefined,
-					createdByMe:
-						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-				}));
-			});
+			);
 	});

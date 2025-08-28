@@ -26,11 +26,10 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			async ({ locals, query }) => {
 				const convs = await collections.conversations
 					.find(authCondition(locals))
-					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>({
+					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" >>({
 						title: 1,
 						updatedAt: 1,
 						model: 1,
-						assistantId: 1,
 					})
 					.sort({ updatedAt: -1 })
 					.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
@@ -48,7 +47,6 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					updatedAt: conv.updatedAt,
 					model: conv.model,
 					modelId: conv.model, // legacy param iOS
-					assistantId: conv.assistantId,
 					modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 				}));
 
@@ -89,16 +87,10 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					.sort({
 						updatedAt: -1, // Sort by date updated in descending order
 					})
-					.project<
-						Pick<
-							Conversation,
-							"_id" | "title" | "updatedAt" | "model" | "assistantId" | "messages" | "userId"
-						>
-					>({
+					.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "messages" | "userId">>({
 						title: 1,
 						updatedAt: 1,
 						model: 1,
-						assistantId: 1,
 						messages: 1,
 						userId: 1,
 					})
@@ -297,7 +289,6 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								matchedText,
 								updatedAt: conv.updatedAt,
 								model: conv.model,
-								assistantId: conv.assistantId,
 								modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 							};
 						})
@@ -379,15 +370,9 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							model: conversation.model,
 							preprompt: conversation.preprompt,
 							rootMessageId: conversation.rootMessageId,
-							assistant: conversation.assistantId
-								? ((await collections.assistants.findOne({
-										_id: new ObjectId(conversation.assistantId),
-									})) ?? undefined)
-								: undefined,
 							id: conversation._id.toString(),
 							updatedAt: conversation.updatedAt,
 							modelId: conversation.model,
-							assistantId: conversation.assistantId,
 							modelTools: models.find((m) => m.id == conversation.model)?.tools ?? false,
 							shared: conversation.shared,
 						};

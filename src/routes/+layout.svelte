@@ -160,7 +160,7 @@
 	});
 
 	let mobileNavTitle = $derived(
-		["/models", "/assistants", "/privacy", "/tools"].includes($page.route.id ?? "")
+		["/models", "/privacy", "/tools"].includes($page.route.id ?? "")
 			? ""
 			: conversations.find((conv) => conv.id === $page.params.id)?.title
 	);
@@ -179,9 +179,9 @@
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
 
-	<!-- use those meta tags everywhere except on the share assistant page -->
+	<!-- use those meta tags everywhere except on special listing pages -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
+	{#if !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
 		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />

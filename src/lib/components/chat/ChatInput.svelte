@@ -10,7 +10,6 @@
 		fetchUrlToolId,
 		imageGenToolId,
 	} from "$lib/utils/toolIds";
-	import type { Assistant } from "$lib/types/Assistant";
 	import { page } from "$app/state";
 	import type { ToolFront } from "$lib/types/Tool";
 	import ToolLogo from "../ToolLogo.svelte";
@@ -29,7 +28,6 @@
 		placeholder?: string;
 		loading?: boolean;
 		disabled?: boolean;
-		assistant?: Assistant | undefined;
 		modelHasTools?: boolean;
 		modelIsMultimodal?: boolean;
 		children?: import("svelte").Snippet;
@@ -44,7 +42,6 @@
 		placeholder = "",
 		loading = false,
 		disabled = false,
-		assistant = undefined,
 		modelHasTools = false,
 		modelIsMultimodal = false,
 		children,
@@ -131,9 +128,9 @@
 			) satisfies ToolFront[]
 	);
 
-	let showImageGen = $derived(modelHasTools && !assistant);
+let showImageGen = $derived(modelHasTools);
 	let showFileUpload = $derived((modelIsMultimodal || modelHasTools) && mimeTypes.length > 0);
-	let showExtraTools = $derived(modelHasTools && !assistant);
+let showExtraTools = $derived(modelHasTools);
 
 	let showNoTools = $derived(!showImageGen && !showFileUpload && !showExtraTools);
 </script>
