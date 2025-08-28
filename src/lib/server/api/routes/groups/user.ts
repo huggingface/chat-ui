@@ -5,7 +5,6 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
-import { toolFromConfigs } from "$lib/server/tools";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
@@ -72,12 +71,7 @@ export const userGroup = new Elysia()
 						settings?.shareConversationsWithModelAuthors ??
 						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
-					customPrompts: settings?.customPrompts ?? {},
-					tools:
-						settings?.tools ??
-						toolFromConfigs
-							.filter((el) => !el.isHidden && el.isOnByDefault)
-							.map((el) => el._id.toString()),
+                    customPrompts: settings?.customPrompts ?? {},
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {
@@ -92,28 +86,12 @@ export const userGroup = new Elysia()
 						ethicsModalAccepted: z.boolean().optional(),
 						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 						customPrompts: z.record(z.string()).default({}),
-						tools: z.array(z.string()).optional(),
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
 					})
 					.parse(body) satisfies SettingsEditable;
 
-				// make sure all tools exist
-				// either in db or in config
-				if (settings.tools) {
-					const newTools = [
-						...(await collections.tools
-							.find({ _id: { $in: settings.tools.map((toolId) => new ObjectId(toolId)) } })
-							.project({ _id: 1 })
-							.toArray()
-							.then((tools) => tools.map((tool) => tool._id.toString()))),
-						...toolFromConfigs
-							.filter((el) => (settings?.tools ?? []).includes(el._id.toString()))
-							.map((el) => el._id.toString()),
-					];
-
-					settings.tools = newTools;
-				}
+				// Tools removed: ignore tools updates
 
 				await collections.settings.updateOne(
 					authCondition(locals),

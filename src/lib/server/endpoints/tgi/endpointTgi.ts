@@ -35,51 +35,24 @@ export function endpointTgi(input: z.input<typeof endpointTgiParametersSchema>):
 		endpointTgiParametersSchema.parse(input);
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
-	return async ({
-		messages,
-		preprompt,
-		continueMessage,
-		generateSettings,
-		tools,
-		toolResults,
-		isMultimodal,
-		conversationId,
-	}) => {
+    return async ({ messages, preprompt, continueMessage, generateSettings, isMultimodal, conversationId }) => {
 		const messagesWithResizedFiles = await Promise.all(
 			messages.map((message) => prepareMessage(Boolean(isMultimodal), message, imageProcessor))
 		);
 
-		const prompt = await buildPrompt({
-			messages: messagesWithResizedFiles,
-			preprompt,
-			model,
-			continueMessage,
-			tools,
-			toolResults,
-		});
+        const prompt = await buildPrompt({
+            messages: messagesWithResizedFiles,
+            preprompt,
+            model,
+            continueMessage,
+        });
 
-		return textGenerationStream(
-			{
-				parameters: { ...model.parameters, ...generateSettings, return_full_text: false },
-				model: url,
-				inputs: prompt,
-				accessToken,
-			},
-			{
-				fetch: async (endpointUrl, info) => {
-					if (info && authorization && !accessToken) {
-						// Set authorization header if it is defined and HF_TOKEN is empty
-						info.headers = {
-							...info.headers,
-							Authorization: authorization,
-							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
-							"X-Use-Cache": "false",
-						};
-					}
-					return fetch(endpointUrl, info);
-				},
-			}
-		);
+        return textGenerationStream({
+            parameters: { ...model.parameters, ...generateSettings, return_full_text: false },
+            model: url,
+            inputs: prompt,
+            accessToken,
+        });
 	};
 }
 

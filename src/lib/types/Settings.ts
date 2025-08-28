@@ -19,7 +19,6 @@ export interface Settings extends Timestamps {
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 
-    tools?: string[];
     disableStream: boolean;
     directPaste: boolean;
 }
@@ -31,7 +30,6 @@ export const DEFAULT_SETTINGS = {
     activeModel: defaultModel.id,
     hideEmojiOnSidebar: false,
     customPrompts: {},
-    tools: [],
     disableStream: false,
     directPaste: false,
 } satisfies SettingsEditable;

@@ -116,7 +116,7 @@
 
 	const settings = createSettingsStore(data.settings);
 
-	onMount(async () => {
+		onMount(async () => {
 		if ($page.url.searchParams.has("model")) {
 			await settings
 				.instantSet({
@@ -131,21 +131,7 @@
 				});
 		}
 
-		if ($page.url.searchParams.has("tools")) {
-			const tools = $page.url.searchParams.get("tools")?.split(",");
-
-			await settings
-				.instantSet({
-					tools: [...($settings.tools ?? []), ...(tools ?? [])],
-				})
-				.then(async () => {
-					const query = new URLSearchParams($page.url.searchParams.toString());
-					query.delete("tools");
-					await goto(`${base}/?${query.toString()}`, {
-						invalidateAll: true,
-					});
-				});
-		}
+		// Tools feature removed: ignore tools query param
 
 		if ($page.url.searchParams.has("token")) {
 			const token = $page.url.searchParams.get("token");
@@ -160,7 +146,7 @@
 	});
 
 	let mobileNavTitle = $derived(
-		["/models", "/privacy", "/tools"].includes($page.route.id ?? "")
+		["/models", "/privacy"].includes($page.route.id ?? "")
 			? ""
 			: conversations.find((conv) => conv.id === $page.params.id)?.title
 	);
@@ -181,7 +167,7 @@
 
 	<!-- use those meta tags everywhere except on special listing pages -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
+	{#if !$page.url.pathname.includes("/models/")}
 		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />

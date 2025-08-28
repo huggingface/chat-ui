@@ -1,25 +1,22 @@
 import type { WebSearchSource } from "$lib/types/WebSearch";
-import type { ToolCall, ToolResult } from "$lib/types/Tool";
 
 export type MessageUpdate =
-	| MessageStatusUpdate
-	| MessageTitleUpdate
-	| MessageToolUpdate
-	| MessageWebSearchUpdate
-	| MessageStreamUpdate
-	| MessageFileUpdate
-	| MessageFinalAnswerUpdate
-	| MessageReasoningUpdate;
+    | MessageStatusUpdate
+    | MessageTitleUpdate
+    | MessageWebSearchUpdate
+    | MessageStreamUpdate
+    | MessageFileUpdate
+    | MessageFinalAnswerUpdate
+    | MessageReasoningUpdate;
 
 export enum MessageUpdateType {
-	Status = "status",
-	Title = "title",
-	Tool = "tool",
-	WebSearch = "webSearch",
-	Stream = "stream",
-	File = "file",
-	FinalAnswer = "finalAnswer",
-	Reasoning = "reasoning",
+    Status = "status",
+    Title = "title",
+    WebSearch = "webSearch",
+    Stream = "stream",
+    File = "file",
+    FinalAnswer = "finalAnswer",
+    Reasoning = "reasoning",
 }
 
 // Status
@@ -69,43 +66,7 @@ export type MessageWebSearchUpdate =
 	| MessageWebSearchSourcesUpdate
 	| MessageWebSearchFinishedUpdate;
 
-// Tool
-export enum MessageToolUpdateType {
-	/** A request to call a tool alongside it's parameters */
-	Call = "call",
-	/** The result of a tool call */
-	Result = "result",
-	/** Error while running tool */
-	Error = "error",
-	/** ETA update */
-	ETA = "eta",
-}
-
-interface MessageToolBaseUpdate<TSubType extends MessageToolUpdateType> {
-	type: MessageUpdateType.Tool;
-	subtype: TSubType;
-	uuid: string;
-}
-export interface MessageToolCallUpdate extends MessageToolBaseUpdate<MessageToolUpdateType.Call> {
-	call: ToolCall;
-}
-export interface MessageToolResultUpdate
-	extends MessageToolBaseUpdate<MessageToolUpdateType.Result> {
-	result: ToolResult;
-}
-export interface MessageToolErrorUpdate extends MessageToolBaseUpdate<MessageToolUpdateType.Error> {
-	message: string;
-}
-
-export interface MessageToolETAUpdate extends MessageToolBaseUpdate<MessageToolUpdateType.ETA> {
-	eta: number;
-}
-
-export type MessageToolUpdate =
-	| MessageToolCallUpdate
-	| MessageToolResultUpdate
-	| MessageToolErrorUpdate
-	| MessageToolETAUpdate;
+// Tools feature removed: no tool update types
 
 // Everything else
 export interface MessageTitleUpdate {

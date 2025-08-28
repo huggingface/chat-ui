@@ -25,7 +25,7 @@ import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
-import { documentParserToolId } from "$lib/utils/toolIds.js";
+// Tools feature removed
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -152,7 +152,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
         id: messageId,
         is_retry: isRetry,
         is_continue: isContinue,
-        tools: toolsPreferences,
     } = z
         .object({
             id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -164,7 +163,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
             ),
             is_retry: z.optional(z.boolean()),
             is_continue: z.optional(z.boolean()),
-            tools: z.array(z.string()).optional(),
             files: z.optional(
                 z.array(
                     z.object({
@@ -194,13 +192,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			})
 	);
 
-	// Check for PDF files in the input
-	const hasPdfFiles = inputFiles?.some((file) => file.mime === "application/pdf") ?? false;
-
-	// Check for existing PDF files in the conversation
-	const hasPdfInConversation =
-		conv.messages?.some((msg) => msg.files?.some((file) => file.mime === "application/pdf")) ??
-		false;
+    // Tools removed: no document parser auto-activation
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		error(400, "Message too long.");
@@ -453,10 +445,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
                 messages: messagesForPrompt,
                 assistant: undefined,
                 isContinue: isContinue ?? false,
-                toolsPreference: [
-                    ...(toolsPreferences ?? []),
-                    ...(hasPdfFiles || hasPdfInConversation ? [documentParserToolId] : []), // Add document parser tool if PDF files are present
-                ],
                 promptedAt,
                 ip: getClientAddress(),
                 username: locals.user?.username,

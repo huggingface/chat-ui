@@ -33,7 +33,7 @@
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
-	import type { ToolFront } from "$lib/types/Tool";
+	// Tools feature removed
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import { beforeNavigate } from "$app/navigation";
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
@@ -201,20 +201,12 @@
 
 	const settings = useSettingsStore();
 
-	let mimeTypesFromActiveTools = $derived(
-		page.data.tools
-			.filter((tool: ToolFront) => (currentModel.tools ? ($settings?.tools?.includes(tool._id) ?? tool.isOnByDefault) : false))
-			.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
-	);
-
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...mimeTypesFromActiveTools, // fetch mime types from active tools
-				...(currentModel.tools ? ["application/pdf"] : []), // tool models can enable document parser; accept pdfs
 				...(currentModel.multimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"])
-					: []), // if its a multimodal model, we always accept images
+					: []),
 			])
 		)
 	);
@@ -391,11 +383,10 @@
 								mimeTypes={activeMimeTypes}
 								on:submit={handleSubmit}
 								{onPaste}
-								disabled={isReadOnly || lastIsError}
-								modelHasTools={currentModel.tools}
-								modelIsMultimodal={currentModel.multimodal}
-								bind:focused
-							/>
+                            disabled={isReadOnly || lastIsError}
+                            modelIsMultimodal={currentModel.multimodal}
+                            bind:focused
+                        />
 						{/if}
 
 						{#if loading}

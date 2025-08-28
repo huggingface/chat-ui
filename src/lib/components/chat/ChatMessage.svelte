@@ -11,15 +11,9 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
 
-	import {
-		MessageUpdateType,
-		type MessageToolUpdate,
-		type MessageFinalAnswerUpdate,
-		type MessageReasoningUpdate,
-		MessageReasoningUpdateType,
-	} from "$lib/types/MessageUpdate";
+import { MessageUpdateType, type MessageFinalAnswerUpdate, type MessageReasoningUpdate, MessageReasoningUpdateType } from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
-	import ToolUpdate from "./ToolUpdate.svelte";
+// Tools feature removed
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -75,23 +69,7 @@
 			({ type }) => type === MessageUpdateType.FinalAnswer
 		) as MessageFinalAnswerUpdate
 	);
-	// filter all updates with type === "tool" then group them by uuid field
-
-	let toolUpdates = $derived(
-		message.updates
-			?.filter(({ type }) => type === "tool")
-			.reduce(
-				(acc, update) => {
-					if (update.type !== "tool") {
-						return acc;
-					}
-					acc[update.uuid] = acc[update.uuid] ?? [];
-					acc[update.uuid].push(update);
-					return acc;
-				},
-				{} as Record<string, MessageToolUpdate[]>
-			)
-	);
+    // Tools removed
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 	// web search sources removed
@@ -153,15 +131,7 @@
 				/>
 			{/if}
 
-			{#if toolUpdates}
-				{#each Object.values(toolUpdates) as tool}
-					{#if tool.length}
-						{#key tool[0].uuid}
-							<ToolUpdate {tool} {loading} />
-						{/key}
-					{/if}
-				{/each}
-			{/if}
+            
 
 				<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
@@ -178,7 +148,7 @@
 
 		</div>
 
-		{#if !loading && (message.content || toolUpdates)}
+		{#if !loading && message.content}
 			<div
 				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
 	{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}

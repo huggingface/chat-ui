@@ -4,9 +4,8 @@ import type { Endpoint } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type { Cohere, CohereClient } from "cohere-ai";
 import { buildPrompt } from "$lib/buildPrompt";
-import { ToolResultStatus, type ToolCall } from "$lib/types/Tool";
 import { pipeline, Writable, type Readable } from "node:stream";
-import { toolHasName } from "$lib/utils/tools";
+// Tools feature removed
 
 export const endpointCohereParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -35,37 +34,29 @@ export async function endpointCohere(
 		throw new Error("Failed to import cohere-ai", { cause: e });
 	}
 
-	return async ({ messages, preprompt, generateSettings, continueMessage, tools, toolResults }) => {
-		let system = preprompt;
-		if (messages?.[0]?.from === "system") {
-			system = messages[0].content;
-		}
+    return async ({ messages, preprompt, generateSettings, continueMessage }) => {
+        let system = preprompt;
+        if (messages?.[0]?.from === "system") {
+            system = messages[0].content;
+        }
 
-		// Tools must use [A-z_] for their names and directly_answer is banned
-		// It's safe to convert the tool names because we treat - and _ the same
-		tools = tools
-			?.filter((tool) => !toolHasName("directly_answer", tool))
-			.map((tool) => ({ ...tool, name: tool.name.replaceAll("-", "_") }));
+        const parameters = { ...model.parameters, ...generateSettings };
 
-		const parameters = { ...model.parameters, ...generateSettings };
+        return (async function* () {
+            let stream;
+            let tokenId = 0;
 
-		return (async function* () {
-			let stream;
-			let tokenId = 0;
+            if (raw) {
+                const prompt = await buildPrompt({
+                    messages,
+                    model,
+                    preprompt: system,
+                    continueMessage,
+                });
 
-			if (raw) {
-				const prompt = await buildPrompt({
-					messages,
-					model,
-					preprompt: system,
-					continueMessage,
-					tools,
-					toolResults,
-				});
-
-				stream = await cohere.chatStream({
-					forceSingleStep,
-					message: prompt,
+                stream = await cohere.chatStream({
+                    forceSingleStep,
+                    message: prompt,
 					rawPrompting: true,
 					model: model.id ?? model.name,
 					p: parameters?.top_p,
@@ -96,19 +87,9 @@ export async function endpointCohere(
 						temperature: parameters?.temperature,
 						stopSequences: parameters?.stop,
 						frequencyPenalty: parameters?.frequency_penalty,
-						tools,
-						toolResults:
-							toolResults?.length && toolResults?.length > 0
-								? toolResults?.map((toolResult) => {
-										if (toolResult.status === ToolResultStatus.Error) {
-											return { call: toolResult.call, outputs: [{ error: toolResult.message }] };
-										}
-										return { call: toolResult.call, outputs: toolResult.outputs };
-									})
-								: undefined,
-					})
-					.catch(async (err) => {
-						if (!err.body) throw err;
+                })
+                    .catch(async (err) => {
+                        if (!err.body) throw err;
 
 						// Decode the error message and throw
 						const message = await convertStreamToBuffer(err.body).catch(() => {
@@ -130,22 +111,10 @@ export async function endpointCohere(
 						generated_text: null,
 						details: null,
 					} satisfies TextGenerationStreamOutput;
-				} else if (output.eventType === "tool-calls-generation") {
-					yield {
-						token: {
-							id: tokenId++,
-							text: "",
-							logprob: 0,
-							special: true,
-							toolCalls: output.toolCalls as ToolCall[],
-						},
-						generated_text: null,
-						details: null,
-					};
-				} else if (output.eventType === "stream-end") {
-					if (["ERROR", "ERROR_TOXIC", "ERROR_LIMIT"].includes(output.finishReason)) {
-						throw new Error(output.finishReason);
-					}
+                } else if (output.eventType === "stream-end") {
+                    if (["ERROR", "ERROR_TOXIC", "ERROR_LIMIT"].includes(output.finishReason)) {
+                        throw new Error(output.finishReason);
+                    }
 					yield {
 						token: {
 							id: tokenId++,
