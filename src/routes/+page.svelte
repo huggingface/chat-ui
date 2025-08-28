@@ -33,11 +33,7 @@
 			if (validModels.includes($settings.activeModel)) {
 				model = $settings.activeModel;
 			} else {
-				if (data.assistant?.modelId && validModels.includes(data.assistant.modelId)) {
-					model = data.assistant.modelId;
-				} else {
-					model = data.models[0].id;
-				}
+				model = data.models[0].id;
 			}
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
@@ -47,7 +43,6 @@
 				body: JSON.stringify({
 					model,
 					preprompt: $settings.customPrompts[$settings.activeModel],
-					assistantId: data.assistant?._id,
 				}),
 			});
 
@@ -83,12 +78,7 @@
 	});
 
 	let currentModel = $derived(
-		findCurrentModel(
-			[...data.models, ...data.oldModels],
-			!$settings.assistants.includes($settings.activeModel)
-				? $settings.activeModel
-				: data.assistant?.modelId
-		)
+		findCurrentModel([...data.models, ...data.oldModels], $settings.activeModel)
 	);
 </script>
 
@@ -99,7 +89,6 @@
 <ChatWindow
 	on:message={(ev) => createConversation(ev.detail)}
 	{loading}
-	assistant={data.assistant}
 	{currentModel}
 	models={data.models}
 	bind:files

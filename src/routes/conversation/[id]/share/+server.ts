@@ -40,7 +40,6 @@ export async function POST({ params, locals }) {
 		model: conversation.model,
 		// embedding model removed in this build
 		preprompt: conversation.preprompt,
-		assistantId: conversation.assistantId,
 	};
 
 	await collections.sharedConversations.insertOne(shared);

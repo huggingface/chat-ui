@@ -7,7 +7,7 @@ import { ObjectId, type Filter } from "mongodb";
 import type { CommunityToolDB, ToolFront, ToolInputFile } from "$lib/types/Tool";
 import { MetricsServer } from "$lib/server/metrics";
 import { authCondition } from "$lib/server/auth";
-import { SortKey } from "$lib/types/Assistant";
+import { SortKey } from "$lib/types/SortKey";
 import type { User } from "$lib/types/User";
 import { generateQueryTokens, generateSearchTokens } from "$lib/utils/searchTokens";
 import { config } from "$lib/server/config";

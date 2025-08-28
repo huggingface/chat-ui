@@ -1,6 +1,5 @@
 import { authPlugin } from "$api/authPlugin";
 import { conversationGroup } from "$api/routes/groups/conversations";
-import { assistantGroup } from "$api/routes/groups/assistants";
 import { userGroup } from "$api/routes/groups/user";
 import { toolGroup } from "$api/routes/groups/tools";
 import { misc } from "$api/routes/groups/misc";
@@ -42,7 +41,6 @@ export const app = new Elysia({ prefix })
 	.use(authPlugin)
 	.use(conversationGroup)
 	.use(toolGroup)
-	.use(assistantGroup)
 	.use(userGroup)
 	.use(modelGroup)
 	.use(misc);

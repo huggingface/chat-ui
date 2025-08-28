@@ -130,15 +130,6 @@ export async function DELETE({ params, locals }) {
 		}
 	);
 
-	// Remove the tool from all assistants
-	await collections.assistants.updateMany(
-		{
-			tools: { $in: [tool._id.toString()] },
-		},
-		{
-			$pull: { tools: tool._id.toString() },
-		}
-	);
 
 	return new Response("Tool deleted", { status: 200 });
 }
