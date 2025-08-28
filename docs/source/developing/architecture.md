@@ -16,15 +16,15 @@ Provides all of the routes rendered with SSR via SvelteKit. The majority of back
 
 ### `textGeneration`
 
-Provides a standard interface for most chat features such as model output, web search, assistants and tools. Outputs `MessageUpdate`s which provide fine-grained updates on the request status such as new tokens and web search results.
+Provides a standard interface for chat features such as model output, assistants and tools. Outputs `MessageUpdate`s which provide fine-grained updates on the request status such as new tokens.
 
-### `endpoints`/`embeddingEndpoints`
+### `endpoints`
 
-Provides a common streaming interface for many third party LLM and embedding providers.
+Provides a common streaming interface for many third party LLM providers.
 
-### `websearch`
+### Web Search
 
-Implements web search querying and RAG. See the [Web Search](../configuration/web-search) section for more information.
+Removed in this build.
 
 ### `tools`
 

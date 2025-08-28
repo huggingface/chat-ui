@@ -2,7 +2,11 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
-import type { WebSearchSource } from "$lib/types/WebSearch";
+// Simple type to replace removed WebSearchSource
+type SimpleSource = {
+	title?: string;
+	link: string;
+};
 import hljs from "highlight.js";
 
 interface katexBlockToken extends Tokens.Generic {
@@ -133,7 +137,7 @@ function escapeHTML(content: string) {
 	);
 }
 
-function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []): string {
+function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
 	const linkStyle =
 		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
 	return md.replace(/\[(\d+)\]/g, (match: string) => {
@@ -153,7 +157,7 @@ function addInlineCitations(md: string, webSearchSources: WebSearchSource[] = []
 	});
 }
 
-function createMarkedInstance(sources: WebSearchSource[]): Marked {
+function createMarkedInstance(sources: SimpleSource[]): Marked {
 	return new Marked({
 		hooks: {
 			postprocess: (html) => addInlineCitations(html, sources),
@@ -180,7 +184,7 @@ type TextToken = {
 	html: string | Promise<string>;
 };
 
-export async function processTokens(content: string, sources: WebSearchSource[]): Promise<Token[]> {
+export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
 	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
 
@@ -205,7 +209,7 @@ export async function processTokens(content: string, sources: WebSearchSource[])
 	return processedTokens;
 }
 
-export function processTokensSync(content: string, sources: WebSearchSource[]): Token[] {
+export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
 	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {

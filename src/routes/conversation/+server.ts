@@ -6,7 +6,6 @@ import { base } from "$app/paths";
 import { z } from "zod";
 import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
-import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
@@ -21,7 +20,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		.object({
 			fromShare: z.string().optional(),
 			model: validateModel(models),
-			assistantId: z.string().optional(),
 			preprompt: z.string().optional(),
 		})
 		.safeParse(JSON.parse(body));
@@ -56,7 +54,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	];
 
 	let rootMessageId: Message["id"] = messages[0].id;
-	let embeddingModel: string;
 
 	if (values.fromShare) {
 		const conversation = await collections.sharedConversations.findOne({
@@ -72,26 +69,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		rootMessageId = conversation.rootMessageId ?? rootMessageId;
 		values.model = conversation.model;
 		values.preprompt = conversation.preprompt;
-		values.assistantId = conversation.assistantId?.toString();
-		embeddingModel = conversation.embeddingModel;
+		// embeddings and websearch removed; ignore embeddingModel from shares
 	}
 
-	embeddingModel ??= model.embeddingModel ?? defaultEmbeddingModel.name;
+	// embeddings removed; no embedding model is tracked
 
 	if (model.unlisted) {
 		error(400, "Can't start a conversation with an unlisted model");
 	}
 
-	// get preprompt from assistant if it exists
-	const assistant = await collections.assistants.findOne({
-		_id: new ObjectId(values.assistantId),
-	});
-
-	if (assistant) {
-		values.preprompt = assistant.preprompt;
-	} else {
-		values.preprompt ??= model?.preprompt ?? "";
-	}
+	// use provided preprompt or model preprompt
+	values.preprompt ??= model?.preprompt ?? "";
 
 	if (messages && messages.length > 0 && messages[0].from === "system") {
 		messages[0].content = values.preprompt;
@@ -104,11 +92,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		messages,
 		model: values.model,
 		preprompt: values.preprompt,
-		assistantId: values.assistantId ? new ObjectId(values.assistantId) : undefined,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 		userAgent: request.headers.get("User-Agent") ?? undefined,
-		embeddingModel,
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});

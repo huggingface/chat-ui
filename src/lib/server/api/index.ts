@@ -1,10 +1,10 @@
 import { authPlugin } from "$api/authPlugin";
 import { conversationGroup } from "$api/routes/groups/conversations";
-import { assistantGroup } from "$api/routes/groups/assistants";
 import { userGroup } from "$api/routes/groups/user";
-import { toolGroup } from "$api/routes/groups/tools";
+// Tools feature removed
 import { misc } from "$api/routes/groups/misc";
 import { modelGroup } from "$api/routes/groups/models";
+import { debugGroup } from "$api/routes/groups/debug";
 
 import { Elysia } from "elysia";
 import { base } from "$app/paths";
@@ -41,10 +41,9 @@ export const app = new Elysia({ prefix })
 	)
 	.use(authPlugin)
 	.use(conversationGroup)
-	.use(toolGroup)
-	.use(assistantGroup)
 	.use(userGroup)
 	.use(modelGroup)
-	.use(misc);
+	.use(misc)
+	.use(debugGroup);
 
 export type App = typeof app;

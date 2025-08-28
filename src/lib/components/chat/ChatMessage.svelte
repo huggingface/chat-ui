@@ -11,19 +11,14 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
 
-	import OpenWebSearchResults from "../OpenWebSearchResults.svelte";
 	import {
 		MessageUpdateType,
-		MessageWebSearchUpdateType,
-		type MessageToolUpdate,
-		type MessageWebSearchSourcesUpdate,
-		type MessageWebSearchUpdate,
 		type MessageFinalAnswerUpdate,
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
 	import { base } from "$app/paths";
-	import ToolUpdate from "./ToolUpdate.svelte";
+	// Tools feature removed
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -67,10 +62,7 @@
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
 	let editFormEl: HTMLFormElement | undefined = $state();
 
-	let searchUpdates = $derived(
-		(message.updates?.filter(({ type }) => type === MessageUpdateType.WebSearch) ??
-			[]) as MessageWebSearchUpdate[]
-	);
+	// web search updates removed
 
 	let reasoningUpdates = $derived(
 		(message.updates?.filter(({ type }) => type === MessageUpdateType.Reasoning) ??
@@ -82,31 +74,10 @@
 			({ type }) => type === MessageUpdateType.FinalAnswer
 		) as MessageFinalAnswerUpdate
 	);
-	// filter all updates with type === "tool" then group them by uuid field
-
-	let toolUpdates = $derived(
-		message.updates
-			?.filter(({ type }) => type === "tool")
-			.reduce(
-				(acc, update) => {
-					if (update.type !== "tool") {
-						return acc;
-					}
-					acc[update.uuid] = acc[update.uuid] ?? [];
-					acc[update.uuid].push(update);
-					return acc;
-				},
-				{} as Record<string, MessageToolUpdate[]>
-			)
-	);
+	// Tools removed
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
-	let webSearchSources = $derived(
-		searchUpdates?.find(
-			(update): update is MessageWebSearchSourcesUpdate =>
-				update.subtype === MessageWebSearchUpdateType.Sources
-		)?.sources
-	);
+	// web search sources removed
 
 	$effect(() => {
 		if (isCopied) {
@@ -137,19 +108,11 @@
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		{#if page.data?.assistant?.avatar}
-			<img
-				src="{base}/settings/assistants/{page.data.assistant._id}/avatar.jpg"
-				alt="Avatar"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
-			/>
-		{:else}
-			<img
-				alt=""
-				src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
-			/>
-		{/if}
+		<img
+			alt=""
+			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
+			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
+		/>
 		<div
 			class="relative flex min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
@@ -160,9 +123,7 @@
 					{/each}
 				</div>
 			{/if}
-			{#if searchUpdates && searchUpdates.length > 0}
-				<OpenWebSearchResults webSearchMessages={searchUpdates} />
-			{/if}
+
 			{#if reasoningUpdates && reasoningUpdates.length > 0 && message.reasoning && message.reasoning.trim().length > 0}
 				{@const summaries = reasoningUpdates
 					.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
@@ -175,20 +136,7 @@
 				/>
 			{/if}
 
-			{#if toolUpdates}
-				{#each Object.values(toolUpdates) as tool}
-					{#if tool.length}
-						{#key tool[0].uuid}
-							<ToolUpdate {tool} {loading} />
-						{/key}
-					{/if}
-				{/each}
-			{/if}
-
-			<div
-				bind:this={contentEl}
-				class:mt-2={reasoningUpdates.length > 0 || searchUpdates.length > 0}
-			>
+			<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
@@ -196,56 +144,12 @@
 				<div
 					class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 				>
-					<MarkdownRenderer content={message.content} sources={webSearchSources} />
+					<MarkdownRenderer content={message.content} />
 				</div>
 			</div>
-
-			<!-- Web Search sources -->
-			{#if webSearchSources?.length}
-				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
-					{#each webSearchSources as { link, title }}
-						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-							href={link}
-							target="_blank"
-						>
-							<img
-								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname ||
-									'placeholder'}"
-								alt="{title} favicon"
-							/>
-							<div>{new URL(link).hostname.replace(/^www\./, "")}</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Endpoint web sources -->
-			{#if messageFinalAnswer?.webSources && messageFinalAnswer.webSources.length}
-				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
-					{#each messageFinalAnswer.webSources as { uri, title }}
-						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-							href={uri}
-							target="_blank"
-						>
-							<img
-								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(uri).hostname ||
-									'placeholder'}"
-								alt="{title} favicon"
-							/>
-							<div>{title}</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
 		</div>
 
-		{#if !loading && (message.content || toolUpdates)}
+		{#if !loading && message.content}
 			<div
 				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
 	{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}

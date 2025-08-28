@@ -1,5 +1,4 @@
 import { defaultModel } from "$lib/server/models";
-import type { Assistant } from "./Assistant";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
@@ -20,8 +19,6 @@ export interface Settings extends Timestamps {
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 
-	assistants?: Assistant["_id"][];
-	tools?: string[];
 	disableStream: boolean;
 	directPaste: boolean;
 }
@@ -33,8 +30,6 @@ export const DEFAULT_SETTINGS = {
 	activeModel: defaultModel.id,
 	hideEmojiOnSidebar: false,
 	customPrompts: {},
-	assistants: [],
-	tools: [],
 	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;

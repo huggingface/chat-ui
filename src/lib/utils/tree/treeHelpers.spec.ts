@@ -11,7 +11,7 @@ export const insertLegacyConversation = async () => {
 		updatedAt: new Date(),
 		title: "legacy conversation",
 		model: "",
-		embeddingModel: "",
+
 		messages: [
 			{
 				id: "1-1-1-1-1",
@@ -45,7 +45,6 @@ export const insertLinearBranchConversation = async () => {
 		updatedAt: new Date(),
 		title: "linear branch conversation",
 		model: "",
-		embeddingModel: "",
 
 		rootMessageId: "1-1-1-1-1",
 		messages: [
@@ -89,7 +88,7 @@ export const insertSideBranchesConversation = async () => {
 		updatedAt: new Date(),
 		title: "side branches conversation",
 		model: "",
-		embeddingModel: "",
+
 		rootMessageId: "1-1-1-1-1",
 		messages: [
 			{

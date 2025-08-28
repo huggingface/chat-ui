@@ -2,16 +2,31 @@ import type { Migration } from ".";
 import { collections } from "$lib/server/database";
 import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
-import type { WebSearchSource } from "$lib/types/WebSearch";
+// Simple type to replace removed WebSearchSource for migration compatibility
+type WebSearchSource = {
+	title?: string;
+	link: string;
+};
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
-	MessageWebSearchUpdateType,
 	type MessageUpdate,
-	type MessageWebSearchFinishedUpdate,
 } from "$lib/types/MessageUpdate";
+
+// Legacy types for migration compatibility
+enum MessageWebSearchUpdateType {
+	Update = "update",
+	Error = "error",
+	Sources = "sources",
+	Finished = "finished",
+}
+
+type MessageWebSearchFinishedUpdate = {
+	type: "webSearch";
+	subtype: MessageWebSearchUpdateType.Finished;
+};
 import type { Message } from "$lib/types/Message";
-import { isMessageWebSearchSourcesUpdate } from "$lib/utils/messageUpdates";
+// isMessageWebSearchSourcesUpdate removed from utils; use inline predicate
 
 // -----------
 // Copy of the previous message update types
@@ -161,13 +176,13 @@ const updateMessageUpdates: Migration = {
 					.filter((update): update is MessageUpdate => Boolean(update));
 
 				// Add the new web search finished update if the sources update exists and webSearch is defined
-				const webSearchSourcesUpdateIndex = updates?.findIndex(isMessageWebSearchSourcesUpdate);
-				if (
-					message.webSearch &&
-					updates &&
-					webSearchSourcesUpdateIndex &&
-					webSearchSourcesUpdateIndex !== -1
-				) {
+				const webSearchSourcesUpdateIndex =
+					updates?.findIndex(
+						(u) =>
+							u.type === MessageUpdateType.WebSearch &&
+							u.subtype === MessageWebSearchUpdateType.Sources
+					) ?? -1;
+				if (message.webSearch && updates && webSearchSourcesUpdateIndex !== -1) {
 					const webSearchFinishedUpdate: MessageWebSearchFinishedUpdate = {
 						type: MessageUpdateType.WebSearch,
 						subtype: MessageWebSearchUpdateType.Finished,

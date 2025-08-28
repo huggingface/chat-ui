@@ -17,21 +17,6 @@ interface Metrics {
 		votesPositive: Counter<Model["id"]>;
 		votesNegative: Counter<Model["id"]>;
 	};
-
-	webSearch: {
-		requestCount: Counter;
-		pageFetchCount: Counter;
-		pageFetchCountError: Counter;
-		pageFetchDuration: Summary;
-		embeddingDuration: Summary;
-	};
-
-	tool: {
-		toolUseCount: Counter<string>;
-		toolUseCountError: Counter<string>;
-		toolUseDuration: Summary<string>;
-		timeToChooseTools: Summary;
-	};
 }
 
 export class MetricsServer {
@@ -121,67 +106,7 @@ export class MetricsServer {
 					registers: [register],
 				}),
 			},
-			webSearch: {
-				requestCount: new Counter({
-					name: "web_search_request_count",
-					help: "Total number of web search requests",
-					registers: [register],
-				}),
-				pageFetchCount: new Counter({
-					name: "web_search_page_fetch_count",
-					help: "Total number of web search page fetches",
-					registers: [register],
-				}),
-				pageFetchCountError: new Counter({
-					name: "web_search_page_fetch_count_error",
-					help: "Total number of web search page fetch errors",
-					registers: [register],
-				}),
-				pageFetchDuration: new Summary({
-					name: "web_search_page_fetch_duration_ms",
-					help: "Web search page fetch duration",
-					registers: [register],
-					maxAgeSeconds: 5 * 60,
-					ageBuckets: 5,
-				}),
-				embeddingDuration: new Summary({
-					name: "web_search_embedding_duration_ms",
-					help: "Web search embedding duration",
-					registers: [register],
-					maxAgeSeconds: 5 * 60,
-					ageBuckets: 5,
-				}),
-			},
-			tool: {
-				toolUseCount: new Counter({
-					name: "tool_use_count",
-					help: "Total number of tool uses",
-					labelNames: ["tool"],
-					registers: [register],
-				}),
-				toolUseCountError: new Counter({
-					name: "tool_use_count_error",
-					help: "Total number of tool use errors",
-					labelNames: ["tool"],
-					registers: [register],
-				}),
-				toolUseDuration: new Summary({
-					name: "tool_use_duration_ms",
-					help: "Tool use duration",
-					labelNames: ["tool"],
-					registers: [register],
-					maxAgeSeconds: 30 * 60, // longer duration since we use this to give feedback to the user
-					ageBuckets: 5,
-				}),
-				timeToChooseTools: new Summary({
-					name: "time_to_choose_tools_ms",
-					help: "Time to choose tools",
-					labelNames: ["model"],
-					registers: [register],
-					maxAgeSeconds: 5 * 60,
-					ageBuckets: 5,
-				}),
-			},
+			// webSearch metrics removed, tools removed
 		};
 
 		app.get("/metrics", (req, res) => {

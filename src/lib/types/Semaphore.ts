@@ -6,7 +6,6 @@ export interface Semaphore extends Timestamps {
 }
 
 export enum Semaphores {
-	ASSISTANTS_COUNT = "assistants.count",
 	CONVERSATION_STATS = "conversation.stats",
 	CONFIG_UPDATE = "config.update",
 	MIGRATION = "migration",

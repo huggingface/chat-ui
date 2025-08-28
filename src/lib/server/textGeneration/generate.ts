@@ -1,5 +1,4 @@
 import { config } from "$lib/server/config";
-import type { ToolResult, Tool } from "$lib/types/Tool";
 import {
 	MessageReasoningUpdateType,
 	MessageUpdateType,
@@ -16,9 +15,7 @@ type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: End
 
 export async function* generate(
 	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
-	toolResults: ToolResult[],
-	preprompt?: string,
-	tools?: Tool[]
+	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
 	// reasoning mode is false by default
 	let reasoning = false;
@@ -48,8 +45,6 @@ export async function* generate(
 		preprompt,
 		continueMessage: isContinue,
 		generateSettings: assistant?.generateSettings,
-		tools,
-		toolResults,
 		isMultimodal: model.multimodal,
 		conversationId: conv._id,
 	})) {

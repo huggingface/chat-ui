@@ -5,7 +5,6 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
-import { toolFromConfigs } from "$lib/server/tools";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
@@ -41,11 +40,7 @@ export const userGroup = new Elysia()
 			.get("/settings", async ({ locals }) => {
 				const settings = await collections.settings.findOne(authCondition(locals));
 
-				if (
-					settings &&
-					!validateModel(models).safeParse(settings?.activeModel).success &&
-					!settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)
-				) {
+				if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
 					settings.activeModel = defaultModel.id;
 					await collections.settings.updateOne(authCondition(locals), {
 						$set: { activeModel: defaultModel.id },
@@ -77,12 +72,6 @@ export const userGroup = new Elysia()
 						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
 					customPrompts: settings?.customPrompts ?? {},
-					assistants: settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [],
-					tools:
-						settings?.tools ??
-						toolFromConfigs
-							.filter((el) => !el.isHidden && el.isOnByDefault)
-							.map((el) => el._id.toString()),
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {
@@ -97,28 +86,12 @@ export const userGroup = new Elysia()
 						ethicsModalAccepted: z.boolean().optional(),
 						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 						customPrompts: z.record(z.string()).default({}),
-						tools: z.array(z.string()).optional(),
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
 					})
 					.parse(body) satisfies SettingsEditable;
 
-				// make sure all tools exist
-				// either in db or in config
-				if (settings.tools) {
-					const newTools = [
-						...(await collections.tools
-							.find({ _id: { $in: settings.tools.map((toolId) => new ObjectId(toolId)) } })
-							.project({ _id: 1 })
-							.toArray()
-							.then((tools) => tools.map((tool) => tool._id.toString()))),
-						...toolFromConfigs
-							.filter((el) => (settings?.tools ?? []).includes(el._id.toString()))
-							.map((el) => el._id.toString()),
-					];
-
-					settings.tools = newTools;
-				}
+				// Tools removed: ignore tools updates
 
 				await collections.settings.updateOne(
 					authCondition(locals),
@@ -150,46 +123,5 @@ export const userGroup = new Elysia()
 					})
 					.toArray();
 				return reports;
-			})
-			.get("/assistant/active", async ({ locals }) => {
-				const settings = await collections.settings.findOne(authCondition(locals));
-
-				if (!settings) {
-					return null;
-				}
-
-				if (settings.assistants?.map((el) => el.toString())?.includes(settings?.activeModel)) {
-					return await collections.assistants.findOne({
-						_id: new ObjectId(settings.activeModel),
-					});
-				}
-
-				return null;
-			})
-			.get("/assistants", async ({ locals }) => {
-				const settings = await collections.settings.findOne(authCondition(locals));
-
-				if (!settings) {
-					return [];
-				}
-
-				const userAssistants =
-					settings?.assistants?.map((assistantId) => assistantId.toString()) ?? [];
-
-				const assistants = await collections.assistants
-					.find({
-						_id: {
-							$in: [...userAssistants.map((el) => new ObjectId(el))],
-						},
-					})
-					.toArray();
-
-				return assistants.map((el) => ({
-					...el,
-					_id: el._id.toString(),
-					createdById: undefined,
-					createdByMe:
-						el.createdById.toString() === (locals.user?._id ?? locals.sessionId).toString(),
-				}));
 			});
 	});

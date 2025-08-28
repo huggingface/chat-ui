@@ -12,7 +12,7 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
-import type { CommunityToolDB } from "$lib/types/Tool";
+// Tools feature removed
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
@@ -130,7 +130,7 @@ export class Database {
 		const migrationResults = db.collection<MigrationResult>("migrationResults");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
-		const tools = db.collection<CommunityToolDB>("tools");
+		const tools = db.collection("tools");
 		const configCollection = db.collection<ConfigKey>("config");
 
 		return {
@@ -271,9 +271,7 @@ export class Database {
 			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
 			.catch((e) => logger.error(e));
 		tokenCaches.createIndex({ tokenHash: 1 }).catch((e) => logger.error(e));
-		tools.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
-		tools.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		tools.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
+		// Tools removed: skipping tools indexes
 
 		conversations
 			.createIndex({

@@ -1,8 +1,7 @@
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { taskModel } from "../models";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
-import { getToolOutput } from "../tools/getToolOutput";
-import type { Tool } from "$lib/types/Tool";
+// Tools feature removed
 import { logger } from "../logger";
 
 export async function generateSummaryOfReasoning(buffer: string): Promise<string> {
@@ -18,32 +17,7 @@ export async function generateSummaryOfReasoning(buffer: string): Promise<string
 	const preprompt = `You are tasked with submitting a summary of the latest reasoning steps into a tool. Never describe results of the reasoning, only the process. Remain vague in your summary.
 The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. The sentence must be very short, ideally 5 words or less.`;
 
-	if (taskModel.tools) {
-		const summaryTool = {
-			name: "summary",
-			description: "Submit a summary for the submitted text",
-			inputs: [
-				{
-					name: "summary",
-					type: "str",
-					description:
-						"The short summary of the reasoning steps. 5 words or less. Must start with a gerund.",
-					paramType: "required",
-				},
-			],
-		} as unknown as Tool;
-
-		const endpoint = await taskModel.getEndpoint();
-		summary = await getToolOutput({
-			messages,
-			preprompt,
-			tool: summaryTool,
-			endpoint,
-		}).catch(() => {
-			logger.warn("Error getting tool output");
-			return undefined;
-		});
-	}
+	// Tools removed: no tool-based summarization path
 
 	if (!summary) {
 		summary = await getReturnFromGenerator(

@@ -92,7 +92,7 @@ export default defineConfig({
 		...(shouldCopyLlama ? [copyLlamaFiles()] : []),
 	],
 	optimizeDeps: {
-		include: ["uuid", "@huggingface/transformers", "sharp", "@gradio/client", "clsx"],
+		include: ["uuid", "sharp", "@gradio/client", "clsx"],
 	},
 	test: {
 		workspace: [

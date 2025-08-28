@@ -2,46 +2,14 @@ import type { MessageFile } from "$lib/types/Message";
 import {
 	type MessageUpdate,
 	type MessageStreamUpdate,
-	type MessageToolCallUpdate,
-	MessageToolUpdateType,
 	MessageUpdateType,
-	type MessageToolUpdate,
-	type MessageWebSearchUpdate,
-	type MessageWebSearchGeneralUpdate,
-	type MessageWebSearchSourcesUpdate,
-	type MessageWebSearchErrorUpdate,
-	MessageWebSearchUpdateType,
-	type MessageToolErrorUpdate,
-	type MessageToolResultUpdate,
 } from "$lib/types/MessageUpdate";
 
 import { page } from "$app/state";
 
-export const isMessageWebSearchUpdate = (update: MessageUpdate): update is MessageWebSearchUpdate =>
-	update.type === MessageUpdateType.WebSearch;
-export const isMessageWebSearchGeneralUpdate = (
-	update: MessageUpdate
-): update is MessageWebSearchGeneralUpdate =>
-	isMessageWebSearchUpdate(update) && update.subtype === MessageWebSearchUpdateType.Update;
-export const isMessageWebSearchSourcesUpdate = (
-	update: MessageUpdate
-): update is MessageWebSearchSourcesUpdate =>
-	isMessageWebSearchUpdate(update) && update.subtype === MessageWebSearchUpdateType.Sources;
-export const isMessageWebSearchErrorUpdate = (
-	update: MessageUpdate
-): update is MessageWebSearchErrorUpdate =>
-	isMessageWebSearchUpdate(update) && update.subtype === MessageWebSearchUpdateType.Error;
+// Web search updates removed
 
-export const isMessageToolUpdate = (update: MessageUpdate): update is MessageToolUpdate =>
-	update.type === MessageUpdateType.Tool;
-export const isMessageToolCallUpdate = (update: MessageUpdate): update is MessageToolCallUpdate =>
-	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Call;
-export const isMessageToolResultUpdate = (
-	update: MessageUpdate
-): update is MessageToolResultUpdate =>
-	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Result;
-export const isMessageToolErrorUpdate = (update: MessageUpdate): update is MessageToolErrorUpdate =>
-	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
+// Tools feature removed: no tool update helpers
 
 type MessageUpdateRequestOptions = {
 	base: string;
@@ -49,8 +17,7 @@ type MessageUpdateRequestOptions = {
 	messageId?: string;
 	isRetry: boolean;
 	isContinue: boolean;
-	webSearch: boolean;
-	tools?: Array<string>;
+	// tools removed
 	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
@@ -68,8 +35,6 @@ export async function fetchMessageUpdates(
 		id: opts.messageId,
 		is_retry: opts.isRetry,
 		is_continue: opts.isContinue,
-		web_search: opts.webSearch,
-		tools: opts.tools,
 	});
 
 	opts.files?.forEach((file) => {

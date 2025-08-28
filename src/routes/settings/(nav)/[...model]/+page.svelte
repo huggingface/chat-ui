@@ -5,7 +5,6 @@
 	import type { BackendModel } from "$lib/server/models";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
-	import TokensCounter from "$lib/components/TokensCounter.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonChat from "~icons/carbon/chat";
@@ -143,13 +142,6 @@
 			class="w-full resize-none rounded-md border-2 bg-gray-100 p-2"
 			bind:value={$settings.customPrompts[page.params.model]}
 		></textarea>
-		{#if model.tokenizer && $settings.customPrompts[page.params.model]}
-			<TokensCounter
-				classNames="absolute bottom-2 right-2"
-				prompt={$settings.customPrompts[page.params.model]}
-				modelTokenizer={model.tokenizer}
-				truncate={model?.parameters?.truncate}
-			/>
-		{/if}
+		<!-- Tokenizer-based token counting disabled in this build -->
 	</div>
 </div>

@@ -1,5 +1,7 @@
 # Models Overview
 
+Note: This build is OpenAI-compatible only. Examples for non-OpenAI providers are not applicable.
+
 You can customize the parameters passed to the model or even use a new model by updating the `MODELS` variable in your `.env.local`. The default one can be found in `.env` and looks like this :
 
 ```ini
@@ -55,7 +57,7 @@ The following is the default `chatPromptTemplate`, although newlines and indenta
 {{assistantMessageToken}}
 ```
 
-## Custom endpoint authorization
+## Custom endpoint authorization (OpenAI-compatible servers)
 
 ### Basic and Bearer
 
@@ -110,38 +112,4 @@ If you're using a self-signed certificate, e.g. for testing or development purpo
 
 ## Specific Embedding Model
 
-A model can use any of the embedding models defined under `TEXT_EMBEDDING_MODELS`, (currently used when web searching). By default it will use the first embedding model, but it can be changed with the field `embeddingModel`:
-
-```ini
-TEXT_EMBEDDING_MODELS = `[
-  {
-    "name": "Xenova/gte-small",
-    "chunkCharLength": 512,
-    "endpoints": [
-      {"type": "transformersjs"}
-    ]
-  },
-  {
-    "name": "intfloat/e5-base-v2",
-    "chunkCharLength": 768,
-    "endpoints": [
-      {"type": "tei", "url": "http://127.0.0.1:8080/", "authorization": "Basic VVNFUjpQQVNT"},
-      {"type": "tei", "url": "http://127.0.0.1:8081/"}
-    ]
-  }
-]`
-
-MODELS=`[
-  {
-      "name": "Ollama Mistral",
-      "chatPromptTemplate": "...",
-      "embeddingModel": "intfloat/e5-base-v2"
-      "parameters": {
-        ...
-      },
-      "endpoints": [
-        ...
-      ]
-  }
-]`
-```
+Removed in this build.
