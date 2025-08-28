@@ -6,7 +6,6 @@
 	import { page } from "$app/state";
 	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
@@ -504,7 +503,6 @@
 	on:continue={onContinue}
 	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation(page.params.id, data.title)}
 	on:stop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",
