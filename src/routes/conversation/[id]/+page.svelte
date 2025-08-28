@@ -27,7 +27,6 @@
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
-	// Tools feature removed
 
 	let { data = $bindable() } = $props();
 
