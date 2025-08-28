@@ -9,7 +9,6 @@ import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building, dev } from "$app/environment";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { MetricsServer } from "$lib/server/metrics";
 import { initExitHandler } from "$lib/server/exitHandler";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
@@ -31,8 +30,7 @@ export const init: ServerInit = async () => {
 		// Assistants feature removed; no assistant count refresher
 		refreshConversationStats();
 
-		// Init metrics server
-		MetricsServer.getInstance();
+		// Metrics feature removed
 
 		// Init AbortedGenerations refresh process
 		AbortedGenerations.getInstance();
