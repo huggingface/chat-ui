@@ -146,5 +146,4 @@ export const userGroup = new Elysia()
 					.toArray();
 				return reports;
 			})
-			);
 	});

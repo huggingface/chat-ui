@@ -3,13 +3,11 @@ import type { Message } from "$lib/types/Message";
 import type { TextGenerationStreamOutput, TextGenerationStreamToken } from "@huggingface/inference";
 import { endpointTgi, endpointTgiParametersSchema } from "./tgi/endpointTgi";
 import { z } from "zod";
-import endpointAws, { endpointAwsParametersSchema } from "./aws/endpointAws";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import endpointLlamacpp, { endpointLlamacppParametersSchema } from "./llamacpp/endpointLlamacpp";
 import endpointOllama, { endpointOllamaParametersSchema } from "./ollama/endpointOllama";
 import endpointVertex, { endpointVertexParametersSchema } from "./google/endpointVertex";
 import endpointGenAI, { endpointGenAIParametersSchema } from "./google/endpointGenAI";
-import { endpointBedrock, endpointBedrockParametersSchema } from "./aws/endpointBedrock";
 
 import {
 	endpointAnthropic,
@@ -70,8 +68,6 @@ export const endpoints = {
 	tgi: endpointTgi,
 	anthropic: endpointAnthropic,
 	anthropicvertex: endpointAnthropicVertex,
-	bedrock: endpointBedrock,
-	aws: endpointAws,
 	openai: endpointOai,
 	llamacpp: endpointLlamacpp,
 	ollama: endpointOllama,
@@ -87,8 +83,6 @@ export const endpoints = {
 export const endpointSchema = z.discriminatedUnion("type", [
 	endpointAnthropicParametersSchema,
 	endpointAnthropicVertexParametersSchema,
-	endpointAwsParametersSchema,
-	endpointBedrockParametersSchema,
 	endpointOAIParametersSchema,
 	endpointTgiParametersSchema,
 	endpointLlamacppParametersSchema,

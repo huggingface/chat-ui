@@ -305,4 +305,10 @@ export function getCallMethod(tool: Omit<BaseTool, "call">): BackendCall {
 	};
 }
 
-export const toolFromConfigs = configTools.parse(JSON5.parse(config.TOOLS)) satisfies ConfigTool[];
+// Tolerate backtick-wrapped env values (e.g., TOOLS=`[...]`)
+const _toolsRaw = (config.TOOLS ?? "").trim();
+const _toolsSanitized =
+	_toolsRaw.startsWith("`") && _toolsRaw.endsWith("`")
+		? _toolsRaw.slice(1, -1)
+		: _toolsRaw;
+export const toolFromConfigs = configTools.parse(JSON5.parse(_toolsSanitized || "[]")) satisfies ConfigTool[];
