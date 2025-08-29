@@ -74,6 +74,16 @@
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 
+	// Zero-config reasoning autodetection: detect <think> blocks in content
+	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/g;
+	let hasServerReasoning = $derived(
+		reasoningUpdates &&
+		reasoningUpdates.length > 0 &&
+		!!message.reasoning &&
+		message.reasoning.trim().length > 0
+	);
+	let hasClientThink = $derived(!hasServerReasoning && /<think>/.test(message.content));
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
@@ -119,7 +129,7 @@
 				</div>
 			{/if}
 
-			{#if reasoningUpdates && reasoningUpdates.length > 0 && message.reasoning && message.reasoning.trim().length > 0}
+			{#if hasServerReasoning}
 				{@const summaries = reasoningUpdates
 					.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
 					.map((u) => u.status)}
@@ -136,11 +146,36 @@
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 
-				<div
-					class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
-				>
-					<MarkdownRenderer content={message.content} />
-				</div>
+				{#if hasClientThink}
+					{#each message.content.split(THINK_BLOCK_REGEX) as part, i}
+						{#if part && part.startsWith("<think>")}
+							{@const isClosed = part.endsWith("</think>")}
+							{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
+							{@const summary =
+								isClosed
+									? (thinkContent.trim().split(/\n+/)[0] || "Reasoning")
+									: "Thinking..."}
+
+							<OpenReasoningResults
+								summary={summary}
+								content={thinkContent}
+								loading={isLast && loading && !isClosed}
+							/>
+						{:else if part && part.trim().length > 0}
+							<div
+								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+							>
+								<MarkdownRenderer content={part} />
+							</div>
+						{/if}
+					{/each}
+				{:else}
+					<div
+						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+					>
+						<MarkdownRenderer content={message.content} />
+					</div>
+				{/if}
 			</div>
 		</div>
 
