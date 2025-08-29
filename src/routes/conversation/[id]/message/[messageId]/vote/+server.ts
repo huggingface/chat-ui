@@ -1,6 +1,5 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
-import { MetricsServer } from "$lib/server/metrics.js";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
@@ -24,14 +23,6 @@ export async function POST({ params, request, locals }) {
 			{ projection: { model: 1 } }
 		)
 		.then((c) => c?.model);
-
-	if (model) {
-		if (score === 1) {
-			MetricsServer.getMetrics().model.votesPositive.inc({ model });
-		} else {
-			MetricsServer.getMetrics().model.votesNegative.inc({ model });
-		}
-	}
 
 	const document = await collections.conversations.updateOne(
 		{

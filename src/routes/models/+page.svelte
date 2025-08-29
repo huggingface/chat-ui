@@ -6,8 +6,7 @@
 	import { page } from "$app/state";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
-	import CarbonTools from "~icons/carbon/tools";
-	import CarbonImage from "~icons/carbon/image";
+	import CarbonView from "~icons/carbon/view";
 	import { useSettingsStore } from "$lib/stores/settings";
 	interface Props {
 		data: PageData;
@@ -73,24 +72,14 @@
 							></div>
 						{/if}
 						<div class="flex items-center gap-1">
-							{#if model.tools}
-								<span
-									title="This model supports tools."
-									class="ml-auto grid size-[21px] place-items-center rounded-lg border border-purple-300 dark:border-purple-700"
-									aria-label="Model supports tools"
-									role="img"
-								>
-									<CarbonTools class="text-xxs text-purple-700 dark:text-purple-500" />
-								</span>
-							{/if}
-							{#if model.multimodal}
+							{#if model.multimodal || $settings.multimodalOverrides?.[model.id]}
 								<span
 									title="This model is multimodal and supports image inputs natively."
 									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-500"
 									aria-label="Model is multimodal"
 									role="img"
 								>
-									<CarbonImage class="text-xxs text-blue-700 dark:text-blue-500" />
+									<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
 								</span>
 							{/if}
 							{#if model.reasoning}

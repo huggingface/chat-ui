@@ -4,7 +4,8 @@ Chat UI handles configuration with environment variables. The default config for
 
 ```ini
 MONGODB_URL=mongodb://localhost:27017
-HF_TOKEN=your_token
+OPENAI_API_KEY=your_token
+HF_TOKEN= # optional legacy alias
 ```
 
 The following sections detail various sections of the app you may want to configure.

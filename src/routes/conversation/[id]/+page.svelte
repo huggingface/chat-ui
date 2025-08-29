@@ -6,10 +6,8 @@
 	import { page } from "$app/state";
 	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
 	import {
 		MessageReasoningUpdateType,
@@ -28,7 +26,6 @@
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
-	import { documentParserToolId } from "$lib/utils/toolIds.js";
 
 	let { data = $bindable() } = $props();
 
@@ -247,15 +244,7 @@
 				throw new Error("Message to write to not found");
 			}
 
-			// disable websearch if assistant is present
-			const hasAssistant = !!page.data.assistant;
 			const messageUpdatesAbortController = new AbortController();
-
-			let tools = $settings.tools;
-
-			if (!files.some((file) => file.type.startsWith("application/"))) {
-				tools = $settings.tools?.filter((tool) => tool !== documentParserToolId);
-			}
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
@@ -265,8 +254,6 @@
 					messageId,
 					isRetry,
 					isContinue,
-					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
-					tools,
 					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
@@ -516,7 +503,6 @@
 	on:continue={onContinue}
 	on:showAlternateMsg={onShowAlternateMsg}
 	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation(page.params.id, data.title)}
 	on:stop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",
@@ -534,5 +520,4 @@
 	}}
 	models={data.models}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
-	assistant={data.assistant}
 />

@@ -1,5 +1,4 @@
 import { defaultModel } from "$lib/server/models";
-import type { Assistant } from "./Assistant";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
@@ -20,8 +19,13 @@ export interface Settings extends Timestamps {
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 
-	assistants?: Assistant["_id"][];
-	tools?: string[];
+	/**
+	 * Per‑model overrides to enable multimodal (image) support
+	 * even when not advertised by the provider/model list.
+	 * Only the `true` value is meaningful (enables images).
+	 */
+	multimodalOverrides?: Record<string, boolean>;
+
 	disableStream: boolean;
 	directPaste: boolean;
 }
@@ -33,8 +37,7 @@ export const DEFAULT_SETTINGS = {
 	activeModel: defaultModel.id,
 	hideEmojiOnSidebar: false,
 	customPrompts: {},
-	assistants: [],
-	tools: [],
+	multimodalOverrides: {},
 	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;

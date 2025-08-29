@@ -89,7 +89,6 @@
 		{/if}
 	</div>
 	<a
-		class:invisible={!page.params?.id}
 		href="{base}/"
 		class="-mr-3 flex size-12 shrink-0 items-center justify-center text-lg"><IconNew /></a
 	>

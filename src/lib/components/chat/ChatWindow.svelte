@@ -6,7 +6,6 @@
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
 	import CarbonExport from "~icons/carbon/export";
-	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -18,16 +17,15 @@
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
-	import type { Assistant } from "$lib/types/Assistant";
 	import { base } from "$app/paths";
 	import ContinueBtn from "../ContinueBtn.svelte";
-	import AssistantIntroduction from "./AssistantIntroduction.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { snapScrollToBottom } from "$lib/actions/snapScrollToBottom";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
+	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
@@ -35,9 +33,8 @@
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
-	import type { ToolFront } from "$lib/types/Tool";
 	import { loginModalOpen } from "$lib/stores/loginModal";
-	import { beforeNavigate } from "$app/navigation";
+
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 
 	interface Props {
@@ -48,7 +45,6 @@
 		shared?: boolean;
 		currentModel: Model;
 		models: Model[];
-		assistant?: Assistant | undefined;
 		preprompt?: string | undefined;
 		files?: File[];
 	}
@@ -61,7 +57,6 @@
 		shared = false,
 		currentModel,
 		models,
-		assistant = undefined,
 		preprompt = undefined,
 		files = $bindable([]),
 	}: Props = $props();
@@ -69,20 +64,13 @@
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
 
 	let message: string = $state("");
-	let timeout: ReturnType<typeof setTimeout>;
-	let isSharedRecently = $state(false);
+	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
-	beforeNavigate(() => {
-		if (page.params.id) {
-			isSharedRecently = false;
-		}
-	});
 
 	const dispatch = createEventDispatcher<{
 		message: string;
-		share: void;
 		stop: void;
 		retry: { id: Message["id"]; content?: string };
 		continue: { id: Message["id"] };
@@ -168,25 +156,10 @@
 	);
 
 	function onShare() {
-		if (!confirm("Are you sure you want to share this conversation? This cannot be undone.")) {
-			return;
-		}
-
-		dispatch("share");
-		isSharedRecently = true;
-		if (timeout) {
-			clearTimeout(timeout);
-		}
-		timeout = setTimeout(() => {
-			isSharedRecently = false;
-		}, 2000);
+		shareModalOpen = true;
 	}
 
-	onDestroy(() => {
-		if (timeout) {
-			clearTimeout(timeout);
-		}
-	});
+	onDestroy(() => {});
 
 	let chatContainer: HTMLElement | undefined = $state();
 
@@ -205,28 +178,16 @@
 
 	const settings = useSettingsStore();
 
-	let mimeTypesFromActiveTools = $derived(
-		page.data.tools
-			.filter((tool: ToolFront) => {
-				if (assistant) {
-					return assistant.tools?.includes(tool._id);
-				}
-				if (currentModel.tools) {
-					return $settings?.tools?.includes(tool._id) ?? tool.isOnByDefault;
-				}
-				return false;
-			})
-			.flatMap((tool: ToolFront) => tool.mimeTypes ?? [])
+	// Respect per‑model multimodal toggle from settings (force enable)
+	let modelIsMultimodal = $derived(
+		currentModel.multimodal || ($settings.multimodalOverrides?.[currentModel.id] ?? false)
 	);
-
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...mimeTypesFromActiveTools, // fetch mime types from active tools either from tool settings or active assistant
-				...(currentModel.tools && !assistant ? ["application/pdf"] : []), // if its a tool model, we can always enable document parser so we always accept pdfs
-				...(currentModel.multimodal
+				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"])
-					: []), // if its a multimodal model, we always accept images
+					: []),
 			])
 		)
 	);
@@ -248,6 +209,9 @@
 />
 
 <div class="relative z-[-1] min-h-0 min-w-0">
+	{#if shareModalOpen}
+		<ShareConversationModal open={shareModalOpen} on:close={() => (shareModalOpen = false)} />
+	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
 		use:snapScrollToBottom={messages.map((message) => message.content)}
@@ -256,28 +220,7 @@
 		<div
 			class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
 		>
-			{#if assistant && !!messages.length}
-				<a
-					class="mx-auto flex items-center gap-1.5 rounded-full border border-gray-100 bg-gray-50 py-1 pl-1 pr-3 text-sm text-gray-800 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-					href="{base}/assistant/{assistant._id}"
-				>
-					{#if assistant.avatar}
-						<img
-							src="{base}/settings/assistants/{assistant._id.toString()}/avatar.jpg?hash=${assistant.avatar}"
-							alt="Avatar"
-							class="size-5 rounded-full object-cover"
-						/>
-					{:else}
-						<div
-							class="flex size-6 items-center justify-center rounded-full bg-gray-300 font-bold uppercase text-gray-500"
-						>
-							{assistant.name[0]}
-						</div>
-					{/if}
-
-					{assistant.name}
-				</a>
-			{:else if preprompt && preprompt != currentModel.preprompt}
+			{#if preprompt && preprompt != currentModel.preprompt}
 				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 
@@ -314,22 +257,9 @@
 					isAuthor={!shared}
 					readOnly={isReadOnly}
 				/>
-			{:else if !assistant}
+			{:else}
 				<ChatIntroduction
 					{currentModel}
-					on:message={(ev) => {
-						if (page.data.loginRequired) {
-							ev.preventDefault();
-							$loginModalOpen = true;
-						} else {
-							dispatch("message", ev.detail);
-						}
-					}}
-				/>
-			{:else}
-				<AssistantIntroduction
-					{models}
-					{assistant}
 					on:message={(ev) => {
 						if (page.data.loginRequired) {
 							ev.preventDefault();
@@ -430,7 +360,6 @@
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
 							<ChatInput
-								{assistant}
 								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
 								{loading}
 								bind:value={message}
@@ -439,8 +368,7 @@
 								on:submit={handleSubmit}
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
-								modelHasTools={currentModel.tools}
-								modelIsMultimodal={currentModel.multimodal}
+								modelIsMultimodal={modelIsMultimodal}
 								bind:focused
 							/>
 						{/if}
@@ -454,7 +382,7 @@
 							</button>
 						{:else}
 							<button
-								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:text-gray-400/50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black dark:disabled:text-gray-600/50"
+								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black"
 								disabled={!message || isReadOnly}
 								type="submit"
 								aria-label="Send message"
@@ -487,31 +415,16 @@
 			>
 				<p>
 					Model:
-					{#if !assistant}
-						{#if models.find((m) => m.id === currentModel.id)}
-							<a
-								href="{base}/settings/{currentModel.id}"
-								class="inline-flex items-center hover:underline"
-								>{currentModel.displayName}<CarbonCaretDown class="text-xxs" /></a
-							>
-						{:else}
-							<span class="inline-flex items-center line-through dark:border-gray-700">
-								{currentModel.id}
-							</span>
-						{/if}
+					{#if models.find((m) => m.id === currentModel.id)}
+						<a
+							href="{base}/settings/{currentModel.id}"
+							class="inline-flex items-center hover:underline"
+							>{currentModel.displayName}<CarbonCaretDown class="text-xxs" /></a
+						>
 					{:else}
-						{@const model = models.find((m) => m.id === assistant?.modelId)}
-						{#if model}
-							<a
-								href="{base}/settings/assistants/{assistant._id}"
-								class="inline-flex items-center border-b hover:text-gray-600 dark:border-gray-700 dark:hover:text-gray-300"
-								>{model?.displayName}<CarbonCaretDown class="text-xxs" /></a
-							>
-						{:else}
-							<span class="inline-flex items-center line-through dark:border-gray-700">
-								{currentModel.id}
-							</span>
-						{/if}
+						<span class="inline-flex items-center line-through dark:border-gray-700">
+							{currentModel.id}
+						</span>
 					{/if}
 					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
 					or false.
@@ -520,17 +433,10 @@
 					<button
 						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
-						class:hover:underline={!isSharedRecently}
 						onclick={onShare}
-						disabled={isSharedRecently}
 					>
-						{#if isSharedRecently}
-							<CarbonCheckmark class="text-[.6rem] sm:mr-1.5 sm:text-green-600" />
-							<div class="text-green-600 max-sm:hidden">Link copied to clipboard</div>
-						{:else}
-							<CarbonExport class="sm:text-primary-500 text-[.6rem] sm:mr-1.5" />
-							<div class="max-sm:hidden">Share this conversation</div>
-						{/if}
+						<CarbonExport class="text-[.6rem] text-black dark:text-white sm:mr-1.5" />
+						<div class="max-sm:hidden">Share this conversation</div>
 					</button>
 				{/if}
 			</div>

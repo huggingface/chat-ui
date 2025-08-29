@@ -9,7 +9,6 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 
-	import { shareConversation } from "$lib/shareConversation";
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
@@ -20,7 +19,6 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
-	import Search from "$lib/components/chat/Search.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
@@ -80,19 +78,21 @@
 			});
 	}
 
-	async function editConversationTitle(id: string, title: string) {
-		client
-			.conversations({ id })
-			.patch({ title })
-			.then(handleResponse)
-			.then(async () => {
-				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
-			})
-			.catch((err) => {
-				console.error(err);
-				$error = String(err);
-			});
-	}
+    async function editConversationTitle(id: string, title: string) {
+        // Always strip <think> markers before saving and updating UI
+        const cleanTitle = title.replace(/<\/?think>/gi, "").trim();
+        client
+            .conversations({ id })
+            .patch({ title: cleanTitle })
+            .then(handleResponse)
+            .then(async () => {
+                conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title: cleanTitle } : conv));
+            })
+            .catch((err) => {
+                console.error(err);
+                $error = String(err);
+            });
+    }
 
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
@@ -131,22 +131,6 @@
 				});
 		}
 
-		if ($page.url.searchParams.has("tools")) {
-			const tools = $page.url.searchParams.get("tools")?.split(",");
-
-			await settings
-				.instantSet({
-					tools: [...($settings.tools ?? []), ...(tools ?? [])],
-				})
-				.then(async () => {
-					const query = new URLSearchParams($page.url.searchParams.toString());
-					query.delete("tools");
-					await goto(`${base}/?${query.toString()}`, {
-						invalidateAll: true,
-					});
-				});
-		}
-
 		if ($page.url.searchParams.has("token")) {
 			const token = $page.url.searchParams.get("token");
 
@@ -160,7 +144,7 @@
 	});
 
 	let mobileNavTitle = $derived(
-		["/models", "/assistants", "/privacy", "/tools"].includes($page.route.id ?? "")
+		["/models", "/privacy"].includes($page.route.id ?? "")
 			? ""
 			: conversations.find((conv) => conv.id === $page.params.id)?.title
 	);
@@ -179,9 +163,9 @@
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:site" content="@huggingface" />
 
-	<!-- use those meta tags everywhere except on the share assistant page -->
+	<!-- use those meta tags everywhere except on special listing pages -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !$page.url.pathname.includes("/assistant/") && $page.route.id !== "/assistants" && !$page.url.pathname.includes("/models/") && !$page.url.pathname.includes("/tools")}
+	{#if !$page.url.pathname.includes("/models/")}
 		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />
@@ -222,7 +206,6 @@
 	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
 
-<Search />
 
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
@@ -242,7 +225,6 @@
 			{conversations}
 			user={data.user}
 			canLogin={!data.user && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>
@@ -254,7 +236,6 @@
 			{conversations}
 			user={data.user}
 			canLogin={!data.user && data.loginEnabled}
-			on:shareConversation={(ev) => shareConversation(ev.detail.id, ev.detail.title)}
 			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
 			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
 		/>

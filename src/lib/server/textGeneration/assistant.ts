@@ -55,21 +55,11 @@ export async function processPreprompt(preprompt: string, user_message: string |
 export async function getAssistantById(id?: ObjectId) {
 	return collections.assistants
 		.findOne<
-			Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings" | "tools">
-		>({ _id: id }, { projection: { rag: 1, dynamicPrompt: 1, generateSettings: 1, tools: 1 } })
+			Pick<Assistant, "dynamicPrompt" | "generateSettings">
+		>({ _id: id }, { projection: { dynamicPrompt: 1, generateSettings: 1 } })
 		.then((a) => a ?? undefined);
 }
 
-export function assistantHasWebSearch(assistant?: Pick<Assistant, "rag"> | null) {
-	return (
-		config.ENABLE_ASSISTANTS_RAG === "true" &&
-		!!assistant?.rag &&
-		(assistant.rag.allowedLinks.length > 0 ||
-			assistant.rag.allowedDomains.length > 0 ||
-			assistant.rag.allowAllDomains)
-	);
-}
-
 export function assistantHasDynamicPrompt(assistant?: Pick<Assistant, "dynamicPrompt">) {
-	return config.ENABLE_ASSISTANTS_RAG === "true" && Boolean(assistant?.dynamicPrompt);
+	return Boolean(assistant?.dynamicPrompt);
 }

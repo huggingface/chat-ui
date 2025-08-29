@@ -23,12 +23,7 @@
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
-	import { toggleSearch } from "./chat/Search.svelte";
-	import CarbonSearch from "~icons/carbon/search";
-	import { closeMobileNav } from "./MobileNav.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 
 	const publicConfig = usePublicConfig();
@@ -108,62 +103,33 @@
 		<Logo classNames="mr-1" />
 		{publicConfig.PUBLIC_APP_NAME}
 	</a>
-	{#if $page.url.pathname !== base + "/"}
-		<a
-			href={`${base}/`}
-			onclick={handleNewChatClick}
-			class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
-		>
-			New Chat
-		</a>
-	{/if}
+	<a
+		href={`${base}/`}
+		onclick={handleNewChatClick}
+		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
+	>
+		New Chat
+	</a>
 </div>
+
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	<button
-		class="group mx-auto flex w-full flex-row items-center justify-stretch gap-x-2 rounded-xl px-2 py-1 align-middle text-gray-600 hover:bg-gray-500/20 dark:text-gray-400"
-		onclick={() => {
-			closeMobileNav();
-			toggleSearch();
-		}}
-	>
-		<CarbonSearch class="text-xs" />
-		<span class="block">Search chats</span>
-		{#if !isVirtualKeyboard()}
-			<span class="invisible ml-auto text-xs text-gray-500 group-hover:visible"
-				><kbd>ctrl</kbd>+<kbd>k</kbd></span
-			>
-		{/if}
-	</button>
-	{#await groupedConversations}
-		{#if $page.data.nConversations > 0}
-			<div class="overflow-y-hidden">
-				<div class="flex animate-pulse flex-col gap-4">
-					<div class="h-4 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
-					{#each Array(100) as _}
-						<div class="ml-2 h-5 w-4/5 gap-5 rounded bg-gray-200 dark:bg-gray-700"></div>
-					{/each}
-				</div>
-			</div>
-		{/if}
-	{:then groupedConversations}
-		<div class="flex flex-col gap-1">
-			{#each Object.entries(groupedConversations) as [group, convs]}
-				{#if convs.length}
-					<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
-						{titles[group]}
-					</h4>
-					{#each convs as conv}
-						<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
-					{/each}
-				{/if}
-			{/each}
-		</div>
-		{#if hasMore}
-			<InfiniteScroll on:visible={handleVisible} />
-		{/if}
-	{/await}
+	<div class="flex flex-col gap-1">
+		{#each Object.entries(groupedConversations) as [group, convs]}
+			{#if convs.length}
+				<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">
+					{titles[group]}
+				</h4>
+				{#each convs as conv}
+					<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
+				{/each}
+			{/if}
+		{/each}
+	</div>
+	{#if hasMore}
+		<InfiniteScroll on:visible={handleVisible} />
+	{/if}
 </div>
 <div
 	class="flex touch-none flex-col gap-1 rounded-r-xl p-3 text-sm md:mt-3 md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
@@ -211,26 +177,6 @@
 			>
 		</a>
 	{/if}
-	{#if $page.data.enableAssistants}
-		<a
-			href="{base}/assistants"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			Assistants
-		</a>
-	{/if}
-	{#if $page.data.enableCommunityTools}
-		<a
-			href="{base}/tools"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			Tools
-			<span
-				class="ml-auto rounded-full border border-purple-300 px-2 py-0.5 text-xs text-purple-500 dark:border-purple-500 dark:text-purple-400"
-				>New</span
-			>
-		</a>
-	{/if}
 
 	<span class="flex flex-row-reverse gap-1 md:flex-row">
 		<a
@@ -245,7 +191,7 @@
 				theme = localStorage.theme;
 			}}
 			aria-label="Toggle theme"
-			class="flex h-9 min-w-[1.5em] flex-none items-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			class="flex size-9 min-w-[1.5em] flex-none items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			{#if browser}
 				{#if theme === "dark"}

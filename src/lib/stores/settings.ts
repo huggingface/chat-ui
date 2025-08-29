@@ -2,7 +2,6 @@ import { browser } from "$app/environment";
 import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
 import { UrlDependency } from "$lib/types/UrlDependency";
-import type { ObjectId } from "mongodb";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
@@ -13,9 +12,8 @@ type SettingsStore = {
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
 	customPrompts: Record<string, string>;
+	multimodalOverrides: Record<string, boolean>;
 	recentlySaved: boolean;
-	assistants: Array<ObjectId | string>;
-	tools?: Array<string>;
 	disableStream: boolean;
 	directPaste: boolean;
 };

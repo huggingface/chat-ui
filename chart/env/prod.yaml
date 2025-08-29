@@ -51,11 +51,8 @@ envVars:
   COOKIE_SAMESITE: "lax"
   COOKIE_SECURE: "true"
   ENABLE_ASSISTANTS: "true"
-  ENABLE_ASSISTANTS_RAG: "true"
   ENABLE_CONFIG_MANAGER: "false"
-  METRICS_PORT: 5565
   LOG_LEVEL: "debug"
-  METRICS_ENABLED: "true"
   MODELS: >
     [
       {

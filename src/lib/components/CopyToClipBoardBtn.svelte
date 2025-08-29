@@ -9,9 +9,10 @@
 		value: string;
 		children?: import("svelte").Snippet;
 		onClick?: () => void;
+		showTooltip?: boolean;
 	}
 
-	let { classNames = "", value, children, onClick }: Props = $props();
+	let { classNames = "", value, children, onClick, showTooltip = true }: Props = $props();
 
 	let isSuccess = $state(false);
 	let timeout: ReturnType<typeof setTimeout>;
@@ -74,6 +75,8 @@
 			<IconCopy classNames="h-[1.14em] w-[1.14em]" />
 		{/if}
 
-		<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
+		{#if showTooltip}
+			<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
+		{/if}
 	</div>
 </button>

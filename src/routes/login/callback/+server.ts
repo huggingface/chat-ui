@@ -6,17 +6,23 @@ import { config } from "$lib/server/config";
 import JSON5 from "json5";
 import { updateUser } from "./updateUser.js";
 
+const sanitizeJSONEnv = (val: string, fallback: string) => {
+	const raw = (val ?? "").trim();
+	const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
+	return unquoted || fallback;
+};
+
 const allowedUserEmails = z
 	.array(z.string().email())
 	.optional()
 	.default([])
-	.parse(JSON5.parse(config.ALLOWED_USER_EMAILS));
+	.parse(JSON5.parse(sanitizeJSONEnv(config.ALLOWED_USER_EMAILS, "[]")));
 
 const allowedUserDomains = z
 	.array(z.string().regex(/\.\w+$/)) // Contains at least a dot
 	.optional()
 	.default([])
-	.parse(JSON5.parse(config.ALLOWED_USER_DOMAINS));
+	.parse(JSON5.parse(sanitizeJSONEnv(config.ALLOWED_USER_DOMAINS, "[]")));
 
 export async function GET({ url, locals, cookies, request, getClientAddress }) {
 	const { error: errorName, error_description: errorDescription } = z
