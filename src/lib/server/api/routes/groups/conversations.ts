@@ -8,7 +8,6 @@ import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversa
 import type { Conversation } from "$lib/types/Conversation";
 
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
-// search chat feature removed
 
 export const conversationGroup = new Elysia().use(authPlugin).group("/conversations", (app) => {
 	return app

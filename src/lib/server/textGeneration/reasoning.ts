@@ -1,7 +1,6 @@
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { taskModel } from "../models";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
-// Tools feature removed
 import { logger } from "../logger";
 
 export async function generateSummaryOfReasoning(buffer: string): Promise<string> {

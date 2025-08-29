@@ -9,7 +9,6 @@ import type {
 	ChatCompletionCreateParamsNonStreaming,
 	ChatCompletionCreateParamsStreaming,
 } from "openai/resources/chat/completions";
-// Tools feature removed: no function/tool schema needed
 import { buildPrompt } from "$lib/buildPrompt";
 import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";

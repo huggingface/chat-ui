@@ -5,7 +5,6 @@ import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate"
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 import { taskModel } from "../models";
-// Tools feature removed
 
 export async function* generateTitleForConversation(
 	conv: Conversation

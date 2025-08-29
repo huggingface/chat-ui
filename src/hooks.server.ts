@@ -37,10 +37,7 @@ export const init: ServerInit = async () => {
 		initExitHandler();
 
 		checkAndRunMigrations();
-		// Assistants feature removed; no assistant count refresher
 		refreshConversationStats();
-
-		// Metrics feature removed
 
 		// Init AbortedGenerations refresh process
 		AbortedGenerations.getInstance();

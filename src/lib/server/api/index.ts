@@ -1,7 +1,6 @@
 import { authPlugin } from "$api/authPlugin";
 import { conversationGroup } from "$api/routes/groups/conversations";
 import { userGroup } from "$api/routes/groups/user";
-// Tools feature removed
 import { misc } from "$api/routes/groups/misc";
 import { modelGroup } from "$api/routes/groups/models";
 import { debugGroup } from "$api/routes/groups/debug";

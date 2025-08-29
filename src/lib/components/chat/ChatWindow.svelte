@@ -33,7 +33,6 @@
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
-	// Tools feature removed
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";

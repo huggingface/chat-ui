@@ -4,7 +4,6 @@ import type { TextGenerationStreamOutput, TextGenerationStreamToken } from "@hug
 import { z } from "zod";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import type { Model } from "$lib/types/Model";
-// Tools feature removed
 import type { ObjectId } from "mongodb";
 
 export type EndpointMessage = Omit<Message, "id">;
