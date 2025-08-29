@@ -61,10 +61,6 @@
 	});
 
 	const settings = useSettingsStore();
-
-	// Local filter for model list (filter on model id)
-	let modelFilter = $state("");
-	let normalizedFilter = $derived(modelFilter.trim().toLowerCase());
 </script>
 
 <div
@@ -108,21 +104,7 @@
 				Models
 			</h3>
 
-			<!-- Filter input -->
-			<div class="px-2 py-2">
-				<input
-					bind:value={modelFilter}
-					type="search"
-					placeholder="Filter by name"
-					aria-label="Filter models by id"
-					class="w-full rounded-full border border-gray-300 bg-white px-4 py-1 text-sm
-						placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-				/>
-			</div>
-
-			{#each data.models
-				.filter((el) => !el.unlisted)
-				.filter((el) => el.id.toLowerCase().includes(normalizedFilter)) as model}
+			{#each data.models.filter((el) => !el.unlisted) as model}
 				<button
 					type="button"
 					onclick={() => goto(`${base}/settings/${model.id}`)}
