@@ -82,7 +82,7 @@ You can then add the generated information and the `authorization` parameter to 
 ]
 ```
 
-Please note that if `HF_TOKEN` is also set or not empty, it will take precedence.
+The canonical token is `OPENAI_API_KEY`. If only `HF_TOKEN` is set, it will be used as a legacy alias.
 
 ## Models hosted on multiple custom endpoints
 

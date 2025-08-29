@@ -40,12 +40,12 @@ docker run \
   -p 3000 \
   -e MONGODB_URL=mongodb://host.docker.internal:27017 \
   -e OPENAI_BASE_URL=https://router.huggingface.co/v1 \
-  -e HF_TOKEN=hf_*** \
+  -e OPENAI_API_KEY=hf_*** \
   -v db:/data \
   ghcr.io/huggingface/chat-ui-db:latest
 ```
 
-Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) for all environment variables. In this build, only OpenAI-compatible endpoints are supported via `OPENAI_BASE_URL` and `OPENAI_API_KEY` (or `HF_TOKEN`). Other providers are not available.
+Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) for all environment variables. In this build, only OpenAI-compatible endpoints are supported via `OPENAI_BASE_URL` and `OPENAI_API_KEY` (with `HF_TOKEN` supported as a legacy alias). Other providers are not available.
 
 ### Local setup
 
@@ -81,7 +81,7 @@ If you don't want to configure, setup, and launch your own Chat UI yourself, you
 
 You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
 
-Set `OPENAI_BASE_URL` (for example `https://router.huggingface.co/v1`) and optionally `HF_TOKEN` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets). `HF_TOKEN` is recommended when using the Hugging Face router, and `OPENAI_API_KEY` can be used for other OpenAI-compatible providers. Make sure to create your personal token first in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
+Set `OPENAI_BASE_URL` (for example `https://router.huggingface.co/v1`) and `OPENAI_API_KEY` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets). `HF_TOKEN` remains supported as a legacy alias if you already have it configured. Create your personal token in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
 
@@ -94,8 +94,8 @@ Start by creating a `.env.local` file in the root of the repository. The bare mi
 ```env
 MONGODB_URL=<the URL to your MongoDB instance>
 OPENAI_BASE_URL=<OpenAI-compatible API base URL, e.g. https://router.huggingface.co/v1>
-# One of the following for authorization (prefer HF_TOKEN with Hugging Face router):
-HF_TOKEN=<your HF access token>
+# Authorization
+OPENAI_API_KEY=<your access token>
 # or
 OPENAI_API_KEY=<your provider API key>
 ```
@@ -180,7 +180,7 @@ PUBLIC_APP_DISCLAIMER=
 
 ### Models
 
-This build does not use the `MODELS` env var or GGUF discovery. Configure models via `OPENAI_BASE_URL` only; Chat UI will fetch `${OPENAI_BASE_URL}/models` and populate the list automatically. Authorization uses `HF_TOKEN` (preferred for the HF router) or `OPENAI_API_KEY`.
+This build does not use the `MODELS` env var or GGUF discovery. Configure models via `OPENAI_BASE_URL` only; Chat UI will fetch `${OPENAI_BASE_URL}/models` and populate the list automatically. Authorization uses `OPENAI_API_KEY` (preferred). `HF_TOKEN` remains a legacy alias.
 
 ## Common issues
 
@@ -194,7 +194,7 @@ Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as
 
 Create a `DOTENV_LOCAL` secret to your HF space with the content of your .env.local, and they will be picked up automatically when you run.
 
-Ensure the secret includes at least: `MONGODB_URL` and `OPENAI_BASE_URL`. Add `HF_TOKEN` or `OPENAI_API_KEY` depending on your provider.
+Ensure the secret includes at least: `MONGODB_URL`, `OPENAI_BASE_URL`, and `OPENAI_API_KEY`.
 
 ## Building
 
@@ -227,7 +227,7 @@ You can then create a new `.env.SECRET_CONFIG` file with the following content
 
 ```env
 MONGODB_URL=<link to your mongo DB from step 3>
-HF_TOKEN=<your HF token from step 2>
+OPENAI_API_KEY=<your token from step 2>
 OPENAI_BASE_URL=https://router.huggingface.co/v1
 OPENID_CONFIG=`{
   PROVIDER_URL: "https://huggingface.co",
@@ -292,4 +292,3 @@ DOTENV_LOCAL=$(<.env.local)  docker run --network=host -e DOTENV_LOCAL chat-ui-d
 ```bash
 docker run --network=host --mount type=bind,source="$(pwd)/.env.local",target=/app/.env.local chat-ui-db
 ```
-

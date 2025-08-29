@@ -31,5 +31,5 @@ envVars:
   MONGODB_URL: mongodb://chat-ui-mongo:27017
   # Ensure that your values.yaml will not leak anywhere
   # PRs welcome for a chart rework with envFrom support!
-  HF_TOKEN: secret_token
+  OPENAI_API_KEY: secret_token
 ```
