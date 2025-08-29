@@ -7,8 +7,8 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 			const { models } = await import("$lib/server/models");
 			return {
 				OPENAI_BASE_URL: config.OPENAI_BASE_URL,
-				OPENAI_API_KEY_SET: Boolean(config.OPENAI_API_KEY),
-				HF_TOKEN_SET: Boolean(config.HF_TOKEN),
+				OPENAI_API_KEY_SET: Boolean(config.OPENAI_API_KEY || config.HF_TOKEN),
+				LEGACY_HF_TOKEN_SET: Boolean(config.HF_TOKEN && !config.OPENAI_API_KEY),
 				MODELS_COUNT: models.length,
 				NODE_VERSION: process.versions.node,
 			};

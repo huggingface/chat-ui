@@ -8,7 +8,7 @@ The default config for Chat UI is stored in the `.env` file. You will need to ov
 
 ```ini
 MONGODB_URL=<the URL to your MongoDB instance>
-HF_TOKEN=<your access token> # find your token at hf.co/settings/token
+OPENAI_API_KEY=<your access token> # works with HF router, OpenAI, local servers
 ```
 
 ## Database

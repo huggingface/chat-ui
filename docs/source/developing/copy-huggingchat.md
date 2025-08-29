@@ -21,7 +21,7 @@ You can then create a new `.env.SECRET_CONFIG` file with the following content
 
 ```ini
 MONGODB_URL=<link to your mongo DB from step 4>
-HF_TOKEN=<your HF token from step 2>
+OPENAI_API_KEY=<your token from step 2>
 OPENID_CONFIG=`{
   PROVIDER_URL: "https://huggingface.co",
   CLIENT_ID: "<your client ID from step 1>",
