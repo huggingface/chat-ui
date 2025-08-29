@@ -1,9 +1,9 @@
 import { json } from "@sveltejs/kit";
 import { config } from "$lib/server/config";
+const DEFAULT_OPENAI_BASE = "https://router.huggingface.co/v1";
 
 export async function GET() {
-	const base = (config.OPENAI_BASE_URL || config.OPENAI_MODEL_LIST_URL || "").replace(/\/$/, "");
-	if (!base) return json({ base, error: "no_base" });
+	const base = (config.OPENAI_BASE_URL || DEFAULT_OPENAI_BASE).replace(/\/$/, "");
 	try {
 		const res = await fetch(`${base}/models`);
 		const text = await res.text();
