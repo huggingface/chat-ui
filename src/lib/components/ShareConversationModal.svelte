@@ -84,10 +84,7 @@
 						</svg>
 					</button>
 				</div>
-				<div class="text-sm text-gray-600">
-					A public link to your chat has been created. Manage previously shared chats anytime in
-					<a href="{base}/settings" class="underline hover:no-underline">Settings</a>.
-				</div>
+				<div class="text-sm text-gray-600">A public link to your chat has been created.</div>
 			{:else}
 				<div class="flex items-start justify-between">
 					<div class="text-xl font-semibold text-gray-800">Share public link to chat</div>
@@ -105,7 +102,7 @@
 					</button>
 				</div>
 				<div class="text-sm text-gray-600">
-					Your name and any messages you add after sharing stay private. <a
+					Any messages you add after sharing stay private. <a
 						href="{base}/privacy"
 						class="underline hover:no-underline">Learn more</a
 					>.
@@ -120,7 +117,7 @@
 
 			<!-- URL row -->
 			<div
-				class="flex items-center gap-2 whitespace-nowrap rounded-2xl border border-gray-200 bg-gray-50 p-2.5"
+				class="flex h-12 items-center gap-2 whitespace-nowrap rounded-2xl border border-gray-200 bg-gray-50 p-2.5"
 			>
 				<input
 					class="w-full bg-transparent px-2 text-[15px] text-gray-700 outline-none placeholder:text-gray-400"
@@ -131,7 +128,7 @@
 
 				{#if createdUrl}
 					<CopyToClipBoardBtn
-						classNames="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50"
+						classNames="inline-flex items-center rounded-xl -mr-0.5 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50"
 						showTooltip={false}
 						value={withLeafId(createdUrl) ?? createdUrl}
 						onClick={() => {
@@ -160,7 +157,7 @@
 					</CopyToClipBoardBtn>
 				{:else}
 					<button
-						class="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50"
+						class="-mr-0.5 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50"
 						type="button"
 						disabled={creating}
 						onclick={handleCreate}
