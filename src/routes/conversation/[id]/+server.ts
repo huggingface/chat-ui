@@ -353,7 +353,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// Set the title
 				else if (event.type === MessageUpdateType.Title) {
-					conv.title = event.title;
+					// Always strip <think> markers from titles when saving
+					const sanitizedTitle = event.title.replace(/<\/?think>/gi, "").trim();
+					conv.title = sanitizedTitle;
 					await collections.conversations.updateOne(
 						{ _id: convId },
 						{ $set: { title: conv?.title, updatedAt: new Date() } }
@@ -516,9 +518,12 @@ export async function PATCH({ request, locals, params }) {
 		error(404, "Conversation not found");
 	}
 
-	// Only include defined values in the update
+
+	// Only include defined values in the update, with title sanitized
 	const updateValues = {
-		...(values.title !== undefined && { title: values.title }),
+		...(values.title !== undefined && {
+			title: values.title.replace(/<\/?think>/gi, "").trim(),
+		}),
 		...(values.model !== undefined && { model: values.model }),
 	};
 

@@ -78,19 +78,21 @@
 			});
 	}
 
-	async function editConversationTitle(id: string, title: string) {
-		client
-			.conversations({ id })
-			.patch({ title })
-			.then(handleResponse)
-			.then(async () => {
-				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
-			})
-			.catch((err) => {
-				console.error(err);
-				$error = String(err);
-			});
-	}
+    async function editConversationTitle(id: string, title: string) {
+        // Always strip <think> markers before saving and updating UI
+        const cleanTitle = title.replace(/<\/?think>/gi, "").trim();
+        client
+            .conversations({ id })
+            .patch({ title: cleanTitle })
+            .then(handleResponse)
+            .then(async () => {
+                conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title: cleanTitle } : conv));
+            })
+            .catch((err) => {
+                console.error(err);
+                $error = String(err);
+            });
+    }
 
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);

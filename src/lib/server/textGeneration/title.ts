@@ -4,7 +4,7 @@ import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
-import { taskModel } from "../models";
+// taskModel no longer used directly here; we pass the current model instead
 
 export async function* generateTitleForConversation(
 	conv: Conversation
@@ -15,7 +15,7 @@ export async function* generateTitleForConversation(
 		if (conv.title !== "New Chat" || !userMessage) return;
 
 		const prompt = userMessage.content;
-		const title = (await generateTitle(prompt)) ?? "New Chat";
+		const title = (await generateTitle(prompt, conv.model)) ?? "New Chat";
 
 		yield {
 			type: MessageUpdateType.Title,
@@ -26,32 +26,40 @@ export async function* generateTitleForConversation(
 	}
 }
 
-export async function generateTitle(prompt: string) {
-	if (config.LLM_SUMMARIZATION !== "true") {
-		return prompt.split(/\s+/g).slice(0, 5).join(" ");
-	}
+export async function generateTitle(prompt: string, modelId?: string) {
+    if (config.LLM_SUMMARIZATION !== "true") {
+        return prompt.split(/\s+/g).slice(0, 5).join(" ");
+    }
 
 	// Tools removed: no tool-based title path
 
-	return await getReturnFromGenerator(
-		generateFromDefaultEndpoint({
-			messages: [{ from: "user", content: prompt }],
-			preprompt:
-				"You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it, only summarize the user's query. Always start your answer with an emoji relevant to the summary",
-			generateSettings: {
-				max_new_tokens: 30,
-			},
-		})
-	)
+    return await getReturnFromGenerator(
+        generateFromDefaultEndpoint({
+            messages: [{ from: "user", content: prompt }],
+            preprompt:
+                "You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it, only summarize the user's query. Always start your answer with an emoji relevant to the summary",
+            generateSettings: {
+                max_new_tokens: 30,
+            },
+            modelId,
+        })
+    )
 		.then((summary) => {
-			// add an emoji if none is found in the first three characters
-			if (!/\p{Emoji}/u.test(summary.slice(0, 3))) {
-				return "💬 " + summary;
+			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
+			const trimmed = summary.trim();
+			// Fallback: if empty, use emoji + first five words
+			if (!trimmed) {
+				return "💬 " + firstFive;
 			}
-			return summary;
+			// Ensure emoji prefix if missing
+			if (!/\p{Emoji}/u.test(trimmed.slice(0, 3))) {
+				return "💬 " + trimmed;
+			}
+			return trimmed;
 		})
 		.catch((e) => {
 			logger.error(e);
-			return null;
+			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
+			return "💬 " + firstFive;
 		});
 }

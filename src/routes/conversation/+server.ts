@@ -63,7 +63,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			error(404, "Conversation not found");
 		}
 
-		title = conversation.title;
+		// Strip <think> markers from imported titles
+		title = conversation.title.replace(/<\/?think>/gi, "").trim();
 		messages = conversation.messages;
 		rootMessageId = conversation.rootMessageId ?? rootMessageId;
 		values.model = conversation.model;
@@ -83,7 +84,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const res = await collections.conversations.insertOne({
 		_id: new ObjectId(),
-		title: title || "New Chat",
+		// Always store sanitized titles
+		title: (title || "New Chat").replace(/<\/?think>/gi, "").trim(),
 		rootMessageId,
 		messages,
 		model: values.model,

@@ -27,6 +27,9 @@ export const load = async ({ depends, fetch, url }) => {
 			conv.title = conv.title.replace(/\p{Emoji}/gu, "");
 		}
 
+		// Always strip <think> markers from titles for sidebar display
+		conv.title = conv.title.replace(/<\/?think>/gi, "");
+
 		// remove invalid unicode and trim whitespaces
 		conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
 

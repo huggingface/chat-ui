@@ -18,7 +18,7 @@
 
 <details
 	bind:open={isOpen}
-	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+	class="group mb-4 flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary
 		class="
@@ -69,7 +69,7 @@
 	</summary>
 
 	<div
-		class="space-y-4 border-t border-gray-200 px-5 pb-2 pt-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
+		class="space-y-4 border-t border-gray-200 p-3 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400"
 	>
 		{#key content}
 			<MarkdownRenderer {content} />
