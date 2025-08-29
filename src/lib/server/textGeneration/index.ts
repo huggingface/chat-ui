@@ -1,7 +1,6 @@
 import { preprocessMessages } from "../endpoints/preprocessMessages";
 
 import { generateTitleForConversation } from "./title";
-// Assistants feature removed: no dynamic prompt or assistant lookup
 import {
 	type MessageUpdate,
 	MessageUpdateType,
@@ -10,7 +9,6 @@ import {
 import { generate } from "./generate";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
-// Tools feature removed
 
 async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	while (!done.aborted) {

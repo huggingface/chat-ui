@@ -28,7 +28,7 @@ export interface MessageStatusUpdate {
 	message?: string;
 }
 
-// Tools feature removed: no tool update types
+ 
 
 // Everything else
 export interface MessageTitleUpdate {
