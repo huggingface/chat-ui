@@ -178,10 +178,14 @@
 
 	const settings = useSettingsStore();
 
+	// Respect per‑model multimodal toggle from settings (force enable)
+	let modelIsMultimodal = $derived(
+		currentModel.multimodal || ($settings.multimodalOverrides?.[currentModel.id] ?? false)
+	);
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...(currentModel.multimodal
+				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"])
 					: []),
 			])
@@ -364,7 +368,7 @@
 								on:submit={handleSubmit}
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
-								modelIsMultimodal={currentModel.multimodal}
+								modelIsMultimodal={modelIsMultimodal}
 								bind:focused
 							/>
 						{/if}

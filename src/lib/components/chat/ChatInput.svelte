@@ -5,8 +5,6 @@
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { page } from "$app/state";
-	import { captureScreen } from "$lib/utils/screenshot";
-	import IconScreenshot from "../icons/IconScreenshot.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
@@ -94,7 +92,7 @@
 
 	const settings = useSettingsStore();
 
-	// Tools removed; only show file upload and screenshot when applicable
+	// Tools removed; only show file upload when applicable
 	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
 	let showNoTools = $derived(!showFileUpload);
 </script>
@@ -162,32 +160,7 @@
 						</label>
 					</HoverTooltip>
 				</div>
-				{#if mimeTypes.includes("image/*")}
-					<HoverTooltip
-						label="Capture screenshot"
-						position="top"
-						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
-					>
-						<button
-							class="base-tool"
-							onclick={async (e) => {
-								e.preventDefault();
-								const screenshot = await captureScreen();
 
-								// Convert base64 to blob
-								const base64Response = await fetch(screenshot);
-								const blob = await base64Response.blob();
-
-								// Create a File object from the blob
-								const file = new File([blob], "screenshot.png", { type: "image/png" });
-
-								files = [...files, file];
-							}}
-						>
-							<IconScreenshot classNames="text-xl" />
-						</button>
-					</HoverTooltip>
-				{/if}
 			{/if}
 		</div>
 	{/if}
