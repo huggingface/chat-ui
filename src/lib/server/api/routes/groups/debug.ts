@@ -7,7 +7,6 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 			const { models } = await import("$lib/server/models");
 			return {
 				OPENAI_BASE_URL: config.OPENAI_BASE_URL,
-				OPENAI_MODEL_LIST_URL: config.OPENAI_MODEL_LIST_URL,
 				OPENAI_API_KEY_SET: Boolean(config.OPENAI_API_KEY),
 				HF_TOKEN_SET: Boolean(config.HF_TOKEN),
 				MODELS_COUNT: models.length,
@@ -15,11 +14,7 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 			};
 		})
 		.get("/refresh", async () => {
-			const base = (config.OPENAI_BASE_URL || config.OPENAI_MODEL_LIST_URL || "").replace(
-				/\/$/,
-				""
-			);
-			if (!base) return { error: "no_base" };
+			const base = (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
 			const res = await fetch(`${base}/models`);
 			const body = await res.text();
 			let parsed: unknown;

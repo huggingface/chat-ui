@@ -73,34 +73,17 @@ const modelConfig = z.object({
 
 const ggufModelsConfig: Array<z.infer<typeof modelConfig>> = [];
 
-// If OPENAI_BASE_URL (preferred) or OPENAI_MODEL_LIST_URL (legacy) is defined,
-// source models exclusively from that OpenAI-compatible endpoint.
-// Otherwise, fall back to MODELS env and optional GGUF auto-discovery.
+// Source models exclusively from an OpenAI-compatible endpoint.
 let modelsRaw: z.infer<typeof modelConfig>[] = [];
 
-// Prefer explicit base URL, then fall back to a full list URL
-// If neither is set, default to the Hugging Face router base.
+// Prefer explicit base URL; if unset, default to the Hugging Face router base.
 const DEFAULT_OPENAI_BASE = "https://router.huggingface.co/v1";
-const openaiBaseUrl = (() => {
-	if (config.OPENAI_BASE_URL) {
-		return config.OPENAI_BASE_URL.replace(/\/$/, "");
-	}
-	if (config.OPENAI_MODEL_LIST_URL) {
-		try {
-			const listUrl = new URL(config.OPENAI_MODEL_LIST_URL);
-			const basePath = listUrl.pathname.replace(/\/?models\/?$/, "");
-			return `${listUrl.origin}${basePath}`.replace(/\/$/, "");
-		} catch (e) {
-			logger.error(e, "Invalid OPENAI_MODEL_LIST_URL provided");
-		}
-	}
-	return DEFAULT_OPENAI_BASE;
-})();
+const openaiBaseUrl = (config.OPENAI_BASE_URL || DEFAULT_OPENAI_BASE).replace(/\/$/, "");
 
 {
     try {
         const baseURL = openaiBaseUrl;
-        if (!config.OPENAI_BASE_URL && !config.OPENAI_MODEL_LIST_URL) {
+        if (!config.OPENAI_BASE_URL) {
             logger.info({ baseURL }, "[models] Using default OpenAI-compatible base URL");
         } else {
             logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
