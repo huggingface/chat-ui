@@ -17,6 +17,10 @@
 	const settings = useSettingsStore();
 
 	const publicConfig = usePublicConfig();
+
+	// Local filter state for model id search
+	let modelFilter = $state("");
+	let normalizedFilter = $derived(modelFilter.trim().toLowerCase());
 </script>
 
 <svelte:head>
@@ -45,8 +49,21 @@
 			{/if}
 		</div>
 		<h2 class="text-gray-500">All models available on {publicConfig.PUBLIC_APP_NAME}</h2>
-		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
-			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
+
+		<!-- Filter input -->
+		<input
+			type="search"
+			bind:value={modelFilter}
+			placeholder="Filter by name"
+			aria-label="Filter models by id"
+			class="mt-4 w-full rounded-3xl border border-gray-300 bg-white px-5 py-2 text-[15px]
+				placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300
+				dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-gray-700"
+		/>
+		<div class="mt-6 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
+			{#each data.models
+				.filter((el) => !el.unlisted)
+				.filter((el) => el.id.toLowerCase().includes(normalizedFilter)) as model, index (model.id)}
 				<div
 					aria-label="Model card"
 					role="region"
