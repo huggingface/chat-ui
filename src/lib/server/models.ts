@@ -79,6 +79,8 @@ const ggufModelsConfig: Array<z.infer<typeof modelConfig>> = [];
 let modelsRaw: z.infer<typeof modelConfig>[] = [];
 
 // Prefer explicit base URL, then fall back to a full list URL
+// If neither is set, default to the Hugging Face router base.
+const DEFAULT_OPENAI_BASE = "https://router.huggingface.co/v1";
 const openaiBaseUrl = (() => {
 	if (config.OPENAI_BASE_URL) {
 		return config.OPENAI_BASE_URL.replace(/\/$/, "");
@@ -92,13 +94,17 @@ const openaiBaseUrl = (() => {
 			logger.error(e, "Invalid OPENAI_MODEL_LIST_URL provided");
 		}
 	}
-	return undefined;
+	return DEFAULT_OPENAI_BASE;
 })();
 
-if (openaiBaseUrl) {
-	try {
-		const baseURL = openaiBaseUrl;
-		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
+{
+    try {
+        const baseURL = openaiBaseUrl;
+        if (!config.OPENAI_BASE_URL && !config.OPENAI_MODEL_LIST_URL) {
+            logger.info({ baseURL }, "[models] Using default OpenAI-compatible base URL");
+        } else {
+            logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
+        }
 		// Prefer HF_TOKEN for Hugging Face router compatibility; otherwise use OPENAI_API_KEY
 		const authToken = config.HF_TOKEN || config.OPENAI_API_KEY || "";
 
@@ -148,15 +154,10 @@ if (openaiBaseUrl) {
 				},
 			],
 		})) as z.infer<typeof modelConfig>[];
-	} catch (e) {
-		logger.error(e, "Failed to load models from OpenAI base URL");
-		throw e;
-	}
-} else {
-	logger.error(
-		"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
-	);
-	throw new Error("OPENAI_BASE_URL not set");
+    } catch (e) {
+        logger.error(e, "Failed to load models from OpenAI base URL");
+        throw e;
+    }
 }
 
 function getChatPromptRender(
