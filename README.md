@@ -1,3 +1,12 @@
+---
+title: Chat Ui
+emoji: 📚
+colorFrom: purple
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # Chat UI
 
 **Find the docs at [hf.co/docs/chat-ui](https://huggingface.co/docs/chat-ui/index).**
