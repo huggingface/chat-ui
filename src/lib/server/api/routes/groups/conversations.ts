@@ -172,9 +172,12 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								}
 							}
 
-							// Only include defined values in the update
+
+							// Only include defined values in the update (sanitize title)
 							const updateValues = {
-								...(body.title !== undefined && { title: body.title }),
+								...(body.title !== undefined && {
+									title: body.title.replace(/<\/?think>/gi, "").trim(),
+								}),
 								...(body.model !== undefined && { model: body.model }),
 							};
 
