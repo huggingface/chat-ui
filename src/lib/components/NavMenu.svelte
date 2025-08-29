@@ -165,18 +165,16 @@
 			Login
 		</a>
 	{/if}
-	{#if nModels > 1}
-		<a
-			href="{base}/models"
-			class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+	<a
+		href="{base}/models"
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+	>
+		Models
+		<span
+			class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
+			>{nModels}</span
 		>
-			Models
-			<span
-				class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
-				>{nModels}</span
-			>
-		</a>
-	{/if}
+	</a>
 
 	<span class="flex flex-row-reverse gap-1 md:flex-row">
 		<a
