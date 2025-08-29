@@ -30,7 +30,8 @@ RUN apt-get update
 RUN apt-get install gnupg curl git cmake clang libgomp1 -y
 
 
-RUN chown -R 1000:1000 /home/user/.npm
+# ensure npm cache dir exists before adjusting ownership
+RUN mkdir -p /home/user/.npm && chown -R 1000:1000 /home/user/.npm
 
 USER user
 
