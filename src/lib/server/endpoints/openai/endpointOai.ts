@@ -31,24 +31,21 @@ export const endpointOAIParametersSchema = z.object({
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 	extraBody: z.record(z.any()).optional(),
-	multimodal: z
-		.object({
-			image: createImageProcessorOptionsValidator({
-				supportedMimeTypes: [
-					"image/png",
-					"image/jpeg",
-					"image/webp",
-					"image/avif",
-					"image/tiff",
-					"image/gif",
-				],
-				preferredMimeType: "image/webp",
-				maxSizeInMB: Infinity,
-				maxWidth: 4096,
-				maxHeight: 4096,
-			}),
-		})
-		.default({}),
+    multimodal: z
+        .object({
+            image: createImageProcessorOptionsValidator({
+                supportedMimeTypes: [
+                    // Restrict to the most widely-supported formats
+                    "image/png",
+                    "image/jpeg",
+                ],
+                preferredMimeType: "image/jpeg",
+                maxSizeInMB: 3,
+                maxWidth: 2048,
+                maxHeight: 2048,
+            }),
+        })
+        .default({}),
 	/* enable use of max_completion_tokens in place of max_tokens */
 	useCompletionTokens: z.boolean().default(false),
 	streamingSupported: z.boolean().default(true),
@@ -118,11 +115,15 @@ export async function endpointOai(
 
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
-	} else if (completion === "chat_completions") {
-		return async ({ messages, preprompt, generateSettings, conversationId }) => {
+    } else if (completion === "chat_completions") {
+        return async ({ messages, preprompt, generateSettings, conversationId, isMultimodal }) => {
 			// Format messages for the chat API, handling multimodal content if supported
-			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor, model.multimodal);
+            let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+                await prepareMessages(
+                    messages,
+                    imageProcessor,
+                    isMultimodal ?? model.multimodal
+                );
 
 			// Check if a system message already exists as the first message
 			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
@@ -214,36 +215,34 @@ async function prepareMessages(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-	return Promise.all(
-		messages.map(async (message) => {
-			if (message.from === "user" && isMultimodal) {
-				return {
-					role: message.from,
-					content: [
-						...(await prepareFiles(imageProcessor, message.files ?? [])),
-						{ type: "text", text: message.content },
-					],
-				};
-			}
-			return {
-				role: message.from,
-				content: message.content,
-			};
-		})
-	);
+    return Promise.all(
+        messages.map(async (message) => {
+            if (message.from === "user" && isMultimodal) {
+                const parts = [
+                    { type: "text" as const, text: message.content },
+                    ...(await prepareFiles(imageProcessor, message.files ?? [])),
+                ];
+                return { role: message.from, content: parts };
+            }
+            return { role: message.from, content: message.content };
+        })
+    );
 }
 
 async function prepareFiles(
-	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	files: MessageFile[]
+    imageProcessor: ReturnType<typeof makeImageProcessor>,
+    files: MessageFile[]
 ): Promise<OpenAI.Chat.Completions.ChatCompletionContentPartImage[]> {
-	const processedFiles = await Promise.all(
-		files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
-	);
-	return processedFiles.map((file) => ({
-		type: "image_url" as const,
-		image_url: {
-			url: `data:${file.mime};base64,${file.image.toString("base64")}`,
-		},
-	}));
+    const processedFiles = await Promise.all(
+        files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
+    );
+    return processedFiles.map((file) => ({
+        type: "image_url" as const,
+        image_url: {
+            url: `data:${file.mime};base64,${file.image.toString("base64")}`,
+            // Improves compatibility with some OpenAI-compatible servers
+            // that expect an explicit detail setting.
+            detail: "auto",
+        },
+    }));
 }

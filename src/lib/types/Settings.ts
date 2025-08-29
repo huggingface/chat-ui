@@ -19,6 +19,13 @@ export interface Settings extends Timestamps {
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 
+	/**
+	 * Per‑model overrides to enable multimodal (image) support
+	 * even when not advertised by the provider/model list.
+	 * Only the `true` value is meaningful (enables images).
+	 */
+	multimodalOverrides?: Record<string, boolean>;
+
 	disableStream: boolean;
 	directPaste: boolean;
 }
@@ -30,6 +37,7 @@ export const DEFAULT_SETTINGS = {
 	activeModel: defaultModel.id,
 	hideEmojiOnSidebar: false,
 	customPrompts: {},
+	multimodalOverrides: {},
 	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;

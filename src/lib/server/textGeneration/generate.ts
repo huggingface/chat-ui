@@ -14,7 +14,16 @@ import { logger } from "../logger";
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
 export async function* generate(
-	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
+	{
+		model,
+		endpoint,
+		conv,
+		messages,
+		assistant,
+		isContinue,
+		promptedAt,
+		forceMultimodal,
+	}: GenerateContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
 	// reasoning mode is false by default
@@ -45,7 +54,8 @@ export async function* generate(
 		preprompt,
 		continueMessage: isContinue,
 		generateSettings: assistant?.generateSettings,
-		isMultimodal: model.multimodal,
+		// Allow user-level override to force multimodal
+		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,
 	})) {
 		// text generation completed

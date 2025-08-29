@@ -12,6 +12,7 @@
 
 	import { goto } from "$app/navigation";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import Switch from "$lib/components/Switch.svelte";
 
 	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
@@ -32,6 +33,21 @@
 	);
 
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === page.params.model));
+
+	// Initialize multimodal override for this model if not set yet
+	$effect(() => {
+		if (!$settings.multimodalOverrides) {
+			$settings.multimodalOverrides = {};
+		}
+		const modelId = page.params.model;
+		if ($settings.multimodalOverrides[modelId] === undefined && model) {
+			// Default to the model's advertised capability
+			$settings.multimodalOverrides = {
+				...$settings.multimodalOverrides,
+				[modelId]: !!model.multimodal,
+			};
+		}
+	});
 </script>
 
 <div class="flex flex-col items-start">
@@ -143,6 +159,25 @@
 			class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px]"
 			bind:value={$settings.customPrompts[page.params.model]}
 		></textarea>
+		<!-- Capabilities -->
+		<div class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-sm">
+			<div class="divide-y divide-gray-200">
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800">
+							Supports image inputs (multimodal)
+						</div>
+						<p class="text-[12px] text-gray-500">
+							Enable image uploads and send images to this model.
+						</p>
+					</div>
+					<Switch
+						name="forceMultimodal"
+						bind:checked={$settings.multimodalOverrides[page.params.model]}
+					/>
+				</div>
+			</div>
+		</div>
 		<!-- Tokenizer-based token counting disabled in this build -->
 	</div>
 </div>

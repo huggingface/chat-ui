@@ -72,6 +72,7 @@ export const userGroup = new Elysia()
 						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
 
 					customPrompts: settings?.customPrompts ?? {},
+					multimodalOverrides: settings?.multimodalOverrides ?? {},
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {
@@ -86,6 +87,7 @@ export const userGroup = new Elysia()
 						ethicsModalAccepted: z.boolean().optional(),
 						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 						customPrompts: z.record(z.string()).default({}),
+						multimodalOverrides: z.record(z.boolean()).default({}),
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
 					})

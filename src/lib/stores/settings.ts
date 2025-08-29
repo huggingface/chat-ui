@@ -12,6 +12,7 @@ type SettingsStore = {
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
 	customPrompts: Record<string, string>;
+	multimodalOverrides: Record<string, boolean>;
 	recentlySaved: boolean;
 	disableStream: boolean;
 	directPaste: boolean;

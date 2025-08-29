@@ -425,6 +425,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
+					// Force-enable multimodal if user settings say so for this model
+					forceMultimodal: Boolean(
+						(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
+							model.id
+						]
+					),
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
