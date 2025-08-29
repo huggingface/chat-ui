@@ -10,16 +10,36 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { useAPIClient } from "$lib/APIClient";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
+	import { onMount } from "svelte";
 
 	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
 
 	const client = useAPIClient();
+
+	let OPENAI_BASE_URL: string | null = null;
+	onMount(async () => {
+		try {
+			const cfg = await client.debug.config.get().then(handleResponse);
+			OPENAI_BASE_URL = (cfg as { OPENAI_BASE_URL?: string }).OPENAI_BASE_URL || null;
+		} catch (e) {
+			// ignore if debug endpoint is unavailable
+		}
+	});
 </script>
 
 <div class="flex w-full flex-col gap-4">
 	<h2 class="text-center text-lg font-semibold text-gray-800 md:text-left">Application Settings</h2>
+
+	{#if OPENAI_BASE_URL !== null}
+		<div
+			class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-700"
+		>
+			<span class="font-medium">API Base URL:</span>
+			<code class="ml-1 break-all font-mono text-[12px] text-gray-800">{OPENAI_BASE_URL}</code>
+		</div>
+	{/if}
 	{#if !!publicConfig.PUBLIC_COMMIT_SHA}
 		<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
 			<a
