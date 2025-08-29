@@ -7,6 +7,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
+	import CarbonView from "~icons/carbon/view";
 
 	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
@@ -107,12 +108,23 @@
 				<button
 					type="button"
 					onclick={() => goto(`${base}/settings/${model.id}`)}
-					class="group flex h-9 w-full flex-none items-center gap-2 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100
+					class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100
 					md:rounded-xl md:px-3
 					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
 					aria-label="Configure {model.displayName}"
 				>
 					<div class="mr-auto truncate">{model.displayName}</div>
+
+					{#if model.multimodal || $settings.multimodalOverrides?.[model.id]}
+						<span
+							title="Supports image inputs (multimodal)"
+							class="grid size-[21px] place-items-center rounded-md border border-blue-700 dark:border-blue-500"
+							aria-label="Model is multimodal"
+							role="img"
+						>
+							<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
+						</span>
+					{/if}
 
 					{#if $settings.customPrompts?.[model.id]}
 						<CarbonTextLongParagraph
@@ -121,7 +133,7 @@
 					{/if}
 					{#if model.id === $settings.activeModel}
 						<div
-							class="rounded-md bg-black/90 px-2 py-1 text-[10px] font-semibold leading-none text-white"
+							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[10px] font-semibold leading-none text-white"
 						>
 							Active
 						</div>
@@ -133,7 +145,7 @@
 			<button
 				type="button"
 				onclick={() => goto(`${base}/settings/application`)}
-				class="group flex h-9 w-full flex-none items-center gap-2 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
+				class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
 				{page.url.pathname === `${base}/settings/application` ? '!bg-gray-100 !text-gray-800' : ''}"
 				aria-label="Configure application settings"
 			>

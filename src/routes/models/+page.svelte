@@ -6,7 +6,7 @@
 	import { page } from "$app/state";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
-	import CarbonImage from "~icons/carbon/image";
+	import CarbonView from "~icons/carbon/view";
 	import { useSettingsStore } from "$lib/stores/settings";
 	interface Props {
 		data: PageData;
@@ -72,14 +72,14 @@
 							></div>
 						{/if}
 						<div class="flex items-center gap-1">
-							{#if model.multimodal}
+							{#if model.multimodal || $settings.multimodalOverrides?.[model.id]}
 								<span
 									title="This model is multimodal and supports image inputs natively."
 									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-500"
 									aria-label="Model is multimodal"
 									role="img"
 								>
-									<CarbonImage class="text-xxs text-blue-700 dark:text-blue-500" />
+									<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
 								</span>
 							{/if}
 							{#if model.reasoning}
