@@ -8,8 +8,8 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
+	import CarbonSettings from "~icons/carbon/settings";
 
-	import UserIcon from "~icons/carbon/user";
 	import type { LayoutData } from "../$types";
 	import { browser } from "$app/environment";
 	import { isDesktop } from "$lib/utils/isDesktop";
@@ -149,7 +149,7 @@
 				{page.url.pathname === `${base}/settings/application` ? '!bg-gray-100 !text-gray-800' : ''}"
 				aria-label="Configure application settings"
 			>
-				<UserIcon class="text-sm" />
+				<CarbonSettings class="text-xs" />
 				Application Settings
 			</button>
 		</div>
