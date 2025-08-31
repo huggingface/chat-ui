@@ -72,7 +72,7 @@
 >
 	<div class="relative">
 		{#if children}{@render children()}{:else}
-			<IconCopy classNames="h-[1.14em] w-[1.14em]" />
+			<IconCopy classNames="size-3" />
 		{/if}
 
 		{#if showTooltip}
