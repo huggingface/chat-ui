@@ -74,11 +74,33 @@ export async function endpointOai(
 		throw new Error("Failed to import OpenAI", { cause: e });
 	}
 
+	// Store router metadata if captured
+	let routerMetadata: { route?: string; model?: string } = {};
+
+	// Custom fetch wrapper to capture response headers for router metadata
+	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+		const response = await fetch(url, init);
+		
+		// Capture router headers if present
+		const routeHeader = response.headers.get('X-Router-Route');
+		const modelHeader = response.headers.get('X-Router-Model');
+		
+		if (routeHeader && modelHeader) {
+			routerMetadata = {
+				route: routeHeader,
+				model: modelHeader,
+			};
+		}
+		
+		return response;
+	};
+
 	const openai = new OpenAI({
 		apiKey: apiKey || "sk-",
 		baseURL,
 		defaultHeaders,
 		defaultQuery,
+		fetch: customFetch,
 	});
 
 	const imageProcessor = makeImageProcessor(multimodal.image);
@@ -190,7 +212,7 @@ export async function endpointOai(
 						},
 					}
 				);
-				return openAIChatToTextGenerationStream(openChatAICompletion);
+				return openAIChatToTextGenerationStream(openChatAICompletion, routerMetadata);
 			} else {
 				const openChatAICompletion = await openai.chat.completions.create(
 					body as ChatCompletionCreateParamsNonStreaming,
@@ -202,7 +224,7 @@ export async function endpointOai(
 						},
 					}
 				);
-				return openAIChatToTextGenerationSingle(openChatAICompletion);
+				return openAIChatToTextGenerationSingle(openChatAICompletion, routerMetadata);
 			}
 		};
 	} else {

@@ -180,6 +180,18 @@
 					</div>
 				{/if}
 			</div>
+
+			{#if message.routerMetadata}
+				<div class="mt-1 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+					<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+						{message.routerMetadata.route}
+					</span>
+					<span class="font-medium">with</span>
+					<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+						{message.routerMetadata.model.split("/").pop()}
+					</span>
+				</div>
+			{/if}
 		</div>
 
 		{#if !loading && message.content}

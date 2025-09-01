@@ -6,7 +6,8 @@ import type { Stream } from "openai/streaming";
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
  */
 export async function* openAIChatToTextGenerationStream(
-	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>
+	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
+	routerMetadata?: { route?: string; model?: string }
 ) {
 	let generatedText = "";
 	let tokenId = 0;
@@ -68,13 +69,29 @@ export async function* openAIChatToTextGenerationStream(
 
 		// Tools removed: ignore tool_calls deltas
 	}
+
+	// If we have router metadata, yield it at the end
+	if (routerMetadata && routerMetadata.route && routerMetadata.model) {
+		yield {
+			token: {
+				id: tokenId++,
+				text: "",
+				logprob: 0,
+				special: true,
+			},
+			generated_text: null,
+			details: null,
+			routerMetadata,
+		} as TextGenerationStreamOutput & { routerMetadata: typeof routerMetadata };
+	}
 }
 
 /**
  * Transform a non-streaming OpenAI chat completion into a stream of TextGenerationStreamOutput
  */
 export async function* openAIChatToTextGenerationSingle(
-	completion: OpenAI.Chat.Completions.ChatCompletion
+	completion: OpenAI.Chat.Completions.ChatCompletion,
+	routerMetadata?: { route?: string; model?: string }
 ) {
 	const content = completion.choices[0]?.message?.content || "";
 	const tokenId = 0;
@@ -89,5 +106,6 @@ export async function* openAIChatToTextGenerationSingle(
 		},
 		generated_text: content,
 		details: null,
-	} as TextGenerationStreamOutput;
+		...(routerMetadata && routerMetadata.route && routerMetadata.model ? { routerMetadata } : {}),
+	} as TextGenerationStreamOutput & { routerMetadata?: typeof routerMetadata };
 }

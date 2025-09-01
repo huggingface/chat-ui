@@ -58,6 +58,15 @@ export async function* generate(
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,
 	})) {
+		// Check if this output contains router metadata
+		if ('routerMetadata' in output && output.routerMetadata) {
+			yield {
+				type: MessageUpdateType.RouterMetadata,
+				route: output.routerMetadata.route,
+				model: output.routerMetadata.model,
+			};
+			continue;
+		}
 		// text generation completed
 		if (output.generated_text) {
 			let interrupted =

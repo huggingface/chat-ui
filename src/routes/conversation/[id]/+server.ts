@@ -376,6 +376,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					];
 				}
 
+				// Store router metadata if this is the router model
+				else if (event.type === MessageUpdateType.RouterMetadata) {
+					if (config.LLM_ROUTER_MODEL_ID && model.id === config.LLM_ROUTER_MODEL_ID) {
+						messageToWriteTo.routerMetadata = {
+							route: event.route,
+							model: event.model,
+						};
+					}
+				}
+
 				// Append to the persistent message updates if it's not a stream update
 				if (
 					event.type !== MessageUpdateType.Stream &&

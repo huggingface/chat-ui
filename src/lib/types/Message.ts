@@ -17,6 +17,12 @@ export type Message = Partial<Timestamps> & {
 	files?: MessageFile[];
 	interrupted?: boolean;
 
+	// Router metadata when using llm-router
+	routerMetadata?: {
+		route: string;
+		model: string;
+	};
+
 	// needed for conversation trees
 	ancestors?: Message["id"][];
 
