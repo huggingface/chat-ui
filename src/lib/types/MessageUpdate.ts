@@ -4,7 +4,8 @@ export type MessageUpdate =
 	| MessageStreamUpdate
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
-	| MessageReasoningUpdate;
+	| MessageReasoningUpdate
+	| MessageRouterMetadataUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -13,6 +14,7 @@ export enum MessageUpdateType {
 	File = "file",
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
+	RouterMetadata = "routerMetadata",
 }
 
 // Status
@@ -68,4 +70,9 @@ export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
 	text: string;
 	interrupted: boolean;
+}
+export interface MessageRouterMetadataUpdate {
+	type: MessageUpdateType.RouterMetadata;
+	route: string;
+	model: string;
 }
