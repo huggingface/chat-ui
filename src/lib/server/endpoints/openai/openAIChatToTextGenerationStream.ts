@@ -7,13 +7,37 @@ import type { Stream } from "openai/streaming";
  */
 export async function* openAIChatToTextGenerationStream(
 	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
-	routerMetadata?: { route?: string; model?: string }
+	getRouterMetadata?: () => { route?: string; model?: string }
 ) {
 	let generatedText = "";
 	let tokenId = 0;
 	let toolBuffer = ""; // legacy hack kept harmless
+	let metadataYielded = false;
 
 	for await (const completion of completionStream) {
+		// Check if this chunk contains router metadata (first chunk from llm-router)
+		if (!metadataYielded && (completion as any)['x-router-metadata']) {
+			const metadata = (completion as any)['x-router-metadata'];
+			yield {
+				token: {
+					id: tokenId++,
+					text: "",
+					logprob: 0,
+					special: true,
+				},
+				generated_text: null,
+				details: null,
+				routerMetadata: {
+					route: metadata.route,
+					model: metadata.model,
+				},
+			} as TextGenerationStreamOutput & { routerMetadata: { route: string; model: string } };
+			metadataYielded = true;
+			// Skip processing this chunk as content since it's just metadata
+			if (!completion.choices || completion.choices.length === 0 || !completion.choices[0].delta?.content) {
+				continue;
+			}
+		}
 		const { choices } = completion;
 		const content = choices[0]?.delta?.content ?? "";
 		const last = choices[0]?.finish_reason === "stop" || choices[0]?.finish_reason === "length";
@@ -70,19 +94,22 @@ export async function* openAIChatToTextGenerationStream(
 		// Tools removed: ignore tool_calls deltas
 	}
 
-	// If we have router metadata, yield it at the end
-	if (routerMetadata && routerMetadata.route && routerMetadata.model) {
-		yield {
-			token: {
-				id: tokenId++,
-				text: "",
-				logprob: 0,
-				special: true,
-			},
-			generated_text: null,
-			details: null,
-			routerMetadata,
-		} as TextGenerationStreamOutput & { routerMetadata: typeof routerMetadata };
+	// If metadata wasn't yielded from chunks (e.g., from headers), yield it at the end
+	if (!metadataYielded && getRouterMetadata) {
+		const routerMetadata = getRouterMetadata();
+		if (routerMetadata && routerMetadata.route && routerMetadata.model) {
+			yield {
+				token: {
+					id: tokenId++,
+					text: "",
+					logprob: 0,
+					special: true,
+				},
+				generated_text: null,
+				details: null,
+				routerMetadata,
+			} as TextGenerationStreamOutput & { routerMetadata: { route?: string; model?: string } };
+		}
 	}
 }
 
@@ -91,7 +118,7 @@ export async function* openAIChatToTextGenerationStream(
  */
 export async function* openAIChatToTextGenerationSingle(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
-	routerMetadata?: { route?: string; model?: string }
+	getRouterMetadata?: () => { route?: string; model?: string }
 ) {
 	const content = completion.choices[0]?.message?.content || "";
 	const tokenId = 0;
@@ -106,6 +133,9 @@ export async function* openAIChatToTextGenerationSingle(
 		},
 		generated_text: content,
 		details: null,
-		...(routerMetadata && routerMetadata.route && routerMetadata.model ? { routerMetadata } : {}),
-	} as TextGenerationStreamOutput & { routerMetadata?: typeof routerMetadata };
+		...(getRouterMetadata ? (() => {
+			const metadata = getRouterMetadata();
+			return metadata && metadata.route && metadata.model ? { routerMetadata: metadata } : {};
+		})() : {}),
+	} as TextGenerationStreamOutput & { routerMetadata?: { route?: string; model?: string } };
 }

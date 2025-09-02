@@ -65,7 +65,9 @@
 						: summary + "..."}
 			</dt>
 		</dl>
-		<CarbonCaretDown class="size-6 text-gray-400 transition-transform group-open:rotate-180" />
+		<CarbonCaretDown
+			class="transition-rotate size-5 -rotate-90 text-gray-400 group-open:rotate-0"
+		/>
 	</summary>
 
 	<div
