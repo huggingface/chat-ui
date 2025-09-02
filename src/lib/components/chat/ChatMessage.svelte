@@ -17,7 +17,6 @@
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
-	import { base } from "$app/paths";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -151,7 +150,7 @@
 				{/if}
 
 				{#if hasClientThink}
-					{#each message.content.split(THINK_BLOCK_REGEX) as part, i}
+					{#each message.content.split(THINK_BLOCK_REGEX) as part}
 						{#if part && part.startsWith("<think>")}
 							{@const isClosed = part.endsWith("</think>")}
 							{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
@@ -182,7 +181,7 @@
 			</div>
 		</div>
 
-		{#if !loading && message.content}
+		{#if message.routerMetadata || (!loading && message.content)}
 			<div class="absolute -bottom-4 right-0 flex items-center gap-1">
 				{#if message.routerMetadata}
 					<div class="mr-4 mt-1 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-400">

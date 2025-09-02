@@ -81,7 +81,7 @@ export async function endpointOai(
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
 		const response = await fetch(url, init);
 		
-		// Capture router headers if present
+		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get('X-Router-Route');
 		const modelHeader = response.headers.get('X-Router-Model');
 		
@@ -212,7 +212,7 @@ export async function endpointOai(
 						},
 					}
 				);
-				return openAIChatToTextGenerationStream(openChatAICompletion, routerMetadata);
+				return openAIChatToTextGenerationStream(openChatAICompletion, () => routerMetadata);
 			} else {
 				const openChatAICompletion = await openai.chat.completions.create(
 					body as ChatCompletionCreateParamsNonStreaming,
@@ -224,7 +224,7 @@ export async function endpointOai(
 						},
 					}
 				);
-				return openAIChatToTextGenerationSingle(openChatAICompletion, routerMetadata);
+				return openAIChatToTextGenerationSingle(openChatAICompletion, () => routerMetadata);
 			}
 		};
 	} else {

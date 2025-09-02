@@ -338,6 +338,12 @@
 							reasoningLastUpdate = currentTime;
 						}
 					}
+				} else if (update.type === MessageUpdateType.RouterMetadata) {
+					// Update router metadata immediately when received
+					messageToWriteTo.routerMetadata = {
+						route: update.route,
+						model: update.model,
+					};
 				}
 			}
 		} catch (err) {
