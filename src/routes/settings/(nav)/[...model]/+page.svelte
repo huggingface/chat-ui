@@ -6,7 +6,7 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
-	import CarbonLink from "~icons/carbon/link";
+	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonChat from "~icons/carbon/chat";
 	import CarbonCode from "~icons/carbon/code";
 
@@ -116,26 +116,34 @@
 			</a>
 		{/if}
 
-		{#if model.hasInferenceAPI}
+		{#if publicConfig.isHuggingChat}
 			<a
 				href={"https://huggingface.co/playground?modelId=" + model.name}
 				target="_blank"
 				rel="noreferrer"
 				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50"
 			>
-				<CarbonCode class="mr-1.5 shrink-0 text-xs " />
+				<CarbonCode class="mr-1.5 shrink-0 text-xs" />
 				API Playground
 			</a>
+			<a
+				href={"https://huggingface.co/" + model.name}
+				target="_blank"
+				rel="noreferrer"
+				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50"
+			>
+				<CarbonCode class="mr-1.5 shrink-0 text-xs" />
+				View model card
+			</a>
+			<CopyToClipBoardBtn
+				value="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{model.id}"
+				classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50"
+			>
+				<div class="flex items-center gap-1.5">
+					<CarbonCopy class="shrink-0 text-xs" />Copy direct link to model
+				</div>
+			</CopyToClipBoardBtn>
 		{/if}
-
-		<CopyToClipBoardBtn
-			value="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{model.id}"
-			classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50"
-		>
-			<div class="flex items-center gap-1.5">
-				<CarbonLink />Copy direct link to model
-			</div>
-		</CopyToClipBoardBtn>
 	</div>
 
 	<div class="relative flex w-full flex-col gap-2">
