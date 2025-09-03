@@ -70,12 +70,12 @@
 			<!-- Header + copy -->
 			{#if createdUrl}
 				<div class="flex items-start justify-between">
-					<div class="text-xl font-semibold text-gray-800">Public link created</div>
+					<div class="text-xl font-semibold text-gray-800 dark:text-gray-200">Public link created</div>
 					<button type="button" class="group" onclick={close} aria-label="Close">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							viewBox="0 0 32 32"
-							class="size-5 text-gray-700 group-hover:text-gray-500"
+							class="size-5 text-gray-700 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-400"
 						>
 							<path
 								d="M24 9.41 22.59 8 16 14.59 9.41 8 8 9.41 14.59 16 8 22.59 9.41 24 16 17.41 22.59 24 24 22.59 17.41 16 24 9.41z"
@@ -84,15 +84,15 @@
 						</svg>
 					</button>
 				</div>
-				<div class="text-sm text-gray-600">A public link to your chat has been created.</div>
+				<div class="text-sm text-gray-600 dark:text-gray-400">A public link to your chat has been created.</div>
 			{:else}
 				<div class="flex items-start justify-between">
-					<div class="text-xl font-semibold text-gray-800">Share public link to chat</div>
+					<div class="text-xl font-semibold text-gray-800 dark:text-gray-200">Share public link to chat</div>
 					<button type="button" class="group" onclick={close} aria-label="Close">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							viewBox="0 0 32 32"
-							class="size-5 text-gray-700 group-hover:text-gray-500"
+							class="size-5 text-gray-700 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-400"
 						>
 							<path
 								d="M24 9.41 22.59 8 16 14.59 9.41 8 8 9.41 14.59 16 8 22.59 9.41 24 16 17.41 22.59 24 24 22.59 17.41 16 24 9.41z"
@@ -101,26 +101,26 @@
 						</svg>
 					</button>
 				</div>
-				<div class="text-sm text-gray-600">
+				<div class="text-sm text-gray-600 dark:text-gray-400">
 					Any messages you add after sharing stay private. <a
 						href="{base}/privacy"
-						class="underline hover:no-underline">Learn more</a
+						class="underline hover:no-underline dark:text-gray-300">Learn more</a
 					>.
 				</div>
 			{/if}
 
 			{#if errorMsg}
-				<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+				<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-500/10 dark:text-red-300">
 					{errorMsg}
 				</div>
 			{/if}
 
 			<!-- URL row -->
 			<div
-				class="flex h-12 items-center gap-2 whitespace-nowrap rounded-2xl border border-gray-200 bg-gray-50 p-2.5"
+				class="flex h-12 items-center gap-2 whitespace-nowrap rounded-2xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800"
 			>
 				<input
-					class="w-full bg-transparent px-2 text-[15px] text-gray-700 outline-none placeholder:text-gray-400"
+					class="w-full bg-transparent px-2 text-[15px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
 					readonly
 					value={createdUrl ??
 						`${page.data.publicConfig.PUBLIC_SHARE_PREFIX || `${page.data.publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`}/r/...`}
@@ -128,7 +128,7 @@
 
 				{#if createdUrl}
 					<CopyToClipBoardBtn
-						classNames="inline-flex items-center rounded-xl -mr-0.5 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50"
+						classNames="inline-flex items-center rounded-xl -mr-0.5 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:enabled:hover:bg-gray-600"
 						showTooltip={false}
 						value={withLeafId(createdUrl) ?? createdUrl}
 						onClick={() => {
@@ -140,7 +140,7 @@
 						{#snippet children()}
 							<span class="inline-flex items-center gap-1.5">
 								{#if justCopied}
-									<CarbonCheckmark class="text-[.95em] text-green-600" />
+									<CarbonCheckmark class="text-[.95em] text-green-600 dark:text-green-400" />
 									Copied
 								{:else}
 									<!-- Use the copy icon provided by CopyToClipBoardBtn default otherwise -->
@@ -157,7 +157,7 @@
 					</CopyToClipBoardBtn>
 				{:else}
 					<button
-						class="-mr-0.5 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50"
+						class="-mr-0.5 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 						type="button"
 						disabled={creating}
 						onclick={handleCreate}
