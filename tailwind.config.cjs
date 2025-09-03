@@ -10,6 +10,12 @@ module.exports = {
 		extend: {
 			colors: {
 				primary: colors[process.env.PUBLIC_APP_COLOR],
+				gray: {
+					700: "#252a33",
+					800: "#1b1f27",
+					900: "#12151c",
+					950: "#07090d",
+				},
 			},
 			fontSize: {
 				xxs: "0.625rem",
