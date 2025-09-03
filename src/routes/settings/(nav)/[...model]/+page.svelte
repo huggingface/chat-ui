@@ -64,7 +64,7 @@
 	</div>
 
 	<!-- Actions -->
-	<div class="mb-4 flex flex-wrap items-center gap-2">
+	<div class="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1">
 		<button
 			class="flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm !text-white shadow-sm hover:bg-black/90"
 			name="Activate model"
@@ -132,7 +132,7 @@
 				rel="noreferrer"
 				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50"
 			>
-				<CarbonCode class="mr-1.5 shrink-0 text-xs" />
+				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
 				View model card
 			</a>
 			<CopyToClipBoardBtn
