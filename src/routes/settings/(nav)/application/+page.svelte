@@ -30,23 +30,29 @@
 </script>
 
 <div class="flex w-full flex-col gap-4">
-	<h2 class="text-center text-lg font-semibold text-gray-800 md:text-left">Application Settings</h2>
+	<h2 class="text-center text-lg font-semibold text-gray-800 dark:text-gray-200 md:text-left">
+		Application Settings
+	</h2>
 
 	{#if OPENAI_BASE_URL !== null}
 		<div
-			class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-700"
+			class="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-700/80 dark:text-gray-300"
 		>
 			<span class="font-medium">API Base URL:</span>
-			<code class="ml-1 break-all font-mono text-[12px] text-gray-800">{OPENAI_BASE_URL}</code>
+			<code class="ml-1 break-all font-mono text-[12px] text-gray-800 dark:text-gray-100"
+				>{OPENAI_BASE_URL}</code
+			>
 		</div>
 	{/if}
 	{#if !!publicConfig.PUBLIC_COMMIT_SHA}
-		<div class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800">
+		<div
+			class="flex flex-col items-start justify-between text-xl font-semibold text-gray-800 dark:text-gray-200"
+		>
 			<a
 				href={`https://github.com/huggingface/chat-ui/commit/${publicConfig.PUBLIC_COMMIT_SHA}`}
 				target="_blank"
 				rel="noreferrer"
-				class="text-sm font-light text-gray-500"
+				class="text-sm font-light text-gray-500 dark:text-gray-400"
 			>
 				Latest deployment <span class="gap-2 font-mono"
 					>{publicConfig.PUBLIC_COMMIT_SHA.slice(0, 7)}</span
@@ -55,16 +61,24 @@
 		</div>
 	{/if}
 	{#if page.data.isAdmin}
-		<p class="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700">Admin mode</p>
+		<p
+			class="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300"
+		>
+			Admin mode
+		</p>
 	{/if}
 	<div class="flex h-full flex-col gap-4 max-sm:pt-0">
-		<div class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm">
-			<div class="divide-y divide-gray-200">
+		<div
+			class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+		>
+			<div class="divide-y divide-gray-200 dark:divide-gray-700">
 				{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
 					<div class="flex items-start justify-between py-3">
 						<div>
-							<div class="text-[13px] font-medium text-gray-800">Share with model authors</div>
-							<p class="text-[12px] text-gray-500">
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Share with model authors
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
 								Sharing your data helps improve open models over time.
 							</p>
 						</div>
@@ -77,24 +91,34 @@
 
 				<div class="flex items-start justify-between py-3">
 					<div>
-						<div class="text-[13px] font-medium text-gray-800">Hide emoticons in topics</div>
-						<p class="text-[12px] text-gray-500">Hide emojis shown in the conversation list.</p>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Hide emoticons in topics
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Hide emojis shown in the conversation list.
+						</p>
 					</div>
 					<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
 				</div>
 
 				<div class="flex items-start justify-between py-3">
 					<div>
-						<div class="text-[13px] font-medium text-gray-800">Disable streaming tokens</div>
-						<p class="text-[12px] text-gray-500">Show responses only when complete.</p>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Disable streaming tokens
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Show responses only when complete.
+						</p>
 					</div>
 					<Switch name="disableStream" bind:checked={$settings.disableStream} />
 				</div>
 
 				<div class="flex items-start justify-between py-3">
 					<div>
-						<div class="text-[13px] font-medium text-gray-800">Paste text directly</div>
-						<p class="text-[12px] text-gray-500">
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+							Paste text directly
+						</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
 							Paste long text directly into chat instead of a file.
 						</p>
 					</div>
@@ -108,13 +132,13 @@
 				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
 				target="_blank"
 				rel="noreferrer"
-				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
 			>
 			{#if publicConfig.isHuggingChat}
 				<a
 					href="{base}/privacy"
-					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700"
+					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> About & Privacy</a
 				>
 			{/if}
@@ -134,7 +158,7 @@
 							});
 				}}
 				type="submit"
-				class="flex items-center underline decoration-red-200 underline-offset-2 hover:decoration-red-500"
+				class="flex items-center underline decoration-red-200 underline-offset-2 hover:decoration-red-500 dark:decoration-red-900 dark:hover:decoration-red-700"
 				><CarbonTrashCan class="mr-2 inline text-sm text-red-500" />Delete all conversations</button
 			>
 		</div>

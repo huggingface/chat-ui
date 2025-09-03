@@ -70,13 +70,13 @@
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
 				class={[
-					"relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none",
+					"relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 dark:text-gray-200",
 					width,
 				]}
 			>
 				{#if closeButton}
 					<button class="absolute right-4 top-4 z-50" onclick={() => dispatch("close")}>
-						<CarbonClose class="size-6 text-gray-700" />
+						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}
 				{@render children?.()}
@@ -89,13 +89,13 @@
 				onkeydown={handleKeydown}
 				in:fly={{ y: 100 }}
 				class={[
-					"relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none",
+					"relative mx-auto max-h-[95dvh] max-w-[90dvw] overflow-y-auto overflow-x-hidden rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 dark:text-gray-200",
 					width,
 				]}
 			>
 				{#if closeButton}
 					<button class="absolute right-4 top-4 z-50" onclick={() => dispatch("close")}>
-						<CarbonClose class="size-6 text-gray-700" />
+						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}
 				{@render children?.()}
