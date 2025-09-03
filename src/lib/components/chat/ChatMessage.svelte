@@ -22,6 +22,7 @@
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import Vote from "./Vote.svelte";
+	import MessageAvatar from "./MessageAvatar.svelte";
 
 	interface Props {
 		message: Message;
@@ -78,9 +79,9 @@
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/g;
 	let hasServerReasoning = $derived(
 		reasoningUpdates &&
-		reasoningUpdates.length > 0 &&
-		!!message.reasoning &&
-		message.reasoning.trim().length > 0
+			reasoningUpdates.length > 0 &&
+			!!message.reasoning &&
+			message.reasoning.trim().length > 0
 	);
 	let hasClientThink = $derived(!hasServerReasoning && /<think>/.test(message.content));
 
@@ -113,11 +114,15 @@
 		onclick={() => (isTapped = !isTapped)}
 		onkeydown={() => (isTapped = !isTapped)}
 	>
-		<img
+		<MessageAvatar
+			classNames="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
+			animating={isLast && loading}
+		/>
+		<!-- <img
 			alt=""
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
 			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
-		/>
+		/> -->
 		<div
 			class="relative flex min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
 		>
@@ -151,13 +156,12 @@
 						{#if part && part.startsWith("<think>")}
 							{@const isClosed = part.endsWith("</think>")}
 							{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-							{@const summary =
-								isClosed
-									? (thinkContent.trim().split(/\n+/)[0] || "Reasoning")
-									: "Thinking..."}
+							{@const summary = isClosed
+								? thinkContent.trim().split(/\n+/)[0] || "Reasoning"
+								: "Thinking..."}
 
 							<OpenReasoningResults
-								summary={summary}
+								{summary}
 								content={thinkContent}
 								loading={isLast && loading && !isClosed}
 							/>

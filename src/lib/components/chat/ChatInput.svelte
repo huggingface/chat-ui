@@ -160,7 +160,6 @@
 						</label>
 					</HoverTooltip>
 				</div>
-
 			{/if}
 		</div>
 	{/if}

@@ -6,10 +6,7 @@ export interface FileProcessorOptions<TMimeType extends string = string> {
 	maxSizeInMB: number;
 }
 
-export type ImageProcessor<TMimeType extends string = string> = (file: MessageFile) => Promise<{
-	file: Buffer;
-	mime: TMimeType;
-}>;
+// Removed unused ImageProcessor type alias
 
 export const createDocumentProcessorOptionsValidator = <TMimeType extends string = string>(
 	defaults: FileProcessorOptions<TMimeType>
@@ -29,10 +26,7 @@ export const createDocumentProcessorOptionsValidator = <TMimeType extends string
 		.default(defaults);
 };
 
-export type DocumentProcessor<TMimeType extends string = string> = (file: MessageFile) => {
-	file: Buffer;
-	mime: TMimeType;
-};
+// Removed unused DocumentProcessor type alias
 
 export type AsyncDocumentProcessor<TMimeType extends string = string> = (
 	file: MessageFile

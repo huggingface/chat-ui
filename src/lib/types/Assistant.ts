@@ -28,7 +28,4 @@ export interface Assistant extends Timestamps {
 }
 
 // eslint-disable-next-line no-shadow
-export enum SortKey {
-	POPULAR = "popular",
-	TRENDING = "trending",
-}
+// Removed duplicate unused SortKey enum (shared enum exists elsewhere)

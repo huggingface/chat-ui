@@ -98,7 +98,7 @@
 	</div>
 	{#if !(showContent && browser && !isDesktop(window))}
 		<div
-			class="col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
+			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
 			class:max-md:hidden={showContent && browser}
 		>
 			<!-- Section Headers -->
@@ -174,7 +174,7 @@
 	{/if}
 	{#if showContent}
 		<div
-			class="col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
+			class="scrollbar-custom col-span-1 w-full overflow-y-auto overflow-x-clip px-1 md:col-span-2 md:row-span-2"
 			class:max-md:hidden={!showContent && browser}
 		>
 			{@render children?.()}
