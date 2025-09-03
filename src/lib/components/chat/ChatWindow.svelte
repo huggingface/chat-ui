@@ -68,7 +68,6 @@
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
-
 	const dispatch = createEventDispatcher<{
 		message: string;
 		stop: void;
@@ -185,9 +184,7 @@
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...(modelIsMultimodal
-					? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"])
-					: []),
+				...(modelIsMultimodal ? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"]) : []),
 			])
 		)
 	);
@@ -368,7 +365,7 @@
 								on:submit={handleSubmit}
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
-								modelIsMultimodal={modelIsMultimodal}
+								{modelIsMultimodal}
 								bind:focused
 							/>
 						{/if}

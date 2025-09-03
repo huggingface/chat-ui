@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 
-	import IconCopy from "./icons/IconCopy.svelte";
+	import CarbonCopy from "~icons/carbon/copy";
 	import Tooltip from "./Tooltip.svelte";
 
 	interface Props {
@@ -72,7 +72,7 @@
 >
 	<div class="relative">
 		{#if children}{@render children()}{:else}
-			<IconCopy classNames="size-3" />
+			<CarbonCopy />
 		{/if}
 
 		{#if showTooltip}
