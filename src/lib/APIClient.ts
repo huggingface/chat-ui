@@ -49,12 +49,3 @@ export function handleResponse<T extends Record<number, unknown>>(
 		typeof response.data === "string" ? response.data : JSON.stringify(response.data)
 	) as T[200];
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Success<T extends (...args: any) => any> =
-	Awaited<ReturnType<T>> extends {
-		data: infer D;
-		error: unknown;
-	}
-		? D
-		: never;

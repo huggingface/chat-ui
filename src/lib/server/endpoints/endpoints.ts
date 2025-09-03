@@ -18,9 +18,6 @@ export interface EndpointParameters {
 	conversationId?: ObjectId;
 }
 
-interface CommonEndpoint {
-	weight: number;
-}
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken;
 };
@@ -28,9 +25,6 @@ export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & 
 export type Endpoint = (
 	params: EndpointParameters
 ) => Promise<AsyncGenerator<TextGenerationStreamOutputSimplified, void, void>>;
-
-// generator function that takes in parameters for defining the endpoint and return the endpoint
-export type EndpointGenerator<T extends CommonEndpoint> = (parameters: T) => Endpoint;
 
 // list of all endpoint generators
 export const endpoints = {
