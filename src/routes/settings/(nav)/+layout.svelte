@@ -68,7 +68,7 @@
 </script>
 
 <div
-	class="mx-auto grid h-full w-full max-w-[1400px] grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-6 overflow-hidden p-4 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-4"
+	class="mx-auto grid h-full w-full max-w-[1400px] grid-cols-1 grid-rows-[auto,1fr] content-start gap-x-6 overflow-hidden p-4 text-gray-800 dark:text-gray-300 md:grid-cols-3 md:grid-rows-[auto,1fr] md:p-4"
 >
 	<div class="col-span-1 mb-3 flex items-center justify-between md:col-span-3 md:mb-4">
 		{#if showContent && browser}
@@ -80,7 +80,9 @@
 					goto(`${base}/settings`);
 				}}
 			>
-				<CarbonChevronLeft class="text-xl text-gray-900 hover:text-black" />
+				<CarbonChevronLeft
+					class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
+				/>
 			</button>
 		{/if}
 		<h2 class="absolute left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">
@@ -93,7 +95,9 @@
 				goto(previousPage);
 			}}
 		>
-			<CarbonClose class="text-xl text-gray-900 hover:text-black" />
+			<CarbonClose
+				class="text-xl text-gray-900 hover:text-black dark:text-gray-200 dark:hover:text-white"
+			/>
 		</button>
 	</div>
 	{#if !(showContent && browser && !isDesktop(window))}
@@ -103,7 +107,7 @@
 		>
 			<!-- Section Headers -->
 			<h3
-				class="px-3 pb-1 pt-2 text-center text-xs font-semibold tracking-wide text-gray-600 md:text-left"
+				class="px-3 pb-1 pt-2 text-center text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400 md:text-left"
 			>
 				Models
 			</h3>
@@ -115,8 +119,7 @@
 					type="search"
 					placeholder="Filter by name"
 					aria-label="Filter models by id"
-					class="w-full rounded-full border border-gray-300 bg-white px-4 py-1 text-sm
-						placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+					class="w-full rounded-full border border-gray-300 bg-white px-4 py-1 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:ring-gray-700"
 				/>
 			</div>
 
@@ -126,9 +129,10 @@
 				<button
 					type="button"
 					onclick={() => goto(`${base}/settings/${model.id}`)}
-					class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100
-					md:rounded-xl md:px-3
-					{model.id === page.params.model ? '!bg-gray-100 !text-gray-800' : ''}"
+					class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 md:rounded-xl md:px-3 {model.id ===
+					page.params.model
+						? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
+						: ''}"
 					aria-label="Configure {model.displayName}"
 				>
 					<div class="mr-auto truncate">{model.displayName}</div>
@@ -146,12 +150,12 @@
 
 					{#if $settings.customPrompts?.[model.id]}
 						<CarbonTextLongParagraph
-							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800"
+							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
 						/>
 					{/if}
 					{#if model.id === $settings.activeModel}
 						<div
-							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[10px] font-semibold leading-none text-white"
+							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[10px] font-semibold leading-none text-white dark:bg-white/10 dark:text-white"
 						>
 							Active
 						</div>
@@ -159,12 +163,14 @@
 				</button>
 			{/each}
 
-			<div class="my-2 mt-auto w-full border-b border-gray-200"></div>
+			<div class="my-2 mt-auto w-full border-b border-gray-200 dark:border-gray-700"></div>
 			<button
 				type="button"
 				onclick={() => goto(`${base}/settings/application`)}
-				class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 max-md:order-first md:rounded-xl md:px-3
-				{page.url.pathname === `${base}/settings/application` ? '!bg-gray-100 !text-gray-800' : ''}"
+				class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 max-md:order-first md:rounded-xl md:px-3 {page
+					.url.pathname === `${base}/settings/application`
+					? '!bg-gray-100 !text-gray-800 dark:!bg-gray-800 dark:!text-gray-200'
+					: ''}"
 				aria-label="Configure application settings"
 			>
 				<CarbonSettings class="text-xs" />

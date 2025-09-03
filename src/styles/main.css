@@ -53,7 +53,11 @@
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	} */
 	.prose hr {
-		@apply my-4; /* Example overrides */
+		@apply my-4;
+	}
+
+	.prose strong {
+		@apply font-medium;
 	}
 }
 

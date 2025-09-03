@@ -115,7 +115,7 @@
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
-	<div class="flex flex-col gap-1">
+	<div class="flex flex-col gap-0.5">
 		{#each Object.entries(groupedConversations) as [group, convs]}
 			{#if convs.length}
 				<h4 class="mb-1.5 mt-4 pl-0.5 text-sm text-gray-400 first:mt-0 dark:text-gray-500">

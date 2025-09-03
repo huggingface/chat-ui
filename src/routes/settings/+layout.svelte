@@ -26,12 +26,12 @@
 <Modal
 	on:close={() => goto(previousPage)}
 	disableFly={true}
-	width="h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[95dvh] xl:w-[1200px] xl:h-[75dvh]"
+	width="h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 dark:text-gray-200 sm:h-[95dvh] xl:w-[1200px] xl:h-[75dvh]"
 >
 	{@render children?.()}
 	{#if $settings.recentlySaved}
 		<div
-			class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border bg-black px-3 py-1 text-white"
+			class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border bg-black px-3 py-1 text-white dark:border-white/10 dark:bg-gray-700 dark:text-gray-100"
 		>
 			<CarbonCheckmark class="text-white" />
 			Saved
