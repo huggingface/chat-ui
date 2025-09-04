@@ -122,7 +122,7 @@
 							{/if}
 							{#if model.id === $settings.activeModel}
 								<span
-									class="rounded-full border border-blue-500 bg-blue-500/5 px-2 py-0.5 text-xs text-blue-500 dark:border-blue-500 dark:bg-blue-500/10"
+									class="rounded-full bg-black px-2 py-0.5 text-xs text-white dark:bg-white dark:text-black"
 								>
 									Active
 								</span>
