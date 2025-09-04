@@ -184,7 +184,7 @@
 		{#if message.routerMetadata || (!loading && message.content)}
 			<div class="absolute -bottom-4 right-0 flex items-center gap-1">
 				{#if message.routerMetadata}
-					<div class="mr-4 mt-1 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-400">
+					<div class="mr-2 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-400">
 						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
 							{message.routerMetadata.route}
 						</span>
