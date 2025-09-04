@@ -51,7 +51,7 @@
 </script>
 
 <div class="flex flex-col items-start">
-	<div class="mb-3 flex flex-col gap-0.5">
+	<div class="mb-4 flex flex-col gap-0.5">
 		<h2 class="text-base font-semibold md:text-lg">
 			{page.params.model}
 		</h2>
@@ -85,7 +85,7 @@
 				href={model.modelUrl || "https://huggingface.co/" + model.name}
 				target="_blank"
 				rel="noreferrer"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Model page
@@ -97,7 +97,7 @@
 				href={model.datasetUrl || "https://huggingface.co/datasets/" + model.datasetName}
 				target="_blank"
 				rel="noreferrer"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
 				Dataset page
@@ -108,7 +108,7 @@
 			<a
 				href={model.websiteUrl}
 				target="_blank"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 				rel="noreferrer"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs " />
@@ -121,7 +121,7 @@
 				href={"https://huggingface.co/playground?modelId=" + model.name}
 				target="_blank"
 				rel="noreferrer"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<CarbonCode class="mr-1.5 shrink-0 text-xs" />
 				API Playground
@@ -130,14 +130,14 @@
 				href={"https://huggingface.co/" + model.name}
 				target="_blank"
 				rel="noreferrer"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
 				View model card
 			</a>
 			<CopyToClipBoardBtn
 				value="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{model.id}"
-				classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<div class="flex items-center gap-1.5">
 					<CarbonCopy class="shrink-0 text-xs" />Copy direct link to model
