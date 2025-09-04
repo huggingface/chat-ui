@@ -358,31 +358,6 @@
 		}
 	}
 
-	async function voteMessage(score: Message["score"], messageId: string) {
-		let conversationId = page.params.id;
-		let oldScore: Message["score"] | undefined;
-
-		// optimistic update to avoid waiting for the server
-		messages = messages.map((message) => {
-			if (message.id === messageId) {
-				oldScore = message.score;
-				return { ...message, score };
-			}
-			return message;
-		});
-
-		try {
-			await fetch(`${base}/conversation/${conversationId}/message/${messageId}/vote`, {
-				method: "POST",
-				body: JSON.stringify({ score }),
-			});
-		} catch {
-			// revert score on any error
-			messages = messages.map((message) => {
-				return message.id !== messageId ? message : { ...message, score: oldScore };
-			});
-		}
-	}
 
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
@@ -502,7 +477,6 @@
 	on:retry={onRetry}
 	on:continue={onContinue}
 	on:showAlternateMsg={onShowAlternateMsg}
-	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
 	on:stop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",

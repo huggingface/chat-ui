@@ -21,7 +21,6 @@
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
-	import Vote from "./Vote.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
 
 	interface Props {
@@ -190,9 +189,7 @@
 	{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 	"
 			>
-				{#if isAuthor}
-					<Vote {message} on:vote />
-				{/if}
+
 				<button
 					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"

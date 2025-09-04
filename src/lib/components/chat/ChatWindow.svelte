@@ -233,7 +233,6 @@
 							isLast={idx === messages.length - 1}
 							bind:editMsdgId
 							on:retry
-							on:vote
 							on:continue
 							on:showAlternateMsg
 						/>
