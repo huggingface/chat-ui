@@ -17,6 +17,8 @@
 	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
 
+	type RouterProvider = { provider: string } & Record<string, unknown>;
+
 	$effect(() => {
 		if ($settings.customPrompts[page.params.model] === undefined) {
 			$settings.customPrompts = {
@@ -33,6 +35,7 @@
 	);
 
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === page.params.model));
+	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
 
 	// Initialize multimodal override for this model if not set yet
 	$effect(() => {
@@ -66,7 +69,7 @@
 	<!-- Actions -->
 	<div class="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1">
 		<button
-			class="flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm !text-white shadow-sm hover:bg-black/90 dark:bg-white dark:!text-gray-900 dark:hover:bg-white/90"
+			class="flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm !text-white shadow-sm hover:bg-black/90 dark:bg-white/80 dark:!text-gray-900 dark:hover:bg-white/90"
 			name="Activate model"
 			onclick={(e) => {
 				e.stopPropagation();
@@ -188,6 +191,39 @@
 				</div>
 			</div>
 		</div>
+
+		{#if model.providers?.length}
+			<div
+				class="mt-3 flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+			>
+				<div>
+					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+						Providers serving this model
+					</div>
+					<p class="text-[12px] text-gray-500 dark:text-gray-400">
+						Your requests for this model will be routed through one of the available providers.
+					</p>
+				</div>
+				<ul class="mb-0.5 flex flex-wrap gap-2">
+					{#each providerList as prov, i (prov.provider || i)}
+						<li>
+							<span
+								class="flex items-center gap-1 rounded-md bg-gray-100 py-0.5 pl-1.5 pr-2 text-xs text-gray-700 dark:bg-gray-700/60 dark:text-gray-200"
+							>
+								{#if prov.provider}
+									<img
+										class="h-[14px] w-auto"
+										src={`${base}/huggingchat/providers/${prov.provider}.svg`}
+										alt="{prov.provider} logo"
+									/>
+								{/if}
+								{prov.provider}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		<!-- Tokenizer-based token counting disabled in this build -->
 	</div>
 </div>

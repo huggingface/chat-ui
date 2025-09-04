@@ -17,7 +17,6 @@
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
-	import { base } from "$app/paths";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -55,6 +54,9 @@
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
+		}
+		if (e.key === "Escape") {
+			editMsdgId = null;
 		}
 	}
 
@@ -183,7 +185,15 @@
 		</div>
 
 		{#if !loading && message.content}
-			<div class="absolute -bottom-4 right-0 flex items-center gap-1">
+			<div class="absolute -bottom-3.5 right-1 flex items-center gap-0.5">
+				<CopyToClipBoardBtn
+					onClick={() => {
+						isCopied = true;
+					}}
+					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+					value={message.content}
+					iconClassNames="text-xs"
+				/>
 				<button
 					class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
@@ -194,14 +204,6 @@
 				>
 					<CarbonRotate360 />
 				</button>
-				<CopyToClipBoardBtn
-					onClick={() => {
-						isCopied = true;
-					}}
-					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-					value={message.content}
-					iconClassNames="text-xs"
-				/>
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
 				{/if}
