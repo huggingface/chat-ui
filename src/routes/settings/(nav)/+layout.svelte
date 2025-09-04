@@ -8,7 +8,7 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
-	import CarbonSettings from "~icons/carbon/settings";
+	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
 	import { browser } from "$app/environment";
@@ -85,9 +85,7 @@
 				/>
 			</button>
 		{/if}
-		<h2 class="absolute left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">
-			Settings
-		</h2>
+		<h2 class=" left-0 right-0 mx-auto w-fit text-center text-xl font-bold md:hidden">Settings</h2>
 		<button
 			class="btn rounded-lg"
 			aria-label="Close settings"
@@ -107,7 +105,7 @@
 		>
 			<!-- Section Headers -->
 			<h3
-				class="px-3 pb-1 pt-2 text-center text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400 md:text-left"
+				class="px-3 pb-1 pt-2 text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400 md:text-left"
 			>
 				Models
 			</h3>
@@ -169,11 +167,11 @@
 				onclick={() => goto(`${base}/settings/application`)}
 				class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 max-md:order-first md:rounded-xl md:px-3 {page
 					.url.pathname === `${base}/settings/application`
-					? '!bg-gray-100 !text-gray-800 dark:!bg-gray-800 dark:!text-gray-200'
+					? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
 					: ''}"
 				aria-label="Configure application settings"
 			>
-				<CarbonSettings class="text-xs" />
+				<IconGear class="mr-0.5 text-xxs" />
 				Application Settings
 			</button>
 		</div>

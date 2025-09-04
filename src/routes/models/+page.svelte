@@ -64,21 +64,16 @@
 			{#each data.models
 				.filter((el) => !el.unlisted)
 				.filter((el) => el.id.toLowerCase().includes(normalizedFilter)) as model, index (model.id)}
-				<div
+				<a
+					href="{base}/models/{model.id}"
 					aria-label="Model card"
-					role="region"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 					class:active-model={model.id === $settings.activeModel}
 				>
-					<a
-						href="{base}/models/{model.id}"
-						class="absolute inset-0 z-10"
-						aria-label="View details for {model.displayName}"
-					></a>
 					<div class="flex items-center justify-between gap-1">
 						{#if model.logoUrl}
 							<img
-								class="overflown aspect-square size-6 rounded border dark:border-gray-700"
+								class="aspect-square size-6 rounded border bg-white dark:border-gray-700"
 								src={model.logoUrl}
 								alt="{model.displayName} logo"
 							/>
@@ -141,7 +136,7 @@
 					<span class="whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
 						{model.description || "-"}
 					</span>
-				</div>
+				</a>
 			{/each}
 		</div>
 	</div>

@@ -55,7 +55,7 @@
 					<div class="flex items-center gap-1.5 font-semibold max-sm:text-smd">
 						{#if currentModel.logoUrl}
 							<img
-								class=" overflown aspect-square size-4 rounded border dark:border-gray-700"
+								class="aspect-square size-4 rounded border bg-white dark:border-gray-700"
 								src={currentModel.logoUrl}
 								alt=""
 							/>

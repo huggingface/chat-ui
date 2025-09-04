@@ -49,6 +49,7 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	endpoints: z.array(endpointSchema).optional(),
+	providers: z.array(z.object({ supports_tools: z.boolean().optional() }).passthrough()).optional(),
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
@@ -78,13 +79,14 @@ let modelsRaw: z.infer<typeof modelConfig>[] = [];
 
 // Require explicit base URL; no implicit default here
 const openaiBaseUrl = config.OPENAI_BASE_URL
-    ? config.OPENAI_BASE_URL.replace(/\/$/, "")
-    : undefined;
+	? config.OPENAI_BASE_URL.replace(/\/$/, "")
+	: undefined;
+const isHFRouter = openaiBaseUrl === "https://router.huggingface.co/v1";
 
 if (openaiBaseUrl) {
-    try {
-        const baseURL = openaiBaseUrl;
-        logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
+	try {
+		const baseURL = openaiBaseUrl;
+		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
 
 		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
 		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
@@ -123,27 +125,36 @@ if (openaiBaseUrl) {
 		const parsed = listSchema.parse(json);
 		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
 
-		modelsRaw = parsed.data.map((m) => ({
-			id: m.id,
-			name: m.id,
-			displayName: m.id,
-			endpoints: [
-				{
-					type: "openai" as const,
-					baseURL,
-					// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
-				},
-			],
-		})) as z.infer<typeof modelConfig>[];
-    } catch (e) {
-        logger.error(e, "Failed to load models from OpenAI base URL");
-        throw e;
-    }
+		modelsRaw = parsed.data.map((m) => {
+			let logoUrl: string | undefined = undefined;
+			if (isHFRouter && m.id.includes("/")) {
+				const org = m.id.split("/")[0];
+				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
+			}
+			return {
+				id: m.id,
+				name: m.id,
+				displayName: m.id,
+				logoUrl,
+				providers: m.providers,
+				endpoints: [
+					{
+						type: "openai" as const,
+						baseURL,
+						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+					},
+				],
+			} as z.infer<typeof modelConfig>;
+		}) as z.infer<typeof modelConfig>[];
+	} catch (e) {
+		logger.error(e, "Failed to load models from OpenAI base URL");
+		throw e;
+	}
 } else {
-    logger.error(
-        "OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
-    );
-    throw new Error("OPENAI_BASE_URL not set");
+	logger.error(
+		"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
+	);
+	throw new Error("OPENAI_BASE_URL not set");
 }
 
 function getChatPromptRender(

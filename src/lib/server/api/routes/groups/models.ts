@@ -15,6 +15,7 @@ export type GETModelsResponse = Array<{
 	description?: string;
 	reasoning: boolean;
 	logoUrl?: string;
+    providers?: Array<{ provider: string } & Record<string, unknown>>;
 	promptExamples?: { title: string; prompt: string }[];
 	parameters: BackendModel["parameters"];
 	preprompt?: string;
@@ -48,7 +49,8 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 						displayName: model.displayName,
 						description: model.description,
 						reasoning: !!model.reasoning,
-						logoUrl: model.logoUrl,
+                    logoUrl: model.logoUrl,
+                    providers: (model.providers as unknown as Array<{ provider: string } & Record<string, unknown>>),
 						promptExamples: model.promptExamples,
 						parameters: model.parameters,
 						preprompt: model.preprompt,
