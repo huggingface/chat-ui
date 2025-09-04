@@ -6,7 +6,7 @@
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
-	import CarbonDownload from "~icons/carbon/download";
+	// import CarbonDownload from "~icons/carbon/download";
 
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
@@ -72,7 +72,7 @@
 		) as MessageFinalAnswerUpdate
 	);
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
-	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
+	// let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/g;
@@ -183,14 +183,9 @@
 		</div>
 
 		{#if !loading && message.content}
-			<div
-				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100
-	{message.score ? 'visible opacity-100' : 'invisible max-md:-translate-y-4 max-md:opacity-0'}
-	{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
-	"
-			>
+			<div class="absolute -bottom-4 right-0 flex items-center gap-1">
 				<button
-					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+					class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
 					type="button"
 					onclick={() => {
@@ -205,13 +200,14 @@
 					}}
 					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					value={message.content}
+					iconClassNames="text-xs"
 				/>
+				{#if alternatives.length > 1 && editMsdgId === null}
+					<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+				{/if}
 			</div>
 		{/if}
 	</div>
-	{#if alternatives.length > 1 && editMsdgId === null}
-		<Alternatives {message} {alternatives} {loading} on:showAlternateMsg classNames="ml-3.5" />
-	{/if}
 {/if}
 {#if message.from === "user"}
 	<div
@@ -242,7 +238,7 @@
 					</p>
 				{:else}
 					<form
-						class="flex w-full flex-col"
+						class="mt-3 flex w-full flex-col"
 						bind:this={editFormEl}
 						onsubmit={(e) => {
 							e.preventDefault();
@@ -282,38 +278,6 @@
 						</div>
 					</form>
 				{/if}
-				<!-- {#if !loading && !editMode}
-					<div
-						class="
-                        max-md:opacity-0' invisible absolute
-                        right-0 top-3.5 z-10 h-max max-md:-translate-y-4 max-md:transition-all md:bottom-0 md:group-hover:visible md:group-hover:opacity-100 {isTapped ||
-						isCopied
-							? 'max-md:visible max-md:translate-y-0 max-md:opacity-100'
-							: ''}"
-					>
-						<div class="mx-auto flex flex-row flex-nowrap gap-2">
-							<a
-								class="rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 max-sm:!hidden md:hidden"
-								title="Download prompt and parameters"
-								type="button"
-								target="_blank"
-								href={downloadLink}
-							>
-								<CarbonDownload />
-							</a>
-							{#if !readOnly}
-								<button
-									class="cursor-pointer rounded-lg border border-gray-100 bg-gray-100 p-1 text-xs text-gray-400 group-hover:block hover:text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
-									title="Branch"
-									type="button"
-									onclick={() => (editMsdgId = message.id)}
-								>
-									<CarbonPen />
-								</button>
-							{/if}
-						</div>
-					</div>
-				{/if} -->
 			</div>
 			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
 				{#if alternatives.length > 1 && editMsdgId === null}
@@ -321,7 +285,7 @@
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
 					<button
-						class="cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
 						title="Edit"
 						type="button"
 						onclick={() => (editMsdgId = message.id)}

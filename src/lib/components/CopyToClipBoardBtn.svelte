@@ -6,13 +6,21 @@
 
 	interface Props {
 		classNames?: string;
+		iconClassNames?: string;
 		value: string;
 		children?: import("svelte").Snippet;
 		onClick?: () => void;
 		showTooltip?: boolean;
 	}
 
-	let { classNames = "", value, children, onClick, showTooltip = true }: Props = $props();
+	let {
+		classNames = "",
+		iconClassNames = "",
+		value,
+		children,
+		onClick,
+		showTooltip = true,
+	}: Props = $props();
 
 	let isSuccess = $state(false);
 	let timeout: ReturnType<typeof setTimeout>;
@@ -72,7 +80,7 @@
 >
 	<div class="relative">
 		{#if children}{@render children()}{:else}
-			<CarbonCopy />
+			<CarbonCopy class={iconClassNames} />
 		{/if}
 
 		{#if showTooltip}
