@@ -106,7 +106,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-4 flex items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="group relative -mb-4 flex w-fit items-start justify-start gap-4 pb-4 leading-relaxed"
 		data-message-id={message.id}
 		data-message-role="assistant"
 		role="presentation"
@@ -189,7 +189,6 @@
 	{isTapped || isCopied ? 'max-md:visible max-md:translate-y-0 max-md:opacity-100' : ''}
 	"
 			>
-
 				<button
 					class="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
@@ -211,12 +210,14 @@
 		{/if}
 	</div>
 	{#if alternatives.length > 1 && editMsdgId === null}
-		<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+		<Alternatives {message} {alternatives} {loading} on:showAlternateMsg classNames="ml-3.5" />
 	{/if}
 {/if}
 {#if message.from === "user"}
 	<div
-		class="group relative w-full items-start justify-start gap-4 max-sm:text-sm"
+		class="group relative {alternatives.length > 1 && editMsdgId === null
+			? 'mb-7'
+			: ''} w-full items-start justify-start gap-4 max-sm:text-sm"
 		data-message-id={message.id}
 		data-message-type="user"
 		role="presentation"
@@ -267,7 +268,7 @@
 								"
 								disabled={loading}
 							>
-								Submit
+								Send
 							</button>
 							<button
 								type="button"
@@ -281,7 +282,7 @@
 						</div>
 					</form>
 				{/if}
-				{#if !loading && !editMode}
+				<!-- {#if !loading && !editMode}
 					<div
 						class="
                         max-md:opacity-0' invisible absolute
@@ -312,11 +313,24 @@
 							{/if}
 						</div>
 					</div>
+				{/if} -->
+			</div>
+			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
+				{#if alternatives.length > 1 && editMsdgId === null}
+					<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+				{/if}
+				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
+					<button
+						class="cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 md:hidden lg:-right-2"
+						title="Edit"
+						type="button"
+						onclick={() => (editMsdgId = message.id)}
+					>
+						<CarbonPen />
+						Edit
+					</button>
 				{/if}
 			</div>
-			{#if alternatives.length > 1 && editMsdgId === null}
-				<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
-			{/if}
 		</div>
 	</div>
 {/if}

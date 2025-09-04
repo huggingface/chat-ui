@@ -15,9 +15,10 @@
 		message: Message;
 		alternatives?: Message["id"][];
 		loading?: boolean;
+		classNames?: string;
 	}
 
-	let { message, alternatives = [], loading = false }: Props = $props();
+	let { message, alternatives = [], loading = false, classNames = "" }: Props = $props();
 
 	let currentIdx = $derived(alternatives.findIndex((id) => id === message.id));
 
@@ -29,7 +30,7 @@
 </script>
 
 <div
-	class="font-white group/navbranch z-0 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
+	class="font-white group/navbranch z-0 flex h-6 w-fit select-none items-center justify-center gap-1 text-sm {classNames}"
 >
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
@@ -51,7 +52,7 @@
 	>
 		<CarbonChevronRight class="text-sm" />
 	</button>
-	{#if !loading && message.children}
+	<!-- {#if !loading && message.children}
 		<button
 			class="hidden group-hover/navbranch:block"
 			onclick={() => {
@@ -77,5 +78,5 @@
 				<CarbonTrashCan />
 			</div>
 		</button>
-	{/if}
+	{/if} -->
 </div>
