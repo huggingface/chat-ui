@@ -21,6 +21,7 @@
 	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
+	import { isAborted } from "$lib/stores/isAborted";
 
 	let { data = $bindable(), children } = $props();
 
@@ -141,6 +142,24 @@
 				goto(`${base}/`, { invalidateAll: true });
 			});
 		}
+
+		// Global keyboard shortcut: New Chat (Ctrl/Cmd + Shift + O)
+		const onKeydown = (e: KeyboardEvent) => {
+			// Ignore when a modal has focus (app is inert)
+			const appEl = document.getElementById("app");
+			if (appEl?.hasAttribute("inert")) return;
+
+			const oPressed = e.key?.toLowerCase() === "o";
+			const metaOrCtrl = e.metaKey || e.ctrlKey;
+			if (oPressed && e.shiftKey && metaOrCtrl) {
+				e.preventDefault();
+				isAborted.set(true);
+				goto(`${base}/`, { invalidateAll: true });
+			}
+		};
+
+		window.addEventListener("keydown", onKeydown, { capture: true });
+		onDestroy(() => window.removeEventListener("keydown", onKeydown, { capture: true } as EventListenerOptions));
 	});
 
 	let mobileNavTitle = $derived(
