@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { base } from "$app/paths";
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
@@ -25,6 +25,27 @@
 	let previousPage: string = $state(base || "/");
 	let showContent: boolean = $state(false);
 
+	let navContainer: HTMLDivElement | undefined = $state();
+
+	async function scrollSelectedModelIntoView() {
+		await tick();
+		const container = navContainer;
+		if (!container) return;
+		const currentModelId = page.params.model as string | undefined;
+		if (!currentModelId) return;
+		const buttons = container.querySelectorAll<HTMLButtonElement>("button[data-model-id]");
+		let target: HTMLElement | null = null;
+		for (const btn of buttons) {
+			if (btn.dataset.modelId === currentModelId) {
+				target = btn;
+				break;
+			}
+		}
+		if (!target) return;
+		// Use minimal movement; keep within view if needed
+		target.scrollIntoView({ block: "nearest", inline: "nearest" });
+	}
+
 	function checkDesktopRedirect() {
 		if (
 			browser &&
@@ -42,6 +63,9 @@
 		// Initial desktop redirect check
 		checkDesktopRedirect();
 
+		// Ensure the selected model (if any) is visible in the nav
+		void scrollSelectedModelIntoView();
+
 		// Add resize listener for desktop redirect
 		if (browser) {
 			const debouncedCheck = debounce(checkDesktopRedirect, 100);
@@ -58,6 +82,8 @@
 		showContent = page.url.pathname !== `${base}/settings`;
 		// Check desktop redirect after navigation
 		checkDesktopRedirect();
+		// After navigation, keep the selected model in view
+		void scrollSelectedModelIntoView();
 	});
 
 	const settings = useSettingsStore();
@@ -102,6 +128,7 @@
 		<div
 			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
 			class:max-md:hidden={showContent && browser}
+			bind:this={navContainer}
 		>
 			<!-- Section Headers -->
 			<h3
@@ -131,6 +158,7 @@
 					page.params.model
 						? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
 						: ''}"
+					data-model-id={model.id}
 					aria-label="Configure {model.displayName}"
 				>
 					<div class="mr-auto truncate">{model.displayName}</div>
