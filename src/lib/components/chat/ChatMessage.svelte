@@ -108,7 +108,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-4 flex w-fit items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed"
 		data-message-id={message.id}
 		data-message-role="assistant"
 		role="presentation"
