@@ -18,7 +18,7 @@
 
 <details
 	bind:open={isOpen}
-	class="group mb-4 flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary
 		class="

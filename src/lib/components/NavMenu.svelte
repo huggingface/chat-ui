@@ -171,7 +171,7 @@
 	>
 		Models
 		<span
-			class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
+			class="ml-auto rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-600 dark:text-gray-400"
 			>{nModels}</span
 		>
 	</a>
