@@ -154,7 +154,7 @@
 			<h3 class="mb-1 text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
 			{#if hasCustomPreprompt}
 				<button
-					class="ml-auto underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+					class="ml-auto text-xs underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					onclick={(e) => {
 						e.stopPropagation();
 						$settings.customPrompts[page.params.model] = model.preprompt;

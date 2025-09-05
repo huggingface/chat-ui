@@ -177,11 +177,7 @@ export async function endpointOai(
 				};
 			}
 
-			// Format tool results for the API to provide context for follow-up tool calls
-			// This creates the full conversation flow needed for multi-step tool interactions
-			if (false && Array.isArray(undefined)) {
-				// Tools integration removed
-			}
+			// Tools integration removed
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
