@@ -88,9 +88,10 @@
 
 	const settings = useSettingsStore();
 
-	// Local filter for model list (filter on model id)
+	// Local filter for model list (hyphen/space insensitive)
 	let modelFilter = $state("");
-	let normalizedFilter = $derived(modelFilter.trim().toLowerCase());
+	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 </script>
 
 <div
@@ -142,15 +143,18 @@
 				<input
 					bind:value={modelFilter}
 					type="search"
-					placeholder="Filter by name"
-					aria-label="Filter models by id"
+					placeholder="Search by name"
+					aria-label="Search models by name or id"
 					class="w-full rounded-full border border-gray-300 bg-white px-4 py-1 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:ring-gray-700"
 				/>
 			</div>
 
 			{#each data.models
 				.filter((el) => !el.unlisted)
-				.filter((el) => el.id.toLowerCase().includes(normalizedFilter)) as model}
+				.filter((el) => {
+					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
+					return queryTokens.every((q) => haystack.includes(q));
+				}) as model}
 				<button
 					type="button"
 					onclick={() => goto(`${base}/settings/${model.id}`)}
