@@ -65,7 +65,7 @@
 </script>
 
 {#if open}
-	<Modal on:close={close} width="w-90dvh md:w-[500px]">
+	<Modal on:close={close} width="w-[90dvh] md:w-[500px]">
 		<div class="flex w-full flex-col gap-5 p-6">
 			<!-- Header + copy -->
 			{#if createdUrl}

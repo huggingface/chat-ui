@@ -9,7 +9,6 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 
-
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
@@ -79,21 +78,19 @@
 			});
 	}
 
-    async function editConversationTitle(id: string, title: string) {
-        // Always strip <think> markers before saving and updating UI
-        const cleanTitle = title.replace(/<\/?think>/gi, "").trim();
-        client
-            .conversations({ id })
-            .patch({ title: cleanTitle })
-            .then(handleResponse)
-            .then(async () => {
-                conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title: cleanTitle } : conv));
-            })
-            .catch((err) => {
-                console.error(err);
-                $error = String(err);
-            });
-    }
+	async function editConversationTitle(id: string, title: string) {
+		client
+			.conversations({ id })
+			.patch({ title })
+			.then(handleResponse)
+			.then(async () => {
+				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+			})
+			.catch((err) => {
+				console.error(err);
+				$error = String(err);
+			});
+	}
 
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
@@ -159,7 +156,9 @@
 		};
 
 		window.addEventListener("keydown", onKeydown, { capture: true });
-		onDestroy(() => window.removeEventListener("keydown", onKeydown, { capture: true } as EventListenerOptions));
+		onDestroy(() =>
+			window.removeEventListener("keydown", onKeydown, { capture: true } as EventListenerOptions)
+		);
 	});
 
 	let mobileNavTitle = $derived(
@@ -224,7 +223,6 @@
 {#if overloadedModalOpen && publicConfig.isHuggingChat}
 	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
-
 
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
