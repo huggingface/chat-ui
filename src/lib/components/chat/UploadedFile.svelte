@@ -131,7 +131,7 @@
 >
 	<div class="group relative flex items-center rounded-xl shadow-sm">
 		{#if isImage(file.mime)}
-			<div class="size-48 overflow-hidden rounded-xl">
+			<div class="h-48 overflow-hidden rounded-xl">
 				<img
 					src={file.type === "base64"
 						? `data:${file.mime};base64,${file.value}`

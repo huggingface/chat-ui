@@ -65,12 +65,14 @@
 </script>
 
 {#if open}
-	<Modal on:close={close} width="w-full !max-w-lg">
+	<Modal on:close={close} width="w-[90dvh] md:w-[500px]">
 		<div class="flex w-full flex-col gap-5 p-6">
 			<!-- Header + copy -->
 			{#if createdUrl}
 				<div class="flex items-start justify-between">
-					<div class="text-xl font-semibold text-gray-800 dark:text-gray-200">Public link created</div>
+					<div class="text-xl font-semibold text-gray-800 dark:text-gray-200">
+						Public link created
+					</div>
 					<button type="button" class="group" onclick={close} aria-label="Close">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -84,10 +86,14 @@
 						</svg>
 					</button>
 				</div>
-				<div class="text-sm text-gray-600 dark:text-gray-400">A public link to your chat has been created.</div>
+				<div class="text-sm text-gray-600 dark:text-gray-400">
+					A public link to your chat has been created.
+				</div>
 			{:else}
 				<div class="flex items-start justify-between">
-					<div class="text-xl font-semibold text-gray-800 dark:text-gray-200">Share public link to chat</div>
+					<div class="text-xl font-semibold text-gray-800 dark:text-gray-200">
+						Share public link to chat
+					</div>
 					<button type="button" class="group" onclick={close} aria-label="Close">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -110,7 +116,9 @@
 			{/if}
 
 			{#if errorMsg}
-				<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-500/10 dark:text-red-300">
+				<div
+					class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-500/10 dark:text-red-300"
+				>
 					{errorMsg}
 				</div>
 			{/if}

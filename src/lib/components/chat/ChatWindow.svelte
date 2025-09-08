@@ -372,13 +372,16 @@
 						{#if loading}
 							<button
 								disabled
-								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
+								class="btn absolute bottom-0.5 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
 							>
 								<EosIconsLoading />
 							</button>
 						{:else}
 							<button
-								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:hover:enabled:bg-black"
+								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!message ||
+								isReadOnly
+									? ''
+									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
 								disabled={!message || isReadOnly}
 								type="submit"
 								aria-label="Send message"

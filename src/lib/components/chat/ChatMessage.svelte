@@ -55,6 +55,9 @@
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
 		}
+		if (e.key === "Escape") {
+			editMsdgId = null;
+		}
 	}
 
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
@@ -105,7 +108,7 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-4 flex w-fit items-start justify-start gap-4 pb-4 leading-relaxed"
+		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed"
 		data-message-id={message.id}
 		data-message-role="assistant"
 		role="presentation"
@@ -121,8 +124,9 @@
 			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
 			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 		/> -->
+		<!-- min-h-[calc(2rem+theme(spacing[3.5])*2)] -->
 		<div
-			class="relative flex min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
+			class="relative flex min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300"
 		>
 			{#if message.files?.length}
 				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
@@ -181,21 +185,32 @@
 			</div>
 		</div>
 
-		{#if message.routerMetadata || (!loading && message.content)}
-			<div class="absolute -bottom-4 right-0 flex items-center gap-1">
-				{#if message.routerMetadata}
-					<div
-						class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 dark:text-gray-400"
-					>
-						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
-							{message.routerMetadata.route}
-						</span>
-						<span class="text-gray-500">with</span>
-						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
-							{message.routerMetadata.model.split("/").pop()}
-						</span>
-					</div>
-				{/if}
+			{#if message.routerMetadata || (!loading && message.content)}
+				<div class="absolute -bottom-3.5 right-1 flex items-center gap-0.5">
+					{#if message.routerMetadata}
+						<div
+							class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 dark:text-gray-400"
+						>
+							<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+								{message.routerMetadata.route}
+							</span>
+							<span class="text-gray-500">with</span>
+							<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+								{message.routerMetadata.model.split("/").pop()}
+							</span>
+						</div>
+					{/if}
+
+					{#if !loading && message.content}
+						<CopyToClipBoardBtn
+							onClick={() => {
+								isCopied = true;
+							}}
+							classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+							value={message.content}
+							iconClassNames="text-xs"
+						/>
+					{/if}
 				<button
 					class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
@@ -206,14 +221,6 @@
 				>
 					<CarbonRotate360 />
 				</button>
-				<CopyToClipBoardBtn
-					onClick={() => {
-						isCopied = true;
-					}}
-					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-					value={message.content}
-					iconClassNames="text-xs"
-				/>
 				{#if alternatives.length > 1 && editMsdgId === null}
 					<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
 				{/if}
@@ -259,7 +266,7 @@
 						}}
 					>
 						<textarea
-							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max dark:bg-gray-800 dark:text-gray-400"
+							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max focus:outline-none dark:bg-gray-800 dark:text-gray-400"
 							rows="5"
 							bind:this={editContentEl}
 							value={message.content.trim()}

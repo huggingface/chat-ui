@@ -12,6 +12,8 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import { onMount } from "svelte";
+	import { browser } from "$app/environment";
+	import { getThemePreference, setTheme, type ThemePreference } from "$lib/switchTheme";
 
 	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
@@ -27,6 +29,8 @@
 			// ignore if debug endpoint is unavailable
 		}
 	});
+
+	let themePref: ThemePreference = browser ? getThemePreference() : "system";
 </script>
 
 <div class="flex w-full flex-col gap-4">
@@ -89,17 +93,7 @@
 					</div>
 				{/if}
 
-				<div class="flex items-start justify-between py-3">
-					<div>
-						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Hide emoticons in topics
-						</div>
-						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Hide emojis shown in the conversation list.
-						</p>
-					</div>
-					<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
-				</div>
+
 
 				<div class="flex items-start justify-between py-3">
 					<div>
@@ -123,6 +117,56 @@
 						</p>
 					</div>
 					<Switch name="directPaste" bind:checked={$settings.directPaste} />
+				</div>
+
+				<!-- Theme selector -->
+				<div class="flex items-start justify-between py-3">
+					<div>
+						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Theme</div>
+						<p class="text-[12px] text-gray-500 dark:text-gray-400">
+							Choose light, dark, or follow system.
+						</p>
+					</div>
+					<div
+						class="flex items-center divide-x overflow-hidden rounded-md border dark:divide-gray-600 dark:border-gray-600"
+					>
+						<button
+							class={"inline-flex items-center px-2.5 py-1 text-xs " +
+								(themePref === "system"
+									? "bg-black text-white dark:border-white/10 dark:bg-white/80 dark:text-gray-900"
+									: "hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60")}
+							onclick={() => {
+								setTheme("system");
+								themePref = "system";
+							}}
+						>
+							system
+						</button>
+						<button
+							class={"inline-flex items-center px-2.5 py-1 text-xs " +
+								(themePref === "light"
+									? "bg-black text-white dark:border-white/10 dark:bg-white/80 dark:text-gray-900"
+									: "hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60")}
+							onclick={() => {
+								setTheme("light");
+								themePref = "light";
+							}}
+						>
+							light
+						</button>
+						<button
+							class={"inline-flex items-center px-2.5 py-1 text-xs " +
+								(themePref === "dark"
+									? "bg-black text-white dark:border-white/10 dark:bg-white/80 dark:text-gray-900"
+									: "hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60")}
+							onclick={() => {
+								setTheme("dark");
+								themePref = "dark";
+							}}
+						>
+							dark
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>

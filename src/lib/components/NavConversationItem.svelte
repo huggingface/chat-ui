@@ -9,6 +9,8 @@
 	import CarbonEdit from "~icons/carbon/edit";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
+	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
+
 	interface Props {
 		conv: ConvSidebar;
 		readOnly?: true;
@@ -17,6 +19,7 @@
 	let { conv, readOnly }: Props = $props();
 
 	let confirmDelete = $state(false);
+	let renameOpen = $state(false);
 
 	const dispatch = createEventDispatcher<{
 		deleteConversation: string;
@@ -30,7 +33,7 @@
 		confirmDelete = false;
 	}}
 	href="{base}/conversation/{conv.id}"
-	class="group flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
+	class="group flex h-[2.15rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
 	<div class="my-2 flex flex-1 flex-col items-start truncate">
@@ -76,9 +79,7 @@
 				title="Edit conversation title"
 				onclick={(e) => {
 					e.preventDefault();
-					const newTitle = prompt("Edit this conversation title:", conv.title);
-					if (!newTitle) return;
-					dispatch("editConversationTitle", { id: conv.id.toString(), title: newTitle });
+					renameOpen = true;
 				}}
 			>
 				<CarbonEdit class="text-xs text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" />
@@ -104,3 +105,16 @@
 		{/if}
 	{/if}
 </a>
+
+<!-- Edit title modal -->
+{#if renameOpen}
+	<EditConversationModal
+		open={renameOpen}
+		title={conv.title}
+		on:close={() => (renameOpen = false)}
+		on:save={(e) => {
+			renameOpen = false;
+			dispatch("editConversationTitle", { id: conv.id.toString(), title: e.detail.title });
+		}}
+	/>
+{/if}

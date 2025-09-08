@@ -14,7 +14,7 @@ export interface Settings extends Timestamps {
 	shareConversationsWithModelAuthors: boolean;
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
-	hideEmojiOnSidebar?: boolean;
+
 
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
@@ -35,7 +35,6 @@ export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "created
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,
 	activeModel: defaultModel.id,
-	hideEmojiOnSidebar: false,
 	customPrompts: {},
 	multimodalOverrides: {},
 	disableStream: false,

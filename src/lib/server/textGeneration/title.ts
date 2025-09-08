@@ -28,6 +28,7 @@ export async function* generateTitleForConversation(
 
 export async function generateTitle(prompt: string, modelId?: string) {
     if (config.LLM_SUMMARIZATION !== "true") {
+        // When summarization is disabled, use the first five words without adding emojis
         return prompt.split(/\s+/g).slice(0, 5).join(" ");
     }
 
@@ -37,7 +38,7 @@ export async function generateTitle(prompt: string, modelId?: string) {
         generateFromDefaultEndpoint({
             messages: [{ from: "user", content: prompt }],
             preprompt:
-                "You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it, only summarize the user's query. Always start your answer with an emoji relevant to the summary",
+                "You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it; only summarize the user's query.",
             generateSettings: {
                 max_new_tokens: 30,
             },
@@ -47,19 +48,12 @@ export async function generateTitle(prompt: string, modelId?: string) {
 		.then((summary) => {
 			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
 			const trimmed = summary.trim();
-			// Fallback: if empty, use emoji + first five words
-			if (!trimmed) {
-				return "💬 " + firstFive;
-			}
-			// Ensure emoji prefix if missing
-			if (!/\p{Emoji}/u.test(trimmed.slice(0, 3))) {
-				return "💬 " + trimmed;
-			}
-			return trimmed;
+			// Fallback: if empty, return first five words only (no emoji)
+			return trimmed || firstFive;
 		})
 		.catch((e) => {
 			logger.error(e);
 			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
-			return "💬 " + firstFive;
+			return firstFive;
 		});
 }
