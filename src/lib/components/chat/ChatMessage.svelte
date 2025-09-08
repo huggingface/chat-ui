@@ -185,32 +185,32 @@
 			</div>
 		</div>
 
-			{#if message.routerMetadata || (!loading && message.content)}
-				<div class="absolute -bottom-3.5 right-1 flex items-center gap-0.5">
-					{#if message.routerMetadata}
-						<div
-							class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 dark:text-gray-400"
-						>
-							<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
-								{message.routerMetadata.route}
-							</span>
-							<span class="text-gray-500">with</span>
-							<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
-								{message.routerMetadata.model.split("/").pop()}
-							</span>
-						</div>
-					{/if}
+		{#if message.routerMetadata || (!loading && message.content)}
+			<div class="absolute -bottom-3.5 right-1 flex items-center gap-0.5">
+				{#if message.routerMetadata}
+					<div
+						class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 dark:text-gray-400"
+					>
+						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+							{message.routerMetadata.route}
+						</span>
+						<span class="text-gray-500">with</span>
+						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+							{message.routerMetadata.model.split("/").pop()}
+						</span>
+					</div>
+				{/if}
 
-					{#if !loading && message.content}
-						<CopyToClipBoardBtn
-							onClick={() => {
-								isCopied = true;
-							}}
-							classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-							value={message.content}
-							iconClassNames="text-xs"
-						/>
-					{/if}
+				{#if !loading && message.content}
+					<CopyToClipBoardBtn
+						onClick={() => {
+							isCopied = true;
+						}}
+						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						value={message.content}
+						iconClassNames="text-xs"
+					/>
+				{/if}
 				<button
 					class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
