@@ -7,7 +7,6 @@ import { type Writable, writable, get } from "svelte/store";
 
 type SettingsStore = {
 	shareConversationsWithModelAuthors: boolean;
-	hideEmojiOnSidebar: boolean;
 	ethicsModalAccepted: boolean;
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;

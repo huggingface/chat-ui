@@ -12,7 +12,6 @@ export async function POST({ request, locals }) {
 			shareConversationsWithModelAuthors: z
 				.boolean()
 				.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-			hideEmojiOnSidebar: z.boolean().default(DEFAULT_SETTINGS.hideEmojiOnSidebar),
 			ethicsModalAccepted: z.boolean().optional(),
 			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 			customPrompts: z.record(z.string()).default({}),

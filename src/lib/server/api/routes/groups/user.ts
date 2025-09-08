@@ -64,7 +64,6 @@ export const userGroup = new Elysia()
 					ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
 
 					activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
-					hideEmojiOnSidebar: settings?.hideEmojiOnSidebar ?? DEFAULT_SETTINGS.hideEmojiOnSidebar,
 					disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 					directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
 					shareConversationsWithModelAuthors:
@@ -83,7 +82,6 @@ export const userGroup = new Elysia()
 						shareConversationsWithModelAuthors: z
 							.boolean()
 							.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-						hideEmojiOnSidebar: z.boolean().default(DEFAULT_SETTINGS.hideEmojiOnSidebar),
 						ethicsModalAccepted: z.boolean().optional(),
 						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 						customPrompts: z.record(z.string()).default({}),

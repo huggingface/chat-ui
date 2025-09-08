@@ -93,17 +93,7 @@
 					</div>
 				{/if}
 
-				<div class="flex items-start justify-between py-3">
-					<div>
-						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Hide emoticons in topics
-						</div>
-						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Hide emojis shown in the conversation list.
-						</p>
-					</div>
-					<Switch name="hideEmojiOnSidebar" bind:checked={$settings.hideEmojiOnSidebar} />
-				</div>
+
 
 				<div class="flex items-start justify-between py-3">
 					<div>
