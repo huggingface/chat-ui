@@ -372,7 +372,7 @@
 						{#if loading}
 							<button
 								disabled
-								class="btn absolute bottom-1 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
+								class="btn absolute bottom-0.5 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
 							>
 								<EosIconsLoading />
 							</button>
