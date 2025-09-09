@@ -12,12 +12,11 @@
 	interface Props {
 		content: string;
 		sources?: { title?: string; link: string }[];
-		generating?: boolean;
 	}
 
 	let worker: Worker | null = null;
 
-	let { content, sources = [], generating = false }: Props = $props();
+	let { content, sources = [] }: Props = $props();
 
 	let tokens: Token[] = $state(processTokensSync(content, sources));
 
@@ -83,6 +82,6 @@
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 		{@html token.html}
 	{:else if token.type === "code"}
-		<CodeBlock code={token.code} rawCode={token.rawCode} disabled={generating} />
+		<CodeBlock code={token.code} rawCode={token.rawCode} />
 	{/if}
 {/each}
