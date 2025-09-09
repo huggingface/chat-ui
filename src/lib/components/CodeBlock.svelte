@@ -7,9 +7,10 @@
 	interface Props {
 		code?: string;
 		rawCode?: string;
+		disabled?: boolean;
 	}
 
-	let { code = "", rawCode = "" }: Props = $props();
+	let { code = "", rawCode = "", disabled = false }: Props = $props();
 
 	let previewOpen = $state(false);
 
@@ -32,10 +33,12 @@
 	<div class="absolute right-2 top-2 flex items-center gap-1.5">
 		{#if showPreview}
 			<button
-				class="btn h-7 gap-1 rounded-lg border border-gray-200 px-2 text-xs text-gray-200 shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
+				class="btn h-7 gap-1 rounded-lg border border-gray-200 px-2 text-xs text-gray-200 shadow-sm transition-all hover:border-gray-300 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
 				onclick={() => (previewOpen = true)}
 				title="Preview HTML"
 				aria-label="Preview HTML"
+				{disabled}
+				aria-disabled={disabled}
 			>
 				<PlayFilledAlt class="text-[0.6rem]" />
 				Preview
