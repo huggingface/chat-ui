@@ -15,7 +15,6 @@ export interface Settings extends Timestamps {
 	ethicsModalAcceptedAt: Date | null;
 	activeModel: string;
 
-
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 

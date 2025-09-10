@@ -14,7 +14,10 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 			};
 		})
 		.get("/refresh", async () => {
-			const base = (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
+			const base = (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(
+				/\/$/,
+				""
+			);
 			const res = await fetch(`${base}/models`);
 			const body = await res.text();
 			let parsed: unknown;

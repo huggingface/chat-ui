@@ -338,7 +338,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					if (event.token === "") return;
 					messageToWriteTo.content += event.token;
 
-
 					if (!lastTokenTimestamp) {
 						lastTokenTimestamp = new Date();
 					}
@@ -527,7 +526,6 @@ export async function PATCH({ request, locals, params }) {
 	if (!conv) {
 		error(404, "Conversation not found");
 	}
-
 
 	// Only include defined values in the update, with title sanitized
 	const updateValues = {

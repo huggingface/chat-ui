@@ -364,7 +364,6 @@
 		}
 	}
 
-
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
