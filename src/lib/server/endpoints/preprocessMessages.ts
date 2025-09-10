@@ -1,5 +1,4 @@
 import type { Message } from "$lib/types/Message";
-import { format } from "date-fns";
 import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";

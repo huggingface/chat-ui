@@ -1,5 +1,4 @@
 import { collections } from "$lib/server/database";
-import { models } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";

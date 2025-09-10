@@ -3,7 +3,7 @@ import { authPlugin } from "$api/authPlugin";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { authCondition } from "$lib/server/auth";
-import { models, validModelIdSchema } from "$lib/server/models";
+import { validModelIdSchema } from "$lib/server/models";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import type { Conversation } from "$lib/types/Conversation";
 

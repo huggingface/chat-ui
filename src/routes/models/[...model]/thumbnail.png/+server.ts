@@ -28,7 +28,7 @@ export const GET: RequestHandler = (async ({ params }) => {
 	// so cast here to satisfy the compiler without pulling in React types.
 	const reactLike = html(
 		"<style>" + renderedComponent.head + "</style>" + renderedComponent.body
-	) as unknown as any;
+	) as unknown as never;
 
 	const svg = await satori(reactLike, {
 		width: 1200,

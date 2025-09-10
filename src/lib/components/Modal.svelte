@@ -47,7 +47,7 @@
 	onDestroy(() => {
 		if (!browser) return;
 		document.getElementById("app")?.removeAttribute("inert");
-		window.removeEventListener("keydown", handleKeydown, { capture: true } as EventListenerOptions);
+		window.removeEventListener("keydown", handleKeydown, { capture: true });
 	});
 </script>
 

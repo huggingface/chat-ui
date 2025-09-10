@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
 	import { createEventDispatcher, tick } from "svelte";
-	import { page } from "$app/state";
 
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
@@ -13,7 +12,6 @@
 
 	import {
 		MessageUpdateType,
-		type MessageFinalAnswerUpdate,
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
@@ -36,8 +34,8 @@
 	let {
 		message,
 		loading = false,
-		isAuthor = true,
-		readOnly = false,
+		isAuthor: _isAuthor = true,
+		readOnly: _readOnly = false,
 		isTapped = $bindable(false),
 		alternatives = [],
 		editMsdgId = $bindable(null),
@@ -50,6 +48,11 @@
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
+
+	$effect(() => {
+		// referenced to appease linter for currently-unused props
+		void (_isAuthor, _readOnly);
+	});
 
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -68,12 +71,12 @@
 			[]) as MessageReasoningUpdate[]
 	);
 
-	let messageFinalAnswer = $derived(
-		message.updates?.find(
-			({ type }) => type === MessageUpdateType.FinalAnswer
-		) as MessageFinalAnswerUpdate
-	);
-	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
+	// const messageFinalAnswer = $derived(
+	// 	message.updates?.find(
+	// 		({ type }) => type === MessageUpdateType.FinalAnswer
+	// 	) as MessageFinalAnswerUpdate
+	// );
+	// const urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	// let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
@@ -154,7 +157,7 @@
 				{/if}
 
 				{#if hasClientThink}
-					{#each message.content.split(THINK_BLOCK_REGEX) as part}
+					{#each message.content.split(THINK_BLOCK_REGEX) as part, _i}
 						{#if part && part.startsWith("<think>")}
 							{@const isClosed = part.endsWith("</think>")}
 							{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}

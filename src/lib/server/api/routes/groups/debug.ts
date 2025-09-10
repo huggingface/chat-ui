@@ -23,15 +23,20 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 			let parsed: unknown;
 			try {
 				parsed = JSON.parse(body);
-			} catch {}
+			} catch (_err) {
+				parsed = undefined;
+			}
 			return {
 				status: res.status,
 				ok: res.ok,
 				base,
-				length:
-					typeof parsed === "object" && parsed && "data" in (parsed as any)
-						? ((parsed as any).data?.length ?? null)
-						: null,
+				length: (() => {
+					if (parsed && typeof parsed === "object" && "data" in parsed) {
+						const data = (parsed as { data?: unknown }).data;
+						return Array.isArray(data) ? data.length : null;
+					}
+					return null;
+				})(),
 				sample: body.slice(0, 2000),
 			};
 		})

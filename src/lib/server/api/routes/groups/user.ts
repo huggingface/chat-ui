@@ -5,7 +5,6 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
-import { ObjectId } from "mongodb";
 import { z } from "zod";
 
 export const userGroup = new Elysia()

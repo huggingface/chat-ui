@@ -172,7 +172,6 @@ export class Database {
 			messageEvents,
 			semaphores,
 			tokenCaches,
-			tools,
 			config,
 		} = this.getCollections();
 

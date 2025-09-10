@@ -11,7 +11,9 @@ export async function GET() {
 		try {
 			const parsed = JSON.parse(text);
 			length = Array.isArray(parsed?.data) ? parsed.data.length : null;
-		} catch {}
+		} catch (_err) {
+			length = null; // ignore parse errors
+		}
 		return json({ base, status: res.status, ok: res.ok, length, sample: text.slice(0, 1000) });
 	} catch (e) {
 		return json({ base, error: String(e) });
