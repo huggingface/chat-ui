@@ -1,5 +1,4 @@
 import { config } from "$lib/server/config";
-import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models, validModelIdSchema } from "$lib/server/models";

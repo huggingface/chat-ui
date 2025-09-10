@@ -1,12 +1,6 @@
 <script lang="ts">
 	import Logo from "$lib/components/icons/Logo.svelte";
-	import { createEventDispatcher } from "svelte";
-	import IconGear from "~icons/bi/gear-fill";
-	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import type { Model } from "$lib/types/Model";
-	import ModelCardMetadata from "../ModelCardMetadata.svelte";
-	import { base } from "$app/paths";
-	import JSON5 from "json5";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	const publicConfig = usePublicConfig();
@@ -15,9 +9,12 @@
 		currentModel: Model;
 	}
 
-	let { currentModel }: Props = $props();
+	let { currentModel: _currentModel }: Props = $props();
 
-	const dispatch = createEventDispatcher<{ message: string }>();
+	$effect(() => {
+		// referenced to appease linter while UI blocks are commented out
+		void _currentModel;
+	});
 </script>
 
 <div class="my-auto grid items-center justify-center gap-8 text-center">

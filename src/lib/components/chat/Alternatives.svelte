@@ -1,15 +1,9 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 
 	import { createEventDispatcher } from "svelte";
-	import { page } from "$app/state";
-	import { error } from "$lib/stores/errors";
-	import { invalidate } from "$app/navigation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		message: Message;
@@ -26,7 +20,7 @@
 		showAlternateMsg: { id: Message["id"] };
 	}>();
 
-	const client = useAPIClient();
+	// API client removed as deletion UI is commented out
 </script>
 
 <div

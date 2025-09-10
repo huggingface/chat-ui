@@ -2,7 +2,6 @@
 	import { createBubbler } from "svelte/legacy";
 
 	const bubble = createBubbler();
-	import { useSettingsStore } from "$lib/stores/settings";
 	import CarbonImage from "~icons/carbon/image";
 
 	interface Props {
@@ -19,8 +18,6 @@
 		onDrag = $bindable(false),
 		onDragInner = $bindable(false),
 	}: Props = $props();
-
-	const settings = useSettingsStore();
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();

@@ -1,22 +1,11 @@
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
-import { logger } from "../logger";
 
 export async function generateSummaryOfReasoning(
 	buffer: string,
 	modelId?: string
 ): Promise<string> {
 	let summary: string | undefined;
-
-	const messages = [
-		{
-			from: "user" as const,
-			content: buffer.slice(-300),
-		},
-	];
-
-	const preprompt = `You are tasked with submitting a summary of the latest reasoning steps into a tool. Never describe results of the reasoning, only the process. Remain vague in your summary.
-The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. The sentence must be very short, ideally 5 words or less.`;
 
 	// Tools removed: no tool-based summarization path
 

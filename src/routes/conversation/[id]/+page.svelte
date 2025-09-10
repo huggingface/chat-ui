@@ -437,7 +437,6 @@
 		messages = data.messages;
 	});
 
-	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
 	let messagesPath = $derived(createMessagesPath(messages));
 	let messagesAlternatives = $derived(createMessagesAlternatives(messages));

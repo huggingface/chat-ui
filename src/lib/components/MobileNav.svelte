@@ -14,7 +14,6 @@
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import { Spring } from "svelte/motion";
-	import CarbonClose from "~icons/carbon/close";
 	import { pan, type GestureCustomEvent, type PanCustomEvent } from "svelte-gestures";
 	interface Props {
 		title: string | undefined;

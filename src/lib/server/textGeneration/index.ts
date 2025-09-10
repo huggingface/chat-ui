@@ -41,10 +41,10 @@ async function* textGenerationWithoutTitle(
 		status: MessageUpdateStatus.Started,
 	};
 
-	const { model, conv, messages, assistant, isContinue } = ctx;
+	const { conv, messages } = ctx;
 	const convId = conv._id;
 
-	let preprompt = conv.preprompt;
+	const preprompt = conv.preprompt;
 
 	const processedMessages = await preprocessMessages(messages, convId);
 	yield* generate({ ...ctx, messages: processedMessages }, preprompt);
