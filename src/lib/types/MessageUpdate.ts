@@ -28,8 +28,6 @@ export interface MessageStatusUpdate {
 	message?: string;
 }
 
- 
-
 // Everything else
 export interface MessageTitleUpdate {
 	type: MessageUpdateType.Title;

@@ -23,29 +23,29 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-    // Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
-    apiKey: z.string().default(config.OPENAI_API_KEY || config.HF_TOKEN || "sk-"),
+	// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
+	apiKey: z.string().default(config.OPENAI_API_KEY || config.HF_TOKEN || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
 	defaultHeaders: z.record(z.string()).optional(),
 	defaultQuery: z.record(z.string()).optional(),
 	extraBody: z.record(z.any()).optional(),
-    multimodal: z
-        .object({
-            image: createImageProcessorOptionsValidator({
-                supportedMimeTypes: [
-                    // Restrict to the most widely-supported formats
-                    "image/png",
-                    "image/jpeg",
-                ],
-                preferredMimeType: "image/jpeg",
-                maxSizeInMB: 3,
-                maxWidth: 2048,
-                maxHeight: 2048,
-            }),
-        })
-        .default({}),
+	multimodal: z
+		.object({
+			image: createImageProcessorOptionsValidator({
+				supportedMimeTypes: [
+					// Restrict to the most widely-supported formats
+					"image/png",
+					"image/jpeg",
+				],
+				preferredMimeType: "image/jpeg",
+				maxSizeInMB: 3,
+				maxWidth: 2048,
+				maxHeight: 2048,
+			}),
+		})
+		.default({}),
 	/* enable use of max_completion_tokens in place of max_tokens */
 	useCompletionTokens: z.boolean().default(false),
 	streamingSupported: z.boolean().default(true),
@@ -115,15 +115,11 @@ export async function endpointOai(
 
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
-    } else if (completion === "chat_completions") {
-        return async ({ messages, preprompt, generateSettings, conversationId, isMultimodal }) => {
+	} else if (completion === "chat_completions") {
+		return async ({ messages, preprompt, generateSettings, conversationId, isMultimodal }) => {
 			// Format messages for the chat API, handling multimodal content if supported
-            let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-                await prepareMessages(
-                    messages,
-                    imageProcessor,
-                    isMultimodal ?? model.multimodal
-                );
+			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+				await prepareMessages(messages, imageProcessor, isMultimodal ?? model.multimodal);
 
 			// Check if a system message already exists as the first message
 			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
@@ -211,34 +207,34 @@ async function prepareMessages(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
 	isMultimodal: boolean
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-    return Promise.all(
-        messages.map(async (message) => {
-            if (message.from === "user" && isMultimodal) {
-                const parts = [
-                    { type: "text" as const, text: message.content },
-                    ...(await prepareFiles(imageProcessor, message.files ?? [])),
-                ];
-                return { role: message.from, content: parts };
-            }
-            return { role: message.from, content: message.content };
-        })
-    );
+	return Promise.all(
+		messages.map(async (message) => {
+			if (message.from === "user" && isMultimodal) {
+				const parts = [
+					{ type: "text" as const, text: message.content },
+					...(await prepareFiles(imageProcessor, message.files ?? [])),
+				];
+				return { role: message.from, content: parts };
+			}
+			return { role: message.from, content: message.content };
+		})
+	);
 }
 
 async function prepareFiles(
-    imageProcessor: ReturnType<typeof makeImageProcessor>,
-    files: MessageFile[]
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+	files: MessageFile[]
 ): Promise<OpenAI.Chat.Completions.ChatCompletionContentPartImage[]> {
-    const processedFiles = await Promise.all(
-        files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
-    );
-    return processedFiles.map((file) => ({
-        type: "image_url" as const,
-        image_url: {
-            url: `data:${file.mime};base64,${file.image.toString("base64")}`,
-            // Improves compatibility with some OpenAI-compatible servers
-            // that expect an explicit detail setting.
-            detail: "auto",
-        },
-    }));
+	const processedFiles = await Promise.all(
+		files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
+	);
+	return processedFiles.map((file) => ({
+		type: "image_url" as const,
+		image_url: {
+			url: `data:${file.mime};base64,${file.image.toString("base64")}`,
+			// Improves compatibility with some OpenAI-compatible servers
+			// that expect an explicit detail setting.
+			detail: "auto",
+		},
+	}));
 }

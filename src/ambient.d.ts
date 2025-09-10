@@ -8,12 +8,13 @@ declare module "*.ttf" {
 // This mirrors older/internal naming to avoid TS "cannot find name" errors
 // when the file references the type without importing it.
 type WebSearchSource = {
-  title?: string;
-  link: string;
+	title?: string;
+	link: string;
 };
 
-type TextGenerationStreamOutputWithToolsAndWebSources = import("@huggingface/inference").TextGenerationStreamOutput & {
-  webSources?: WebSearchSource[];
-  toolCalls?: unknown[];
-  toolCallDelta?: unknown;
-};
+type TextGenerationStreamOutputWithToolsAndWebSources =
+	import("@huggingface/inference").TextGenerationStreamOutput & {
+		webSources?: WebSearchSource[];
+		toolCalls?: unknown[];
+		toolCallDelta?: unknown;
+	};
