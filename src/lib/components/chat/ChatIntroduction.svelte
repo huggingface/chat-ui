@@ -20,8 +20,12 @@
 	const dispatch = createEventDispatcher<{ message: string }>();
 </script>
 
-<div class="my-auto grid gap-8 lg:grid-cols-3">
-	<div class="lg:col-span-1">
+<div class="my-auto grid items-center justify-center gap-8 text-center">
+	<div class="flex -translate-y-8 select-none items-center rounded-xl text-5xl font-semibold">
+		<Logo classNames="size-20 dark:invert" />
+		{publicConfig.PUBLIC_APP_NAME}
+	</div>
+	<!-- <div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
 				<Logo classNames="mr-1 flex-none dark:invert" />
@@ -29,7 +33,7 @@
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
-					v{publicConfig.PUBLIC_VERSION}
+					{publicConfig.PUBLIC_VERSION}
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
@@ -95,5 +99,5 @@
 			</div>
 		</div>
 	{/if}
-	<div class="h-40 sm:h-24"></div>
+	<div class="h-40 sm:h-24"></div> -->
 </div>
