@@ -73,7 +73,7 @@
 </script>
 
 <nav
-	class="flex h-12 items-center justify-between border-b bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-800/70 md:hidden"
+	class="flex h-12 items-center justify-between rounded-b-xl border-b bg-gray-50 px-3 shadow dark:border-gray-800 dark:bg-gray-800/70 dark:shadow-xl md:hidden"
 >
 	<button
 		type="button"
