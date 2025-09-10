@@ -18,9 +18,10 @@
 
 	const publicConfig = usePublicConfig();
 
-	// Local filter state for model id search
+	// Local filter state for model search (hyphen/space insensitive)
 	let modelFilter = $state("");
-	let normalizedFilter = $derived(modelFilter.trim().toLowerCase());
+	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 </script>
 
 <svelte:head>
@@ -54,8 +55,8 @@
 		<input
 			type="search"
 			bind:value={modelFilter}
-			placeholder="Filter by name"
-			aria-label="Filter models by id"
+			placeholder="Search by name"
+			aria-label="Search models by name or id"
 			class="mt-4 w-full rounded-3xl border border-gray-300 bg-white px-5 py-2 text-[15px]
 				placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300
 				dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-gray-700"
@@ -63,7 +64,10 @@
 		<div class="mt-6 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
 			{#each data.models
 				.filter((el) => !el.unlisted)
-				.filter((el) => el.id.toLowerCase().includes(normalizedFilter)) as model, index (model.id)}
+				.filter((el) => {
+					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
+					return queryTokens.every((q) => haystack.includes(q));
+				}) as model, index (model.id)}
 				<a
 					href="{base}/models/{model.id}"
 					aria-label="Model card"
