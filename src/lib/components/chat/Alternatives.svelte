@@ -30,7 +30,7 @@
 </script>
 
 <div
-	class="font-white group/navbranch z-0 flex h-6 w-fit select-none items-center justify-center gap-1 text-sm {classNames}"
+	class="font-white group/navbranch z-0 flex h-6 w-fit select-none items-center justify-center gap-1 whitespace-nowrap text-sm {classNames}"
 >
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"

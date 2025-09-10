@@ -69,6 +69,7 @@
 			<div class="flex flex-col gap-2">
 				<label for="conv-title" class="text-sm text-gray-600 dark:text-gray-400">Title</label>
 				<input
+					autocomplete="off"
 					id="conv-title"
 					bind:this={inputEl}
 					value={newTitle}
