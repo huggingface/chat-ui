@@ -13,11 +13,12 @@ export async function* openAIChatToTextGenerationStream(
 	let tokenId = 0;
 	let toolBuffer = ""; // legacy hack kept harmless
 	let metadataYielded = false;
+	let thinkOpen = false;
 
 	for await (const completion of completionStream) {
 		// Check if this chunk contains router metadata (first chunk from llm-router)
-		if (!metadataYielded && (completion as any)['x-router-metadata']) {
-			const metadata = (completion as any)['x-router-metadata'];
+		if (!metadataYielded && (completion as any)["x-router-metadata"]) {
+			const metadata = (completion as any)["x-router-metadata"];
 			yield {
 				token: {
 					id: tokenId++,
@@ -34,12 +35,23 @@ export async function* openAIChatToTextGenerationStream(
 			} as TextGenerationStreamOutput & { routerMetadata: { route: string; model: string } };
 			metadataYielded = true;
 			// Skip processing this chunk as content since it's just metadata
-			if (!completion.choices || completion.choices.length === 0 || !completion.choices[0].delta?.content) {
+			if (
+				!completion.choices ||
+				completion.choices.length === 0 ||
+				!completion.choices[0].delta?.content
+			) {
 				continue;
 			}
 		}
 		const { choices } = completion;
-		const content = choices[0]?.delta?.content ?? "";
+		const delta: any = choices?.[0]?.delta ?? {};
+		const content: string = (delta?.content as string) ?? "";
+		const reasoning: string =
+			typeof delta?.reasoning === "string"
+				? (delta.reasoning as string)
+				: typeof delta?.reasoning_content === "string"
+					? (delta.reasoning_content as string)
+					: "";
 		const last = choices[0]?.finish_reason === "stop" || choices[0]?.finish_reason === "length";
 
 		// if the last token is a stop and the tool buffer is not empty, yield it as a generated_text
@@ -76,13 +88,39 @@ export async function* openAIChatToTextGenerationStream(
 			}
 		}
 
-		if (content) {
-			generatedText = generatedText + content;
+		let combined = "";
+		if (reasoning && reasoning.length > 0) {
+			if (!thinkOpen) {
+				combined += "<think>" + reasoning;
+				thinkOpen = true;
+			} else {
+				combined += reasoning;
+			}
 		}
+
+		if (content && content.length > 0) {
+			const trimmed = content.trim();
+			// If provider sends a lone closing tag with no prior <think>, drop it.
+			if (!thinkOpen && trimmed === "</think>") {
+				// ignore stray closing tag
+			} else if (thinkOpen && trimmed === "</think>") {
+				// close once without duplicating the tag
+				combined += "</think>";
+				thinkOpen = false;
+			} else if (thinkOpen) {
+				combined += "</think>" + content;
+				thinkOpen = false;
+			} else {
+				combined += content;
+			}
+		}
+
+		// Accumulate the combined token into the full text
+		generatedText += combined;
 		const output: TextGenerationStreamOutput = {
 			token: {
 				id: tokenId++,
-				text: content ?? "",
+				text: combined,
 				logprob: 0,
 				special: last,
 			},
@@ -120,7 +158,18 @@ export async function* openAIChatToTextGenerationSingle(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
 	getRouterMetadata?: () => { route?: string; model?: string }
 ) {
-	const content = completion.choices[0]?.message?.content || "";
+	const message: any = completion.choices?.[0]?.message ?? {};
+	let content: string = message?.content || "";
+	// Provider-dependent reasoning shapes (non-streaming)
+	const r: string =
+		typeof message?.reasoning === "string"
+			? (message.reasoning as string)
+			: typeof message?.reasoning_content === "string"
+				? (message.reasoning_content as string)
+				: "";
+	if (r && r.length > 0) {
+		content = `<think>${r}</think>` + content;
+	}
 	const tokenId = 0;
 
 	// Yield the content as a single token
@@ -133,9 +182,11 @@ export async function* openAIChatToTextGenerationSingle(
 		},
 		generated_text: content,
 		details: null,
-		...(getRouterMetadata ? (() => {
-			const metadata = getRouterMetadata();
-			return metadata && metadata.route && metadata.model ? { routerMetadata: metadata } : {};
-		})() : {}),
+		...(getRouterMetadata
+			? (() => {
+					const metadata = getRouterMetadata();
+					return metadata && metadata.route && metadata.model ? { routerMetadata: metadata } : {};
+				})()
+			: {}),
 	} as TextGenerationStreamOutput & { routerMetadata?: { route?: string; model?: string } };
 }
