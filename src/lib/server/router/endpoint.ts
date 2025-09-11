@@ -38,14 +38,13 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
       });
     }
 
-    // First yield router metadata for immediate UI display
-    const firstCandidate = candidates[0];
-    async function* metadataThenStream(gen: AsyncGenerator<any>) {
+    // Yield router metadata for immediate UI display, using the actual candidate
+    async function* metadataThenStream(gen: AsyncGenerator<any>, actualModel: string) {
       yield {
         token: { id: 0, text: "", special: true, logprob: 0 },
         generated_text: null,
         details: null,
-        routerMetadata: { route: routeName, model: firstCandidate },
+        routerMetadata: { route: routeName, model: actualModel },
       } as any;
       for await (const ev of gen) yield ev;
     }
@@ -56,8 +55,8 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
         logger.info({ route: routeName, model: candidate }, "[router] trying candidate");
         const ep = await createCandidateEndpoint(candidate);
         const gen = await ep({ ...params });
-        // Only yield metadata once with the first candidate
-        return metadataThenStream(gen);
+        // Yield metadata with the actual candidate used
+        return metadataThenStream(gen, candidate);
       } catch (e) {
         lastErr = e;
         logger.warn({ route: routeName, model: candidate, err: String(e) }, "[router] candidate failed");
@@ -69,4 +68,3 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
     throw new Error(`Routing failed for route=${routeName}: ${String(lastErr)}`);
   };
 }
-
