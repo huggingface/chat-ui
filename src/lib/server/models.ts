@@ -5,6 +5,7 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
+import { makeRouterEndpoint } from "$lib/server/router/endpoint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -188,6 +189,12 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	getEndpoint: async (): Promise<Endpoint> => {
 		if (!m.endpoints || m.endpoints.length === 0) {
 			throw new Error("No endpoints configured. This build requires OpenAI-compatible endpoints.");
+		}
+
+		// Router integration: when the selected model matches LLM_ROUTER_MODEL_ID,
+		// wrap calls with the internal router endpoint.
+		if (config.LLM_ROUTER_MODEL_ID && m.id === config.LLM_ROUTER_MODEL_ID) {
+			return await makeRouterEndpoint(m);
 		}
 
 		// Only support OpenAI-compatible endpoints in this build
