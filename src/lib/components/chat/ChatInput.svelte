@@ -3,7 +3,6 @@
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
-	import { useSettingsStore } from "$lib/stores/settings";
 	import { page } from "$app/state";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
@@ -89,8 +88,6 @@
 			dispatch("submit");
 		}
 	}
-
-	const settings = useSettingsStore();
 
 	// Tools removed; only show file upload when applicable
 	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);

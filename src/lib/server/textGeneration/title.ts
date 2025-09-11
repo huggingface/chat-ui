@@ -27,24 +27,24 @@ export async function* generateTitleForConversation(
 }
 
 export async function generateTitle(prompt: string, modelId?: string) {
-    if (config.LLM_SUMMARIZATION !== "true") {
-        // When summarization is disabled, use the first five words without adding emojis
-        return prompt.split(/\s+/g).slice(0, 5).join(" ");
-    }
+	if (config.LLM_SUMMARIZATION !== "true") {
+		// When summarization is disabled, use the first five words without adding emojis
+		return prompt.split(/\s+/g).slice(0, 5).join(" ");
+	}
 
 	// Tools removed: no tool-based title path
 
-    return await getReturnFromGenerator(
-        generateFromDefaultEndpoint({
-            messages: [{ from: "user", content: prompt }],
-            preprompt:
-                "You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it; only summarize the user's query.",
-            generateSettings: {
-                max_new_tokens: 30,
-            },
-            modelId,
-        })
-    )
+	return await getReturnFromGenerator(
+		generateFromDefaultEndpoint({
+			messages: [{ from: "user", content: prompt }],
+			preprompt:
+				"You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it; only summarize the user's query.",
+			generateSettings: {
+				max_new_tokens: 30,
+			},
+			modelId,
+		})
+	)
 		.then((summary) => {
 			const firstFive = prompt.split(/\s+/g).slice(0, 5).join(" ");
 			const trimmed = summary.trim();

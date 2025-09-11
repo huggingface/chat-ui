@@ -1,5 +1,4 @@
 import { config } from "$lib/server/config";
-import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models, validModelIdSchema } from "$lib/server/models";
@@ -338,7 +337,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					if (event.token === "") return;
 					messageToWriteTo.content += event.token;
 
-
 					if (!lastTokenTimestamp) {
 						lastTokenTimestamp = new Date();
 					}
@@ -527,7 +525,6 @@ export async function PATCH({ request, locals, params }) {
 	if (!conv) {
 		error(404, "Conversation not found");
 	}
-
 
 	// Only include defined values in the update, with title sanitized
 	const updateValues = {

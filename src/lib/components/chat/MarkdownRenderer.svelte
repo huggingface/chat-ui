@@ -20,7 +20,10 @@
 
 	let tokens: Token[] = $state(processTokensSync(content, sources));
 
-	async function processContent(content: string, sources: { title?: string; link: string }[]): Promise<Token[]> {
+	async function processContent(
+		content: string,
+		sources: { title?: string; link: string }[]
+	): Promise<Token[]> {
 		if (worker) {
 			return new Promise((resolve) => {
 				if (!worker) {

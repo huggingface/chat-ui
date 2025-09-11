@@ -14,10 +14,9 @@ function applyDarkClass(isDark: boolean) {
 }
 
 export function getThemePreference(): ThemePreference {
-	const pref = (typeof localStorage !== "undefined" ? (localStorage as any).theme : undefined) as
-		| ThemePreference
-		| undefined;
-	return pref ?? "system";
+	const raw = typeof localStorage !== "undefined" ? localStorage.getItem("theme") : null;
+	if (raw === "light" || raw === "dark" || raw === "system") return raw;
+	return "system";
 }
 
 /**
@@ -29,7 +28,9 @@ export function getThemePreference(): ThemePreference {
 export function setTheme(preference: ThemePreference) {
 	try {
 		localStorage.theme = preference;
-	} catch {}
+	} catch (_err) {
+		void 0; // ignore write errors
+	}
 
 	const mql = window.matchMedia("(prefers-color-scheme: dark)");
 	const resolve = () =>
@@ -43,25 +44,34 @@ export function setTheme(preference: ThemePreference) {
 	// Store on window to allow replacing listener later
 	const key = "__theme_mql_listener" as const;
 	const w = window as unknown as {
-		[key: string]: ((this: MediaQueryList, ev: MediaQueryListEvent) => any) | undefined;
+		[key: string]: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | undefined;
 	};
-	if (w[key]) {
+	const existing = w[key];
+	if (existing) {
 		try {
-			mql.removeEventListener("change", w[key]!);
-		} catch {
-			// older Safari
-			// @ts-ignore
-			mql.removeListener(w[key]!);
+			mql.removeEventListener("change", existing);
+		} catch (_err) {
+			// older Safari compatibility
+			const legacy = (
+				mql as unknown as {
+					removeListener?: (l: (this: MediaQueryList, ev: MediaQueryListEvent) => void) => void;
+				}
+			).removeListener;
+			legacy?.(existing);
 		}
 		w[key] = undefined;
 	}
 	if (preference === "system") {
 		try {
 			mql.addEventListener("change", listener);
-		} catch {
-			// older Safari
-			// @ts-ignore
-			mql.addListener(listener);
+		} catch (_err) {
+			// older Safari compatibility
+			const legacy = (
+				mql as unknown as {
+					addListener?: (l: (this: MediaQueryList, ev: MediaQueryListEvent) => void) => void;
+				}
+			).addListener;
+			legacy?.(listener);
 		}
 		w[key] = listener;
 	}

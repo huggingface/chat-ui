@@ -16,7 +16,8 @@
 
 	function buildSrcdoc(content: string, channel: string): string {
 		const baseTag = '<base target="_blank">';
-		const errorHook = `\n<script>\n(function(){\n  function send(detail){\n    try{ parent.postMessage({ type: 'chatui.preview.error', channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n})();\n<\/script>`;
+		const endScriptTag = "</scr" + "ipt>";
+		const errorHook = `\n<script>\n(function(){\n  function send(detail){\n    try{ parent.postMessage({ type: 'chatui.preview.error', channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n})();\n${endScriptTag}`;
 
 		const headMatch = content.match(/<head[^>]*>/i);
 		if (headMatch) {
@@ -41,12 +42,20 @@
 
 	let srcdoc = $derived(buildSrcdoc(html, channel));
 
+	type PreviewMessage = {
+		type: string;
+		channel: string;
+		detail?: { message?: unknown; stack?: string };
+	};
+
 	function onMessage(ev: MessageEvent) {
 		if (!iframeEl || ev.source !== iframeEl.contentWindow) return;
-		const data = ev.data as any;
-		if (!data || data.type !== "chatui.preview.error" || data.channel !== channel) return;
-		const detail = data.detail || {};
-		errors = [...errors, { message: String(detail.message || "Error"), stack: detail.stack }];
+		const raw = ev.data as unknown;
+		if (!raw || typeof raw !== "object") return;
+		const data = raw as Partial<PreviewMessage>;
+		if (data.type !== "chatui.preview.error" || data.channel !== channel) return;
+		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
+		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
 	}
 
 	onMount(() => {

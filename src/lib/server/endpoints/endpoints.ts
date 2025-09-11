@@ -28,7 +28,7 @@ export type Endpoint = (
 
 // list of all endpoint generators
 export const endpoints = {
-    openai: endpointOai,
+	openai: endpointOai,
 };
 
 export const endpointSchema = z.discriminatedUnion("type", [endpointOAIParametersSchema]);

@@ -5,7 +5,6 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
-import { fetchJSON } from "$lib/utils/fetchJSON";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -72,7 +71,7 @@ const modelConfig = z.object({
 	reasoning: reasoningSchema.optional(),
 });
 
-const ggufModelsConfig: Array<z.infer<typeof modelConfig>> = [];
+// ggufModelsConfig unused in this build
 
 // Source models exclusively from an OpenAI-compatible endpoint.
 let modelsRaw: z.infer<typeof modelConfig>[] = [];
@@ -158,7 +157,7 @@ if (openaiBaseUrl) {
 }
 
 function getChatPromptRender(
-	m: z.infer<typeof modelConfig>
+	_m: z.infer<typeof modelConfig>
 ): (inputs: ChatTemplateInput) => string {
 	// Minimal template to support legacy "completions" flow if ever used.
 	// We avoid any tokenizer/Jinja usage in this build.

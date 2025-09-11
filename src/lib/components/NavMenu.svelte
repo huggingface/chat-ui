@@ -99,10 +99,10 @@
 	class="sticky top-0 flex flex-none touch-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0"
 >
 	<a
-		class="flex items-center rounded-xl text-lg font-semibold"
+		class="flex select-none items-center rounded-xl text-lg font-semibold"
 		href="{publicConfig.PUBLIC_ORIGIN}{base}/"
 	>
-		<Logo classNames="mr-1 dark:invert" />
+		<Logo classNames="dark:invert mr-[2px]" />
 		{publicConfig.PUBLIC_APP_NAME}
 	</a>
 	<a
