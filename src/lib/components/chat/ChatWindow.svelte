@@ -5,9 +5,9 @@
 	import type { Message, MessageFile } from "$lib/types/Message";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
+	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
-	import CarbonIbmDynamicRouteServer from "~icons/carbon/ibm-dynamic-route-server";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -409,37 +409,36 @@
 			</form>
 			<div
 				class={{
-					"mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+					"mt-2 flex self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
 					"max-sm:hidden": focused && isVirtualKeyboard(),
 				}}
 			>
-				<p>
-					{#if models.find((m) => m.id === currentModel.id)}
-						<a
-							href="{base}/settings/{currentModel.id}"
-							class="inline-flex items-center gap-1 hover:underline"
-						>
-							{#if currentModel.isRouter}
-								<CarbonIbmDynamicRouteServer
+				{#if models.find((m) => m.id === currentModel.id)}
+					<a
+						href="{base}/settings/{currentModel.id}"
+						class="inline-flex items-center gap-1 hover:underline"
+					>
+						{#if currentModel.isRouter}
+							<!-- <CarbonIbmDynamicRouteServer
 									class="text-[0.9rem] text-gray-700 dark:text-gray-200"
-								/>
-								{currentModel.displayName}
-							{:else}
-								Model: {currentModel.displayName}
-							{/if}
-							<CarbonCaretDown class="-ml-0.5 text-xxs" />
-						</a>
-					{:else}
-						<span class="inline-flex items-center line-through dark:border-gray-700">
-							{currentModel.id}
-						</span>
-					{/if}
-					<span class="max-sm:hidden">·</span><br class="sm:hidden" /> Generated content may be inaccurate
-					or false.
-				</p>
+								/> -->
+							<IconOmni />
+
+							{currentModel.displayName}
+						{:else}
+							Model: {currentModel.displayName}
+						{/if}
+						<CarbonCaretDown class="-ml-0.5 text-xxs" />
+					</a>
+				{:else}
+					<span class="inline-flex items-center line-through dark:border-gray-700">
+						{currentModel.id}
+					</span>
+				{/if}
+				<span class="ml-2">Generated content may be inaccurate or false.</span>
 				{#if messages.length}
 					<button
-						class="flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
+						class="ml-auto flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
 						type="button"
 						onclick={onShare}
 					>
