@@ -122,12 +122,6 @@
 			classNames="mt-5 size-3.5 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 			animating={isLast && loading}
 		/>
-		<!-- <img
-			alt=""
-			src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-			class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg max-sm:hidden"
-		/> -->
-		<!-- min-h-[calc(2rem+theme(spacing[3.5])*2)] -->
 		<div
 			class="relative flex min-w-[60px] flex-col gap-2 break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/80 dark:text-gray-300"
 		>
