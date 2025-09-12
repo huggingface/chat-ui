@@ -56,7 +56,7 @@
 <div class="flex flex-col items-start">
 	<div class="mb-4 flex flex-col gap-0.5">
 		<h2 class="text-base font-semibold md:text-lg">
-			{page.params.model}
+			{model.displayName}
 		</h2>
 
 		{#if model.description}
@@ -120,24 +120,26 @@
 		{/if}
 
 		{#if publicConfig.isHuggingChat}
-			<a
-				href={"https://huggingface.co/playground?modelId=" + model.name}
-				target="_blank"
-				rel="noreferrer"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
-			>
-				<CarbonCode class="mr-1.5 shrink-0 text-xs" />
-				API Playground
-			</a>
-			<a
-				href={"https://huggingface.co/" + model.name}
-				target="_blank"
-				rel="noreferrer"
-				class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
-			>
-				<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
-				View model card
-			</a>
+			{#if !(model as any)?.isRouter}
+				<a
+					href={"https://huggingface.co/playground?modelId=" + model.name}
+					target="_blank"
+					rel="noreferrer"
+					class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				>
+					<CarbonCode class="mr-1.5 shrink-0 text-xs" />
+					API Playground
+				</a>
+				<a
+					href={"https://huggingface.co/" + model.name}
+					target="_blank"
+					rel="noreferrer"
+					class="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
+				>
+					<CarbonArrowUpRight class="mr-1.5 shrink-0 text-xs" />
+					View model card
+				</a>
+			{/if}
 			<CopyToClipBoardBtn
 				value="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}/models/{model.id}"
 				classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
