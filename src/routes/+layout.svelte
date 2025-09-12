@@ -13,7 +13,7 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import titleUpdate from "$lib/stores/titleUpdate";
-	import DisclaimerModal from "$lib/components/DisclaimerModal.svelte";
+	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
@@ -165,12 +165,8 @@
 			: conversations.find((conv) => conv.id === $page.params.id)?.title
 	);
 
-	let showDisclaimer = $derived(
-		!$settings.ethicsModalAccepted &&
-			$page.url.pathname !== `${base}/privacy` &&
-			publicConfig.PUBLIC_APP_DISCLAIMER === "1" &&
-			!($page.data.shared === true)
-	);
+	// Show the welcome modal once on first app load
+	let showWelcome = $derived(!$settings.welcomeModalSeen && !($page.data.shared === true));
 </script>
 
 <svelte:head>
@@ -206,8 +202,8 @@
 	{/if}
 </svelte:head>
 
-{#if showDisclaimer}
-	<DisclaimerModal on:close={() => ($settings.ethicsModalAccepted = true)} />
+{#if showWelcome}
+	<WelcomeModal on:close={() => ($settings.welcomeModalSeen = true)} />
 {/if}
 
 {#if $loginModalOpen}

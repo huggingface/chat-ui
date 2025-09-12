@@ -6,13 +6,9 @@ export interface Settings extends Timestamps {
 	userId?: User["_id"];
 	sessionId?: string;
 
-	/**
-	 * Note: Only conversations with this settings explicitly set to true should be shared.
-	 *
-	 * This setting is explicitly set to true when users accept the ethics modal.
-	 * */
 	shareConversationsWithModelAuthors: boolean;
-	ethicsModalAcceptedAt: Date | null;
+    /** One-time welcome modal acknowledgement */
+    welcomeModalSeenAt?: Date | null;
 	activeModel: string;
 
 	// model name and system prompts
@@ -29,7 +25,10 @@ export interface Settings extends Timestamps {
 	directPaste: boolean;
 }
 
-export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "createdAt" | "updatedAt">;
+export type SettingsEditable = Omit<
+	Settings,
+	"welcomeModalSeenAt" | "createdAt" | "updatedAt"
+>;
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,

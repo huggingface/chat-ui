@@ -4,13 +4,13 @@
 
 	import LogoHuggingFaceBorderless from "$lib/components/icons/LogoHuggingFaceBorderless.svelte";
 	import Modal from "$lib/components/Modal.svelte";
-	import { useSettingsStore } from "$lib/stores/settings";
+	import { createEventDispatcher } from "svelte";
 	import { cookiesAreEnabled } from "$lib/utils/cookiesAreEnabled";
 	import Logo from "./icons/Logo.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	const publicConfig = usePublicConfig();
-	const settings = useSettingsStore();
+	const dispatch = createEventDispatcher<{ close: void }>();
 </script>
 
 <Modal on:close width="!max-w-[400px] !m-4">
@@ -49,7 +49,7 @@
 							e.preventDefault();
 							window.open(window.location.href, "_blank");
 						}
-						$settings.ethicsModalAccepted = true;
+						dispatch("close");
 					}}
 				>
 					Start chatting

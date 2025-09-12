@@ -8,7 +8,7 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, oldModels, user, publicConfig, featureFlags, conversationsData] =
+    const [settings, models, oldModels, user, publicConfig, featureFlags, conversationsData] =
 		await Promise.all([
 			client.user.settings.get().then(handleResponse),
 			client.models.get().then(handleResponse),
@@ -38,19 +38,19 @@ export const load = async ({ depends, fetch, url }) => {
 		} satisfies ConvSidebar;
 	});
 
-	return {
-		nConversations,
-		conversations,
-		models,
-		oldModels,
-		user,
-		settings: {
-			...settings,
-			ethicsModalAcceptedAt: settings.ethicsModalAcceptedAt
-				? new Date(settings.ethicsModalAcceptedAt)
-				: null,
-		},
-		publicConfig: getConfigManager(publicConfig),
-		...featureFlags,
-	};
+    return {
+        nConversations,
+        conversations,
+        models,
+        oldModels,
+        user,
+        settings: {
+            ...settings,
+            welcomeModalSeenAt: settings.welcomeModalSeenAt
+                ? new Date(settings.welcomeModalSeenAt)
+                : null,
+        },
+        publicConfig: getConfigManager(publicConfig),
+        ...featureFlags,
+    };
 };

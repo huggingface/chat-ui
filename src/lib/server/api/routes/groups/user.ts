@@ -59,8 +59,8 @@ export const userGroup = new Elysia()
 
 				// todo: get user settings
 				return {
-					ethicsModalAccepted: !!settings?.ethicsModalAcceptedAt,
-					ethicsModalAcceptedAt: settings?.ethicsModalAcceptedAt ?? null,
+					welcomeModalSeen: !!settings?.welcomeModalSeenAt,
+					welcomeModalSeenAt: settings?.welcomeModalSeenAt ?? null,
 
 					activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 					disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
@@ -76,12 +76,12 @@ export const userGroup = new Elysia()
 			.post("/settings", async ({ locals, request }) => {
 				const body = await request.json();
 
-				const { ethicsModalAccepted, ...settings } = z
+				const { welcomeModalSeen, ...settings } = z
 					.object({
 						shareConversationsWithModelAuthors: z
 							.boolean()
 							.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-						ethicsModalAccepted: z.boolean().optional(),
+						welcomeModalSeen: z.boolean().optional(),
 						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 						customPrompts: z.record(z.string()).default({}),
 						multimodalOverrides: z.record(z.boolean()).default({}),
@@ -97,7 +97,7 @@ export const userGroup = new Elysia()
 					{
 						$set: {
 							...settings,
-							...(ethicsModalAccepted && { ethicsModalAcceptedAt: new Date() }),
+							...(welcomeModalSeen && { welcomeModalSeenAt: new Date() }),
 							updatedAt: new Date(),
 						},
 						$setOnInsert: {

@@ -183,7 +183,6 @@ async function seed() {
 				userId: user._id,
 				shareConversationsWithModelAuthors: faker.datatype.boolean(0.25),
 				hideEmojiOnSidebar: faker.datatype.boolean(0.25),
-				ethicsModalAcceptedAt: faker.date.recent({ days: 30 }),
 				activeModel: faker.helpers.arrayElement(modelIds),
 				createdAt: faker.date.recent({ days: 30 }),
 				updatedAt: faker.date.recent({ days: 30 }),
