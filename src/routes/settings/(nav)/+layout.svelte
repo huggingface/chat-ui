@@ -4,6 +4,7 @@
 	import { afterNavigate, goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { useSettingsStore } from "$lib/stores/settings";
+	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
@@ -167,10 +168,10 @@
 					aria-label="Configure {model.displayName}"
 				>
 					<div class="mr-auto flex items-center gap-1 truncate">
-						{#if model.isRouter}
-							<CarbonIbmDynamicRouteServer class="text-[0.9rem] text-gray-700 dark:text-gray-200" />
-						{/if}
 						<span class="truncate">{model.displayName}</span>
+						{#if model.isRouter}
+							<IconOmni />
+						{/if}
 					</div>
 
 					{#if model.multimodal || $settings.multimodalOverrides?.[model.id]}

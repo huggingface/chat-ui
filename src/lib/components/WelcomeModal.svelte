@@ -1,33 +1,49 @@
 <script lang="ts">
-    import Modal from "$lib/components/Modal.svelte";
-    import Logo from "$lib/components/icons/Logo.svelte";
-    import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-    import { useSettingsStore } from "$lib/stores/settings";
+	import Modal from "$lib/components/Modal.svelte";
+	import Logo from "$lib/components/icons/Logo.svelte";
+	import IconOmni from "$lib/components/icons/IconOmni.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { useSettingsStore } from "$lib/stores/settings";
 
-    const publicConfig = usePublicConfig();
-    const settings = useSettingsStore();
+	const publicConfig = usePublicConfig();
+	const settings = useSettingsStore();
 </script>
 
-<Modal closeOnBackdrop={false} on:close={() => ($settings.welcomeModalSeen = true)} width="!max-w-[420px] !m-4">
-    <div class="from-black/30 via-black/5 to-transparent flex w-full flex-col items-center gap-5 bg-gradient-to-b px-6 pb-7 pt-8 text-center dark:from-white/10 dark:via-white/5">
-        <h2 class="flex items-center text-2xl font-semibold text-gray-900 dark:text-gray-100">
-            <Logo classNames="mr-2" /> {publicConfig.PUBLIC_APP_NAME}
-        </h2>
+<Modal
+	closeOnBackdrop={false}
+	on:close={() => ($settings.welcomeModalSeen = true)}
+	width="!max-w-[420px] !m-4"
+>
+	<div
+		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
+	>
+		<div
+			class="-mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
+		>
+			<h2
+				class="flex translate-y-1 items-center text-3xl font-semibold text-gray-900 dark:text-gray-100"
+			>
+				<Logo classNames="mr-2 size-12 dark:invert" />
+				{publicConfig.PUBLIC_APP_NAME}
+			</h2>
+		</div>
 
-        <div class="text-gray-700 dark:text-gray-200">
-            <p class="text-[15px] leading-relaxed">
-                Welcome to {publicConfig.PUBLIC_APP_NAME}, the open source chat app powered by open source AI.
-            </p>
-            <p class="mt-3 text-[15px] leading-relaxed">
-                To give you the best answer, it can automatically select the best AI model based on your query. You can also choose from many state-of-the-art open‑source models to chat with directly. Happy chatting!
-            </p>
-        </div>
+		<div class="text-gray-700 dark:text-gray-200">
+			<p class="text-[15px] leading-relaxed">
+				Welcome to {publicConfig.PUBLIC_APP_NAME}, the chat app powered by open source AI models.
+			</p>
+			<p class="mt-3 text-[15px] leading-relaxed">
+				With <IconOmni classNames="-translate-y-px" /> Omni, it automatically picks the best AI model
+				to give you the best answer depending on your request. You can also choose from any advanced
+				open source models to chat with directly.
+			</p>
+		</div>
 
-        <button
-            class="mt-2 w-full rounded-full border-2 border-black bg-white px-5 py-2 text-lg font-semibold text-black hover:bg-gray-100 dark:border-white dark:bg-black dark:text-white dark:hover:bg-gray-900"
-            onclick={() => ($settings.welcomeModalSeen = true)}
-        >
-            Start chatting
-        </button>
-    </div>
+		<button
+			class="k w-full rounded-xl bg-black px-5 py-2.5 text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+			onclick={() => ($settings.welcomeModalSeen = true)}
+		>
+			Start chatting
+		</button>
+	</div>
 </Modal>

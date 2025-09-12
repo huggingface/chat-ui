@@ -3,6 +3,7 @@
 	import { base } from "$app/paths";
 
 	import type { BackendModel } from "$lib/server/models";
+	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
@@ -67,7 +68,7 @@
 	</div>
 
 	<!-- Actions -->
-	<div class="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+	<div class="mb-4 flex flex-wrap items-center gap-1.5">
 		<button
 			class="flex w-fit items-center rounded-full bg-black px-3 py-1.5 text-sm !text-white shadow-sm hover:bg-black/90 dark:bg-white/80 dark:!text-gray-900 dark:hover:bg-white/90"
 			name="Activate model"
@@ -152,6 +153,12 @@
 	</div>
 
 	<div class="relative flex w-full flex-col gap-2">
+		{#if model?.isRouter}
+			<p class="mb-3 mt-2 rounded-xl bg-gray-100 px-3 py-2 text-sm">
+				<IconOmni classNames="-translate-y-px" /> Omni routes your message to the best underlying model
+				depending on your request.
+			</p>
+		{/if}
 		<div class="flex w-full flex-row content-between">
 			<h3 class="mb-1 text-[15px] font-semibold text-gray-800 dark:text-gray-200">System Prompt</h3>
 			{#if hasCustomPreprompt}
@@ -166,6 +173,7 @@
 				</button>
 			{/if}
 		</div>
+
 		<textarea
 			aria-label="Custom system prompt"
 			rows="8"

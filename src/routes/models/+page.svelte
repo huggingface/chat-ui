@@ -7,7 +7,6 @@
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonView from "~icons/carbon/view";
-	import CarbonIbmDynamicRouteServer from "~icons/carbon/ibm-dynamic-route-server";
 	import { useSettingsStore } from "$lib/stores/settings";
 	interface Props {
 		data: PageData;
@@ -136,9 +135,6 @@
 						</div>
 					</div>
 					<span class="flex items-center gap-2 font-semibold">
-						{#if model.isRouter}
-							<CarbonIbmDynamicRouteServer class="text-[0.95rem] text-gray-700 dark:text-gray-200" />
-						{/if}
 						{model.displayName}
 					</span>
 					<span class="whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">

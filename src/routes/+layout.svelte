@@ -184,7 +184,18 @@
 		<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
 		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
-	<link rel="icon" href="{publicConfig.assetPath}/favicon.ico" sizes="32x32" />
+	<link
+		rel="icon"
+		href="{publicConfig.assetPath}/favicon.svg"
+		type="image/svg+xml"
+		media="(prefers-color-scheme: light)"
+	/>
+	<link
+		rel="icon"
+		href="{publicConfig.assetPath}/favicon-dark.svg"
+		type="image/svg+xml"
+		media="(prefers-color-scheme: dark)"
+	/>
 	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
 	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
 	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
