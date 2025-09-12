@@ -6,12 +6,12 @@ import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 export async function POST({ request, locals }) {
 	const body = await request.json();
 
-	const { ethicsModalAccepted, ...settings } = z
+	const { welcomeModalSeen, ...settings } = z
 		.object({
 			shareConversationsWithModelAuthors: z
 				.boolean()
 				.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-			ethicsModalAccepted: z.boolean().optional(),
+			welcomeModalSeen: z.boolean().optional(),
 			activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 			customPrompts: z.record(z.string()).default({}),
 			multimodalOverrides: z.record(z.boolean()).default({}),
@@ -25,7 +25,7 @@ export async function POST({ request, locals }) {
 		{
 			$set: {
 				...settings,
-				...(ethicsModalAccepted && { ethicsModalAcceptedAt: new Date() }),
+				...(welcomeModalSeen && { welcomeModalSeenAt: new Date() }),
 				updatedAt: new Date(),
 			},
 			$setOnInsert: {
