@@ -208,18 +208,43 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 
 const inferenceApiIds: string[] = [];
 
-export const models = await Promise.all(
-	modelsRaw.map((e) =>
-		processModel(e)
-			.then(addEndpoint)
-			.then(async (m) => ({
-				...m,
-				hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
-			}))
-	)
+const builtModels = await Promise.all(
+    modelsRaw.map((e) =>
+        processModel(e)
+            .then(addEndpoint)
+            .then(async (m) => ({
+                ...m,
+                hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
+                // router decoration added later
+                isRouter: false as boolean,
+            }))
+    )
 );
 
-export type ProcessedModel = (typeof models)[number];
+// Decorate and order the router model if fully configured
+const routerId = (config.LLM_ROUTER_MODEL_ID || "").trim();
+const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
+const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
+const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
+
+let decorated = builtModels.map((m) => {
+    if (routerId && archBase && m.id === routerId) {
+        return {
+            ...m,
+            displayName: routerLabel,
+            logoUrl: routerLogo || m.logoUrl,
+            isRouter: true,
+        };
+    }
+    return m;
+});
+
+// Put router first if present; preserve original order otherwise
+decorated = decorated.sort((a, b) => Number(b.isRouter) - Number(a.isRouter));
+
+export const models = decorated;
+
+export type ProcessedModel = (typeof models)[number] & { isRouter?: boolean };
 
 // super ugly but not sure how to make typescript happier
 export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
