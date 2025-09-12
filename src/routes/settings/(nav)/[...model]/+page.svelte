@@ -120,7 +120,7 @@
 		{/if}
 
 		{#if publicConfig.isHuggingChat}
-			{#if !(model as any)?.isRouter}
+			{#if !model?.isRouter}
 				<a
 					href={"https://huggingface.co/playground?modelId=" + model.name}
 					target="_blank"
@@ -145,7 +145,7 @@
 				classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<div class="flex items-center gap-1.5">
-					<CarbonCopy class="shrink-0 text-xs" />Copy direct link to model
+					<CarbonCopy class="shrink-0 text-xs" />Copy new chat link
 				</div>
 			</CopyToClipBoardBtn>
 		{/if}
