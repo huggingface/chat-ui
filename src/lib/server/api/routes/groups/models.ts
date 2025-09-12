@@ -23,6 +23,8 @@ export type GETModelsResponse = Array<{
 	multimodalAcceptedMimetypes?: string[];
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
+	// Mark router entry for UI decoration
+	isRouter?: boolean;
 }>;
 
 export type GETOldModelsResponse = Array<{
@@ -60,6 +62,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 						multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
 						unlisted: model.unlisted,
 						hasInferenceAPI: model.hasInferenceAPI,
+						isRouter: (model as any).isRouter,
 					})) satisfies GETModelsResponse;
 			} catch (e) {
 				// Return empty list instead of crashing the whole page

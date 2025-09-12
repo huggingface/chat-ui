@@ -8,6 +8,7 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
+	import CarbonIbmDynamicRouteServer from "~icons/carbon/ibm-dynamic-route-server";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
@@ -165,7 +166,12 @@
 					data-model-id={model.id}
 					aria-label="Configure {model.displayName}"
 				>
-					<div class="mr-auto truncate">{model.displayName}</div>
+					<div class="mr-auto flex items-center gap-1 truncate">
+						{#if (model as any).isRouter}
+							<CarbonIbmDynamicRouteServer class="text-[0.9rem] text-gray-700 dark:text-gray-200" />
+						{/if}
+						<span class="truncate">{model.displayName}</span>
+					</div>
 
 					{#if model.multimodal || $settings.multimodalOverrides?.[model.id]}
 						<span

@@ -7,6 +7,7 @@
 
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
+	import CarbonIbmDynamicRouteServer from "~icons/carbon/ibm-dynamic-route-server";
 
 	import EosIconsLoading from "~icons/eos-icons/loading";
 
@@ -417,8 +418,14 @@
 					{#if models.find((m) => m.id === currentModel.id)}
 						<a
 							href="{base}/settings/{currentModel.id}"
-							class="inline-flex items-center hover:underline"
-							>{currentModel.displayName}<CarbonCaretDown class="text-xxs" /></a
+							class="inline-flex items-center gap-1 hover:underline"
+							>
+							{#if (currentModel as any).isRouter}
+								<CarbonIbmDynamicRouteServer class="text-[0.9rem] text-gray-700 dark:text-gray-200" />
+							{/if}
+							{currentModel.displayName}
+							<CarbonCaretDown class="text-xxs" />
+						</a
 						>
 					{:else}
 						<span class="inline-flex items-center line-through dark:border-gray-700">
