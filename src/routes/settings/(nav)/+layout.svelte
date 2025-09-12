@@ -167,7 +167,7 @@
 					aria-label="Configure {model.displayName}"
 				>
 					<div class="mr-auto flex items-center gap-1 truncate">
-						{#if (model as any).isRouter}
+						{#if model.isRouter}
 							<CarbonIbmDynamicRouteServer class="text-[0.9rem] text-gray-700 dark:text-gray-200" />
 						{/if}
 						<span class="truncate">{model.displayName}</span>

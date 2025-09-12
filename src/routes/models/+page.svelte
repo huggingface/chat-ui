@@ -136,7 +136,7 @@
 						</div>
 					</div>
 					<span class="flex items-center gap-2 font-semibold">
-						{#if (model as any).isRouter}
+						{#if model.isRouter}
 							<CarbonIbmDynamicRouteServer class="text-[0.95rem] text-gray-700 dark:text-gray-200" />
 						{/if}
 						{model.displayName}
