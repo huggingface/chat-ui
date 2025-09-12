@@ -8,7 +8,7 @@
     const settings = useSettingsStore();
 </script>
 
-<Modal on:close={() => ($settings.welcomeModalSeen = true)} width="!max-w-[420px] !m-4">
+<Modal closeOnBackdrop={false} on:close={() => ($settings.welcomeModalSeen = true)} width="!max-w-[420px] !m-4">
     <div class="from-black/30 via-black/5 to-transparent flex w-full flex-col items-center gap-5 bg-gradient-to-b px-6 pb-7 pt-8 text-center dark:from-white/10 dark:via-white/5">
         <h2 class="flex items-center text-2xl font-semibold text-gray-900 dark:text-gray-100">
             <Logo classNames="mr-2" /> {publicConfig.PUBLIC_APP_NAME}
@@ -31,4 +31,3 @@
         </button>
     </div>
 </Modal>
-
