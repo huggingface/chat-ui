@@ -190,13 +190,6 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 		if (!m.endpoints || m.endpoints.length === 0) {
 			throw new Error("No endpoints configured. This build requires OpenAI-compatible endpoints.");
 		}
-
-		// Router integration: when the selected model matches LLM_ROUTER_MODEL_ID,
-		// wrap calls with the internal router endpoint.
-		if (config.LLM_ROUTER_MODEL_ID && m.id === config.LLM_ROUTER_MODEL_ID) {
-			return await makeRouterEndpoint(m);
-		}
-
 		// Only support OpenAI-compatible endpoints in this build
 		const endpoint = m.endpoints[0];
 		if (endpoint.type !== "openai") {
@@ -221,28 +214,47 @@ const builtModels = await Promise.all(
     )
 );
 
-// Decorate and order the router model if fully configured
-const routerId = (config.LLM_ROUTER_MODEL_ID || "").trim();
+// Inject a synthetic router alias ("Omni") if Arch router is configured
 const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
 const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
 const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
+const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
 
-let decorated = builtModels.map((m) => {
-    if (routerId && archBase && m.id === routerId) {
-        return {
-            ...m,
-            displayName: routerLabel,
-            logoUrl: routerLogo || m.logoUrl,
-            isRouter: true,
-        };
-    }
-    return m;
-});
+let decorated = builtModels as any[];
 
-// Put router first if present; preserve original order otherwise
-decorated = decorated.sort((a, b) => Number(b.isRouter) - Number(a.isRouter));
+if (archBase) {
+    // Build a minimal model config for the alias
+    const aliasRaw: z.infer<typeof modelConfig> = {
+        id: routerAliasId,
+        name: routerAliasId,
+        displayName: routerLabel,
+        logoUrl: routerLogo || undefined,
+        preprompt: "",
+        endpoints: [
+            {
+                type: "openai" as const,
+                baseURL: openaiBaseUrl!,
+            },
+        ],
+        // Keep the alias visible
+        unlisted: false,
+    } as any;
 
-export const models = decorated;
+    const aliasBase = await processModel(aliasRaw);
+    // Create a self-referential ProcessedModel for the router endpoint
+    let aliasModel: any = {};
+    aliasModel = {
+        ...aliasBase,
+        isRouter: true,
+        // getEndpoint uses the router wrapper regardless of the endpoints array
+        getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
+    };
+
+    // Put alias first
+    decorated = [aliasModel, ...decorated];
+}
+
+export const models = decorated as typeof builtModels;
 
 export type ProcessedModel = (typeof models)[number] & { isRouter?: boolean };
 

@@ -374,9 +374,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					];
 				}
 
-				// Store router metadata if this is the router model
+				// Store router metadata if this is the virtual router (Omni)
 				else if (event.type === MessageUpdateType.RouterMetadata) {
-					if (config.LLM_ROUTER_MODEL_ID && model.id === config.LLM_ROUTER_MODEL_ID) {
+					if ((model as any).isRouter) {
 						messageToWriteTo.routerMetadata = {
 							route: event.route,
 							model: event.model,
