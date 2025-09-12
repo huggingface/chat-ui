@@ -5,15 +5,39 @@
 	export let classNames = "";
 
 	let blobAnim: SVGAnimateElement;
+	let svgEl: SVGSVGElement;
+
+	// Only trigger begin/end on transitions, and pause when not animating
+	let prevAnimating: boolean | undefined = undefined;
+	let prevBlobAnim: SVGAnimateElement | undefined = undefined;
 
 	$: if (blobAnim) {
-		animating ? blobAnim.beginElement() : blobAnim.endElement();
+		const blobChanged = blobAnim !== prevBlobAnim;
+		const animChanged = animating !== prevAnimating;
+		if (blobChanged || animChanged) {
+			if (animating) {
+				// Resume animations and start once
+				svgEl?.unpauseAnimations?.();
+				blobAnim.beginElement();
+			} else {
+				// Stop current run and pause so it cannot restart from queued begins
+				blobAnim.endElement();
+				svgEl?.pauseAnimations?.();
+			}
+			prevAnimating = animating;
+			prevBlobAnim = blobAnim;
+		}
 	}
 
-	onDestroy(() => blobAnim?.endElement());
+	onDestroy(() => {
+		blobAnim?.endElement();
+		svgEl?.pauseAnimations?.();
+	});
 </script>
 
+
 <svg
+	bind:this={svgEl}
 	class={classNames}
 	id="ball"
 	width="1em"
