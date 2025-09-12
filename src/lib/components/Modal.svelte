@@ -10,10 +10,18 @@
 		width?: string;
 		closeButton?: boolean;
 		disableFly?: boolean;
+		/** When false, clicking backdrop will not close the modal */
+		closeOnBackdrop?: boolean;
 		children?: import("svelte").Snippet;
 	}
 
-	let { width = "max-w-sm", children, closeButton = false, disableFly = false }: Props = $props();
+	let {
+		width = "max-w-sm",
+		children,
+		closeButton = false,
+		disableFly = false,
+		closeOnBackdrop = true,
+	}: Props = $props();
 
 	let backdropEl: HTMLDivElement | undefined = $state();
 	let modalEl: HTMLDivElement | undefined = $state();
@@ -32,7 +40,7 @@
 		if (window?.getSelection()?.toString()) {
 			return;
 		}
-		if (event.target === backdropEl) {
+		if (event.target === backdropEl && closeOnBackdrop) {
 			dispatch("close");
 		}
 	}
