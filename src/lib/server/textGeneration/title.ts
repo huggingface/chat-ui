@@ -4,7 +4,6 @@ import { logger } from "$lib/server/logger";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { Conversation } from "$lib/types/Conversation";
 import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
-// taskModel no longer used directly here; we pass the current model instead
 
 export async function* generateTitleForConversation(
 	conv: Conversation
@@ -15,7 +14,8 @@ export async function* generateTitleForConversation(
 		if (conv.title !== "New Chat" || !userMessage) return;
 
 		const prompt = userMessage.content;
-		const title = (await generateTitle(prompt, conv.model)) ?? "New Chat";
+		const modelForTitle = config.TASK_MODEL?.trim() ? config.TASK_MODEL : conv.model;
+		const title = (await generateTitle(prompt, modelForTitle)) ?? "New Chat";
 
 		yield {
 			type: MessageUpdateType.Title,
@@ -41,6 +41,7 @@ export async function generateTitle(prompt: string, modelId?: string) {
 				"You are a summarization AI. Summarize the user's request into a single short sentence of four words or less. Do not try to answer it; only summarize the user's query.",
 			generateSettings: {
 				max_new_tokens: 30,
+				temperature: 0,
 			},
 			modelId,
 		})
