@@ -160,21 +160,6 @@ export async function endpointOai(
 				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
 			}
 
-			// Handle models that don't support system role by converting to user message
-			// This maintains compatibility with older or non-standard models
-			if (
-				!model.systemRoleSupported &&
-				messagesOpenAI.length > 0 &&
-				messagesOpenAI[0]?.role === "system"
-			) {
-				messagesOpenAI[0] = {
-					...messagesOpenAI[0],
-					role: "user",
-				};
-			}
-
-			// Tools integration removed
-
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
 			const body = {
