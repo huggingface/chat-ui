@@ -21,6 +21,12 @@ export interface Settings extends Timestamps {
 	 */
 	multimodalOverrides?: Record<string, boolean>;
 
+	/**
+	 * Per-model toggle to hide Omni prompt suggestions shown near the composer.
+	 * When set to `true`, prompt examples for that model are suppressed.
+	 */
+	hidePromptExamples?: Record<string, boolean>;
+
 	disableStream: boolean;
 	directPaste: boolean;
 }
@@ -35,6 +41,7 @@ export const DEFAULT_SETTINGS = {
 	activeModel: defaultModel.id,
 	customPrompts: {},
 	multimodalOverrides: {},
+	hidePromptExamples: {},
 	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;

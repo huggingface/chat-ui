@@ -177,6 +177,7 @@
 	});
 
 	const settings = useSettingsStore();
+	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
 
 	// Respect per‑model multimodal toggle from settings (force enable)
 	let modelIsMultimodal = $derived(
@@ -319,7 +320,13 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length}
+		{#if !message.length &&
+			!messages.length &&
+			!sources.length &&
+			!loading &&
+			currentModel.isRouter &&
+			routerExamples.length &&
+			!hideRouterExamples}
 			<div
 				class="mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;] dark:text-gray-500"
 			>

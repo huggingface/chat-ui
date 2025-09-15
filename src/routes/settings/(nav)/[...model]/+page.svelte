@@ -52,6 +52,20 @@
 			};
 		}
 	});
+
+	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
+	$effect(() => {
+		if (!$settings.hidePromptExamples) {
+			$settings.hidePromptExamples = {};
+		}
+		const modelId = page.params.model;
+		if ($settings.hidePromptExamples[modelId] === undefined) {
+			$settings.hidePromptExamples = {
+				...$settings.hidePromptExamples,
+				[modelId]: false,
+			};
+		}
+	});
 </script>
 
 <div class="flex flex-col items-start">
@@ -199,6 +213,23 @@
 						bind:checked={$settings.multimodalOverrides[page.params.model]}
 					/>
 				</div>
+
+				{#if model?.isRouter}
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Hide prompt examples
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								Hide the prompt suggestions above the chat input.
+							</p>
+						</div>
+						<Switch
+							name="hidePromptExamples"
+							bind:checked={$settings.hidePromptExamples[page.params.model]}
+						/>
+					</div>
+				{/if}
 			</div>
 		</div>
 

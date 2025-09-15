@@ -65,6 +65,7 @@ export const userGroup = new Elysia()
 					activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
 					disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
 					directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
+					hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
 					shareConversationsWithModelAuthors:
 						settings?.shareConversationsWithModelAuthors ??
 						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
@@ -87,6 +88,7 @@ export const userGroup = new Elysia()
 						multimodalOverrides: z.record(z.boolean()).default({}),
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
+						hidePromptExamples: z.record(z.boolean()).default({}),
 					})
 					.parse(body) satisfies SettingsEditable;
 

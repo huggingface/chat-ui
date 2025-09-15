@@ -6,15 +6,16 @@ import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
 type SettingsStore = {
-    shareConversationsWithModelAuthors: boolean;
-    welcomeModalSeen: boolean;
-    welcomeModalSeenAt: Date | null;
-    activeModel: string;
-    customPrompts: Record<string, string>;
-    multimodalOverrides: Record<string, boolean>;
-    recentlySaved: boolean;
-    disableStream: boolean;
+	shareConversationsWithModelAuthors: boolean;
+	welcomeModalSeen: boolean;
+	welcomeModalSeenAt: Date | null;
+	activeModel: string;
+	customPrompts: Record<string, string>;
+	multimodalOverrides: Record<string, boolean>;
+	recentlySaved: boolean;
+	disableStream: boolean;
 	directPaste: boolean;
+	hidePromptExamples: Record<string, boolean>;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {
