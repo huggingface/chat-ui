@@ -191,7 +191,7 @@
 					{/if}
 					{#if model.id === $settings.activeModel}
 						<div
-							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[10px] font-semibold leading-none text-white dark:bg-white/10 dark:text-white"
+							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
 						>
 							Active
 						</div>
