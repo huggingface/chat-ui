@@ -209,12 +209,11 @@
 		{
 			title: "Explain LLMs",
 			prompt:
-				"Explain how large language models work at a high level using simple analogies. Avoid heavy math and keep it friendly.",
+				"Explain how large language models based on transformers work, covering attention, embeddings, and training objectives.",
 		},
 		{
 			title: "Translate in Italian",
-			prompt:
-				"Translate the following paragraph into Italian with a formal tone: <paste your text here>.",
+			prompt: `Translate in Italian: Some are born great, some achieve greatness, and some have greatness thrust upon ’em`,
 		},
 	];
 
