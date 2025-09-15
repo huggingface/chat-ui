@@ -199,16 +199,14 @@
 					</div>
 				{/if}
 
-				{#if !loading && message.content}
-					<CopyToClipBoardBtn
-						onClick={() => {
-							isCopied = true;
-						}}
-						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-						value={message.content}
-						iconClassNames="text-xs"
-					/>
-				{/if}
+				<CopyToClipBoardBtn
+					onClick={() => {
+						isCopied = true;
+					}}
+					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+					value={message.content}
+					iconClassNames="text-xs"
+				/>
 				<button
 					class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 					title="Retry"
