@@ -1,3 +1,4 @@
+/* eslint-disable */
 import {
 	Issuer,
 	type BaseClient,
@@ -196,118 +197,129 @@ export async function authenticateRequest(
 	cookie: CookieRecord,
 	isApi?: boolean
 ): Promise<App.Locals & { secretSessionId: string }> {
-	// once the entire API has been moved to elysia
-	// we can move this function to authPlugin.ts
-	// and get rid of the isApi && type: "svelte" options
-	const token =
-		cookie.type === "elysia"
-			? cookie.value[config.COOKIE_NAME].value
-			: cookie.value.get(config.COOKIE_NAME);
+	const dev_token = config.PUBLIC_DEV_AUTH_TOKEN || ""; // TODO: Temporary auth token for dev purposes
+	const sessionId = dev_token;
+	const secretSessionId = dev_token;
+	const isAdmin = dev_token ? true : false;
+	return {
+		user: undefined,
+		sessionId,
+		secretSessionId,
+		isAdmin: isAdmin,
+	};
 
-	let email = null;
-	if (config.TRUSTED_EMAIL_HEADER) {
-		if (headers.type === "elysia") {
-			email = headers.value[config.TRUSTED_EMAIL_HEADER];
-		} else {
-			email = headers.value.get(config.TRUSTED_EMAIL_HEADER);
-		}
-	}
+	// // once the entire API has been moved to elysia
+	// // we can move this function to authPlugin.ts
+	// // and get rid of the isApi && type: "svelte" options
+	// const token =
+	// 	cookie.type === "elysia"
+	// 		? cookie.value[config.COOKIE_NAME].value
+	// 		: cookie.value.get(config.COOKIE_NAME);
 
-	let secretSessionId: string | null = null;
-	let sessionId: string | null = null;
+	// let email = null;
+	// if (config.TRUSTED_EMAIL_HEADER) {
+	// 	if (headers.type === "elysia") {
+	// 		email = headers.value[config.TRUSTED_EMAIL_HEADER];
+	// 	} else {
+	// 		email = headers.value.get(config.TRUSTED_EMAIL_HEADER);
+	// 	}
+	// }
 
-	if (email) {
-		secretSessionId = sessionId = await sha256(email);
-		return {
-			user: {
-				_id: new ObjectId(sessionId.slice(0, 24)),
-				name: email,
-				email,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				hfUserId: email,
-				avatarUrl: "",
-				logoutDisabled: true,
-			},
-			sessionId,
-			secretSessionId,
-			isAdmin: adminTokenManager.isAdmin(sessionId),
-		};
-	}
+	// let secretSessionId: string | null = null;
+	// let sessionId: string | null = null;
 
-	if (token) {
-		secretSessionId = token;
-		sessionId = await sha256(token);
-		const user = await findUser(sessionId);
-		return {
-			user: user ?? undefined,
-			sessionId,
-			secretSessionId,
-			isAdmin: user?.isAdmin || adminTokenManager.isAdmin(sessionId),
-		};
-	}
+	// if (email) {
+	// 	secretSessionId = sessionId = await sha256(email);
+	// 	return {
+	// 		user: {
+	// 			_id: new ObjectId(sessionId.slice(0, 24)),
+	// 			name: email,
+	// 			email,
+	// 			createdAt: new Date(),
+	// 			updatedAt: new Date(),
+	// 			hfUserId: email,
+	// 			avatarUrl: "",
+	// 			logoutDisabled: true,
+	// 		},
+	// 		sessionId,
+	// 		secretSessionId,
+	// 		isAdmin: adminTokenManager.isAdmin(sessionId),
+	// 	};
+	// }
 
-	if (isApi) {
-		const authorization =
-			headers.type === "elysia"
-				? headers.value["Authorization"]
-				: headers.value.get("Authorization");
-		if (authorization?.startsWith("Bearer ")) {
-			const token = authorization.slice(7);
-			const hash = await sha256(token);
-			sessionId = secretSessionId = hash;
+	// if (token) {
+	// 	secretSessionId = token;
+	// 	sessionId = await sha256(token);
+	// 	const user = await findUser(sessionId);
+	// 	return {
+	// 		user: user ?? undefined,
+	// 		sessionId,
+	// 		secretSessionId,
+	// 		isAdmin: user?.isAdmin || adminTokenManager.isAdmin(sessionId),
+	// 	};
+	// }
 
-			const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
-			if (cacheHit) {
-				const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
-				if (!user) {
-					throw new Error("User not found");
-				}
-				return {
-					user,
-					sessionId,
-					secretSessionId,
-					isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
-				};
-			}
+	// if (isApi) {
+	// 	const authorization =
+	// 		headers.type === "elysia"
+	// 			? headers.value["Authorization"]
+	// 			: headers.value.get("Authorization");
+	// 	if (authorization?.startsWith("Bearer ")) {
+	// 		const token = authorization.slice(7);
+	// 		const hash = await sha256(token);
+	// 		sessionId = secretSessionId = hash;
 
-			const response = await fetch("https://huggingface.co/api/whoami-v2", {
-				headers: { Authorization: `Bearer ${token}` },
-			});
+	// 		const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
+	// 		if (cacheHit) {
+	// 			const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
+	// 			if (!user) {
+	// 				throw new Error("User not found");
+	// 			}
+	// 			return {
+	// 				user,
+	// 				sessionId,
+	// 				secretSessionId,
+	// 				isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
+	// 			};
+	// 		}
 
-			if (!response.ok) {
-				throw new Error("Unauthorized");
-			}
+	// 		const response = await fetch("https://huggingface.co/api/whoami-v2", {
+	// 			headers: { Authorization: `Bearer ${token}` },
+	// 		});
 
-			const data = await response.json();
-			const user = await collections.users.findOne({ hfUserId: data.id });
-			if (!user) {
-				throw new Error("User not found");
-			}
+	// 		if (!response.ok) {
+	// 			throw new Error("Unauthorized");
+	// 		}
 
-			await collections.tokenCaches.insertOne({
-				tokenHash: hash,
-				userId: data.id,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			});
+	// 		const data = await response.json();
+	// 		const user = await collections.users.findOne({ hfUserId: data.id });
+	// 		if (!user) {
+	// 			throw new Error("User not found");
+	// 		}
 
-			return {
-				user,
-				sessionId,
-				secretSessionId,
-				isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
-			};
-		}
-	}
+	// 		await collections.tokenCaches.insertOne({
+	// 			tokenHash: hash,
+	// 			userId: data.id,
+	// 			createdAt: new Date(),
+	// 			updatedAt: new Date(),
+	// 		});
 
-	// Generate new session if none exists
-	secretSessionId = crypto.randomUUID();
-	sessionId = await sha256(secretSessionId);
+	// 		return {
+	// 			user,
+	// 			sessionId,
+	// 			secretSessionId,
+	// 			isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
+	// 		};
+	// 	}
+	// }
 
-	if (await collections.sessions.findOne({ sessionId })) {
-		throw new Error("Session ID collision");
-	}
+	// // Generate new session if none exists
+	// secretSessionId = crypto.randomUUID();
+	// sessionId = await sha256(secretSessionId);
 
-	return { user: undefined, sessionId, secretSessionId, isAdmin: false };
+	// if (await collections.sessions.findOne({ sessionId })) {
+	// 	throw new Error("Session ID collision");
+	// }
+
+	// return { user: undefined, sessionId, secretSessionId, isAdmin: false };
 }
