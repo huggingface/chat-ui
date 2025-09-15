@@ -214,7 +214,7 @@
 </svelte:head>
 
 {#if showWelcome}
-	<WelcomeModal on:close={() => ($settings.welcomeModalSeen = true)} />
+	<WelcomeModal close={() => settings.set({ welcomeModalSeen: true })} />
 {/if}
 
 {#if $loginModalOpen}

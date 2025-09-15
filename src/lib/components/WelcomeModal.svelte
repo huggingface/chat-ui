@@ -3,15 +3,19 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { useSettingsStore } from "$lib/stores/settings";
 
 	const publicConfig = usePublicConfig();
-	const settings = useSettingsStore();
+
+	interface Props {
+		close: () => void;
+	}
+
+	let { close }: Props = $props();
 </script>
 
 <Modal
 	closeOnBackdrop={false}
-	on:close={() => ($settings.welcomeModalSeen = true)}
+	on:close={close}
 	width="!max-w-[420px] !m-4"
 >
 	<div
@@ -41,7 +45,7 @@
 
 		<button
 			class="k w-full rounded-xl bg-black px-5 py-2.5 text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-			onclick={() => ($settings.welcomeModalSeen = true)}
+			onclick={close}
 		>
 			Start chatting
 		</button>
