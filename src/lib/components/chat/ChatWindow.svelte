@@ -1,9 +1,6 @@
 <script lang="ts">
-	import { createBubbler } from "svelte/legacy";
-
-	const bubble = createBubbler();
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { createEventDispatcher, onDestroy, tick } from "svelte";
+	import { onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonExport from "~icons/carbon/export";
@@ -48,6 +45,11 @@
 		models: Model[];
 		preprompt?: string | undefined;
 		files?: File[];
+		onmessage?: (content: string) => void;
+		onstop?: () => void;
+		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
+		oncontinue?: (payload: { id: Message["id"] }) => void;
+		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
 
 	let {
@@ -60,6 +62,11 @@
 		models,
 		preprompt = undefined,
 		files = $bindable([]),
+		onmessage,
+		onstop,
+		onretry,
+		oncontinue,
+		onshowAlternateMsg,
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
@@ -69,16 +76,9 @@
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
-	const dispatch = createEventDispatcher<{
-		message: string;
-		stop: void;
-		retry: { id: Message["id"]; content?: string };
-		continue: { id: Message["id"] };
-	}>();
-
 	const handleSubmit = () => {
 		if (loading) return;
-		dispatch("message", message);
+		onmessage?.(message);
 		message = "";
 	};
 
@@ -233,7 +233,6 @@
 	ondragleave={onDragLeave}
 	ondragover={(e) => {
 		e.preventDefault();
-		bubble("dragover");
 	}}
 	ondrop={(e) => {
 		e.preventDefault();
@@ -243,7 +242,7 @@
 
 <div class="relative z-[-1] min-h-0 min-w-0">
 	{#if shareModalOpen}
-		<ShareConversationModal open={shareModalOpen} on:close={() => (shareModalOpen = false)} />
+		<ShareConversationModal open={shareModalOpen} onclose={() => (shareModalOpen = false)} />
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
@@ -268,9 +267,8 @@
 							readOnly={isReadOnly}
 							isLast={idx === messages.length - 1}
 							bind:editMsdgId
-							on:retry
-							on:continue
-							on:showAlternateMsg
+							onretry={(payload) => onretry?.(payload)}
+							onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
 						/>
 					{/each}
 					{#if isReadOnly}
@@ -292,12 +290,11 @@
 			{:else}
 				<ChatIntroduction
 					{currentModel}
-					on:message={(ev) => {
+					onmessage={(content) => {
 						if (page.data.loginRequired) {
-							ev.preventDefault();
 							$loginModalOpen = true;
 						} else {
-							dispatch("message", ev.detail);
+							onmessage?.(content);
 						}
 					}}
 				/>
@@ -343,7 +340,7 @@
 					{#await source then src}
 						<UploadedFile
 							file={src}
-							on:close={() => {
+							onclose={() => {
 								files = files.filter((_, i) => i !== index);
 							}}
 						/>
@@ -355,13 +352,13 @@
 		<div class="w-full">
 			<div class="flex w-full *:mb-3">
 				{#if loading}
-					<StopGeneratingBtn classNames="ml-auto" onClick={() => dispatch("stop")} />
+					<StopGeneratingBtn classNames="ml-auto" onClick={() => onstop?.()} />
 				{:else if lastIsError}
 					<RetryBtn
 						classNames="ml-auto"
 						onClick={() => {
 							if (lastMessage && lastMessage.ancestors) {
-								dispatch("retry", {
+								onretry?.({
 									id: lastMessage.id,
 								});
 							}
@@ -372,7 +369,7 @@
 						<ContinueBtn
 							onClick={() => {
 								if (lastMessage && lastMessage.ancestors) {
-									dispatch("continue", {
+									oncontinue?.({
 										id: lastMessage?.id,
 									});
 								}
@@ -404,18 +401,18 @@
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
-							<ChatInput
-								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-								{loading}
-								bind:value={message}
-								bind:files
-								mimeTypes={activeMimeTypes}
-								on:submit={handleSubmit}
-								{onPaste}
-								disabled={isReadOnly || lastIsError}
-								{modelIsMultimodal}
-								bind:focused
-							/>
+								<ChatInput
+									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+									{loading}
+									bind:value={message}
+									bind:files
+									mimeTypes={activeMimeTypes}
+									onsubmit={handleSubmit}
+									{onPaste}
+									disabled={isReadOnly || lastIsError}
+									{modelIsMultimodal}
+									bind:focused
+								/>
 						{/if}
 
 						{#if loading}

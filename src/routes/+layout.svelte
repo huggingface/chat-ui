@@ -4,7 +4,7 @@
 	import { onDestroy, onMount, untrack } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
@@ -68,7 +68,7 @@
 			.then(async () => {
 				conversations = conversations.filter((conv) => conv.id !== id);
 
-				if ($page.params.id === id) {
+				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });
 				}
 			})
@@ -115,13 +115,13 @@
 	const settings = createSettingsStore(data.settings);
 
 	onMount(async () => {
-		if ($page.url.searchParams.has("model")) {
+		if (page.url.searchParams.has("model")) {
 			await settings
 				.instantSet({
-					activeModel: $page.url.searchParams.get("model") ?? $settings.activeModel,
+					activeModel: page.url.searchParams.get("model") ?? $settings.activeModel,
 				})
 				.then(async () => {
-					const query = new URLSearchParams($page.url.searchParams.toString());
+					const query = new URLSearchParams(page.url.searchParams.toString());
 					query.delete("model");
 					await goto(`${base}/?${query.toString()}`, {
 						invalidateAll: true,
@@ -129,8 +129,8 @@
 				});
 		}
 
-		if ($page.url.searchParams.has("token")) {
-			const token = $page.url.searchParams.get("token");
+		if (page.url.searchParams.has("token")) {
+			const token = page.url.searchParams.get("token");
 
 			await fetch(`${base}/api/user/validate-token`, {
 				method: "POST",
@@ -160,13 +160,13 @@
 	});
 
 	let mobileNavTitle = $derived(
-		["/models", "/privacy"].includes($page.route.id ?? "")
+		["/models", "/privacy"].includes(page.route.id ?? "")
 			? ""
-			: conversations.find((conv) => conv.id === $page.params.id)?.title
+			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
 
 	// Show the welcome modal once on first app load
-	let showWelcome = $derived(!$settings.welcomeModalSeen && !($page.data.shared === true));
+	let showWelcome = $derived(!$settings.welcomeModalSeen && !(page.data.shared === true));
 </script>
 
 <svelte:head>
@@ -177,10 +177,10 @@
 
 	<!-- use those meta tags everywhere except on special listing pages -->
 	<!-- feel free to refacto if there's a better way -->
-	{#if !$page.url.pathname.includes("/models/")}
+	{#if !page.url.pathname.includes("/models/")}
 		<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
 		<meta property="og:type" content="website" />
-		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || $page.url.origin}{base}" />
+		<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}" />
 		<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
 		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
@@ -219,7 +219,7 @@
 
 {#if $loginModalOpen}
 	<LoginModal
-		on:close={() => {
+		onclose={() => {
 			$loginModalOpen = false;
 		}}
 	/>
@@ -247,8 +247,8 @@
 			{conversations}
 			user={data.user}
 			canLogin={!data.user && data.loginEnabled}
-			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			ondeleteConversation={(id) => deleteConversation(id)}
+			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>
 	</MobileNav>
 	<nav
@@ -258,8 +258,8 @@
 			{conversations}
 			user={data.user}
 			canLogin={!data.user && data.loginEnabled}
-			on:deleteConversation={(ev) => deleteConversation(ev.detail)}
-			on:editConversationTitle={(ev) => editConversationTitle(ev.detail.id, ev.detail.title)}
+			ondeleteConversation={(id) => deleteConversation(id)}
+			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>
 	</nav>
 	{#if currentError}

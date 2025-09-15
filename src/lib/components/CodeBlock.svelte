@@ -49,6 +49,6 @@
 	</div>
 
 	{#if previewOpen}
-		<HtmlPreviewModal html={rawCode} on:close={() => (previewOpen = false)} />
+		<HtmlPreviewModal html={rawCode} onclose={() => (previewOpen = false)} />
 	{/if}
 </div>

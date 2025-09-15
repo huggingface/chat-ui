@@ -90,7 +90,7 @@
 
 {#if hasModels}
 	<ChatWindow
-		on:message={(ev) => createConversation(ev.detail)}
+		onmessage={(message) => createConversation(message)}
 		{loading}
 		{currentModel}
 		models={data.models}

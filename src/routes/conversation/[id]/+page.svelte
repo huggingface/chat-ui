@@ -373,27 +373,27 @@
 		}
 	});
 
-	async function onMessage(event: CustomEvent<string>) {
+	async function onMessage(content: string) {
 		if (!data.shared) {
-			await writeMessage({ prompt: event.detail });
+			await writeMessage({ prompt: content });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
-				.then(async () => await writeMessage({ prompt: event.detail }))
+				.then(async () => await writeMessage({ prompt: content }))
 				.finally(() => (loading = false));
 		}
 	}
 
-	async function onRetry(event: CustomEvent<{ id: Message["id"]; content?: string }>) {
-		const lastMsgId = event.detail.id;
+	async function onRetry(payload: { id: Message["id"]; content?: string }) {
+		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);
 
 		if (!data.shared) {
 			await writeMessage({
-				prompt: event.detail.content,
-				messageId: event.detail.id,
+				prompt: payload.content,
+				messageId: payload.id,
 				isRetry: true,
 			});
 		} else {
@@ -404,8 +404,8 @@
 				.then(
 					async () =>
 						await writeMessage({
-							prompt: event.detail.content,
-							messageId: event.detail.id,
+							prompt: payload.content,
+							messageId: payload.id,
 							isRetry: true,
 						})
 				)
@@ -413,14 +413,14 @@
 		}
 	}
 
-	async function onShowAlternateMsg(event: CustomEvent<{ id: Message["id"] }>) {
-		const msgId = event.detail.id;
+	async function onShowAlternateMsg(payload: { id: Message["id"] }) {
+		const msgId = payload.id;
 		messagesPath = createMessagesPath(messages, msgId);
 	}
 
-	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
+	async function onContinue(payload: { id: Message["id"] }) {
 		if (!data.shared) {
-			await writeMessage({ messageId: event.detail.id, isContinue: true });
+			await writeMessage({ messageId: payload.id, isContinue: true });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
@@ -429,7 +429,7 @@
 				.then(
 					async () =>
 						await writeMessage({
-							messageId: event.detail.id,
+							messageId: payload.id,
 							isContinue: true,
 						})
 				)
@@ -477,11 +477,11 @@
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:files
-	on:message={onMessage}
-	on:retry={onRetry}
-	on:continue={onContinue}
-	on:showAlternateMsg={onShowAlternateMsg}
-	on:stop={async () => {
+	onmessage={onMessage}
+	onretry={onRetry}
+	oncontinue={onContinue}
+	onshowAlternateMsg={onShowAlternateMsg}
+	onstop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",
 		}).then((r) => {

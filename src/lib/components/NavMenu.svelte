@@ -20,7 +20,7 @@
 	import type { LayoutData } from "../../routes/$types";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 	import type { Model } from "$lib/types/Model";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 	import { goto } from "$app/navigation";
@@ -36,9 +36,18 @@
 		canLogin: boolean;
 		user: LayoutData["user"];
 		p?: number;
+		ondeleteConversation?: (id: string) => void;
+		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
-	let { conversations = $bindable(), canLogin, user, p = $bindable(0) }: Props = $props();
+	let {
+		conversations = $bindable(),
+		canLogin,
+		user,
+		p = $bindable(0),
+		ondeleteConversation,
+		oneditConversationTitle,
+	}: Props = $props();
 
 	let hasMore = $state(true);
 
@@ -63,7 +72,7 @@
 		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
 	});
 
-	const nModels: number = $page.data.models.filter((el: Model) => !el.unlisted).length;
+	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
 
 	async function handleVisible() {
 		p++;
@@ -124,13 +133,17 @@
 					{titles[group]}
 				</h4>
 				{#each convs as conv}
-					<NavConversationItem on:editConversationTitle on:deleteConversation {conv} />
+					<NavConversationItem
+						{conv}
+						oneditConversationTitle={oneditConversationTitle}
+						ondeleteConversation={ondeleteConversation}
+					/>
 				{/each}
 			{/if}
 		{/each}
 	</div>
 	{#if hasMore}
-		<InfiniteScroll on:visible={handleVisible} />
+		<InfiniteScroll onvisible={handleVisible} />
 	{/if}
 </div>
 <div

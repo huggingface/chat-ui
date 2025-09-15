@@ -1,14 +1,14 @@
 <script lang="ts">
 	import Modal from "./Modal.svelte";
-	import { createEventDispatcher, onMount, onDestroy } from "svelte";
+	import { onMount, onDestroy } from "svelte";
 	import CarbonCopy from "~icons/carbon/copy";
 
 	interface Props {
 		html: string;
+		onclose?: () => void;
 	}
 
-	let { html }: Props = $props();
-	const dispatch = createEventDispatcher<{ close: void }>();
+	let { html, onclose }: Props = $props();
 
 	let iframeEl: HTMLIFrameElement | undefined = $state();
 	let channel = $state(`preview_${Math.random().toString(36).slice(2)}`);
@@ -101,7 +101,7 @@
 	let copyTimer: ReturnType<typeof setTimeout>;
 </script>
 
-<Modal width="max-w-[90dvw]" closeButton on:close={() => dispatch("close")}>
+<Modal width="max-w-[90dvw]" closeButton onclose={() => onclose?.()}>
 	<div class="p-4">
 		<div class="relative h-[90dvh] w-[80dvw]">
 			<iframe

@@ -80,7 +80,7 @@
 </svelte:head>
 
 <ChatWindow
-	on:message={(ev) => createConversation(ev.detail)}
+	onmessage={(message) => createConversation(message)}
 	{loading}
 	currentModel={findCurrentModel([...data.models, ...data.oldModels], modelId)}
 	models={data.models}

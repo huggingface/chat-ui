@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import type { MessageFile } from "$lib/types/Message";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonDocumentBlank from "~icons/carbon/document-blank";
@@ -14,15 +13,14 @@
 	interface Props {
 		file: MessageFile;
 		canClose?: boolean;
+		onclose?: () => void;
 	}
 
-	let { file, canClose = true }: Props = $props();
+	let { file, canClose = true, onclose }: Props = $props();
 
 	let showModal = $state(false);
 
-	let urlNotTrailing = $derived($page.url.pathname.replace(/\/$/, ""));
-
-	const dispatch = createEventDispatcher<{ close: void }>();
+	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 
 	function truncateMiddle(text: string, maxLength: number): string {
 		if (text.length <= maxLength) {
@@ -57,7 +55,7 @@
 
 {#if showModal && isClickable}
 	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="sm:max-w-[800px]" on:close={() => (showModal = false)}>
+	<Modal width="sm:max-w-[800px]" onclose={() => (showModal = false)}>
 		{#if isImage(file.mime)}
 			{#if file.type === "hash"}
 				<img
@@ -225,18 +223,18 @@
 			</div>
 		{/if}
 		<!-- add a button on top that removes the image -->
-		{#if canClose}
-			<button
-				class="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
-				class:invisible={navigator.maxTouchPoints === 0}
-				onclick={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					dispatch("close");
-				}}
-			>
-				<CarbonClose class=" text-xs  text-white" />
-			</button>
-		{/if}
+	{#if canClose}
+		<button
+			class="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border bg-black group-hover:visible dark:border-gray-700"
+			class:invisible={navigator.maxTouchPoints === 0}
+			onclick={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				onclose?.();
+			}}
+		>
+			<CarbonClose class=" text-xs  text-white" />
+		</button>
+	{/if}
 	</div>
 </div>
