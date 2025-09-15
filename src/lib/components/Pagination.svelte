@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { getHref } from "$lib/utils/getHref";
 	import PaginationArrow from "./PaginationArrow.svelte";
 
@@ -53,7 +53,7 @@
 		return pageIdxs;
 	}
 	let numTotalPages = $derived(Math.ceil(numTotalItems / numItemsPerPage));
-	let pageIndex = $derived(parseInt($page.url.searchParams.get("p") ?? "0"));
+	let pageIndex = $derived(parseInt(page.url.searchParams.get("p") ?? "0"));
 	let pageIndexes = $derived(getPageIndexes(pageIndex, numTotalPages));
 </script>
 
@@ -64,7 +64,7 @@
 		>
 			<li>
 				<PaginationArrow
-					href={getHref($page.url, { newKeys: { p: (pageIndex - 1).toString() } })}
+					href={getHref(page.url, { newKeys: { p: (pageIndex - 1).toString() } })}
 					direction="previous"
 					isDisabled={pageIndex - 1 < 0}
 				/>
@@ -79,7 +79,7 @@
 							: ''}
 						"
 						class:pointer-events-none={pageIdx === ELLIPSIS_IDX || pageIndex === pageIdx}
-						href={getHref($page.url, { newKeys: { p: pageIdx.toString() } })}
+						href={getHref(page.url, { newKeys: { p: pageIdx.toString() } })}
 					>
 						{pageIdx === ELLIPSIS_IDX ? "..." : pageIdx + 1}
 					</a>
@@ -87,7 +87,7 @@
 			{/each}
 			<li>
 				<PaginationArrow
-					href={getHref($page.url, { newKeys: { p: (pageIndex + 1).toString() } })}
+					href={getHref(page.url, { newKeys: { p: (pageIndex + 1).toString() } })}
 					direction="next"
 					isDisabled={pageIndex + 1 >= numTotalPages}
 				/>

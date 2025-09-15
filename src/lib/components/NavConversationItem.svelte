@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
-	import { createEventDispatcher } from "svelte";
 
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonTrashCan from "~icons/carbon/trash-can";
@@ -14,17 +13,14 @@
 	interface Props {
 		conv: ConvSidebar;
 		readOnly?: true;
+		ondeleteConversation?: (id: string) => void;
+		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
-	let { conv, readOnly }: Props = $props();
+	let { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
 
 	let confirmDelete = $state(false);
 	let renameOpen = $state(false);
-
-	const dispatch = createEventDispatcher<{
-		deleteConversation: string;
-		editConversationTitle: { id: string; title: string };
-	}>();
 </script>
 
 <a
@@ -65,7 +61,7 @@
 				onclick={(e) => {
 					e.preventDefault();
 					confirmDelete = false;
-					dispatch("deleteConversation", conv.id.toString());
+					ondeleteConversation?.(conv.id.toString());
 				}}
 			>
 				<CarbonCheckmark
@@ -92,7 +88,7 @@
 				onclick={(event) => {
 					event.preventDefault();
 					if (event.shiftKey) {
-						dispatch("deleteConversation", conv.id.toString());
+						ondeleteConversation?.(conv.id.toString());
 					} else {
 						confirmDelete = true;
 					}
@@ -111,10 +107,10 @@
 	<EditConversationModal
 		open={renameOpen}
 		title={conv.title}
-		on:close={() => (renameOpen = false)}
-		on:save={(e) => {
+		onclose={() => (renameOpen = false)}
+		onsave={(payload) => {
 			renameOpen = false;
-			dispatch("editConversationTitle", { id: conv.id.toString(), title: e.detail.title });
+			oneditConversationTitle?.({ id: conv.id.toString(), title: payload.title });
 		}}
 	/>
 {/if}

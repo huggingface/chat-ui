@@ -6,16 +6,16 @@
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
-	import { createEventDispatcher, onMount } from "svelte";
+	import { onMount } from "svelte";
 	import { createShareLink } from "$lib/createShareLink";
 
 	interface Props {
 		open?: boolean;
+		onclose?: () => void;
+		oncopied?: () => void;
 	}
 
-	let { open = false }: Props = $props();
-
-	const dispatch = createEventDispatcher<{ close: void; copied: void }>();
+	let { open = false, onclose, oncopied }: Props = $props();
 
 	let creating = $state(false);
 	let createdUrl: string | null = $state(null);
@@ -36,7 +36,7 @@
 
 	function close() {
 		open = false;
-		dispatch("close");
+		onclose?.();
 	}
 
 	// If the current page is already a shared chat (7-char id), pre-fill the link
@@ -65,7 +65,7 @@
 </script>
 
 {#if open}
-	<Modal on:close={close} width="w-[90dvh] md:w-[500px]">
+	<Modal onclose={close} width="w-[90dvh] md:w-[500px]">
 		<div class="flex w-full flex-col gap-5 p-6">
 			<!-- Header + copy -->
 			{#if createdUrl}
@@ -141,7 +141,7 @@
 						value={withLeafId(createdUrl) ?? createdUrl}
 						onClick={() => {
 							justCopied = true;
-							dispatch("copied");
+							oncopied?.();
 							setTimeout(() => (justCopied = false), 1200);
 						}}
 					>

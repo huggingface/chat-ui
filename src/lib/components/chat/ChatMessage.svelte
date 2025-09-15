@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import { createEventDispatcher, tick } from "svelte";
+	import { tick } from "svelte";
 
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
@@ -29,6 +29,8 @@
 		alternatives?: Message["id"][];
 		editMsdgId?: Message["id"] | null;
 		isLast?: boolean;
+		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
+		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
 
 	let {
@@ -40,18 +42,17 @@
 		alternatives = [],
 		editMsdgId = $bindable(null),
 		isLast = false,
+		onretry,
+		onshowAlternateMsg,
 	}: Props = $props();
-
-	const dispatch = createEventDispatcher<{
-		retry: { content?: string; id: Message["id"] };
-	}>();
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
 
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
-		void (_isAuthor, _readOnly);
+		void _isAuthor;
+		void _readOnly;
 	});
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -213,13 +214,18 @@
 					title="Retry"
 					type="button"
 					onclick={() => {
-						dispatch("retry", { id: message.id });
+						onretry?.({ id: message.id });
 					}}
 				>
 					<CarbonRotate360 />
 				</button>
 				{#if alternatives.length > 1 && editMsdgId === null}
-					<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+					<Alternatives
+						{message}
+						{alternatives}
+						{loading}
+						onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
+					/>
 				{/if}
 			</div>
 		{/if}
@@ -258,7 +264,7 @@
 						bind:this={editFormEl}
 						onsubmit={(e) => {
 							e.preventDefault();
-							dispatch("retry", { content: editContentEl?.value, id: message.id });
+							onretry?.({ content: editContentEl?.value, id: message.id });
 							editMsdgId = null;
 						}}
 					>
@@ -297,7 +303,12 @@
 			</div>
 			<div class="absolute -bottom-4 ml-3.5 flex w-full gap-1.5">
 				{#if alternatives.length > 1 && editMsdgId === null}
-					<Alternatives {message} {alternatives} {loading} on:showAlternateMsg />
+					<Alternatives
+						{message}
+						{alternatives}
+						{loading}
+						onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
+					/>
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
 					<button

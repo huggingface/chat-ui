@@ -13,7 +13,7 @@
 	let { close }: Props = $props();
 </script>
 
-<Modal closeOnBackdrop={false} on:close={close} width="!max-w-[420px] !m-4">
+<Modal closeOnBackdrop={false} onclose={close} width="!max-w-[420px] !m-4">
 	<div
 		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>

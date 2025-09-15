@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher, onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { cubicOut } from "svelte/easing";
 	import { fade, fly } from "svelte/transition";
 	import Portal from "./Portal.svelte";
@@ -12,6 +12,7 @@
 		disableFly?: boolean;
 		/** When false, clicking backdrop will not close the modal */
 		closeOnBackdrop?: boolean;
+		onclose?: () => void;
 		children?: import("svelte").Snippet;
 	}
 
@@ -21,18 +22,17 @@
 		closeButton = false,
 		disableFly = false,
 		closeOnBackdrop = true,
+		onclose,
 	}: Props = $props();
 
 	let backdropEl: HTMLDivElement | undefined = $state();
 	let modalEl: HTMLDivElement | undefined = $state();
 
-	const dispatch = createEventDispatcher<{ close: void }>();
-
 	function handleKeydown(event: KeyboardEvent) {
 		// close on ESC
 		if (event.key === "Escape") {
 			event.preventDefault();
-			dispatch("close");
+			onclose?.();
 		}
 	}
 
@@ -41,7 +41,7 @@
 			return;
 		}
 		if (event.target === backdropEl && closeOnBackdrop) {
-			dispatch("close");
+			onclose?.();
 		}
 	}
 
@@ -83,7 +83,7 @@
 				]}
 			>
 				{#if closeButton}
-					<button class="absolute right-4 top-4 z-50" onclick={() => dispatch("close")}>
+					<button class="absolute right-4 top-4 z-50" onclick={() => onclose?.()}>
 						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}
@@ -102,7 +102,7 @@
 				]}
 			>
 				{#if closeButton}
-					<button class="absolute right-4 top-4 z-50" onclick={() => dispatch("close")}>
+					<button class="absolute right-4 top-4 z-50" onclick={() => onclose?.()}>
 						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}

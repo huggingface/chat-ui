@@ -7,13 +7,15 @@
 
 	interface Props {
 		currentModel: Model;
+		onmessage?: (content: string) => void;
 	}
 
-	let { currentModel: _currentModel }: Props = $props();
+	let { currentModel: _currentModel, onmessage }: Props = $props();
 
 	$effect(() => {
 		// referenced to appease linter while UI blocks are commented out
 		void _currentModel;
+		void onmessage;
 	});
 </script>
 

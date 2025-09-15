@@ -1,7 +1,11 @@
 <script lang="ts">
-	import { onMount, createEventDispatcher } from "svelte";
+	import { onMount } from "svelte";
+	interface Props {
+		onvisible?: () => void;
+	}
 
-	const dispatch = createEventDispatcher();
+	let { onvisible }: Props = $props();
+
 	let loader: HTMLDivElement | undefined = $state();
 	let observer: IntersectionObserver;
 	let intervalId: ReturnType<typeof setInterval> | undefined;
@@ -20,7 +24,7 @@
 					}
 					// Start new interval that dispatches every 250ms
 					intervalId = setInterval(() => {
-						dispatch("visible");
+						onvisible?.();
 					}, 250);
 				} else {
 					// Clear interval when not intersecting
