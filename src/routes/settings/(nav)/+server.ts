@@ -17,6 +17,7 @@ export async function POST({ request, locals }) {
 			multimodalOverrides: z.record(z.boolean()).default({}),
 			disableStream: z.boolean().default(false),
 			directPaste: z.boolean().default(false),
+			hidePromptExamples: z.record(z.boolean()).default({}),
 		})
 		.parse(body) satisfies SettingsEditable;
 
