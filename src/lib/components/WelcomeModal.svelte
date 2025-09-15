@@ -13,23 +13,25 @@
 	let { close }: Props = $props();
 </script>
 
-<Modal
-	closeOnBackdrop={false}
-	on:close={close}
-	width="!max-w-[420px] !m-4"
->
+<Modal closeOnBackdrop={false} on:close={close} width="!max-w-[420px] !m-4">
 	<div
 		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
 		<div
 			class="-mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
-			<h2
+			<video
+				class="size-full object-cover"
+				autoplay
+				muted
+				src="https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/WSOTmErfqlGNZwSqdfrA7.mp4"
+			></video>
+			<!-- <h2
 				class="flex translate-y-1 items-center text-3xl font-semibold text-gray-900 dark:text-gray-100"
 			>
 				<Logo classNames="mr-2 size-12 dark:invert" />
 				{publicConfig.PUBLIC_APP_NAME}
-			</h2>
+			</h2> -->
 		</div>
 
 		<div class="text-gray-700 dark:text-gray-200">

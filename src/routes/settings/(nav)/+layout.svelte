@@ -9,7 +9,6 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
-	import CarbonIbmDynamicRouteServer from "~icons/carbon/ibm-dynamic-route-server";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
