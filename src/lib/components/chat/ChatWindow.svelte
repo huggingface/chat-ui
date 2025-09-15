@@ -279,6 +279,7 @@
 			scrollNode={chatContainer}
 		/>
 	</div>
+
 	<div
 		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
 			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white
@@ -286,6 +287,32 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
+		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter}
+			<div
+				class="mb-3 flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;]"
+			>
+				<button
+					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
+					>Tetris in HTML</button
+				>
+				<button
+					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
+					>Act as Yoda</button
+				>
+				<button
+					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
+					>Generate prompts</button
+				>
+				<button
+					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
+					>Explain LLMs</button
+				>
+				<button
+					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
+					>Translate in Italian</button
+				>
+			</div>
+		{/if}
 		{#if sources?.length && !loading}
 			<div
 				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
@@ -435,7 +462,9 @@
 						{currentModel.id}
 					</span>
 				{/if}
-				<span class="ml-2">Generated content may be inaccurate or false.</span>
+				{#if !messages.length}
+					<span class="ml-2">Generated content may be inaccurate or false.</span>
+				{/if}
 				{#if messages.length}
 					<button
 						class="ml-auto flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
