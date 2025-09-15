@@ -133,11 +133,7 @@
 					{titles[group]}
 				</h4>
 				{#each convs as conv}
-					<NavConversationItem
-						{conv}
-						oneditConversationTitle={oneditConversationTitle}
-						ondeleteConversation={ondeleteConversation}
-					/>
+					<NavConversationItem {conv} {oneditConversationTitle} {ondeleteConversation} />
 				{/each}
 			{/if}
 		{/each}
@@ -186,7 +182,7 @@
 	>
 		Models
 		<span
-			class="ml-auto rounded-md bg-gray-500/5 px-2 py-0.5 text-xs text-gray-400 dark:bg-gray-500/20 dark:text-gray-400"
+			class="ml-auto rounded-md bg-gray-500/5 px-1.5 py-0.5 text-xs text-gray-400 dark:bg-gray-500/20 dark:text-gray-400"
 			>{nModels}</span
 		>
 	</a>
