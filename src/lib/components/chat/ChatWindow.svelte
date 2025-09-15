@@ -191,6 +191,42 @@
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
+
+	type RouterExample = { title: string; prompt: string };
+	const routerExamples: RouterExample[] = [
+		{
+			title: "Tetris in HTML",
+			prompt: "Create a Tetris in HTML",
+		},
+		{
+			title: "Act as Yoda",
+			prompt: "Act as Yoda",
+		},
+		{
+			title: "Generate prompts",
+			prompt: `Generate 10 creative prompts Text-to-image prompts like: "Cyberpunk cityscape at night, neon lights, flying cars, rain-slicked streets, blade runner aesthetic, highly detailed`,
+		},
+		{
+			title: "Explain LLMs",
+			prompt:
+				"Explain how large language models work at a high level using simple analogies. Avoid heavy math and keep it friendly.",
+		},
+		{
+			title: "Translate in Italian",
+			prompt:
+				"Translate the following paragraph into Italian with a formal tone: <paste your text here>.",
+		},
+	];
+
+	function startExample(prompt: string) {
+		if (loading) return;
+		if (page.data.loginRequired) {
+			$loginModalOpen = true;
+			return;
+		}
+		message = prompt;
+		handleSubmit();
+	}
 </script>
 
 <svelte:window
@@ -287,30 +323,16 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter}
+		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length}
 			<div
-				class="mb-3 flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;]"
+				class="mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;] dark:text-gray-500"
 			>
-				<button
-					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
-					>Tetris in HTML</button
-				>
-				<button
-					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
-					>Act as Yoda</button
-				>
-				<button
-					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
-					>Generate prompts</button
-				>
-				<button
-					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
-					>Explain LLMs</button
-				>
-				<button
-					class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700"
-					>Translate in Italian</button
-				>
+				{#each routerExamples as ex}
+					<button
+						class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700 dark:hover:text-gray-400"
+						onclick={() => startExample(ex.prompt)}>{ex.title}</button
+					>
+				{/each}
 			</div>
 		{/if}
 		{#if sources?.length && !loading}
