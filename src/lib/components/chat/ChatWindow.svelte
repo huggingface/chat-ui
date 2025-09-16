@@ -144,6 +144,46 @@
 				lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1)
 	);
 
+	let streamingAssistantMessage = $derived(
+		(() => {
+			for (let i = messages.length - 1; i >= 0; i -= 1) {
+				const candidate = messages[i];
+				if (candidate.from === "assistant") {
+					return candidate;
+				}
+			}
+			return undefined;
+		})()
+	);
+	let streamingRouterMetadata = $derived(streamingAssistantMessage?.routerMetadata ?? null);
+	let streamingRouterModelName = $derived(
+		streamingRouterMetadata?.model
+			? (streamingRouterMetadata.model.split("/").pop() ?? streamingRouterMetadata.model)
+			: ""
+	);
+	let showRouterDetails = $state(false);
+	let routerDetailsTimeout: ReturnType<typeof setTimeout> | undefined;
+
+	$effect(() => {
+		if (!currentModel.isRouter || !loading) {
+			showRouterDetails = false;
+			if (routerDetailsTimeout) {
+				clearTimeout(routerDetailsTimeout);
+				routerDetailsTimeout = undefined;
+			}
+			return;
+		}
+
+		if (routerDetailsTimeout) {
+			clearTimeout(routerDetailsTimeout);
+		}
+
+		showRouterDetails = false;
+		routerDetailsTimeout = setTimeout(() => {
+			showRouterDetails = true;
+		}, 1000);
+	});
+
 	let sources = $derived(
 		files?.map<Promise<MessageFile>>((file) =>
 			file2base64(file).then((value) => ({
@@ -159,7 +199,11 @@
 		shareModalOpen = true;
 	}
 
-	onDestroy(() => {});
+	onDestroy(() => {
+		if (routerDetailsTimeout) {
+			clearTimeout(routerDetailsTimeout);
+		}
+	});
 
 	let chatContainer: HTMLElement | undefined = $state();
 
@@ -320,13 +364,7 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !message.length &&
-			!messages.length &&
-			!sources.length &&
-			!loading &&
-			currentModel.isRouter &&
-			routerExamples.length &&
-			!hideRouterExamples}
+		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples}
 			<div
 				class="mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;] dark:text-gray-500"
 			>
@@ -408,18 +446,18 @@
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
-								<ChatInput
-									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-									{loading}
-									bind:value={message}
-									bind:files
-									mimeTypes={activeMimeTypes}
-									onsubmit={handleSubmit}
-									{onPaste}
-									disabled={isReadOnly || lastIsError}
-									{modelIsMultimodal}
-									bind:focused
-								/>
+							<ChatInput
+								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+								{loading}
+								bind:value={message}
+								bind:files
+								mimeTypes={activeMimeTypes}
+								onsubmit={handleSubmit}
+								{onPaste}
+								disabled={isReadOnly || lastIsError}
+								{modelIsMultimodal}
+								bind:focused
+							/>
 						{/if}
 
 						{#if loading}
@@ -466,22 +504,43 @@
 				}}
 			>
 				{#if models.find((m) => m.id === currentModel.id)}
-					<a
-						href="{base}/settings/{currentModel.id}"
-						class="inline-flex items-center gap-1 hover:underline"
-					>
-						{#if currentModel.isRouter}
-							<!-- <CarbonIbmDynamicRouteServer
-									class="text-[0.9rem] text-gray-700 dark:text-gray-200"
-								/> -->
-							<IconOmni />
+					{#if !currentModel.isRouter || !loading}
+						<a
+							href="{base}/settings/{currentModel.id}"
+							class="inline-flex items-center gap-1 hover:underline"
+						>
+							{#if currentModel.isRouter}
+								<IconOmni />
+								{currentModel.displayName}
+							{:else}
+								Model: {currentModel.displayName}
+							{/if}
+							<CarbonCaretDown class="-ml-0.5 text-xxs" />
+						</a>
+					{:else if showRouterDetails && streamingRouterMetadata}
+						<div
+							class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-[.70rem] text-xs leading-none text-gray-400 dark:text-gray-400"
+						>
+							<IconOmni classNames="text-xs animate-pulse" />
 
-							{currentModel.displayName}
-						{:else}
-							Model: {currentModel.displayName}
-						{/if}
-						<CarbonCaretDown class="-ml-0.5 text-xxs" />
-					</a>
+							<span class="router-badge-text router-shimmer">
+								{streamingRouterMetadata.route}
+							</span>
+
+							<span class="text-gray-500">with</span>
+
+							<span class="router-badge-text">
+								{streamingRouterModelName}
+							</span>
+						</div>
+					{:else}
+						<div
+							class="loading-dots relative inline-flex items-center text-gray-400 dark:text-gray-400"
+							aria-label="Routing…"
+						>
+							<IconOmni classNames="text-xs animate-pulse mr-1" /> Routing
+						</div>
+					{/if}
 				{:else}
 					<span class="inline-flex items-center line-through dark:border-gray-700">
 						{currentModel.id}
@@ -520,6 +579,67 @@
 		}
 		100% {
 			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+		}
+	}
+
+	.router-badge-text {
+		display: inline-block;
+		position: relative;
+		color: inherit;
+	}
+
+	.router-shimmer {
+		display: inline-block;
+		background-image: linear-gradient(
+			90deg,
+			rgba(156, 163, 175, 1) 0%,
+			rgba(156, 163, 175, 0.6) 10%,
+			rgba(156, 163, 175, 0.6) 50%,
+			rgba(156, 163, 175, 0.6) 90%,
+			rgba(156, 163, 175, 1) 100%
+		);
+		background-size: 220% 100%;
+		animation: router-shimmer 2.8s linear infinite;
+		background-clip: text;
+		-webkit-background-clip: text;
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+	}
+
+	:global(.dark) .router-shimmer {
+		background-image: linear-gradient(
+			90deg,
+			rgba(255, 255, 255, 0.15) 0%,
+			rgba(255, 255, 255, 0.7) 50%,
+			rgba(255, 255, 255, 0.15) 100%
+		);
+	}
+
+	@keyframes router-shimmer {
+		0% {
+			background-position: 200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
+	}
+
+	.loading-dots::after {
+		content: "";
+		animation: dots-content 0.9s steps(1, end) infinite;
+	}
+	@keyframes dots-content {
+		0% {
+			content: "";
+		}
+		33% {
+			content: ".";
+		}
+		66% {
+			content: "..";
+		}
+		88% {
+			content: "...";
 		}
 	}
 </style>
