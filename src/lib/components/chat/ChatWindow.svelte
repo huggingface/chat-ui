@@ -196,8 +196,8 @@
 	type RouterExample = { title: string; prompt: string };
 	const routerExamples: RouterExample[] = [
 		{
-			title: "Tetris in HTML",
-			prompt: "Create a Tetris in HTML",
+			title: "Brick breaker game",
+			prompt: "Create a cybernetic Brick breaker game in HTML",
 		},
 		{
 			title: "Act as Yoda",

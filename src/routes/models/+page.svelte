@@ -125,7 +125,7 @@
 								>
 									Active
 								</span>
-							{:else if index === 0 && model.displayName === "Omni"}
+							{:else if index === 0 && model.id === "omni"}
 								<span
 									class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
 								>

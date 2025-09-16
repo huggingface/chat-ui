@@ -6,7 +6,7 @@ let ROUTES: Route[] = [];
 let loaded = false;
 
 export async function loadPolicy(): Promise<Route[]> {
-	const path = config.LLM_ROUTER_ROUTES_PATH || "llm-router/routes.chat.json";
+	const path = config.LLM_ROUTER_ROUTES_PATH;
 	const text = await readFile(path, "utf8");
 	const arr = JSON.parse(text) as Route[];
 	if (!Array.isArray(arr)) {
