@@ -240,8 +240,8 @@
 	type RouterExample = { title: string; prompt: string };
 	const routerExamples: RouterExample[] = [
 		{
-			title: "Brick breaker game",
-			prompt: "Create a cybernetic Brick breaker game in HTML",
+			title: "Pong game",
+			prompt: "Create a vintage pong game in HTML",
 		},
 		{
 			title: "Act as Yoda",
