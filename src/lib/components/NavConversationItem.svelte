@@ -32,10 +32,10 @@
 	class="group flex h-[2.15rem] flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 max-sm:h-10
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
-	<div class="my-2 flex-1 min-w-0 truncate">
+	<div class="my-2 min-w-0 flex-1 truncate">
 		<span>
 			{#if confirmDelete}
-				<span class="mr-1 font-semibold"> Delete </span>
+				<span class="mr-1 font-semibold"> Delete? </span>
 			{/if}
 			{conv.title}
 		</span>
