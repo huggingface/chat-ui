@@ -2,6 +2,8 @@
 	import type { Message } from "$lib/types/Message";
 	import { tick } from "svelte";
 
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	const publicConfig = usePublicConfig();
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import IconLoading from "../icons/IconLoading.svelte";
 	import CarbonRotate360 from "~icons/carbon/rotate-360";
@@ -193,9 +195,19 @@
 							{message.routerMetadata.route}
 						</span>
 						<span class="text-gray-500">with</span>
-						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
-							{message.routerMetadata.model.split("/").pop()}
-						</span>
+						{#if publicConfig.isHuggingChat}
+							<a
+								href="https://huggingface.co/{message.routerMetadata.model}"
+								target="_blank"
+								class="rounded bg-gray-100 px-1.5 py-0.5 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300"
+							>
+								{message.routerMetadata.model.split("/").pop()}
+							</a>
+						{:else}
+							<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+								{message.routerMetadata.model.split("/").pop()}
+							</span>
+						{/if}
 					</div>
 				{/if}
 
