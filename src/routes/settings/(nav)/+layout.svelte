@@ -128,7 +128,7 @@
 	</div>
 	{#if !(showContent && browser && !isDesktop(window))}
 		<div
-			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-700/40 to-10% max-md:-mx-4 max-md:h-full md:pr-6"
+			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-50 to-10% dark:from-gray-700/40 max-md:-mx-4 max-md:h-full md:pr-6"
 			class:max-md:hidden={showContent && browser}
 			bind:this={navContainer}
 		>
