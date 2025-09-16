@@ -15,9 +15,18 @@
 	let errors: { message: string; stack?: string }[] = $state([]);
 
 	function buildSrcdoc(content: string, channel: string): string {
+		const trimmed = content.trimStart();
+		const svgPattern = /^(?:<\?xml[^>]*>\s*)?(?:<!doctype\s+svg[^>]*>\s*)?<svg[\s>]/i;
 		const baseTag = '<base target="_blank">';
 		const endScriptTag = "</scr" + "ipt>";
 		const errorHook = `\n<script>\n(function(){\n  function send(detail){\n    try{ parent.postMessage({ type: 'chatui.preview.error', channel: '${channel}', detail: detail }, '*'); }catch(e){}\n  }\n  window.addEventListener('error', function(ev){\n    var msg = ev && ev.message ? ev.message : 'Script error';\n    var stack = ev && ev.error && ev.error.stack ? ev.error.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n  window.addEventListener('unhandledrejection', function(ev){\n    var r = ev && ev.reason;\n    var msg = (typeof r === 'string') ? r : (r && r.message) ? r.message : 'Unhandled promise rejection';\n    var stack = r && r.stack ? r.stack : undefined;\n    send({ message: msg, stack: stack });\n  });\n})();\n${endScriptTag}`;
+
+		if (svgPattern.test(trimmed)) {
+			const svgContent = trimmed
+				.replace(/^(<\?xml[^>]*>\s*)/i, "")
+				.replace(/^(<!doctype[^>]*>\s*)/i, "");
+			return `<!doctype html><html><head>${baseTag}${errorHook}</head><body>${svgContent}</body></html>`;
+		}
 
 		const headMatch = content.match(/<head[^>]*>/i);
 		if (headMatch) {
