@@ -185,7 +185,7 @@
 
 		{#if message.routerMetadata || (!loading && message.content)}
 			<div class="absolute -bottom-3.5 right-1 flex items-center gap-0.5">
-				{#if message.routerMetadata}
+				{#if message.routerMetadata && (!isLast || !loading)}
 					<div
 						class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 dark:text-gray-400"
 					>

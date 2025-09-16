@@ -96,7 +96,7 @@ export default defineConfig({
 		// Allow any ngrok-free.app subdomain (dynamic tunnels)
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
-		allowedHosts: [".ngrok-free.app"],
+		allowedHosts: ["huggingface.ngrok.io"],
 	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "@gradio/client", "clsx"],

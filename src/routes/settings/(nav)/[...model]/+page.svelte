@@ -169,7 +169,7 @@
 	<div class="relative flex w-full flex-col gap-2">
 		{#if model?.isRouter}
 			<p class="mb-3 mt-2 rounded-lg bg-gray-100 px-3 py-2 text-sm dark:bg-white/5">
-				<IconOmni classNames="-translate-y-px" /> Omni routes your message to the best underlying model
+				<IconOmni classNames="-translate-y-px" /> Omni routes your messages to the best underlying model
 				depending on your request.
 			</p>
 		{/if}
