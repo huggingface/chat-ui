@@ -536,7 +536,7 @@
 						class="flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700 dark:hover:text-gray-400"
 						onclick={() => startFollowUp(followUp)}
 					>
-						<CarbonDirectionRight class="scale-y-[-1]" />
+						<CarbonDirectionRight class="scale-y-[-1] text-xs" />
 						{followUp.title}</button
 					>
 				{/each}
