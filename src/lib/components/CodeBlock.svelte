@@ -21,7 +21,12 @@
 		return /^<!doctype\s+html\s*>/i.test(trimmed);
 	}
 
-	let showPreview = $derived(hasStrictHtml5Doctype(rawCode));
+	function isSvgDocument(input: string): boolean {
+		const trimmed = input.trimStart();
+		return /^(?:<\?xml[^>]*>\s*)?(?:<!doctype\s+svg[^>]*>\s*)?<svg[\s>]/i.test(trimmed);
+	}
+
+	let showPreview = $derived(hasStrictHtml5Doctype(rawCode) || isSvgDocument(rawCode));
 </script>
 
 <div class="group relative my-4 rounded-lg">
@@ -32,7 +37,7 @@
 	<div class="absolute right-2 top-2 flex items-center gap-1.5">
 		{#if showPreview}
 			<button
-				class="btn h-7 gap-1 rounded-lg border border-gray-200 px-2 text-xs text-gray-200 shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
+				class="btn h-7 gap-1 rounded-lg border border-gray-600 bg-gray-600 px-2 text-xs text-gray-300 shadow-sm transition-all hover:border-gray-500 active:shadow-inner dark:border-gray-700 dark:bg-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
 				onclick={() => (previewOpen = true)}
 				title="Preview HTML"
 				aria-label="Preview HTML"
@@ -43,7 +48,7 @@
 		{/if}
 		<CopyToClipBoardBtn
 			iconClassNames="size-3"
-			classNames="btn rounded-lg border border-gray-200 size-7 text-sm shadow-sm transition-all hover:border-gray-300 active:shadow-inner dark:border-gray-700 dark:hover:border-gray-500  dark:text-gray-400 text-gray-200"
+			classNames="btn rounded-lg border size-7 text-sm shadow-sm transition-all bg-gray-600 dark:hover:border-gray-500 dark:bg-gray-700 active:shadow-inner border-gray-600 dark:border-gray-700 hover:border-gray-500 dark:text-gray-400 text-gray-300 "
 			value={rawCode}
 		/>
 	</div>
