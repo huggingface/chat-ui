@@ -5,7 +5,7 @@
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
-
+	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
@@ -236,32 +236,176 @@
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 
-	type RouterExample = { title: string; prompt: string };
+	type RouterFollowUp = { title: string; prompt: string };
+	type RouterExample = {
+		title: string;
+		prompt: string;
+		followUps?: RouterFollowUp[];
+	};
 	const routerExamples: RouterExample[] = [
 		{
 			title: "Pong game",
 			prompt: "Create a vintage pong game in HTML",
+			followUps: [
+				{
+					title: "Translate to Italian",
+					prompt:
+						"Translate the Pong game you just created into Italian, including any on-screen text or comments.",
+				},
+				{
+					title: "Add power-ups",
+					prompt:
+						"Add a power-up mechanic to the Pong game so paddles temporarily grow when a player scores twice in a row.",
+				},
+				{
+					title: "React refactor",
+					prompt:
+						"Refactor the Pong game into a React component that renders inside a single-page app.",
+				},
+			],
+		},
+		{
+			title: "Landing page",
+			prompt:
+				"Build a responsive SaaS landing page using Tailwind CSS with a hero, features, testimonials, and pricing sections.",
+			followUps: [
+				{
+					title: "Dark mode",
+					prompt:
+						"Extend the Tailwind CSS landing page with a toggleable dark mode that remembers the user's choice.",
+				},
+				{
+					title: "Add blog teasers",
+					prompt:
+						"Add a latest blog posts section to the Tailwind CSS landing page with three article cards and call-to-action buttons.",
+				},
+				{
+					title: "Convert to React",
+					prompt:
+						"Refactor the Tailwind CSS landing page into a reusable React component structure with sections as separate components.",
+				},
+			],
 		},
 		{
 			title: "Act as Yoda",
 			prompt: "Act as Yoda",
+			followUps: [
+				{
+					title: "Give advice",
+					prompt:
+						"Continue acting as Yoda and offer three pieces of life advice for staying focused under pressure.",
+				},
+				{
+					title: "Explain the Force",
+					prompt:
+						"In Yoda's voice, explain the concept of the Force to a young padawan using modern language.",
+				},
+				{
+					title: "Plain English",
+					prompt:
+						"Rewrite the previous response from Yoda into plain English while keeping the same meaning.",
+				},
+			],
 		},
 		{
 			title: "Generate prompts",
 			prompt: `Generate 10 creative prompts Text-to-image prompts like: "Cyberpunk cityscape at night, neon lights, flying cars, rain-slicked streets, blade runner aesthetic, highly detailed`,
+			followUps: [
+				{
+					title: "More cyberpunk",
+					prompt:
+						"Create five more cyberpunk-themed text-to-image prompts that explore different weather conditions.",
+				},
+				{
+					title: "Watercolor scenes",
+					prompt:
+						"Generate five text-to-image prompts that describe watercolor illustrations of tranquil nature scenes.",
+				},
+				{
+					title: "Sci-fi portraits",
+					prompt:
+						"Produce five futuristic character portrait prompts with unique professions and settings.",
+				},
+			],
 		},
 		{
 			title: "Explain LLMs",
 			prompt:
 				"Explain how large language models based on transformers work, covering attention, embeddings, and training objectives.",
+			followUps: [
+				{
+					title: "Compare to RNNs",
+					prompt:
+						"Compare transformer-based large language models to recurrent neural networks, focusing on training efficiency and capabilities.",
+				},
+				{
+					title: "Student summary",
+					prompt:
+						"Summarize the explanation of large language models for a high school student using relatable analogies.",
+				},
+				{
+					title: "Fine-tuning pitfalls",
+					prompt:
+						"List common pitfalls teams encounter when fine-tuning large language models for production use.",
+				},
+			],
 		},
 		{
 			title: "Translate in Italian",
 			prompt: `Translate in Italian: Some are born great, some achieve greatness, and some have greatness thrust upon ’em`,
+			followUps: [
+				{
+					title: "Back to English",
+					prompt:
+						"Translate the Italian version back into English while keeping Shakespeare's tone intact.",
+				},
+				{
+					title: "Explain choices",
+					prompt: "Explain your translation choices for each key phrase from the Italian version.",
+				},
+				{
+					title: "Modernize",
+					prompt:
+						"Modernize the Italian translation into contemporary informal Italian suitable for social media.",
+				},
+			],
 		},
 	];
 
-	function startExample(prompt: string) {
+	let activeRouterExamplePrompt = $state<string | null>(null);
+	let routerFollowUps = $derived<RouterFollowUp[]>(
+		activeRouterExamplePrompt
+			? (routerExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
+			: []
+	);
+	let routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
+	let shouldShowRouterFollowUps = $derived(
+		!message.length &&
+			activeRouterExamplePrompt &&
+			routerFollowUps.length > 0 &&
+			routerUserMessages.length === 1 &&
+			currentModel.isRouter &&
+			!hideRouterExamples &&
+			!loading
+	);
+
+	$effect(() => {
+		if (!currentModel.isRouter || !messages.length) {
+			activeRouterExamplePrompt = null;
+			return;
+		}
+
+		const firstUserMessage = messages.find((msg) => msg.from === "user");
+		if (!firstUserMessage) {
+			activeRouterExamplePrompt = null;
+			return;
+		}
+
+		const match = routerExamples.find((ex) => ex.prompt.trim() === firstUserMessage.content.trim());
+		activeRouterExamplePrompt = match ? match.prompt : null;
+	});
+
+	function triggerPrompt(prompt: string) {
 		if (loading) return;
 		if (page.data.loginRequired) {
 			$loginModalOpen = true;
@@ -269,6 +413,15 @@
 		}
 		message = prompt;
 		handleSubmit();
+	}
+
+	function startExample(example: RouterExample) {
+		activeRouterExamplePrompt = example.prompt;
+		triggerPrompt(example.prompt);
+	}
+
+	function startFollowUp(followUp: RouterFollowUp) {
+		triggerPrompt(followUp.prompt);
 	}
 </script>
 
@@ -370,7 +523,21 @@
 				{#each routerExamples as ex}
 					<button
 						class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700 dark:hover:text-gray-400"
-						onclick={() => startExample(ex.prompt)}>{ex.title}</button
+						onclick={() => startExample(ex)}>{ex.title}</button
+					>
+				{/each}
+			</div>
+		{/if}
+		{#if shouldShowRouterFollowUps}
+			<div class="mb-3 flex w-full flex-wrap items-center gap-2 text-gray-400 dark:text-gray-500">
+				<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
+				{#each routerFollowUps as followUp}
+					<button
+						class="flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700 dark:hover:text-gray-400"
+						onclick={() => startFollowUp(followUp)}
+					>
+						<CarbonDirectionRight class="scale-y-[-1]" />
+						{followUp.title}</button
 					>
 				{/each}
 			</div>
@@ -416,7 +583,7 @@
 											id: lastMessage?.id,
 										});
 									}
-							}}
+								}}
 							/>
 						</div>
 					{/if}
