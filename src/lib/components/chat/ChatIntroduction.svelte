@@ -21,7 +21,7 @@
 
 <div class="my-auto grid items-center justify-center gap-8 text-center">
 	<div
-		class="flex -translate-y-16 select-none items-center rounded-xl text-3xl font-semibold md:-translate-y-8 md:text-5xl"
+		class="flex -translate-y-16 select-none items-center rounded-xl text-3xl font-semibold md:-translate-y-12 md:text-5xl"
 	>
 		<Logo classNames="size-12 md:size-20 dark:invert mr-0.5" />
 		{publicConfig.PUBLIC_APP_NAME}
