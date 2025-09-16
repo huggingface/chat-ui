@@ -287,6 +287,28 @@
 			],
 		},
 		{
+			title: "Eminem song",
+			prompt:
+				"Write an Eminem-style rap battling AI taking over hip-hop, with two energetic verses and a catchy hook.",
+			followUps: [
+				{
+					title: "Add chorus",
+					prompt:
+						"Add a new chorus to the Eminem-style AI rap that the crowd can shout back, keeping the same rhyme scheme.",
+				},
+				{
+					title: "Explain references",
+					prompt:
+						"Explain the references and wordplay used in the Eminem-style AI rap to someone new to hip-hop.",
+				},
+				{
+					title: "Radio edit",
+					prompt:
+						"Rewrite the Eminem-style AI rap into a clean radio edit while keeping the punchlines intact.",
+				},
+			],
+		},
+		{
 			title: "Act as Yoda",
 			prompt: "Act as Yoda",
 			followUps: [
@@ -522,7 +544,7 @@
 			>
 				{#each routerExamples as ex}
 					<button
-						class="flex rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700 dark:hover:text-gray-400"
+						class="flex items-center rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
 						onclick={() => startExample(ex)}>{ex.title}</button
 					>
 				{/each}
@@ -533,7 +555,7 @@
 				<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
 				{#each routerFollowUps as followUp}
 					<button
-						class="flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-center text-sm hover:text-gray-500 dark:bg-gray-700 dark:hover:text-gray-400"
+						class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
 						onclick={() => startFollowUp(followUp)}
 					>
 						<CarbonDirectionRight class="scale-y-[-1] text-xs" />
