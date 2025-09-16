@@ -97,8 +97,8 @@
 	{
 		"name": "frontend_ui",
 		"description": "Build accessible, responsive UI components and pages.",
-		"primary_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-		"fallback_models": ["zai-org/GLM-4.5", "deepseek-ai/DeepSeek-R1-0528"]
+		"primary_model": "deepseek-ai/DeepSeek-R1-0528",
+		"fallback_models": ["Qwen/Qwen3-Coder-480B-A35B-Instruct", "zai-org/GLM-4.5"]
 	},
 	{
 		"name": "code_maintenance",
