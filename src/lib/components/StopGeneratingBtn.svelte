@@ -54,7 +54,7 @@
 	}
 
 	:global(.dark) .stop-generating-btn {
-		--stop-generating-ring-color: rgba(255, 255, 255, 0.45);
+		--stop-generating-ring-color: rgba(255, 255, 255, 0.2);
 	}
 
 	@keyframes stop-generating-rotate {
