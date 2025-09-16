@@ -128,7 +128,7 @@
 	</div>
 	{#if !(showContent && browser && !isDesktop(window))}
 		<div
-			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap max-md:-mx-4 max-md:h-full md:pr-6"
+			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-700/40 to-10% max-md:-mx-4 max-md:h-full md:pr-6"
 			class:max-md:hidden={showContent && browser}
 			bind:this={navContainer}
 		>
@@ -199,14 +199,13 @@
 				</button>
 			{/each}
 
-			<div class="my-2 mt-auto w-full border-b border-gray-200 dark:border-gray-700"></div>
 			<button
 				type="button"
 				onclick={() => goto(`${base}/settings/application`)}
-				class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 max-md:order-first md:rounded-xl md:px-3 {page
+				class="group sticky bottom-0 mt-1 flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 dark:text-gray-300 max-md:order-first md:rounded-xl md:px-3 {page
 					.url.pathname === `${base}/settings/application`
 					? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
-					: ''}"
+					: 'bg-white dark:bg-gray-800'}"
 				aria-label="Configure application settings"
 			>
 				<IconGear class="mr-0.5 text-xxs" />
