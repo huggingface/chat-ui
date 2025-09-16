@@ -39,7 +39,7 @@
 				Welcome to {publicConfig.PUBLIC_APP_NAME}, the chat app powered by open source AI models.
 			</p>
 			<p class="mt-3 text-[15px] leading-relaxed">
-				With <IconOmni classNames="-translate-y-px" /> Omni, it automatically picks the best AI model
+				With <IconOmni classNames="-translate-y-px" /> Omni, automatically picks the optimal AI model
 				to give you the best answer depending on your request. You can also choose from any advanced
 				open source models to chat with directly.
 			</p>
