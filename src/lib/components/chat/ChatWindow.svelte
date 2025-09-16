@@ -6,7 +6,6 @@
 	import CarbonExport from "~icons/carbon/export";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 
-	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
@@ -396,31 +395,31 @@
 
 		<div class="w-full">
 			<div class="flex w-full *:mb-3">
-				{#if loading}
-					<StopGeneratingBtn classNames="ml-auto" onClick={() => onstop?.()} />
-				{:else if lastIsError}
-					<RetryBtn
-						classNames="ml-auto"
-						onClick={() => {
-							if (lastMessage && lastMessage.ancestors) {
-								onretry?.({
-									id: lastMessage.id,
-								});
-							}
-						}}
-					/>
-				{:else if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
-					<div class="ml-auto gap-2">
-						<ContinueBtn
+				{#if !loading}
+					{#if lastIsError}
+						<RetryBtn
+							classNames="ml-auto"
 							onClick={() => {
 								if (lastMessage && lastMessage.ancestors) {
-									oncontinue?.({
-										id: lastMessage?.id,
+									onretry?.({
+										id: lastMessage.id,
 									});
 								}
 							}}
 						/>
-					</div>
+					{:else if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
+						<div class="ml-auto gap-2">
+							<ContinueBtn
+								onClick={() => {
+									if (lastMessage && lastMessage.ancestors) {
+										oncontinue?.({
+											id: lastMessage?.id,
+										});
+									}
+							}}
+							/>
+						</div>
+					{/if}
 				{/if}
 			</div>
 			<form
@@ -461,12 +460,11 @@
 						{/if}
 
 						{#if loading}
-							<button
-								disabled
-								class="btn absolute bottom-0.5 right-0.5 size-10 self-end rounded-lg bg-transparent text-gray-400"
-							>
-								<EosIconsLoading />
-							</button>
+							<StopGeneratingBtn
+								onClick={() => onstop?.()}
+								showBorder={true}
+								classNames="absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+							/>
 						{:else}
 							<button
 								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!message ||
