@@ -171,7 +171,7 @@
 							<div
 								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 							>
-								<MarkdownRenderer content={part} />
+								<MarkdownRenderer content={part} loading={isLast && loading} />
 							</div>
 						{/if}
 					{/each}
@@ -179,7 +179,7 @@
 					<div
 						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 					>
-						<MarkdownRenderer content={message.content} />
+						<MarkdownRenderer content={message.content} loading={isLast && loading} />
 					</div>
 				{/if}
 			</div>
