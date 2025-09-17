@@ -530,7 +530,7 @@
 			</form>
 			<div
 				class={{
-					"mt-2 flex self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+					"mt-2 flex self-stretch px-0.5 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
 					"max-sm:hidden": focused && isVirtualKeyboard(),
 				}}
 			>
