@@ -27,8 +27,8 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
-import { routerExamples } from "$lib/constants/routerExamples";
-import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
+	import { routerExamples } from "$lib/constants/routerExamples";
+	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -399,7 +399,9 @@ import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExample
 			</div>
 		{/if}
 		{#if shouldShowRouterFollowUps}
-			<div class="mb-3 flex w-full flex-wrap items-center gap-2 text-gray-400 dark:text-gray-500">
+			<div
+				class="mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;] dark:text-gray-500"
+			>
 				<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
 				{#each routerFollowUps as followUp}
 					<button

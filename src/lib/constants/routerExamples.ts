@@ -62,9 +62,8 @@ export const routerExamples: RouterExample[] = [
 				prompt: "Provide a psychological analysis of Eminem’s emotions in this song.",
 			},
 			{
-				title: "Explain references",
-				prompt:
-					"Explain the references and wordplay used in the Eminem-style AI rap to someone new to hip-hop.",
+				title: "Wired Article",
+				prompt: "Write an article in the style of Wired explaining this Eminem release.",
 			},
 			{
 				title: "Roleplay",
