@@ -7,9 +7,10 @@
 	interface Props {
 		code?: string;
 		rawCode?: string;
+		loading?: boolean;
 	}
 
-	let { code = "", rawCode = "" }: Props = $props();
+	let { code = "", rawCode = "", loading = false }: Props = $props();
 
 	let previewOpen = $state(false);
 
@@ -36,8 +37,13 @@
 		>
 			{#if showPreview}
 				<button
-					class="btn h-7 gap-1 rounded-lg border border-gray-600 bg-gray-600/50 px-2 text-xs text-gray-300 shadow-sm backdrop-blur transition-all hover:border-gray-500 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
-					onclick={() => (previewOpen = true)}
+					class="btn h-7 gap-1 rounded-lg border border-gray-600 bg-gray-600/50 px-2 text-xs text-gray-300 shadow-sm backdrop-blur transition-all hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
+					disabled={loading}
+					onclick={() => {
+						if (!loading) {
+							previewOpen = true;
+						}
+					}}
 					title="Preview HTML"
 					aria-label="Preview HTML"
 				>
