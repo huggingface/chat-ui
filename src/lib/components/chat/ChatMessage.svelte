@@ -84,13 +84,14 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/g;
+	let thinkSegments = $derived.by(() => message.content.split(THINK_BLOCK_REGEX));
 	let hasServerReasoning = $derived(
 		reasoningUpdates &&
 			reasoningUpdates.length > 0 &&
 			!!message.reasoning &&
 			message.reasoning.trim().length > 0
 	);
-	let hasClientThink = $derived(!hasServerReasoning && /<think>/.test(message.content));
+	let hasClientThink = $derived(!hasServerReasoning && thinkSegments.length > 1);
 
 	$effect(() => {
 		if (isCopied) {

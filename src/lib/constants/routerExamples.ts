@@ -115,7 +115,7 @@ export const routerExamples: RouterExample[] = [
 		followUps: [
 			{
 				title: "Generate a Quiz",
-				prompt: "Create a short quiz with 5 multiple-choice questions to validate my knowledge.",
+				prompt: "Craft a 5-question multiple-choice quiz to validate what I learned.",
 			},
 			{
 				title: "Compare to RNNs",

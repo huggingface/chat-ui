@@ -27,8 +27,8 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
-	import { routerExamples } from "$lib/constants/routerExamples";
-	import type { RouterFollowUp } from "$lib/constants/routerExamples";
+import { routerExamples } from "$lib/constants/routerExamples";
+import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -138,6 +138,10 @@
 	};
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
+	let scrollSignal = $derived.by(() => {
+		const last = messages.at(-1) as Message | undefined;
+		return last ? `${last.id}:${last.content.length}:${messages.length}` : `${messages.length}:0`;
+	});
 	let lastIsError = $derived(
 		lastMessage &&
 			!loading &&
@@ -309,7 +313,7 @@
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
-		use:snapScrollToBottom={messages.map((message) => message.content)}
+		use:snapScrollToBottom={scrollSignal}
 		bind:this={chatContainer}
 	>
 		<div
