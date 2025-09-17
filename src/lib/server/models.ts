@@ -9,6 +9,12 @@ import { makeRouterEndpoint } from "$lib/server/router/endpoint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
+const sanitizeJSONEnv = (val: string, fallback: string) => {
+	const raw = (val ?? "").trim();
+	const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
+	return unquoted || fallback;
+};
+
 const reasoningSchema = z.union([
 	z.object({
 		type: z.literal("regex"), // everything is reasoning, extract the answer from the regex
@@ -72,10 +78,24 @@ const modelConfig = z.object({
 	reasoning: reasoningSchema.optional(),
 });
 
+type ModelConfig = z.infer<typeof modelConfig>;
+
+const overrideEntrySchema = modelConfig
+	.partial()
+	.extend({
+		id: z.string().optional(),
+		name: z.string().optional(),
+	})
+	.refine((value) => Boolean((value.id ?? value.name)?.trim()), {
+		message: "Model override entry must provide an id or name",
+	});
+
+type ModelOverride = z.infer<typeof overrideEntrySchema>;
+
 // ggufModelsConfig unused in this build
 
 // Source models exclusively from an OpenAI-compatible endpoint.
-let modelsRaw: z.infer<typeof modelConfig>[] = [];
+let modelsRaw: ModelConfig[] = [];
 
 // Require explicit base URL; no implicit default here
 const openaiBaseUrl = config.OPENAI_BASE_URL
@@ -144,8 +164,8 @@ if (openaiBaseUrl) {
 						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
 					},
 				],
-			} as z.infer<typeof modelConfig>;
-		}) as z.infer<typeof modelConfig>[];
+			} as ModelConfig;
+		}) as ModelConfig[];
 	} catch (e) {
 		logger.error(e, "Failed to load models from OpenAI base URL");
 		throw e;
@@ -157,8 +177,44 @@ if (openaiBaseUrl) {
 	throw new Error("OPENAI_BASE_URL not set");
 }
 
+let modelOverrides: ModelOverride[] = [];
+const overridesEnv = (Reflect.get(config, "MODELS") as string | undefined) ?? "";
+
+if (overridesEnv.trim()) {
+	try {
+		modelOverrides = z
+			.array(overrideEntrySchema)
+			.parse(JSON5.parse(sanitizeJSONEnv(overridesEnv, "[]")));
+	} catch (error) {
+		logger.error(error, "[models] Failed to parse MODELS overrides");
+	}
+}
+
+if (modelOverrides.length) {
+	const overrideMap = new Map<string, ModelOverride>();
+	for (const override of modelOverrides) {
+		for (const key of [override.id, override.name]) {
+			const trimmed = key?.trim();
+			if (trimmed) overrideMap.set(trimmed, override);
+		}
+	}
+
+	modelsRaw = modelsRaw.map((model) => {
+		const override =
+			overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
+		if (!override) return model;
+
+		const { id, name, ...rest } = override;
+
+		return {
+			...model,
+			...rest,
+		};
+	});
+}
+
 function getChatPromptRender(
-	_m: z.infer<typeof modelConfig>
+	_m: ModelConfig
 ): (inputs: ChatTemplateInput) => string {
 	// Minimal template to support legacy "completions" flow if ever used.
 	// We avoid any tokenizer/Jinja usage in this build.
@@ -174,7 +230,7 @@ function getChatPromptRender(
 	};
 }
 
-const processModel = async (m: z.infer<typeof modelConfig>) => ({
+const processModel = async (m: ModelConfig) => ({
 	...m,
 	chatPromptRender: await getChatPromptRender(m),
 	id: m.id || m.name,
@@ -224,7 +280,7 @@ let decorated = builtModels as any[];
 
 if (archBase) {
     // Build a minimal model config for the alias
-    const aliasRaw: z.infer<typeof modelConfig> = {
+	const aliasRaw: ModelConfig = {
         id: routerAliasId,
         name: routerAliasId,
         displayName: routerLabel,
@@ -264,12 +320,6 @@ export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...
 export const defaultModel = models[0];
 
 // Models that have been deprecated
-const sanitizeJSONEnv = (val: string, fallback: string) => {
-	const raw = (val ?? "").trim();
-	const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
-	return unquoted || fallback;
-};
-
 export const oldModels = config.OLD_MODELS
 	? z
 			.array(
