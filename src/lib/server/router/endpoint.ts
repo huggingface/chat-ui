@@ -1,10 +1,27 @@
-import type { Endpoint, EndpointParameters } from "../endpoints/endpoints";
+import type { Endpoint, EndpointParameters, EndpointMessage } from "../endpoints/endpoints";
 import endpoints from "../endpoints/endpoints";
 import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { archSelectRoute } from "./arch";
 import { getRoutes, resolveRouteModels } from "./policy";
+
+const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
+
+function stripReasoningBlocks(text: string): string {
+	const stripped = text.replace(REASONING_BLOCK_REGEX, "");
+	return stripped === text ? text : stripped.trim();
+}
+
+function stripReasoningFromMessage(message: EndpointMessage): EndpointMessage {
+	const { reasoning: _reasoning, ...rest } = message;
+	const content =
+		typeof message.content === "string" ? stripReasoningBlocks(message.content) : message.content;
+	return {
+		...rest,
+		content,
+	};
+}
 
 /**
  * Create an Endpoint that performs route selection via Arch and then forwards
@@ -13,7 +30,8 @@ import { getRoutes, resolveRouteModels } from "./policy";
 export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<Endpoint> {
 	return async function routerEndpoint(params: EndpointParameters) {
 		const routes = await getRoutes();
-		const { routeName } = await archSelectRoute(params.messages);
+		const sanitizedMessages = params.messages.map(stripReasoningFromMessage);
+		const { routeName } = await archSelectRoute(sanitizedMessages);
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
 		const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
