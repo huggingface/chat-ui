@@ -210,5 +210,11 @@
 		"description": "Teach concepts with step-by-step explanations, examples, and practice.",
 		"primary_model": "deepseek-ai/DeepSeek-V3.1",
 		"fallback_models": ["Qwen/Qwen3-235B-A22B-Thinking-2507", "deepseek-ai/DeepSeek-R1-0528"]
+	},
+	{
+		"name": "structured_data",
+		"description": "Extract structured JSON from text.",
+		"primary_model": "zai-org/GLM-4.5",
+		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
 	}
 ]
