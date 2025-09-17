@@ -12,8 +12,12 @@ export type RouterExample = {
 export const routerExamples: RouterExample[] = [
 	{
 		title: "Pong game",
-		prompt: "Create a vintage pong game in HTML",
+		prompt: "Create a vintage pong game in HTML + tailwindcss",
 		followUps: [
+			{
+				title: "README.md file",
+				prompt: "Create a comprehensive README.md for the Pong game project.",
+			},
 			{
 				title: "Add power-ups",
 				prompt:
@@ -44,8 +48,7 @@ export const routerExamples: RouterExample[] = [
 			},
 			{
 				title: "Translate to Italian",
-				prompt:
-					"Translate the Pong game you just created into Italian, including any on-screen text or comments.",
+				prompt: "Translate the visible content of the page into italian",
 			},
 		],
 	},
@@ -55,9 +58,8 @@ export const routerExamples: RouterExample[] = [
 			"Write an Eminem-style rap battling AI taking over hip-hop, with two energetic verses and a catchy hook.",
 		followUps: [
 			{
-				title: "Add chorus",
-				prompt:
-					"Add a new chorus to the Eminem-style AI rap that the crowd can shout back, keeping the same rhyme scheme.",
+				title: "Psychological analysis",
+				prompt: "Provide a psychological analysis of Eminem’s emotions in this song.",
 			},
 			{
 				title: "Explain references",
@@ -65,9 +67,8 @@ export const routerExamples: RouterExample[] = [
 					"Explain the references and wordplay used in the Eminem-style AI rap to someone new to hip-hop.",
 			},
 			{
-				title: "Radio edit",
-				prompt:
-					"Rewrite the Eminem-style AI rap into a clean radio edit while keeping the punchlines intact.",
+				title: "Roleplay",
+				prompt: "Roleplay as Eminem so I can discuss the song with him.",
 			},
 		],
 	},
@@ -94,16 +95,11 @@ export const routerExamples: RouterExample[] = [
 	},
 	{
 		title: "Generate prompts",
-		prompt: `Generate 10 creative prompts Text-to-image prompts like: "Cyberpunk cityscape at night, neon lights, flying cars, rain-slicked streets, blade runner aesthetic, highly detailed`,
+		prompt: `Generate 5 creative prompts Text-to-image prompts like: "Cyberpunk cityscape at night, neon lights, flying cars, rain-slicked streets, blade runner aesthetic, highly detailed`,
 		followUps: [
 			{
-				title: "More cyberpunk",
-				prompt:
-					"Create five more cyberpunk-themed text-to-image prompts that explore different weather conditions.",
-			},
-			{
 				title: "Turn into JSON",
-				prompt: "Convert the prompt into JSON format",
+				prompt: `Generate a detailed JSON object for each prompt. Include fields for subjects (list of objects), scene (setting, environment, background details), actions (what’s happening), style (artistic style or medium)`,
 			},
 			{
 				title: "Sci-fi portraits",
@@ -118,6 +114,10 @@ export const routerExamples: RouterExample[] = [
 			"Explain how large language models based on transformers work, covering attention, embeddings, and training objectives.",
 		followUps: [
 			{
+				title: "Generate a Quiz",
+				prompt: "Create a short quiz with 5 multiple-choice questions to validate my knowledge.",
+			},
+			{
 				title: "Compare to RNNs",
 				prompt:
 					"Compare transformer-based large language models to recurrent neural networks, focusing on training efficiency and capabilities.",
@@ -126,10 +126,6 @@ export const routerExamples: RouterExample[] = [
 				title: "Student summary",
 				prompt:
 					"Summarize the explanation of large language models for a high school student using relatable analogies.",
-			},
-			{
-				title: "Generate a Quizz",
-				prompt: "Create a Quizz so we can test how well I understand this.",
 			},
 		],
 	},

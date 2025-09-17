@@ -198,7 +198,7 @@
 	},
 	{
 		"name": "emotional_support",
-		"description": "Offer empathetic listening and coping strategies.",
+		"description": "Provide compassionate listening and gentle guidance for emotional well-being.",
 		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
 		"fallback_models": [
 			"meta-llama/Llama-4-Maverick-17B-128E-Instruct",
