@@ -101,11 +101,13 @@
 	);
 	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 	let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
-	let webSearchSources = $derived(
-		searchUpdates?.find(
-			(update): update is MessageWebSearchSourcesUpdate =>
-				update.subtype === MessageWebSearchUpdateType.Sources
-		)?.sources
+    let webSearchSources = $derived(
+		searchUpdates
+			?.filter(
+				(update): update is MessageWebSearchSourcesUpdate =>
+					update.subtype === MessageWebSearchUpdateType.Sources
+			)
+			?.flatMap(update => update.sources)
 	);
 
 	$effect(() => {
