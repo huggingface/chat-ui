@@ -137,6 +137,12 @@ if (openaiBaseUrl) {
 						providers: z
 							.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
 							.optional(),
+						architecture: z
+							.object({
+								input_modalities: z.array(z.string()).optional(),
+							})
+							.passthrough()
+							.optional(),
 					})
 				),
 			})
@@ -151,12 +157,20 @@ if (openaiBaseUrl) {
 				const org = m.id.split("/")[0];
 				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
 			}
+
+			const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
+				modality.toLowerCase()
+			);
+			const supportsImageInput =
+				inputModalities.includes("image") || inputModalities.includes("vision");
 			return {
 				id: m.id,
 				name: m.id,
 				displayName: m.id,
 				logoUrl,
 				providers: m.providers,
+				multimodal: supportsImageInput,
+				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				endpoints: [
 					{
 						type: "openai" as const,
@@ -200,8 +214,7 @@ if (modelOverrides.length) {
 	}
 
 	modelsRaw = modelsRaw.map((model) => {
-		const override =
-			overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
+		const override = overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
 		if (!override) return model;
 
 		const { id, name, ...rest } = override;
@@ -213,9 +226,7 @@ if (modelOverrides.length) {
 	});
 }
 
-function getChatPromptRender(
-	_m: ModelConfig
-): (inputs: ChatTemplateInput) => string {
+function getChatPromptRender(_m: ModelConfig): (inputs: ChatTemplateInput) => string {
 	// Minimal template to support legacy "completions" flow if ever used.
 	// We avoid any tokenizer/Jinja usage in this build.
 	return ({ messages, preprompt }) => {
@@ -258,16 +269,16 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 const inferenceApiIds: string[] = [];
 
 const builtModels = await Promise.all(
-    modelsRaw.map((e) =>
-        processModel(e)
-            .then(addEndpoint)
-            .then(async (m) => ({
-                ...m,
-                hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
-                // router decoration added later
-                isRouter: false as boolean,
-            }))
-    )
+	modelsRaw.map((e) =>
+		processModel(e)
+			.then(addEndpoint)
+			.then(async (m) => ({
+				...m,
+				hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
+				// router decoration added later
+				isRouter: false as boolean,
+			}))
+	)
 );
 
 // Inject a synthetic router alias ("Omni") if Arch router is configured
@@ -279,35 +290,35 @@ const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "o
 let decorated = builtModels as any[];
 
 if (archBase) {
-    // Build a minimal model config for the alias
+	// Build a minimal model config for the alias
 	const aliasRaw: ModelConfig = {
-        id: routerAliasId,
-        name: routerAliasId,
-        displayName: routerLabel,
-        logoUrl: routerLogo || undefined,
-        preprompt: "",
-        endpoints: [
-            {
-                type: "openai" as const,
-                baseURL: openaiBaseUrl!,
-            },
-        ],
-        // Keep the alias visible
-        unlisted: false,
-    } as any;
+		id: routerAliasId,
+		name: routerAliasId,
+		displayName: routerLabel,
+		logoUrl: routerLogo || undefined,
+		preprompt: "",
+		endpoints: [
+			{
+				type: "openai" as const,
+				baseURL: openaiBaseUrl!,
+			},
+		],
+		// Keep the alias visible
+		unlisted: false,
+	} as any;
 
-    const aliasBase = await processModel(aliasRaw);
-    // Create a self-referential ProcessedModel for the router endpoint
-    let aliasModel: any = {};
-    aliasModel = {
-        ...aliasBase,
-        isRouter: true,
-        // getEndpoint uses the router wrapper regardless of the endpoints array
-        getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
-    };
+	const aliasBase = await processModel(aliasRaw);
+	// Create a self-referential ProcessedModel for the router endpoint
+	let aliasModel: any = {};
+	aliasModel = {
+		...aliasBase,
+		isRouter: true,
+		// getEndpoint uses the router wrapper regardless of the endpoints array
+		getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
+	};
 
-    // Put alias first
-    decorated = [aliasModel, ...decorated];
+	// Put alias first
+	decorated = [aliasModel, ...decorated];
 }
 
 export const models = decorated as typeof builtModels;

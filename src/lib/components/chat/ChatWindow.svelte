@@ -229,9 +229,8 @@
 	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
 
 	// Respect per‑model multimodal toggle from settings (force enable)
-	let modelIsMultimodal = $derived(
-		currentModel.multimodal || ($settings.multimodalOverrides?.[currentModel.id] ?? false)
-	);
+	let modelIsMultimodalOverride = $derived($settings.multimodalOverrides?.[currentModel.id]);
+	let modelIsMultimodal = $derived((modelIsMultimodalOverride ?? currentModel.multimodal) === true);
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
