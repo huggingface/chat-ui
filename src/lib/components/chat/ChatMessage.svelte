@@ -211,32 +211,33 @@
 						{/if}
 					</div>
 				{/if}
-
-				<CopyToClipBoardBtn
-					onClick={() => {
-						isCopied = true;
-					}}
-					classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-					value={message.content}
-					iconClassNames="text-xs"
-				/>
-				<button
-					class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-					title="Retry"
-					type="button"
-					onclick={() => {
-						onretry?.({ id: message.id });
-					}}
-				>
-					<CarbonRotate360 />
-				</button>
-				{#if alternatives.length > 1 && editMsdgId === null}
-					<Alternatives
-						{message}
-						{alternatives}
-						{loading}
-						onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
+				{#if !isLast || !loading}
+					<CopyToClipBoardBtn
+						onClick={() => {
+							isCopied = true;
+						}}
+						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						value={message.content}
+						iconClassNames="text-xs"
 					/>
+					<button
+						class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
+						title="Retry"
+						type="button"
+						onclick={() => {
+							onretry?.({ id: message.id });
+						}}
+					>
+						<CarbonRotate360 />
+					</button>
+					{#if alternatives.length > 1 && editMsdgId === null}
+						<Alternatives
+							{message}
+							{alternatives}
+							{loading}
+							onshowAlternateMsg={(payload) => onshowAlternateMsg?.(payload)}
+						/>
+					{/if}
 				{/if}
 			</div>
 		{/if}
