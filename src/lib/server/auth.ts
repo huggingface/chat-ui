@@ -197,7 +197,7 @@ export async function authenticateRequest(
 	cookie: CookieRecord,
 	isApi?: boolean
 ): Promise<App.Locals & { secretSessionId: string }> {
-	const dev_token = config.PUBLIC_DEV_AUTH_TOKEN || ""; // TODO: Temporary auth token for dev purposes
+	const dev_token = config.DEV_AUTH_TOKEN || ""; // TODO: Temporary auth token for dev purposes
 	const sessionId = dev_token;
 	const secretSessionId = dev_token;
 	const isAdmin = dev_token ? true : false;

@@ -18,6 +18,7 @@ services:
       - "5173:5173"
     environment:
       MONGODB_URL: "mongodb://mongo-chatui:27017"
+      MODELS: ${MODELS}
     depends_on:
       - mongo
     networks:
