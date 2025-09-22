@@ -12,7 +12,7 @@ export type RouterExample = {
 export const routerExamples: RouterExample[] = [
 	{
 		title: "Pong game",
-		prompt: "Create a vintage pong game in HTML + tailwindcss",
+		prompt: "Create a minimalist pong game using  HTML and tailwindcss",
 		followUps: [
 			{
 				title: "README.md file",
@@ -25,9 +25,8 @@ export const routerExamples: RouterExample[] = [
 			},
 
 			{
-				title: "React refactor",
-				prompt:
-					"Refactor the Pong game into a React component that renders inside a single-page app.",
+				title: "CRT Screen",
+				prompt: "Add a CRT screen effect to the game",
 			},
 		],
 	},
