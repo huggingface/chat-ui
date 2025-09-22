@@ -1,8 +1,9 @@
 <script lang="ts">
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
 	import DOMPurify from "isomorphic-dompurify";
-	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
+	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
+	import EosIconsLoading from "~icons/eos-icons/loading";
 
 	interface Props {
 		code?: string;
@@ -47,7 +48,11 @@
 					title="Preview HTML"
 					aria-label="Preview HTML"
 				>
-					<PlayFilledAlt class="text-[0.6rem]" />
+					{#if loading}
+						<EosIconsLoading class="size-3.5" />
+					{:else}
+						<PlayFilledAlt class="size-3.5" />
+					{/if}
 					Preview
 				</button>
 			{/if}
