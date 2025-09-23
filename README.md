@@ -1,12 +1,3 @@
----
-title: Chat Ui
-emoji: 📚
-colorFrom: purple
-colorTo: blue
-sdk: docker
-pinned: false
----
-
 # Chat UI
 
 **Find the docs at [hf.co/docs/chat-ui](https://huggingface.co/docs/chat-ui/index).**
@@ -16,24 +7,94 @@ pinned: false
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
 0. [Quickstart](#quickstart)
-1. [No Setup Deploy](#no-setup-deploy)
-2. [Setup](#setup)
-3. [Launch](#launch)
-4. [Extra parameters](#extra-parameters)
-5. [Common issues](#common-issues)
-6. [Deploying to a HF Space](#deploying-to-a-hf-space)
-7. [Building](#building)
-8. [Config changes for HuggingChat](#config-changes-for-huggingchat)
-9. [Populate database](#populate-database)
-10. [Building the docker images locally](#building-the-docker-images-locally)
+1. [Database Options](#database-options)
+2. [Launch](#launch)
+3. [Optional Docker Image](#optional-docker-image)
+4. [No Setup Deploy](#no-setup-deploy)
+5. [Extra parameters](#extra-parameters)
+6. [Common issues](#common-issues)
+7. [Deploying to a HF Space](#deploying-to-a-hf-space)
+8. [Building](#building)
+9. [Config changes for HuggingChat](#config-changes-for-huggingchat)
+10. [Populate database](#populate-database)
+11. [Building the docker images locally](#building-the-docker-images-locally)
 
-> Note on models in this build: This branch only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. The legacy `MODELS` env var, GGUF discovery, llama.cpp/TGI/Ollama/provider-specific endpoints, and embedding/web-search features are removed.
+> Note on models: Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol—Hugging Face router, llama.cpp server, Ollama’s OpenAI bridge, OpenRouter, Anthropic-on-OpenRouter, etc.—will work.
 
 ## Quickstart
 
-### Docker image
+Chat UI speaks to OpenAI-compatible APIs only. The fastest way to get running is with the Hugging Face Inference Providers router plus your personal Hugging Face access token.
 
-You can deploy a chat-ui instance in a single command using the docker image. Get your Hugging Face token from [here](https://huggingface.co/settings/tokens) if you plan to use the HF router.
+**Step 1 – Create `.env.local`:**
+
+```env
+OPENAI_BASE_URL=https://router.huggingface.co/v1
+OPENAI_API_KEY=hf_************************
+# Fill in once you pick a database option below
+MONGODB_URL=
+```
+
+`OPENAI_API_KEY` can come from any OpenAI-compatible endpoint you plan to call. Pick the combo that matches your setup and drop the values into `.env.local`:
+
+| Provider | Example `OPENAI_BASE_URL` | Example key env |
+| --- | --- | --- |
+| Hugging Face Inference Providers router | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` (or `HF_TOKEN` legacy alias) |
+| llama.cpp server (`llama.cpp --server --api`) | `http://127.0.0.1:8080/v1` | `OPENAI_API_KEY=sk-local-demo` (any string works; llama.cpp ignores it) |
+| Ollama (with OpenAI-compatible bridge) | `http://127.0.0.1:11434/v1` | `OPENAI_API_KEY=ollama` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `OPENAI_API_KEY=sk-or-v1-...` |
+
+Check the root [`.env` template](./.env) for the full list of optional variables you can override.
+
+**Step 2 – Choose where MongoDB lives:** Either provision a managed cluster (for example MongoDB Atlas) or run a local container. Both approaches are described in [Database Options](#database-options). After you have the URI, drop it into `MONGODB_URL` (and, if desired, set `MONGODB_DB_NAME`).
+
+**Step 3 – Install and launch the dev server:**
+
+```bash
+git clone https://github.com/huggingface/chat-ui
+cd chat-ui
+npm install
+npm run dev -- --open
+```
+
+You now have Chat UI running against the Hugging Face router without needing to host MongoDB yourself.
+
+## Database Options
+
+Chat history, users, settings, files, and stats all live in MongoDB. You can point Chat UI at any MongoDB 6/7 deployment.
+
+### MongoDB Atlas (managed)
+
+1. Create a free cluster at [mongodb.com](https://www.mongodb.com/pricing).
+2. Add your IP (or `0.0.0.0/0` for development) to the network access list.
+3. Create a database user and copy the connection string.
+4. Paste that string into `MONGODB_URL` in `.env.local`. Keep the default `MONGODB_DB_NAME=chat-ui` or change it per environment.
+
+Atlas keeps MongoDB off your laptop, which is ideal for teams or cloud deployments.
+
+### Local MongoDB (container)
+
+If you prefer to run MongoDB locally:
+
+```bash
+docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
+```
+
+Then set `MONGODB_URL=mongodb://localhost:27017` in `.env.local`. You can also supply `MONGO_STORAGE_PATH` if you want Chat UI’s fallback in-memory server to persist under a specific folder.
+
+## Launch
+
+After configuring your environment variables, start Chat UI with:
+
+```bash
+npm install
+npm run dev
+```
+
+The dev server listens on `http://localhost:5173` by default. Use `npm run build` / `npm run preview` for production builds.
+
+## Optional Docker Image
+
+Prefer containerized setup? You can run everything in one container as long as you supply a MongoDB URI (local or hosted):
 
 ```bash
 docker run \
@@ -45,35 +106,7 @@ docker run \
   ghcr.io/huggingface/chat-ui-db:latest
 ```
 
-Take a look at the [`.env` file](https://github.com/huggingface/chat-ui/blob/main/.env) for all environment variables. In this build, only OpenAI-compatible endpoints are supported via `OPENAI_BASE_URL` and `OPENAI_API_KEY` (with `HF_TOKEN` supported as a legacy alias). Other providers are not available.
-
-### Local setup
-
-Note: This build is OpenAI-compatible only. Local llama.cpp, TGI, Ollama and other provider endpoints are disabled.
-
-**Step 1 (make sure you have MongoDB running locally):**
-
-```bash
-docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
-```
-
-Read more [here](#database).
-
-**Step 2 (clone chat-ui):**
-
-```bash
-git clone https://github.com/huggingface/chat-ui
-cd chat-ui
-```
-
-**Step 3 (start chat-ui):**
-
-```bash
-npm install
-npm run dev -- --open
-```
-
-Read more [here](#launch).
+`host.docker.internal` lets the container reach a MongoDB instance on your host machine; swap it for your Atlas URI if you use the hosted option. All environment variables accepted in `.env.local` can be provided as `-e` flags.
 
 ## No Setup Deploy
 
@@ -84,48 +117,6 @@ You can deploy your own customized Chat UI instance with any supported [LLM](htt
 Set `OPENAI_BASE_URL` (for example `https://router.huggingface.co/v1`) and `OPENAI_API_KEY` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets). `HF_TOKEN` remains supported as a legacy alias if you already have it configured. Create your personal token in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
 
 Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
-
-## Setup
-
-The default config for Chat UI is stored in the `.env` file. You will need to override some values to get Chat UI to run locally. This is done in `.env.local`.
-
-Start by creating a `.env.local` file in the root of the repository. The bare minimum config you need to get Chat UI to run locally is the following:
-
-```env
-MONGODB_URL=<the URL to your MongoDB instance>
-OPENAI_BASE_URL=<OpenAI-compatible API base URL, e.g. https://router.huggingface.co/v1>
-# Authorization
-OPENAI_API_KEY=<your access token>
-# or
-OPENAI_API_KEY=<your provider API key>
-```
-
-### Database
-
-The chat history is stored in a MongoDB instance, and having a DB instance available is needed for Chat UI to work.
-
-You can use a local MongoDB instance. The easiest way is to spin one up using docker:
-
-```bash
-docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
-```
-
-In which case the url of your DB will be `MONGODB_URL=mongodb://localhost:27017`.
-
-Alternatively, you can use a [free MongoDB Atlas](https://www.mongodb.com/pricing) instance for this, Chat UI should fit comfortably within their free tier. After which you can set the `MONGODB_URL` variable in `.env.local` to match your instance.
-
-### Hugging Face Access Token
-
-If you use the Hugging Face router, you will need a Hugging Face access token to run Chat UI locally. You can get one from [your Hugging Face profile](https://huggingface.co/settings/tokens).
-
-## Launch
-
-After you're done with the `.env.local` file you can run Chat UI locally with:
-
-```bash
-npm install
-npm run dev
-```
 
 ## Extra parameters
 
@@ -196,20 +187,6 @@ When you select Omni in the UI, Chat UI will:
 - Emit RouterMetadata immediately (route and actual model used) so the UI can display it.
 - Stream from the selected model via your configured `OPENAI_BASE_URL`. On errors, it tries route fallbacks.
 
-## Common issues
-
-### 403：You don't have access to this conversation
-
-Most likely you are running chat-ui over HTTP. The recommended option is to setup something like NGINX to handle HTTPS and proxy the requests to chat-ui. If you really need to run over HTTP you can add `COOKIE_SECURE=false` and `COOKIE_SAMESITE=lax` to your `.env.local`.
-
-Make sure to set your `PUBLIC_ORIGIN` in your `.env.local` to the correct URL as well.
-
-## Deploying to a HF Space
-
-Create a `DOTENV_LOCAL` secret to your HF space with the content of your .env.local, and they will be picked up automatically when you run.
-
-Ensure the secret includes at least: `MONGODB_URL`, `OPENAI_BASE_URL`, and `OPENAI_API_KEY`.
-
 ## Building
 
 To create a production version of your app:
@@ -222,87 +199,3 @@ You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
 
-## Config changes for HuggingChat
-
-The config file for HuggingChat is stored in the `chart/env/prod.yaml` file. It is the source of truth for the environment variables used for our CI/CD pipeline. For HuggingChat, as we need to customize the app color, as well as the base path, we build a custom docker image. You can find the workflow here.
-
-> [!TIP]
-> If you want to make changes to the model config used in production for HuggingChat, you should do so against `chart/env/prod.yaml`.
-
-### Running a copy of HuggingChat locally
-
-If you want to run an exact copy of HuggingChat locally, you will need to do the following first:
-
-1. Create an [OAuth App on the hub](https://huggingface.co/settings/applications/new) with `openid profile email` permissions. Make sure to set the callback URL to something like `http://localhost:5173/chat/login/callback` which matches the right path for your local instance.
-2. Create a [HF Token](https://huggingface.co/settings/tokens) with your Hugging Face account. You will need a Pro account to be able to access some of the larger models available through HuggingChat.
-3. Run an instance of mongoDB, however you want. (Local or remote)
-
-You can then create a new `.env.SECRET_CONFIG` file with the following content
-
-```env
-MONGODB_URL=<link to your mongo DB from step 3>
-OPENAI_API_KEY=<your token from step 2>
-OPENAI_BASE_URL=https://router.huggingface.co/v1
-OPENID_CONFIG=`{
-  PROVIDER_URL: "https://huggingface.co",
-  CLIENT_ID: "<your client ID from step 1>",
-  CLIENT_SECRET: "<your client secret from step 1>",
-}`
-MESSAGES_BEFORE_LOGIN=<can be any numerical value, or set to 0 to require login>
-```
-
-You can then run `npm run updateLocalEnv` in the root of chat-ui. This will create a `.env.local` file which combines the `chart/env/prod.yaml` and the `.env.SECRET_CONFIG` file. You can then run `npm run dev` to start your local instance of HuggingChat.
-
-## Populate database
-
-> [!WARNING]
-> The `MONGODB_URL` used for this script will be fetched from `.env.local`. Make sure it's correct! The command runs directly on the database.
-
-You can populate the database using faker data using the `populate` script:
-
-```bash
-npm run populate <flags here>
-```
-
-At least one flag must be specified, the following flags are available:
-
-- `reset` - resets the database
-- `all` - populates all tables
-- `users` - populates the users table
-- `settings` - populates the settings table for existing users
-- `assistants` - populates the assistants table for existing users
-- `conversations` - populates the conversations table for existing users
-
-For example, you could use it like so:
-
-```bash
-npm run populate reset
-```
-
-to clear out the database. Then login in the app to create your user and run the following command:
-
-```bash
-npm run populate users settings assistants conversations
-```
-
-to populate the database with fake data, including fake conversations and assistants for your user.
-
-## Building the docker images locally
-
-You can build the docker images locally using the following commands:
-
-```bash
-docker build -t chat-ui-db:latest --build-arg INCLUDE_DB=true .
-docker build -t chat-ui:latest --build-arg INCLUDE_DB=false .
-docker build -t huggingchat:latest --build-arg INCLUDE_DB=false --build-arg APP_BASE=/chat --build-arg PUBLIC_APP_COLOR=yellow --build-arg SKIP_LLAMA_CPP_BUILD=true .
-```
-
-If you want to run the images with your local .env.local you have two options
-
-```bash
-DOTENV_LOCAL=$(<.env.local)  docker run --network=host -e DOTENV_LOCAL chat-ui-db
-```
-
-```bash
-docker run --network=host --mount type=bind,source="$(pwd)/.env.local",target=/app/.env.local chat-ui-db
-```

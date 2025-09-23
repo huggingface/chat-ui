@@ -59,7 +59,12 @@ export async function* generate(
 		conversationId: conv._id,
 	})) {
 		// Check if this output contains router metadata
-		if ('routerMetadata' in output && output.routerMetadata) {
+		if (
+			"routerMetadata" in output &&
+			output.routerMetadata &&
+			output.routerMetadata.route &&
+			output.routerMetadata.model
+		) {
 			yield {
 				type: MessageUpdateType.RouterMetadata,
 				route: output.routerMetadata.route,
@@ -141,7 +146,6 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 				type: MessageUpdateType.FinalAnswer,
 				text: finalAnswer,
 				interrupted,
-				webSources: output.webSources,
 			};
 			continue;
 		}

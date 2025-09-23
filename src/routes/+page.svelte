@@ -80,7 +80,7 @@
 	});
 
 	let currentModel = $derived(
-		findCurrentModel([...data.models, ...data.oldModels], $settings.activeModel)
+		findCurrentModel(data.models, data.oldModels, $settings.activeModel)
 	);
 </script>
 

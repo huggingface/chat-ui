@@ -151,7 +151,9 @@ export const ready = (async () => {
 	}
 })();
 
-type ConfigProxy = ConfigManager & { [K in ConfigKey]: string };
+type ExtraConfigKeys = "HF_TOKEN" | "OLD_MODELS" | "ENABLE_ASSISTANTS";
+
+type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 
 export const config: ConfigProxy = new Proxy(configManager, {
 	get(target, prop, receiver) {

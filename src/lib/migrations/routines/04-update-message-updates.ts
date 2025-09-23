@@ -2,29 +2,11 @@ import type { Migration } from ".";
 import { collections } from "$lib/server/database";
 import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
-// Simple type to replace removed WebSearchSource for migration compatibility
-type WebSearchSource = {
-	title?: string;
-	link: string;
-};
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
-
-// Legacy types for migration compatibility
-enum MessageWebSearchUpdateType {
-	Update = "update",
-	Error = "error",
-	Sources = "sources",
-	Finished = "finished",
-}
-
-type MessageWebSearchFinishedUpdate = {
-	type: "webSearch";
-	subtype: MessageWebSearchUpdateType.Finished;
-};
 import type { Message } from "$lib/types/Message";
 // isMessageWebSearchSourcesUpdate removed from utils; use inline predicate
 
@@ -45,7 +27,7 @@ type WebSearchUpdate = {
 	messageType: "update" | "error" | "sources";
 	message: string;
 	args?: string[];
-	sources?: WebSearchSource[];
+	sources?: { title?: string; link: string }[];
 };
 
 type StatusUpdate = {
@@ -130,28 +112,7 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 
 		// Web Search
 		else if (update.type === "webSearch") {
-			if (update.messageType === "update") {
-				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Update,
-					message: update.message,
-					args: update.args,
-				};
-			} else if (update.messageType === "error") {
-				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Error,
-					message: update.message,
-					args: update.args,
-				};
-			} else if (update.messageType === "sources") {
-				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Sources,
-					message: update.message,
-					sources: update.sources ?? [],
-				};
-			}
+			return null; // Web search updates are no longer supported
 		}
 		console.warn("Unknown message update during migration:", update);
 		return null;
@@ -175,21 +136,7 @@ const updateMessageUpdates: Migration = {
 					?.map((update) => convertMessageUpdate(message, update as OldMessageUpdate))
 					.filter((update): update is MessageUpdate => Boolean(update));
 
-				// Add the new web search finished update if the sources update exists and webSearch is defined
-				const webSearchSourcesUpdateIndex =
-					updates?.findIndex(
-						(u) =>
-							u.type === MessageUpdateType.WebSearch &&
-							u.subtype === MessageWebSearchUpdateType.Sources
-					) ?? -1;
-				if (message.webSearch && updates && webSearchSourcesUpdateIndex !== -1) {
-					const webSearchFinishedUpdate: MessageWebSearchFinishedUpdate = {
-						type: MessageUpdateType.WebSearch,
-						subtype: MessageWebSearchUpdateType.Finished,
-					};
-					updates.splice(webSearchSourcesUpdateIndex + 1, 0, webSearchFinishedUpdate);
-				}
-				return { ...message, updates };
+			return { ...message, updates };
 			});
 
 			// Set the new messages array
