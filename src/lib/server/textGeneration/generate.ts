@@ -12,8 +12,8 @@ import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { generateSummaryOfReasoning } from "./reasoning";
 import { logger } from "../logger";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
-import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { callMcpTool } from "$lib/server/mcp/httpClient";
+import { getMcpServers } from "$lib/server/mcp/registry";
 import { selectRouteCandidates } from "$lib/server/router/selection";
 import { randomUUID } from "crypto";
 
@@ -35,10 +35,8 @@ export async function* generate(
     // If MCP servers are configured, attempt a single model-driven tool call first.
     // If a tool is called, we stream Tool updates and return the tool output as the final answer.
     try {
-        const serversRaw = (config as any).MCP_SERVERS || "[]";
-        let servers: McpServerConfig[] = [];
-        try { servers = JSON.parse(serversRaw || "[]"); } catch { servers = []; }
-        const mcpEnabled = Array.isArray(servers) && servers.length > 0;
+        const servers = getMcpServers();
+        const mcpEnabled = servers.length > 0;
         let runMcp = mcpEnabled;
         let mcpTargetModel = model as typeof model & { id?: string; name?: string };
         let mcpCandidateId: string | undefined;
