@@ -7,8 +7,8 @@ export interface Settings extends Timestamps {
 	sessionId?: string;
 
 	shareConversationsWithModelAuthors: boolean;
-    /** One-time welcome modal acknowledgement */
-    welcomeModalSeenAt?: Date | null;
+	/** One-time welcome modal acknowledgement */
+	welcomeModalSeenAt?: Date | null;
 	activeModel: string;
 
 	// model name and system prompts
@@ -31,10 +31,7 @@ export interface Settings extends Timestamps {
 	directPaste: boolean;
 }
 
-export type SettingsEditable = Omit<
-	Settings,
-	"welcomeModalSeenAt" | "createdAt" | "updatedAt"
->;
+export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,

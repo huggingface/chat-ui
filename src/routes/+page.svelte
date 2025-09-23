@@ -79,9 +79,7 @@
 		if (query) createConversation(query);
 	});
 
-	let currentModel = $derived(
-		findCurrentModel(data.models, data.oldModels, $settings.activeModel)
-	);
+	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
 </script>
 
 <svelte:head>

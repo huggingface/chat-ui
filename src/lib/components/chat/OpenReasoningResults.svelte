@@ -74,7 +74,7 @@
 		class="prose prose-sm !max-w-none space-y-4 border-t border-gray-200 p-3 text-sm text-gray-600 dark:prose-invert dark:border-gray-800 dark:text-gray-400"
 	>
 		{#key content}
-			<MarkdownRenderer {content} loading={loading} />
+			<MarkdownRenderer {content} {loading} />
 		{/key}
 	</div>
 </details>

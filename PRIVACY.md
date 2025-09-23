@@ -7,8 +7,7 @@ Basics:
 - Sign-in: You authenticate with your Hugging Face account.
 - Conversation history: Stored so you can access past chats; you can delete any conversation at any time from the UI.
 
-
- 🗓 Please also consult huggingface.co's main privacy policy at <https://huggingface.co/privacy>. To exercise any of your legal privacy rights, please send an email to <privacy@huggingface.co>.
+🗓 Please also consult huggingface.co's main privacy policy at <https://huggingface.co/privacy>. To exercise any of your legal privacy rights, please send an email to <privacy@huggingface.co>.
 
 ## Data handling and processing
 

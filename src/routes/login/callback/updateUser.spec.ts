@@ -96,24 +96,24 @@ describe("login", () => {
 
 		const settings = await collections.settings.findOne({ userId: user?._id });
 
-    expect(settings).toMatchObject({
-        userId: user?._id,
-        updatedAt: expect.any(Date),
-        createdAt: expect.any(Date),
-        ...DEFAULT_SETTINGS,
-    });
+		expect(settings).toMatchObject({
+			userId: user?._id,
+			updatedAt: expect.any(Date),
+			createdAt: expect.any(Date),
+			...DEFAULT_SETTINGS,
+		});
 
 		await collections.settings.deleteOne({ userId: user?._id });
 	});
 
 	it("should migrate pre-existing settings for pre-existing user", async () => {
-    const { insertedId } = await collections.settings.insertOne({
-        sessionId: locals.sessionId,
-        updatedAt: new Date(),
-        createdAt: new Date(),
-        ...DEFAULT_SETTINGS,
-        shareConversationsWithModelAuthors: false,
-    });
+		const { insertedId } = await collections.settings.insertOne({
+			sessionId: locals.sessionId,
+			updatedAt: new Date(),
+			createdAt: new Date(),
+			...DEFAULT_SETTINGS,
+			shareConversationsWithModelAuthors: false,
+		});
 
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
@@ -126,13 +126,13 @@ describe("login", () => {
 
 		const user = await collections.users.findOne({ hfUserId: userData.sub });
 
-    expect(settings).toMatchObject({
-        userId: user?._id,
-        updatedAt: expect.any(Date),
-        createdAt: expect.any(Date),
-        ...DEFAULT_SETTINGS,
-        shareConversationsWithModelAuthors: false,
-    });
+		expect(settings).toMatchObject({
+			userId: user?._id,
+			updatedAt: expect.any(Date),
+			createdAt: expect.any(Date),
+			...DEFAULT_SETTINGS,
+			shareConversationsWithModelAuthors: false,
+		});
 
 		await collections.settings.deleteOne({ userId: user?._id });
 	});

@@ -136,7 +136,7 @@ const updateMessageUpdates: Migration = {
 					?.map((update) => convertMessageUpdate(message, update as OldMessageUpdate))
 					.filter((update): update is MessageUpdate => Boolean(update));
 
-			return { ...message, updates };
+				return { ...message, updates };
 			});
 
 			// Set the new messages array

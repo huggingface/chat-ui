@@ -35,7 +35,6 @@
 	});
 </script>
 
-
 <svg
 	bind:this={svgEl}
 	class={classNames}
