@@ -73,6 +73,7 @@
 		"@iconify-json/bi": "^1.1.21",
 		"@resvg/resvg-js": "^2.6.2",
 		"autoprefixer": "^10.4.14",
+		"bits-ui": "^2.11.0",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.5.0",
 		"file-type": "^21.0.0",

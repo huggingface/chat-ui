@@ -21,6 +21,7 @@
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
+	import SearchCommand from "$lib/components/chat/Search.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -228,6 +229,8 @@
 {#if overloadedModalOpen && publicConfig.isHuggingChat}
 	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
+
+<SearchCommand />
 
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed

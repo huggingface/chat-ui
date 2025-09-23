@@ -62,7 +62,90 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				});
 				return res.deletedCount;
 			})
-			// search endpoint removed
+			.get(
+				"/search",
+				async ({ locals, query }) => {
+					const q = (query.q ?? "").trim();
+					const p = Number.isFinite(query.p) ? Number(query.p) : 0;
+
+					if (q.length < 3) {
+						return [];
+					}
+
+					if (!locals.user?._id && !locals.sessionId) {
+						throw new Error("Must have a valid session or user");
+					}
+
+					const baseFilter = {
+						sessionId: undefined,
+						...authCondition(locals),
+					};
+
+					const projection = {
+						_id: 1,
+						title: 1,
+						updatedAt: 1,
+						model: 1,
+						messages: 1,
+					} as const;
+
+					const makeSnippet = (messages?: Conversation["messages"]) => {
+						if (!Array.isArray(messages) || messages.length === 0) return "";
+						const first = messages.find((m) => typeof m?.content === "string" && m.content.trim());
+						const text = (first?.content ?? messages[0]?.content ?? "") as string;
+						return text.length > 160 ? `${text.slice(0, 160)}...` : text;
+					};
+
+					const limit = 5;
+
+					try {
+						const byText = await collections.conversations
+							.find({ ...baseFilter, $text: { $search: q } })
+							.project(projection as any)
+							.sort({ score: { $meta: "textScore" }, updatedAt: -1 } as any)
+							.skip(p * limit)
+							.limit(limit)
+							.toArray();
+
+						return byText.map((conv) => ({
+							_id: conv._id,
+							id: conv._id,
+							title: conv.title,
+							content: makeSnippet(conv.messages),
+							updatedAt: conv.updatedAt,
+							model: conv.model,
+						}));
+					} catch {
+						const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+						const regex = new RegExp(escaped, "i");
+						const byRegex = await collections.conversations
+							.find({
+								...baseFilter,
+								$or: [{ title: regex }, { "messages.content": regex }],
+							})
+							.project(projection as any)
+							.sort({ updatedAt: -1 })
+							.skip(p * limit)
+							.limit(limit)
+							.toArray();
+
+						return byRegex.map((conv) => ({
+							_id: conv._id,
+							id: conv._id,
+							title: conv.title,
+							content: makeSnippet(conv.messages),
+							updatedAt: conv.updatedAt,
+							model: conv.model,
+						}));
+					}
+				},
+				{
+					query: t.Object({
+						q: t.String(),
+						p: t.Optional(t.Number()),
+					}),
+				}
+			)
 			.group(
 				"/:id",
 				{
