@@ -134,6 +134,7 @@ if (openaiBaseUrl) {
 				data: z.array(
 					z.object({
 						id: z.string(),
+						description: z.string().optional(),
 						providers: z
 							.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
 							.optional(),
@@ -167,6 +168,7 @@ if (openaiBaseUrl) {
 				id: m.id,
 				name: m.id,
 				displayName: m.id,
+				description: m.description,
 				logoUrl,
 				providers: m.providers,
 				multimodal: supportsImageInput,

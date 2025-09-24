@@ -137,7 +137,7 @@
 					<span class="flex items-center gap-2 font-semibold">
 						{model.displayName}
 					</span>
-					<span class="whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
+					<span class="line-clamp-4 whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
 						{model.description || "-"}
 					</span>
 				</a>

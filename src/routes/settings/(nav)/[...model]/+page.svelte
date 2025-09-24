@@ -75,7 +75,7 @@
 		</h2>
 
 		{#if model.description}
-			<p class="whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-400">
+			<p class="line-clamp-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-400">
 				{model.description}
 			</p>
 		{/if}
