@@ -2,7 +2,12 @@ import { config, ready } from "$lib/server/config";
 import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import {
+	authenticateFromHfCookie,
+	authenticateRequest,
+	refreshSessionCookie,
+	requiresUser,
+} from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
@@ -121,10 +126,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const auth = await authenticateRequest(
-		{ type: "svelte", value: event.request.headers },
-		{ type: "svelte", value: event.cookies }
-	);
+	const auth = config.USE_HFCO_COOKIE
+		? await authenticateFromHfCookie(event.request.headers, event.cookies)
+		: await authenticateRequest(
+				{ type: "svelte", value: event.request.headers },
+				{ type: "svelte", value: event.cookies }
+			);
 
 	event.locals.user = auth.user || undefined;
 	event.locals.sessionId = auth.sessionId;

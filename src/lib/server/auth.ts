@@ -17,6 +17,7 @@ import { logger } from "$lib/server/logger";
 import { ObjectId } from "mongodb";
 import type { Cookie } from "elysia";
 import { adminTokenManager } from "./adminToken";
+import { updateUser } from "../../routes/login/callback/updateUser";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -304,6 +305,83 @@ export async function authenticateRequest(
 	// Generate new session if none exists
 	secretSessionId = crypto.randomUUID();
 	sessionId = await sha256(secretSessionId);
+
+	if (await collections.sessions.findOne({ sessionId })) {
+		throw new Error("Session ID collision");
+	}
+
+	return { user: undefined, sessionId, secretSessionId, isAdmin: false };
+}
+
+export async function authenticateFromHfCookie(
+	headers: Headers,
+	cookies: Cookies
+): Promise<App.Locals & { secretSessionId: string }> {
+	const cookieHfco = cookies.get("token");
+
+	if (cookieHfco) {
+		const hash = await sha256(cookieHfco);
+		const sessionId = hash;
+		const secretSessionId = hash;
+
+		const cacheHit = await collections.tokenCaches.findOne({ tokenHash: hash });
+		if (cacheHit) {
+			const user = await collections.users.findOne({ hfUserId: cacheHit.userId });
+			if (!user) {
+				throw new Error("User not found");
+			}
+			return {
+				user,
+				sessionId,
+				secretSessionId,
+				isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
+			};
+		}
+
+		/// Pass the cookie as an actual cookie, not a Bearer token.
+		const response = await fetch("https://huggingface.co/api/whoami-v2", {
+			headers: { Cookie: `token=${cookieHfco}` },
+		});
+
+		if (!response.ok) {
+			throw new Error("Unauthorized");
+		}
+
+		const userData = z
+			.object({
+				id: z.string(),
+				name: z.string(),
+				avatarUrl: z.string(),
+			})
+			.parse(await response.json());
+
+		const locals = {
+			user: userData,
+			sessionId,
+			secretSessionId,
+			isAdmin: adminTokenManager.isAdmin(sessionId),
+		};
+		await updateUser({
+			userData,
+			locals,
+			cookies,
+			userAgent: headers.get("user-agent") ?? undefined,
+		});
+		await collections.tokenCaches.insertOne({
+			tokenHash: hash,
+			userId: userData.id,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		/// TODO: Get a JWT token for inference from the Hub
+
+		return locals;
+	}
+
+	// Generate new session if none exists
+	const secretSessionId = crypto.randomUUID();
+	const sessionId = await sha256(secretSessionId);
 
 	if (await collections.sessions.findOne({ sessionId })) {
 		throw new Error("Session ID collision");
