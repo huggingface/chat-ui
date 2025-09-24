@@ -12,9 +12,11 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import IconNew from "$lib/components/icons/IconNew.svelte";
+	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import { Spring } from "svelte/motion";
 	import { pan, type GestureCustomEvent, type PanCustomEvent } from "svelte-gestures";
+	import { shareModal } from "$lib/stores/shareModal";
 	interface Props {
 		title: string | undefined;
 		children?: import("svelte").Snippet;
@@ -28,6 +30,11 @@
 	let panX: number | undefined = $state(undefined);
 	let panStart: number | undefined = $state(undefined);
 	let panStartTime: number | undefined = undefined;
+
+	const isHuggingChat = $derived(Boolean(page.data?.publicConfig?.isHuggingChat));
+	const canShare = $derived(
+		isHuggingChat && Boolean(page.params?.id) && page.route.id?.startsWith("/conversation/")
+	);
 
 	// Define the width for the drawer (less than 100% to create the gap)
 	const drawerWidthPercentage = 85;
@@ -87,9 +94,25 @@
 			<span class="max-w-full truncate px-4" data-testid="chat-title">{title}</span>
 		{/if}
 	</div>
-	<a href="{base}/" class="-mr-3 flex size-12 shrink-0 items-center justify-center text-lg">
-		<IconNew />
-	</a>
+	<div class="flex items-center">
+		{#if isHuggingChat}
+			<button
+				type="button"
+				class="flex size-8 shrink-0 items-center justify-center text-lg"
+				disabled={!canShare}
+				onclick={() => {
+					if (!canShare) return;
+					shareModal.open();
+				}}
+				aria-label="Share conversation"
+			>
+				<IconShare classNames={!canShare ? "opacity-40" : ""} />
+			</button>
+		{/if}
+		<a href="{base}/" class="flex size-8 shrink-0 items-center justify-center text-lg">
+			<IconNew />
+		</a>
+	</div>
 </nav>
 
 <!-- Mobile drawer overlay - shows when drawer is open -->

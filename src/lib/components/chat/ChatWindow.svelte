@@ -3,7 +3,6 @@
 	import { onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
-	import CarbonExport from "~icons/carbon/export";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 
@@ -29,6 +28,7 @@
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import { routerExamples } from "$lib/constants/routerExamples";
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
+	import { shareModal } from "$lib/stores/shareModal";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -200,11 +200,13 @@
 		)
 	);
 
-	function onShare() {
-		shareModalOpen = true;
-	}
+	const unsubscribeShareModal = shareModal.subscribe((value) => {
+		shareModalOpen = value;
+	});
 
 	onDestroy(() => {
+		unsubscribeShareModal();
+		shareModal.close();
 		if (routerDetailsTimeout) {
 			clearTimeout(routerDetailsTimeout);
 		}
@@ -308,7 +310,7 @@
 
 <div class="relative z-[-1] min-h-0 min-w-0">
 	{#if shareModalOpen}
-		<ShareConversationModal open={shareModalOpen} onclose={() => (shareModalOpen = false)} />
+		<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
@@ -535,7 +537,7 @@
 			</form>
 			<div
 				class={{
-					"mt-2 flex self-stretch px-0.5 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
+					"mt-1.5 flex h-5 items-center self-stretch whitespace-nowrap px-0.5 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
 					"max-sm:hidden": focused && isVirtualKeyboard(),
 				}}
 			>
@@ -583,20 +585,10 @@
 					</span>
 				{/if}
 				{#if !messages.length}
-					<span class="ml-2">Generated content may be inaccurate or false.</span>
+					<span>Generated content may be inaccurate or false.</span>
 				{/if}
-				{#if messages.length}
-					<button
-						class="ml-auto flex flex-none items-center hover:text-gray-400 max-sm:rounded-lg max-sm:bg-gray-50 max-sm:px-2.5 dark:max-sm:bg-gray-800"
-						type="button"
-						onclick={onShare}
-					>
-						<CarbonExport class="text-[.6rem] text-black dark:text-white sm:mr-1.5" />
-						<div class="max-sm:hidden">Share this conversation</div>
-					</button>
-				{/if}
-			</div>
 		</div>
+	</div>
 	</div>
 </div>
 
