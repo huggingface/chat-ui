@@ -15,11 +15,7 @@ export interface Assistant extends Timestamps {
 	preprompt: string;
 	userCount?: number;
 	review: ReviewStatus;
-	rag?: {
-		allowAllDomains: boolean;
-		allowedDomains: string[];
-		allowedLinks: string[];
-	};
+	// Web search / RAG removed in this build
 	generateSettings?: {
 		temperature?: number;
 		top_p?: number;
@@ -29,11 +25,7 @@ export interface Assistant extends Timestamps {
 	dynamicPrompt?: boolean;
 	searchTokens: string[];
 	last24HoursCount: number;
-	tools?: string[];
 }
 
 // eslint-disable-next-line no-shadow
-export enum SortKey {
-	POPULAR = "popular",
-	TRENDING = "trending",
-}
+// Removed duplicate unused SortKey enum (shared enum exists elsewhere)

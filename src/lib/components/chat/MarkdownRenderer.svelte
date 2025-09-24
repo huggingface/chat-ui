@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { WebSearchSource } from "$lib/types/WebSearch";
 	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
 	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import CodeBlock from "../CodeBlock.svelte";
@@ -12,16 +11,20 @@
 
 	interface Props {
 		content: string;
-		sources?: WebSearchSource[];
+		sources?: { title?: string; link: string }[];
+		loading?: boolean;
 	}
 
 	let worker: Worker | null = null;
 
-	let { content, sources = [] }: Props = $props();
+	let { content, sources = [], loading = false }: Props = $props();
 
 	let tokens: Token[] = $state(processTokensSync(content, sources));
 
-	async function processContent(content: string, sources: WebSearchSource[]): Promise<Token[]> {
+	async function processContent(
+		content: string,
+		sources: { title?: string; link: string }[]
+	): Promise<Token[]> {
 		if (worker) {
 			return new Promise((resolve) => {
 				if (!worker) {
@@ -83,6 +86,6 @@
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 		{@html token.html}
 	{:else if token.type === "code"}
-		<CodeBlock code={token.code} rawCode={token.rawCode} />
+		<CodeBlock code={token.code} rawCode={token.rawCode} {loading} />
 	{/if}
 {/each}

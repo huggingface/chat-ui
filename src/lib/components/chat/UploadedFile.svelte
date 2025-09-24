@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher } from "svelte";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import type { MessageFile } from "$lib/types/Message";
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonDocumentBlank from "~icons/carbon/document-blank";
@@ -14,15 +13,14 @@
 	interface Props {
 		file: MessageFile;
 		canClose?: boolean;
+		onclose?: () => void;
 	}
 
-	let { file, canClose = true }: Props = $props();
+	let { file, canClose = true, onclose }: Props = $props();
 
 	let showModal = $state(false);
 
-	let urlNotTrailing = $derived($page.url.pathname.replace(/\/$/, ""));
-
-	const dispatch = createEventDispatcher<{ close: void }>();
+	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
 
 	function truncateMiddle(text: string, maxLength: number): string {
 		if (text.length <= maxLength) {
@@ -57,7 +55,7 @@
 
 {#if showModal && isClickable}
 	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="sm:max-w-[800px]" on:close={() => (showModal = false)}>
+	<Modal width="sm:max-w-[800px]" onclose={() => (showModal = false)}>
 		{#if isImage(file.mime)}
 			{#if file.type === "hash"}
 				<img
@@ -131,7 +129,7 @@
 >
 	<div class="group relative flex items-center rounded-xl shadow-sm">
 		{#if isImage(file.mime)}
-			<div class="size-48 overflow-hidden rounded-xl">
+			<div class="h-36 overflow-hidden rounded-xl">
 				<img
 					src={file.type === "base64"
 						? `data:${file.mime};base64,${file.value}`
@@ -232,7 +230,7 @@
 				onclick={(e) => {
 					e.preventDefault();
 					e.stopPropagation();
-					dispatch("close");
+					onclose?.();
 				}}
 			>
 				<CarbonClose class=" text-xs  text-white" />

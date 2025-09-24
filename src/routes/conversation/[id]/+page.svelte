@@ -6,10 +6,8 @@
 	import { page } from "$app/state";
 	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
-	import { shareConversation } from "$lib/shareConversation";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
-	import { webSearchParameters } from "$lib/stores/webSearchParameters";
 	import type { Message } from "$lib/types/Message";
 	import {
 		MessageReasoningUpdateType,
@@ -28,7 +26,6 @@
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
-	import { documentParserToolId } from "$lib/utils/toolIds.js";
 
 	let { data = $bindable() } = $props();
 
@@ -247,15 +244,7 @@
 				throw new Error("Message to write to not found");
 			}
 
-			// disable websearch if assistant is present
-			const hasAssistant = !!page.data.assistant;
 			const messageUpdatesAbortController = new AbortController();
-
-			let tools = $settings.tools;
-
-			if (!files.some((file) => file.type.startsWith("application/"))) {
-				tools = $settings.tools?.filter((tool) => tool !== documentParserToolId);
-			}
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
@@ -265,8 +254,6 @@
 					messageId,
 					isRetry,
 					isContinue,
-					webSearch: !hasAssistant && !activeModel.tools && $webSearchParameters.useSearch,
-					tools,
 					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
@@ -351,6 +338,12 @@
 							reasoningLastUpdate = currentTime;
 						}
 					}
+				} else if (update.type === MessageUpdateType.RouterMetadata) {
+					// Update router metadata immediately when received
+					messageToWriteTo.routerMetadata = {
+						route: update.route,
+						model: update.model,
+					};
 				}
 			}
 		} catch (err) {
@@ -371,32 +364,6 @@
 		}
 	}
 
-	async function voteMessage(score: Message["score"], messageId: string) {
-		let conversationId = page.params.id;
-		let oldScore: Message["score"] | undefined;
-
-		// optimistic update to avoid waiting for the server
-		messages = messages.map((message) => {
-			if (message.id === messageId) {
-				oldScore = message.score;
-				return { ...message, score };
-			}
-			return message;
-		});
-
-		try {
-			await fetch(`${base}/conversation/${conversationId}/message/${messageId}/vote`, {
-				method: "POST",
-				body: JSON.stringify({ score }),
-			});
-		} catch {
-			// revert score on any error
-			messages = messages.map((message) => {
-				return message.id !== messageId ? message : { ...message, score: oldScore };
-			});
-		}
-	}
-
 	onMount(async () => {
 		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
@@ -406,27 +373,27 @@
 		}
 	});
 
-	async function onMessage(event: CustomEvent<string>) {
+	async function onMessage(content: string) {
 		if (!data.shared) {
-			await writeMessage({ prompt: event.detail });
+			await writeMessage({ prompt: content });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
-				.then(async () => await writeMessage({ prompt: event.detail }))
+				.then(async () => await writeMessage({ prompt: content }))
 				.finally(() => (loading = false));
 		}
 	}
 
-	async function onRetry(event: CustomEvent<{ id: Message["id"]; content?: string }>) {
-		const lastMsgId = event.detail.id;
+	async function onRetry(payload: { id: Message["id"]; content?: string }) {
+		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);
 
 		if (!data.shared) {
 			await writeMessage({
-				prompt: event.detail.content,
-				messageId: event.detail.id,
+				prompt: payload.content,
+				messageId: payload.id,
 				isRetry: true,
 			});
 		} else {
@@ -437,8 +404,8 @@
 				.then(
 					async () =>
 						await writeMessage({
-							prompt: event.detail.content,
-							messageId: event.detail.id,
+							prompt: payload.content,
+							messageId: payload.id,
 							isRetry: true,
 						})
 				)
@@ -446,14 +413,14 @@
 		}
 	}
 
-	async function onShowAlternateMsg(event: CustomEvent<{ id: Message["id"] }>) {
-		const msgId = event.detail.id;
+	async function onShowAlternateMsg(payload: { id: Message["id"] }) {
+		const msgId = payload.id;
 		messagesPath = createMessagesPath(messages, msgId);
 	}
 
-	async function onContinue(event: CustomEvent<{ id: Message["id"] }>) {
+	async function onContinue(payload: { id: Message["id"] }) {
 		if (!data.shared) {
-			await writeMessage({ messageId: event.detail.id, isContinue: true });
+			await writeMessage({ messageId: payload.id, isContinue: true });
 		} else {
 			await convFromShared()
 				.then(async (convId) => {
@@ -462,7 +429,7 @@
 				.then(
 					async () =>
 						await writeMessage({
-							messageId: event.detail.id,
+							messageId: payload.id,
 							isContinue: true,
 						})
 				)
@@ -476,7 +443,6 @@
 		messages = data.messages;
 	});
 
-	let activeModel = $derived(findCurrentModel([...data.models, ...data.oldModels], data.model));
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
 	let messagesPath = $derived(createMessagesPath(messages));
 	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
@@ -511,13 +477,11 @@
 	shared={data.shared}
 	preprompt={data.preprompt}
 	bind:files
-	on:message={onMessage}
-	on:retry={onRetry}
-	on:continue={onContinue}
-	on:showAlternateMsg={onShowAlternateMsg}
-	on:vote={(event) => voteMessage(event.detail.score, event.detail.id)}
-	on:share={() => shareConversation(page.params.id, data.title)}
-	on:stop={async () => {
+	onmessage={onMessage}
+	onretry={onRetry}
+	oncontinue={onContinue}
+	onshowAlternateMsg={onShowAlternateMsg}
+	onstop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
 			method: "POST",
 		}).then((r) => {
@@ -533,6 +497,5 @@
 		});
 	}}
 	models={data.models}
-	currentModel={findCurrentModel([...data.models, ...data.oldModels], data.model)}
-	assistant={data.assistant}
+	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />

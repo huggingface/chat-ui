@@ -1,6 +1,5 @@
-import { navigating } from "$app/stores";
+import { navigating } from "$app/state";
 import { tick } from "svelte";
-import { get } from "svelte/store";
 
 const detachedOffset = 10;
 
@@ -31,7 +30,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 		const options = { ...defaultOptions, ..._options };
 		const { force } = options;
 
-		if (!force && isDetached && !get(navigating)) return;
+		if (!force && isDetached && !navigating.to) return;
 
 		// wait for next tick to ensure that the DOM is updated
 		await tick();

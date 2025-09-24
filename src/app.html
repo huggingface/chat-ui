@@ -5,15 +5,18 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="rgb(249, 250, 251)" />
 		<script>
-			if (
-				localStorage.theme === "dark" ||
-				(!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
-			) {
-				document.documentElement.classList.add("dark");
-				document
-					.querySelector('meta[name="theme-color"]')
-					.setAttribute("content", "rgb(26, 36, 50)");
-			}
+			(function () {
+				try {
+					var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+					var stored = localStorage.getItem("theme");
+					var followSystem = stored === null || stored === "system";
+					var isDark = stored === "dark" || (followSystem && prefersDark);
+					if (isDark) {
+						document.documentElement.classList.add("dark");
+						document.querySelector('meta[name="theme-color"]').setAttribute("content", "#07090d");
+					}
+				} catch (e) {}
+			})();
 
 			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
 			window.gaId = "%gaId%";

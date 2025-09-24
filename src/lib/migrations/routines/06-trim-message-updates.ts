@@ -2,38 +2,21 @@ import type { Migration } from ".";
 import { collections } from "$lib/server/database";
 import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
-import {
-	MessageUpdateType,
-	MessageWebSearchUpdateType,
-	type MessageUpdate,
-} from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
+import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { logger } from "$lib/server/logger";
 
 // -----------
 
 /** Converts the old message update to the new schema */
-function convertMessageUpdate(message: Message, update: MessageUpdate): MessageUpdate | null {
+function convertMessageUpdate(message: Message, update: unknown): MessageUpdate | null {
 	try {
-		// trim final websearch update, and sources update
-
-		if (update.type === "webSearch") {
-			if (update.subtype === MessageWebSearchUpdateType.Sources) {
-				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Sources,
-					message: update.message,
-					sources: update.sources.map(({ link, title }) => ({ link, title })),
-				};
-			} else if (update.subtype === MessageWebSearchUpdateType.Finished) {
-				return {
-					type: MessageUpdateType.WebSearch,
-					subtype: MessageWebSearchUpdateType.Finished,
-				};
-			}
+		// Trim legacy web search updates entirely
+		if (typeof update === "object" && update !== null && (update as any).type === "webSearch") {
+			return null;
 		}
 
-		return update;
+		return update as MessageUpdate;
 	} catch (error) {
 		logger.error(error, "Error converting message update during migration. Skipping it..");
 		return null;

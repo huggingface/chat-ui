@@ -9,11 +9,11 @@ export interface TextGenerationContext {
 	endpoint: Endpoint;
 	conv: Conversation;
 	messages: Message[];
-	assistant?: Pick<Assistant, "rag" | "dynamicPrompt" | "generateSettings" | "tools">;
+	assistant?: Pick<Assistant, "dynamicPrompt" | "generateSettings">;
 	isContinue: boolean;
-	webSearch: boolean;
-	toolsPreference: Array<string>;
 	promptedAt: Date;
 	ip: string;
 	username?: string;
+	/** Force-enable multimodal handling for endpoints that support it */
+	forceMultimodal?: boolean;
 }

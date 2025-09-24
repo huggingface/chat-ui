@@ -9,9 +9,7 @@ import { checkAndRunMigrations } from "$lib/migrations/migrations";
 import { building, dev } from "$app/environment";
 import { logger } from "$lib/server/logger";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
-import { MetricsServer } from "$lib/server/metrics";
 import { initExitHandler } from "$lib/server/exitHandler";
-import { refreshAssistantsCounts } from "$lib/jobs/refresh-assistants-counts";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
@@ -22,20 +20,24 @@ export const init: ServerInit = async () => {
 
 	// TODO: move this code on a started server hook, instead of using a "building" flag
 	if (!building) {
-		// Set HF_TOKEN as a process variable for Transformers.JS to see it
-		process.env.HF_TOKEN ??= config.HF_TOKEN;
+		// Ensure legacy env expected by some libs: map OPENAI_API_KEY -> HF_TOKEN if absent
+		const canonicalToken = config.OPENAI_API_KEY || config.HF_TOKEN;
+		if (canonicalToken) {
+			process.env.HF_TOKEN ??= canonicalToken;
+		}
+
+		// Warn if legacy-only var is used
+		if (!config.OPENAI_API_KEY && config.HF_TOKEN) {
+			logger.warn(
+				"HF_TOKEN is deprecated in favor of OPENAI_API_KEY. Please migrate to OPENAI_API_KEY."
+			);
+		}
 
 		logger.info("Starting server...");
 		initExitHandler();
 
 		checkAndRunMigrations();
-		if (config.ENABLE_ASSISTANTS) {
-			refreshAssistantsCounts();
-		}
 		refreshConversationStats();
-
-		// Init metrics server
-		MetricsServer.getInstance();
 
 		// Init AbortedGenerations refresh process
 		AbortedGenerations.getInstance();
@@ -186,23 +188,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			return errorResponse(401, ERROR_MESSAGES.authOnly);
 		}
 
-		// if login is not required and the call is not from /settings and we display the ethics modal with PUBLIC_APP_DISCLAIMER
-		//  we check if the user has accepted the ethics modal first.
-		// If login is required, `ethicsModalAcceptedAt` is already true at this point, so do not pass this condition. This saves a DB call.
-		if (
-			!requiresUser &&
-			!event.url.pathname.startsWith(`${base}/settings`) &&
-			config.PUBLIC_APP_DISCLAIMER === "1"
-		) {
-			const hasAcceptedEthicsModal = await collections.settings.countDocuments({
-				sessionId: event.locals.sessionId,
-				ethicsModalAcceptedAt: { $exists: true },
-			});
-
-			if (!hasAcceptedEthicsModal) {
-				return errorResponse(405, "You need to accept the welcome modal first");
-			}
-		}
+		// Ethics disclaimer gating removed
 	}
 
 	let replaced = false;

@@ -10,7 +10,7 @@
 	}
 
 	.active-model {
-		@apply border-blue-500 bg-blue-500/5 hover:bg-blue-500/10;
+		@apply border-black dark:border-white;
 	}
 
 	.file-hoverable {
@@ -27,8 +27,37 @@
 }
 
 @layer utilities {
+	/* your existing utilities */
 	.scrollbar-custom {
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
+	}
+
+	/* Rounded top/bottom caps for vertical scrollbars (Chrome/Edge/Safari) */
+	.scrollbar-custom::-webkit-scrollbar-track {
+		@apply rounded-full bg-clip-padding; /* clip bg to padding so caps look round */
+		/* space for the end caps — tweak with Tailwind spacing */
+		border-top: theme("spacing.2") solid transparent; /* 0.5rem */
+		border-bottom: theme("spacing.2") solid transparent; /* 0.5rem */
+	}
+
+	/* Rounded left/right caps for horizontal scrollbars */
+	.scrollbar-custom::-webkit-scrollbar-track:horizontal {
+		@apply rounded-full bg-clip-padding;
+		border-left: theme("spacing.2") solid transparent;
+		border-right: theme("spacing.2") solid transparent;
+		border-top-width: 0;
+		border-bottom-width: 0;
+	}
+
+	/* .scrollbar-custom {
+		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
+	} */
+	.prose hr {
+		@apply my-4;
+	}
+
+	.prose strong {
+		@apply font-medium;
 	}
 }
 

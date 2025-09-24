@@ -91,8 +91,15 @@ export default defineConfig({
 		loadTTFAsArrayBuffer(),
 		...(shouldCopyLlama ? [copyLlamaFiles()] : []),
 	],
+	// Allow external access via ngrok tunnel host
+	server: {
+		// Allow any ngrok-free.app subdomain (dynamic tunnels)
+		// See Vite server.allowedHosts: string[] | true
+		// Using leading dot matches subdomains per Vite's host check logic
+		allowedHosts: ["huggingface.ngrok.io"],
+	},
 	optimizeDeps: {
-		include: ["uuid", "@huggingface/transformers", "sharp", "@gradio/client", "clsx"],
+		include: ["uuid", "sharp", "@gradio/client", "clsx"],
 	},
 	test: {
 		workspace: [

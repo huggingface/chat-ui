@@ -1,30 +1,19 @@
 import { config } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
-import { compileTemplate } from "$lib/utils/template";
 import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
-import { endpointTgi } from "./endpoints/tgi/endpointTgi";
-import { sum } from "$lib/utils/sum";
-import { embeddingModels, validateEmbeddingModelByName } from "./embeddingModels";
-
-import type { PreTrainedTokenizer } from "@huggingface/transformers";
 
 import JSON5 from "json5";
-import { getTokenizer } from "$lib/utils/getTokenizer";
 import { logger } from "$lib/server/logger";
-import { type ToolInput } from "$lib/types/Tool";
-import { fetchJSON } from "$lib/utils/fetchJSON";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { findRepoRoot } from "./findRepoRoot";
-import { Template } from "@huggingface/jinja";
-import { readdirSync } from "fs";
-
-export const MODELS_FOLDER =
-	config.MODELS_STORAGE_PATH ||
-	join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "models");
+import { makeRouterEndpoint } from "$lib/server/router/endpoint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+
+const sanitizeJSONEnv = (val: string, fallback: string) => {
+	const raw = (val ?? "").trim();
+	const unquoted = raw.startsWith("`") && raw.endsWith("`") ? raw.slice(1, -1) : raw;
+	return unquoted || fallback;
+};
 
 const reasoningSchema = z.union([
 	z.object({
@@ -51,20 +40,12 @@ const modelConfig = z.object({
 	logoUrl: z.string().url().optional(),
 	websiteUrl: z.string().url().optional(),
 	modelUrl: z.string().url().optional(),
-	tokenizer: z
-		.union([
-			z.string(),
-			z.object({
-				tokenizerUrl: z.string().url(),
-				tokenizerConfigUrl: z.string().url(),
-			}),
-		])
-		.optional(),
+	tokenizer: z.never().optional(),
 	datasetName: z.string().min(1).optional(),
 	datasetUrl: z.string().url().optional(),
 	preprompt: z.string().default(""),
 	prepromptUrl: z.string().url().optional(),
-	chatPromptTemplate: z.string().optional(),
+	chatPromptTemplate: z.never().optional(),
 	promptExamples: z
 		.array(
 			z.object({
@@ -74,6 +55,7 @@ const modelConfig = z.object({
 		)
 		.optional(),
 	endpoints: z.array(endpointSchema).optional(),
+	providers: z.array(z.object({ supports_tools: z.boolean().optional() }).passthrough()).optional(),
 	parameters: z
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
@@ -89,286 +71,261 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
-	tools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
-	embeddingModel: validateEmbeddingModelByName(embeddingModels).optional(),
+	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
 	reasoning: reasoningSchema.optional(),
 });
 
-const ggufModelsConfig = await Promise.all(
-	readdirSync(MODELS_FOLDER)
-		.filter((f) => f.endsWith(".gguf"))
-		.map(async (f) => {
+type ModelConfig = z.infer<typeof modelConfig>;
+
+const overrideEntrySchema = modelConfig
+	.partial()
+	.extend({
+		id: z.string().optional(),
+		name: z.string().optional(),
+	})
+	.refine((value) => Boolean((value.id ?? value.name)?.trim()), {
+		message: "Model override entry must provide an id or name",
+	});
+
+type ModelOverride = z.infer<typeof overrideEntrySchema>;
+
+// ggufModelsConfig unused in this build
+
+// Source models exclusively from an OpenAI-compatible endpoint.
+let modelsRaw: ModelConfig[] = [];
+
+// Require explicit base URL; no implicit default here
+const openaiBaseUrl = config.OPENAI_BASE_URL
+	? config.OPENAI_BASE_URL.replace(/\/$/, "")
+	: undefined;
+const isHFRouter = openaiBaseUrl === "https://router.huggingface.co/v1";
+
+if (openaiBaseUrl) {
+	try {
+		const baseURL = openaiBaseUrl;
+		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
+
+		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
+		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
+
+		// Try unauthenticated request first (many model lists are public, e.g. HF router)
+		let response = await fetch(`${baseURL}/models`);
+		logger.info({ status: response.status }, "[models] First fetch status");
+		if (response.status === 401 || response.status === 403) {
+			// Retry with Authorization header if available
+			response = await fetch(`${baseURL}/models`, {
+				headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+			});
+			logger.info({ status: response.status }, "[models] Retried fetch status");
+		}
+		if (!response.ok) {
+			throw new Error(
+				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
+			);
+		}
+		const json = await response.json();
+		logger.info({ keys: Object.keys(json || {}) }, "[models] Response keys");
+
+		const listSchema = z
+			.object({
+				data: z.array(
+					z.object({
+						id: z.string(),
+						description: z.string().optional(),
+						providers: z
+							.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+							.optional(),
+						architecture: z
+							.object({
+								input_modalities: z.array(z.string()).optional(),
+							})
+							.passthrough()
+							.optional(),
+					})
+				),
+			})
+			.passthrough();
+
+		const parsed = listSchema.parse(json);
+		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
+
+		modelsRaw = parsed.data.map((m) => {
+			let logoUrl: string | undefined = undefined;
+			if (isHFRouter && m.id.includes("/")) {
+				const org = m.id.split("/")[0];
+				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
+			}
+
+			const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
+				modality.toLowerCase()
+			);
+			const supportsImageInput =
+				inputModalities.includes("image") || inputModalities.includes("vision");
 			return {
-				name: f.replace(".gguf", ""),
+				id: m.id,
+				name: m.id,
+				displayName: m.id,
+				description: m.description,
+				logoUrl,
+				providers: m.providers,
+				multimodal: supportsImageInput,
+				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
 				endpoints: [
 					{
-						type: "local" as const,
-						modelPath: f,
+						type: "openai" as const,
+						baseURL,
+						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
 					},
 				],
-			};
-		})
-);
-
-const turnStringIntoLocalModel = z.preprocess((obj: unknown) => {
-	if (typeof obj !== "string") return obj;
-
-	const name = obj.startsWith("hf:") ? obj.split(":")[1] : obj;
-	const displayName = obj.startsWith("hf:")
-		? obj.split(":")[1].split("/").slice(0, 2).join("/")
-		: obj.endsWith(".gguf")
-			? obj.replace(".gguf", "")
-			: obj;
-
-	const modelPath = obj.includes("/") && !obj.startsWith("hf:") ? `hf:${obj}` : obj;
-
-	return {
-		name,
-		displayName,
-		endpoints: [
-			{
-				type: "local",
-				modelPath,
-			},
-		],
-	} satisfies z.input<typeof modelConfig>;
-}, modelConfig);
-
-let modelsRaw = z.array(turnStringIntoLocalModel).parse(JSON5.parse(config.MODELS ?? "[]"));
-
-if (config.LOAD_GGUF_MODELS === "true" || modelsRaw.length === 0) {
-	const parsedGgufModels = z.array(modelConfig).parse(ggufModelsConfig);
-	modelsRaw = [...modelsRaw, ...parsedGgufModels];
-}
-
-async function getChatPromptRender(
-	m: z.infer<typeof modelConfig>
-): Promise<ReturnType<typeof compileTemplate<ChatTemplateInput>>> {
-	if (m.endpoints?.some((e) => e.type === "local")) {
-		const endpoint = m.endpoints?.find((e) => e.type === "local");
-		const path = endpoint?.modelPath ?? `hf:${m.id ?? m.name}`;
-
-		const { resolveModelFile, readGgufFileInfo } = await import("node-llama-cpp");
-
-		const modelPath = await resolveModelFile(path, MODELS_FOLDER);
-
-		const info = await readGgufFileInfo(modelPath, {
-			readTensorInfo: false,
-		});
-
-		if (info.metadata.tokenizer.chat_template) {
-			// compile with jinja
-			const jinjaTemplate = new Template(info.metadata.tokenizer.chat_template);
-			return (inputs: ChatTemplateInput) => {
-				return jinjaTemplate.render({ ...m, ...inputs });
-			};
-		}
-	}
-
-	if (m.chatPromptTemplate) {
-		return compileTemplate<ChatTemplateInput>(m.chatPromptTemplate, m);
-	}
-	let tokenizer: PreTrainedTokenizer;
-
-	try {
-		tokenizer = await getTokenizer(m.tokenizer ?? m.id ?? m.name);
+			} as ModelConfig;
+		}) as ModelConfig[];
 	} catch (e) {
-		// if fetching the tokenizer fails but it wasnt manually set, use the default template
-		if (!m.tokenizer) {
-			logger.warn(
-				`No tokenizer found for model ${m.name}, using default template. Consider setting tokenizer manually or making sure the model is available on the hub.`,
-				m
-			);
-			return compileTemplate<ChatTemplateInput>(
-				"{{#if @root.preprompt}}<|im_start|>system\n{{@root.preprompt}}<|im_end|>\n{{/if}}{{#each messages}}{{#ifUser}}<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n{{/ifUser}}{{#ifAssistant}}{{content}}<|im_end|>\n{{/ifAssistant}}{{/each}}",
-				m
-			);
-		}
-
-		logger.error(
-			e,
-			`Failed to load tokenizer ${
-				m.tokenizer ?? m.id ?? m.name
-			} make sure the model is available on the hub and you have access to any gated models.`
-		);
-		process.exit();
+		logger.error(e, "Failed to load models from OpenAI base URL");
+		throw e;
 	}
-
-	const renderTemplate = ({ messages, preprompt, tools, continueMessage }: ChatTemplateInput) => {
-		let formattedMessages: {
-			role: string;
-			content: string;
-			tool_calls?: { id: string; tool_call_id: string; output: string }[];
-		}[] = messages.map((message) => ({
-			content: message.content,
-			role: message.from,
-		}));
-
-		if (!m.systemRoleSupported) {
-			const firstSystemMessage = formattedMessages.find((msg) => msg.role === "system");
-			formattedMessages = formattedMessages.filter((msg) => msg.role !== "system");
-
-			if (
-				firstSystemMessage &&
-				formattedMessages.length > 0 &&
-				formattedMessages[0].role === "user"
-			) {
-				formattedMessages[0].content =
-					firstSystemMessage.content + "\n" + formattedMessages[0].content;
-			}
-		}
-
-		if (preprompt && formattedMessages[0].role !== "system") {
-			formattedMessages = [
-				{
-					role: m.systemRoleSupported ? "system" : "user",
-					content: preprompt,
-				},
-				...formattedMessages,
-			];
-		}
-
-		const mappedTools =
-			tools?.map((tool) => {
-				const inputs: Record<
-					string,
-					{
-						type: ToolInput["type"];
-						description: string;
-						required: boolean;
-					}
-				> = {};
-
-				for (const value of tool.inputs) {
-					if (value.paramType !== "fixed") {
-						inputs[value.name] = {
-							type: value.type,
-							description: value.description ?? "",
-							required: value.paramType === "required",
-						};
-					}
-				}
-
-				return {
-					name: tool.name,
-					description: tool.description,
-					parameter_definitions: inputs,
-				};
-			}) ?? [];
-
-		const output = tokenizer.apply_chat_template(formattedMessages, {
-			tokenize: false,
-			add_generation_prompt: !continueMessage,
-			tools: mappedTools.length ? mappedTools : undefined,
-		});
-
-		if (typeof output !== "string") {
-			throw new Error("Failed to apply chat template, the output is not a string");
-		}
-
-		return output;
-	};
-	return renderTemplate;
+} else {
+	logger.error(
+		"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
+	);
+	throw new Error("OPENAI_BASE_URL not set");
 }
 
-const processModel = async (m: z.infer<typeof modelConfig>) => ({
+let modelOverrides: ModelOverride[] = [];
+const overridesEnv = (Reflect.get(config, "MODELS") as string | undefined) ?? "";
+
+if (overridesEnv.trim()) {
+	try {
+		modelOverrides = z
+			.array(overrideEntrySchema)
+			.parse(JSON5.parse(sanitizeJSONEnv(overridesEnv, "[]")));
+	} catch (error) {
+		logger.error(error, "[models] Failed to parse MODELS overrides");
+	}
+}
+
+if (modelOverrides.length) {
+	const overrideMap = new Map<string, ModelOverride>();
+	for (const override of modelOverrides) {
+		for (const key of [override.id, override.name]) {
+			const trimmed = key?.trim();
+			if (trimmed) overrideMap.set(trimmed, override);
+		}
+	}
+
+	modelsRaw = modelsRaw.map((model) => {
+		const override = overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
+		if (!override) return model;
+
+		const { id, name, ...rest } = override;
+
+		return {
+			...model,
+			...rest,
+		};
+	});
+}
+
+function getChatPromptRender(_m: ModelConfig): (inputs: ChatTemplateInput) => string {
+	// Minimal template to support legacy "completions" flow if ever used.
+	// We avoid any tokenizer/Jinja usage in this build.
+	return ({ messages, preprompt }) => {
+		const parts: string[] = [];
+		if (preprompt) parts.push(`[SYSTEM]\n${preprompt}`);
+		for (const msg of messages) {
+			const role = msg.from === "assistant" ? "ASSISTANT" : msg.from.toUpperCase();
+			parts.push(`[${role}]\n${msg.content}`);
+		}
+		parts.push(`[ASSISTANT]`);
+		return parts.join("\n\n");
+	};
+}
+
+const processModel = async (m: ModelConfig) => ({
 	...m,
 	chatPromptRender: await getChatPromptRender(m),
 	id: m.id || m.name,
 	displayName: m.displayName || m.name,
 	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
 	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
+	unlisted: m.unlisted ?? false,
 });
 
 const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	...m,
 	getEndpoint: async (): Promise<Endpoint> => {
-		if (!m.endpoints) {
-			return endpointTgi({
-				type: "tgi",
-				url: `${config.HF_API_ROOT}/${m.name}`,
-				accessToken: config.HF_TOKEN ?? config.HF_ACCESS_TOKEN,
-				weight: 1,
-				model: m,
-			});
+		if (!m.endpoints || m.endpoints.length === 0) {
+			throw new Error("No endpoints configured. This build requires OpenAI-compatible endpoints.");
 		}
-		const totalWeight = sum(m.endpoints.map((e) => e.weight));
-
-		let random = Math.random() * totalWeight;
-
-		for (const endpoint of m.endpoints) {
-			if (random < endpoint.weight) {
-				const args = { ...endpoint, model: m };
-
-				switch (args.type) {
-					case "tgi":
-						return endpoints.tgi(args);
-					case "local":
-						return endpoints.local(args);
-					case "inference-client":
-						return endpoints.inferenceClient(args);
-					case "anthropic":
-						return endpoints.anthropic(args);
-					case "anthropic-vertex":
-						return endpoints.anthropicvertex(args);
-					case "bedrock":
-						return endpoints.bedrock(args);
-					case "aws":
-						return await endpoints.aws(args);
-					case "openai":
-						return await endpoints.openai(args);
-					case "llamacpp":
-						return endpoints.llamacpp(args);
-					case "ollama":
-						return endpoints.ollama(args);
-					case "vertex":
-						return await endpoints.vertex(args);
-					case "genai":
-						return await endpoints.genai(args);
-					case "cloudflare":
-						return await endpoints.cloudflare(args);
-					case "cohere":
-						return await endpoints.cohere(args);
-					case "langserve":
-						return await endpoints.langserve(args);
-					default:
-						// for legacy reason
-						return endpoints.tgi(args);
-				}
-			}
-			random -= endpoint.weight;
+		// Only support OpenAI-compatible endpoints in this build
+		const endpoint = m.endpoints[0];
+		if (endpoint.type !== "openai") {
+			throw new Error("Only 'openai' endpoint type is supported in this build");
 		}
-
-		throw new Error(`Failed to select endpoint`);
+		return await endpoints.openai({ ...endpoint, model: m });
 	},
 });
 
-const inferenceApiIds = config.isHuggingChat
-	? await fetchJSON<{ id: string }[]>(
-			"https://huggingface.co/api/models?pipeline_tag=text-generation&inference=warm&filter=conversational"
-		)
-			.then((arr) => arr?.map((r) => r.id) || [])
-			.catch(() => {
-				logger.error("Failed to fetch inference API ids");
-				return [];
-			})
-	: [];
+const inferenceApiIds: string[] = [];
 
-export const models = await Promise.all(
+const builtModels = await Promise.all(
 	modelsRaw.map((e) =>
 		processModel(e)
 			.then(addEndpoint)
 			.then(async (m) => ({
 				...m,
 				hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
+				// router decoration added later
+				isRouter: false as boolean,
 			}))
 	)
 );
 
-export type ProcessedModel = (typeof models)[number];
+// Inject a synthetic router alias ("Omni") if Arch router is configured
+const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
+const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
+const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
+const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
+
+let decorated = builtModels as any[];
+
+if (archBase) {
+	// Build a minimal model config for the alias
+	const aliasRaw: ModelConfig = {
+		id: routerAliasId,
+		name: routerAliasId,
+		displayName: routerLabel,
+		logoUrl: routerLogo || undefined,
+		preprompt: "",
+		endpoints: [
+			{
+				type: "openai" as const,
+				baseURL: openaiBaseUrl!,
+			},
+		],
+		// Keep the alias visible
+		unlisted: false,
+	} as any;
+
+	const aliasBase = await processModel(aliasRaw);
+	// Create a self-referential ProcessedModel for the router endpoint
+	let aliasModel: any = {};
+	aliasModel = {
+		...aliasBase,
+		isRouter: true,
+		// getEndpoint uses the router wrapper regardless of the endpoints array
+		getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
+	};
+
+	// Put alias first
+	decorated = [aliasModel, ...decorated];
+}
+
+export const models = decorated as typeof builtModels;
+
+export type ProcessedModel = (typeof models)[number] & { isRouter?: boolean };
 
 // super ugly but not sure how to make typescript happier
 export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
@@ -386,7 +343,7 @@ export const oldModels = config.OLD_MODELS
 					transferTo: validModelIdSchema.optional(),
 				})
 			)
-			.parse(JSON5.parse(config.OLD_MODELS))
+			.parse(JSON5.parse(sanitizeJSONEnv(config.OLD_MODELS, "[]")))
 			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
 	: [];
 
@@ -399,13 +356,12 @@ export const validateModel = (_models: BackendModel[]) => {
 
 export const taskModel = addEndpoint(
 	config.TASK_MODEL
-		? ((models.find((m) => m.name === config.TASK_MODEL) ||
-				(await processModel(modelConfig.parse(JSON5.parse(config.TASK_MODEL))))) ??
+		? (models.find((m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL) ??
 				defaultModel)
 		: defaultModel
 );
 
 export type BackendModel = Optional<
 	typeof defaultModel,
-	"preprompt" | "parameters" | "multimodal" | "unlisted" | "tools" | "hasInferenceAPI"
+	"preprompt" | "parameters" | "multimodal" | "unlisted" | "hasInferenceAPI"
 >;

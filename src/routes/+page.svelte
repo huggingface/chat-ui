@@ -14,6 +14,8 @@
 	import { onMount } from "svelte";
 
 	let { data } = $props();
+
+	let hasModels = $derived(Boolean(data.models?.length));
 	let loading = $state(false);
 	let files: File[] = $state([]);
 
@@ -33,11 +35,7 @@
 			if (validModels.includes($settings.activeModel)) {
 				model = $settings.activeModel;
 			} else {
-				if (data.assistant?.modelId && validModels.includes(data.assistant.modelId)) {
-					model = data.assistant.modelId;
-				} else {
-					model = data.models[0].id;
-				}
+				model = data.models[0].id;
 			}
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
@@ -47,7 +45,6 @@
 				body: JSON.stringify({
 					model,
 					preprompt: $settings.customPrompts[$settings.activeModel],
-					assistantId: data.assistant?._id,
 				}),
 			});
 
@@ -82,25 +79,27 @@
 		if (query) createConversation(query);
 	});
 
-	let currentModel = $derived(
-		findCurrentModel(
-			[...data.models, ...data.oldModels],
-			!$settings.assistants.includes($settings.activeModel)
-				? $settings.activeModel
-				: data.assistant?.modelId
-		)
-	);
+	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
 </script>
 
 <svelte:head>
 	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 </svelte:head>
 
-<ChatWindow
-	on:message={(ev) => createConversation(ev.detail)}
-	{loading}
-	assistant={data.assistant}
-	{currentModel}
-	models={data.models}
-	bind:files
-/>
+{#if hasModels}
+	<ChatWindow
+		onmessage={(message) => createConversation(message)}
+		{loading}
+		{currentModel}
+		models={data.models}
+		bind:files
+	/>
+{:else}
+	<div class="mx-auto my-20 max-w-xl rounded-xl border p-6 text-center dark:border-gray-700">
+		<h2 class="mb-2 text-xl font-semibold">No models available</h2>
+		<p class="text-gray-600 dark:text-gray-300">
+			No chat models are configured. Set `OPENAI_BASE_URL` and ensure the server can reach the
+			endpoint, then reload. If unset, the app defaults to the Hugging Face router.
+		</p>
+	</div>
+{/if}

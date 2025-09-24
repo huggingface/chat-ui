@@ -1,5 +1,4 @@
 import { defaultModel } from "$lib/server/models";
-import type { Assistant } from "./Assistant";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
@@ -7,34 +6,39 @@ export interface Settings extends Timestamps {
 	userId?: User["_id"];
 	sessionId?: string;
 
-	/**
-	 * Note: Only conversations with this settings explicitly set to true should be shared.
-	 *
-	 * This setting is explicitly set to true when users accept the ethics modal.
-	 * */
 	shareConversationsWithModelAuthors: boolean;
-	ethicsModalAcceptedAt: Date | null;
+	/** One-time welcome modal acknowledgement */
+	welcomeModalSeenAt?: Date | null;
 	activeModel: string;
-	hideEmojiOnSidebar?: boolean;
 
 	// model name and system prompts
 	customPrompts?: Record<string, string>;
 
-	assistants?: Assistant["_id"][];
-	tools?: string[];
+	/**
+	 * Per‑model overrides to enable multimodal (image) support
+	 * even when not advertised by the provider/model list.
+	 * Only the `true` value is meaningful (enables images).
+	 */
+	multimodalOverrides?: Record<string, boolean>;
+
+	/**
+	 * Per-model toggle to hide Omni prompt suggestions shown near the composer.
+	 * When set to `true`, prompt examples for that model are suppressed.
+	 */
+	hidePromptExamples?: Record<string, boolean>;
+
 	disableStream: boolean;
 	directPaste: boolean;
 }
 
-export type SettingsEditable = Omit<Settings, "ethicsModalAcceptedAt" | "createdAt" | "updatedAt">;
+export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
 // TODO: move this to a constant file along with other constants
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,
 	activeModel: defaultModel.id,
-	hideEmojiOnSidebar: false,
 	customPrompts: {},
-	assistants: [],
-	tools: [],
+	multimodalOverrides: {},
+	hidePromptExamples: {},
 	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;

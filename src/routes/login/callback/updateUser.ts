@@ -179,7 +179,6 @@ export async function updateUser(params: {
 			// if no settings found for user, create default settings
 			await collections.settings.insertOne({
 				userId,
-				ethicsModalAcceptedAt: new Date(),
 				updatedAt: new Date(),
 				createdAt: new Date(),
 				...DEFAULT_SETTINGS,

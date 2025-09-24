@@ -1,39 +1,35 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
-
-	import { createEventDispatcher } from "svelte";
-	import { page } from "$app/state";
-	import { error } from "$lib/stores/errors";
-	import { invalidate } from "$app/navigation";
-	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { handleResponse, useAPIClient } from "$lib/APIClient";
 
 	interface Props {
 		message: Message;
 		alternatives?: Message["id"][];
 		loading?: boolean;
+		classNames?: string;
+		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
 
-	let { message, alternatives = [], loading = false }: Props = $props();
+	let {
+		message,
+		alternatives = [],
+		loading = false,
+		classNames = "",
+		onshowAlternateMsg,
+	}: Props = $props();
 
 	let currentIdx = $derived(alternatives.findIndex((id) => id === message.id));
 
-	const dispatch = createEventDispatcher<{
-		showAlternateMsg: { id: Message["id"] };
-	}>();
-
-	const client = useAPIClient();
+	// API client removed as deletion UI is commented out
 </script>
 
 <div
-	class="font-white group/navbranch z-0 -mt-1 ml-3.5 mr-auto flex h-6 w-fit select-none flex-row items-center justify-center gap-1 text-sm"
+	class="font-white group/navbranch z-0 flex h-6 w-fit select-none items-center justify-center gap-1 whitespace-nowrap text-sm {classNames}"
 >
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
-		onclick={() => dispatch("showAlternateMsg", { id: alternatives[Math.max(0, currentIdx - 1)] })}
+		onclick={() => onshowAlternateMsg?.({ id: alternatives[Math.max(0, currentIdx - 1)] })}
 		disabled={currentIdx === 0 || loading}
 	>
 		<CarbonChevronLeft class="text-sm" />
@@ -44,14 +40,14 @@
 	<button
 		class="inline text-lg font-thin text-gray-400 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-25 dark:text-gray-500 dark:hover:text-gray-200"
 		onclick={() =>
-			dispatch("showAlternateMsg", {
+			onshowAlternateMsg?.({
 				id: alternatives[Math.min(alternatives.length - 1, currentIdx + 1)],
 			})}
 		disabled={currentIdx === alternatives.length - 1 || loading}
 	>
 		<CarbonChevronRight class="text-sm" />
 	</button>
-	{#if !loading && message.children}
+	<!-- {#if !loading && message.children}
 		<button
 			class="hidden group-hover/navbranch:block"
 			onclick={() => {
@@ -77,5 +73,5 @@
 				<CarbonTrashCan />
 			</div>
 		</button>
-	{/if}
+	{/if} -->
 </div>

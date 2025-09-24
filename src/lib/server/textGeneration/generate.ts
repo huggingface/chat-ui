@@ -1,5 +1,4 @@
 import { config } from "$lib/server/config";
-import type { ToolResult, Tool } from "$lib/types/Tool";
 import {
 	MessageReasoningUpdateType,
 	MessageUpdateType,
@@ -15,10 +14,17 @@ import { logger } from "../logger";
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
 export async function* generate(
-	{ model, endpoint, conv, messages, assistant, isContinue, promptedAt }: GenerateContext,
-	toolResults: ToolResult[],
-	preprompt?: string,
-	tools?: Tool[]
+	{
+		model,
+		endpoint,
+		conv,
+		messages,
+		assistant,
+		isContinue,
+		promptedAt,
+		forceMultimodal,
+	}: GenerateContext,
+	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
 	// reasoning mode is false by default
 	let reasoning = false;
@@ -48,11 +54,24 @@ export async function* generate(
 		preprompt,
 		continueMessage: isContinue,
 		generateSettings: assistant?.generateSettings,
-		tools,
-		toolResults,
-		isMultimodal: model.multimodal,
+		// Allow user-level override to force multimodal
+		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,
 	})) {
+		// Check if this output contains router metadata
+		if (
+			"routerMetadata" in output &&
+			output.routerMetadata &&
+			output.routerMetadata.route &&
+			output.routerMetadata.model
+		) {
+			yield {
+				type: MessageUpdateType.RouterMetadata,
+				route: output.routerMetadata.route,
+				model: output.routerMetadata.model,
+			};
+			continue;
+		}
 		// text generation completed
 		if (output.generated_text) {
 			let interrupted =
@@ -94,6 +113,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 						generateSettings: {
 							max_new_tokens: 1024,
 						},
+						modelId: model.id,
 					});
 					finalAnswer = summary;
 					yield {
@@ -126,7 +146,6 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 				type: MessageUpdateType.FinalAnswer,
 				text: finalAnswer,
 				interrupted,
-				webSources: output.webSources,
 			};
 			continue;
 		}
@@ -205,7 +224,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			) {
 				lastReasoningUpdate = new Date();
 				try {
-					generateSummaryOfReasoning(reasoningBuffer).then((summary) => {
+					generateSummaryOfReasoning(reasoningBuffer, model.id).then((summary) => {
 						status = summary;
 					});
 				} catch (e) {

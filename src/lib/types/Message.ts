@@ -1,6 +1,5 @@
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
-import type { WebSearch } from "./WebSearch";
 import type { v4 } from "uuid";
 
 export type Message = Partial<Timestamps> & {
@@ -8,8 +7,6 @@ export type Message = Partial<Timestamps> & {
 	id: ReturnType<typeof v4>;
 	content: string;
 	updates?: MessageUpdate[];
-	webSearchId?: WebSearch["_id"]; // legacy version
-	webSearch?: WebSearch;
 
 	reasoning?: string;
 	score?: -1 | 0 | 1;
@@ -19,6 +16,12 @@ export type Message = Partial<Timestamps> & {
 	 **/
 	files?: MessageFile[];
 	interrupted?: boolean;
+
+	// Router metadata when using llm-router
+	routerMetadata?: {
+		route: string;
+		model: string;
+	};
 
 	// needed for conversation trees
 	ancestors?: Message["id"][];

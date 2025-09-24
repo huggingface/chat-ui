@@ -24,7 +24,11 @@ export const GET: RequestHandler = (async ({ params }) => {
 		},
 	});
 
-	const reactLike = html("<style>" + renderedComponent.head + "</style>" + renderedComponent.body);
+	// satori-html returns a VNode (React-like). satori's TS types expect ReactNode,
+	// so cast here to satisfy the compiler without pulling in React types.
+	const reactLike = html(
+		"<style>" + renderedComponent.head + "</style>" + renderedComponent.body
+	) as unknown as never;
 
 	const svg = await satori(reactLike, {
 		width: 1200,
@@ -49,7 +53,8 @@ export const GET: RequestHandler = (async ({ params }) => {
 		.render()
 		.asPng();
 
-	return new Response(png, {
+	// Return a Uint8Array so BodyInit matches cleanly without generics mismatch
+	return new Response(new Uint8Array(png), {
 		headers: {
 			"Content-Type": "image/png",
 		},

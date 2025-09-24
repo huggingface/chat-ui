@@ -20,28 +20,20 @@ superjson.registerCustom<ObjectId, string>(
 	"ObjectId"
 );
 
-export function useAPIClient({ fetch }: { fetch?: Treaty.Config["fetcher"] } = {}) {
-	let url;
+export function useAPIClient({
+	fetch,
+	origin,
+}: {
+	fetch?: Treaty.Config["fetcher"];
+	origin?: string;
+} = {}) {
+	// On the server, use the current request origin when available to avoid
+	// incorrect port guessing and ensure cookies are forwarded properly.
+	// Fall back to a sane default in dev if origin is missing.
+	const url = browser
+		? `${window.location.origin}${base}/api/v2`
+		: `${origin ?? `http://localhost:5173`}${base}/api/v2`;
 
-	if (!browser) {
-		let port;
-		if (process.argv.includes("--port")) {
-			port = parseInt(process.argv[process.argv.indexOf("--port") + 1]);
-		} else {
-			const mode = process.argv.find((arg) => arg === "preview" || arg === "dev");
-			if (mode === "preview") {
-				port = 4173;
-			} else if (mode === "dev") {
-				port = 5173;
-			} else {
-				port = 3000;
-			}
-		}
-		// Always use localhost for server-side requests to avoid external HTTP calls during SSR
-		url = `http://localhost:${port}${base}/api/v2`;
-	} else {
-		url = `${window.location.origin}${base}/api/v2`;
-	}
 	const app = treaty<App>(url, { fetcher: fetch });
 	return app;
 }
@@ -57,12 +49,3 @@ export function handleResponse<T extends Record<number, unknown>>(
 		typeof response.data === "string" ? response.data : JSON.stringify(response.data)
 	) as T[200];
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Success<T extends (...args: any) => any> =
-	Awaited<ReturnType<T>> extends {
-		data: infer D;
-		error: unknown;
-	}
-		? D
-		: never;

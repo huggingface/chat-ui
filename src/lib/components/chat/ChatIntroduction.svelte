@@ -1,35 +1,40 @@
 <script lang="ts">
 	import Logo from "$lib/components/icons/Logo.svelte";
-	import { createEventDispatcher } from "svelte";
-	import IconGear from "~icons/bi/gear-fill";
-	import AnnouncementBanner from "../AnnouncementBanner.svelte";
 	import type { Model } from "$lib/types/Model";
-	import ModelCardMetadata from "../ModelCardMetadata.svelte";
-	import { base } from "$app/paths";
-	import JSON5 from "json5";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	const publicConfig = usePublicConfig();
 
 	interface Props {
 		currentModel: Model;
+		onmessage?: (content: string) => void;
 	}
 
-	let { currentModel }: Props = $props();
+	let { currentModel: _currentModel, onmessage }: Props = $props();
 
-	const dispatch = createEventDispatcher<{ message: string }>();
+	$effect(() => {
+		// referenced to appease linter while UI blocks are commented out
+		void _currentModel;
+		void onmessage;
+	});
 </script>
 
-<div class="my-auto grid gap-8 lg:grid-cols-3">
-	<div class="lg:col-span-1">
+<div class="my-auto grid items-center justify-center gap-8 text-center">
+	<div
+		class="flex -translate-y-16 select-none items-center rounded-xl text-3xl font-semibold md:-translate-y-12 md:text-5xl"
+	>
+		<Logo classNames="size-12 md:size-20 dark:invert mr-0.5" />
+		{publicConfig.PUBLIC_APP_NAME}
+	</div>
+	<!-- <div class="lg:col-span-1">
 		<div>
 			<div class="mb-3 flex items-center text-2xl font-semibold">
-				<Logo classNames="mr-1 flex-none" />
+				<Logo classNames="mr-1 flex-none dark:invert" />
 				{publicConfig.PUBLIC_APP_NAME}
 				<div
 					class="ml-3 flex h-6 items-center rounded-lg border border-gray-100 bg-gray-50 px-2 text-base text-gray-400 dark:border-gray-700/60 dark:bg-gray-800"
 				>
-					v{publicConfig.PUBLIC_VERSION}
+					{publicConfig.PUBLIC_VERSION}
 				</div>
 			</div>
 			<p class="text-base text-gray-600 dark:text-gray-400">
@@ -55,7 +60,7 @@
 					<div class="flex items-center gap-1.5 font-semibold max-sm:text-smd">
 						{#if currentModel.logoUrl}
 							<img
-								class=" overflown aspect-square size-4 rounded border dark:border-gray-700"
+								class="aspect-square size-4 rounded border bg-white dark:border-gray-700"
 								src={currentModel.logoUrl}
 								alt=""
 							/>
@@ -77,23 +82,5 @@
 			<ModelCardMetadata variant="dark" model={currentModel} />
 		</div>
 	</div>
-	{#if currentModel.promptExamples}
-		<div class="lg:col-span-3 lg:mt-6">
-			<p class="mb-3 text-center text-gray-600 dark:text-gray-300 lg:text-left">Examples</p>
-			<div
-				class="flex max-h-60 gap-2 overflow-x-auto pb-2 text-center scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 lg:grid lg:grid-cols-3 lg:overflow-y-auto lg:text-left"
-			>
-				{#each currentModel.promptExamples as example}
-					<button
-						type="button"
-						class="flex-shrink-0 rounded-xl border bg-gray-50 p-2.5 text-sm text-gray-600 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 sm:p-3 lg:w-full xl:p-3.5 xl:text-base"
-						onclick={() => dispatch("message", example.prompt)}
-					>
-						{example.title}
-					</button>
-				{/each}
-			</div>
-		</div>
-	{/if}
-	<div class="h-40 sm:h-24"></div>
+	<div class="h-40 sm:h-24"></div> -->
 </div>

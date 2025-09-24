@@ -52,7 +52,7 @@ const conversationBase = {
 	createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
 	updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
 	model: "model-id",
-	embeddingModel: "embedding-model-id",
+
 	title: "title",
 	messages: [],
 } satisfies Conversation;

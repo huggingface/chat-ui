@@ -1,5 +1,4 @@
 import { collections } from "$lib/server/database";
-import { models } from "$lib/server/models";
 import { authCondition } from "$lib/server/auth";
 import type { Conversation } from "$lib/types/Conversation";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
@@ -11,11 +10,10 @@ export async function GET({ locals, url }) {
 			.find({
 				...authCondition(locals),
 			})
-			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | "assistantId">>({
+			.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model" | never>>({
 				title: 1,
 				updatedAt: 1,
 				model: 1,
-				assistantId: 1,
 			})
 			.sort({ updatedAt: -1 })
 			.skip(p * CONV_NUM_PER_PAGE)
@@ -32,8 +30,6 @@ export async function GET({ locals, url }) {
 			updatedAt: conv.updatedAt,
 			model: conv.model,
 			modelId: conv.model, // legacy param iOS
-			assistantId: conv.assistantId,
-			modelTools: models.find((m) => m.id == conv.model)?.tools ?? false,
 		}));
 		return Response.json(res);
 	} else {

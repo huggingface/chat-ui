@@ -1,7 +1,11 @@
 <script lang="ts">
-	import { onMount, createEventDispatcher } from "svelte";
+	import { onMount } from "svelte";
+	interface Props {
+		onvisible?: () => void;
+	}
 
-	const dispatch = createEventDispatcher();
+	let { onvisible }: Props = $props();
+
 	let loader: HTMLDivElement | undefined = $state();
 	let observer: IntersectionObserver;
 	let intervalId: ReturnType<typeof setInterval> | undefined;
@@ -20,7 +24,7 @@
 					}
 					// Start new interval that dispatches every 250ms
 					intervalId = setInterval(() => {
-						dispatch("visible");
+						onvisible?.();
 					}, 250);
 				} else {
 					// Clear interval when not intersecting
@@ -43,8 +47,4 @@
 	});
 </script>
 
-<div bind:this={loader} class="flex animate-pulse flex-col gap-4">
-	<div class="w-5/5 ml-2 h-5 gap-5 rounded bg-gray-300 dark:bg-gray-700"></div>
-	<div class="w-5/5 ml-2 h-5 gap-5 rounded bg-gray-300 dark:bg-gray-700"></div>
-	<div class="w-5/5 ml-2 h-5 gap-5 rounded bg-gray-300 dark:bg-gray-700"></div>
-</div>
+<div bind:this={loader} class="h-2"></div>

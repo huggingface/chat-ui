@@ -24,15 +24,16 @@
 </script>
 
 <Modal
-	on:close={() => goto(previousPage)}
-	width="h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none sm:h-[95dvh] xl:w-[1200px] 2xl:h-[75dvh]"
+	onclose={() => goto(previousPage)}
+	disableFly={true}
+	width="border dark:border-gray-700 h-[95dvh] w-[90dvw] pb-0 overflow-hidden rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 dark:text-gray-200 sm:h-[95dvh] xl:w-[1200px] xl:h-[70dvh]"
 >
 	{@render children?.()}
 	{#if $settings.recentlySaved}
 		<div
-			class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-200 px-3 py-1 text-black"
+			class="absolute bottom-4 right-4 m-2 flex items-center gap-1.5 rounded-full border bg-black px-3 py-1 text-white dark:border-white/10 dark:bg-gray-700 dark:text-gray-100"
 		>
-			<CarbonCheckmark class="text-green-500" />
+			<CarbonCheckmark class="text-white" />
 			Saved
 		</div>
 	{/if}

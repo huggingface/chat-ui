@@ -11,10 +11,7 @@ import mimeTypes from "mime-types";
 import { logger } from "$lib/server/logger";
 
 export interface FeatureFlags {
-	searchEnabled: boolean;
 	enableAssistants: boolean;
-	enableAssistantsRAG: boolean;
-	enableCommunityTools: boolean;
 	loginEnabled: boolean;
 	loginRequired: boolean;
 	guestMode: boolean;
@@ -59,19 +56,7 @@ export const misc = new Elysia()
 		}
 
 		return {
-			searchEnabled: !!(
-				config.SERPAPI_KEY ||
-				config.SERPER_API_KEY ||
-				config.SERPSTACK_API_KEY ||
-				config.SEARCHAPI_KEY ||
-				config.YDC_API_KEY ||
-				config.USE_LOCAL_WEBSEARCH ||
-				config.SEARXNG_QUERY_URL ||
-				config.BING_SUBSCRIPTION_KEY
-			),
 			enableAssistants: config.ENABLE_ASSISTANTS === "true",
-			enableAssistantsRAG: config.ENABLE_ASSISTANTS_RAG === "true",
-			enableCommunityTools: config.COMMUNITY_TOOLS === "true",
 			loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
 			loginRequired,
 			guestMode: requiresUser && messagesBeforeLogin > 0,
@@ -136,9 +121,9 @@ export const misc = new Elysia()
 		const stats: {
 			nConversations: number;
 			nMessages: number;
+			nFiles: number;
 			nAssistants: number;
 			nAvatars: number;
-			nFiles: number;
 		} = {
 			nConversations: 0,
 			nMessages: 0,
@@ -195,13 +180,6 @@ export const misc = new Elysia()
 								messages: conversation.messages.map((message) => {
 									return {
 										...message,
-										webSearch: message.webSearch
-											? {
-													prompt: message.webSearch?.prompt,
-													searchQuery: message.webSearch?.searchQuery,
-													results: message.webSearch?.results.map((result) => result.link),
-												}
-											: undefined,
 										files: filenames,
 										updates: undefined,
 									};
@@ -258,8 +236,6 @@ export const misc = new Elysia()
 								description: assistant.description,
 								dynamicPrompt: assistant.dynamicPrompt,
 								exampleInputs: assistant.exampleInputs,
-								rag: assistant.rag,
-								tools: assistant.tools,
 								generateSettings: assistant.generateSettings,
 								createdAt: assistant.createdAt.toISOString(),
 								updatedAt: assistant.updatedAt.toISOString(),

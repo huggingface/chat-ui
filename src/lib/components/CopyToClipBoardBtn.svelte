@@ -1,17 +1,26 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 
-	import IconCopy from "./icons/IconCopy.svelte";
+	import CarbonCopy from "~icons/carbon/copy";
 	import Tooltip from "./Tooltip.svelte";
 
 	interface Props {
 		classNames?: string;
+		iconClassNames?: string;
 		value: string;
 		children?: import("svelte").Snippet;
 		onClick?: () => void;
+		showTooltip?: boolean;
 	}
 
-	let { classNames = "", value, children, onClick }: Props = $props();
+	let {
+		classNames = "",
+		iconClassNames = "",
+		value,
+		children,
+		onClick,
+		showTooltip = true,
+	}: Props = $props();
 
 	let isSuccess = $state(false);
 	let timeout: ReturnType<typeof setTimeout>;
@@ -71,9 +80,11 @@
 >
 	<div class="relative">
 		{#if children}{@render children()}{:else}
-			<IconCopy classNames="h-[1.14em] w-[1.14em]" />
+			<CarbonCopy class={iconClassNames} />
 		{/if}
 
-		<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
+		{#if showTooltip}
+			<Tooltip classNames={isSuccess ? "opacity-100" : "opacity-0"} />
+		{/if}
 	</div>
 </button>

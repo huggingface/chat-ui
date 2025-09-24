@@ -8,88 +8,22 @@ import type { CompletionCreateParamsStreaming } from "openai/resources/completio
 import type {
 	ChatCompletionCreateParamsNonStreaming,
 	ChatCompletionCreateParamsStreaming,
-	ChatCompletionTool,
 } from "openai/resources/chat/completions";
-import type { FunctionDefinition, FunctionParameters } from "openai/resources/shared";
 import { buildPrompt } from "$lib/buildPrompt";
 import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { MessageFile } from "$lib/types/Message";
-import { type Tool } from "$lib/types/Tool";
 import type { EndpointMessage } from "../endpoints";
-import { v4 as uuidv4 } from "uuid";
-function createChatCompletionToolsArray(tools: Tool[] | undefined): ChatCompletionTool[] {
-	const toolChoices = [] as ChatCompletionTool[];
-	if (tools === undefined) {
-		return toolChoices;
-	}
-
-	for (const t of tools) {
-		const requiredProperties = [] as string[];
-
-		const properties = {} as Record<string, unknown>;
-		for (const idx in t.inputs) {
-			const parameterDefinition = t.inputs[idx];
-
-			const parameter = {} as Record<string, unknown>;
-			switch (parameterDefinition.type) {
-				case "str":
-					parameter.type = "string";
-					break;
-				case "float":
-				case "int":
-					parameter.type = "number";
-					break;
-				case "bool":
-					parameter.type = "boolean";
-					break;
-				case "file":
-					throw new Error("File type's currently not supported");
-				default:
-					throw new Error(`Unknown tool IO type: ${t}`);
-			}
-
-			if ("description" in parameterDefinition) {
-				parameter.description = parameterDefinition.description;
-			}
-
-			if (parameterDefinition.paramType == "required") {
-				requiredProperties.push(t.inputs[idx].name);
-			}
-
-			properties[t.inputs[idx].name] = parameter;
-		}
-
-		const functionParameters: FunctionParameters = {
-			type: "object",
-			...(requiredProperties.length > 0 ? { required: requiredProperties } : {}),
-			properties,
-		};
-
-		const functionDefinition: FunctionDefinition = {
-			name: t.name,
-			description: t.description,
-			parameters: functionParameters,
-		};
-
-		const toolDefinition: ChatCompletionTool = {
-			type: "function",
-			function: functionDefinition,
-		};
-
-		toolChoices.push(toolDefinition);
-	}
-
-	return toolChoices;
-}
+// uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
+	// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
 	apiKey: z.string().default(config.OPENAI_API_KEY || config.HF_TOKEN || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
@@ -101,17 +35,14 @@ export const endpointOAIParametersSchema = z.object({
 		.object({
 			image: createImageProcessorOptionsValidator({
 				supportedMimeTypes: [
+					// Restrict to the most widely-supported formats
 					"image/png",
 					"image/jpeg",
-					"image/webp",
-					"image/avif",
-					"image/tiff",
-					"image/gif",
 				],
-				preferredMimeType: "image/webp",
-				maxSizeInMB: Infinity,
-				maxWidth: 4096,
-				maxHeight: 4096,
+				preferredMimeType: "image/jpeg",
+				maxSizeInMB: 3,
+				maxWidth: 2048,
+				maxHeight: 2048,
 			}),
 		})
 		.default({}),
@@ -143,21 +74,38 @@ export async function endpointOai(
 		throw new Error("Failed to import OpenAI", { cause: e });
 	}
 
+	// Store router metadata if captured
+	let routerMetadata: { route?: string; model?: string } = {};
+
+	// Custom fetch wrapper to capture response headers for router metadata
+	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+		const response = await fetch(url, init);
+
+		// Capture router headers if present (fallback for non-streaming)
+		const routeHeader = response.headers.get("X-Router-Route");
+		const modelHeader = response.headers.get("X-Router-Model");
+
+		if (routeHeader && modelHeader) {
+			routerMetadata = {
+				route: routeHeader,
+				model: modelHeader,
+			};
+		}
+
+		return response;
+	};
+
 	const openai = new OpenAI({
 		apiKey: apiKey || "sk-",
 		baseURL,
 		defaultHeaders,
 		defaultQuery,
+		fetch: customFetch,
 	});
 
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
 	if (completion === "completions") {
-		if (model.tools) {
-			throw new Error(
-				"Tools are not supported for 'completions' mode, switch to 'chat_completions' instead"
-			);
-		}
 		return async ({ messages, preprompt, continueMessage, generateSettings, conversationId }) => {
 			const prompt = await buildPrompt({
 				messages,
@@ -190,17 +138,10 @@ export async function endpointOai(
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
 	} else if (completion === "chat_completions") {
-		return async ({
-			messages,
-			preprompt,
-			generateSettings,
-			tools,
-			toolResults,
-			conversationId,
-		}) => {
+		return async ({ messages, preprompt, generateSettings, conversationId, isMultimodal }) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor, !model.tools && model.multimodal);
+				await prepareMessages(messages, imageProcessor, isMultimodal ?? model.multimodal);
 
 			// Check if a system message already exists as the first message
 			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
@@ -219,60 +160,8 @@ export async function endpointOai(
 				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
 			}
 
-			// Handle models that don't support system role by converting to user message
-			// This maintains compatibility with older or non-standard models
-			if (
-				!model.systemRoleSupported &&
-				messagesOpenAI.length > 0 &&
-				messagesOpenAI[0]?.role === "system"
-			) {
-				messagesOpenAI[0] = {
-					...messagesOpenAI[0],
-					role: "user",
-				};
-			}
-
-			// Format tool results for the API to provide context for follow-up tool calls
-			// This creates the full conversation flow needed for multi-step tool interactions
-			if (toolResults && toolResults.length > 0) {
-				const toolCallRequests: OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam = {
-					role: "assistant",
-					content: null,
-					tool_calls: [],
-				};
-
-				const responses: Array<OpenAI.Chat.Completions.ChatCompletionToolMessageParam> = [];
-
-				for (const result of toolResults) {
-					const id = result?.call?.toolId || uuidv4();
-
-					const toolCallResult: OpenAI.Chat.Completions.ChatCompletionMessageToolCall = {
-						type: "function",
-						function: {
-							name: result.call.name,
-							arguments: JSON.stringify(result.call.parameters),
-						},
-						id,
-					};
-
-					toolCallRequests.tool_calls?.push(toolCallResult);
-					const toolCallResponse: OpenAI.Chat.Completions.ChatCompletionToolMessageParam = {
-						role: "tool",
-						content: "",
-						tool_call_id: id,
-					};
-					if ("outputs" in result) {
-						toolCallResponse.content = JSON.stringify(result.outputs);
-					}
-					responses.push(toolCallResponse);
-				}
-				messagesOpenAI.push(toolCallRequests);
-				messagesOpenAI.push(...responses);
-			}
-
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
-			const toolCallChoices = createChatCompletionToolsArray(tools);
 			const body = {
 				model: model.id ?? model.name,
 				messages: messagesOpenAI,
@@ -286,8 +175,6 @@ export async function endpointOai(
 				top_p: parameters?.top_p,
 				frequency_penalty: parameters?.repetition_penalty,
 				presence_penalty: parameters?.presence_penalty,
-				// Only include tool configuration if tools are provided
-				...(toolCallChoices.length > 0 ? { tools: toolCallChoices, tool_choice: "auto" } : {}),
 			};
 
 			// Handle both streaming and non-streaming responses with appropriate processors
@@ -302,7 +189,7 @@ export async function endpointOai(
 						},
 					}
 				);
-				return openAIChatToTextGenerationStream(openChatAICompletion);
+				return openAIChatToTextGenerationStream(openChatAICompletion, () => routerMetadata);
 			} else {
 				const openChatAICompletion = await openai.chat.completions.create(
 					body as ChatCompletionCreateParamsNonStreaming,
@@ -314,7 +201,7 @@ export async function endpointOai(
 						},
 					}
 				);
-				return openAIChatToTextGenerationSingle(openChatAICompletion);
+				return openAIChatToTextGenerationSingle(openChatAICompletion, () => routerMetadata);
 			}
 		};
 	} else {
@@ -330,18 +217,13 @@ async function prepareMessages(
 	return Promise.all(
 		messages.map(async (message) => {
 			if (message.from === "user" && isMultimodal) {
-				return {
-					role: message.from,
-					content: [
-						...(await prepareFiles(imageProcessor, message.files ?? [])),
-						{ type: "text", text: message.content },
-					],
-				};
+				const parts = [
+					{ type: "text" as const, text: message.content },
+					...(await prepareFiles(imageProcessor, message.files ?? [])),
+				];
+				return { role: message.from, content: parts };
 			}
-			return {
-				role: message.from,
-				content: message.content,
-			};
+			return { role: message.from, content: message.content };
 		})
 	);
 }
@@ -357,6 +239,9 @@ async function prepareFiles(
 		type: "image_url" as const,
 		image_url: {
 			url: `data:${file.mime};base64,${file.image.toString("base64")}`,
+			// Improves compatibility with some OpenAI-compatible servers
+			// that expect an explicit detail setting.
+			detail: "auto",
 		},
 	}));
 }

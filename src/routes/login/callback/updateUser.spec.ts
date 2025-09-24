@@ -6,7 +6,6 @@ import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { defaultModel } from "$lib/server/models";
 import { findUser } from "$lib/server/auth";
-import { defaultEmbeddingModel } from "$lib/server/embeddingModels";
 
 const userData = {
 	preferred_username: "new-username",
@@ -48,7 +47,7 @@ const insertRandomConversations = async (count: number) => {
 			title: "random title",
 			messages: [],
 			model: defaultModel.id,
-			embeddingModel: defaultEmbeddingModel.id,
+			// embedding model removed in this build
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			sessionId: locals.sessionId,
@@ -101,7 +100,6 @@ describe("login", () => {
 			userId: user?._id,
 			updatedAt: expect.any(Date),
 			createdAt: expect.any(Date),
-			ethicsModalAcceptedAt: expect.any(Date),
 			...DEFAULT_SETTINGS,
 		});
 
@@ -111,7 +109,6 @@ describe("login", () => {
 	it("should migrate pre-existing settings for pre-existing user", async () => {
 		const { insertedId } = await collections.settings.insertOne({
 			sessionId: locals.sessionId,
-			ethicsModalAcceptedAt: new Date(),
 			updatedAt: new Date(),
 			createdAt: new Date(),
 			...DEFAULT_SETTINGS,
@@ -133,7 +130,6 @@ describe("login", () => {
 			userId: user?._id,
 			updatedAt: expect.any(Date),
 			createdAt: expect.any(Date),
-			ethicsModalAcceptedAt: expect.any(Date),
 			...DEFAULT_SETTINGS,
 			shareConversationsWithModelAuthors: false,
 		});

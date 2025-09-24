@@ -6,8 +6,7 @@
 	import { page } from "$app/state";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
-	import CarbonTools from "~icons/carbon/tools";
-	import CarbonImage from "~icons/carbon/image";
+	import CarbonView from "~icons/carbon/view";
 	import { useSettingsStore } from "$lib/stores/settings";
 	interface Props {
 		data: PageData;
@@ -18,6 +17,11 @@
 	const settings = useSettingsStore();
 
 	const publicConfig = usePublicConfig();
+
+	// Local filter state for model search (hyphen/space insensitive)
+	let modelFilter = $state("");
+	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 </script>
 
 <svelte:head>
@@ -46,23 +50,34 @@
 			{/if}
 		</div>
 		<h2 class="text-gray-500">All models available on {publicConfig.PUBLIC_APP_NAME}</h2>
-		<div class="mt-8 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
-			{#each data.models.filter((el) => !el.unlisted) as model, index (model.id)}
-				<div
+
+		<!-- Filter input -->
+		<input
+			type="search"
+			bind:value={modelFilter}
+			placeholder="Search by name"
+			aria-label="Search models by name or id"
+			class="mt-4 w-full rounded-3xl border border-gray-300 bg-white px-5 py-2 text-[15px]
+				placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300
+				dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-gray-700"
+		/>
+		<div class="mt-6 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
+			{#each data.models
+				.filter((el) => !el.unlisted)
+				.filter((el) => {
+					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
+					return queryTokens.every((q) => haystack.includes(q));
+				}) as model, index (model.id)}
+				<a
+					href="{base}/models/{model.id}"
 					aria-label="Model card"
-					role="region"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
 					class:active-model={model.id === $settings.activeModel}
 				>
-					<a
-						href="{base}/models/{model.id}"
-						class="absolute inset-0 z-10"
-						aria-label="View details for {model.displayName}"
-					></a>
 					<div class="flex items-center justify-between gap-1">
 						{#if model.logoUrl}
 							<img
-								class="overflown aspect-square size-6 rounded border dark:border-gray-700"
+								class="aspect-square size-6 rounded border bg-white dark:border-gray-700"
 								src={model.logoUrl}
 								alt="{model.displayName} logo"
 							/>
@@ -73,24 +88,14 @@
 							></div>
 						{/if}
 						<div class="flex items-center gap-1">
-							{#if model.tools}
-								<span
-									title="This model supports tools."
-									class="ml-auto grid size-[21px] place-items-center rounded-lg border border-purple-300 dark:border-purple-700"
-									aria-label="Model supports tools"
-									role="img"
-								>
-									<CarbonTools class="text-xxs text-purple-700 dark:text-purple-500" />
-								</span>
-							{/if}
-							{#if model.multimodal}
+							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 								<span
 									title="This model is multimodal and supports image inputs natively."
 									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-500"
 									aria-label="Model is multimodal"
 									role="img"
 								>
-									<CarbonImage class="text-xxs text-blue-700 dark:text-blue-500" />
+									<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
 								</span>
 							{/if}
 							{#if model.reasoning}
@@ -116,11 +121,11 @@
 							{/if}
 							{#if model.id === $settings.activeModel}
 								<span
-									class="rounded-full border border-blue-500 bg-blue-500/5 px-2 py-0.5 text-xs text-blue-500 dark:border-blue-500 dark:bg-blue-500/10"
+									class="rounded-full bg-black px-2 py-0.5 text-xs text-white dark:bg-white dark:text-black"
 								>
 									Active
 								</span>
-							{:else if index === 0}
+							{:else if index === 0 && model.id === "omni"}
 								<span
 									class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
 								>
@@ -132,10 +137,10 @@
 					<span class="flex items-center gap-2 font-semibold">
 						{model.displayName}
 					</span>
-					<span class="whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
+					<span class="line-clamp-4 whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
 						{model.description || "-"}
 					</span>
-				</div>
+				</a>
 			{/each}
 		</div>
 	</div>

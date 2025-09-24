@@ -3,7 +3,7 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import dotenv from "dotenv";
 import { execSync } from "child_process";
 
-dotenv.config({ path: "./.env.local" });
+dotenv.config({ path: "./.env.local", override: true });
 dotenv.config({ path: "./.env" });
 
 function getCurrentCommitSHA() {

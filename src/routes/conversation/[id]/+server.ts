@@ -1,5 +1,4 @@
 import { config } from "$lib/server/config";
-import { startOfHour } from "date-fns";
 import { authCondition, requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models, validModelIdSchema } from "$lib/server/models";
@@ -21,11 +20,9 @@ import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
 import { usageLimits } from "$lib/server/usageLimits";
-import { MetricsServer } from "$lib/server/metrics";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
-import { documentParserToolId } from "$lib/utils/toolIds.js";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -152,8 +149,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		id: messageId,
 		is_retry: isRetry,
 		is_continue: isContinue,
-		web_search: webSearch,
-		tools: toolsPreferences,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -165,8 +160,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			),
 			is_retry: z.optional(z.boolean()),
 			is_continue: z.optional(z.boolean()),
-			web_search: z.optional(z.boolean()),
-			tools: z.array(z.string()).optional(),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -195,14 +188,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				};
 			})
 	);
-
-	// Check for PDF files in the input
-	const hasPdfFiles = inputFiles?.some((file) => file.mime === "application/pdf") ?? false;
-
-	// Check for existing PDF files in the conversation
-	const hasPdfInConversation =
-		conv.messages?.some((msg) => msg.files?.some((file) => file.mime === "application/pdf")) ??
-		false;
 
 	if (usageLimits?.messageLength && (newPrompt?.length ?? 0) > usageLimits.messageLength) {
 		error(400, "Message too long.");
@@ -352,23 +337,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					if (event.token === "") return;
 					messageToWriteTo.content += event.token;
 
-					// add to token total
-					MetricsServer.getMetrics().model.tokenCountTotal.inc({ model: model?.id });
-
-					// if this is the first token, add to time to first token
 					if (!lastTokenTimestamp) {
-						MetricsServer.getMetrics().model.timeToFirstToken.observe(
-							{ model: model?.id },
-							Date.now() - promptedAt.getTime()
-						);
 						lastTokenTimestamp = new Date();
 					}
-
-					// add to time per token
-					MetricsServer.getMetrics().model.timePerOutputToken.observe(
-						{ model: model?.id },
-						Date.now() - (lastTokenTimestamp ?? promptedAt).getTime()
-					);
 					lastTokenTimestamp = new Date();
 				} else if (
 					event.type === MessageUpdateType.Reasoning &&
@@ -380,7 +351,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 
 				// Set the title
 				else if (event.type === MessageUpdateType.Title) {
-					conv.title = event.title;
+					// Always strip <think> markers from titles when saving
+					const sanitizedTitle = event.title.replace(/<\/?think>/gi, "").trim();
+					conv.title = sanitizedTitle;
 					await collections.conversations.updateOne(
 						{ _id: convId },
 						{ $set: { title: conv?.title, updatedAt: new Date() } }
@@ -391,12 +364,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
-
-					// add to latency
-					MetricsServer.getMetrics().model.latency.observe(
-						{ model: model?.id },
-						Date.now() - promptedAt.getTime()
-					);
 				}
 
 				// Add file
@@ -405,6 +372,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
 					];
+				}
+
+				// Store router metadata if this is the virtual router (Omni)
+				else if (event.type === MessageUpdateType.RouterMetadata) {
+					if (model?.isRouter) {
+						messageToWriteTo.routerMetadata = {
+							route: event.route,
+							model: event.model,
+						};
+					}
 				}
 
 				// Append to the persistent message updates if it's not a stream update
@@ -455,14 +432,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messages: messagesForPrompt,
 					assistant: undefined,
 					isContinue: isContinue ?? false,
-					webSearch: webSearch ?? false,
-					toolsPreference: [
-						...(toolsPreferences ?? []),
-						...(hasPdfFiles || hasPdfInConversation ? [documentParserToolId] : []), // Add document parser tool if PDF files are present
-					],
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
+					// Force-enable multimodal if user settings say so for this model
+					forceMultimodal: Boolean(
+						(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
+							model.id
+						]
+					),
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
@@ -504,16 +482,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		},
 	});
 
-	if (conv.assistantId) {
-		await collections.assistantStats.updateOne(
-			{ assistantId: conv.assistantId, "date.at": startOfHour(new Date()), "date.span": "hour" },
-			{ $inc: { count: 1 } },
-			{ upsert: true }
-		);
-	}
-
-	const metrics = MetricsServer.getMetrics();
-	metrics.model.messagesTotal.inc({ model: model?.id });
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {
 		headers: {
@@ -558,9 +526,11 @@ export async function PATCH({ request, locals, params }) {
 		error(404, "Conversation not found");
 	}
 
-	// Only include defined values in the update
+	// Only include defined values in the update, with title sanitized
 	const updateValues = {
-		...(values.title !== undefined && { title: values.title }),
+		...(values.title !== undefined && {
+			title: values.title.replace(/<\/?think>/gi, "").trim(),
+		}),
 		...(values.model !== undefined && { model: values.model }),
 	};
 

@@ -15,8 +15,6 @@ import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
 import type { Conversation } from "../src/lib/types/Conversation";
 import type { Settings } from "../src/lib/types/Settings";
-import type { CommunityToolDB, ToolLogoColor, ToolLogoIcon } from "../src/lib/types/Tool";
-import { defaultEmbeddingModel } from "../src/lib/server/embeddingModels.ts";
 import { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
@@ -40,7 +38,7 @@ rl.on("close", function () {
 
 const samples = fs.readFileSync(path.join(__dirname, "samples.txt"), "utf8").split("\n---\n");
 
-const possibleFlags = ["reset", "all", "users", "settings", "assistants", "conversations", "tools"];
+const possibleFlags = ["reset", "all", "users", "settings", "assistants", "conversations"];
 const argv = minimist(process.argv.slice(2));
 const flags = argv["_"].filter((flag) => possibleFlags.includes(flag));
 
@@ -156,7 +154,6 @@ async function seed() {
 		await collections.settings.deleteMany({});
 		await collections.assistants.deleteMany({});
 		await collections.conversations.deleteMany({});
-		await collections.tools.deleteMany({});
 		await collections.migrationResults.deleteMany({});
 		await collections.semaphores.deleteMany({});
 		console.log("Reset done");
@@ -186,12 +183,12 @@ async function seed() {
 				userId: user._id,
 				shareConversationsWithModelAuthors: faker.datatype.boolean(0.25),
 				hideEmojiOnSidebar: faker.datatype.boolean(0.25),
-				ethicsModalAcceptedAt: faker.date.recent({ days: 30 }),
 				activeModel: faker.helpers.arrayElement(modelIds),
 				createdAt: faker.date.recent({ days: 30 }),
 				updatedAt: faker.date.recent({ days: 30 }),
 				disableStream: faker.datatype.boolean(0.25),
 				directPaste: faker.datatype.boolean(0.25),
+				hidePromptExamples: {},
 				customPrompts: {},
 				assistants: [],
 			};
@@ -272,7 +269,7 @@ async function seed() {
 							updatedAt: faker.date.recent({ days: 145 }),
 							model: faker.helpers.arrayElement(modelIds),
 							title: faker.internet.emoji() + " " + faker.hacker.phrase(),
-							embeddingModel: defaultEmbeddingModel.id,
+							// embeddings removed in this build
 							messages,
 							rootMessageId: messages[0].id,
 						} satisfies Conversation;
@@ -286,80 +283,6 @@ async function seed() {
 			})
 		);
 		console.log("Done creating conversations.");
-	}
-
-	// generate Community Tools
-	if (flags.includes("tools") || flags.includes("all")) {
-		const tools = await Promise.all(
-			faker.helpers.multiple(
-				() => {
-					const _id = new ObjectId();
-					const displayName = faker.company.catchPhrase();
-					const description = faker.company.catchPhrase();
-					const color = faker.helpers.arrayElement([
-						"purple",
-						"blue",
-						"green",
-						"yellow",
-						"red",
-					]) satisfies ToolLogoColor;
-					const icon = faker.helpers.arrayElement([
-						"wikis",
-						"tools",
-						"camera",
-						"code",
-						"email",
-						"cloud",
-						"terminal",
-						"game",
-						"chat",
-						"speaker",
-						"video",
-					]) satisfies ToolLogoIcon;
-					const baseUrl = faker.helpers.arrayElement([
-						"stabilityai/stable-diffusion-3-medium",
-						"multimodalart/cosxl",
-						"gokaygokay/SD3-Long-Captioner",
-						"xichenhku/MimicBrush",
-					]);
-
-					// keep empty for populate for now
-
-					const user: User = faker.helpers.arrayElement(users);
-					const createdById = user._id;
-					const createdByName = user.username ?? user.name;
-
-					return {
-						type: "community" as const,
-						_id,
-						createdById,
-						createdByName,
-						displayName,
-						name: displayName.toLowerCase().replace(" ", "_"),
-						endpoint: "/test",
-						description,
-						color,
-						icon,
-						baseUrl,
-						inputs: [],
-						outputPath: null,
-						outputType: "str" as const,
-						showOutput: false,
-						useCount: faker.number.int({ min: 0, max: 100000 }),
-						last24HoursUseCount: faker.number.int({ min: 0, max: 1000 }),
-						createdAt: faker.date.recent({ days: 30 }),
-						updatedAt: faker.date.recent({ days: 30 }),
-						searchTokens: generateSearchTokens(displayName),
-						review: faker.helpers.enumValue(ReviewStatus),
-						outputComponent: null,
-						outputComponentIdx: null,
-					};
-				},
-				{ count: faker.number.int({ min: 10, max: 200 }) }
-			)
-		);
-
-		await collections.tools.insertMany(tools satisfies CommunityToolDB[]);
 	}
 }
 
