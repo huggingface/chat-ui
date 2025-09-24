@@ -2,7 +2,7 @@
 
 ![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/Frame%2013.png)
 
-A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
+A chat interface using open source models, eg Qwen, GPT-OSS, or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
 0. [Quickstart](#quickstart)
 1. [Database Options](#database-options)
@@ -11,11 +11,11 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 4. [Extra parameters](#extra-parameters)
 5. [Building](#building)
 
-> Note on models: Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol—Hugging Face router, llama.cpp server, Ollama’s OpenAI bridge, OpenRouter, Anthropic-on-OpenRouter, etc.—will work.
+> Note on models: Chat UI v2 only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol—Hugging Face router, llama.cpp server, Ollama’s OpenAI bridge, OpenRouter, Anthropic-on-OpenRouter, etc.—will work.
 
 ## Quickstart
 
-Chat UI speaks to OpenAI-compatible APIs only. The fastest way to get running is with the Hugging Face Inference Providers router plus your personal Hugging Face access token.
+Chat UI speaks to OpenAI-compatible APIs only. The fastest way to get running is with the [Hugging Face Inference Providers router](https://huggingface.co/docs/inference-providers) plus your personal Hugging Face access token.
 
 **Step 1 – Create `.env.local`:**
 
