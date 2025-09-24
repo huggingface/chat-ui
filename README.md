@@ -2,7 +2,7 @@
 
 **Find the docs at [hf.co/docs/chat-ui](https://huggingface.co/docs/chat-ui/index).**
 
-![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chatui-websearch.png)
+![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/Frame%2013.png)
 
 A chat interface using open source models, eg OpenAssistant or Llama. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
 
@@ -10,14 +10,8 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 1. [Database Options](#database-options)
 2. [Launch](#launch)
 3. [Optional Docker Image](#optional-docker-image)
-4. [No Setup Deploy](#no-setup-deploy)
-5. [Extra parameters](#extra-parameters)
-6. [Common issues](#common-issues)
-7. [Deploying to a HF Space](#deploying-to-a-hf-space)
-8. [Building](#building)
-9. [Config changes for HuggingChat](#config-changes-for-huggingchat)
-10. [Populate database](#populate-database)
-11. [Building the docker images locally](#building-the-docker-images-locally)
+4. [Extra parameters](#extra-parameters)
+5. [Building](#building)
 
 > Note on models: Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol—Hugging Face router, llama.cpp server, Ollama’s OpenAI bridge, OpenRouter, Anthropic-on-OpenRouter, etc.—will work.
 
@@ -108,47 +102,7 @@ docker run \
 
 `host.docker.internal` lets the container reach a MongoDB instance on your host machine; swap it for your Atlas URI if you use the hosted option. All environment variables accepted in `.env.local` can be provided as `-e` flags.
 
-## No Setup Deploy
-
-If you don't want to configure, setup, and launch your own Chat UI yourself, you can use this option as a fast deploy alternative.
-
-You can deploy your own customized Chat UI instance with any supported [LLM](https://huggingface.co/models?pipeline_tag=text-generation&sort=trending) of your choice on [Hugging Face Spaces](https://huggingface.co/spaces). To do so, use the chat-ui template [available here](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
-
-Set `OPENAI_BASE_URL` (for example `https://router.huggingface.co/v1`) and `OPENAI_API_KEY` in [Space secrets](https://huggingface.co/docs/hub/spaces-overview#managing-secrets). `HF_TOKEN` remains supported as a legacy alias if you already have it configured. Create your personal token in your [User Access Tokens settings](https://huggingface.co/settings/tokens).
-
-Read the full tutorial [here](https://huggingface.co/docs/hub/spaces-sdks-docker-chatui#chatui-on-spaces).
-
 ## Extra parameters
-
-### OpenID connect
-
-The login feature is disabled by default and users are attributed a unique ID based on their browser. But if you want to use OpenID to authenticate your users, you can add the following to your `.env.local` file:
-
-```env
-OPENID_CONFIG=`{
-  PROVIDER_URL: "<your OIDC issuer>",
-  CLIENT_ID: "<your OIDC client ID>",
-  CLIENT_SECRET: "<your OIDC client secret>",
-  SCOPES: "openid profile",
-  TOLERANCE: // optional
-  RESOURCE: // optional
-}`
-```
-
-These variables will enable the openID sign-in modal for users.
-
-### Trusted header authentication
-
-You can set the env variable `TRUSTED_EMAIL_HEADER` to point to the header that contains the user's email address. This will allow you to authenticate users from the header. This setup is usually combined with a proxy that will be in front of chat-ui and will handle the auth and set the header.
-
-> [!WARNING]
-> Make sure to only allow requests to chat-ui through your proxy which handles authentication, otherwise users could authenticate as anyone by setting the header manually! Only set this up if you understand the implications and know how to do it correctly.
-
-Here is a list of header names for common auth providers:
-
-- Tailscale Serve: `Tailscale-User-Login`
-- Cloudflare Access: `Cf-Access-Authenticated-User-Email`
-- oauth2-proxy: `X-Forwarded-Email`
 
 ### Theming
 
