@@ -11,7 +11,11 @@ A chat interface using open source models, eg OpenAssistant or Llama. It is a Sv
 4. [Extra parameters](#extra-parameters)
 5. [Building](#building)
 
-> Note on models: Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol—Hugging Face router, llama.cpp server, Ollama’s OpenAI bridge, OpenRouter, Anthropic-on-OpenRouter, etc.—will work.
+> [!NOTE]
+> Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc. will work by default).
+
+> [!NOTE]
+> The old version is still available on the [legacy branch](https://github.com/huggingface/chat-ui/tree/legacy)
 
 ## Quickstart
 
