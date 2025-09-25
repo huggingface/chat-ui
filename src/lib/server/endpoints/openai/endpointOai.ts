@@ -217,11 +217,11 @@ async function prepareMessages(
 	return Promise.all(
 		messages.map(async (message) => {
 			if (message.from === "user" && isMultimodal) {
-				const parts = [
-					{ type: "text" as const, text: message.content },
-					...(await prepareFiles(imageProcessor, message.files ?? [])),
-				];
-				return { role: message.from, content: parts };
+				const imageParts = await prepareFiles(imageProcessor, message.files ?? []);
+				if (imageParts.length) {
+					const parts = [{ type: "text" as const, text: message.content }, ...imageParts];
+					return { role: message.from, content: parts };
+				}
 			}
 			return { role: message.from, content: message.content };
 		})
