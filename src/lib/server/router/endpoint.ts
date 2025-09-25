@@ -102,23 +102,28 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 		if (routerMultimodalEnabled && hasImageInput) {
 			const multimodalCandidate = await findFirstMultimodalCandidateId();
-			if (multimodalCandidate) {
-				try {
-					logger.info(
-						{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate },
-						"[router] multimodal input detected; bypassing Arch selection"
-					);
-					const ep = await createCandidateEndpoint(multimodalCandidate);
-					const gen = await ep({ ...params });
-					return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
-				} catch (e) {
-					logger.warn(
-						{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate, err: String(e) },
-						"[router] multimodal fallback failed"
-					);
-				}
-			} else {
-				logger.warn("[router] multimodal input detected but no multimodal model available");
+			if (!multimodalCandidate) {
+				throw new Error(
+					"No multimodal models are configured for the router. Remove the image or enable a multimodal model."
+				);
+			}
+
+			try {
+				logger.info(
+					{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate },
+					"[router] multimodal input detected; bypassing Arch selection"
+				);
+				const ep = await createCandidateEndpoint(multimodalCandidate);
+				const gen = await ep({ ...params });
+				return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
+			} catch (e) {
+				logger.error(
+					{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate, err: String(e) },
+					"[router] multimodal fallback failed"
+				);
+				throw new Error(
+					"Failed to call the configured multimodal model. Remove the image or try again later."
+				);
 			}
 		}
 
