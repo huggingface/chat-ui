@@ -288,6 +288,8 @@ const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
 const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
 const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
 const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
+const routerMultimodalEnabled =
+	(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
 
 let decorated = builtModels as any[];
 
@@ -308,6 +310,11 @@ if (archBase) {
 		// Keep the alias visible
 		unlisted: false,
 	} as any;
+
+	if (routerMultimodalEnabled) {
+		aliasRaw.multimodal = true;
+		aliasRaw.multimodalAcceptedMimetypes = ["image/*"];
+	}
 
 	const aliasBase = await processModel(aliasRaw);
 	// Create a self-referential ProcessedModel for the router endpoint
