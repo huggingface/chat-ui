@@ -587,8 +587,8 @@
 				{#if !messages.length}
 					<span>Generated content may be inaccurate or false.</span>
 				{/if}
+			</div>
 		</div>
-	</div>
 	</div>
 </div>
 
