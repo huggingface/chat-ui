@@ -1,4 +1,4 @@
-import { refreshSessionCookie } from "$lib/server/auth";
+import { getCoupledCookieHash, refreshSessionCookie } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
@@ -119,6 +119,9 @@ export async function updateUser(params: {
 
 	locals.sessionId = sessionId;
 
+	// Get cookie hash if coupling is enabled
+	const coupledCookieHash = await getCoupledCookieHash({ type: "svelte", value: cookies });
+
 	if (existingUser) {
 		// update existing user if any
 		await collections.users.updateOne(
@@ -137,6 +140,7 @@ export async function updateUser(params: {
 			userAgent,
 			ip,
 			expiresAt: addWeeks(new Date(), 2),
+			...(coupledCookieHash ? { coupledCookieHash } : {}),
 		});
 	} else {
 		// user doesn't exist yet, create a new one
@@ -164,6 +168,7 @@ export async function updateUser(params: {
 			userAgent,
 			ip,
 			expiresAt: addWeeks(new Date(), 2),
+			...(coupledCookieHash ? { coupledCookieHash } : {}),
 		});
 
 		// move pre-existing settings to new user
