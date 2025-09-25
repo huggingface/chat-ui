@@ -1,43 +1,28 @@
 <script lang="ts">
-	import logo from "../../../../../static/huggingchat/logo.svg?raw";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	const publicConfig = usePublicConfig();
+	import logo from "../../../../../static/huggingchat/fulltext-logo.svg?raw";
 
 	interface Props {
 		name: string;
-		logoUrl: string | undefined;
+		isHuggingChat?: boolean;
+		backgroundImage?: string;
 	}
 
-	let { name, logoUrl }: Props = $props();
+	let { name, isHuggingChat = false }: Props = $props();
 </script>
 
-<div class=" flex h-[648px] w-full flex-col items-center bg-white">
-	<div class="flex flex-1 flex-col items-center justify-center">
-		{#if logoUrl}
-			<img class="h-48 w-48" src={logoUrl} alt="avatar" />
-		{/if}
-		<h1 class="m-0 text-5xl font-bold text-black">
-			{name}
-		</h1>
-	</div>
+<div
+	class=" flex h-[648px] w-full flex-col items-center justify-center bg-black text-white"
+	style="background-image: url(https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/L4XVRJ7MsfFDD7ROx_geO.png);"
+>
+	<h1 class="mb-8 text-7xl font-bold text-white">
+		{name.split("/")[1]}
+	</h1>
 
-	<div
-		class="flex h-[200px] w-full flex-col items-center justify-center rounded-b-none bg-{publicConfig.PUBLIC_APP_COLOR}-500/10 pb-10 pt-10 text-4xl text-gray-500"
-		style="border-radius: 100% 100% 0 0;"
-	>
-		Try it now
-		{#if publicConfig.isHuggingChat}
-			on
-		{/if}
-
-		{#if publicConfig.isHuggingChat}
-			<div class="flex flex-row pt-3 text-5xl font-bold text-black">
-				<div class="mr-5 flex items-center justify-center" id="logo">
-					<!-- eslint-disable-next-line -->
-					{@html logo}
-				</div>
-				<span>HuggingChat</span>
-			</div>
-		{/if}
-	</div>
+	{#if isHuggingChat}
+		<div class="flex items-center text-5xl text-white">
+			<div class="mr-4 text-4xl">Chat with it on</div>
+			<!-- eslint-disable-next-line -->
+			{@html logo}
+		</div>
+	{/if}
 </div>
