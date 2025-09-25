@@ -10,6 +10,7 @@ import InterBold from "$lib/server/fonts/Inter-Bold.ttf";
 import { base } from "$app/paths";
 import { models } from "$lib/server/models";
 import { render } from "svelte/server";
+import { config } from "$lib/server/config";
 
 export const GET: RequestHandler = (async ({ params }) => {
 	const model = models.find(({ id }) => id === params.model);
@@ -20,7 +21,7 @@ export const GET: RequestHandler = (async ({ params }) => {
 	const renderedComponent = render(ModelThumbnail, {
 		props: {
 			name: model.name,
-			logoUrl: model.logoUrl,
+			isHuggingChat: config.isHuggingChat,
 		},
 	});
 
