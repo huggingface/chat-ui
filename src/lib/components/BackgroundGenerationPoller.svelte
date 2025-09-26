@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from "$app/environment";
+	import { browser, dev } from "$app/environment";
 	import { invalidate } from "$app/navigation";
 
 	import {
@@ -16,6 +16,9 @@
 
 	const client = useAPIClient();
 	const pollers = new Map<string, () => void>();
+	const inflight = new Set<string>();
+	const assistantSnapshots = new Map<string, string>();
+	const failureCounts = new Map<string, number>();
 
 	$effect.root(() => {
 		if (!browser) {
@@ -25,16 +28,23 @@
 
 		let destroyed = false;
 
-		const stopPoller = (id: string) => {
-			const stop = pollers.get(id);
-			if (!stop) return;
+			const stopPoller = (id: string) => {
+				const stop = pollers.get(id);
+				if (!stop) return;
 
-			stop();
-			pollers.delete(id);
-		};
+				stop();
+				pollers.delete(id);
+				inflight.delete(id);
+				assistantSnapshots.delete(id);
+				failureCounts.delete(id);
+			};
 
 		const pollOnce = async (id: string) => {
-			if (destroyed) return;
+			if (destroyed || inflight.has(id)) return;
+			inflight.add(id);
+			if (dev) {
+				console.log("background generation poll", id);
+			}
 
 			try {
 				const response = await client.conversations({ id }).get();
@@ -54,19 +64,55 @@
 						)
 					?? false;
 
+				const snapshot = lastAssistant
+					? JSON.stringify({
+						id: lastAssistant.id,
+						updatedAt: lastAssistant.updatedAt,
+						contentLength: lastAssistant.content?.length ?? 0,
+						updatesLength: lastAssistant.updates?.length ?? 0,
+					})
+					: "__none__";
+				const previousSnapshot = assistantSnapshots.get(id);
+				let shouldInvalidateConversation = false;
+
 				if (lastAssistant) {
-					await invalidate(UrlDependency.Conversation);
+					assistantSnapshots.set(id, snapshot);
+					if (snapshot !== previousSnapshot) {
+						shouldInvalidateConversation = true;
+					}
+				} else if (assistantSnapshots.has(id)) {
+					assistantSnapshots.delete(id);
+					shouldInvalidateConversation = true;
 				}
 
 				if (lastAssistant && (hasFinalAnswer || hasError)) {
 					removeBackgroundGeneration(id);
+					assistantSnapshots.delete(id);
+					failureCounts.delete(id);
+					shouldInvalidateConversation = true;
 					await invalidate(UrlDependency.ConversationList);
 				}
+
+				if (shouldInvalidateConversation) {
+					await invalidate(UrlDependency.Conversation);
+				}
+
+				failureCounts.delete(id);
 			} catch (err) {
 				console.error("Background generation poll failed", err);
-				removeBackgroundGeneration(id);
+				const failures = (failureCounts.get(id) ?? 0) + 1;
+				failureCounts.set(id, failures);
+				if (failures >= 3) {
+					removeBackgroundGeneration(id);
+					assistantSnapshots.delete(id);
+					failureCounts.delete(id);
+					await invalidate(UrlDependency.ConversationList);
+				}
 			}
-		};
+			finally {
+				inflight.delete(id);
+			}
+			};
 
 		const startPoller = (entry: BackgroundGeneration) => {
 			if (pollers.has(entry.id)) return;
@@ -97,10 +143,13 @@
 			}
 		});
 
-		return () => {
+			return () => {
 			destroyed = true;
 			for (const stop of pollers.values()) stop();
 			pollers.clear();
+			inflight.clear();
+			assistantSnapshots.clear();
+			failureCounts.clear();
 		};
 	});
 </script>

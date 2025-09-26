@@ -469,7 +469,7 @@
 			loading = false;
 		}
 
-		if (!streaming) {
+		if (!streaming && browser) {
 			removeBackgroundGeneration(page.params.id);
 		}
 	});
