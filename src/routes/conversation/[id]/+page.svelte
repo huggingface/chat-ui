@@ -22,9 +22,11 @@
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
-	import { backgroundGenerations } from "$lib/stores/backgroundGenerations";
-	import { get } from "svelte/store";
-
+	import {
+		addBackgroundGeneration,
+		hasBackgroundGeneration,
+		removeBackgroundGeneration,
+	} from "$lib/stores/backgroundGenerations";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
@@ -468,7 +470,7 @@
 		}
 
 		if (!streaming) {
-			backgroundGenerations.remove(page.params.id);
+			removeBackgroundGeneration(page.params.id);
 		}
 	});
 
@@ -489,7 +491,7 @@
 			navigation.to?.params?.id !== page.params.id;
 
 		if (loading && navigatingAway) {
-			backgroundGenerations.add({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 		}
 
 		$isAborted = true;
@@ -497,11 +499,10 @@
 	});
 
 	onMount(() => {
-		const entries = get(backgroundGenerations);
-		const hasBackgroundEntry = entries.some((entry) => entry.id === page.params.id);
+		const hasBackgroundEntry = hasBackgroundGeneration(page.params.id);
 		const streaming = isConversationStreaming(messages);
 		if (hasBackgroundEntry && streaming) {
-			backgroundGenerations.add({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 			loading = true;
 		}
 	});

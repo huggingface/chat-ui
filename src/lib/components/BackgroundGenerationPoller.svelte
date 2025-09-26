@@ -1,9 +1,12 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
 	import { browser } from "$app/environment";
 	import { invalidate } from "$app/navigation";
 
-	import { backgroundGenerations, type BackgroundGeneration } from "$lib/stores/backgroundGenerations";
+	import {
+		type BackgroundGeneration,
+		backgroundGenerationEntries,
+		removeBackgroundGeneration,
+	} from "$lib/stores/backgroundGenerations";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
@@ -11,23 +14,28 @@
 
 	const POLL_INTERVAL_MS = 1000;
 
-	onMount(() => {
-		if (!browser) return;
+	const client = useAPIClient();
+	const pollers = new Map<string, () => void>();
 
-		const client = useAPIClient();
-		const pollers = new Map<string, () => void>();
+	$effect.root(() => {
+		if (!browser) {
+			pollers.clear();
+			return;
+		}
+
 		let destroyed = false;
 
 		const stopPoller = (id: string) => {
 			const stop = pollers.get(id);
-			if (stop) {
-				stop();
-				pollers.delete(id);
-			}
+			if (!stop) return;
+
+			stop();
+			pollers.delete(id);
 		};
 
 		const pollOnce = async (id: string) => {
 			if (destroyed) return;
+
 			try {
 				const response = await client.conversations({ id }).get();
 				const conversation = handleResponse(response);
@@ -36,28 +44,27 @@
 					.reverse()
 					.find((message: Message) => message.from === "assistant");
 
-				const hasFinalAnswer = Boolean(
-					lastAssistant?.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer)
-				);
-				const hasError = Boolean(
+				const hasFinalAnswer =
+					lastAssistant?.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ?? false;
+				const hasError =
 					lastAssistant?.updates?.some(
 						(update) =>
 							update.type === MessageUpdateType.Status &&
 							update.status === MessageUpdateStatus.Error
 						)
-				);
+					?? false;
 
 				if (lastAssistant) {
 					await invalidate(UrlDependency.Conversation);
 				}
 
 				if (lastAssistant && (hasFinalAnswer || hasError)) {
-					backgroundGenerations.remove(id);
+					removeBackgroundGeneration(id);
 					await invalidate(UrlDependency.ConversationList);
 				}
 			} catch (err) {
 				console.error("Background generation poll failed", err);
-				backgroundGenerations.remove(id);
+				removeBackgroundGeneration(id);
 			}
 		};
 
@@ -72,7 +79,9 @@
 			void pollOnce(entry.id);
 		};
 
-		const unsubscribe = backgroundGenerations.subscribe((entries) => {
+		$effect(() => {
+			const entries = backgroundGenerationEntries;
+
 			if (destroyed) return;
 
 			const activeIds = new Set(entries.map((entry) => entry.id));
@@ -88,11 +97,10 @@
 			}
 		});
 
-		onDestroy(() => {
+		return () => {
 			destroyed = true;
-			unsubscribe();
 			for (const stop of pollers.values()) stop();
 			pollers.clear();
-		});
+		};
 	});
 </script>
