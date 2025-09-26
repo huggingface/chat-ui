@@ -320,8 +320,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	);
 
 	let doneStreaming = false;
+	let clientDetached = false;
 
 	let lastTokenTimestamp: undefined | Date = undefined;
+
+	const persistConversation = async () => {
+		await collections.conversations.updateOne(
+			{ _id: convId },
+			{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
+		);
+	};
 
 	// we now build the stream
 	const stream = new ReadableStream({
@@ -396,33 +404,45 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						event.subtype === MessageReasoningUpdateType.Stream
 					)
 				) {
-					messageToWriteTo?.updates?.push(event);
+						messageToWriteTo?.updates?.push(event);
+					}
+
+					// Avoid remote keylogging attack executed by watching packet lengths
+					// by padding the text with null chars to a fixed length
+					// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
+					if (event.type === MessageUpdateType.Stream) {
+						event = { ...event, token: event.token.padEnd(16, "\0") };
+					}
+
+					messageToWriteTo.updatedAt = new Date();
+
+					const enqueueUpdate = async () => {
+						if (clientDetached) return;
+						try {
+							controller.enqueue(JSON.stringify(event) + "\n");
+							if (event.type === MessageUpdateType.FinalAnswer) {
+								controller.enqueue(" ".repeat(4096));
+							}
+						} catch (err) {
+							clientDetached = true;
+							logger.info(
+								{ conversationId: convId.toString() },
+								"Client detached during message streaming"
+							);
+						}
+					};
+
+					await enqueueUpdate();
+
+					if (clientDetached) {
+						await persistConversation();
+					}
 				}
 
-				// Avoid remote keylogging attack executed by watching packet lengths
-				// by padding the text with null chars to a fixed length
-				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
-				if (event.type === MessageUpdateType.Stream) {
-					event = { ...event, token: event.token.padEnd(16, "\0") };
-				}
+				await persistConversation();
 
-				// Send the update to the client
-				controller.enqueue(JSON.stringify(event) + "\n");
-
-				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
-				if (event.type === MessageUpdateType.FinalAnswer) {
-					controller.enqueue(" ".repeat(4096));
-				}
-			}
-
-			await collections.conversations.updateOne(
-				{ _id: convId },
-				{ $set: { title: conv.title, updatedAt: new Date() } }
-			);
-			messageToWriteTo.updatedAt = new Date();
-
-			let hasError = false;
-			const initialMessageContent = messageToWriteTo.content;
+				let hasError = false;
+				const initialMessageContent = messageToWriteTo.content;
 
 			try {
 				const ctx: TextGenerationContext = {
@@ -463,22 +483,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			}
 
-			await collections.conversations.updateOne(
-				{ _id: convId },
-				{ $set: { messages: conv.messages, title: conv?.title, updatedAt: new Date() } }
-			);
+			await persistConversation();
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;
-
-			controller.close();
+			if (!clientDetached) {
+				controller.close();
+			}
 		},
 		async cancel() {
 			if (doneStreaming) return;
-			await collections.conversations.updateOne(
-				{ _id: convId },
-				{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
-			);
+			clientDetached = true;
+			await persistConversation();
 		},
 	});
 

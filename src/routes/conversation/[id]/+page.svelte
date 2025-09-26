@@ -22,6 +22,7 @@
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
+	import { backgroundGenerations } from "$lib/stores/backgroundGenerations";
 
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
@@ -453,11 +454,22 @@
 		}
 	});
 
-	beforeNavigate(() => {
-		if (page.params.id) {
-			$isAborted = true;
-			loading = false;
+	beforeNavigate((navigation) => {
+		if (!page.params.id) return;
+
+		const navigatingAway = navigation.to?.route.id !== page.route.id ||
+			navigation.to?.params?.id !== page.params.id;
+
+		if (loading && navigatingAway) {
+			backgroundGenerations.add({ id: page.params.id, startedAt: Date.now() });
 		}
+
+		$isAborted = true;
+		loading = false;
+	});
+
+	onMount(() => {
+		backgroundGenerations.remove(page.params.id);
 	});
 
 	let title = $derived(
