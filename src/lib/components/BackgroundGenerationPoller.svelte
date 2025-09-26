@@ -6,10 +6,10 @@
 	import { backgroundGenerations, type BackgroundGeneration } from "$lib/stores/backgroundGenerations";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { UrlDependency } from "$lib/types/UrlDependency";
-	import { MessageUpdateType } from "$lib/types/MessageUpdate";
+	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { Message } from "$lib/types/Message";
 
-	const POLL_INTERVAL_MS = 2500;
+	const POLL_INTERVAL_MS = 1000;
 
 	onMount(() => {
 		if (!browser) return;
@@ -39,14 +39,21 @@
 				const hasFinalAnswer = Boolean(
 					lastAssistant?.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer)
 				);
-				const hasContent = Boolean(lastAssistant?.content?.trim().length);
+				const hasError = Boolean(
+					lastAssistant?.updates?.some(
+						(update) =>
+							update.type === MessageUpdateType.Status &&
+							update.status === MessageUpdateStatus.Error
+						)
+				);
 
-				if (lastAssistant && (hasFinalAnswer || hasContent)) {
+				if (lastAssistant) {
+					await invalidate(UrlDependency.Conversation);
+				}
+
+				if (lastAssistant && (hasFinalAnswer || hasError)) {
 					backgroundGenerations.remove(id);
-					await Promise.all([
-						invalidate(UrlDependency.Conversation),
-						invalidate(UrlDependency.ConversationList),
-					]);
+					await invalidate(UrlDependency.ConversationList);
 				}
 			} catch (err) {
 				console.error("Background generation poll failed", err);
