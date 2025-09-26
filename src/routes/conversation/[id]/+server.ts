@@ -439,7 +439,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 
-				await persistConversation();
 
 				let hasError = false;
 				const initialMessageContent = messageToWriteTo.content;
