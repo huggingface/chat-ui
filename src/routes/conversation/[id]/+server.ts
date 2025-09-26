@@ -404,44 +404,43 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						event.subtype === MessageReasoningUpdateType.Stream
 					)
 				) {
-						messageToWriteTo?.updates?.push(event);
-					}
-
-					// Avoid remote keylogging attack executed by watching packet lengths
-					// by padding the text with null chars to a fixed length
-					// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
-					if (event.type === MessageUpdateType.Stream) {
-						event = { ...event, token: event.token.padEnd(16, "\0") };
-					}
-
-					messageToWriteTo.updatedAt = new Date();
-
-					const enqueueUpdate = async () => {
-						if (clientDetached) return;
-						try {
-							controller.enqueue(JSON.stringify(event) + "\n");
-							if (event.type === MessageUpdateType.FinalAnswer) {
-								controller.enqueue(" ".repeat(4096));
-							}
-						} catch (err) {
-							clientDetached = true;
-							logger.info(
-								{ conversationId: convId.toString() },
-								"Client detached during message streaming"
-							);
-						}
-					};
-
-					await enqueueUpdate();
-
-					if (clientDetached) {
-						await persistConversation();
-					}
+					messageToWriteTo?.updates?.push(event);
 				}
 
+				// Avoid remote keylogging attack executed by watching packet lengths
+				// by padding the text with null chars to a fixed length
+				// https://cdn.arstechnica.net/wp-content/uploads/2024/03/LLM-Side-Channel.pdf
+				if (event.type === MessageUpdateType.Stream) {
+					event = { ...event, token: event.token.padEnd(16, "\0") };
+				}
 
-				let hasError = false;
-				const initialMessageContent = messageToWriteTo.content;
+				messageToWriteTo.updatedAt = new Date();
+
+				const enqueueUpdate = async () => {
+					if (clientDetached) return;
+					try {
+						controller.enqueue(JSON.stringify(event) + "\n");
+						if (event.type === MessageUpdateType.FinalAnswer) {
+							controller.enqueue(" ".repeat(4096));
+						}
+					} catch (err) {
+						clientDetached = true;
+						logger.info(
+							{ conversationId: convId.toString() },
+							"Client detached during message streaming"
+						);
+					}
+				};
+
+				await enqueueUpdate();
+
+				if (clientDetached) {
+					await persistConversation();
+				}
+			}
+
+			let hasError = false;
+			const initialMessageContent = messageToWriteTo.content;
 
 			try {
 				const ctx: TextGenerationContext = {

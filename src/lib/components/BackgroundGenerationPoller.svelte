@@ -28,16 +28,16 @@
 
 		let destroyed = false;
 
-			const stopPoller = (id: string) => {
-				const stop = pollers.get(id);
-				if (!stop) return;
+		const stopPoller = (id: string) => {
+			const stop = pollers.get(id);
+			if (!stop) return;
 
-				stop();
-				pollers.delete(id);
-				inflight.delete(id);
-				assistantSnapshots.delete(id);
-				failureCounts.delete(id);
-			};
+			stop();
+			pollers.delete(id);
+			inflight.delete(id);
+			assistantSnapshots.delete(id);
+			failureCounts.delete(id);
+		};
 
 		const pollOnce = async (id: string) => {
 			if (destroyed || inflight.has(id)) return;
@@ -55,22 +55,22 @@
 					.find((message: Message) => message.from === "assistant");
 
 				const hasFinalAnswer =
-					lastAssistant?.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ?? false;
+					lastAssistant?.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
+					false;
 				const hasError =
 					lastAssistant?.updates?.some(
 						(update) =>
 							update.type === MessageUpdateType.Status &&
 							update.status === MessageUpdateStatus.Error
-						)
-					?? false;
+					) ?? false;
 
 				const snapshot = lastAssistant
 					? JSON.stringify({
-						id: lastAssistant.id,
-						updatedAt: lastAssistant.updatedAt,
-						contentLength: lastAssistant.content?.length ?? 0,
-						updatesLength: lastAssistant.updates?.length ?? 0,
-					})
+							id: lastAssistant.id,
+							updatedAt: lastAssistant.updatedAt,
+							contentLength: lastAssistant.content?.length ?? 0,
+							updatesLength: lastAssistant.updates?.length ?? 0,
+						})
 					: "__none__";
 				const previousSnapshot = assistantSnapshots.get(id);
 				let shouldInvalidateConversation = false;
@@ -108,11 +108,10 @@
 					failureCounts.delete(id);
 					await invalidate(UrlDependency.ConversationList);
 				}
-			}
-			finally {
+			} finally {
 				inflight.delete(id);
 			}
-			};
+		};
 
 		const startPoller = (entry: BackgroundGeneration) => {
 			if (pollers.has(entry.id)) return;
@@ -143,7 +142,7 @@
 			}
 		});
 
-			return () => {
+		return () => {
 			destroyed = true;
 			for (const stop of pollers.values()) stop();
 			pollers.clear();

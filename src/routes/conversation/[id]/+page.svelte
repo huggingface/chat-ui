@@ -451,13 +451,13 @@
 		const lastAssistant = [...msgs].reverse().find((msg) => msg.from === "assistant");
 		if (!lastAssistant) return false;
 		const hasFinalAnswer =
-			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ?? false;
+			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
+			false;
 		const hasError =
 			lastAssistant.updates?.some(
 				(update) =>
 					update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
-				)
-			?? false;
+			) ?? false;
 		return !hasFinalAnswer && !hasError;
 	}
 
@@ -487,8 +487,8 @@
 	beforeNavigate((navigation) => {
 		if (!page.params.id) return;
 
-		const navigatingAway = navigation.to?.route.id !== page.route.id ||
-			navigation.to?.params?.id !== page.params.id;
+		const navigatingAway =
+			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
 
 		if (loading && navigatingAway) {
 			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
@@ -516,17 +516,17 @@
 	<title>{title}</title>
 </svelte:head>
 
-	<ChatWindow
-		{loading}
-		{pending}
-		messages={messagesPath as Message[]}
-		{messagesAlternatives}
-		shared={data.shared}
-		preprompt={data.preprompt}
-		bind:files
-		onmessage={onMessage}
-		onretry={onRetry}
-		oncontinue={onContinue}
+<ChatWindow
+	{loading}
+	{pending}
+	messages={messagesPath as Message[]}
+	{messagesAlternatives}
+	shared={data.shared}
+	preprompt={data.preprompt}
+	bind:files
+	onmessage={onMessage}
+	onretry={onRetry}
+	oncontinue={onContinue}
 	onshowAlternateMsg={onShowAlternateMsg}
 	onstop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
