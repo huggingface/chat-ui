@@ -387,15 +387,9 @@
 			{/if}
 		</div>
 
-		<ScrollToPreviousBtn
-			class="fixed right-4 max-md:bottom-[calc(50%+26px)] md:bottom-48 lg:right-10"
-			scrollNode={chatContainer}
-		/>
+		<ScrollToPreviousBtn class="fixed bottom-48 right-4 lg:right-10" scrollNode={chatContainer} />
 
-		<ScrollToBottomBtn
-			class="fixed right-4 max-md:bottom-[calc(50%-26px)] md:bottom-36 lg:right-10"
-			scrollNode={chatContainer}
-		/>
+		<ScrollToBottomBtn class="fixed bottom-36 right-4 lg:right-10" scrollNode={chatContainer} />
 	</div>
 
 	<div
@@ -407,7 +401,7 @@
 	>
 		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples}
 			<div
-				class="mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;] dark:text-gray-500"
+				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
 				{#each routerExamples as ex}
 					<button
@@ -419,7 +413,7 @@
 		{/if}
 		{#if shouldShowRouterFollowUps}
 			<div
-				class="mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 [scrollbar-width:none;] dark:text-gray-500"
+				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
 				<!-- <span class=" text-gray-500 dark:text-gray-400">Follow ups</span> -->
 				{#each routerFollowUps as followUp}
