@@ -3,10 +3,15 @@ export type RouterFollowUp = {
 	prompt: string;
 };
 
+export type RouterExampleAttachment = {
+	src: string;
+};
+
 export type RouterExample = {
 	title: string;
 	prompt: string;
 	followUps?: RouterFollowUp[];
+	attachments?: RouterExampleAttachment[];
 };
 
 export const routerExamples: RouterExample[] = [
@@ -27,6 +32,15 @@ export const routerExamples: RouterExample[] = [
 			{
 				title: "CRT Screen",
 				prompt: "Add a CRT screen effect to the game",
+			},
+		],
+	},
+	{
+		title: "Weird painting",
+		prompt: "is this a real painting?",
+		attachments: [
+			{
+				src: "huggingchat/castle-example.jpg",
 			},
 		],
 	},

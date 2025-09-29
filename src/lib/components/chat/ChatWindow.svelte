@@ -286,8 +286,26 @@
 		handleSubmit();
 	}
 
-	function startExample(example: RouterExample) {
+	async function startExample(example: RouterExample) {
 		activeRouterExamplePrompt = example.prompt;
+
+		if (browser && example.attachments?.length) {
+			const loadedFiles: File[] = [];
+			for (const attachment of example.attachments) {
+				try {
+					const response = await fetch(`${base}/${attachment.src}`);
+					if (!response.ok) continue;
+
+					const blob = await response.blob();
+					const name = attachment.src.split("/").pop() ?? "attachment";
+					loadedFiles.push(new File([blob], name, { type: blob.type || "application/octet-stream" }));
+				} catch (err) {
+					console.error("Error loading attachment:", err);
+				}
+			}
+			files = loadedFiles;
+		}
+
 		triggerPrompt(example.prompt);
 	}
 
