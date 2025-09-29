@@ -60,11 +60,11 @@ const modelConfig = z.object({
 		.object({
 			temperature: z.number().min(0).max(2).optional(),
 			truncate: z.number().int().positive().optional(),
-			max_new_tokens: z.number().int().positive().optional(),
+			max_tokens: z.number().int().positive().optional(),
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),
-			repetition_penalty: z.number().min(-2).max(2).optional(),
+				frequency_penalty: z.number().min(-2).max(2).optional(),
 			presence_penalty: z.number().min(-2).max(2).optional(),
 		})
 		.passthrough()

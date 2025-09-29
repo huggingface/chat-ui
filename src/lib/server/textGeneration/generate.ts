@@ -111,7 +111,7 @@ If the user is just having a casual conversation that doesn't require explanatio
 
 Do not use prefixes such as Response: or Answer: when answering to the user.`,
 						generateSettings: {
-							max_new_tokens: 1024,
+							max_tokens: 1024,
 						},
 						modelId: model.id,
 					});

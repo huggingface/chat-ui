@@ -119,11 +119,11 @@ export async function endpointOai(
 				model: model.id ?? model.name,
 				prompt,
 				stream: true,
-				max_tokens: parameters?.max_new_tokens,
+				max_tokens: parameters?.max_tokens,
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
-				frequency_penalty: parameters?.repetition_penalty,
+					frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
 			};
 
@@ -168,12 +168,12 @@ export async function endpointOai(
 				stream: streamingSupported,
 				// Support two different ways of specifying token limits depending on the model
 				...(useCompletionTokens
-					? { max_completion_tokens: parameters?.max_new_tokens }
-					: { max_tokens: parameters?.max_new_tokens }),
+					? { max_completion_tokens: parameters?.max_tokens }
+					: { max_tokens: parameters?.max_tokens }),
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
-				frequency_penalty: parameters?.repetition_penalty,
+					frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
 			};
 
