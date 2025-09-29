@@ -38,7 +38,7 @@
 		>
 			{#if showPreview}
 				<button
-					class="btn h-7 gap-1 rounded-lg border border-gray-600 bg-gray-600/50 px-2 text-xs text-gray-300 shadow-sm backdrop-blur transition-all hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500"
+					class="btn h-7 gap-1 rounded-lg border px-2 text-xs shadow-sm backdrop-blur transition-none hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-600/50 dark:hover:border-gray-500"
 					disabled={loading}
 					onclick={() => {
 						if (!loading) {
@@ -58,13 +58,12 @@
 			{/if}
 			<CopyToClipBoardBtn
 				iconClassNames="size-3"
-				classNames="btn rounded-lg border size-7 text-sm shadow-sm transition-all bg-gray-600/50 backdrop-blur dark:hover:border-gray-500  active:shadow-inner border-gray-600 dark:border-gray-700 hover:border-gray-500 dark:text-gray-400 text-gray-300 "
+				classNames="btn transition-none rounded-lg border size-7 text-sm shadow-sm dark:bg-gray-600/50 backdrop-blur dark:hover:border-gray-500  active:shadow-inner dark:border-gray-600  hover:border-gray-500"
 				value={rawCode}
 			/>
 		</div>
 	</div>
-	<pre
-		class="scrollbar-custom overflow-auto px-5 font-mono transition-[height] scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20"><code
+	<pre class="scrollbar-custom overflow-auto px-5 font-mono transition-[height]"><code
 			><!-- eslint-disable svelte/no-at-html-tags -->{@html DOMPurify.sanitize(code)}</code
 		></pre>
 

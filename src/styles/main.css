@@ -59,6 +59,10 @@
 	.prose strong {
 		@apply font-medium;
 	}
+
+	.prose pre {
+		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
+	}
 }
 
 .katex-display {
