@@ -198,8 +198,7 @@
 						<span class="text-gray-500">with</span>
 						{#if publicConfig.isHuggingChat}
 							<a
-								href="https://huggingface.co/{message.routerMetadata.model}"
-								target="_blank"
+								href="/chat/settings/{message.routerMetadata.model}"
 								class="rounded bg-gray-100 px-1.5 py-0.5 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300"
 							>
 								{message.routerMetadata.model.split("/").pop()}
