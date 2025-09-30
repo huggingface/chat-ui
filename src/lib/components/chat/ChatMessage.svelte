@@ -203,14 +203,14 @@
 					<div
 						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 sm:text-xs"
 					>
-						<span class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px">
+						<span class="truncate rounded bg-gray-100 px-1 font-mono dark:bg-gray-800 sm:py-px">
 							{message.routerMetadata.route}
 						</span>
 						<span class="text-gray-500">with</span>
 						{#if publicConfig.isHuggingChat}
 							<a
 								href="/chat/settings/{message.routerMetadata.model}"
-								class="truncate rounded bg-gray-100 px-1.5 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+								class="truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
 							>
 								{message.routerMetadata.model.split("/").pop()}
 							</a>

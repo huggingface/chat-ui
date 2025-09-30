@@ -507,9 +507,10 @@
 		}
 	});
 
-	let title = $derived(
-		conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title
-	);
+	let title = $derived.by(() => {
+		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
+		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
+	});
 </script>
 
 <svelte:head>
