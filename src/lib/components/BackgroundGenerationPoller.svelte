@@ -13,6 +13,7 @@
 	import type { Message } from "$lib/types/Message";
 
 	const POLL_INTERVAL_MS = 1000;
+	const MAX_POLL_DURATION_MS = 3 * 60_000;
 
 	const client = useAPIClient();
 	const pollers = new Map<string, () => void>();
@@ -28,7 +29,13 @@
 
 		let destroyed = false;
 
-		const stopPoller = (id: string) => {
+		const log = (...args: unknown[]) => {
+			if (dev) {
+				console.log("background generation", ...args);
+			}
+		};
+
+		const stopPoller = (id: string, reason?: string) => {
 			const stop = pollers.get(id);
 			if (!stop) return;
 
@@ -37,14 +44,24 @@
 			inflight.delete(id);
 			assistantSnapshots.delete(id);
 			failureCounts.delete(id);
+			log("stop", id, reason);
 		};
 
 		const pollOnce = async (id: string) => {
 			if (destroyed || inflight.has(id)) return;
-			inflight.add(id);
-			if (dev) {
-				console.log("background generation poll", id);
+
+			const entry = backgroundGenerationEntries.find((candidate) => candidate.id === id);
+			if (entry && Date.now() - entry.startedAt > MAX_POLL_DURATION_MS) {
+				removeBackgroundGeneration(id);
+				stopPoller(id, "timed out");
+				log("timeout", id);
+				await invalidate(UrlDependency.ConversationList);
+				await invalidate(UrlDependency.Conversation);
+				return;
 			}
+
+			inflight.add(id);
+			log("poll", id);
 
 			try {
 				const response = await client.conversations({ id }).get();
@@ -90,6 +107,7 @@
 					assistantSnapshots.delete(id);
 					failureCounts.delete(id);
 					shouldInvalidateConversation = true;
+					log("complete", id, hasFinalAnswer ? "final" : "error");
 					await invalidate(UrlDependency.ConversationList);
 				}
 
@@ -99,13 +117,14 @@
 
 				failureCounts.delete(id);
 			} catch (err) {
-				console.error("Background generation poll failed", err);
+				console.error("Background generation poll failed", id, err);
 				const failures = (failureCounts.get(id) ?? 0) + 1;
 				failureCounts.set(id, failures);
 				if (failures >= 3) {
 					removeBackgroundGeneration(id);
 					assistantSnapshots.delete(id);
 					failureCounts.delete(id);
+					log("failures", id, failures);
 					await invalidate(UrlDependency.ConversationList);
 				}
 			} finally {
@@ -122,6 +141,7 @@
 
 			pollers.set(entry.id, () => clearInterval(intervalId));
 			void pollOnce(entry.id);
+			log("start", entry.id);
 		};
 
 		$effect(() => {
