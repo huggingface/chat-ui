@@ -536,7 +536,7 @@
 				setTimeout(() => {
 					$isAborted = true;
 					loading = false;
-				}, 3000);
+				}, 500);
 			} else {
 				$isAborted = true;
 				loading = false;
