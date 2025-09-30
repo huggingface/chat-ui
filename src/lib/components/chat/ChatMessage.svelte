@@ -50,6 +50,8 @@
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
+	let messageWidth: number = $state(0);
+	let messageInfoWidth: number = $state(0);
 
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
@@ -115,7 +117,11 @@
 
 {#if message.from === "assistant"}
 	<div
-		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed"
+		bind:offsetWidth={messageWidth}
+		class="group relative -mb-4 flex w-fit max-w-full items-start justify-start gap-4 pb-4 leading-relaxed max-sm:mb-1 {message.routerMetadata &&
+		messageInfoWidth >= messageWidth
+			? 'mb-1'
+			: ''}"
 		data-message-id={message.id}
 		data-message-role="assistant"
 		role="presentation"
@@ -187,24 +193,29 @@
 		</div>
 
 		{#if message.routerMetadata || (!loading && message.content)}
-			<div class="absolute -bottom-3.5 right-1 flex items-center gap-0.5">
+			<div
+				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
+					? 'left-1 pl-1 lg:pl-7'
+					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5 overflow-hidden"
+				bind:offsetWidth={messageInfoWidth}
+			>
 				{#if message.routerMetadata && (!isLast || !loading)}
 					<div
-						class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 dark:text-gray-400"
+						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 sm:text-xs"
 					>
-						<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+						<span class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px">
 							{message.routerMetadata.route}
 						</span>
 						<span class="text-gray-500">with</span>
 						{#if publicConfig.isHuggingChat}
 							<a
 								href="/chat/settings/{message.routerMetadata.model}"
-								class="rounded bg-gray-100 px-1.5 py-0.5 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300"
+								class="truncate rounded bg-gray-100 px-1.5 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
 							>
 								{message.routerMetadata.model.split("/").pop()}
 							</a>
 						{:else}
-							<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono dark:bg-gray-800">
+							<span class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px">
 								{message.routerMetadata.model.split("/").pop()}
 							</span>
 						{/if}
