@@ -22,7 +22,11 @@
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
-
+	import {
+		addBackgroundGeneration,
+		hasBackgroundGeneration,
+		removeBackgroundGeneration,
+	} from "$lib/stores/backgroundGenerations";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
@@ -443,6 +447,33 @@
 		messages = data.messages;
 	});
 
+	function isConversationStreaming(msgs: Message[]): boolean {
+		const lastAssistant = [...msgs].reverse().find((msg) => msg.from === "assistant");
+		if (!lastAssistant) return false;
+		const hasFinalAnswer =
+			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
+			false;
+		const hasError =
+			lastAssistant.updates?.some(
+				(update) =>
+					update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
+			) ?? false;
+		return !hasFinalAnswer && !hasError;
+	}
+
+	$effect(() => {
+		const streaming = isConversationStreaming(messages);
+		if (streaming) {
+			loading = true;
+		} else if (!pending) {
+			loading = false;
+		}
+
+		if (!streaming && browser) {
+			removeBackgroundGeneration(page.params.id);
+		}
+	});
+
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
 	let messagesPath = $derived(createMessagesPath(messages));
 	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
@@ -453,10 +484,26 @@
 		}
 	});
 
-	beforeNavigate(() => {
-		if (page.params.id) {
-			$isAborted = true;
-			loading = false;
+	beforeNavigate((navigation) => {
+		if (!page.params.id) return;
+
+		const navigatingAway =
+			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
+
+		if (loading && navigatingAway) {
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+		}
+
+		$isAborted = true;
+		loading = false;
+	});
+
+	onMount(() => {
+		const hasBackgroundEntry = hasBackgroundGeneration(page.params.id);
+		const streaming = isConversationStreaming(messages);
+		if (hasBackgroundEntry && streaming) {
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			loading = true;
 		}
 	});
 
