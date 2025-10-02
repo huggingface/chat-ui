@@ -91,7 +91,9 @@
 	>
 	<div class="flex h-full items-center justify-center overflow-hidden">
 		{#if page.params?.id}
-			<span class="max-w-full truncate px-4" data-testid="chat-title">{title}</span>
+			<span class="max-w-full truncate px-4 first-letter:uppercase" data-testid="chat-title"
+				>{title}</span
+			>
 		{/if}
 	</div>
 	<div class="flex items-center">

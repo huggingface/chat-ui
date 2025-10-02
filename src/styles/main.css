@@ -49,6 +49,10 @@
 		border-bottom-width: 0;
 	}
 
+	.no-scrollbar {
+		@apply [-ms-overflow-style:none] [scrollbar-width:none] [&::-ms-scrollbar]:hidden [&::-webkit-scrollbar]:hidden;
+	}
+
 	/* .scrollbar-custom {
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	} */
@@ -58,6 +62,10 @@
 
 	.prose strong {
 		@apply font-medium;
+	}
+
+	.prose pre {
+		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
 	}
 }
 

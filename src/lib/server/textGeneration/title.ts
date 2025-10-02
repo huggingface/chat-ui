@@ -44,9 +44,9 @@ Do not answer the question.
 Do not include the word prompt into your response.
 Do not include quotes, emojis, hashtags or trailing punctuation.
 Return ONLY the title text.`,
-			generateSettings: {
-				max_new_tokens: 30,
-			},
+		generateSettings: {
+			max_tokens: 30,
+		},
 			modelId,
 		})
 	)
