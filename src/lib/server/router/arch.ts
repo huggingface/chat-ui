@@ -106,7 +106,7 @@ export async function archSelectRoute(
 		});
 		clearTimeout(to);
 		if (!resp.ok) throw new Error(`arch-router ${resp.status}`);
-		const data: any = await resp.json();
+		const data: { choices: { message: { content: string } }[] } = await resp.json();
 		const text = (data?.choices?.[0]?.message?.content ?? "").toString().trim();
 		const raw = parseRouteName(text);
 
@@ -114,7 +114,7 @@ export async function archSelectRoute(
 		const chosen = raw === "other" ? other : raw || "casual_conversation";
 		const exists = routes.some((r) => r.name === chosen);
 		return { routeName: exists ? chosen : "casual_conversation" };
-	} catch (e: any) {
+	} catch (e) {
 		clearTimeout(to);
 		logger.warn({ err: String(e), traceId }, "arch router selection failed");
 		return { routeName: "arch_router_failure" };

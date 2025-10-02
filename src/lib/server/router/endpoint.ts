@@ -1,4 +1,9 @@
-import type { Endpoint, EndpointParameters, EndpointMessage } from "../endpoints/endpoints";
+import type {
+	Endpoint,
+	EndpointParameters,
+	EndpointMessage,
+	TextGenerationStreamOutputSimplified,
+} from "../endpoints/endpoints";
 import endpoints from "../endpoints/endpoints";
 import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
@@ -17,6 +22,7 @@ function stripReasoningBlocks(text: string): string {
 
 function stripReasoningFromMessage(message: EndpointMessage): EndpointMessage {
 	const { reasoning: _reasoning, ...rest } = message;
+	void _reasoning;
 	const content =
 		typeof message.content === "string" ? stripReasoningBlocks(message.content) : message.content;
 	return {
@@ -47,7 +53,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			let modelForCall: ProcessedModel | undefined;
 			try {
 				const mod = await import("../models");
-				const all = (mod as any).models as ProcessedModel[];
+				const all = (mod as { models: ProcessedModel[] }).models;
 				modelForCall = all?.find((m) => m.id === candidateModelId || m.name === candidateModelId);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for candidate lookup");
@@ -75,7 +81,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 		// Yield router metadata for immediate UI display, using the actual candidate
 		async function* metadataThenStream(
-			gen: AsyncGenerator<any>,
+			gen: AsyncGenerator<TextGenerationStreamOutputSimplified>,
 			actualModel: string,
 			selectedRoute: string
 		) {
@@ -84,14 +90,14 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				generated_text: null,
 				details: null,
 				routerMetadata: { route: selectedRoute, model: actualModel },
-			} as any;
+			};
 			for await (const ev of gen) yield ev;
 		}
 
 		async function findFirstMultimodalCandidateId(): Promise<string | undefined> {
 			try {
 				const mod = await import("../models");
-				const all = (mod as any).models as ProcessedModel[];
+				const all = (mod as { models: ProcessedModel[] }).models;
 				const first = all?.find((m) => !m.isRouter && m.multimodal);
 				return first?.id ?? first?.name;
 			} catch (e) {
@@ -132,7 +138,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
 		const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
 
-		let lastErr: any = undefined;
+		let lastErr: unknown = undefined;
 		for (const candidate of candidates) {
 			try {
 				logger.info({ route: routeName, model: candidate }, "[router] trying candidate");

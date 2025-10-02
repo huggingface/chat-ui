@@ -26,7 +26,6 @@ Security and routing facts
 
 External providers are responsible for their own security and data handling. Please consult each provider’s respective security and privacy policies via the Inference Providers documentation linked above.
 
-
 ## Technical details
 
 [![chat-ui](https://img.shields.io/github/stars/huggingface/chat-ui)](https://github.com/huggingface/chat-ui)

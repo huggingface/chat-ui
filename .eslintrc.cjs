@@ -24,6 +24,7 @@ module.exports = {
 		extraFileExtensions: [".svelte"],
 	},
 	rules: {
+		"no-empty": "off",
 		"require-yield": "off",
 		"@typescript-eslint/no-explicit-any": "error",
 		"@typescript-eslint/no-non-null-assertion": "error",
