@@ -3,11 +3,22 @@
 {
 	"name": "Node.js & TypeScript",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
 
 	"customizations": {
 		"vscode": {
 			"extensions": ["esbenp.prettier-vscode", "dbaeumer.vscode-eslint", "svelte.svelte-vscode"]
+		}
+	},
+
+	"features": {
+		// Install docker in container
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			// Use proprietary docker engine. I get a timeout error when using the default moby engine and loading
+			// microsoft's PGP keys
+			"moby": false
 		}
 	}
 

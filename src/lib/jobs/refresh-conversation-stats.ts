@@ -33,6 +33,10 @@ async function computeStats(params: {
 	span: ConversationStats["date"]["span"];
 	type: ConversationStats["type"];
 }) {
+	if (!(await collections.conversations.estimatedDocumentCount())) {
+		return;
+	}
+
 	const lastComputed = await collections.conversationStats.findOne(
 		{ "date.field": params.dateField, "date.span": params.span, type: params.type },
 		{ sort: { "date.at": -1 } }
