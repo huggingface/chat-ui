@@ -22,12 +22,12 @@
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
-import ToolUpdate from "./ToolUpdate.svelte";
-import {
-	isMessageToolCallUpdate,
-	isMessageToolErrorUpdate,
-	isMessageToolResultUpdate,
-} from "$lib/utils/messageUpdates";
+	import ToolUpdate from "./ToolUpdate.svelte";
+	import {
+		isMessageToolCallUpdate,
+		isMessageToolErrorUpdate,
+		isMessageToolResultUpdate,
+	} from "$lib/utils/messageUpdates";
 
 	interface Props {
 		message: Message;
@@ -83,20 +83,21 @@ import {
 			[]) as MessageReasoningUpdate[]
 	);
 
-	let toolUpdateGroups = $derived(() => {
+	let toolUpdateGroups = $derived.by(() => {
 		const updates = message.updates?.filter((update) => update.type === MessageUpdateType.Tool) as
 			| MessageToolUpdate[]
 			| undefined;
 		if (!updates || updates.length === 0) return {} as Record<string, MessageToolUpdate[]>;
-		return updates.reduce((acc, update) => {
-			(acc[update.uuid] ??= []).push(update);
-			return acc;
-		}, {} as Record<string, MessageToolUpdate[]>);
+		return updates.reduce(
+			(acc, update) => {
+				(acc[update.uuid] ??= []).push(update);
+				return acc;
+			},
+			{} as Record<string, MessageToolUpdate[]>
+		);
 	});
 
-	let hasToolUpdates = $derived(
-		Object.values(toolUpdateGroups).some((group) => group.length > 0)
-	);
+	let hasToolUpdates = $derived(Object.values(toolUpdateGroups).some((group) => group.length > 0));
 
 	// const messageFinalAnswer = $derived(
 	// 	message.updates?.find(
@@ -176,7 +177,6 @@ import {
 					loading={loading && message.content.length === 0}
 				/>
 			{/if}
-
 			{#if hasToolUpdates}
 				{#each Object.values(toolUpdateGroups) as group}
 					{#if group.length}
