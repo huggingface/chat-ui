@@ -39,6 +39,7 @@ jobs:
           cache: "npm"
       - run: |
           npm ci
+          npx playwright install
       - name: "Tests"
         run: |
           npm run test
