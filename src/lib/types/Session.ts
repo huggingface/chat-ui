@@ -10,4 +10,5 @@ export interface Session extends Timestamps {
 	ip?: string;
 	expiresAt: Date;
 	admin?: boolean;
+	coupledCookieHash?: string;
 }

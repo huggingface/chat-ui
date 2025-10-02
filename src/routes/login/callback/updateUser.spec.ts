@@ -90,7 +90,7 @@ describe("login", () => {
 	it("should create default settings for new user", async () => {
 		await updateUser({ userData, locals, cookies: cookiesMock });
 
-		const user = await findUser(locals.sessionId);
+		const user = (await findUser(locals.sessionId)).user;
 
 		assert.exists(user);
 

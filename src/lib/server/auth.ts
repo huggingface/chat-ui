@@ -17,6 +17,7 @@ import { logger } from "$lib/server/logger";
 import { ObjectId } from "mongodb";
 import type { Cookie } from "elysia";
 import { adminTokenManager } from "./adminToken";
+import type { User } from "$lib/types/User";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -72,14 +73,27 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	});
 }
 
-export async function findUser(sessionId: string) {
+export async function findUser(
+	sessionId: string,
+	coupledCookieHash?: string
+): Promise<{
+	user: User | null;
+	invalidateSession: boolean;
+}> {
 	const session = await collections.sessions.findOne({ sessionId });
 
 	if (!session) {
-		return null;
+		return { user: null, invalidateSession: false };
 	}
 
-	return await collections.users.findOne({ _id: session.userId });
+	if (coupledCookieHash && session.coupledCookieHash !== coupledCookieHash) {
+		return { user: null, invalidateSession: true };
+	}
+
+	return {
+		user: await collections.users.findOne({ _id: session.userId }),
+		invalidateSession: false,
+	};
 }
 export const authCondition = (locals: App.Locals) => {
 	if (!locals.user && !locals.sessionId) {
@@ -191,6 +205,23 @@ type HeaderRecord =
 	| { type: "elysia"; value: Record<string, string | undefined> }
 	| { type: "svelte"; value: Headers };
 
+export async function getCoupledCookieHash(cookie: CookieRecord): Promise<string | undefined> {
+	if (!config.COUPLE_SESSION_WITH_COOKIE_NAME) {
+		return undefined;
+	}
+
+	const cookieValue =
+		cookie.type === "elysia"
+			? cookie.value[config.COUPLE_SESSION_WITH_COOKIE_NAME]?.value
+			: cookie.value.get(config.COUPLE_SESSION_WITH_COOKIE_NAME);
+
+	if (!cookieValue) {
+		return "no-cookie";
+	}
+
+	return await sha256(cookieValue);
+}
+
 export async function authenticateRequest(
 	headers: HeaderRecord,
 	cookie: CookieRecord,
@@ -238,12 +269,23 @@ export async function authenticateRequest(
 	if (token) {
 		secretSessionId = token;
 		sessionId = await sha256(token);
-		const user = await findUser(sessionId);
+
+		const result = await findUser(sessionId, await getCoupledCookieHash(cookie));
+
+		if (result.invalidateSession) {
+			secretSessionId = crypto.randomUUID();
+			sessionId = await sha256(secretSessionId);
+
+			if (await collections.sessions.findOne({ sessionId })) {
+				throw new Error("Session ID collision");
+			}
+		}
+
 		return {
-			user: user ?? undefined,
+			user: result.user ?? undefined,
 			sessionId,
 			secretSessionId,
-			isAdmin: user?.isAdmin || adminTokenManager.isAdmin(sessionId),
+			isAdmin: result.user?.isAdmin || adminTokenManager.isAdmin(sessionId),
 		};
 	}
 
