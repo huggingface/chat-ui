@@ -12,6 +12,7 @@ declare global {
 			sessionId: string;
 			user?: User & { logoutDisabled?: boolean };
 			isAdmin: boolean;
+			token?: string;
 		}
 
 		interface Error {

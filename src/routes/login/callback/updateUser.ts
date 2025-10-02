@@ -3,23 +3,24 @@ import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { z } from "zod";
-import type { UserinfoResponse } from "openid-client";
+import type { UserinfoResponse, TokenSet } from "openid-client";
 import { error, type Cookies } from "@sveltejs/kit";
 import crypto from "crypto";
 import { sha256 } from "$lib/utils/sha256";
-import { addWeeks } from "date-fns";
+import { addWeeks, subMinutes } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 
 export async function updateUser(params: {
 	userData: UserinfoResponse;
+	token: TokenSet;
 	locals: App.Locals;
 	cookies: Cookies;
 	userAgent?: string;
 	ip?: string;
 }) {
-	const { userData, locals, cookies, userAgent, ip } = params;
+	const { userData, token, locals, cookies, userAgent, ip } = params;
 
 	// Microsoft Entra v1 tokens do not provide preferred_username, instead the username is provided in the upn
 	// claim. See https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference
@@ -122,6 +123,21 @@ export async function updateUser(params: {
 	// Get cookie hash if coupling is enabled
 	const coupledCookieHash = await getCoupledCookieHash({ type: "svelte", value: cookies });
 
+	// Prepare OAuth token data for session storage
+	const oauthData = token.access_token
+		? {
+				token: {
+					value: token.access_token,
+					expiresAt: token.expires_at
+						? subMinutes(new Date(token.expires_at * 1000), 1)
+						: token.expires_in
+							? subMinutes(new Date(Date.now() + token.expires_in * 1000), 1)
+							: addWeeks(new Date(), 2),
+				},
+				...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
+			}
+		: undefined;
+
 	if (existingUser) {
 		// update existing user if any
 		await collections.users.updateOne(
@@ -141,6 +157,7 @@ export async function updateUser(params: {
 			ip,
 			expiresAt: addWeeks(new Date(), 2),
 			...(coupledCookieHash ? { coupledCookieHash } : {}),
+			...(oauthData ? { oauth: oauthData } : {}),
 		});
 	} else {
 		// user doesn't exist yet, create a new one
@@ -169,6 +186,7 @@ export async function updateUser(params: {
 			ip,
 			expiresAt: addWeeks(new Date(), 2),
 			...(coupledCookieHash ? { coupledCookieHash } : {}),
+			...(oauthData ? { oauth: oauthData } : {}),
 		});
 
 		// move pre-existing settings to new user

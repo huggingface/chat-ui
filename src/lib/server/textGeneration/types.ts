@@ -16,4 +16,5 @@ export interface TextGenerationContext {
 	username?: string;
 	/** Force-enable multimodal handling for endpoints that support it */
 	forceMultimodal?: boolean;
+	locals: App.Locals | undefined;
 }

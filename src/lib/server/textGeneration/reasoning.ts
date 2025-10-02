@@ -3,7 +3,8 @@ import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 
 export async function generateSummaryOfReasoning(
 	buffer: string,
-	modelId?: string
+	modelId: string | undefined,
+	locals: App.Locals | undefined
 ): Promise<string> {
 	let summary: string | undefined;
 
@@ -25,6 +26,7 @@ export async function generateSummaryOfReasoning(
 					max_tokens: 50,
 				},
 				modelId,
+				locals,
 			})
 		);
 	}

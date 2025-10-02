@@ -7,18 +7,20 @@ export async function* generateFromDefaultEndpoint({
 	preprompt,
 	generateSettings,
 	modelId,
+	locals,
 }: {
 	messages: EndpointMessage[];
 	preprompt?: string;
 	generateSettings?: Record<string, unknown>;
 	/** Optional: use this model instead of the default task model */
 	modelId?: string;
+	locals: App.Locals | undefined;
 }): AsyncGenerator<MessageUpdate, string, undefined> {
 	try {
 		// Choose endpoint based on provided modelId, else fall back to taskModel
 		const model = modelId ? (models.find((m) => m.id === modelId) ?? taskModel) : taskModel;
 		const endpoint = await model.getEndpoint();
-		const tokenStream = await endpoint({ messages, preprompt, generateSettings });
+		const tokenStream = await endpoint({ messages, preprompt, generateSettings, locals });
 
 		for await (const output of tokenStream) {
 			// if not generated_text is here it means the generation is not done

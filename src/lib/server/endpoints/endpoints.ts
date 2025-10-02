@@ -16,6 +16,7 @@ export interface EndpointParameters {
 	generateSettings?: Partial<Model["parameters"]>;
 	isMultimodal?: boolean;
 	conversationId?: ObjectId;
+	locals: App.Locals | undefined;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

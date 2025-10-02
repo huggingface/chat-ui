@@ -10,6 +10,7 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { archSelectRoute } from "./arch";
 import { getRoutes, resolveRouteModels } from "./policy";
+import { getApiToken } from "$lib/server/apiToken";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -72,7 +73,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			return endpoints.openai({
 				type: "openai",
 				baseURL: (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, ""),
-				apiKey: config.OPENAI_API_KEY || config.HF_TOKEN || "sk-",
+				apiKey: getApiToken(params.locals),
 				model: modelForCall,
 				// Ensure streaming path is used
 				streamingSupported: true,
@@ -133,7 +134,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			}
 		}
 
-		const { routeName } = await archSelectRoute(sanitizedMessages);
+		const { routeName } = await archSelectRoute(sanitizedMessages, undefined, params.locals);
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
 		const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);

@@ -128,6 +128,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	event.locals.user = auth.user || undefined;
 	event.locals.sessionId = auth.sessionId;
+	event.locals.token = auth.token;
 
 	event.locals.isAdmin =
 		event.locals.user?.isAdmin || adminTokenManager.isAdmin(event.locals.sessionId);

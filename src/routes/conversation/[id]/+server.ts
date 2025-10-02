@@ -459,6 +459,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							model.id
 						]
 					),
+					locals,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);

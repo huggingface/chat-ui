@@ -52,7 +52,7 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		throw error(403, "Invalid or expired CSRF token");
 	}
 
-	const { userData } = await getOIDCUserData(
+	const { userData, token } = await getOIDCUserData(
 		{ redirectURI: validatedToken.redirectUrl },
 		code,
 		iss
@@ -79,6 +79,7 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 
 	await updateUser({
 		userData,
+		token,
 		locals,
 		cookies,
 		userAgent: request.headers.get("user-agent") ?? undefined,
