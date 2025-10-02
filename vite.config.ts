@@ -2,6 +2,9 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import Icons from "unplugin-icons/vite";
 import { promises } from "fs";
 import { defineConfig } from "vitest/config";
+import { config } from "dotenv";
+
+config({ path: "./.env.local" });
 
 // used to load fonts server side for thumbnail generation
 function loadTTFAsArrayBuffer() {
@@ -26,6 +29,7 @@ export default defineConfig({
 	],
 	// Allow external access via ngrok tunnel host
 	server: {
+		port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
 		// Allow any ngrok-free.app subdomain (dynamic tunnels)
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
