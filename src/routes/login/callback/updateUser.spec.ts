@@ -6,6 +6,7 @@ import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 import { defaultModel } from "$lib/server/models";
 import { findUser } from "$lib/server/auth";
+import type { TokenSet } from "openid-client";
 
 const userData = {
 	preferred_username: "new-username",
@@ -20,6 +21,13 @@ const locals = {
 	sessionId: "1234567890",
 	isAdmin: false,
 };
+
+const token = {
+	access_token: "access_token",
+	refresh_token: "refresh_token",
+	expires_at: 1717334400,
+	expires_in: 3600,
+} as TokenSet;
 
 // @ts-expect-error SvelteKit cookies dumb mock
 const cookiesMock: Cookies = {
@@ -61,7 +69,7 @@ describe("login", () => {
 	it("should update user if existing", async () => {
 		await insertRandomUser();
 
-		await updateUser({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
 		const existingUser = await collections.users.findOne({ hfUserId: userData.sub });
 
@@ -75,7 +83,7 @@ describe("login", () => {
 
 		await insertRandomConversations(2);
 
-		await updateUser({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
 		const conversationCount = await collections.conversations.countDocuments({
 			userId: insertedId,
@@ -88,7 +96,7 @@ describe("login", () => {
 	});
 
 	it("should create default settings for new user", async () => {
-		await updateUser({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
 		const user = (await findUser(locals.sessionId)).user;
 
@@ -115,7 +123,7 @@ describe("login", () => {
 			shareConversationsWithModelAuthors: false,
 		});
 
-		await updateUser({ userData, locals, cookies: cookiesMock });
+		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
 		const settings = await collections.settings.findOne({
 			_id: insertedId,

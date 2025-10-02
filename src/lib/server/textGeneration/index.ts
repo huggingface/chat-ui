@@ -23,7 +23,7 @@ async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, unde
 export async function* textGeneration(ctx: TextGenerationContext) {
 	const done = new AbortController();
 
-	const titleGen = generateTitleForConversation(ctx.conv);
+	const titleGen = generateTitleForConversation(ctx.conv, ctx.locals);
 	const textGen = textGenerationWithoutTitle(ctx, done);
 	const keepAliveGen = keepAlive(done.signal);
 

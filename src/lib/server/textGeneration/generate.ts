@@ -116,6 +116,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 							max_tokens: 1024,
 						},
 						modelId: model.id,
+						locals,
 					});
 					finalAnswer = summary;
 					yield {
@@ -226,7 +227,7 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 			) {
 				lastReasoningUpdate = new Date();
 				try {
-					generateSummaryOfReasoning(reasoningBuffer, model.id).then((summary) => {
+					generateSummaryOfReasoning(reasoningBuffer, model.id, locals).then((summary) => {
 						status = summary;
 					});
 				} catch (e) {
