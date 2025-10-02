@@ -19,16 +19,9 @@ WORKDIR /app
 # add a .env.local if the user doesn't bind a volume to it
 RUN touch /app/.env.local
 
-
-
 USER root
-
-RUN mkdir -p /data/models
-RUN chown -R 1000:1000 /data/models
-
 RUN apt-get update
-RUN apt-get install gnupg curl git cmake clang libgomp1 -y
-
+RUN apt-get install -y libgomp1
 
 # ensure npm cache dir exists before adjusting ownership
 RUN mkdir -p /home/user/.npm && chown -R 1000:1000 /home/user/.npm
@@ -38,7 +31,6 @@ USER user
 
 COPY --chown=1000 .env /app/.env
 COPY --chown=1000 entrypoint.sh /app/entrypoint.sh
-COPY --chown=1000 gcp-*.json /app/
 COPY --chown=1000 package.json /app/package.json
 COPY --chown=1000 package-lock.json /app/package-lock.json
 
@@ -94,7 +86,6 @@ ARG PUBLIC_APP_COLOR=blue
 ARG PUBLIC_COMMIT_SHA=
 ENV PUBLIC_COMMIT_SHA=${PUBLIC_COMMIT_SHA}
 ENV BODY_SIZE_LIMIT=15728640
-ENV MODELS_STORAGE_PATH=/data/models
 
 #import the build & dependencies
 COPY --from=builder --chown=1000 /app/build /app/build
