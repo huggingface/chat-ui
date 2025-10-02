@@ -23,11 +23,6 @@
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import ToolUpdate from "./ToolUpdate.svelte";
-	import {
-		isMessageToolCallUpdate,
-		isMessageToolErrorUpdate,
-		isMessageToolResultUpdate,
-	} from "$lib/utils/messageUpdates";
 
 	interface Props {
 		message: Message;
