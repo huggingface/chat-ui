@@ -18,6 +18,7 @@ import { initExitHandler } from "$lib/server/exitHandler";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
+import { loadMcpServersOnStartup, refreshMcpServersIfChanged } from "$lib/server/mcp/registry";
 
 export const init: ServerInit = async () => {
 	// Wait for config to be fully loaded
@@ -38,8 +39,9 @@ export const init: ServerInit = async () => {
 			);
 		}
 
-		logger.info("Starting server...");
-		initExitHandler();
+			logger.info("Starting server...");
+			initExitHandler();
+			loadMcpServersOnStartup();
 
 		checkAndRunMigrations();
 		refreshConversationStats();
@@ -93,6 +95,7 @@ export const handleError: HandleServerError = async ({ error, event, status, mes
 export const handle: Handle = async ({ event, resolve }) => {
 	await ready.then(() => {
 		config.checkForUpdates();
+		refreshMcpServersIfChanged();
 	});
 
 	logger.debug({

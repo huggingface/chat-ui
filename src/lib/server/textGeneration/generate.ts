@@ -1,6 +1,7 @@
 import { config } from "$lib/server/config";
 import {
 	MessageReasoningUpdateType,
+	MessageToolUpdateType,
 	MessageUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
@@ -10,8 +11,439 @@ import type { EndpointMessage } from "../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { generateSummaryOfReasoning } from "./reasoning";
 import { logger } from "../logger";
+import { getMcpServers } from "$lib/server/mcp/registry";
+import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
+import { callMcpTool } from "$lib/server/mcp/httpClient";
+import { archSelectRoute } from "$lib/server/router/arch";
+import { getRoutes, resolveRouteModels } from "$lib/server/router/policy";
+import { randomUUID } from "crypto";
+import { ToolResultStatus } from "$lib/types/Tool";
+
+const ROUTER_REASONING_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
+
+function stripReasoningBlocks(text: string): string {
+	const stripped = text.replace(ROUTER_REASONING_REGEX, "");
+	return stripped === text ? text : stripped.trim();
+}
+
+function stripReasoningFromMessageForRouting(message: EndpointMessage): EndpointMessage {
+	const clone = { ...message } as EndpointMessage & { reasoning?: string };
+	if ("reasoning" in clone) {
+		delete clone.reasoning;
+	}
+	const content =
+		typeof message.content === "string" ? stripReasoningBlocks(message.content) : message.content;
+	return {
+		...clone,
+		content,
+	};
+}
+
+type ToolRun = {
+	name: string;
+	parameters: Record<string, string | number | boolean>;
+	output: string;
+};
 
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
+
+async function* runMcpFlow(
+	{
+		model,
+		conv,
+		messages,
+		assistant,
+		forceMultimodal,
+		preprompt,
+	}: GenerateContext & { preprompt?: string }
+): AsyncGenerator<MessageUpdate, boolean, undefined> {
+	const servers = getMcpServers();
+	if (servers.length === 0) {
+		return false;
+	}
+
+	let runMcp = true;
+	let targetModel = model;
+	let candidateModelId: string | undefined;
+	let resolvedRoute: string | undefined;
+
+	if ((model as any)?.isRouter) {
+		try {
+			const routes = await getRoutes();
+			const sanitized = messages.map(stripReasoningFromMessageForRouting);
+			const { routeName } = await archSelectRoute(sanitized);
+			resolvedRoute = routeName;
+			const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || model.id;
+			const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
+			const primaryCandidateId = candidates[0];
+			if (!primaryCandidateId || primaryCandidateId === fallbackModel) {
+				runMcp = false;
+			} else {
+				try {
+					const mod = await import("../models");
+					const allModels = (mod as any).models as typeof model[];
+					const found = allModels?.find(
+						(candidate) => candidate.id === primaryCandidateId || candidate.name === primaryCandidateId
+					);
+					if (found) {
+						targetModel = found;
+						candidateModelId = primaryCandidateId;
+					} else {
+						runMcp = false;
+					}
+				} catch (error) {
+					logger.warn({ err: String(error) }, "[mcp] failed to resolve router candidate");
+					runMcp = false;
+				}
+			}
+		} catch (error) {
+			logger.warn({ err: String(error) }, "[mcp] routing preflight failed");
+			runMcp = false;
+		}
+	}
+
+	if (!runMcp) {
+		return false;
+	}
+
+	const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers);
+	if (oaTools.length === 0) {
+		return false;
+	}
+
+	try {
+		const { OpenAI } = await import("openai");
+		const openai = new OpenAI({
+			apiKey: config.OPENAI_API_KEY || config.HF_TOKEN || "sk-",
+			baseURL: config.OPENAI_BASE_URL || "https://api.openai.com/v1",
+		});
+
+		const mmEnabled = (forceMultimodal ?? false) || targetModel.multimodal;
+		const toOpenAiMessage = (msg: EndpointMessage): any => {
+			if (msg.from === "user" && mmEnabled) {
+				const parts: any[] = [{ type: "text", text: msg.content }];
+				for (const file of msg.files ?? []) {
+					if (typeof file?.mime === "string" && file.mime.startsWith("image/")) {
+						const encoded =
+							typeof file.value === "string"
+								? file.value
+								: Buffer.isBuffer(file.value)
+								? file.value.toString("base64")
+								: String(file.value ?? "");
+						const url = encoded.startsWith("data:")
+							? encoded
+							: `data:${file.mime};base64,${encoded}`;
+						parts.push({
+							type: "image_url",
+							image_url: { url, detail: "auto" },
+						});
+					}
+				}
+				return { role: msg.from, content: parts };
+			}
+			return { role: msg.from, content: msg.content };
+		};
+
+		let messagesOpenAI = messages.map(toOpenAiMessage);
+		const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
+		if (hasSystemMessage) {
+			if (preprompt !== undefined) {
+				const existing = messagesOpenAI[0].content || "";
+				messagesOpenAI[0].content = preprompt + (existing ? "\n\n" + existing : "");
+			}
+		} else {
+			messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
+		}
+
+		if (!targetModel.systemRoleSupported && messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system") {
+			messagesOpenAI[0] = { ...messagesOpenAI[0], role: "user" };
+		}
+
+		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<string, unknown>;
+		const maxTokens =
+			(parameters?.max_tokens as number | undefined) ??
+			(parameters?.max_new_tokens as number | undefined) ??
+			(parameters?.max_completion_tokens as number | undefined);
+
+		const requestBase: Record<string, unknown> = {
+			model: targetModel.id ?? targetModel.name,
+			stream: true,
+			temperature: parameters?.temperature,
+			top_p: parameters?.top_p,
+			frequency_penalty: parameters?.frequency_penalty ?? parameters?.repetition_penalty,
+			presence_penalty: parameters?.presence_penalty,
+			stop: parameters?.stop,
+		};
+		if (maxTokens !== undefined) {
+			requestBase.max_tokens = maxTokens;
+		}
+
+		const toPrimitive = (value: unknown): string | number | boolean | undefined => {
+			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+				return value;
+			}
+			return undefined;
+		};
+
+		const parseArgs = (raw: unknown): Record<string, unknown> => {
+			if (typeof raw !== "string" || raw.trim().length === 0) return {};
+			try {
+				return JSON.parse(raw);
+			} catch {
+				return {};
+			}
+		};
+
+		const toolRuns: ToolRun[] = [];
+		let lastAssistantContent = "";
+		let streamedContent = false;
+
+		if (resolvedRoute && candidateModelId) {
+			yield {
+				type: MessageUpdateType.RouterMetadata,
+				route: resolvedRoute,
+				model: candidateModelId,
+			};
+		}
+
+		for (let loop = 0; loop < 5; loop += 1) {
+			lastAssistantContent = "";
+			streamedContent = false;
+
+			const body = {
+				...requestBase,
+				messages: messagesOpenAI,
+				tools: oaTools,
+				tool_choice: "auto",
+			};
+
+			const completionStream = await openai.chat.completions.create(body as any, {
+				body,
+				headers: {
+					"ChatUI-Conversation-ID": conv._id.toString(),
+					"X-use-cache": "false",
+				},
+			});
+
+			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
+			let sawToolCall = false;
+
+			for await (const chunk of completionStream) {
+				const choice = chunk.choices?.[0];
+				const delta = choice?.delta as any;
+				if (!delta) continue;
+
+				const chunkToolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+				if (chunkToolCalls.length > 0) {
+					sawToolCall = true;
+					for (const call of chunkToolCalls) {
+						const index = call.index ?? 0;
+						const current = toolCallState[index] ?? { arguments: "" };
+						if (call.id) current.id = call.id;
+						if (call.function?.name) current.name = call.function.name;
+						if (call.function?.arguments) current.arguments += call.function.arguments;
+						toolCallState[index] = current;
+					}
+				}
+
+				const deltaContent = (() => {
+					if (typeof delta.content === "string") return delta.content;
+					if (Array.isArray(delta.content)) {
+						return delta.content
+							.map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+							.join("");
+					}
+					return "";
+				})();
+
+				if (deltaContent) {
+					lastAssistantContent += deltaContent;
+					if (!sawToolCall) {
+						streamedContent = true;
+						yield {
+							type: MessageUpdateType.Stream,
+							token: deltaContent,
+						};
+					}
+				}
+			}
+
+			const normalizedCalls = Object.values(toolCallState)
+				.map((call, index) => ({
+					id: call.id ?? `call_${index}`,
+					name: call.name,
+					arguments: call.arguments,
+				}))
+				.filter((call) => typeof call.name === "string");
+
+			if (!normalizedCalls.length) {
+				break;
+			}
+
+			const assistantToolMessage: any = {
+				role: "assistant",
+				content: lastAssistantContent,
+				tool_calls: normalizedCalls.map((call) => ({
+					id: call.id,
+					type: "function",
+					function: { name: call.name, arguments: call.arguments },
+				})),
+			};
+
+			const toolMessages: any[] = [];
+
+			for (const call of normalizedCalls) {
+				const fnName = call.name as string;
+				const mappingEntry = mapping[fnName];
+				const uuid = randomUUID();
+				const argsObj = parseArgs(call.arguments);
+				const parametersClean: Record<string, string | number | boolean> = {};
+				for (const [key, value] of Object.entries(argsObj ?? {})) {
+					const primitive = toPrimitive(value);
+					if (primitive !== undefined) {
+						parametersClean[key] = primitive;
+					}
+				}
+
+				yield {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Call,
+					uuid,
+					call: { name: fnName, parameters: parametersClean },
+				};
+
+				yield {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.ETA,
+					uuid,
+					eta: 10,
+				};
+
+				if (!mappingEntry) {
+					yield {
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid,
+						message: `Unknown MCP function: ${fnName}`,
+					};
+					yield {
+						type: MessageUpdateType.FinalAnswer,
+						text: `Unknown MCP function: ${fnName}`,
+						interrupted: false,
+					};
+					return true;
+				}
+
+				const serverConfig = servers.find((server) => server.name === mappingEntry.server);
+				if (!serverConfig) {
+					yield {
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid,
+						message: `Unknown MCP server: ${mappingEntry.server}`,
+					};
+					yield {
+						type: MessageUpdateType.FinalAnswer,
+						text: `Unknown MCP server: ${mappingEntry.server}`,
+						interrupted: false,
+					};
+					return true;
+				}
+
+				try {
+					const output = await callMcpTool(serverConfig, mappingEntry.tool, argsObj);
+
+					yield {
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Result,
+						uuid,
+						result: {
+							status: ToolResultStatus.Success,
+							call: { name: fnName, parameters: parametersClean },
+							outputs: [{ content: output }],
+							display: true,
+						},
+					};
+
+					toolRuns.push({ name: fnName, parameters: parametersClean, output });
+					toolMessages.push({ role: "tool", tool_call_id: call.id, content: output });
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					yield {
+						type: MessageUpdateType.Tool,
+						subtype: MessageToolUpdateType.Error,
+						uuid,
+						message,
+					};
+					yield {
+						type: MessageUpdateType.FinalAnswer,
+						text: `MCP error: ${message}`,
+						interrupted: false,
+					};
+					return true;
+				}
+			}
+
+			messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...toolMessages];
+		}
+
+		if (toolRuns.length > 0) {
+			const question = messages[messages.length - 1]?.content ?? "";
+			const formattedResults = toolRuns
+				.map((run, index) => {
+					const argsEntries = Object.entries(run.parameters);
+					const argsString = argsEntries.length
+						? `Arguments: ${JSON.stringify(Object.fromEntries(argsEntries), null, 2)}\n`
+						: "";
+					return `Tool ${index + 1}: ${run.name}\n${argsString}Output:\n${run.output}`;
+				})
+				.join("\n\n");
+
+			const synthesis = yield* generateFromDefaultEndpoint({
+				messages: [
+					{
+						from: "user",
+						content: `Question: ${question}\n\nTool results:\n${formattedResults}\n\nUsing only the tool results above, answer the question concisely. If uncertain, say you don't know.${
+							lastAssistantContent ? `\n\nModel notes: ${lastAssistantContent}` : ""
+						}`,
+					},
+				],
+				preprompt: "You are a helpful assistant. Use the provided tool results as the sole source of truth.",
+				generateSettings: { temperature: 0.2, max_tokens: 512 },
+				modelId: candidateModelId ?? targetModel.id,
+			});
+
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text: synthesis,
+				interrupted: false,
+			};
+
+			return true;
+		}
+
+		if (lastAssistantContent) {
+			if (!streamedContent) {
+				yield {
+					type: MessageUpdateType.Stream,
+					token: lastAssistantContent,
+				};
+			}
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text: lastAssistantContent,
+				interrupted: false,
+			};
+			return true;
+		}
+
+		return false;
+	} catch (error) {
+		logger.warn({ err: String(error) }, "[mcp] tool flow failed; falling back to default generation");
+	}
+
+	return false;
+}
 
 export async function* generate(
 	{
@@ -27,6 +459,19 @@ export async function* generate(
 	}: GenerateContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
+	const handledByMcp = yield* runMcpFlow({
+		model,
+		conv,
+		messages,
+		assistant,
+		forceMultimodal,
+		preprompt,
+	});
+
+	if (handledByMcp) {
+		return;
+	}
+
 	// reasoning mode is false by default
 	let reasoning = false;
 	let reasoningBuffer = "";

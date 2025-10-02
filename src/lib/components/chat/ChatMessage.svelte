@@ -16,11 +16,18 @@
 		MessageUpdateType,
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
+		type MessageToolUpdate,
 	} from "$lib/types/MessageUpdate";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
+import ToolUpdate from "./ToolUpdate.svelte";
+import {
+	isMessageToolCallUpdate,
+	isMessageToolErrorUpdate,
+	isMessageToolResultUpdate,
+} from "$lib/utils/messageUpdates";
 
 	interface Props {
 		message: Message;
@@ -74,6 +81,21 @@
 	let reasoningUpdates = $derived(
 		(message.updates?.filter(({ type }) => type === MessageUpdateType.Reasoning) ??
 			[]) as MessageReasoningUpdate[]
+	);
+
+	let toolUpdateGroups = $derived(() => {
+		const updates = message.updates?.filter((update) => update.type === MessageUpdateType.Tool) as
+			| MessageToolUpdate[]
+			| undefined;
+		if (!updates || updates.length === 0) return {} as Record<string, MessageToolUpdate[]>;
+		return updates.reduce((acc, update) => {
+			(acc[update.uuid] ??= []).push(update);
+			return acc;
+		}, {} as Record<string, MessageToolUpdate[]>);
+	});
+
+	let hasToolUpdates = $derived(
+		Object.values(toolUpdateGroups).some((group) => group.length > 0)
 	);
 
 	// const messageFinalAnswer = $derived(
@@ -155,6 +177,16 @@
 				/>
 			{/if}
 
+			{#if hasToolUpdates}
+				{#each Object.values(toolUpdateGroups) as group}
+					{#if group.length}
+						{#key group[0].uuid}
+							<ToolUpdate tool={group} {loading} />
+						{/key}
+					{/if}
+				{/each}
+			{/if}
+
 			<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
@@ -192,7 +224,7 @@
 			</div>
 		</div>
 
-		{#if message.routerMetadata || (!loading && message.content)}
+		{#if message.routerMetadata || (!loading && (message.content || hasToolUpdates))}
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
 					? 'left-1 pl-1 lg:pl-7'
