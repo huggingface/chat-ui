@@ -10,8 +10,6 @@ export type PublicConfigKey = keyof typeof publicEnv;
 const keysFromEnv = { ...publicEnv, ...serverEnv };
 export type ConfigKey = keyof typeof keysFromEnv;
 
-export const USE_USER_TOKEN = "user-token";
-
 class ConfigManager {
 	private keysFromDB: Partial<Record<ConfigKey, string>> = {};
 	private isInitialized = false;

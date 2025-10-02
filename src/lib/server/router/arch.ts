@@ -3,6 +3,7 @@ import { logger } from "$lib/server/logger";
 import type { EndpointMessage } from "../endpoints/endpoints";
 import type { Route, RouteConfig } from "./types";
 import { getRoutes } from "./policy";
+import { getApiToken } from "$lib/server/apiToken";
 
 const DEFAULT_LAST_TURNS = 16;
 const PROMPT_TEMPLATE = `
@@ -68,7 +69,8 @@ function parseRouteName(text: string): string | undefined {
 
 export async function archSelectRoute(
 	messages: EndpointMessage[],
-	traceId?: string
+	traceId: string | undefined,
+	locals: App.Locals | undefined
 ): Promise<{ routeName: string }> {
 	const routes = await getRoutes();
 	const prompt = toRouterPrompt(messages, routes);
@@ -82,7 +84,7 @@ export async function archSelectRoute(
 	}
 
 	const headers: HeadersInit = {
-		Authorization: `Bearer ${config.OPENAI_API_KEY || config.HF_TOKEN}`,
+		Authorization: `Bearer ${getApiToken(locals)}`,
 		"Content-Type": "application/json",
 	};
 	const body = {

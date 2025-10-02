@@ -23,6 +23,7 @@ export async function* generate(
 		isContinue,
 		promptedAt,
 		forceMultimodal,
+		locals,
 	}: GenerateContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
@@ -57,6 +58,7 @@ export async function* generate(
 		// Allow user-level override to force multimodal
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,
+		locals,
 	})) {
 		// Check if this output contains router metadata
 		if (
