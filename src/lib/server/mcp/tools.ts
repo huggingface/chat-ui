@@ -71,37 +71,59 @@ export async function getOpenAiToolsForMcp(
 	const tools: OpenAiTool[] = [];
 	const mapping: Record<string, McpToolMapping> = {};
 
-	for (const server of servers) {
-		try {
-			const serverTools = await listServerTools(server);
-			for (const tool of serverTools as any[]) {
-				const fnName = sanitizeName(`${server.name}.${tool.name}`);
-				const parameters = tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
-				const description = tool.description ?? tool?.annotations?.title;
+  const seenNames = new Set<string>();
 
-				tools.push({
-					type: "function",
-					function: {
-						name: fnName,
-						description,
-						parameters,
-					},
-				});
+  const pushToolDefinition = (
+    name: string,
+    description: string | undefined,
+    parameters: Record<string, unknown> | undefined,
+  ) => {
+    if (seenNames.has(name)) return;
+    tools.push({
+      type: "function",
+      function: {
+        name,
+        description,
+        parameters,
+      },
+    });
+    seenNames.add(name);
+  };
 
-				mapping[fnName] = {
-					fnName,
-					server: server.name,
-					tool: tool.name,
-				};
-			}
-		} catch {
-			// Ignore individual server failures
-			continue;
-		}
-	}
+  for (const server of servers) {
+    try {
+      const serverTools = await listServerTools(server);
+      for (const tool of serverTools as any[]) {
+        const parameters =
+          tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
+        const description = tool.description ?? tool?.annotations?.title;
 
-	cache = { fetchedAt: now, ttlMs, tools, mapping };
-	return { tools, mapping };
+        const primaryName = sanitizeName(`${server.name}.${tool.name}`);
+        pushToolDefinition(primaryName, description, parameters);
+        mapping[primaryName] = {
+          fnName: primaryName,
+          server: server.name,
+          tool: tool.name,
+        };
+
+        const plainName = sanitizeName(tool.name);
+        if (!(plainName in mapping)) {
+          pushToolDefinition(plainName, description, parameters);
+          mapping[plainName] = {
+            fnName: plainName,
+            server: server.name,
+            tool: tool.name,
+          };
+        }
+      }
+    } catch {
+      // Ignore individual server failures
+      continue;
+    }
+  }
+
+  cache = { fetchedAt: now, ttlMs, tools, mapping };
+  return { tools, mapping };
 }
 
 export function resetMcpToolsCache() {

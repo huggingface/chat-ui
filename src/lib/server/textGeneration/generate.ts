@@ -62,6 +62,10 @@ async function* runMcpFlow(
 		return false;
 	}
 
+	const hasImageInput = messages.some((msg) =>
+		(msg.files ?? []).some((file) => typeof file?.mime === "string" && file.mime.startsWith("image/"))
+	);
+
 	let runMcp = true;
 	let targetModel = model;
 	let candidateModelId: string | undefined;
@@ -69,19 +73,31 @@ async function* runMcpFlow(
 
 	if ((model as any)?.isRouter) {
 		try {
-			const routes = await getRoutes();
-			const sanitized = messages.map(stripReasoningFromMessageForRouting);
-			const { routeName } = await archSelectRoute(sanitized);
-			resolvedRoute = routeName;
-			const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || model.id;
-			const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
-			const primaryCandidateId = candidates[0];
-			if (!primaryCandidateId || primaryCandidateId === fallbackModel) {
-				runMcp = false;
+			const mod = await import("../models");
+			const allModels = (mod as any).models as typeof model[];
+
+			if (hasImageInput) {
+				const multimodalCandidate = allModels?.find(
+					(candidate) => !candidate.isRouter && candidate.multimodal
+				);
+				if (multimodalCandidate) {
+					targetModel = multimodalCandidate;
+					candidateModelId = multimodalCandidate.id ?? multimodalCandidate.name;
+					resolvedRoute = "multimodal";
+				} else {
+					runMcp = false;
+				}
 			} else {
-				try {
-					const mod = await import("../models");
-					const allModels = (mod as any).models as typeof model[];
+				const routes = await getRoutes();
+				const sanitized = messages.map(stripReasoningFromMessageForRouting);
+				const { routeName } = await archSelectRoute(sanitized);
+				resolvedRoute = routeName;
+				const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || model.id;
+				const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
+				const primaryCandidateId = candidates[0];
+				if (!primaryCandidateId || primaryCandidateId === fallbackModel) {
+					runMcp = false;
+				} else {
 					const found = allModels?.find(
 						(candidate) => candidate.id === primaryCandidateId || candidate.name === primaryCandidateId
 					);
@@ -91,9 +107,6 @@ async function* runMcpFlow(
 					} else {
 						runMcp = false;
 					}
-				} catch (error) {
-					logger.warn({ err: String(error) }, "[mcp] failed to resolve router candidate");
-					runMcp = false;
 				}
 			}
 		} catch (error) {

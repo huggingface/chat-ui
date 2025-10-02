@@ -1,8 +1,5 @@
 <script lang="ts">
-	import {
-		MessageToolUpdateType,
-		type MessageToolUpdate,
-	} from "$lib/types/MessageUpdate";
+	import { MessageToolUpdateType, type MessageToolUpdate } from "$lib/types/MessageUpdate";
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
@@ -63,7 +60,7 @@
 
 {#if toolFnName}
 	<details
-		class="group/tool my-2.5 w-fit cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm transition-all open:mb-3 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-2"
+		class="group/tool my-2.5 w-fit max-w-full cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm transition-all open:mb-3 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-2"
 	>
 		<summary
 			class="relative flex select-none list-none items-center gap-1.5 py-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
@@ -73,7 +70,9 @@
 				class="absolute -m-1 hidden h-full w-[calc(100%+1rem)] rounded-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
 			></div>
 
-			<div class="relative grid size-[22px] place-items-center rounded bg-purple-600/10 dark:bg-purple-600/20">
+			<div
+				class="relative grid size-[22px] place-items-center rounded bg-purple-600/10 dark:bg-purple-600/20"
+			>
 				<svg
 					class="absolute inset-0 text-purple-500/40 transition-opacity"
 					class:invisible={toolDone || toolError}
