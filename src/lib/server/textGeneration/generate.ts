@@ -351,7 +351,15 @@ async function* runMcpFlow(
 				}
 
 				try {
+					logger.debug(
+						{ server: mappingEntry.server, tool: mappingEntry.tool, parameters: parametersClean },
+						"[mcp] invoking tool"
+					);
 					const output = await callMcpTool(serverConfig, mappingEntry.tool, argsObj);
+					logger.debug(
+						{ server: mappingEntry.server, tool: mappingEntry.tool },
+						"[mcp] tool call completed"
+					);
 
 					yield {
 						type: MessageUpdateType.Tool,
@@ -369,6 +377,10 @@ async function* runMcpFlow(
 					toolMessages.push({ role: "tool", tool_call_id: call.id, content: output });
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
+					logger.warn(
+						{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
+						"[mcp] tool call failed"
+					);
 					yield {
 						type: MessageUpdateType.Tool,
 						subtype: MessageToolUpdateType.Error,
