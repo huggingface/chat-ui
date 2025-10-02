@@ -12,7 +12,11 @@ import { logger } from "$lib/server/logger";
 function convertMessageUpdate(message: Message, update: unknown): MessageUpdate | null {
 	try {
 		// Trim legacy web search updates entirely
-		if (typeof update === "object" && update !== null && (update as any).type === "webSearch") {
+		if (
+			typeof update === "object" &&
+			update !== null &&
+			(update as { type: string }).type === "webSearch"
+		) {
 			return null;
 		}
 

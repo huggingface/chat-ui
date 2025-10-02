@@ -174,6 +174,7 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 }
 function isFencedBlockClosed(raw?: string): boolean {
 	if (!raw) return true;
+	/* eslint-disable-next-line no-control-regex */
 	const trimmed = raw.replace(/[\s\u0000]+$/, "");
 	const openingFenceMatch = trimmed.match(/^([`~]{3,})/);
 	if (!openingFenceMatch) {
@@ -203,14 +204,14 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 
 	const processedTokens = await Promise.all(
 		tokens.map(async (token) => {
-				if (token.type === "code") {
-					return {
-						type: "code" as const,
-						lang: token.lang,
-						code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
-						rawCode: token.text,
-						isClosed: isFencedBlockClosed(token.raw ?? ""),
-					};
+			if (token.type === "code") {
+				return {
+					type: "code" as const,
+					lang: token.lang,
+					code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+					rawCode: token.text,
+					isClosed: isFencedBlockClosed(token.raw ?? ""),
+				};
 			} else {
 				return {
 					type: "text" as const,
@@ -227,14 +228,14 @@ export function processTokensSync(content: string, sources: SimpleSource[]): Tok
 	const marked = createMarkedInstance(sources);
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
-			if (token.type === "code") {
-				return {
-					type: "code" as const,
-					lang: token.lang,
-					code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
-					rawCode: token.text,
-					isClosed: isFencedBlockClosed(token.raw ?? ""),
-				};
+		if (token.type === "code") {
+			return {
+				type: "code" as const,
+				lang: token.lang,
+				code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+				rawCode: token.text,
+				isClosed: isFencedBlockClosed(token.raw ?? ""),
+			};
 		}
 		return { type: "text" as const, html: marked.parse(token.raw) };
 	});

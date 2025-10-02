@@ -123,7 +123,7 @@ export async function endpointOai(
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
-					frequency_penalty: parameters?.frequency_penalty,
+				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
 			};
 
@@ -173,7 +173,7 @@ export async function endpointOai(
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
 				top_p: parameters?.top_p,
-					frequency_penalty: parameters?.frequency_penalty,
+				frequency_penalty: parameters?.frequency_penalty,
 				presence_penalty: parameters?.presence_penalty,
 			};
 

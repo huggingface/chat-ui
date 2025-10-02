@@ -42,7 +42,6 @@
 
 	let {
 		conversations = $bindable(),
-		canLogin,
 		user,
 		p = $bindable(0),
 		ondeleteConversation,

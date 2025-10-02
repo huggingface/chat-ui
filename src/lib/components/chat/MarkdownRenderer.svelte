@@ -86,10 +86,6 @@
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 		{@html token.html}
 	{:else if token.type === "code"}
-		<CodeBlock
-			code={token.code}
-			rawCode={token.rawCode}
-			loading={loading && !token.isClosed}
-		/>
+		<CodeBlock code={token.code} rawCode={token.rawCode} loading={loading && !token.isClosed} />
 	{/if}
 {/each}
