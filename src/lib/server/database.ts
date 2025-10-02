@@ -66,9 +66,11 @@ export class Database {
 		}
 
 		try {
+			logger.info("Connecting to database");
 			await this.client.connect();
+			logger.info("Connected to database");
 			this.client.db(config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
-			this.client.on("open", () => this.initDatabase());
+			await this.initDatabase();
 		} catch (err) {
 			logger.error(err, "Connection error");
 			process.exit(1);

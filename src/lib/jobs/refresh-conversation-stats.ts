@@ -33,7 +33,9 @@ async function computeStats(params: {
 	span: ConversationStats["date"]["span"];
 	type: ConversationStats["type"];
 }) {
-	if (!(await collections.conversations.estimatedDocumentCount())) {
+	const indexes = await collections.semaphores.listIndexes().toArray();
+	if (indexes.length <= 2) {
+		logger.info("Indexes not created, skipping stats computation");
 		return;
 	}
 
