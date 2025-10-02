@@ -412,7 +412,7 @@ async function* runMcpFlow(
 			messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...toolMessages];
 		}
 
-		if (toolRuns.length > 0) {
+		if (toolRuns.length > 0 && !lastAssistantContent.trim()) {
 			const question = messages[messages.length - 1]?.content ?? "";
 			const formattedResults = toolRuns
 				.map((run, index) => {
