@@ -19,7 +19,7 @@ export interface Assistant extends Timestamps {
 	generateSettings?: {
 		temperature?: number;
 		top_p?: number;
-		repetition_penalty?: number;
+		frequency_penalty?: number;
 		top_k?: number;
 	};
 	dynamicPrompt?: boolean;

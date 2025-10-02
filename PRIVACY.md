@@ -26,13 +26,6 @@ Security and routing facts
 
 External providers are responsible for their own security and data handling. Please consult each provider’s respective security and privacy policies via the Inference Providers documentation linked above.
 
-## About available LLMs
-
-The goal of this app is to showcase that it is now possible to build an open source alternative to ChatGPT. 💪
-
-We aim to always provide a diverse set of state‑of‑the‑art open LLMs, and we may update the available models over time. Discuss models or request new ones on the [models discussion page](https://huggingface.co/spaces/huggingchat/chat-ui/discussions/372).
-
-Check the [models](https://huggingface.co/chat/models/) page for an up‑to‑date list of the best available LLMs.
 
 ## Technical details
 
@@ -43,8 +36,6 @@ The app is completely open source, and further development takes place on the [h
 You can find the production configuration for HuggingChat [here](https://github.com/huggingface/chat-ui/blob/main/chart/env/prod.yaml).
 
 HuggingChat connects to the OpenAI‑compatible Inference Providers router at `https://router.huggingface.co/v1` to access models across multiple providers. Provider selection may be automatic or fixed depending on the model configuration.
-
-It is possible to deploy a copy of this app to a Space and customize it (swap models, add UI elements, or store user messages according to your own Terms and Conditions). You can also 1‑click deploy your own instance using the [Chat UI Spaces Docker template](https://huggingface.co/new-space?template=huggingchat/chat-ui-template).
 
 We welcome any feedback on this app: please participate in the public discussion at <https://huggingface.co/spaces/huggingchat/chat-ui/discussions>
 

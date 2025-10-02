@@ -66,7 +66,7 @@
 
 {#if open}
 	<Modal onclose={close} width="w-[90dvh] md:w-[500px]">
-		<div class="flex w-full flex-col gap-5 p-6">
+		<div class="flex w-full flex-col gap-3 p-5 sm:gap-5 sm:p-6">
 			<!-- Header + copy -->
 			{#if createdUrl}
 				<div class="flex items-start justify-between">
@@ -108,10 +108,7 @@
 					</button>
 				</div>
 				<div class="text-sm text-gray-600 dark:text-gray-400">
-					Any messages you add after sharing stay private. <a
-						href="{base}/privacy"
-						class="underline hover:no-underline dark:text-gray-300">Learn more</a
-					>.
+					Any messages you add after sharing stay private.
 				</div>
 			{/if}
 
@@ -128,7 +125,7 @@
 				class="flex h-12 items-center gap-2 whitespace-nowrap rounded-2xl border border-gray-200 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800"
 			>
 				<input
-					class="w-full bg-transparent px-2 text-[15px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+					class="w-full truncate bg-transparent text-[15px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500 max-sm:text-sm"
 					readonly
 					value={createdUrl ??
 						`${page.data.publicConfig.PUBLIC_SHARE_PREFIX || `${page.data.publicConfig.PUBLIC_ORIGIN || page.url.origin}${base}`}/r/...`}
@@ -136,7 +133,7 @@
 
 				{#if createdUrl}
 					<CopyToClipBoardBtn
-						classNames="inline-flex items-center rounded-xl -mr-0.5 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:enabled:hover:bg-gray-600"
+						classNames="inline-flex items-center rounded-xl -mr-1 border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow enabled:hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:enabled:hover:bg-gray-600"
 						showTooltip={false}
 						value={withLeafId(createdUrl) ?? createdUrl}
 						onClick={() => {
@@ -165,7 +162,7 @@
 					</CopyToClipBoardBtn>
 				{:else}
 					<button
-						class="-mr-0.5 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+						class="-mr-1 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 						type="button"
 						disabled={creating}
 						onclick={handleCreate}

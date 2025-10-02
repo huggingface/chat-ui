@@ -320,8 +320,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	);
 
 	let doneStreaming = false;
+	let clientDetached = false;
 
 	let lastTokenTimestamp: undefined | Date = undefined;
+
+	const persistConversation = async () => {
+		await collections.conversations.updateOne(
+			{ _id: convId },
+			{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
+		);
+	};
 
 	// we now build the stream
 	const stream = new ReadableStream({
@@ -406,20 +414,30 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					event = { ...event, token: event.token.padEnd(16, "\0") };
 				}
 
-				// Send the update to the client
-				controller.enqueue(JSON.stringify(event) + "\n");
+				messageToWriteTo.updatedAt = new Date();
 
-				// Send 4096 of spaces to make sure the browser doesn't blocking buffer that holding the response
-				if (event.type === MessageUpdateType.FinalAnswer) {
-					controller.enqueue(" ".repeat(4096));
+				const enqueueUpdate = async () => {
+					if (clientDetached) return;
+					try {
+						controller.enqueue(JSON.stringify(event) + "\n");
+						if (event.type === MessageUpdateType.FinalAnswer) {
+							controller.enqueue(" ".repeat(4096));
+						}
+					} catch (err) {
+						clientDetached = true;
+						logger.info(
+							{ conversationId: convId.toString() },
+							"Client detached during message streaming"
+						);
+					}
+				};
+
+				await enqueueUpdate();
+
+				if (clientDetached) {
+					await persistConversation();
 				}
 			}
-
-			await collections.conversations.updateOne(
-				{ _id: convId },
-				{ $set: { title: conv.title, updatedAt: new Date() } }
-			);
-			messageToWriteTo.updatedAt = new Date();
 
 			let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
@@ -463,22 +481,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				}
 			}
 
-			await collections.conversations.updateOne(
-				{ _id: convId },
-				{ $set: { messages: conv.messages, title: conv?.title, updatedAt: new Date() } }
-			);
+			await persistConversation();
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;
-
-			controller.close();
+			if (!clientDetached) {
+				controller.close();
+			}
 		},
 		async cancel() {
 			if (doneStreaming) return;
-			await collections.conversations.updateOne(
-				{ _id: convId },
-				{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
-			);
+			clientDetached = true;
+			await persistConversation();
 		},
 	});
 

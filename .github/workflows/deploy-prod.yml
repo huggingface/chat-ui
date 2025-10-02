@@ -49,7 +49,6 @@ jobs:
             APP_BASE=/chat
             PUBLIC_APP_COLOR=yellow
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
-            SKIP_LLAMA_CPP_BUILD=true
   deploy:
     name: Deploy on prod
     runs-on: ubuntu-latest
