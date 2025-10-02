@@ -70,7 +70,9 @@
 		"@gradio/client": "^1.8.0",
 		"@huggingface/hub": "^2.2.0",
 		"@huggingface/inference": "^3.12.1",
+		"@huggingface/mcp-client": "^0.2.3",
 		"@iconify-json/bi": "^1.1.21",
+		"@modelcontextprotocol/sdk": "^1.17.5",
 		"@resvg/resvg-js": "^2.6.2",
 		"autoprefixer": "^10.4.14",
 		"date-fns": "^2.29.3",
@@ -99,8 +101,7 @@
 		"tailwindcss": "^3.4.0",
 		"uuid": "^10.0.0",
 		"vitest-browser-svelte": "^0.1.0",
-		"zod": "^3.22.3",
-		"@modelcontextprotocol/sdk": "^1.17.5"
+		"zod": "^3.22.3"
 	},
 	"overrides": {
 		"@reflink/reflink": "file:stub/@reflink/reflink"
