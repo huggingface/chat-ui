@@ -1,4 +1,4 @@
-import { config } from "$lib/server/config";
+import { config, USE_USER_TOKEN } from "$lib/server/config";
 import type { ChatTemplateInput } from "$lib/types/Template";
 import { z } from "zod";
 import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints";
@@ -109,7 +109,10 @@ if (openaiBaseUrl) {
 		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
 
 		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
-		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN || "";
+		let authToken = config.OPENAI_API_KEY || config.HF_TOKEN;
+		if (authToken === USE_USER_TOKEN) {
+			authToken = "";
+		}
 
 		// Try unauthenticated request first (many model lists are public, e.g. HF router)
 		let response = await fetch(`${baseURL}/models`);

@@ -18,6 +18,7 @@ import { ObjectId } from "mongodb";
 import type { Cookie } from "elysia";
 import { adminTokenManager } from "./adminToken";
 import type { User } from "$lib/types/User";
+import type { Session } from "$lib/types/Session";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -79,6 +80,7 @@ export async function findUser(
 ): Promise<{
 	user: User | null;
 	invalidateSession: boolean;
+	oauth?: Session["oauth"];
 }> {
 	const session = await collections.sessions.findOne({ sessionId });
 
@@ -93,6 +95,7 @@ export async function findUser(
 	return {
 		user: await collections.users.findOne({ _id: session.userId }),
 		invalidateSession: false,
+		oauth: session.oauth,
 	};
 }
 export const authCondition = (locals: App.Locals) => {
@@ -283,6 +286,7 @@ export async function authenticateRequest(
 
 		return {
 			user: result.user ?? undefined,
+			token: result.oauth?.token?.value,
 			sessionId,
 			secretSessionId,
 			isAdmin: result.user?.isAdmin || adminTokenManager.isAdmin(sessionId),
@@ -308,6 +312,7 @@ export async function authenticateRequest(
 				return {
 					user,
 					sessionId,
+					token,
 					secretSessionId,
 					isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
 				};
@@ -338,6 +343,7 @@ export async function authenticateRequest(
 				user,
 				sessionId,
 				secretSessionId,
+				token,
 				isAdmin: user.isAdmin || adminTokenManager.isAdmin(sessionId),
 			};
 		}
