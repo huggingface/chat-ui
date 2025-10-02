@@ -48,6 +48,7 @@
 		"js-yaml": "^4.1.0",
 		"minimist": "^1.2.8",
 		"mongodb-memory-server": "^10.1.2",
+		"playwright": "^1.55.1",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.2.6",
 		"prettier-plugin-tailwindcss": "^0.6.11",

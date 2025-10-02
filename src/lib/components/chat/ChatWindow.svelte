@@ -298,7 +298,9 @@
 
 					const blob = await response.blob();
 					const name = attachment.src.split("/").pop() ?? "attachment";
-					loadedFiles.push(new File([blob], name, { type: blob.type || "application/octet-stream" }));
+					loadedFiles.push(
+						new File([blob], name, { type: blob.type || "application/octet-stream" })
+					);
 				} catch (err) {
 					console.error("Error loading attachment:", err);
 				}

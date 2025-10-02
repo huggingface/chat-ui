@@ -63,36 +63,6 @@ export const misc = new Elysia()
 			isAdmin: locals.isAdmin,
 		} satisfies FeatureFlags;
 	})
-	.get("/spaces-config", async ({ query }) => {
-		if (config.COMMUNITY_TOOLS !== "true") {
-			throw new Error("Community tools are not enabled");
-		}
-
-		const space = query.space;
-
-		if (!space) {
-			throw new Error("Missing space");
-		}
-
-		// Extract namespace from space URL or use as-is if it's already in namespace format
-		let namespace = null;
-		if (space.startsWith("https://huggingface.co/spaces/")) {
-			namespace = space.split("/").slice(-2).join("/");
-		} else if (space.match(/^[^/]+\/[^/]+$/)) {
-			namespace = space;
-		}
-
-		if (!namespace) {
-			throw new Error("Invalid space name. Specify a namespace or a full URL on huggingface.co.");
-		}
-
-		try {
-			const api = await (await Client.connect(namespace)).view_api();
-			return api as ApiReturnType;
-		} catch (e) {
-			throw new Error("Error fetching space API. Is the name correct?");
-		}
-	})
 	.get("/export", async ({ locals }) => {
 		if (!locals.user) {
 			throw new Error("Not logged in");

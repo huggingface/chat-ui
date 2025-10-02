@@ -16,9 +16,10 @@ export async function* openAIChatToTextGenerationStream(
 	let thinkOpen = false;
 
 	for await (const completion of completionStream) {
+		const retyped = completion as { "x-router-metadata"?: { route: string; model: string } };
 		// Check if this chunk contains router metadata (first chunk from llm-router)
-		if (!metadataYielded && (completion as any)["x-router-metadata"]) {
-			const metadata = (completion as any)["x-router-metadata"];
+		if (!metadataYielded && retyped["x-router-metadata"]) {
+			const metadata = retyped["x-router-metadata"];
 			yield {
 				token: {
 					id: tokenId++,
@@ -44,8 +45,11 @@ export async function* openAIChatToTextGenerationStream(
 			}
 		}
 		const { choices } = completion;
-		const delta: any = choices?.[0]?.delta ?? {};
-		const content: string = (delta?.content as string) ?? "";
+		const delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
+			reasoning?: string;
+			reasoning_content?: string;
+		} = choices?.[0]?.delta ?? {};
+		const content: string = delta.content ?? "";
 		const reasoning: string =
 			typeof delta?.reasoning === "string"
 				? (delta.reasoning as string)
@@ -158,7 +162,10 @@ export async function* openAIChatToTextGenerationSingle(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
 	getRouterMetadata?: () => { route?: string; model?: string }
 ) {
-	const message: any = completion.choices?.[0]?.message ?? {};
+	const message: NonNullable<OpenAI.Chat.Completions.ChatCompletion.Choice>["message"] & {
+		reasoning?: string;
+		reasoning_content?: string;
+	} = completion.choices?.[0]?.message ?? {};
 	let content: string = message?.content || "";
 	// Provider-dependent reasoning shapes (non-streaming)
 	const r: string =

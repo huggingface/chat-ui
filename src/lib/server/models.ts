@@ -64,7 +64,7 @@ const modelConfig = z.object({
 			stop: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),
-				frequency_penalty: z.number().min(-2).max(2).optional(),
+			frequency_penalty: z.number().min(-2).max(2).optional(),
 			presence_penalty: z.number().min(-2).max(2).optional(),
 		})
 		.passthrough()
@@ -220,6 +220,8 @@ if (modelOverrides.length) {
 		if (!override) return model;
 
 		const { id, name, ...rest } = override;
+		void id;
+		void name;
 
 		return {
 			...model,
@@ -291,7 +293,7 @@ const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "o
 const routerMultimodalEnabled =
 	(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
 
-let decorated = builtModels as any[];
+let decorated = builtModels as ProcessedModel[];
 
 if (archBase) {
 	// Build a minimal model config for the alias
@@ -304,12 +306,12 @@ if (archBase) {
 		endpoints: [
 			{
 				type: "openai" as const,
-				baseURL: openaiBaseUrl!,
+				baseURL: openaiBaseUrl,
 			},
 		],
 		// Keep the alias visible
 		unlisted: false,
-	} as any;
+	} as ProcessedModel;
 
 	if (routerMultimodalEnabled) {
 		aliasRaw.multimodal = true;
@@ -318,13 +320,12 @@ if (archBase) {
 
 	const aliasBase = await processModel(aliasRaw);
 	// Create a self-referential ProcessedModel for the router endpoint
-	let aliasModel: any = {};
-	aliasModel = {
+	const aliasModel: ProcessedModel = {
 		...aliasBase,
 		isRouter: true,
 		// getEndpoint uses the router wrapper regardless of the endpoints array
 		getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
-	};
+	} as ProcessedModel;
 
 	// Put alias first
 	decorated = [aliasModel, ...decorated];

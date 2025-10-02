@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Modal from "$lib/components/Modal.svelte";
-	import Logo from "$lib/components/icons/Logo.svelte";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 

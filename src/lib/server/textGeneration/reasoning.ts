@@ -21,9 +21,9 @@ export async function generateSummaryOfReasoning(
 				preprompt: `You are tasked with summarizing the latest reasoning steps. Never describe results of the reasoning, only the process. Remain vague in your summary.
             The text might be incomplete, try your best to summarize it in one very short sentence, starting with a gerund and ending with three points. 
             Example: "Thinking about life...", "Summarizing the results...", "Processing the input..."`,
-			generateSettings: {
-				max_tokens: 50,
-			},
+				generateSettings: {
+					max_tokens: 50,
+				},
 				modelId,
 			})
 		);
