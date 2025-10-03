@@ -2,7 +2,12 @@ import { config, ready } from "$lib/server/config";
 import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import { authenticateRequest, refreshSessionCookie, requiresUser } from "$lib/server/auth";
+import {
+	authenticateRequest,
+	refreshSessionCookie,
+	requiresUser,
+	triggerOauthFlow,
+} from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import { addWeeks } from "date-fns";
 import { checkAndRunMigrations } from "$lib/migrations/migrations";
@@ -126,8 +131,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 		{ type: "svelte", value: event.cookies }
 	);
 
-	event.locals.user = auth.user || undefined;
 	event.locals.sessionId = auth.sessionId;
+
+	if (
+		!auth.user &&
+		config.AUTOMATIC_LOGIN === "true" &&
+		!event.url.pathname.startsWith(`${base}/login`)
+	) {
+		return await triggerOauthFlow({ request: event.request, url: event.url, locals: event.locals });
+	}
+
+	event.locals.user = auth.user || undefined;
 	event.locals.token = auth.token;
 
 	event.locals.isAdmin =

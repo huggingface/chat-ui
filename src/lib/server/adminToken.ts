@@ -37,9 +37,11 @@ class AdminTokenManager {
 		// if admin token is set, don't display it
 		if (!this.enabled || config.ADMIN_TOKEN) return;
 
-		let port = process.argv.includes("--port")
-			? parseInt(process.argv[process.argv.indexOf("--port") + 1])
-			: undefined;
+		let port = process.env.PORT
+			? parseInt(process.env.PORT)
+			: process.argv.includes("--port")
+				? parseInt(process.argv[process.argv.indexOf("--port") + 1])
+				: undefined;
 
 		if (!port) {
 			const mode = process.argv.find((arg) => arg === "preview" || arg === "dev");

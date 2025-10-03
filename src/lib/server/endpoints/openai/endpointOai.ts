@@ -106,7 +106,14 @@ export async function endpointOai(
 	const imageProcessor = makeImageProcessor(multimodal.image);
 
 	if (completion === "completions") {
-		return async ({ messages, preprompt, continueMessage, generateSettings, conversationId }) => {
+		return async ({
+			messages,
+			preprompt,
+			continueMessage,
+			generateSettings,
+			conversationId,
+			locals,
+		}) => {
 			const prompt = await buildPrompt({
 				messages,
 				continueMessage,
@@ -132,13 +139,21 @@ export async function endpointOai(
 				headers: {
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
+					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 				},
 			});
 
 			return openAICompletionToTextGenerationStream(openAICompletion);
 		};
 	} else if (completion === "chat_completions") {
-		return async ({ messages, preprompt, generateSettings, conversationId, isMultimodal }) => {
+		return async ({
+			messages,
+			preprompt,
+			generateSettings,
+			conversationId,
+			isMultimodal,
+			locals,
+		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
 				await prepareMessages(messages, imageProcessor, isMultimodal ?? model.multimodal);
@@ -186,6 +201,7 @@ export async function endpointOai(
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
+							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 						},
 					}
 				);
@@ -198,6 +214,7 @@ export async function endpointOai(
 						headers: {
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
+							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 						},
 					}
 				);
