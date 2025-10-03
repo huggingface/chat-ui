@@ -1,26 +1,20 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
-	import { tick } from "svelte";
-
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	const publicConfig = usePublicConfig();
-	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
-	import IconLoading from "../icons/IconLoading.svelte";
-	import CarbonRotate360 from "~icons/carbon/rotate-360";
-	// import CarbonDownload from "~icons/carbon/download";
-
-	import CarbonPen from "~icons/carbon/pen";
-	import UploadedFile from "./UploadedFile.svelte";
-
 	import {
+		MessageReasoningUpdateType,
 		MessageUpdateType,
 		type MessageReasoningUpdate,
-		MessageReasoningUpdateType,
 	} from "$lib/types/MessageUpdate";
-	import MarkdownRenderer from "./MarkdownRenderer.svelte";
-	import OpenReasoningResults from "./OpenReasoningResults.svelte";
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import CarbonPen from "~icons/carbon/pen";
+	import CarbonRotate360 from "~icons/carbon/rotate-360";
+	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
+	import IconLoading from "../icons/IconLoading.svelte";
 	import Alternatives from "./Alternatives.svelte";
+	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
+	import OpenReasoningResults from "./OpenReasoningResults.svelte";
+	import UploadedFile from "./UploadedFile.svelte";
 
 	interface Props {
 		message: Message;
@@ -48,6 +42,8 @@
 		onshowAlternateMsg,
 	}: Props = $props();
 
+	const publicConfig = usePublicConfig();
+
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
 	let messageWidth: number = $state(0);
@@ -68,7 +64,6 @@
 		}
 	}
 
-	let editContentEl: HTMLTextAreaElement | undefined = $state();
 	let editFormEl: HTMLFormElement | undefined = $state();
 
 	let reasoningUpdates = $derived(
@@ -104,15 +99,7 @@
 	});
 
 	let editMode = $derived(editMsdgId === message.id);
-	$effect(() => {
-		if (editMode) {
-			tick();
-			if (editContentEl) {
-				editContentEl.value = message.content;
-				editContentEl?.focus();
-			}
-		}
-	});
+	let editedContent = $derived(message.content);
 </script>
 
 {#if message.from === "assistant"}
@@ -286,15 +273,14 @@
 						bind:this={editFormEl}
 						onsubmit={(e) => {
 							e.preventDefault();
-							onretry?.({ content: editContentEl?.value, id: message.id });
+							onretry?.({ content: editedContent, id: message.id });
 							editMsdgId = null;
 						}}
 					>
 						<textarea
 							class="w-full whitespace-break-spaces break-words rounded-xl bg-gray-100 px-5 py-3.5 text-gray-500 *:h-max focus:outline-none dark:bg-gray-800 dark:text-gray-400"
 							rows="5"
-							bind:this={editContentEl}
-							value={message.content.trim()}
+							bind:value={editedContent}
 							onkeydown={handleKeyDown}
 							required
 						></textarea>
