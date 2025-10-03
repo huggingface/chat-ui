@@ -155,8 +155,7 @@ function transformOutsideHtmlCode(html: string, transform: (segment: string) => 
 }
 
 function addInlineCitations(html: string, webSearchSources: SimpleSource[] = []): string {
-	const linkStyle =
-		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
+	const linkStyle = "color: rgb(59, 130, 246); text-decoration: none;";
 	const applyReplacements = (value: string) =>
 		value
 			.replace(/\[(\d+)\](?!\()/g, (match: string) => {
@@ -172,7 +171,7 @@ function addInlineCitations(html: string, webSearchSources: SimpleSource[] = [])
 					.join(", ");
 				return links ? ` <sup>${links}</sup>` : match;
 			})
-			.replace(/(?:\(|\s)(\d+(?:\s*,\s*\d+)*)\)/g, (match: string, group: string) => {
+			.replace(/\((\d+\s*(?:,\s*\d+)+)\)/g, (match: string, group: string) => {
 				const indices = group
 					.split(/\s*,\s*/)
 					.map((value) => Number(value.trim()))
