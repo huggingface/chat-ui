@@ -332,7 +332,7 @@
 						messageToWriteTo.content += buffer;
 						buffer = "";
 					}
-					if (update.text && messageToWriteTo.content.trim().length === 0) {
+					if (update.text) {
 						messageToWriteTo.content = update.text;
 					}
 					messageToWriteTo.interrupted = update.interrupted;

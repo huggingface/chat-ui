@@ -115,12 +115,15 @@
 	let formattedSources = $derived.by(() =>
 		(message.sources ?? []).map((source) => {
 			let hostname = source.link;
+			let faviconOrigin = source.link;
 			try {
-				hostname = new URL(source.link).hostname.replace(/^www\./, "");
+				const parsed = new URL(source.link);
+				hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+				faviconOrigin = parsed.origin;
 			} catch {
-				// keep raw link if parsing fails
+				// keep raw values if parsing fails
 			}
-			return { ...source, hostname };
+			return { ...source, hostname, faviconOrigin };
 		})
 	);
 
@@ -245,11 +248,11 @@
 								target="_blank"
 								rel="noopener noreferrer"
 							>
-								<img
-									class="h-3.5 w-3.5 rounded"
-									src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.link)}`}
-									alt=""
-								/>
+									<img
+										class="h-3.5 w-3.5 rounded"
+										src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.faviconOrigin ?? source.link)}`}
+										alt=""
+									/>
 								<div class="text-gray-600 dark:text-gray-300">{source.hostname}</div>
 								<span
 									class="rounded bg-gray-100 px-1 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"

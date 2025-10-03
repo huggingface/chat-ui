@@ -147,14 +147,14 @@ function escapeHTML(content: string) {
 	);
 }
 
-function transformOutsideCode(content: string, transform: (segment: string) => string): string {
-	const parts = content.split(/(```[\s\S]*?```)/g);
+function transformOutsideHtmlCode(html: string, transform: (segment: string) => string): string {
+	const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
 	return parts
-		.map((part) => (part.startsWith("```") ? part : transform(part)))
+		.map((part) => (/^<pre|^<code/i.test(part) ? part : transform(part)))
 		.join("");
 }
 
-function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
+function addInlineCitations(html: string, webSearchSources: SimpleSource[] = []): string {
 	const linkStyle =
 		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
 	const applyReplacements = (value: string) =>
@@ -189,12 +189,8 @@ function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): 
 				return links ? ` (<sup>${links}</sup>)` : match;
 			});
 
-	const decorate = (segment: string) =>
-		segment
-			.split(/(`[^`]+`)/g)
-			.map((part) => (part.startsWith("`") && part.endsWith("`") ? part : applyReplacements(part)))
-			.join("");
-	return transformOutsideCode(md, decorate);
+	const decorate = (segment: string) => applyReplacements(segment);
+	return transformOutsideHtmlCode(html, decorate);
 }
 
 function createMarkedInstance(sources: SimpleSource[]): Marked {
