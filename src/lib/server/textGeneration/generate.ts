@@ -13,6 +13,7 @@ import { generateSummaryOfReasoning } from "./reasoning";
 import { logger } from "../logger";
 import { getMcpServers } from "$lib/server/mcp/registry";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
+import type { OpenAiTool } from "$lib/server/mcp/tools";
 import { callMcpTool } from "$lib/server/mcp/httpClient";
 import { archSelectRoute } from "$lib/server/router/arch";
 import { getRoutes, resolveRouteModels } from "$lib/server/router/policy";
@@ -53,6 +54,20 @@ type ToolRun = {
 	parameters: Record<string, string | number | boolean>;
 	output: string;
 };
+
+function buildToolPreprompt(tools: OpenAiTool[]): string {
+	if (!Array.isArray(tools) || tools.length === 0) {
+		return "";
+	}
+
+	return `When using tools follow those rules:
+
+- Decompose the user's request into distinct goals. When it mentions multiple entities (e.g., "X and Y") or sub-questions, issue a separate tool call for each.
+- When a tool can produce information more accurately or faster than guessing, call it.
+- After each tool result, check whether every part of the user's request is resolved. If not, refine the query or call another tool.
+- When tool outputs include URLs, cite them inline using numbered Markdown links such as ([1](https://...)). Reuse numbers for repeat URLs and never invent links.
+- Base the final answer solely on tool results; if the results leave gaps, say you don't know, and mention the tool names you used.`;
+}
 
 type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -181,14 +196,24 @@ async function* runMcpFlow({
 		};
 
 		let messagesOpenAI: ChatCompletionMessageParam[] = messages.map(toOpenAiMessage);
+		const toolPreprompt = buildToolPreprompt(oaTools);
+		const prepromptPieces: string[] = [];
+		if (toolPreprompt.trim().length > 0) {
+			prepromptPieces.push(toolPreprompt);
+		}
+		if (typeof preprompt === "string" && preprompt.trim().length > 0) {
+			prepromptPieces.push(preprompt);
+		}
+		const mergedPreprompt = prepromptPieces.join("\n\n");
 		const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
 		if (hasSystemMessage) {
-			if (preprompt !== undefined) {
-				const existing = messagesOpenAI[0].content || "";
-				messagesOpenAI[0].content = preprompt + (existing ? "\n\n" + existing : "");
+			if (mergedPreprompt.length > 0) {
+				const existing = messagesOpenAI[0].content ?? "";
+				const existingText = typeof existing === "string" ? existing : "";
+				messagesOpenAI[0].content = mergedPreprompt + (existingText ? "\n\n" + existingText : "");
 			}
-		} else {
-			messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
+		} else if (mergedPreprompt.length > 0) {
+			messagesOpenAI = [{ role: "system", content: mergedPreprompt }, ...messagesOpenAI];
 		}
 
 		if (
