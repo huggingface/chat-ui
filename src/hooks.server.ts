@@ -138,6 +138,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		config.AUTOMATIC_LOGIN === "true" &&
 		!event.url.pathname.startsWith(`${base}/login`)
 	) {
+		// To get the same CSRF token after callback
+		refreshSessionCookie(event.cookies, auth.secretSessionId);
 		return await triggerOauthFlow({ request: event.request, url: event.url, locals: event.locals });
 	}
 

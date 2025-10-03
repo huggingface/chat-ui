@@ -20,7 +20,7 @@ import { adminTokenManager } from "./adminToken";
 import type { User } from "$lib/types/User";
 import type { Session } from "$lib/types/Session";
 import { base } from "$app/paths";
-import { acquireLock, releaseLock } from "$lib/migrations/lock";
+import { acquireLock, isDBLocked, releaseLock } from "$lib/migrations/lock";
 import { Semaphores } from "$lib/types/Semaphore";
 
 export interface OIDCSettings {
@@ -141,6 +141,23 @@ export async function findUser(
 				} finally {
 					await releaseLock(lockKey, lockId);
 				}
+			} else if (new Date() > session.oauth.token.expiresAt) {
+				// If the token has expired, we need to wait for the token refresh to complete
+				let attempts = 0;
+				do {
+					await new Promise((resolve) => setTimeout(resolve, 200));
+					attempts++;
+					if (attempts > 20) {
+						return { user: null, invalidateSession: true };
+					}
+				} while (await isDBLocked(lockKey));
+
+				const updatedSession = await collections.sessions.findOne({ sessionId });
+				if (!updatedSession || updatedSession.oauth?.token === session.oauth.token) {
+					return { user: null, invalidateSession: true };
+				}
+
+				session.oauth = updatedSession.oauth;
 			}
 		}
 	}
