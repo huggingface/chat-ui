@@ -30,6 +30,18 @@
 	let animation: Animation | undefined = $state();
 	let showingLoadingBar = $state(false);
 
+	const formatValue = (value: unknown): string => {
+		if (value == null) return "";
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value, null, 2);
+			} catch {
+				return String(value);
+			}
+		}
+		return String(value);
+	};
+
 	$effect(() => {
 		if (!toolError && !toolDone && loading && loadingBarEl && eta) {
 			loadingBarEl.classList.remove("hidden");
@@ -50,10 +62,11 @@
 			showingLoadingBar = false;
 			loadingBarEl.classList.remove("hidden");
 			animation?.cancel();
-			animation = loadingBarEl.animate(
-				[{ width: loadingBarEl.style.width }, { width: "calc(100%+1rem)" }],
-				{ duration: 300, fill: "forwards" }
-			);
+			const fromWidth = getComputedStyle(loadingBarEl).width;
+			animation = loadingBarEl.animate([{ width: fromWidth }, { width: "calc(100%+1rem)" }], {
+				duration: 300,
+				fill: "forwards",
+			});
 			setTimeout(() => loadingBarEl?.classList.add("hidden"), 300);
 		}
 	});
@@ -111,10 +124,10 @@
 				</div>
 				<ul class="py-1 text-sm">
 					{#each Object.entries(update.call.parameters ?? {}) as [key, value]}
-						{#if value !== null}
+						{#if value != null}
 							<li>
 								<span class="font-semibold">{key}</span>:
-								<span>{value}</span>
+								<span class="whitespace-pre-wrap">{formatValue(value)}</span>
 							</li>
 						{/if}
 					{/each}
@@ -133,15 +146,23 @@
 				<ul class="py-1 text-sm">
 					{#each update.result.outputs as output}
 						{#each Object.entries(output) as [key, value]}
-							{#if value !== null}
+							{#if value != null}
 								<li>
 									<span class="font-semibold">{key}</span>:
-									<span>{value}</span>
+									<span class="whitespace-pre-wrap">{formatValue(value)}</span>
 								</li>
 							{/if}
 						{/each}
 					{/each}
 				</ul>
+			{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
+				<div class="mt-1 flex items-center gap-2 opacity-80">
+					<h3 class="text-sm text-red-600 dark:text-red-400">Error</h3>
+					<div class="h-px flex-1 bg-gradient-to-r from-red-500/20"></div>
+				</div>
+				<p class="whitespace-pre-wrap text-sm text-red-600 dark:text-red-400">
+					{update.result.message}
+				</p>
 			{/if}
 		{/each}
 	</details>
@@ -150,6 +171,15 @@
 <style>
 	details summary::-webkit-details-marker {
 		display: none;
+	}
+
+	@keyframes loading {
+		0% {
+			stroke-dashoffset: 61.45;
+		}
+		100% {
+			stroke-dashoffset: 0;
+		}
 	}
 
 	.loading-path {
