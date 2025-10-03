@@ -284,7 +284,7 @@ async function* runMcpFlow({
 			const toolRuns: ToolRun[] = [];
 			const citationSources: { title?: string; link: string }[] = [];
 			const citationIndex = new Map<string, number>();
-			let mappingMessageInjected = false;
+			let lastMappingCount = 0;
 
 			const buildCitationMappingMessage = (): string | null => {
 				if (citationSources.length === 0) {
@@ -306,7 +306,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 			};
 
 			const injectCitationMappingMessage = () => {
-				if (mappingMessageInjected) {
+				if (citationSources.length === 0 || citationSources.length === lastMappingCount) {
 					return;
 				}
 				const mappingMessage = buildCitationMappingMessage();
@@ -317,7 +317,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 					...messagesOpenAI,
 					{ role: "system", content: mappingMessage },
 				];
-				mappingMessageInjected = true;
+				lastMappingCount = citationSources.length;
 			};
 
 			const registerSource = (rawUrl: string): number | null => {
@@ -394,21 +394,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 
 			const appendMissingCitations = (text: string): string => {
 				if (citationSources.length === 0) return text;
-				let updated = text.replace(/\((\d+(?:\s*,\s*\d+)*)\)/g, (match, group) => {
-					const indices = group
-						.split(/\s*,\s*/)
-						.map((value: string) => Number(value.trim()))
-						.filter((value: number) => Number.isFinite(value) && value > 0);
-					if (indices.length === 0) return match;
-					const rendered = indices
-						.map((index: number) => {
-							const source = citationSources[index - 1];
-							if (!source) return String(index);
-							return `[${index}]`;
-						})
-						.join(" ");
-					return `(${rendered})`;
-				});
+				let updated = text;
 
 				updated = updated.replace(/\n?Sources:\s*(?:\[[\d]+\]\([^)]*\)|\d+)(?:[\s,\n]+(?:\[[\d]+\]\([^)]*\)|\d+))*$/i, "");
 				updated = stripTrailingSourcesBlock(updated);
@@ -618,6 +604,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 
 					toolRuns.push({ name: fnName, parameters: parametersClean, output });
 					toolMessages.push({ role: "tool", tool_call_id: call.id, content: output });
+					injectCitationMappingMessage();
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
 					logger.warn(
@@ -640,6 +627,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 			}
 
 			messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...toolMessages];
+			injectCitationMappingMessage();
 		}
 
 		if (toolRuns.length > 0 && !lastAssistantContent.trim()) {

@@ -247,6 +247,8 @@
 								href={source.link}
 								target="_blank"
 								rel="noopener noreferrer"
+								title={source.link}
+								aria-label={`Source ${index + 1}: ${source.hostname ?? source.link}`}
 							>
 									<img
 										class="h-3.5 w-3.5 rounded"
