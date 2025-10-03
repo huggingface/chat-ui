@@ -32,7 +32,14 @@ function sanitizeName(name: string) {
 	return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 64);
 }
 
-async function listServerTools(server: McpServerConfig) {
+type ListedTool = {
+	name?: string;
+	inputSchema?: Record<string, unknown>;
+	description?: string;
+	annotations?: { title?: string };
+};
+
+async function listServerTools(server: McpServerConfig): Promise<ListedTool[]> {
 	const url = new URL(server.url);
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	try {
@@ -49,7 +56,7 @@ async function listServerTools(server: McpServerConfig) {
 		}
 
 		const response = await client.listTools({});
-		return Array.isArray(response?.tools) ? response.tools : [];
+		return Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
 	} finally {
 		try {
 			await client.close?.();
@@ -71,59 +78,64 @@ export async function getOpenAiToolsForMcp(
 	const tools: OpenAiTool[] = [];
 	const mapping: Record<string, McpToolMapping> = {};
 
-  const seenNames = new Set<string>();
+	const seenNames = new Set<string>();
 
-  const pushToolDefinition = (
-    name: string,
-    description: string | undefined,
-    parameters: Record<string, unknown> | undefined,
-  ) => {
-    if (seenNames.has(name)) return;
-    tools.push({
-      type: "function",
-      function: {
-        name,
-        description,
-        parameters,
-      },
-    });
-    seenNames.add(name);
-  };
+	const pushToolDefinition = (
+		name: string,
+		description: string | undefined,
+		parameters: Record<string, unknown> | undefined
+	) => {
+		if (seenNames.has(name)) return;
+		tools.push({
+			type: "function",
+			function: {
+				name,
+				description,
+				parameters,
+			},
+		});
+		seenNames.add(name);
+	};
 
-  for (const server of servers) {
-    try {
-      const serverTools = await listServerTools(server);
-      for (const tool of serverTools as any[]) {
-        const parameters =
-          tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
-        const description = tool.description ?? tool?.annotations?.title;
+	for (const server of servers) {
+		try {
+			const serverTools = await listServerTools(server);
+			for (const tool of serverTools) {
+				if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
+					continue;
+				}
 
-        const primaryName = sanitizeName(`${server.name}.${tool.name}`);
-        pushToolDefinition(primaryName, description, parameters);
-        mapping[primaryName] = {
-          fnName: primaryName,
-          server: server.name,
-          tool: tool.name,
-        };
+				const parameters =
+					tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
+				const description = tool.description ?? tool.annotations?.title;
+				const toolName = tool.name;
 
-        const plainName = sanitizeName(tool.name);
-        if (!(plainName in mapping)) {
-          pushToolDefinition(plainName, description, parameters);
-          mapping[plainName] = {
-            fnName: plainName,
-            server: server.name,
-            tool: tool.name,
-          };
-        }
-      }
-    } catch {
-      // Ignore individual server failures
-      continue;
-    }
-  }
+				const primaryName = sanitizeName(`${server.name}.${toolName}`);
+				pushToolDefinition(primaryName, description, parameters);
+				mapping[primaryName] = {
+					fnName: primaryName,
+					server: server.name,
+					tool: toolName,
+				};
 
-  cache = { fetchedAt: now, ttlMs, tools, mapping };
-  return { tools, mapping };
+				const plainName = sanitizeName(toolName);
+				if (!(plainName in mapping)) {
+					pushToolDefinition(plainName, description, parameters);
+					mapping[plainName] = {
+						fnName: plainName,
+						server: server.name,
+						tool: toolName,
+					};
+				}
+			}
+		} catch {
+			// Ignore individual server failures
+			continue;
+		}
+	}
+
+	cache = { fetchedAt: now, ttlMs, tools, mapping };
+	return { tools, mapping };
 }
 
 export function resetMcpToolsCache() {

@@ -24,11 +24,10 @@ function parseServers(raw: string): McpServerConfig[] {
 				const headersRaw = (entry as Record<string, unknown>).headers;
 				let headers: Record<string, string> | undefined;
 				if (headersRaw && typeof headersRaw === "object" && !Array.isArray(headersRaw)) {
-					headers = Object.fromEntries(
-						Object.entries(headersRaw as Record<string, unknown>).filter(
-							([, value]): value is string => typeof value === "string"
-						)
+					const headerEntries = Object.entries(headersRaw as Record<string, unknown>).filter(
+						(entry): entry is [string, string] => typeof entry[1] === "string"
 					);
+					headers = Object.fromEntries(headerEntries);
 				}
 
 				return headers ? { name, url, headers } : { name, url };

@@ -18,6 +18,15 @@ import { archSelectRoute } from "$lib/server/router/arch";
 import { getRoutes, resolveRouteModels } from "$lib/server/router/policy";
 import { randomUUID } from "crypto";
 import { ToolResultStatus } from "$lib/types/Tool";
+import type { ProcessedModel } from "../models";
+import type {
+	ChatCompletionChunk,
+	ChatCompletionCreateParamsStreaming,
+	ChatCompletionMessageParam,
+	ChatCompletionContentPart,
+	ChatCompletionMessageToolCall,
+} from "openai/resources/chat/completions";
+import type { Stream } from "openai/streaming";
 
 const ROUTER_REASONING_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -45,25 +54,33 @@ type ToolRun = {
 	output: string;
 };
 
-type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
+type RunMcpFlowContext = Pick<
+	TextGenerationContext,
+	"model" | "conv" | "assistant" | "forceMultimodal" | "locals"
+> & { messages: EndpointMessage[] };
 
-async function* runMcpFlow(
-	{
-		model,
-		conv,
-		messages,
-		assistant,
-		forceMultimodal,
-		preprompt,
-	}: GenerateContext & { preprompt?: string }
-): AsyncGenerator<MessageUpdate, boolean, undefined> {
+type GenerateFunctionContext = Omit<TextGenerationContext, "messages"> & {
+	messages: EndpointMessage[];
+};
+
+async function* runMcpFlow({
+	model,
+	conv,
+	messages,
+	assistant,
+	forceMultimodal,
+	locals,
+	preprompt,
+}: RunMcpFlowContext & { preprompt?: string }): AsyncGenerator<MessageUpdate, boolean, undefined> {
 	const servers = getMcpServers();
 	if (servers.length === 0) {
 		return false;
 	}
 
 	const hasImageInput = messages.some((msg) =>
-		(msg.files ?? []).some((file) => typeof file?.mime === "string" && file.mime.startsWith("image/"))
+		(msg.files ?? []).some(
+			(file) => typeof file?.mime === "string" && file.mime.startsWith("image/")
+		)
 	);
 
 	let runMcp = true;
@@ -71,10 +88,10 @@ async function* runMcpFlow(
 	let candidateModelId: string | undefined;
 	let resolvedRoute: string | undefined;
 
-	if ((model as any)?.isRouter) {
+	if (model.isRouter) {
 		try {
 			const mod = await import("../models");
-			const allModels = (mod as any).models as typeof model[];
+			const allModels = mod.models as ProcessedModel[];
 
 			if (hasImageInput) {
 				const multimodalCandidate = allModels?.find(
@@ -90,7 +107,7 @@ async function* runMcpFlow(
 			} else {
 				const routes = await getRoutes();
 				const sanitized = messages.map(stripReasoningFromMessageForRouting);
-				const { routeName } = await archSelectRoute(sanitized);
+				const { routeName } = await archSelectRoute(sanitized, conv._id.toString(), locals);
 				resolvedRoute = routeName;
 				const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || model.id;
 				const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
@@ -99,7 +116,8 @@ async function* runMcpFlow(
 					runMcp = false;
 				} else {
 					const found = allModels?.find(
-						(candidate) => candidate.id === primaryCandidateId || candidate.name === primaryCandidateId
+						(candidate) =>
+							candidate.id === primaryCandidateId || candidate.name === primaryCandidateId
 					);
 					if (found) {
 						targetModel = found;
@@ -128,21 +146,26 @@ async function* runMcpFlow(
 		const { OpenAI } = await import("openai");
 		const openai = new OpenAI({
 			apiKey: config.OPENAI_API_KEY || config.HF_TOKEN || "sk-",
-			baseURL: config.OPENAI_BASE_URL || "https://api.openai.com/v1",
+			baseURL: config.OPENAI_BASE_URL,
 		});
 
 		const mmEnabled = (forceMultimodal ?? false) || targetModel.multimodal;
-		const toOpenAiMessage = (msg: EndpointMessage): any => {
+		const toOpenAiMessage = (msg: EndpointMessage): ChatCompletionMessageParam => {
 			if (msg.from === "user" && mmEnabled) {
-				const parts: any[] = [{ type: "text", text: msg.content }];
+				const parts: ChatCompletionContentPart[] = [{ type: "text", text: msg.content }];
 				for (const file of msg.files ?? []) {
 					if (typeof file?.mime === "string" && file.mime.startsWith("image/")) {
-						const encoded =
-							typeof file.value === "string"
-								? file.value
-								: Buffer.isBuffer(file.value)
-								? file.value.toString("base64")
-								: String(file.value ?? "");
+						const rawValue = file.value as unknown;
+						let encoded: string;
+						if (typeof rawValue === "string") {
+							encoded = rawValue;
+						} else if (rawValue instanceof Uint8Array) {
+							encoded = Buffer.from(rawValue).toString("base64");
+						} else if (rawValue instanceof ArrayBuffer) {
+							encoded = Buffer.from(rawValue).toString("base64");
+						} else {
+							encoded = String(rawValue ?? "");
+						}
 						const url = encoded.startsWith("data:")
 							? encoded
 							: `data:${file.mime};base64,${encoded}`;
@@ -157,7 +180,7 @@ async function* runMcpFlow(
 			return { role: msg.from, content: msg.content };
 		};
 
-		let messagesOpenAI = messages.map(toOpenAiMessage);
+		let messagesOpenAI: ChatCompletionMessageParam[] = messages.map(toOpenAiMessage);
 		const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
 		if (hasSystemMessage) {
 			if (preprompt !== undefined) {
@@ -168,28 +191,48 @@ async function* runMcpFlow(
 			messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
 		}
 
-		if (!targetModel.systemRoleSupported && messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system") {
+		if (
+			!targetModel.systemRoleSupported &&
+			messagesOpenAI.length > 0 &&
+			messagesOpenAI[0]?.role === "system"
+		) {
 			messagesOpenAI[0] = { ...messagesOpenAI[0], role: "user" };
 		}
 
-		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<string, unknown>;
+		const parameters = { ...targetModel.parameters, ...assistant?.generateSettings } as Record<
+			string,
+			unknown
+		>;
 		const maxTokens =
 			(parameters?.max_tokens as number | undefined) ??
 			(parameters?.max_new_tokens as number | undefined) ??
 			(parameters?.max_completion_tokens as number | undefined);
 
-		const requestBase: Record<string, unknown> = {
+		const stopSequences =
+			typeof parameters?.stop === "string"
+				? parameters.stop
+				: Array.isArray(parameters?.stop)
+					? (parameters.stop as string[])
+					: undefined;
+
+		const completionBase: Omit<ChatCompletionCreateParamsStreaming, "messages"> = {
 			model: targetModel.id ?? targetModel.name,
 			stream: true,
-			temperature: parameters?.temperature,
-			top_p: parameters?.top_p,
-			frequency_penalty: parameters?.frequency_penalty ?? parameters?.repetition_penalty,
-			presence_penalty: parameters?.presence_penalty,
-			stop: parameters?.stop,
+			temperature: typeof parameters?.temperature === "number" ? parameters.temperature : undefined,
+			top_p: typeof parameters?.top_p === "number" ? parameters.top_p : undefined,
+			frequency_penalty:
+				typeof parameters?.frequency_penalty === "number"
+					? parameters.frequency_penalty
+					: typeof parameters?.repetition_penalty === "number"
+						? parameters.repetition_penalty
+						: undefined,
+			presence_penalty:
+				typeof parameters?.presence_penalty === "number" ? parameters.presence_penalty : undefined,
+			stop: stopSequences,
+			max_tokens: typeof maxTokens === "number" ? maxTokens : undefined,
+			tools: oaTools,
+			tool_choice: "auto",
 		};
-		if (maxTokens !== undefined) {
-			requestBase.max_tokens = maxTokens;
-		}
 
 		const toPrimitive = (value: unknown): string | number | boolean | undefined => {
 			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -223,30 +266,30 @@ async function* runMcpFlow(
 			lastAssistantContent = "";
 			streamedContent = false;
 
-			const body = {
-				...requestBase,
+			const completionRequest: ChatCompletionCreateParamsStreaming = {
+				...completionBase,
 				messages: messagesOpenAI,
-				tools: oaTools,
-				tool_choice: "auto",
 			};
 
-			const completionStream = await openai.chat.completions.create(body as any, {
-				body,
-				headers: {
-					"ChatUI-Conversation-ID": conv._id.toString(),
-					"X-use-cache": "false",
-				},
-			});
+			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
+				completionRequest,
+				{
+					headers: {
+						"ChatUI-Conversation-ID": conv._id.toString(),
+						"X-use-cache": "false",
+					},
+				}
+			);
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let sawToolCall = false;
 
 			for await (const chunk of completionStream) {
 				const choice = chunk.choices?.[0];
-				const delta = choice?.delta as any;
+				const delta = choice?.delta;
 				if (!delta) continue;
 
-				const chunkToolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+				const chunkToolCalls = delta.tool_calls ?? [];
 				if (chunkToolCalls.length > 0) {
 					sawToolCall = true;
 					for (const call of chunkToolCalls) {
@@ -261,9 +304,17 @@ async function* runMcpFlow(
 
 				const deltaContent = (() => {
 					if (typeof delta.content === "string") return delta.content;
-					if (Array.isArray(delta.content)) {
-						return delta.content
-							.map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+					const maybeParts = delta.content as unknown;
+					if (Array.isArray(maybeParts)) {
+						return maybeParts
+							.map((part) =>
+								typeof part === "object" &&
+								part !== null &&
+								"text" in part &&
+								typeof (part as { text?: unknown }).text === "string"
+									? (part as { text: string }).text
+									: ""
+							)
 							.join("");
 					}
 					return "";
@@ -281,32 +332,39 @@ async function* runMcpFlow(
 				}
 			}
 
-			const normalizedCalls = Object.values(toolCallState)
-				.map((call, index) => ({
-					id: call.id ?? `call_${index}`,
-					name: call.name,
-					arguments: call.arguments,
-				}))
-				.filter((call) => typeof call.name === "string");
+			const aggregatedCalls = Object.values(toolCallState).map((call, index) => ({
+				id: call.id ?? `call_${index}`,
+				name: call.name,
+				arguments: call.arguments,
+			}));
+
+			const isNamedToolCall = (
+				call: (typeof aggregatedCalls)[number]
+			): call is (typeof aggregatedCalls)[number] & { name: string } =>
+				typeof call.name === "string" && call.name.length > 0;
+
+			const normalizedCalls = aggregatedCalls.filter(isNamedToolCall);
 
 			if (!normalizedCalls.length) {
 				break;
 			}
 
-			const assistantToolMessage: any = {
+			const toolCalls: ChatCompletionMessageToolCall[] = normalizedCalls.map((call) => ({
+				id: call.id,
+				type: "function",
+				function: { name: call.name, arguments: call.arguments },
+			}));
+
+			const assistantToolMessage: ChatCompletionMessageParam = {
 				role: "assistant",
 				content: lastAssistantContent,
-				tool_calls: normalizedCalls.map((call) => ({
-					id: call.id,
-					type: "function",
-					function: { name: call.name, arguments: call.arguments },
-				})),
+				tool_calls: toolCalls,
 			};
 
-			const toolMessages: any[] = [];
+			const toolMessages: ChatCompletionMessageParam[] = [];
 
 			for (const call of normalizedCalls) {
-				const fnName = call.name as string;
+				const fnName = call.name;
 				const mappingEntry = mapping[fnName];
 				const uuid = randomUUID();
 				const argsObj = parseArgs(call.arguments);
@@ -433,9 +491,11 @@ async function* runMcpFlow(
 						}`,
 					},
 				],
-				preprompt: "You are a helpful assistant. Use the provided tool results as the sole source of truth.",
+				preprompt:
+					"You are a helpful assistant. Use the provided tool results as the sole source of truth.",
 				generateSettings: { temperature: 0.2, max_tokens: 512 },
 				modelId: candidateModelId ?? targetModel.id,
+				locals,
 			});
 
 			yield {
@@ -464,7 +524,10 @@ async function* runMcpFlow(
 
 		return false;
 	} catch (error) {
-		logger.warn({ err: String(error) }, "[mcp] tool flow failed; falling back to default generation");
+		logger.warn(
+			{ err: String(error) },
+			"[mcp] tool flow failed; falling back to default generation"
+		);
 	}
 
 	return false;
@@ -481,7 +544,7 @@ export async function* generate(
 		promptedAt,
 		forceMultimodal,
 		locals,
-	}: GenerateContext,
+	}: GenerateFunctionContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
 	const handledByMcp = yield* runMcpFlow({
@@ -490,6 +553,7 @@ export async function* generate(
 		messages,
 		assistant,
 		forceMultimodal,
+		locals,
 		preprompt,
 	});
 

@@ -75,9 +75,7 @@ export async function fetchMessageUpdates(
 export const isMessageToolUpdate = (update: MessageUpdate): update is MessageToolUpdate =>
 	update.type === MessageUpdateType.Tool;
 
-export const isMessageToolCallUpdate = (
-	update: MessageUpdate
-): update is MessageToolCallUpdate =>
+export const isMessageToolCallUpdate = (update: MessageUpdate): update is MessageToolCallUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Call;
 
 export const isMessageToolResultUpdate = (
@@ -85,9 +83,7 @@ export const isMessageToolResultUpdate = (
 ): update is MessageToolResultUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Result;
 
-export const isMessageToolErrorUpdate = (
-	update: MessageUpdate
-): update is MessageToolErrorUpdate =>
+export const isMessageToolErrorUpdate = (update: MessageUpdate): update is MessageToolErrorUpdate =>
 	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
 
 async function* endpointStreamToIterator(

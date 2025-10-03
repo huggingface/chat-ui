@@ -58,8 +58,7 @@ interface MessageToolUpdateBase<TSubtype extends MessageToolUpdateType> {
 	uuid: string;
 }
 
-export interface MessageToolCallUpdate
-	extends MessageToolUpdateBase<MessageToolUpdateType.Call> {
+export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Call> {
 	call: ToolCall;
 }
 
@@ -68,13 +67,11 @@ export interface MessageToolResultUpdate
 	result: ToolResult;
 }
 
-export interface MessageToolErrorUpdate
-	extends MessageToolUpdateBase<MessageToolUpdateType.Error> {
+export interface MessageToolErrorUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Error> {
 	message: string;
 }
 
-export interface MessageToolEtaUpdate
-	extends MessageToolUpdateBase<MessageToolUpdateType.ETA> {
+export interface MessageToolEtaUpdate extends MessageToolUpdateBase<MessageToolUpdateType.ETA> {
 	eta: number;
 }
 
