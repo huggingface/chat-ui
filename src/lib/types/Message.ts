@@ -16,6 +16,7 @@ export type Message = Partial<Timestamps> & {
 	 **/
 	files?: MessageFile[];
 	interrupted?: boolean;
+	sources?: { title?: string; link: string }[];
 
 	// Router metadata when using llm-router
 	routerMetadata?: {

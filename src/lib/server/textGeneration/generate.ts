@@ -55,6 +55,12 @@ type ToolRun = {
 	output: string;
 };
 
+const URL_REGEX = /https?:\/\/[^\s)\]}"'>]+/g;
+
+function normalizeUrl(raw: string): string {
+	return raw.replace(/[)\].,;:"'>]+$/g, "");
+}
+
 function buildToolPreprompt(tools: OpenAiTool[]): string {
 	if (!Array.isArray(tools) || tools.length === 0) {
 		return "";
@@ -65,8 +71,8 @@ function buildToolPreprompt(tools: OpenAiTool[]): string {
 - Decompose the user's request into distinct goals. When it mentions multiple entities (e.g., "X and Y") or sub-questions, issue a separate tool call for each.
 - When a tool can produce information more accurately or faster than guessing, call it.
 - After each tool result, check whether every part of the user's request is resolved. If not, refine the query or call another tool.
-- When tool outputs include URLs, cite them inline using numbered Markdown links such as ([1](https://...)). Reuse numbers for repeat URLs and never invent links.
-- Base the final answer solely on tool results; if the results leave gaps, say you don't know, and mention the tool names you used.`;
+- When tool outputs include URLs, cite them inline using bracketed indices like [1] and reuse the same index for repeat URLs. Never invent links or attach citations to numeric versions or other plain numbers that aren’t factual claims (e.g., leave "Granite 4.0" uncited). Do not append a separate "Sources" section—the UI will present sources based on your inline indices.
+- Base the final answer solely on tool results; if the results leave gaps, say you don't know, and do not mention the tool names in the final response.`;
 }
 
 type RunMcpFlowContext = Pick<
@@ -275,9 +281,125 @@ async function* runMcpFlow({
 			}
 		};
 
-		const toolRuns: ToolRun[] = [];
-		let lastAssistantContent = "";
-		let streamedContent = false;
+			const toolRuns: ToolRun[] = [];
+			const citationSources: { title?: string; link: string }[] = [];
+			const citationIndex = new Map<string, number>();
+
+			const registerSource = (rawUrl: string): number | null => {
+				const normalized = normalizeUrl(rawUrl);
+				if (!normalized) return null;
+				let current = citationIndex.get(normalized);
+				if (!current) {
+					current = citationSources.length + 1;
+					citationIndex.set(normalized, current);
+					citationSources.push({ link: normalized });
+				}
+				return current;
+			};
+
+			const collectToolOutputSources = (text: string): {
+				annotated: string;
+				sources: { index: number; link: string }[];
+			} => {
+				// Gather citation metadata without altering the original tool text so the UI can
+				// decide how to render it.
+				const matches = text.match(URL_REGEX) ?? [];
+				const sources: { index: number; link: string }[] = [];
+				for (const raw of matches) {
+					const index = registerSource(raw);
+					if (!index) continue;
+					const link = citationSources[index - 1]?.link;
+					if (!link) continue;
+					if (!sources.some((entry) => entry.index === index)) {
+						sources.push({ index, link });
+					}
+				}
+
+				if (sources.length === 0) {
+					return { annotated: text, sources };
+				}
+
+				return { annotated: text, sources };
+			};
+
+			const stripTrailingSourcesBlock = (input: string): string => {
+				const lines = input.split("\n");
+				let start = -1;
+				for (let i = lines.length - 1; i >= 0; i -= 1) {
+					const trimmed = lines[i].trim();
+					if (!trimmed) continue;
+					if (/^sources?:\s*$/i.test(trimmed)) {
+						start = i;
+						break;
+					}
+					if (
+						/^sources?:\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+)(?:\s*,\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+))*$/i.test(
+							trimmed
+						)
+					) {
+						start = i;
+						break;
+					}
+					return input;
+				}
+				if (start === -1) return input;
+				for (let j = start + 1; j < lines.length; j += 1) {
+					const trimmed = lines[j].trim();
+					if (!trimmed) continue;
+					if (
+						!/^[-*]?\s*(?:\(?\s*\d+\)?\.?\s*)?(https?:\/\/\S+|\[[\d]+\]\([^)]*\))\s*$/i.test(
+							trimmed
+						)
+					) {
+						return input;
+					}
+				}
+				return lines.slice(0, start).join("\n").replace(/\s+$/, "");
+			};
+
+			const appendMissingCitations = (text: string): string => {
+				if (citationSources.length === 0) return text;
+				let updated = text.replace(/\((\d+(?:\s*,\s*\d+)*)\)/g, (match, group) => {
+					const indices = group
+						.split(/\s*,\s*/)
+						.map((value: string) => Number(value.trim()))
+						.filter((value: number) => Number.isFinite(value) && value > 0);
+					if (indices.length === 0) return match;
+					const rendered = indices
+						.map((index: number) => {
+							const source = citationSources[index - 1];
+							if (!source) return String(index);
+							return `[${index}]`;
+						})
+						.join(" ");
+					return `(${rendered})`;
+				});
+
+				updated = updated.replace(/(\s)(\d+)(?=[)\],.;:?!\s]|$)/g, (match, space, num, offset, full) => {
+					const index = Number(num);
+					if (!Number.isInteger(index) || index < 1 || index > citationSources.length) {
+						return match;
+					}
+					if (space.includes("\n")) {
+						return match;
+					}
+					const source = citationSources[index - 1];
+					if (!source) return match;
+					return `${space}[${index}]`;
+				});
+
+				updated = updated.replace(/\n?Sources:\s*(?:\[[\d]+\]\([^)]*\)|\d+)(?:[\s,\n]+(?:\[[\d]+\]\([^)]*\)|\d+))*$/i, "");
+				updated = stripTrailingSourcesBlock(updated);
+				updated = updated.replace(/(^|\n)Tools?\s+used?:.*$/gi, "");
+				if (/\[[\d]+\]/.test(updated)) {
+					return updated.trim();
+				}
+				const inline = citationSources.map((_, index) => `[${index + 1}]`).join(" ");
+				return `${updated.trim()} ${inline}`.trim();
+			};
+
+			let lastAssistantContent = "";
+			let streamedContent = false;
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -451,7 +573,8 @@ async function* runMcpFlow({
 						{ server: mappingEntry.server, tool: mappingEntry.tool, parameters: parametersClean },
 						"[mcp] invoking tool"
 					);
-					const output = await callMcpTool(serverConfig, mappingEntry.tool, argsObj);
+					const outputRaw = await callMcpTool(serverConfig, mappingEntry.tool, argsObj);
+					const { annotated: output, sources: outputSources } = collectToolOutputSources(outputRaw);
 					logger.debug(
 						{ server: mappingEntry.server, tool: mappingEntry.tool },
 						"[mcp] tool call completed"
@@ -464,7 +587,12 @@ async function* runMcpFlow({
 						result: {
 							status: ToolResultStatus.Success,
 							call: { name: fnName, parameters: parametersClean },
-							outputs: [{ content: output }],
+							outputs: [
+								{
+									content: output,
+									sources: outputSources,
+								},
+							],
 							display: true,
 						},
 					};
@@ -523,11 +651,13 @@ async function* runMcpFlow({
 				locals,
 			});
 
-			yield {
-				type: MessageUpdateType.FinalAnswer,
-				text: synthesis,
-				interrupted: false,
-			};
+				const finalSynthesis = appendMissingCitations(synthesis);
+				yield {
+					type: MessageUpdateType.FinalAnswer,
+					text: finalSynthesis,
+					interrupted: false,
+					sources: citationSources.length > 0 ? [...citationSources] : undefined,
+				};
 
 			return true;
 		}
@@ -539,11 +669,13 @@ async function* runMcpFlow({
 					token: lastAssistantContent,
 				};
 			}
-			yield {
-				type: MessageUpdateType.FinalAnswer,
-				text: lastAssistantContent,
-				interrupted: false,
-			};
+				const finalAssistantContent = appendMissingCitations(lastAssistantContent);
+				yield {
+					type: MessageUpdateType.FinalAnswer,
+					text: finalAssistantContent,
+					interrupted: false,
+					sources: citationSources.length > 0 ? [...citationSources] : undefined,
+				};
 			return true;
 		}
 

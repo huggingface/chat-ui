@@ -87,10 +87,20 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 		const rule1 = /^\$([^$]+?)\$/;
 		const match1 = rule1.exec(src);
 		if (match1) {
+			const content = match1[1];
+			const trimmed = content.trim();
+			const looksLikeCurrency = /^[0-9][0-9,]*(?:\.[0-9]+)?(?:\s*\[\d+\])?$/.test(trimmed);
+			const looksLikeSentence = /[A-Za-z]{3,}/.test(trimmed) && /\s/.test(trimmed);
+			const hasMathControl = /[\\^_=]/.test(trimmed);
+			const probablyMath = hasMathControl || /\d\s*[-+*/]\s*\d/.test(trimmed);
+			// Treat $amount or plain prose as literal text unless explicit math is present
+			if (!probablyMath && (looksLikeCurrency || looksLikeSentence)) {
+				return undefined;
+			}
 			const token: katexInlineToken = {
 				type: "katexInline",
 				raw: match1[0],
-				text: match1[1].trim(),
+				text: trimmed,
 				displayMode: false,
 			};
 			return token;
@@ -137,35 +147,65 @@ function escapeHTML(content: string) {
 	);
 }
 
+function transformOutsideCode(content: string, transform: (segment: string) => string): string {
+	const parts = content.split(/(```[\s\S]*?```)/g);
+	return parts
+		.map((part) => (part.startsWith("```") ? part : transform(part)))
+		.join("");
+}
+
 function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
 	const linkStyle =
 		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
-	return md.replace(/\[(\d+)\]/g, (match: string) => {
-		const indices: number[] = (match.match(/\d+/g) || []).map(Number);
-		const links: string = indices
-			.map((index: number) => {
-				if (index === 0) return false;
-				const source = webSearchSources[index - 1];
-				if (source) {
-					return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
-				}
-				return "";
+	const applyReplacements = (value: string) =>
+		value
+			.replace(/\[(\d+)\](?!\()/g, (match: string) => {
+				const indices: number[] = (match.match(/\d+/g) || []).map(Number);
+				const links: string = indices
+					.map((index: number) => {
+						if (index === 0) return "";
+						const source = webSearchSources[index - 1];
+						if (!source) return "";
+						return `<a href="${source.link}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`;
+					})
+					.filter(Boolean)
+					.join(", ");
+				return links ? ` <sup>${links}</sup>` : match;
 			})
-			.filter(Boolean)
-			.join(", ");
-		return links ? ` <sup>${links}</sup>` : match;
-	});
+			.replace(/(?:\(|\s)(\d+(?:\s*,\s*\d+)*)\)/g, (match: string, group: string) => {
+				const indices = group
+					.split(/\s*,\s*/)
+					.map((value) => Number(value.trim()))
+					.filter((value) => Number.isFinite(value) && value > 0);
+				if (indices.length === 0) return match;
+				const links = indices
+					.map((index: number) => {
+						const source = webSearchSources[index - 1];
+						if (!source) return "";
+						return `<a href="${source.link}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`;
+					})
+					.filter(Boolean)
+					.join(", ");
+				return links ? ` (<sup>${links}</sup>)` : match;
+			});
+
+	const decorate = (segment: string) =>
+		segment
+			.split(/(`[^`]+`)/g)
+			.map((part) => (part.startsWith("`") && part.endsWith("`") ? part : applyReplacements(part)))
+			.join("");
+	return transformOutsideCode(md, decorate);
 }
 
 function createMarkedInstance(sources: SimpleSource[]): Marked {
 	return new Marked({
-		hooks: {
-			postprocess: (html) => addInlineCitations(html, sources),
-		},
+			hooks: {
+				postprocess: (html) => addInlineCitations(html, sources),
+			},
 		extensions: [katexBlockExtension, katexInlineExtension],
-		renderer: {
-			link: (href, title, text) =>
-				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
+			renderer: {
+				link: (href, title, text) =>
+					`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noopener noreferrer">${text}</a>`,
 			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
