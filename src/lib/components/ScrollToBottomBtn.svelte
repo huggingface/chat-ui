@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fade } from "svelte/transition";
 	import IconChevron from "./icons/IconChevron.svelte";
+	import { ScrollState } from "runed";
 
 	interface Props {
 		scrollNode: HTMLElement;
@@ -9,32 +10,8 @@
 
 	let { scrollNode, class: className = "" }: Props = $props();
 
-	let visible = $state(false);
-	let observer: ResizeObserver | null = $state(null);
-
-	function updateVisibility() {
-		if (!scrollNode) return;
-		visible =
-			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight;
-	}
-
-	function destroy() {
-		observer?.disconnect();
-		scrollNode?.removeEventListener("scroll", updateVisibility);
-	}
-	const cleanup = $effect.root(() => {
-		$effect(() => {
-			if (scrollNode) {
-				if (window.ResizeObserver) {
-					observer = new ResizeObserver(() => updateVisibility());
-					observer.observe(scrollNode);
-					cleanup();
-				}
-				scrollNode?.addEventListener("scroll", updateVisibility);
-			}
-		});
-		return () => destroy();
-	});
+	const scrollState = new ScrollState({ element: () => scrollNode, offset: { bottom: 200 } });
+	const visible = $derived(!scrollState.arrived.bottom);
 </script>
 
 {#if visible}
