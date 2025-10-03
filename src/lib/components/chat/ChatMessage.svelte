@@ -320,7 +320,7 @@
 				{/if}
 				{#if (alternatives.length > 1 && editMsdgId === null) || (!loading && !editMode)}
 					<button
-						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
+						class="flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 opacity-0 group-hover:opacity-100 hover:text-gray-500 hover:opacity-100 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
 						title="Edit"
 						type="button"
 						onclick={() => (editMsdgId = message.id)}
