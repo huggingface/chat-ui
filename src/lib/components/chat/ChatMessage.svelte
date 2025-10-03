@@ -45,7 +45,6 @@
 	const publicConfig = usePublicConfig();
 
 	let contentEl: HTMLElement | undefined = $state();
-	let isCopied = $state(false);
 	let messageWidth: number = $state(0);
 	let messageInfoWidth: number = $state(0);
 
@@ -89,14 +88,6 @@
 			message.reasoning.trim().length > 0
 	);
 	let hasClientThink = $derived(!hasServerReasoning && thinkSegments.length > 1);
-
-	$effect(() => {
-		if (isCopied) {
-			setTimeout(() => {
-				isCopied = false;
-			}, 1000);
-		}
-	});
 
 	let editMode = $derived(editMsdgId === message.id);
 	let editedContent = $derived(message.content);
@@ -210,9 +201,6 @@
 				{/if}
 				{#if !isLast || !loading}
 					<CopyToClipBoardBtn
-						onClick={() => {
-							isCopied = true;
-						}}
 						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 						value={message.content}
 						iconClassNames="text-xs"
