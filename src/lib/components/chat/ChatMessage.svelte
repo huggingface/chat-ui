@@ -82,17 +82,18 @@
 		const updates = message.updates?.filter((update) => update.type === MessageUpdateType.Tool) as
 			| MessageToolUpdate[]
 			| undefined;
-		if (!updates || updates.length === 0) return {} as Record<string, MessageToolUpdate[]>;
-		return updates.reduce(
-			(acc, update) => {
-				(acc[update.uuid] ??= []).push(update);
-				return acc;
-			},
-			{} as Record<string, MessageToolUpdate[]>
-		);
+		if (!updates || updates.length === 0) return [] as MessageToolUpdate[][];
+		const grouped = new Map<string, MessageToolUpdate[]>();
+		for (const update of updates) {
+			if (!grouped.has(update.uuid)) {
+				grouped.set(update.uuid, []);
+			}
+			grouped.get(update.uuid)?.push(update);
+		}
+		return Array.from(grouped.values());
 	});
 
-	let hasToolUpdates = $derived(Object.values(toolUpdateGroups).some((group) => group.length > 0));
+	let hasToolUpdates = $derived(toolUpdateGroups.length > 0);
 
 	// const messageFinalAnswer = $derived(
 	// 	message.updates?.find(
@@ -187,13 +188,7 @@
 				/>
 			{/if}
 			{#if hasToolUpdates}
-				{#each Object.values(toolUpdateGroups) as group}
-					{#if group.length}
-						{#key group[0].uuid}
-							<ToolUpdate tool={group} {loading} />
-						{/key}
-					{/if}
-				{/each}
+				<ToolUpdate tools={toolUpdateGroups} {loading} />
 			{/if}
 
 			<div bind:this={contentEl}>
@@ -250,11 +245,11 @@
 								title={source.link}
 								aria-label={`Source ${index + 1}: ${source.hostname ?? source.link}`}
 							>
-									<img
-										class="h-3.5 w-3.5 rounded"
-										src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.faviconOrigin ?? source.link)}`}
-										alt=""
-									/>
+								<img
+									class="h-3.5 w-3.5 rounded"
+									src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.faviconOrigin ?? source.link)}`}
+									alt=""
+								/>
 								<div class="text-gray-600 dark:text-gray-300">{source.hostname}</div>
 								<span
 									class="rounded bg-gray-100 px-1 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"
