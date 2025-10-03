@@ -71,7 +71,7 @@ function buildToolPreprompt(tools: OpenAiTool[]): string {
 - Decompose the user's request into distinct goals. When it mentions multiple entities (e.g., "X and Y") or sub-questions, issue a separate tool call for each.
 - When a tool can produce information more accurately or faster than guessing, call it.
 - After each tool result, check whether every part of the user's request is resolved. If not, refine the query or call another tool.
-- When tool outputs include URLs, cite them inline using bracketed indices like [1] and reuse the same index for repeat URLs. Never invent links or attach citations to numeric versions or other plain numbers that aren’t factual claims (e.g., leave "Granite 4.0" uncited). Do not append a separate "Sources" section—the UI will present sources based on your inline indices.
+	- When tool outputs include URLs, cite them inline using bracketed indices like [1] and reuse the same index for repeat URLs. Only use indices that appear in the source mapping you are given—never invent new numbers, cite plain version numbers, or create a separate "Sources" section.
 - Base the final answer solely on tool results; if the results leave gaps, say you don't know, and do not mention the tool names in the final response.`;
 }
 
@@ -284,6 +284,41 @@ async function* runMcpFlow({
 			const toolRuns: ToolRun[] = [];
 			const citationSources: { title?: string; link: string }[] = [];
 			const citationIndex = new Map<string, number>();
+			let mappingMessageInjected = false;
+
+			const buildCitationMappingMessage = (): string | null => {
+				if (citationSources.length === 0) {
+					return null;
+				}
+				const pairs = citationSources
+					.map((source, index) => {
+						const label = `[${index + 1}]`;
+						return source.link ? `${label} ${source.link}` : label;
+					})
+					.filter(Boolean)
+					.join("\n");
+				if (!pairs) {
+					return null;
+				}
+				return `Use the following source index mapping when citing:
+${pairs}
+Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
+			};
+
+			const injectCitationMappingMessage = () => {
+				if (mappingMessageInjected) {
+					return;
+				}
+				const mappingMessage = buildCitationMappingMessage();
+				if (!mappingMessage) {
+					return;
+				}
+				messagesOpenAI = [
+					...messagesOpenAI,
+					{ role: "system", content: mappingMessage },
+				];
+				mappingMessageInjected = true;
+			};
 
 			const registerSource = (rawUrl: string): number | null => {
 				const normalized = normalizeUrl(rawUrl);
@@ -375,27 +410,10 @@ async function* runMcpFlow({
 					return `(${rendered})`;
 				});
 
-				updated = updated.replace(/(\s)(\d+)(?=[)\],.;:?!\s]|$)/g, (match, space, num, offset, full) => {
-					const index = Number(num);
-					if (!Number.isInteger(index) || index < 1 || index > citationSources.length) {
-						return match;
-					}
-					if (space.includes("\n")) {
-						return match;
-					}
-					const source = citationSources[index - 1];
-					if (!source) return match;
-					return `${space}[${index}]`;
-				});
-
 				updated = updated.replace(/\n?Sources:\s*(?:\[[\d]+\]\([^)]*\)|\d+)(?:[\s,\n]+(?:\[[\d]+\]\([^)]*\)|\d+))*$/i, "");
 				updated = stripTrailingSourcesBlock(updated);
 				updated = updated.replace(/(^|\n)Tools?\s+used?:.*$/gi, "");
-				if (/\[[\d]+\]/.test(updated)) {
-					return updated.trim();
-				}
-				const inline = citationSources.map((_, index) => `[${index + 1}]`).join(" ");
-				return `${updated.trim()} ${inline}`.trim();
+				return updated.trim();
 			};
 
 			let lastAssistantContent = "";
@@ -409,14 +427,15 @@ async function* runMcpFlow({
 			};
 		}
 
-		for (let loop = 0; loop < 5; loop += 1) {
-			lastAssistantContent = "";
-			streamedContent = false;
+			for (let loop = 0; loop < 5; loop += 1) {
+				lastAssistantContent = "";
+				streamedContent = false;
+				injectCitationMappingMessage();
 
-			const completionRequest: ChatCompletionCreateParamsStreaming = {
-				...completionBase,
-				messages: messagesOpenAI,
-			};
+				const completionRequest: ChatCompletionCreateParamsStreaming = {
+					...completionBase,
+					messages: messagesOpenAI,
+				};
 
 			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
 				completionRequest,
@@ -634,6 +653,7 @@ async function* runMcpFlow({
 					return `Tool ${index + 1}: ${run.name}\n${argsString}Output:\n${run.output}`;
 				})
 				.join("\n\n");
+			const mappingDirective = buildCitationMappingMessage();
 
 			const synthesis = yield* generateFromDefaultEndpoint({
 				messages: [
@@ -641,7 +661,7 @@ async function* runMcpFlow({
 						from: "user",
 						content: `Question: ${question}\n\nTool results:\n${formattedResults}\n\nUsing only the tool results above, answer the question concisely. If uncertain, say you don't know.${
 							lastAssistantContent ? `\n\nModel notes: ${lastAssistantContent}` : ""
-						}`,
+						}${mappingDirective ? `\n\n${mappingDirective}` : ""}`,
 					},
 				],
 				preprompt:
