@@ -39,9 +39,9 @@ export const init: ServerInit = async () => {
 			);
 		}
 
-			logger.info("Starting server...");
-			initExitHandler();
-			loadMcpServersOnStartup();
+		logger.info("Starting server...");
+		initExitHandler();
+		loadMcpServersOnStartup();
 
 		checkAndRunMigrations();
 		refreshConversationStats();

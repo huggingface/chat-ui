@@ -23,7 +23,8 @@
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let eta = $derived(tool.find((update) => update.subtype === MessageToolUpdateType.ETA)?.eta);
 
-	const availableTools: ToolFront[] = (page.data as any)?.tools ?? [];
+	const toolsData = page.data as { tools?: ToolFront[] } | undefined;
+	const availableTools: ToolFront[] = toolsData?.tools ?? [];
 
 	let loadingBarEl: HTMLDivElement | undefined = $state();
 	let animation: Animation | undefined = $state();

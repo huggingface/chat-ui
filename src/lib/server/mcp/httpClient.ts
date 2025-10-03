@@ -30,6 +30,11 @@ export async function callMcpTool(
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	const url = toUrl(server.url);
 
+	const normalizedArgs =
+		typeof args === "object" && args !== null && !Array.isArray(args)
+			? (args as Record<string, unknown>)
+			: undefined;
+
 	async function connectStreamable() {
 		const transport = new StreamableHTTPClientTransport(url, {
 			requestInit: { headers: server.headers },
@@ -53,19 +58,24 @@ export async function callMcpTool(
 			usingSse = true;
 		}
 
-		const runTool = async () => client.callTool({ name: tool, arguments: args });
+		const runTool = async () => client.callTool({ name: tool, arguments: normalizedArgs });
+		type CallToolResult = Awaited<ReturnType<typeof runTool>>;
 
 		const raceWithTimeout = <T>(promise: Promise<T>) =>
 			Promise.race([
 				promise,
 				new Promise<never>((_, reject) => {
-					controller.signal.addEventListener("abort", () => reject(new Error("MCP tool call timed out")), {
-						once: true,
-					});
+					controller.signal.addEventListener(
+						"abort",
+						() => reject(new Error("MCP tool call timed out")),
+						{
+							once: true,
+						}
+					);
 				}),
 			]);
 
-		let response: Awaited<ReturnType<typeof runTool>>;
+		let response: CallToolResult;
 		try {
 			response = await raceWithTimeout(runTool());
 		} catch (error) {
@@ -80,10 +90,14 @@ export async function callMcpTool(
 			response = await raceWithTimeout(runTool());
 		}
 
-		const parts = Array.isArray(response?.content) ? response.content : [];
+		const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
 		const textParts = parts
-			.filter((part: any) => part?.type === "text" && typeof part.text === "string")
-			.map((part: any) => part.text as string);
+			.filter((part): part is { type: "text"; text: string } => {
+				if (typeof part !== "object" || part === null) return false;
+				const candidate = part as { type?: unknown; text?: unknown };
+				return candidate.type === "text" && typeof candidate.text === "string";
+			})
+			.map((part) => part.text);
 
 		if (textParts.length > 0) {
 			return textParts.join("\n");
