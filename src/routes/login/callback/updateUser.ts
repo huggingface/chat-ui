@@ -1,4 +1,8 @@
-import { getCoupledCookieHash, refreshSessionCookie } from "$lib/server/auth";
+import {
+	getCoupledCookieHash,
+	refreshSessionCookie,
+	tokenSetToSessionOauth,
+} from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { ObjectId } from "mongodb";
 import { DEFAULT_SETTINGS } from "$lib/types/Settings";
@@ -7,7 +11,7 @@ import type { UserinfoResponse, TokenSet } from "openid-client";
 import { error, type Cookies } from "@sveltejs/kit";
 import crypto from "crypto";
 import { sha256 } from "$lib/utils/sha256";
-import { addWeeks, subMinutes } from "date-fns";
+import { addWeeks } from "date-fns";
 import { OIDConfig } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
@@ -124,19 +128,7 @@ export async function updateUser(params: {
 	const coupledCookieHash = await getCoupledCookieHash({ type: "svelte", value: cookies });
 
 	// Prepare OAuth token data for session storage
-	const oauthData = token.access_token
-		? {
-				token: {
-					value: token.access_token,
-					expiresAt: token.expires_at
-						? subMinutes(new Date(token.expires_at * 1000), 1)
-						: token.expires_in
-							? subMinutes(new Date(Date.now() + token.expires_in * 1000), 1)
-							: addWeeks(new Date(), 2),
-				},
-				...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
-			}
-		: undefined;
+	const oauthData = tokenSetToSessionOauth(token);
 
 	if (existingUser) {
 		// update existing user if any
