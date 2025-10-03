@@ -113,18 +113,21 @@
 	);
 	let hasClientThink = $derived(!hasServerReasoning && thinkSegments.length > 1);
 	let formattedSources = $derived.by(() =>
-		(message.sources ?? []).map((source) => {
-			let hostname = source.link;
-			let faviconOrigin = source.link;
-			try {
-				const parsed = new URL(source.link);
-				hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
-				faviconOrigin = parsed.origin;
-			} catch {
-				// keep raw values if parsing fails
-			}
-			return { ...source, hostname, faviconOrigin };
-		})
+		(message.sources ?? [])
+			.slice()
+			.sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+			.map((source) => {
+				let hostname = source.link;
+				let faviconOrigin = source.link;
+				try {
+					const parsed = new URL(source.link);
+					hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+					faviconOrigin = parsed.origin;
+				} catch {
+					// keep raw values if parsing fails
+				}
+				return { ...source, hostname, faviconOrigin };
+			})
 	);
 
 	$effect(() => {
@@ -248,18 +251,18 @@
 								target="_blank"
 								rel="noopener noreferrer"
 								title={source.link}
-								aria-label={`Source ${index + 1}: ${source.hostname ?? source.link}`}
+								aria-label={`Source ${source.index ?? index + 1}: ${source.hostname ?? source.link}`}
 							>
-									<img
-										class="h-3.5 w-3.5 rounded"
-										src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.faviconOrigin ?? source.link)}`}
-										alt=""
-									/>
+								<img
+									class="h-3.5 w-3.5 rounded"
+									src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.faviconOrigin ?? source.link)}`}
+									alt=""
+								/>
 								<div class="text-gray-600 dark:text-gray-300">{source.hostname}</div>
 								<span
 									class="rounded bg-gray-100 px-1 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"
 								>
-									{index + 1}
+									{source.index ?? index + 1}
 								</span>
 							</a>
 						{/each}

@@ -19,6 +19,7 @@ import { archSelectRoute } from "$lib/server/router/arch";
 import { getRoutes, resolveRouteModels } from "$lib/server/router/policy";
 import { randomUUID } from "crypto";
 import { ToolResultStatus } from "$lib/types/Tool";
+import type { MessageSource } from "$lib/types/MessageUpdate";
 import type { ProcessedModel } from "../models";
 import type {
 	ChatCompletionChunk,
@@ -281,129 +282,194 @@ async function* runMcpFlow({
 			}
 		};
 
-			const toolRuns: ToolRun[] = [];
-			const citationSources: { title?: string; link: string }[] = [];
-			const citationIndex = new Map<string, number>();
-			let lastMappingCount = 0;
+		const toolRuns: ToolRun[] = [];
+		const citationSources: MessageSource[] = [];
+		const citationIndex = new Map<string, number>();
+		let lastMappingCount = 0;
 
-			const buildCitationMappingMessage = (): string | null => {
-				if (citationSources.length === 0) {
-					return null;
-				}
-				const pairs = citationSources
-					.map((source, index) => {
-						const label = `[${index + 1}]`;
-						return source.link ? `${label} ${source.link}` : label;
-					})
-					.filter(Boolean)
-					.join("\n");
-				if (!pairs) {
-					return null;
-				}
-				return `Use the following source index mapping when citing:
+		const buildCitationMappingMessage = (): string | null => {
+			if (citationSources.length === 0) {
+				return null;
+			}
+			const pairs = citationSources
+				.map((source) => {
+					const label = `[${source.index}]`;
+					return source.link ? `${label} ${source.link}` : label;
+				})
+				.filter(Boolean)
+				.join("\n");
+			if (!pairs) {
+				return null;
+			}
+			return `Use the following source index mapping when citing:
 ${pairs}
 Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
-			};
+		};
 
-			const injectCitationMappingMessage = () => {
-				if (citationSources.length === 0 || citationSources.length === lastMappingCount) {
-					return;
-				}
-				const mappingMessage = buildCitationMappingMessage();
-				if (!mappingMessage) {
-					return;
-				}
-				messagesOpenAI = [
-					...messagesOpenAI,
-					{ role: "system", content: mappingMessage },
-				];
-				lastMappingCount = citationSources.length;
-			};
+		const injectCitationMappingMessage = () => {
+			if (citationSources.length === 0 || citationSources.length === lastMappingCount) {
+				return;
+			}
+			const mappingMessage = buildCitationMappingMessage();
+			if (!mappingMessage) {
+				return;
+			}
+			messagesOpenAI = [...messagesOpenAI, { role: "system", content: mappingMessage }];
+			lastMappingCount = citationSources.length;
+		};
 
-			const registerSource = (rawUrl: string): number | null => {
-				const normalized = normalizeUrl(rawUrl);
-				if (!normalized) return null;
-				let current = citationIndex.get(normalized);
-				if (!current) {
-					current = citationSources.length + 1;
-					citationIndex.set(normalized, current);
-					citationSources.push({ link: normalized });
-				}
-				return current;
-			};
+		const registerSource = (rawUrl: string): number | null => {
+			const normalized = normalizeUrl(rawUrl);
+			if (!normalized) return null;
+			let current = citationIndex.get(normalized);
+			if (!current) {
+				current = citationSources.length + 1;
+				citationIndex.set(normalized, current);
+				citationSources.push({ link: normalized, index: current });
+			}
+			return current;
+		};
 
-			const collectToolOutputSources = (text: string): {
-				annotated: string;
-				sources: { index: number; link: string }[];
-			} => {
-				// Gather citation metadata without altering the original tool text so the UI can
-				// decide how to render it.
-				const matches = text.match(URL_REGEX) ?? [];
-				const sources: { index: number; link: string }[] = [];
-				for (const raw of matches) {
-					const index = registerSource(raw);
-					if (!index) continue;
-					const link = citationSources[index - 1]?.link;
-					if (!link) continue;
-					if (!sources.some((entry) => entry.index === index)) {
-						sources.push({ index, link });
-					}
+		const collectToolOutputSources = (
+			text: string
+		): {
+			annotated: string;
+			sources: { index: number; link: string }[];
+		} => {
+			// Gather citation metadata without altering the original tool text so the UI can
+			// decide how to render it.
+			const matches = text.match(URL_REGEX) ?? [];
+			const sources: { index: number; link: string }[] = [];
+			for (const raw of matches) {
+				const index = registerSource(raw);
+				if (!index) continue;
+				const link = citationSources[index - 1]?.link;
+				if (!link) continue;
+				if (!sources.some((entry) => entry.index === index)) {
+					sources.push({ index, link });
 				}
+			}
 
-				if (sources.length === 0) {
-					return { annotated: text, sources };
-				}
-
+			if (sources.length === 0) {
 				return { annotated: text, sources };
-			};
+			}
 
-			const stripTrailingSourcesBlock = (input: string): string => {
-				const lines = input.split("\n");
-				let start = -1;
-				for (let i = lines.length - 1; i >= 0; i -= 1) {
-					const trimmed = lines[i].trim();
-					if (!trimmed) continue;
-					if (/^sources?:\s*$/i.test(trimmed)) {
-						start = i;
-						break;
-					}
-					if (
-						/^sources?:\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+)(?:\s*,\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+))*$/i.test(
-							trimmed
-						)
-					) {
-						start = i;
-						break;
-					}
+			return { annotated: text, sources };
+		};
+
+		const stripTrailingSourcesBlock = (input: string): string => {
+			const lines = input.split("\n");
+			let start = -1;
+			for (let i = lines.length - 1; i >= 0; i -= 1) {
+				const trimmed = lines[i].trim();
+				if (!trimmed) continue;
+				if (/^sources?:\s*$/i.test(trimmed)) {
+					start = i;
+					break;
+				}
+				if (
+					/^sources?:\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+)(?:\s*,\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+))*$/i.test(
+						trimmed
+					)
+				) {
+					start = i;
+					break;
+				}
+				return input;
+			}
+			if (start === -1) return input;
+			for (let j = start + 1; j < lines.length; j += 1) {
+				const trimmed = lines[j].trim();
+				if (!trimmed) continue;
+				if (
+					!/^[-*]?\s*(?:\(?\s*\d+\)?\.?\s*)?(https?:\/\/\S+|\[[\d]+\]\([^)]*\))\s*$/i.test(trimmed)
+				) {
 					return input;
 				}
-				if (start === -1) return input;
-				for (let j = start + 1; j < lines.length; j += 1) {
-					const trimmed = lines[j].trim();
-					if (!trimmed) continue;
-					if (
-						!/^[-*]?\s*(?:\(?\s*\d+\)?\.?\s*)?(https?:\/\/\S+|\[[\d]+\]\([^)]*\))\s*$/i.test(
-							trimmed
-						)
-					) {
-						return input;
+			}
+			return lines.slice(0, start).join("\n").replace(/\s+$/, "");
+		};
+
+		const appendMissingCitations = (text: string): string => {
+			if (citationSources.length === 0) return text;
+			let updated = text;
+
+			updated = updated.replace(
+				/\n?Sources:\s*(?:\[[\d]+\]\([^)]*\)|\d+)(?:[\s,\n]+(?:\[[\d]+\]\([^)]*\)|\d+))*$/i,
+				""
+			);
+			updated = stripTrailingSourcesBlock(updated);
+			updated = updated.replace(/(^|\n)Tools?\s+used?:.*$/gi, "");
+			return updated.trim();
+		};
+
+		const extractUsedSourceIndexes = (text: string): number[] => {
+			const seen = new Set<number>();
+			const order: number[] = [];
+			const pattern = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
+			let match: RegExpExecArray | null;
+			while ((match = pattern.exec(text)) !== null) {
+				const parts = match[1].split(/\s*,\s*/);
+				for (const part of parts) {
+					const index = Number(part);
+					if (!Number.isFinite(index) || index <= 0) continue;
+					if (!seen.has(index)) {
+						seen.add(index);
+						order.push(index);
 					}
 				}
-				return lines.slice(0, start).join("\n").replace(/\s+$/, "");
-			};
+			}
+			return order;
+		};
 
-			const appendMissingCitations = (text: string): string => {
-				if (citationSources.length === 0) return text;
-				let updated = text;
+		const normalizeCitations = (
+			text: string
+		): { normalizedText: string; normalizedSources: MessageSource[] } => {
+			const indices = extractUsedSourceIndexes(text);
+			if (indices.length === 0) {
+				return { normalizedText: text, normalizedSources: [] };
+			}
 
-				updated = updated.replace(/\n?Sources:\s*(?:\[[\d]+\]\([^)]*\)|\d+)(?:[\s,\n]+(?:\[[\d]+\]\([^)]*\)|\d+))*$/i, "");
-				updated = stripTrailingSourcesBlock(updated);
-				updated = updated.replace(/(^|\n)Tools?\s+used?:.*$/gi, "");
-				return updated.trim();
-			};
+			const mapping = new Map<number, number>();
+			indices.forEach((oldIndex, position) => {
+				mapping.set(oldIndex, position + 1);
+			});
 
-			let lastAssistantContent = "";
-			let streamedContent = false;
+			const normalizedText = text.replace(
+				/\[(\d+(?:\s*,\s*\d+)*)\]/g,
+				(match: string, group: string) => {
+					const parts = group.split(/\s*,\s*/);
+					const mapped: number[] = [];
+					for (const part of parts) {
+						const oldIndex = Number(part);
+						if (!Number.isFinite(oldIndex) || oldIndex <= 0) continue;
+						const next = mapping.get(oldIndex);
+						if (!next) continue;
+						if (!mapped.includes(next)) {
+							mapped.push(next);
+						}
+					}
+					return mapped.length > 0 ? `[${mapped.join(", ")}]` : match;
+				}
+			);
+
+			const normalizedSources = indices
+				.map((oldIndex) => {
+					const source = citationSources.find((entry) => entry.index === oldIndex);
+					const newIndex = mapping.get(oldIndex);
+					if (!source || !newIndex) {
+						return null;
+					}
+					return { ...source, index: newIndex } as MessageSource;
+				})
+				.filter((source): source is MessageSource => Boolean(source))
+				.sort((a, b) => a.index - b.index);
+
+			return { normalizedText, normalizedSources };
+		};
+
+		let lastAssistantContent = "";
+		let streamedContent = false;
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -413,15 +479,15 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 			};
 		}
 
-			for (let loop = 0; loop < 5; loop += 1) {
-				lastAssistantContent = "";
-				streamedContent = false;
-				injectCitationMappingMessage();
+		for (let loop = 0; loop < 5; loop += 1) {
+			lastAssistantContent = "";
+			streamedContent = false;
+			injectCitationMappingMessage();
 
-				const completionRequest: ChatCompletionCreateParamsStreaming = {
-					...completionBase,
-					messages: messagesOpenAI,
-				};
+			const completionRequest: ChatCompletionCreateParamsStreaming = {
+				...completionBase,
+				messages: messagesOpenAI,
+			};
 
 			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
 				completionRequest,
@@ -659,13 +725,14 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 				locals,
 			});
 
-				const finalSynthesis = appendMissingCitations(synthesis);
-				yield {
-					type: MessageUpdateType.FinalAnswer,
-					text: finalSynthesis,
-					interrupted: false,
-					sources: citationSources.length > 0 ? [...citationSources] : undefined,
-				};
+			const finalSynthesis = appendMissingCitations(synthesis);
+			const { normalizedText, normalizedSources } = normalizeCitations(finalSynthesis);
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text: normalizedText,
+				interrupted: false,
+				sources: normalizedSources.length > 0 ? normalizedSources : undefined,
+			};
 
 			return true;
 		}
@@ -677,13 +744,14 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 					token: lastAssistantContent,
 				};
 			}
-				const finalAssistantContent = appendMissingCitations(lastAssistantContent);
-				yield {
-					type: MessageUpdateType.FinalAnswer,
-					text: finalAssistantContent,
-					interrupted: false,
-					sources: citationSources.length > 0 ? [...citationSources] : undefined,
-				};
+			const finalAssistantContent = appendMissingCitations(lastAssistantContent);
+			const { normalizedText, normalizedSources } = normalizeCitations(finalAssistantContent);
+			yield {
+				type: MessageUpdateType.FinalAnswer,
+				text: normalizedText,
+				interrupted: false,
+				sources: normalizedSources.length > 0 ? normalizedSources : undefined,
+			};
 			return true;
 		}
 

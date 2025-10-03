@@ -2,6 +2,7 @@
 type SimpleSource = {
 	title?: string;
 	link: string;
+	index?: number;
 };
 import { processTokens, type Token } from "$lib/utils/marked";
 
