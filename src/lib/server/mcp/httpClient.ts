@@ -24,92 +24,62 @@ export async function callMcpTool(
 	args: unknown = {},
 	{ timeoutMs = DEFAULT_TIMEOUT_MS }: { timeoutMs?: number } = {}
 ): Promise<string> {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	const url = toUrl(server.url);
-
 	const normalizedArgs =
 		typeof args === "object" && args !== null && !Array.isArray(args)
 			? (args as Record<string, unknown>)
 			: undefined;
 
-	async function connectStreamable() {
-		const transport = new StreamableHTTPClientTransport(url, {
-			requestInit: { headers: server.headers },
-		});
+	async function connect(kind: "streamable" | "sse", signal: AbortSignal, client: Client) {
+		const requestInit: RequestInit = { headers: server.headers, signal };
+		const transport =
+			kind === "streamable"
+				? new StreamableHTTPClientTransport(url, { requestInit })
+				: new SSEClientTransport(url, { requestInit });
 		await client.connect(transport);
 	}
 
-	async function connectSse() {
-		const transport = new SSEClientTransport(url, {
-			requestInit: { headers: server.headers },
-		});
-		await client.connect(transport);
-	}
+	let lastError: unknown;
 
-	try {
-		let usingSse = false;
+	for (const kind of ["streamable", "sse"] as const) {
+		const controller = new AbortController();
+		const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
+		const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
 		try {
-			await connectStreamable();
-		} catch {
-			await connectSse();
-			usingSse = true;
-		}
+			await connect(kind, controller.signal, client);
+			const response = await client.callTool({ name: tool, arguments: normalizedArgs });
+			const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
+			const textParts = parts
+				.filter((part): part is { type: "text"; text: string } => {
+					if (typeof part !== "object" || part === null) return false;
+					const candidate = part as { type?: unknown; text?: unknown };
+					return candidate.type === "text" && typeof candidate.text === "string";
+				})
+				.map((part) => part.text);
 
-		const runTool = async () => client.callTool({ name: tool, arguments: normalizedArgs });
-		type CallToolResult = Awaited<ReturnType<typeof runTool>>;
+			if (textParts.length > 0) {
+				return textParts.join("\n");
+			}
 
-		const raceWithTimeout = <T>(promise: Promise<T>) =>
-			Promise.race([
-				promise,
-				new Promise<never>((_, reject) => {
-					controller.signal.addEventListener(
-						"abort",
-						() => reject(new Error("MCP tool call timed out")),
-						{
-							once: true,
-						}
-					);
-				}),
-			]);
-
-		let response: CallToolResult;
-		try {
-			response = await raceWithTimeout(runTool());
+			return JSON.stringify(response);
 		} catch (error) {
-			if (usingSse) throw error;
+			lastError = error;
+			if (kind === "sse") {
+				throw error;
+			}
+		} finally {
+			clearTimeout(timeout);
+			controller.abort();
 			try {
 				await client.close?.();
 			} catch {
 				// ignore close errors
 			}
-			await connectSse();
-			usingSse = true;
-			response = await raceWithTimeout(runTool());
-		}
-
-		const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
-		const textParts = parts
-			.filter((part): part is { type: "text"; text: string } => {
-				if (typeof part !== "object" || part === null) return false;
-				const candidate = part as { type?: unknown; text?: unknown };
-				return candidate.type === "text" && typeof candidate.text === "string";
-			})
-			.map((part) => part.text);
-
-		if (textParts.length > 0) {
-			return textParts.join("\n");
-		}
-
-		return JSON.stringify(response);
-	} finally {
-		clearTimeout(timeout);
-		try {
-			await client.close?.();
-		} catch {
-			// ignore close errors
 		}
 	}
+
+	throw lastError instanceof Error
+		? lastError
+		: new Error(String(lastError ?? "MCP tool call failed"));
 }
