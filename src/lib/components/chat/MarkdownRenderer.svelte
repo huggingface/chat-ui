@@ -9,9 +9,11 @@
 	import { onMount } from "svelte";
 	import { updateDebouncer } from "$lib/utils/updates";
 
+	import type { MessageSource } from "$lib/types/MessageUpdate";
+
 	interface Props {
 		content: string;
-		sources?: { title?: string; link: string }[];
+		sources?: MessageSource[];
 		loading?: boolean;
 	}
 

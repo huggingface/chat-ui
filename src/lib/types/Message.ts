@@ -1,4 +1,4 @@
-import type { MessageUpdate } from "./MessageUpdate";
+import type { MessageSource, MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { v4 } from "uuid";
 
@@ -16,7 +16,7 @@ export type Message = Partial<Timestamps> & {
 	 **/
 	files?: MessageFile[];
 	interrupted?: boolean;
-	sources?: { title?: string; link: string }[];
+	sources?: MessageSource[];
 
 	// Router metadata when using llm-router
 	routerMetadata?: {

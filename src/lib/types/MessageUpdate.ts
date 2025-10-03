@@ -109,10 +109,15 @@ export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
 	text: string;
 	interrupted: boolean;
-	sources?: { title?: string; link: string }[];
+	sources?: MessageSource[];
 }
 export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;
 	route: string;
 	model: string;
+}
+export interface MessageSource {
+	title?: string;
+	link: string;
+	index: number;
 }
