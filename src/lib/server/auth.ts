@@ -10,7 +10,7 @@ import { config } from "$lib/server/config";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
 import { dev } from "$app/environment";
-import type { Cookies } from "@sveltejs/kit";
+import { redirect, type Cookies } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
@@ -19,6 +19,7 @@ import type { Cookie } from "elysia";
 import { adminTokenManager } from "./adminToken";
 import type { User } from "$lib/types/User";
 import type { Session } from "$lib/types/Session";
+import { base } from "$app/paths";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -358,4 +359,33 @@ export async function authenticateRequest(
 	}
 
 	return { user: undefined, sessionId, secretSessionId, isAdmin: false };
+}
+
+export async function triggerOauthFlow({
+	request,
+	url,
+	locals,
+}: {
+	request: Request;
+	url: URL;
+	locals: App.Locals;
+}): Promise<Response> {
+	const referer = request.headers.get("referer");
+	let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
+
+	// TODO: Handle errors if provider is not responding
+
+	if (url.searchParams.has("callback")) {
+		const callback = url.searchParams.get("callback") || redirectURI;
+		if (config.ALTERNATIVE_REDIRECT_URLS.includes(callback)) {
+			redirectURI = callback;
+		}
+	}
+
+	const authorizationUrl = await getOIDCAuthorizationUrl(
+		{ redirectURI },
+		{ sessionId: locals.sessionId }
+	);
+
+	throw redirect(302, authorizationUrl);
 }
