@@ -112,6 +112,17 @@
 			message.reasoning.trim().length > 0
 	);
 	let hasClientThink = $derived(!hasServerReasoning && thinkSegments.length > 1);
+	let formattedSources = $derived.by(() =>
+		(message.sources ?? []).map((source) => {
+			let hostname = source.link;
+			try {
+				hostname = new URL(source.link).hostname.replace(/^www\./, "");
+			} catch {
+				// keep raw link if parsing fails
+			}
+			return { ...source, hostname };
+		})
+	);
 
 	$effect(() => {
 		if (isCopied) {
@@ -205,7 +216,11 @@
 							<div
 								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 							>
-								<MarkdownRenderer content={part} loading={isLast && loading} />
+								<MarkdownRenderer
+									content={part}
+									sources={message.sources ?? []}
+									loading={isLast && loading}
+								/>
 							</div>
 						{/if}
 					{/each}
@@ -213,7 +228,36 @@
 					<div
 						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 					>
-						<MarkdownRenderer content={message.content} loading={isLast && loading} />
+						<MarkdownRenderer
+							content={message.content}
+							sources={message.sources ?? []}
+							loading={isLast && loading}
+						/>
+					</div>
+				{/if}
+				{#if formattedSources.length}
+					<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+						<div class="text-gray-400">Sources:</div>
+						{#each formattedSources as source, index}
+							<a
+								class="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-100 bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+								href={source.link}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<img
+									class="h-3.5 w-3.5 rounded"
+									src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.link)}`}
+									alt=""
+								/>
+								<div class="text-gray-600 dark:text-gray-300">{source.hostname}</div>
+								<span
+									class="rounded bg-gray-100 px-1 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"
+								>
+									{index + 1}
+								</span>
+							</a>
+						{/each}
 					</div>
 				{/if}
 			</div>

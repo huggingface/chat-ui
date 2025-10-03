@@ -29,6 +29,7 @@ export async function GET({ locals, params }) {
 					files: message.files,
 					updates: message.updates,
 					reasoning: message.reasoning,
+					sources: message.sources,
 				})),
 			};
 			return Response.json(res);
