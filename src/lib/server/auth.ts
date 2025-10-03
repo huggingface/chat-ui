@@ -5,7 +5,7 @@ import {
 	type TokenSet,
 	custom,
 } from "openid-client";
-import { addHours, addWeeks } from "date-fns";
+import { addHours, addWeeks, differenceInMinutes, subMinutes } from "date-fns";
 import { config } from "$lib/server/config";
 import { sha256 } from "$lib/utils/sha256";
 import { z } from "zod";
@@ -20,6 +20,8 @@ import { adminTokenManager } from "./adminToken";
 import type { User } from "$lib/types/User";
 import type { Session } from "$lib/types/Session";
 import { base } from "$app/paths";
+import { acquireLock, releaseLock } from "$lib/migrations/lock";
+import { Semaphores } from "$lib/types/Semaphore";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -93,6 +95,56 @@ export async function findUser(
 		return { user: null, invalidateSession: true };
 	}
 
+	// Check if OAuth token needs refresh
+	if (session.oauth?.token && session.oauth.refreshToken) {
+		// If token expires in less than 5 minutes, refresh it
+		if (differenceInMinutes(session.oauth.token.expiresAt, new Date()) < 5) {
+			const lockKey = `${Semaphores.OAUTH_TOKEN_REFRESH}:${sessionId}`;
+
+			// Acquire lock for token refresh
+			const lockId = await acquireLock(lockKey);
+			if (lockId) {
+				try {
+					// Attempt to refresh the token
+					const newTokenSet = await refreshOAuthToken(
+						{ redirectURI: `${config.PUBLIC_ORIGIN}${base}/login/callback` },
+						session.oauth.refreshToken
+					);
+
+					if (!newTokenSet || !newTokenSet.access_token) {
+						// Token refresh failed, invalidate session
+						return { user: null, invalidateSession: true };
+					}
+
+					// Update session with new token information
+					const updatedOAuth = tokenSetToSessionOauth(newTokenSet);
+
+					if (!updatedOAuth) {
+						// Token refresh failed, invalidate session
+						return { user: null, invalidateSession: true };
+					}
+
+					await collections.sessions.updateOne(
+						{ sessionId },
+						{
+							$set: {
+								oauth: updatedOAuth,
+								updatedAt: new Date(),
+							},
+						}
+					);
+
+					session.oauth = updatedOAuth;
+				} catch (err) {
+					logger.error("Error during token refresh:", err);
+					return { user: null, invalidateSession: true };
+				} finally {
+					await releaseLock(lockKey, lockId);
+				}
+			}
+		}
+	}
+
 	return {
 		user: await collections.users.findOne({ _id: session.userId }),
 		invalidateSession: false,
@@ -108,6 +160,22 @@ export const authCondition = (locals: App.Locals) => {
 		? { userId: locals.user._id }
 		: { sessionId: locals.sessionId, userId: { $exists: false } };
 };
+
+export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
+	if (!tokenSet.access_token) {
+		return undefined;
+	}
+
+	return {
+		token: {
+			value: tokenSet.access_token,
+			expiresAt: tokenSet.expires_at
+				? subMinutes(new Date(tokenSet.expires_at * 1000), 1)
+				: addWeeks(new Date(), 2),
+		},
+		refreshToken: tokenSet.refresh_token || undefined,
+	};
+}
 
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
@@ -126,8 +194,23 @@ export async function generateCsrfToken(sessionId: string, redirectUrl: string):
 	).toString("base64");
 }
 
+let lastIssuer: Issuer<BaseClient> | null = null;
+let lastIssuerFetchedAt: Date | null = null;
 async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
-	const issuer = await Issuer.discover(OIDConfig.PROVIDER_URL);
+	if (
+		lastIssuer &&
+		lastIssuerFetchedAt &&
+		differenceInMinutes(new Date(), lastIssuerFetchedAt) >= 10
+	) {
+		lastIssuer = null;
+		lastIssuerFetchedAt = null;
+	}
+	if (!lastIssuer) {
+		lastIssuer = await Issuer.discover(OIDConfig.PROVIDER_URL);
+		lastIssuerFetchedAt = new Date();
+	}
+
+	const issuer = lastIssuer;
 
 	const client_config: ConstructorParameters<typeof issuer.Client>[0] = {
 		client_id: OIDConfig.CLIENT_ID,
@@ -171,6 +254,18 @@ export async function getOIDCUserData(
 	const userData = await client.userinfo(token);
 
 	return { token, userData };
+}
+
+/**
+ * Refreshes an OAuth token using the refresh token
+ */
+export async function refreshOAuthToken(
+	settings: OIDCSettings,
+	refreshToken: string
+): Promise<TokenSet | null> {
+	const client = await getOIDCClient(settings);
+	const tokenSet = await client.refresh(refreshToken);
+	return tokenSet;
 }
 
 export async function validateAndParseCsrfToken(
