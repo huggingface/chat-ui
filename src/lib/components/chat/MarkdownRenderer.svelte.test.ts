@@ -36,6 +36,7 @@ describe("MarkdownRenderer", () => {
 				{
 					title: "foo",
 					link: "https://example.com",
+					index: 1,
 				},
 			],
 		};
@@ -54,14 +55,17 @@ describe("MarkdownRenderer", () => {
 				{
 					title: "foo",
 					link: "https://foo.com",
+					index: 1,
 				},
 				{
 					title: "bar",
 					link: "https://bar.com",
+					index: 2,
 				},
 				{
 					title: "baz",
 					link: "https://baz.com",
+					index: 3,
 				},
 			],
 		});
@@ -77,6 +81,7 @@ describe("MarkdownRenderer", () => {
 				{
 					title: "foo",
 					link: "https://example.com",
+					index: 1,
 				},
 			],
 		});

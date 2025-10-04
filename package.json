@@ -100,7 +100,8 @@
 		"tailwindcss": "^3.4.0",
 		"uuid": "^10.0.0",
 		"vitest-browser-svelte": "^0.1.0",
-		"zod": "^3.22.3"
+		"zod": "^3.22.3",
+		"@modelcontextprotocol/sdk": "^1.17.5"
 	},
 	"overrides": {
 		"@reflink/reflink": "file:stub/@reflink/reflink"

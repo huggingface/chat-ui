@@ -6,6 +6,7 @@ import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
 type SimpleSource = {
 	title?: string;
 	link: string;
+	index?: number;
 };
 import hljs from "highlight.js";
 
@@ -87,10 +88,20 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 		const rule1 = /^\$([^$]+?)\$/;
 		const match1 = rule1.exec(src);
 		if (match1) {
+			const content = match1[1];
+			const trimmed = content.trim();
+			const looksLikeCurrency = /^[0-9][0-9,]*(?:\.[0-9]+)?(?:\s*\[\d+\])?$/.test(trimmed);
+			const looksLikeSentence = /[A-Za-z]{3,}/.test(trimmed) && /\s/.test(trimmed);
+			const hasMathControl = /[\\^_=]/.test(trimmed);
+			const probablyMath = hasMathControl || /\d\s*[-+*/]\s*\d/.test(trimmed);
+			// Treat $amount or plain prose as literal text unless explicit math is present
+			if (!probablyMath && (looksLikeCurrency || looksLikeSentence)) {
+				return undefined;
+			}
 			const token: katexInlineToken = {
 				type: "katexInline",
 				raw: match1[0],
-				text: match1[1].trim(),
+				text: trimmed,
 				displayMode: false,
 			};
 			return token;
@@ -137,24 +148,96 @@ function escapeHTML(content: string) {
 	);
 }
 
-function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
-	const linkStyle =
-		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
-	return md.replace(/\[(\d+)\]/g, (match: string) => {
-		const indices: number[] = (match.match(/\d+/g) || []).map(Number);
-		const links: string = indices
-			.map((index: number) => {
-				if (index === 0) return false;
-				const source = webSearchSources[index - 1];
-				if (source) {
-					return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
-				}
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+function escapeAttribute(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function sanitizeHrefAttribute(
+	href: string | undefined,
+	{ allowRelative = false }: { allowRelative?: boolean } = {}
+): string {
+	if (!href) return "";
+	const trimmed = href.replace(/>$/, "");
+
+	const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed);
+	if (hasScheme) {
+		try {
+			const parsed = new URL(trimmed);
+			if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
 				return "";
-			})
-			.filter(Boolean)
-			.join(", ");
-		return links ? ` <sup>${links}</sup>` : match;
+			}
+			return escapeAttribute(trimmed);
+		} catch {
+			return "";
+		}
+	}
+
+	if (!allowRelative) {
+		return "";
+	}
+
+	if (/^(?:#|\/|\.\/|\.\.\/)/.test(trimmed)) {
+		return escapeAttribute(trimmed);
+	}
+
+	return "";
+}
+
+function transformOutsideHtmlCode(html: string, transform: (segment: string) => string): string {
+	const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
+	return parts.map((part) => (/^<pre|^<code/i.test(part) ? part : transform(part))).join("");
+}
+
+function addInlineCitations(html: string, webSearchSources: SimpleSource[] = []): string {
+	const linkStyle = "color: rgb(59, 130, 246); text-decoration: none;";
+	const indexMap = new Map<number, SimpleSource>();
+	webSearchSources.forEach((source, position) => {
+		const resolvedIndex = Number.isFinite(source.index) ? Number(source.index) : position + 1;
+		if (resolvedIndex > 0 && !indexMap.has(resolvedIndex)) {
+			indexMap.set(resolvedIndex, source);
+		}
 	});
+
+	const applyReplacements = (value: string) =>
+		value
+			.replace(/\[(\d+)\](?!\()/g, (match: string, rawIndex: string) => {
+				const index = Number(rawIndex);
+				const source = indexMap.get(index);
+				if (!source) {
+					return match;
+				}
+				const safeHref = sanitizeHrefAttribute(source.link, { allowRelative: false });
+				return safeHref
+					? ` <sup><a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a></sup>`
+					: match;
+			})
+			.replace(/\((\d+\s*(?:,\s*\d+)+)\)/g, (match: string, group: string) => {
+				const linked = group
+					.split(/\s*,\s*/)
+					.map((token) => {
+						const index = Number(token);
+						const source = indexMap.get(index);
+						if (!source) {
+							return "";
+						}
+						const safeHref = sanitizeHrefAttribute(source.link, { allowRelative: false });
+						return safeHref
+							? `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`
+							: "";
+					})
+					.filter(Boolean)
+					.join(", ");
+				return linked ? ` (<sup>${linked}</sup>)` : match;
+			});
+
+	return transformOutsideHtmlCode(html, applyReplacements);
 }
 
 function createMarkedInstance(sources: SimpleSource[]): Marked {
@@ -164,8 +247,13 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
-			link: (href, title, text) =>
-				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
+			link: (href, _title, text) => {
+				const safeHref = sanitizeHrefAttribute(href, { allowRelative: true });
+				const safeText = escapeHTML(text ?? "");
+				return safeHref
+					? `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeText}</a>`
+					: safeText;
+			},
 			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
