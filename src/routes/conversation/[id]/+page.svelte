@@ -247,6 +247,7 @@
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
 			}
+			const initialMessageContent = messageToWriteTo.content ?? "";
 
 			const messageUpdatesAbortController = new AbortController();
 
@@ -332,9 +333,9 @@
 						messageToWriteTo.content += buffer;
 						buffer = "";
 					}
-					if (update.text) {
-						messageToWriteTo.content = update.text;
-					}
+					const finalText =
+						update.text ?? messageToWriteTo.content.slice(initialMessageContent.length);
+					messageToWriteTo.content = initialMessageContent + finalText;
 					messageToWriteTo.interrupted = update.interrupted;
 					if (update.sources && update.sources.length > 0) {
 						messageToWriteTo.sources = update.sources;

@@ -56,10 +56,24 @@ type ToolRun = {
 	output: string;
 };
 
-const URL_REGEX = /https?:\/\/[^\s)\]}"'>]+/g;
+const URL_REGEX = /https?:\/\/[^\s<]+/g;
 
 function normalizeUrl(raw: string): string {
-	return raw.replace(/[)\].,;:"'>]+$/g, "");
+	const canParse = (value: string) => {
+		try {
+			const parsed = new URL(value);
+			return parsed.protocol === "http:" || parsed.protocol === "https:";
+		} catch {
+			return false;
+		}
+	};
+
+	if (canParse(raw)) {
+		return raw;
+	}
+
+	const trimmed = raw.replace(/[)\].,;:"'>]+$/g, "");
+	return canParse(trimmed) ? trimmed : raw;
 }
 
 function buildToolPreprompt(tools: OpenAiTool[]): string {
@@ -286,6 +300,7 @@ async function* runMcpFlow({
 		const citationSources: MessageSource[] = [];
 		const citationIndex = new Map<string, number>();
 		let lastMappingCount = 0;
+		let mappingMessageIndex: number | null = null;
 
 		const buildCitationMappingMessage = (): string | null => {
 			if (citationSources.length === 0) {
@@ -314,7 +329,20 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 			if (!mappingMessage) {
 				return;
 			}
+			if (mappingMessageIndex !== null && mappingMessageIndex >= 0) {
+				if (mappingMessageIndex < messagesOpenAI.length) {
+					const existing = messagesOpenAI[mappingMessageIndex];
+					if (existing?.role === "system") {
+						messagesOpenAI = [
+							...messagesOpenAI.slice(0, mappingMessageIndex),
+							...messagesOpenAI.slice(mappingMessageIndex + 1),
+						];
+					}
+				}
+				mappingMessageIndex = null;
+			}
 			messagesOpenAI = [...messagesOpenAI, { role: "system", content: mappingMessage }];
+			mappingMessageIndex = messagesOpenAI.length - 1;
 			lastMappingCount = citationSources.length;
 		};
 
@@ -359,26 +387,27 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 
 		const stripTrailingSourcesBlock = (input: string): string => {
 			const lines = input.split("\n");
-			let start = -1;
+			let headerIndex = -1;
 			for (let i = lines.length - 1; i >= 0; i -= 1) {
 				const trimmed = lines[i].trim();
 				if (!trimmed) continue;
-				if (/^sources?:\s*$/i.test(trimmed)) {
-					start = i;
-					break;
-				}
 				if (
+					/^sources?:\s*$/i.test(trimmed) ||
 					/^sources?:\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+)(?:\s*,\s*(?:\[[\d]+\]\([^)]*\)|\(?\s*\d+\)?|https?:\/\/\S+))*$/i.test(
 						trimmed
 					)
 				) {
-					start = i;
+					headerIndex = i;
 					break;
 				}
-				return input;
+				if (
+					!/^[-*]?\s*(?:\(?\s*\d+\)?\.?\s*)?(https?:\/\/\S+|\[[\d]+\]\([^)]*\))\s*$/i.test(trimmed)
+				) {
+					return input;
+				}
 			}
-			if (start === -1) return input;
-			for (let j = start + 1; j < lines.length; j += 1) {
+			if (headerIndex === -1) return input;
+			for (let j = headerIndex + 1; j < lines.length; j += 1) {
 				const trimmed = lines[j].trim();
 				if (!trimmed) continue;
 				if (
@@ -387,7 +416,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 					return input;
 				}
 			}
-			return lines.slice(0, start).join("\n").replace(/\s+$/, "");
+			return lines.slice(0, headerIndex).join("\n").replace(/\s+$/, "");
 		};
 
 		const appendMissingCitations = (text: string): string => {
@@ -425,7 +454,32 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 		const normalizeCitations = (
 			text: string
 		): { normalizedText: string; normalizedSources: MessageSource[] } => {
-			const indices = extractUsedSourceIndexes(text);
+			const maskCodeSegments = (value: string) => {
+				const placeholders: string[] = [];
+				const token = (index: number) => `\uE000${index}\uE001`;
+				const stash = (match: string) => {
+					const placeholder = token(placeholders.length);
+					placeholders.push(match);
+					return placeholder;
+				};
+
+				let masked = value.replace(/```[\s\S]*?```/g, stash);
+				masked = masked.replace(/~~~[\s\S]*?~~~/g, stash);
+				masked = masked.replace(/`[^`]*`/g, stash);
+
+				const unmask = (input: string) =>
+					input.replace(/\uE000(\d+)\uE001/g, (_match, idx) => placeholders[Number(idx)] ?? "");
+
+				return { masked, unmask };
+			};
+
+			if (citationSources.length === 0) {
+				return { normalizedText: text, normalizedSources: [] };
+			}
+
+			const { masked, unmask } = maskCodeSegments(text);
+
+			const indices = extractUsedSourceIndexes(masked);
 			if (indices.length === 0) {
 				return { normalizedText: text, normalizedSources: [] };
 			}
@@ -435,7 +489,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 				mapping.set(oldIndex, position + 1);
 			});
 
-			const normalizedText = text.replace(
+			const normalizedMaskedText = masked.replace(
 				/\[(\d+(?:\s*,\s*\d+)*)\]/g,
 				(match: string, group: string) => {
 					const parts = group.split(/\s*,\s*/);
@@ -465,7 +519,7 @@ Reference only these indices (e.g., [1]) and reuse numbers for repeat URLs.`;
 				.filter((source): source is MessageSource => Boolean(source))
 				.sort((a, b) => a.index - b.index);
 
-			return { normalizedText, normalizedSources };
+			return { normalizedText: unmask(normalizedMaskedText), normalizedSources };
 		};
 
 		let lastAssistantContent = "";
