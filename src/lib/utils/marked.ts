@@ -6,6 +6,7 @@ import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
 type SimpleSource = {
 	title?: string;
 	link: string;
+	index?: number;
 };
 import hljs from "highlight.js";
 
@@ -147,60 +148,112 @@ function escapeHTML(content: string) {
 	);
 }
 
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+function escapeAttribute(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function sanitizeHrefAttribute(
+	href: string | undefined,
+	{ allowRelative = false }: { allowRelative?: boolean } = {}
+): string {
+	if (!href) return "";
+	const trimmed = href.replace(/>$/, "");
+
+	const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed);
+	if (hasScheme) {
+		try {
+			const parsed = new URL(trimmed);
+			if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+				return "";
+			}
+			return escapeAttribute(trimmed);
+		} catch {
+			return "";
+		}
+	}
+
+	if (!allowRelative) {
+		return "";
+	}
+
+	if (/^(?:#|\/|\.\/|\.\.\/)/.test(trimmed)) {
+		return escapeAttribute(trimmed);
+	}
+
+	return "";
+}
+
 function transformOutsideHtmlCode(html: string, transform: (segment: string) => string): string {
 	const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
-	return parts
-		.map((part) => (/^<pre|^<code/i.test(part) ? part : transform(part)))
-		.join("");
+	return parts.map((part) => (/^<pre|^<code/i.test(part) ? part : transform(part))).join("");
 }
 
 function addInlineCitations(html: string, webSearchSources: SimpleSource[] = []): string {
 	const linkStyle = "color: rgb(59, 130, 246); text-decoration: none;";
+	const indexMap = new Map<number, SimpleSource>();
+	webSearchSources.forEach((source, position) => {
+		const resolvedIndex = Number.isFinite(source.index) ? Number(source.index) : position + 1;
+		if (resolvedIndex > 0 && !indexMap.has(resolvedIndex)) {
+			indexMap.set(resolvedIndex, source);
+		}
+	});
+
 	const applyReplacements = (value: string) =>
 		value
-			.replace(/\[(\d+)\](?!\()/g, (match: string) => {
-				const indices: number[] = (match.match(/\d+/g) || []).map(Number);
-				const links: string = indices
-					.map((index: number) => {
-						if (index === 0) return "";
-						const source = webSearchSources[index - 1];
-						if (!source) return "";
-						return `<a href="${source.link}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`;
-					})
-					.filter(Boolean)
-					.join(", ");
-				return links ? ` <sup>${links}</sup>` : match;
+			.replace(/\[(\d+)\](?!\()/g, (match: string, rawIndex: string) => {
+				const index = Number(rawIndex);
+				const source = indexMap.get(index);
+				if (!source) {
+					return match;
+				}
+				const safeHref = sanitizeHrefAttribute(source.link, { allowRelative: false });
+				return safeHref
+					? ` <sup><a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a></sup>`
+					: match;
 			})
 			.replace(/\((\d+\s*(?:,\s*\d+)+)\)/g, (match: string, group: string) => {
-				const indices = group
+				const linked = group
 					.split(/\s*,\s*/)
-					.map((value) => Number(value.trim()))
-					.filter((value) => Number.isFinite(value) && value > 0);
-				if (indices.length === 0) return match;
-				const links = indices
-					.map((index: number) => {
-						const source = webSearchSources[index - 1];
-						if (!source) return "";
-						return `<a href="${source.link}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`;
+					.map((token) => {
+						const index = Number(token);
+						const source = indexMap.get(index);
+						if (!source) {
+							return "";
+						}
+						const safeHref = sanitizeHrefAttribute(source.link, { allowRelative: false });
+						return safeHref
+							? `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`
+							: "";
 					})
 					.filter(Boolean)
 					.join(", ");
-				return links ? ` (<sup>${links}</sup>)` : match;
+				return linked ? ` (<sup>${linked}</sup>)` : match;
 			});
 
-	const decorate = (segment: string) => applyReplacements(segment);
-	return transformOutsideHtmlCode(html, decorate);
+	return transformOutsideHtmlCode(html, applyReplacements);
 }
 
 function createMarkedInstance(sources: SimpleSource[]): Marked {
 	return new Marked({
-			hooks: {
-				postprocess: (html) => addInlineCitations(html, sources),
-			},
+		hooks: {
+			postprocess: (html) => addInlineCitations(html, sources),
+		},
 		extensions: [katexBlockExtension, katexInlineExtension],
-			renderer: {
-				link: (href, title, text) =>
-					`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noopener noreferrer">${text}</a>`,
+		renderer: {
+			link: (href, _title, text) => {
+				const safeHref = sanitizeHrefAttribute(href, { allowRelative: true });
+				const safeText = escapeHTML(text ?? "");
+				return safeHref
+					? `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeText}</a>`
+					: safeText;
+			},
 			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
