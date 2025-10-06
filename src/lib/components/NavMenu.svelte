@@ -162,7 +162,7 @@
 
 			<img
 				src="https://huggingface.co/api/users/victor/avatar?redirect=true"
-				class="ml-auto size-4 rounded-full border dark:border-white/40"
+				class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
 		</button>
