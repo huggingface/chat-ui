@@ -334,14 +334,19 @@ export async function* runMcpFlow({
 			});
 
 			let executionResult: ToolCallExecutionResult | undefined;
-			let iterResult = await executionGenerator.next();
-			while (!iterResult.done) {
-				yield iterResult.value;
-				iterResult = await executionGenerator.next();
+			for await (const event of executionGenerator) {
+				if (event.type === "update") {
+					yield event.update;
+				} else if (event.type === "complete") {
+					executionResult = event.summary;
+				}
 			}
-			executionResult = iterResult.value;
 
 			if (!executionResult) {
+				logger.warn(
+					{ serverCount: servers.length, callCount: normalizedCalls.length },
+					"[mcp] executeToolCalls completed without summary"
+				);
 				return false;
 			}
 

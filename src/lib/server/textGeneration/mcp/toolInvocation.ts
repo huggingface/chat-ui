@@ -40,6 +40,10 @@ export interface ToolCallExecutionResult {
 	finalAnswer?: { text: string; interrupted: boolean };
 }
 
+export type ToolExecutionEvent =
+	| { type: "update"; update: MessageUpdate }
+	| { type: "complete"; summary: ToolCallExecutionResult };
+
 const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => {
 	const map = new Map<string, McpServerConfig>();
 	for (const server of servers) {
@@ -57,7 +61,7 @@ export async function* executeToolCalls({
 	parseArgs,
 	toPrimitive,
 	collectToolOutputSources,
-}: ExecuteToolCallsParams): AsyncGenerator<MessageUpdate, ToolCallExecutionResult, undefined> {
+}: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
@@ -75,48 +79,68 @@ export async function* executeToolCalls({
 		}
 
 		yield {
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.Call,
-			uuid,
-			call: { name: call.name, parameters: parametersClean },
+			type: "update",
+			update: {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Call,
+				uuid,
+				call: { name: call.name, parameters: parametersClean },
+			},
 		};
 
 		yield {
-			type: MessageUpdateType.Tool,
-			subtype: MessageToolUpdateType.ETA,
-			uuid,
-			eta: 10,
+			type: "update",
+			update: {
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.ETA,
+				uuid,
+				eta: 10,
+			},
 		};
 
 		if (!mappingEntry) {
 			const message = `Unknown MCP function: ${call.name}`;
 			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Error,
-				uuid,
-				message,
+				type: "update",
+				update: {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid,
+					message,
+				},
 			};
-			return {
-				toolMessages,
-				toolRuns,
-				finalAnswer: { text: message, interrupted: false },
+			yield {
+				type: "complete",
+				summary: {
+					toolMessages,
+					toolRuns,
+					finalAnswer: { text: message, interrupted: false },
+				},
 			};
+			return;
 		}
 
 		const serverConfig = serverLookup.get(mappingEntry.server);
 		if (!serverConfig) {
 			const message = `Unknown MCP server: ${mappingEntry.server}`;
 			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Error,
-				uuid,
-				message,
+				type: "update",
+				update: {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid,
+					message,
+				},
 			};
-			return {
-				toolMessages,
-				toolRuns,
-				finalAnswer: { text: message, interrupted: false },
+			yield {
+				type: "complete",
+				summary: {
+					toolMessages,
+					toolRuns,
+					finalAnswer: { text: message, interrupted: false },
+				},
 			};
+			return;
 		}
 
 		try {
@@ -132,19 +156,22 @@ export async function* executeToolCalls({
 			);
 
 			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Result,
-				uuid,
-				result: {
-					status: ToolResultStatus.Success,
-					call: { name: call.name, parameters: parametersClean },
-					outputs: [
-						{
-							content: output,
-							sources: outputSources,
-						},
-					],
-					display: true,
+				type: "update",
+				update: {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Result,
+					uuid,
+					result: {
+						status: ToolResultStatus.Success,
+						call: { name: call.name, parameters: parametersClean },
+						outputs: [
+							{
+								content: output,
+								sources: outputSources,
+							},
+						],
+						display: true,
+					},
 				},
 			};
 
@@ -157,18 +184,28 @@ export async function* executeToolCalls({
 				"[mcp] tool call failed"
 			);
 			yield {
-				type: MessageUpdateType.Tool,
-				subtype: MessageToolUpdateType.Error,
-				uuid,
-				message,
+				type: "update",
+				update: {
+					type: MessageUpdateType.Tool,
+					subtype: MessageToolUpdateType.Error,
+					uuid,
+					message,
+				},
 			};
-			return {
-				toolMessages,
-				toolRuns,
-				finalAnswer: { text: `MCP error: ${message}`, interrupted: false },
+			yield {
+				type: "complete",
+				summary: {
+					toolMessages,
+					toolRuns,
+					finalAnswer: { text: `MCP error: ${message}`, interrupted: false },
+				},
 			};
+			return;
 		}
 	}
 
-	return { toolMessages, toolRuns };
+	yield {
+		type: "complete",
+		summary: { toolMessages, toolRuns },
+	};
 }
