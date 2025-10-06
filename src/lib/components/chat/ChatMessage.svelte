@@ -242,11 +242,11 @@
 					</div>
 				{/if}
 				{#if formattedSources.length}
-					<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+					<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs sm:text-sm">
 						<div class="text-gray-400">Sources:</div>
 						{#each formattedSources as source, index}
 							<a
-								class="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-100 bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+								class="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-100 bg-white px-1.5 py-1 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 sm:px-2 sm:py-1.5"
 								href={source.link}
 								target="_blank"
 								rel="noopener noreferrer"
@@ -260,7 +260,7 @@
 								/>
 								<div class="text-gray-600 dark:text-gray-300">{source.hostname}</div>
 								<span
-									class="rounded bg-gray-100 px-1 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"
+									class="rounded bg-gray-100 px-1 py-0.5 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"
 								>
 									{source.index ?? index + 1}
 								</span>
