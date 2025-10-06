@@ -159,23 +159,14 @@
 				class="flex h-9 flex-none shrink items-center gap-1.5 truncate pr-2 text-gray-500 dark:text-gray-400"
 				>{user?.username || user?.email}</span
 			>
-			{#if !user.logoutDisabled}
-				<span
-					class="ml-auto h-6 flex-none items-center gap-1.5 rounded-md border bg-white px-2 text-gray-700 shadow-sm group-hover:flex hover:shadow-none dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:text-gray-300 md:hidden"
-				>
-					Sign Out
-				</span>
-			{/if}
+
+			<img
+				src="https://huggingface.co/api/users/victor/avatar?redirect=true"
+				class="ml-auto size-4 rounded-full border dark:border-white/40"
+				alt=""
+			/>
 		</button>
 	{/if}
-	<!-- {#if canLogin}
-		<a
-			href="{base}/login"
-			class="flex h-9 w-full flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-		>
-			Login
-		</a>
-	{/if} -->
 	<a
 		href="{base}/models"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"

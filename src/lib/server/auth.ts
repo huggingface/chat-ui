@@ -374,7 +374,6 @@ export async function authenticateRequest(
 				updatedAt: new Date(),
 				hfUserId: email,
 				avatarUrl: "",
-				logoutDisabled: true,
 			},
 			sessionId,
 			secretSessionId,

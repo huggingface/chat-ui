@@ -170,14 +170,19 @@
 		</div>
 
 		<div class="mt-6 flex flex-col gap-2 text-[13px]">
-			<a
-				href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
-				target="_blank"
-				rel="noreferrer"
-				class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
-				><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
-			>
 			{#if publicConfig.isHuggingChat}
+				<a
+					href="https://huggingface.co/settings/inference-providers"
+					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Providers settings</a
+				>
+				<a
+					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions"
+					target="_blank"
+					rel="noreferrer"
+					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Share your feedback on HuggingChat</a
+				>
 				<a
 					href="{base}/privacy"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"

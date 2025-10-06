@@ -30,7 +30,6 @@ export const userGroup = new Elysia()
 							username: locals.user.username,
 							avatarUrl: locals.user.avatarUrl,
 							email: locals.user.email,
-							logoutDisabled: locals.user.logoutDisabled,
 							isAdmin: locals.user.isAdmin ?? false,
 							isEarlyAccess: locals.user.isEarlyAccess ?? false,
 						}
