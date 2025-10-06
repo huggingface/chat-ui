@@ -35,7 +35,6 @@ export interface ExecuteToolCallsParams {
 }
 
 export interface ToolCallExecutionResult {
-	updates: MessageUpdate[];
 	toolMessages: ChatCompletionMessageParam[];
 	toolRuns: ToolRun[];
 	finalAnswer?: { text: string; interrupted: boolean };
@@ -51,15 +50,14 @@ const serverMap = (servers: McpServerConfig[]): Map<string, McpServerConfig> => 
 	return map;
 };
 
-export async function executeToolCalls({
+export async function* executeToolCalls({
 	calls,
 	mapping,
 	servers,
 	parseArgs,
 	toPrimitive,
 	collectToolOutputSources,
-}: ExecuteToolCallsParams): Promise<ToolCallExecutionResult> {
-	const updates: MessageUpdate[] = [];
+}: ExecuteToolCallsParams): AsyncGenerator<MessageUpdate, ToolCallExecutionResult, undefined> {
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
 	const serverLookup = serverMap(servers);
@@ -76,30 +74,29 @@ export async function executeToolCalls({
 			}
 		}
 
-		updates.push({
+		yield {
 			type: MessageUpdateType.Tool,
 			subtype: MessageToolUpdateType.Call,
 			uuid,
 			call: { name: call.name, parameters: parametersClean },
-		});
+		};
 
-		updates.push({
+		yield {
 			type: MessageUpdateType.Tool,
 			subtype: MessageToolUpdateType.ETA,
 			uuid,
 			eta: 10,
-		});
+		};
 
 		if (!mappingEntry) {
 			const message = `Unknown MCP function: ${call.name}`;
-			updates.push({
+			yield {
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Error,
 				uuid,
 				message,
-			});
+			};
 			return {
-				updates,
 				toolMessages,
 				toolRuns,
 				finalAnswer: { text: message, interrupted: false },
@@ -109,14 +106,13 @@ export async function executeToolCalls({
 		const serverConfig = serverLookup.get(mappingEntry.server);
 		if (!serverConfig) {
 			const message = `Unknown MCP server: ${mappingEntry.server}`;
-			updates.push({
+			yield {
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Error,
 				uuid,
 				message,
-			});
+			};
 			return {
-				updates,
 				toolMessages,
 				toolRuns,
 				finalAnswer: { text: message, interrupted: false },
@@ -135,7 +131,7 @@ export async function executeToolCalls({
 				"[mcp] tool call completed"
 			);
 
-			updates.push({
+			yield {
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Result,
 				uuid,
@@ -150,7 +146,7 @@ export async function executeToolCalls({
 					],
 					display: true,
 				},
-			});
+			};
 
 			toolRuns.push({ name: call.name, parameters: parametersClean, output });
 			toolMessages.push({ role: "tool", tool_call_id: call.id, content: output });
@@ -160,14 +156,13 @@ export async function executeToolCalls({
 				{ server: mappingEntry.server, tool: mappingEntry.tool, err: message },
 				"[mcp] tool call failed"
 			);
-			updates.push({
+			yield {
 				type: MessageUpdateType.Tool,
 				subtype: MessageToolUpdateType.Error,
 				uuid,
 				message,
-			});
+			};
 			return {
-				updates,
 				toolMessages,
 				toolRuns,
 				finalAnswer: { text: `MCP error: ${message}`, interrupted: false },
@@ -175,5 +170,5 @@ export async function executeToolCalls({
 		}
 	}
 
-	return { updates, toolMessages, toolRuns };
+	return { toolMessages, toolRuns };
 }

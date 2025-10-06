@@ -19,7 +19,12 @@ import type { Stream } from "openai/streaming";
 import { CitationTracker } from "../utils/citations";
 import { buildToolPreprompt } from "../utils/toolPrompt";
 import { resolveRouterTarget } from "./routerResolution";
-import { executeToolCalls, type NormalizedToolCall, type ToolRun } from "./toolInvocation";
+import {
+	executeToolCalls,
+	type NormalizedToolCall,
+	type ToolRun,
+	type ToolCallExecutionResult,
+} from "./toolInvocation";
 import { logger } from "../../logger";
 import type { TextGenerationContext } from "../types";
 
@@ -319,7 +324,7 @@ export async function* runMcpFlow({
 				tool_calls: toolCalls,
 			};
 
-			const executionResult = await executeToolCalls({
+			const executionGenerator = executeToolCalls({
 				calls: normalizedCalls,
 				mapping,
 				servers,
@@ -328,8 +333,16 @@ export async function* runMcpFlow({
 				collectToolOutputSources,
 			});
 
-			for (const update of executionResult.updates) {
-				yield update;
+			let executionResult: ToolCallExecutionResult | undefined;
+			let iterResult = await executionGenerator.next();
+			while (!iterResult.done) {
+				yield iterResult.value;
+				iterResult = await executionGenerator.next();
+			}
+			executionResult = iterResult.value;
+
+			if (!executionResult) {
+				return false;
 			}
 
 			if (executionResult.finalAnswer) {
