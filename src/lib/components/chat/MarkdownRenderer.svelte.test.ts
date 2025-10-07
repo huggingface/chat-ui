@@ -29,11 +29,26 @@ describe("MarkdownRenderer", () => {
 		render(MarkdownRenderer, { content: "```foobar```" });
 		expect(page.getByRole("code")).toHaveTextContent("foobar");
 	});
-	it("renders raw bracket citations without turning them into links", () => {
+	it("renders raw bracket citations without turning them into links when no sources provided", () => {
 		render(MarkdownRenderer, { content: "Hello there [1]" });
 		expect(page.getByText("[1]")).toBeInTheDocument();
 		// No link should be created from the bracket citation
 		expect(page.getByRole("link", { name: "1" }).elements).toHaveLength(0);
+	});
+	it("linkifies bracket citations when matching sources are provided", () => {
+		render(MarkdownRenderer, {
+			content: "Hello there [1] and also [2]",
+			sources: [
+				{ index: 1, link: "https://example.com" },
+				{ index: 2, link: "https://example.org" },
+			],
+		});
+		const link1 = page.getByRole("link", { name: "1" });
+		const link2 = page.getByRole("link", { name: "2" });
+		expect(link1).toBeInTheDocument();
+		expect(link1).toHaveAttribute("href", "https://example.com");
+		expect(link2).toBeInTheDocument();
+		expect(link2).toHaveAttribute("href", "https://example.org");
 	});
 	it("doesnt render raw html directly", () => {
 		render(MarkdownRenderer, { content: "<button>Click me</button>" });

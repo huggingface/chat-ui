@@ -9,16 +9,52 @@
 	import { onMount } from "svelte";
 	import { updateDebouncer } from "$lib/utils/updates";
 
+	import type { MessageSource } from "$lib/types/MessageUpdate";
+
 	interface Props {
 		content: string;
+		sources?: MessageSource[];
 		loading?: boolean;
 	}
 
 	let worker: Worker | null = null;
 
-	let { content, loading = false }: Props = $props();
+	let { content, sources = [], loading = false }: Props = $props();
 
 	let tokens: Token[] = $state(processTokensSync(content));
+
+	function linkifyCitations(html: string, sources: MessageSource[]): string {
+		if (!Array.isArray(sources) || sources.length === 0 || typeof html !== "string") return html;
+		const hrefByIndex = new Map<number, string>();
+		for (const s of sources) {
+			const idx = Number(s.index);
+			if (!Number.isFinite(idx) || idx <= 0) continue;
+			try {
+				const u = new URL(s.link);
+				if (u.protocol === "http:" || u.protocol === "https:") {
+					const safe = u.toString().replace(/"/g, "&quot;");
+					hrefByIndex.set(idx, safe);
+				}
+			} catch {
+				// ignore invalid URLs
+			}
+		}
+		if (hrefByIndex.size === 0) return html;
+
+		const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
+		for (let i = 0; i < parts.length; i += 1) {
+			const part = parts[i];
+			if (/^<pre|^<code/i.test(part)) continue;
+			parts[i] = part.replace(/\[(\d+)\]/g, (m, d) => {
+				const n = Number(d);
+				const href = hrefByIndex.get(n);
+				return href
+					? ` <sup><a href="${href}" class="text-blue-500 underline-none no-underline">${n}</a></sup>`
+					: m;
+			});
+		}
+		return parts.join("");
+	}
 
 	async function processContent(content: string): Promise<Token[]> {
 		if (worker) {
@@ -43,7 +79,9 @@
 
 	$effect(() => {
 		if (!browser) {
-			tokens = processTokensSync(content);
+			tokens = processTokensSync(content).map((t) =>
+				t.type === "text" ? { ...t, html: linkifyCitations(t.html as string, sources) } : t
+			);
 		} else {
 			(async () => {
 				updateDebouncer.startRender();
@@ -52,7 +90,9 @@
 						await Promise.all(
 							tokens.map(async (token) => {
 								if (token.type === "text") {
-									token.html = DOMPurify.sanitize(await token.html);
+									const raw = await token.html;
+									const linked = linkifyCitations(raw, sources);
+									token.html = DOMPurify.sanitize(linked);
 								}
 								return token;
 							})
