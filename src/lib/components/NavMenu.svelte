@@ -137,6 +137,9 @@
 				{/each}
 			{/if}
 		{/each}
+		{#if conversations.length === 0}
+			<p class="text-sm text-gray-500 dark:text-gray-400">No conversations yet.</p>
+		{/if}
 	</div>
 	{#if hasMore}
 		<InfiniteScroll onvisible={handleVisible} />
