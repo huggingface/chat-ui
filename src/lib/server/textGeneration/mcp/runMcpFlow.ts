@@ -1,9 +1,5 @@
 import { config } from "$lib/server/config";
-import {
-	MessageUpdateType,
-	type MessageUpdate,
-	type MessageSource,
-} from "$lib/types/MessageUpdate";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../../generateFromDefaultEndpoint";
 import { getMcpServers } from "$lib/server/mcp/registry";
@@ -206,11 +202,6 @@ export async function* runMcpFlow({
 		const appendMissingCitations = (text: string): string =>
 			citationTracker.appendMissingCitations(text);
 
-		const normalizeCitations = (
-			text: string
-		): { normalizedText: string; normalizedSources: MessageSource[] } =>
-			citationTracker.normalizeCitations(text);
-
 		const buildCitationMappingMessage = (): string | null => citationTracker.buildMappingMessage();
 
 		let lastAssistantContent = "";
@@ -396,13 +387,13 @@ export async function* runMcpFlow({
 				locals,
 			});
 
-			const finalSynthesis = appendMissingCitations(synthesis);
-			const { normalizedText, normalizedSources } = normalizeCitations(finalSynthesis);
+			const finalText = appendMissingCitations(synthesis);
+			const finalSources = citationTracker.getSources();
 			yield {
 				type: MessageUpdateType.FinalAnswer,
-				text: normalizedText,
+				text: finalText,
 				interrupted: false,
-				sources: normalizedSources.length > 0 ? normalizedSources : undefined,
+				sources: finalSources.length > 0 ? finalSources : undefined,
 			};
 
 			return true;
@@ -416,12 +407,12 @@ export async function* runMcpFlow({
 				};
 			}
 			const finalAssistantContent = appendMissingCitations(lastAssistantContent);
-			const { normalizedText, normalizedSources } = normalizeCitations(finalAssistantContent);
+			const finalSources = citationTracker.getSources();
 			yield {
 				type: MessageUpdateType.FinalAnswer,
-				text: normalizedText,
+				text: finalAssistantContent,
 				interrupted: false,
-				sources: normalizedSources.length > 0 ? normalizedSources : undefined,
+				sources: finalSources.length > 0 ? finalSources : undefined,
 			};
 			return true;
 		}

@@ -51,24 +51,7 @@ const stripTrailingSourcesBlock = (input: string): string => {
 	return lines.slice(0, headerIndex).join("\n").replace(/\s+$/, "");
 };
 
-const extractUsedSourceIndexes = (text: string): number[] => {
-	const seen = new Set<number>();
-	const order: number[] = [];
-	const pattern = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
-	let match: RegExpExecArray | null;
-	while ((match = pattern.exec(text)) !== null) {
-		const parts = match[1].split(/\s*,\s*/);
-		for (const part of parts) {
-			const index = Number(part);
-			if (!Number.isFinite(index) || index <= 0) continue;
-			if (!seen.has(index)) {
-				seen.add(index);
-				order.push(index);
-			}
-		}
-	}
-	return order;
-};
+// No longer needed: we no longer normalize or remap inline indices.
 
 export type CitationSource = { index: number; link: string };
 
@@ -119,74 +102,8 @@ export class CitationTracker {
 		return updated.trim();
 	}
 
-	normalizeCitations(text: string): { normalizedText: string; normalizedSources: MessageSource[] } {
-		const maskCodeSegments = (value: string) => {
-			const placeholders: string[] = [];
-			const token = (index: number) => `\uE000${index}\uE001`;
-			const stash = (match: string) => {
-				const placeholder = token(placeholders.length);
-				placeholders.push(match);
-				return placeholder;
-			};
-
-			let masked = value.replace(/```[\s\S]*?```/g, stash);
-			masked = masked.replace(/~~~[\s\S]*?~~~/g, stash);
-			masked = masked.replace(/`[^`]*`/g, stash);
-
-			const unmask = (input: string) =>
-				input.replace(/\uE000(\d+)\uE001/g, (_match, idx) => placeholders[Number(idx)] ?? "");
-
-			return { masked, unmask };
-		};
-
-		if (this.citationSources.length === 0) {
-			return { normalizedText: text, normalizedSources: [] };
-		}
-
-		const { masked, unmask } = maskCodeSegments(text);
-
-		const indices = extractUsedSourceIndexes(masked);
-		if (indices.length === 0) {
-			return { normalizedText: text, normalizedSources: [] };
-		}
-
-		const mapping = new Map<number, number>();
-		indices.forEach((oldIndex, position) => {
-			mapping.set(oldIndex, position + 1);
-		});
-
-		const normalizedMaskedText = masked.replace(
-			/\[(\d+(?:\s*,\s*\d+)*)\]/g,
-			(match: string, group: string) => {
-				const parts = group.split(/\s*,\s*/);
-				const mapped: number[] = [];
-				for (const part of parts) {
-					const oldIndex = Number(part);
-					if (!Number.isFinite(oldIndex) || oldIndex <= 0) continue;
-					const next = mapping.get(oldIndex);
-					if (!next) continue;
-					if (!mapped.includes(next)) {
-						mapped.push(next);
-					}
-				}
-				return mapped.length > 0 ? `[${mapped.join(", ")}]` : match;
-			}
-		);
-
-		const normalizedSources = indices
-			.map((oldIndex) => {
-				const source = this.citationSources.find((entry) => entry.index === oldIndex);
-				const newIndex = mapping.get(oldIndex);
-				if (!source || !newIndex) {
-					return null;
-				}
-				return { ...source, index: newIndex } as MessageSource;
-			})
-			.filter((source): source is MessageSource => Boolean(source))
-			.sort((a, b) => a.index - b.index);
-
-		return { normalizedText: unmask(normalizedMaskedText), normalizedSources };
-	}
+	// Removed: normalizeCitations. We rely on the model to cite correctly
+	// using the provided mapping and we surface the collected sources as-is.
 
 	buildMappingMessage(): string | null {
 		if (this.citationSources.length === 0) {

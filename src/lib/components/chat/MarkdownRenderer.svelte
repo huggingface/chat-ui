@@ -9,24 +9,18 @@
 	import { onMount } from "svelte";
 	import { updateDebouncer } from "$lib/utils/updates";
 
-	import type { MessageSource } from "$lib/types/MessageUpdate";
-
 	interface Props {
 		content: string;
-		sources?: MessageSource[];
 		loading?: boolean;
 	}
 
 	let worker: Worker | null = null;
 
-	let { content, sources = [], loading = false }: Props = $props();
+	let { content, loading = false }: Props = $props();
 
-	let tokens: Token[] = $state(processTokensSync(content, sources));
+	let tokens: Token[] = $state(processTokensSync(content));
 
-	async function processContent(
-		content: string,
-		sources: { title?: string; link: string }[]
-	): Promise<Token[]> {
+	async function processContent(content: string): Promise<Token[]> {
 		if (worker) {
 			return new Promise((resolve) => {
 				if (!worker) {
@@ -39,21 +33,21 @@
 					resolve(event.data.tokens);
 				};
 				worker.postMessage(
-					JSON.parse(JSON.stringify({ content, sources, type: "process" })) as IncomingMessage
+					JSON.parse(JSON.stringify({ content, type: "process" })) as IncomingMessage
 				);
 			});
 		} else {
-			return processTokens(content, sources);
+			return processTokens(content);
 		}
 	}
 
 	$effect(() => {
 		if (!browser) {
-			tokens = processTokensSync(content, sources);
+			tokens = processTokensSync(content);
 		} else {
 			(async () => {
 				updateDebouncer.startRender();
-				tokens = await processContent(content, sources).then(
+				tokens = await processContent(content).then(
 					async (tokens) =>
 						await Promise.all(
 							tokens.map(async (token) => {

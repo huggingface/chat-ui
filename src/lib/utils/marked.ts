@@ -2,12 +2,6 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
-// Simple type to replace removed WebSearchSource
-type SimpleSource = {
-	title?: string;
-	link: string;
-	index?: number;
-};
 import hljs from "highlight.js";
 
 interface katexBlockToken extends Tokens.Generic {
@@ -190,61 +184,9 @@ function sanitizeHrefAttribute(
 	return "";
 }
 
-function transformOutsideHtmlCode(html: string, transform: (segment: string) => string): string {
-	const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
-	return parts.map((part) => (/^<pre|^<code/i.test(part) ? part : transform(part))).join("");
-}
-
-function addInlineCitations(html: string, webSearchSources: SimpleSource[] = []): string {
-	const linkStyle = "color: rgb(59, 130, 246); text-decoration: none;";
-	const indexMap = new Map<number, SimpleSource>();
-	webSearchSources.forEach((source, position) => {
-		const resolvedIndex = Number.isFinite(source.index) ? Number(source.index) : position + 1;
-		if (resolvedIndex > 0 && !indexMap.has(resolvedIndex)) {
-			indexMap.set(resolvedIndex, source);
-		}
-	});
-
-	const applyReplacements = (value: string) =>
-		value
-			.replace(/\[(\d+)\](?!\()/g, (match: string, rawIndex: string) => {
-				const index = Number(rawIndex);
-				const source = indexMap.get(index);
-				if (!source) {
-					return match;
-				}
-				const safeHref = sanitizeHrefAttribute(source.link, { allowRelative: false });
-				return safeHref
-					? ` <sup><a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a></sup>`
-					: match;
-			})
-			.replace(/\((\d+\s*(?:,\s*\d+)+)\)/g, (match: string, group: string) => {
-				const linked = group
-					.split(/\s*,\s*/)
-					.map((token) => {
-						const index = Number(token);
-						const source = indexMap.get(index);
-						if (!source) {
-							return "";
-						}
-						const safeHref = sanitizeHrefAttribute(source.link, { allowRelative: false });
-						return safeHref
-							? `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${index}</a>`
-							: "";
-					})
-					.filter(Boolean)
-					.join(", ");
-				return linked ? ` (<sup>${linked}</sup>)` : match;
-			});
-
-	return transformOutsideHtmlCode(html, applyReplacements);
-}
-
-function createMarkedInstance(sources: SimpleSource[]): Marked {
+function createMarkedInstance(): Marked {
 	return new Marked({
-		hooks: {
-			postprocess: (html) => addInlineCitations(html, sources),
-		},
+		// No citation postprocessing; render content as-is.
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
 			link: (href, _title, text) => {
@@ -286,8 +228,8 @@ type TextToken = {
 	html: string | Promise<string>;
 };
 
-export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
-	const marked = createMarkedInstance(sources);
+export async function processTokens(content: string): Promise<Token[]> {
+	const marked = createMarkedInstance();
 	const tokens = marked.lexer(content);
 
 	const processedTokens = await Promise.all(
@@ -312,8 +254,8 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 	return processedTokens;
 }
 
-export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
-	const marked = createMarkedInstance(sources);
+export function processTokensSync(content: string): Token[] {
+	const marked = createMarkedInstance();
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {

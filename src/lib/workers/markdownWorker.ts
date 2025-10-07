@@ -1,15 +1,8 @@
-// Simple type to replace removed WebSearchSource
-type SimpleSource = {
-	title?: string;
-	link: string;
-	index?: number;
-};
 import { processTokens, type Token } from "$lib/utils/marked";
 
 export type IncomingMessage = {
 	type: "process";
 	content: string;
-	sources: SimpleSource[];
 };
 
 export type OutgoingMessage = {
@@ -32,8 +25,8 @@ async function processMessage() {
 		isProcessing = true;
 
 		try {
-			const { content, sources } = nextMessage;
-			const processedTokens = await processTokens(content, sources);
+			const { content } = nextMessage;
+			const processedTokens = await processTokens(content);
 			postMessage(JSON.parse(JSON.stringify({ type: "processed", tokens: processedTokens })));
 		} finally {
 			isProcessing = false;
