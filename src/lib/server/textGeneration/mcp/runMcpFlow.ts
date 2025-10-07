@@ -218,7 +218,7 @@ export async function* runMcpFlow({
 		for (let loop = 0; loop < 5; loop += 1) {
 			lastAssistantContent = "";
 			streamedContent = false;
-			injectCitationMappingMessage();
+			// Defer injecting citation mapping until after tool outputs are appended
 
 			const completionRequest: ChatCompletionCreateParamsStreaming = {
 				...completionBase,

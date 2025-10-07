@@ -45,7 +45,7 @@
 		for (let i = 0; i < parts.length; i += 1) {
 			const part = parts[i];
 			if (/^<pre|^<code/i.test(part)) continue;
-			parts[i] = part.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (m: string, group: string) => {
+			parts[i] = part.replace(/\s*\[(\d+(?:\s*,\s*\d+)*)\]/g, (m: string, group: string) => {
 				const links = group
 					.split(/\s*,\s*/)
 					.map((d: string) => {
@@ -57,7 +57,7 @@
 					})
 					.filter(Boolean)
 					.join(", ");
-				return links ? ` <sup>${links}</sup>` : m;
+				return links ? `<sup class="ml-[2px] select-none">${links}</sup>` : m;
 			});
 		}
 		return parts.join("");
