@@ -45,12 +45,19 @@
 		for (let i = 0; i < parts.length; i += 1) {
 			const part = parts[i];
 			if (/^<pre|^<code/i.test(part)) continue;
-			parts[i] = part.replace(/\[(\d+)\]/g, (m, d) => {
-				const n = Number(d);
-				const href = hrefByIndex.get(n);
-				return href
-					? ` <sup><a href="${href}" class="text-blue-500 underline-none no-underline">${n}</a></sup>`
-					: m;
+			parts[i] = part.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (m: string, group: string) => {
+				const links = group
+					.split(/\s*,\s*/)
+					.map((d: string) => {
+						const n = Number(d);
+						const href = hrefByIndex.get(n);
+						return href
+							? `<a href="${href}" class="text-blue-500 underline-none no-underline">${n}</a>`
+							: "";
+					})
+					.filter(Boolean)
+					.join(", ");
+				return links ? ` <sup>${links}</sup>` : m;
 			});
 		}
 		return parts.join("");
