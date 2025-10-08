@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
-
-	let { animating = false, classNames = "" } = $props();
+	const { animating = false, classNames = "" } = $props();
 
 	let blobAnim: SVGAnimateElement | undefined = $state();
 	let svgEl: SVGSVGElement | undefined = $state();
@@ -27,11 +25,11 @@
 		}
 		prevAnimating = animating;
 		prevBlobAnim = blobAnim;
-	});
 
-	onDestroy(() => {
-		blobAnim?.endElement();
-		svgEl?.pauseAnimations?.();
+		return () => {
+			blobAnim?.endElement();
+			svgEl?.pauseAnimations?.();
+		};
 	});
 </script>
 
