@@ -28,7 +28,7 @@ export interface ExecuteToolCallsParams {
 	servers: McpServerConfig[];
 	parseArgs: (raw: unknown) => Record<string, unknown>;
 	toPrimitive: (value: unknown) => Primitive | undefined;
-	collectToolOutputSources: (text: string) => {
+	processToolOutput: (text: string) => {
 		annotated: string;
 		sources: { index: number; link: string }[];
 	};
@@ -60,7 +60,7 @@ export async function* executeToolCalls({
 	servers,
 	parseArgs,
 	toPrimitive,
-	collectToolOutputSources,
+	processToolOutput,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
@@ -149,7 +149,7 @@ export async function* executeToolCalls({
 				"[mcp] invoking tool"
 			);
 			const outputRaw = await callMcpTool(serverConfig, mappingEntry.tool, argsObj);
-			const { annotated: output, sources: outputSources } = collectToolOutputSources(outputRaw);
+			const { annotated: output, sources: outputSources } = processToolOutput(outputRaw);
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"

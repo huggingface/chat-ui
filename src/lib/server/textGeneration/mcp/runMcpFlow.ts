@@ -187,22 +187,15 @@ export async function* runMcpFlow({
 		const toolRuns: ToolRun[] = [];
 		const citationTracker = new CitationTracker();
 
-		const injectCitationMappingMessage = () => {
-			const result = citationTracker.injectMappingMessage(messagesOpenAI);
-			messagesOpenAI = result.messages;
-		};
-
-		const collectToolOutputSources = (
+		const processToolOutput = (
 			text: string
 		): {
 			annotated: string;
 			sources: { index: number; link: string }[];
-		} => citationTracker.collectToolOutputSources(text);
+		} => citationTracker.process(text, { annotate: true });
 
-		const appendMissingCitations = (text: string): string =>
-			citationTracker.appendMissingCitations(text);
-
-		const buildCitationMappingMessage = (): string | null => citationTracker.buildMappingMessage();
+		const registerAssistantContent = (text: string): string =>
+			citationTracker.process(text, { annotate: true }).annotated;
 
 		let lastAssistantContent = "";
 		let streamedContent = false;
@@ -321,7 +314,7 @@ export async function* runMcpFlow({
 				servers,
 				parseArgs,
 				toPrimitive,
-				collectToolOutputSources,
+				processToolOutput,
 			});
 
 			let executionResult: ToolCallExecutionResult | undefined;
@@ -342,10 +335,13 @@ export async function* runMcpFlow({
 			}
 
 			if (executionResult.finalAnswer) {
+				const annotated = registerAssistantContent(executionResult.finalAnswer.text);
+				const finalSources = citationTracker.sources();
 				yield {
 					type: MessageUpdateType.FinalAnswer,
-					text: executionResult.finalAnswer.text,
+					text: annotated,
 					interrupted: executionResult.finalAnswer.interrupted,
+					sources: finalSources.length > 0 ? finalSources : undefined,
 				};
 				return true;
 			}
@@ -353,7 +349,6 @@ export async function* runMcpFlow({
 			toolRuns.push(...executionResult.toolRuns);
 			const toolMessages: ChatCompletionMessageParam[] = executionResult.toolMessages;
 			messagesOpenAI = [...messagesOpenAI, assistantToolMessage, ...toolMessages];
-			injectCitationMappingMessage();
 		}
 
 		if (toolRuns.length > 0 && !lastAssistantContent.trim()) {
@@ -367,7 +362,6 @@ export async function* runMcpFlow({
 					return `Tool ${index + 1}: ${run.name}\n${argsString}Output:\n${run.output}`;
 				})
 				.join("\n\n");
-			const mappingDirective = buildCitationMappingMessage();
 
 			const synthesis = yield* generateFromDefaultEndpoint({
 				messages: [
@@ -377,7 +371,7 @@ export async function* runMcpFlow({
 							question
 						}\n\nTool results:\n${formattedResults}\n\nUsing only the tool results above, answer the question concisely. If uncertain, say you don't know.${
 							lastAssistantContent ? `\n\nModel notes: ${lastAssistantContent}` : ""
-						}${mappingDirective ? `\n\n${mappingDirective}` : ""}`,
+						}`,
 					},
 				],
 				preprompt:
@@ -387,8 +381,8 @@ export async function* runMcpFlow({
 				locals,
 			});
 
-			const finalText = appendMissingCitations(synthesis);
-			const finalSources = citationTracker.getSources();
+			const finalText = registerAssistantContent(synthesis);
+			const finalSources = citationTracker.sources();
 			yield {
 				type: MessageUpdateType.FinalAnswer,
 				text: finalText,
@@ -406,8 +400,8 @@ export async function* runMcpFlow({
 					token: lastAssistantContent,
 				};
 			}
-			const finalAssistantContent = appendMissingCitations(lastAssistantContent);
-			const finalSources = citationTracker.getSources();
+			const finalAssistantContent = registerAssistantContent(lastAssistantContent);
+			const finalSources = citationTracker.sources();
 			yield {
 				type: MessageUpdateType.FinalAnswer,
 				text: finalAssistantContent,

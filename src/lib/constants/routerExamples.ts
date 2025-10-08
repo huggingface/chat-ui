@@ -16,8 +16,8 @@ export type RouterExample = {
 
 export const routerExamples: RouterExample[] = [
 	{
-		title: "Pong game",
-		prompt: "Create a minimalist pong game using  HTML and tailwindcss",
+		title: "Flappy Bird",
+		prompt: "Code a simple flappy bird using HTML and canvas.",
 		followUps: [
 			{
 				title: "README.md file",

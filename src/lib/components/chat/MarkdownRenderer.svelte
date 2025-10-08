@@ -23,6 +23,8 @@
 
 	let tokens: Token[] = $state(processTokensSync(content));
 
+	const CODE_TAGS = new Set(["code", "pre"]);
+
 	function linkifyCitations(html: string, sources: MessageSource[]): string {
 		if (!Array.isArray(sources) || sources.length === 0 || typeof html !== "string") return html;
 		const hrefByIndex = new Map<number, string>();
@@ -41,11 +43,10 @@
 		}
 		if (hrefByIndex.size === 0) return html;
 
-		const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
-		for (let i = 0; i < parts.length; i += 1) {
-			const part = parts[i];
-			if (/^<pre|^<code/i.test(part)) continue;
-			parts[i] = part.replace(/\s*\[(\d+(?:\s*,\s*\d+)*)\]/g, (m: string, group: string) => {
+		const citationPattern = /\s*\[(\d+(?:\s*,\s*\d+)*)\]/g;
+
+		const replaceInSegment = (segment: string): string =>
+			segment.replace(citationPattern, (match: string, group: string) => {
 				const links = group
 					.split(/\s*,\s*/)
 					.map((d: string) => {
@@ -57,10 +58,76 @@
 					})
 					.filter(Boolean)
 					.join(", ");
-				return links ? `<sup class="ml-[2px] select-none">${links}</sup>` : m;
+				return links ? `<sup class="ml-[2px] select-none">${links}</sup>` : match;
 			});
+
+		let result = "";
+		let cursor = 0;
+		const stack: string[] = [];
+
+		const findTagEnd = (input: string, start: number): number => {
+			let inQuote: string | null = null;
+			for (let i = start + 1; i < input.length; i += 1) {
+				const char = input[i];
+				if (inQuote) {
+					if (char === inQuote) {
+						inQuote = null;
+					}
+					continue;
+				}
+				if (char === '"' || char === "'") {
+					inQuote = char;
+					continue;
+				}
+				if (char === ">") {
+					return i;
+				}
+			}
+			return input.length - 1;
+		};
+
+		const updateStack = (tagContent: string) => {
+			const trimmed = tagContent.trim();
+			if (!trimmed) return;
+			const isClosing = trimmed.startsWith("/");
+			const cleaned = isClosing ? trimmed.slice(1) : trimmed;
+			const spaceIndex = cleaned.search(/\s|\/|$/);
+			const rawName = spaceIndex === -1 ? cleaned : cleaned.slice(0, spaceIndex);
+			const tagName = rawName.toLowerCase();
+			const selfClosing = /\/$/.test(trimmed) || ["br", "hr", "img", "input", "meta", "link"].includes(tagName);
+			if (CODE_TAGS.has(tagName)) {
+				if (isClosing) {
+					for (let i = stack.length - 1; i >= 0; i -= 1) {
+						if (stack[i] === tagName) {
+							stack.splice(i, 1);
+							break;
+						}
+					}
+				} else if (!selfClosing) {
+					stack.push(tagName);
+				}
+			}
+		};
+
+		while (cursor < html.length) {
+			const ltIndex = html.indexOf("<", cursor);
+			if (ltIndex === -1) {
+				const trailing = html.slice(cursor);
+				result += stack.length === 0 ? replaceInSegment(trailing) : trailing;
+				break;
+			}
+
+			const textSegment = html.slice(cursor, ltIndex);
+			result += stack.length === 0 ? replaceInSegment(textSegment) : textSegment;
+
+			const tagEnd = findTagEnd(html, ltIndex);
+			const tag = html.slice(ltIndex, tagEnd + 1);
+			result += tag;
+			updateStack(html.slice(ltIndex + 1, tagEnd));
+			cursor = tagEnd + 1;
 		}
-		return parts.join("");
+
+		return result;
 	}
 
 	async function processContent(content: string): Promise<Token[]> {
