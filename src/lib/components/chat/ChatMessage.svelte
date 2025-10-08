@@ -107,7 +107,7 @@
 		onkeydown={() => (isTapped = !isTapped)}
 	>
 		<MessageAvatar
-			classNames="mt-5 size-3.5 flex-none select-none rounded-full shadow-lg max-sm:hidden"
+			classNames="sticky top-4 mb-5 mt-5 size-5 flex-none select-none rounded-full shadow-lg max-sm:hidden"
 			animating={isLast && loading}
 		/>
 		<div
