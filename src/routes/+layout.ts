@@ -23,14 +23,9 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const { conversations: rawConversations, nConversations } = conversationsData;
 	const conversations = rawConversations.map((conv) => {
-		const sanitizedTitle = conv.title
-			// strip pictographic emoji while keeping ASCII digits (\p{Emoji} also matches 0-9)
-			.replace(/\p{Extended_Pictographic}|\u200d|\ufe0f/gu, "")
-			.replace(/<\/?think>/gi, "")
-			.replace(/\uFFFD/gu, "")
-			.trimStart();
+		const trimmedTitle = conv.title.trim();
 
-		conv.title = sanitizedTitle;
+		conv.title = trimmedTitle;
 
 		return {
 			id: conv._id.toString(),
