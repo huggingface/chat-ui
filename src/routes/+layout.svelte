@@ -267,22 +267,22 @@
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>
 	</MobileNav>
-	<nav
-		class="relative grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-y-clip *:w-[290px] max-md:hidden"
-	>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			canLogin={!data.user && data.loginEnabled}
-			ondeleteConversation={(id) => deleteConversation(id)}
-			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-		/>
+	<div class="relative h-full max-md:hidden">
+		<nav class="grid h-full grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px]">
+			<NavMenu
+				{conversations}
+				user={data.user}
+				canLogin={!data.user && data.loginEnabled}
+				ondeleteConversation={(id) => deleteConversation(id)}
+				oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+			/>
+		</nav>
 		<ExpandNavigation
 			isCollapsed={isNavCollapsed}
 			onClick={() => (isNavCollapsed = !isNavCollapsed)}
 			classNames="absolute inset-y-0 -right-2 z-10 my-auto *:transition-transform"
 		/>
-	</nav>
+	</div>
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
