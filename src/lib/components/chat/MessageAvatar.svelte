@@ -11,9 +11,6 @@
 			// Resume animations and start once
 			svgEl?.unpauseAnimations?.();
 			blobAnim.beginElement();
-		} else {
-			// Stop current run and pause so it cannot restart from queued begins
-			svgEl?.pauseAnimations?.();
 		}
 
 		return () => {
@@ -54,7 +51,7 @@
 					begin="indefinite"
 					end="indefinite"
 					dur="3.2s"
-					repeatCount="indefinite"
+					repeatCount={"indefinite"}
 					fill="freeze"
 					calcMode="spline"
 					keyTimes="0; .33; .66; .9; 1"
