@@ -3,14 +3,18 @@
 
 	let blobAnim = $state<SVGAnimateElement>();
 	let svgEl = $state<SVGSVGElement>();
+	let begun = $state(false);
 
 	$effect(() => {
 		if (!blobAnim) return;
 
 		if (animating) {
 			// Resume animations and start once
+			if (!begun) {
+				blobAnim.beginElement();
+				begun = true;
+			}
 			svgEl?.unpauseAnimations?.();
-			blobAnim.beginElement();
 		}
 
 		return () => {

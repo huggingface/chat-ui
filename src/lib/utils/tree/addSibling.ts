@@ -19,7 +19,7 @@ export function addSibling<T>(conv: Tree<T>, message: NewNode<T>, siblingId: Tre
 		throw new Error("The sibling message is the root message, therefore we can't add a sibling");
 	}
 
-	const messageId = v4();
+	const messageId = "id" in message && message.id ? message.id : v4();
 
 	conv.messages.push({
 		...message,

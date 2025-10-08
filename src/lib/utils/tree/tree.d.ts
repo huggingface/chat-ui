@@ -11,4 +11,4 @@ export type TreeNode<T> = T & {
 	children?: TreeId[];
 };
 
-export type NewNode<T> = Omit<TreeNode<T>, "id">;
+export type NewNode<T> = Omit<TreeNode<T>, "id"> | TreeNode<T>;
