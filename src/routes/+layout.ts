@@ -23,12 +23,14 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const { conversations: rawConversations, nConversations } = conversationsData;
 	const conversations = rawConversations.map((conv) => {
-		// Always strip emojis and <think> markers from titles for sidebar display
-		conv.title = conv.title.replace(/\p{Emoji}/gu, "");
-		conv.title = conv.title.replace(/<\/?think>/gi, "");
+		const sanitizedTitle = conv.title
+			// strip pictographic emoji while keeping ASCII digits (\p{Emoji} also matches 0-9)
+			.replace(/\p{Extended_Pictographic}|\u200d|\ufe0f/gu, "")
+			.replace(/<\/?think>/gi, "")
+			.replace(/\uFFFD/gu, "")
+			.trimStart();
 
-		// remove invalid unicode and trim whitespaces
-		conv.title = conv.title.replace(/\uFFFD/gu, "").trimStart();
+		conv.title = sanitizedTitle;
 
 		return {
 			id: conv._id.toString(),
