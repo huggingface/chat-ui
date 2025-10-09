@@ -161,7 +161,7 @@
 			>
 
 			<img
-				src="https://huggingface.co/api/users/victor/avatar?redirect=true"
+				src="https://huggingface.co/api/users/{user.username}/avatar?redirect=true"
 				class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
