@@ -29,59 +29,26 @@ describe("MarkdownRenderer", () => {
 		render(MarkdownRenderer, { content: "```foobar```" });
 		expect(page.getByRole("code")).toHaveTextContent("foobar");
 	});
-	it("renders sources correctly", () => {
-		const props = {
-			content: "Hello there [1]",
-			sources: [
-				{
-					title: "foo",
-					link: "https://example.com",
-				},
-			],
-		};
-		render(MarkdownRenderer, props);
-
-		const link = page.getByRole("link");
-		expect(link).toBeInTheDocument();
-		expect(link).toHaveAttribute("href", "https://example.com");
-		expect(link).toHaveAttribute("target", "_blank");
-		expect(link).toHaveAttribute("rel", "noreferrer");
+	it("renders raw bracket citations without turning them into links when no sources provided", () => {
+		render(MarkdownRenderer, { content: "Hello there [1]" });
+		expect(page.getByText("[1]")).toBeInTheDocument();
+		// No link should be created from the bracket citation
+		expect(page.getByRole("link", { name: "1" }).elements).toHaveLength(0);
 	});
-	it("handles groups of sources", () => {
+	it("linkifies bracket citations when matching sources are provided", () => {
 		render(MarkdownRenderer, {
-			content: "Hello there [1], [2], [3]",
+			content: "Hello there [1] and also [2]",
 			sources: [
-				{
-					title: "foo",
-					link: "https://foo.com",
-				},
-				{
-					title: "bar",
-					link: "https://bar.com",
-				},
-				{
-					title: "baz",
-					link: "https://baz.com",
-				},
+				{ index: 1, link: "https://example.com" },
+				{ index: 2, link: "https://example.org" },
 			],
 		});
-		expect(page.getByRole("link").all()).toHaveLength(3);
-		expect(page.getByRole("link").nth(0)).toHaveAttribute("href", "https://foo.com");
-		expect(page.getByRole("link").nth(1)).toHaveAttribute("href", "https://bar.com");
-		expect(page.getByRole("link").nth(2)).toHaveAttribute("href", "https://baz.com");
-	});
-	it("does not render sources in code blocks", () => {
-		render(MarkdownRenderer, {
-			content: "```\narray[1]\n```",
-			sources: [
-				{
-					title: "foo",
-					link: "https://example.com",
-				},
-			],
-		});
-		const linkSelector = page.getByRole("link");
-		expect(linkSelector.elements).toHaveLength(0);
+		const link1 = page.getByRole("link", { name: "1" });
+		const link2 = page.getByRole("link", { name: "2" });
+		expect(link1).toBeInTheDocument();
+		expect(link1).toHaveAttribute("href", "https://example.com");
+		expect(link2).toBeInTheDocument();
+		expect(link2).toHaveAttribute("href", "https://example.org");
 	});
 	it("doesnt render raw html directly", () => {
 		render(MarkdownRenderer, { content: "<button>Click me</button>" });

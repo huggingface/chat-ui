@@ -2,11 +2,6 @@ import katex from "katex";
 import "katex/dist/contrib/mhchem.mjs";
 import { Marked } from "marked";
 import type { Tokens, TokenizerExtension, RendererExtension } from "marked";
-// Simple type to replace removed WebSearchSource
-type SimpleSource = {
-	title?: string;
-	link: string;
-};
 import hljs from "highlight.js";
 
 interface katexBlockToken extends Tokens.Generic {
@@ -87,10 +82,20 @@ const katexInlineExtension: TokenizerExtension & RendererExtension = {
 		const rule1 = /^\$([^$]+?)\$/;
 		const match1 = rule1.exec(src);
 		if (match1) {
+			const content = match1[1];
+			const trimmed = content.trim();
+			const looksLikeCurrency = /^[0-9][0-9,]*(?:\.[0-9]+)?(?:\s*\[\d+\])?$/.test(trimmed);
+			const looksLikeSentence = /[A-Za-z]{3,}/.test(trimmed) && /\s/.test(trimmed);
+			const hasMathControl = /[\\^_=]/.test(trimmed);
+			const probablyMath = hasMathControl || /\d\s*[-+*/]\s*\d/.test(trimmed);
+			// Treat $amount or plain prose as literal text unless explicit math is present
+			if (!probablyMath && (looksLikeCurrency || looksLikeSentence)) {
+				return undefined;
+			}
 			const token: katexInlineToken = {
 				type: "katexInline",
 				raw: match1[0],
-				text: match1[1].trim(),
+				text: trimmed,
 				displayMode: false,
 			};
 			return token;
@@ -137,35 +142,60 @@ function escapeHTML(content: string) {
 	);
 }
 
-function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): string {
-	const linkStyle =
-		"color: rgb(59, 130, 246); text-decoration: none; hover:text-decoration: underline;";
-	return md.replace(/\[(\d+)\]/g, (match: string) => {
-		const indices: number[] = (match.match(/\d+/g) || []).map(Number);
-		const links: string = indices
-			.map((index: number) => {
-				if (index === 0) return false;
-				const source = webSearchSources[index - 1];
-				if (source) {
-					return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
-				}
-				return "";
-			})
-			.filter(Boolean)
-			.join(", ");
-		return links ? ` <sup>${links}</sup>` : match;
-	});
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+function escapeAttribute(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
 }
 
-function createMarkedInstance(sources: SimpleSource[]): Marked {
+function sanitizeHrefAttribute(
+	href: string | undefined,
+	{ allowRelative = false }: { allowRelative?: boolean } = {}
+): string {
+	if (!href) return "";
+	const trimmed = href.replace(/>$/, "");
+
+	const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed);
+	if (hasScheme) {
+		try {
+			const parsed = new URL(trimmed);
+			if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+				return "";
+			}
+			return escapeAttribute(trimmed);
+		} catch {
+			return "";
+		}
+	}
+
+	if (!allowRelative) {
+		return "";
+	}
+
+	if (/^(?:#|\/|\.\/|\.\.\/)/.test(trimmed)) {
+		return escapeAttribute(trimmed);
+	}
+
+	return "";
+}
+
+function createMarkedInstance(): Marked {
 	return new Marked({
-		hooks: {
-			postprocess: (html) => addInlineCitations(html, sources),
-		},
+		// No citation postprocessing; render content as-is.
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
-			link: (href, title, text) =>
-				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
+			link: (href, _title, text) => {
+				const safeHref = sanitizeHrefAttribute(href, { allowRelative: true });
+				const safeText = escapeHTML(text ?? "");
+				return safeHref
+					? `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeText}</a>`
+					: safeText;
+			},
 			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
@@ -198,8 +228,8 @@ type TextToken = {
 	html: string | Promise<string>;
 };
 
-export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
-	const marked = createMarkedInstance(sources);
+export async function processTokens(content: string): Promise<Token[]> {
+	const marked = createMarkedInstance();
 	const tokens = marked.lexer(content);
 
 	const processedTokens = await Promise.all(
@@ -224,8 +254,8 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 	return processedTokens;
 }
 
-export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
-	const marked = createMarkedInstance(sources);
+export function processTokensSync(content: string): Token[] {
+	const marked = createMarkedInstance();
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {

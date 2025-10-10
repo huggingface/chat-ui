@@ -247,6 +247,7 @@
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
 			}
+			const initialMessageContent = messageToWriteTo.content ?? "";
 
 			const messageUpdatesAbortController = new AbortController();
 
@@ -327,6 +328,18 @@
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
 					];
+				} else if (update.type === MessageUpdateType.FinalAnswer) {
+					if (buffer.length > 0) {
+						messageToWriteTo.content += buffer;
+						buffer = "";
+					}
+					const finalText =
+						update.text ?? messageToWriteTo.content.slice(initialMessageContent.length);
+					messageToWriteTo.content = initialMessageContent + finalText;
+					messageToWriteTo.interrupted = update.interrupted;
+					if (update.sources && update.sources.length > 0) {
+						messageToWriteTo.sources = update.sources;
+					}
 				} else if (update.type === MessageUpdateType.Reasoning) {
 					if (!messageToWriteTo.reasoning) {
 						messageToWriteTo.reasoning = "";

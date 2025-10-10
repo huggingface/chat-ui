@@ -10,8 +10,11 @@ import type { EndpointMessage } from "../endpoints/endpoints";
 import { generateFromDefaultEndpoint } from "../generateFromDefaultEndpoint";
 import { generateSummaryOfReasoning } from "./reasoning";
 import { logger } from "../logger";
+import { runMcpFlow } from "./mcp/runMcpFlow";
 
-type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
+type GenerateFunctionContext = Omit<TextGenerationContext, "messages"> & {
+	messages: EndpointMessage[];
+};
 
 export async function* generate(
 	{
@@ -24,9 +27,23 @@ export async function* generate(
 		promptedAt,
 		forceMultimodal,
 		locals,
-	}: GenerateContext,
+	}: GenerateFunctionContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
+	const handledByMcp = yield* runMcpFlow({
+		model,
+		conv,
+		messages,
+		assistant,
+		forceMultimodal,
+		locals,
+		preprompt,
+	});
+
+	if (handledByMcp) {
+		return;
+	}
+
 	// reasoning mode is false by default
 	let reasoning = false;
 	let reasoningBuffer = "";

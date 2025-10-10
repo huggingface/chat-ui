@@ -16,11 +16,13 @@
 		MessageUpdateType,
 		type MessageReasoningUpdate,
 		MessageReasoningUpdateType,
+		type MessageToolUpdate,
 	} from "$lib/types/MessageUpdate";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
+	import ToolUpdate from "./ToolUpdate.svelte";
 
 	interface Props {
 		message: Message;
@@ -76,6 +78,22 @@
 			[]) as MessageReasoningUpdate[]
 	);
 
+	let toolUpdateGroups = $derived.by(() => {
+		const updates = message.updates?.filter((update) => update.type === MessageUpdateType.Tool) as
+			| MessageToolUpdate[]
+			| undefined;
+		if (!updates || updates.length === 0) return {} as Record<string, MessageToolUpdate[]>;
+		return updates.reduce(
+			(acc, update) => {
+				(acc[update.uuid] ??= []).push(update);
+				return acc;
+			},
+			{} as Record<string, MessageToolUpdate[]>
+		);
+	});
+
+	let hasToolUpdates = $derived(Object.values(toolUpdateGroups).some((group) => group.length > 0));
+
 	// const messageFinalAnswer = $derived(
 	// 	message.updates?.find(
 	// 		({ type }) => type === MessageUpdateType.FinalAnswer
@@ -94,6 +112,23 @@
 			message.reasoning.trim().length > 0
 	);
 	let hasClientThink = $derived(!hasServerReasoning && thinkSegments.length > 1);
+	let formattedSources = $derived.by(() =>
+		(message.sources ?? [])
+			.slice()
+			.sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+			.map((source) => {
+				let hostname = source.link;
+				let faviconOrigin = source.link;
+				try {
+					const parsed = new URL(source.link);
+					hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+					faviconOrigin = parsed.origin;
+				} catch {
+					// keep raw values if parsing fails
+				}
+				return { ...source, hostname, faviconOrigin };
+			})
+	);
 
 	$effect(() => {
 		if (isCopied) {
@@ -154,6 +189,15 @@
 					loading={loading && message.content.length === 0}
 				/>
 			{/if}
+			{#if hasToolUpdates}
+				{#each Object.values(toolUpdateGroups) as group}
+					{#if group.length}
+						{#key group[0].uuid}
+							<ToolUpdate tool={group} {loading} />
+						{/key}
+					{/if}
+				{/each}
+			{/if}
 
 			<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
@@ -178,7 +222,11 @@
 							<div
 								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 							>
-								<MarkdownRenderer content={part} loading={isLast && loading} />
+								<MarkdownRenderer
+									content={part}
+									sources={message.sources ?? []}
+									loading={isLast && loading}
+								/>
 							</div>
 						{/if}
 					{/each}
@@ -186,13 +234,44 @@
 					<div
 						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
 					>
-						<MarkdownRenderer content={message.content} loading={isLast && loading} />
+						<MarkdownRenderer
+							content={message.content}
+							sources={message.sources ?? []}
+							loading={isLast && loading}
+						/>
+					</div>
+				{/if}
+				{#if formattedSources.length}
+					<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs sm:text-sm">
+						<div class="text-gray-400">Sources:</div>
+						{#each formattedSources as source, index}
+							<a
+								class="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-100 bg-white px-1.5 py-1 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 sm:px-2 sm:py-1.5"
+								href={source.link}
+								target="_blank"
+								rel="noopener noreferrer"
+								title={source.link}
+								aria-label={`Source ${source.index ?? index + 1}: ${source.hostname ?? source.link}`}
+							>
+								<img
+									class="h-3.5 w-3.5 rounded"
+									src={`https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(source.faviconOrigin ?? source.link)}`}
+									alt=""
+								/>
+								<div class="text-gray-600 dark:text-gray-300">{source.hostname}</div>
+								<span
+									class="rounded bg-gray-100 px-1 py-0.5 text-[0.65rem] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-300"
+								>
+									{source.index ?? index + 1}
+								</span>
+							</a>
+						{/each}
 					</div>
 				{/if}
 			</div>
 		</div>
 
-		{#if message.routerMetadata || (!loading && message.content)}
+		{#if message.routerMetadata || (!loading && (message.content || hasToolUpdates))}
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
 					? 'left-1 pl-1 lg:pl-7'

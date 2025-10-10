@@ -372,6 +372,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
+					if (event.sources && event.sources.length > 0) {
+						messageToWriteTo.sources = event.sources;
+					}
 				}
 
 				// Add file
