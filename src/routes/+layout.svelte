@@ -241,18 +241,12 @@
 <BackgroundGenerationPoller />
 
 <div
-	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[290px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
+	class={[
+		"fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-sm",
+		isNavCollapsed ? "md:grid-cols-[0px,1fr]" : "md:grid-cols-[290px,1fr]",
+		"transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]",
+	]}
 >
-	<ExpandNavigation
-		isCollapsed={isNavCollapsed}
-		onClick={() => (isNavCollapsed = !isNavCollapsed)}
-		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-			? 'left-[290px]'
-			: 'left-0'} *:transition-transform"
-	/>
-
 	{#if canShare}
 		<button
 			type="button"
@@ -273,17 +267,22 @@
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>
 	</MobileNav>
-	<nav
-		class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
-	>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			canLogin={!data.user && data.loginEnabled}
-			ondeleteConversation={(id) => deleteConversation(id)}
-			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+	<div class="relative h-full max-md:hidden">
+		<nav class="grid h-full grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px]">
+			<NavMenu
+				{conversations}
+				user={data.user}
+				canLogin={!data.user && data.loginEnabled}
+				ondeleteConversation={(id) => deleteConversation(id)}
+				oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
+			/>
+		</nav>
+		<ExpandNavigation
+			isCollapsed={isNavCollapsed}
+			onClick={() => (isNavCollapsed = !isNavCollapsed)}
+			classNames="absolute inset-y-0 -right-2 z-10 my-auto *:transition-transform"
 		/>
-	</nav>
+	</div>
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}

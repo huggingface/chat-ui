@@ -149,6 +149,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		id: messageId,
 		is_retry: isRetry,
 		is_continue: isContinue,
+		created_message_ids: createdMessageIds,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -170,6 +171,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					})
 				)
 			),
+			created_message_ids: z
+				.optional(
+					z.object({
+						userMessageId: z.string().uuid().optional(),
+						assistantMessageId: z.string().uuid().optional(),
+					})
+				)
+				.optional(),
 		})
 		.parse(JSON.parse(json));
 
@@ -246,6 +255,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const newUserMessageId = addSibling(
 				conv,
 				{
+					...(createdMessageIds?.userMessageId && { id: createdMessageIds.userMessageId }),
 					from: "user",
 					content: newPrompt,
 					files: uploadedFiles,
@@ -257,6 +267,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			messageToWriteToId = addChildren(
 				conv,
 				{
+					...(createdMessageIds?.assistantMessageId && {
+						id: createdMessageIds.assistantMessageId,
+					}),
 					from: "assistant",
 					content: "",
 					createdAt: new Date(),
@@ -270,7 +283,15 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			// just add a sibling to the assistant answer where we can write to
 			messageToWriteToId = addSibling(
 				conv,
-				{ from: "assistant", content: "", createdAt: new Date(), updatedAt: new Date() },
+				{
+					...(createdMessageIds?.assistantMessageId && {
+						id: createdMessageIds.assistantMessageId,
+					}),
+					from: "assistant",
+					content: "",
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
 				messageId
 			);
 			messagesForPrompt = buildSubtree(conv, messageId);
@@ -282,6 +303,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		const newUserMessageId = addChildren(
 			conv,
 			{
+				...(createdMessageIds?.userMessageId && { id: createdMessageIds.userMessageId }),
 				from: "user",
 				content: newPrompt ?? "",
 				files: uploadedFiles,
@@ -294,6 +316,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		messageToWriteToId = addChildren(
 			conv,
 			{
+				...(createdMessageIds?.assistantMessageId && { id: createdMessageIds.assistantMessageId }),
 				from: "assistant",
 				content: "",
 				createdAt: new Date(),

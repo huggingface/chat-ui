@@ -128,7 +128,7 @@
 	</div>
 	{#if !(showContent && browser && !isDesktop(window))}
 		<div
-			class="scrollbar-custom col-span-1 flex flex-col overflow-y-auto whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-50 to-10% dark:from-gray-700/40 max-md:-mx-4 max-md:h-full md:pr-6"
+			class="scrollbar-custom col-span-1 flex flex-col overflow-hidden whitespace-nowrap rounded-r-xl bg-gradient-to-l from-gray-50 to-10% dark:from-gray-700/40 max-md:-mx-4 max-md:h-full md:pr-6"
 			class:max-md:hidden={showContent && browser}
 			bind:this={navContainer}
 		>
@@ -140,7 +140,7 @@
 			</h3>
 
 			<!-- Filter input -->
-			<div class="px-2 py-2">
+			<div class="px-2">
 				<input
 					bind:value={modelFilter}
 					type="search"
@@ -150,54 +150,55 @@
 				/>
 			</div>
 
-			{#each data.models
-				.filter((el) => !el.unlisted)
-				.filter((el) => {
-					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
-					return queryTokens.every((q) => haystack.includes(q));
-				}) as model}
-				<button
-					type="button"
-					onclick={() => goto(`${base}/settings/${model.id}`)}
-					class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 md:rounded-xl md:px-3 {model.id ===
-					page.params.model
-						? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
-						: ''}"
-					data-model-id={model.id}
-					aria-label="Configure {model.displayName}"
-				>
-					<div class="mr-auto flex items-center gap-1 truncate">
-						<span class="truncate">{model.displayName}</span>
-						{#if model.isRouter}
-							<IconOmni />
-						{/if}
-					</div>
-
-					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
-						<span
-							title="Supports image inputs (multimodal)"
-							class="grid size-[21px] flex-none place-items-center rounded-md border border-blue-700 dark:border-blue-500"
-							aria-label="Model is multimodal"
-							role="img"
-						>
-							<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
-						</span>
-					{/if}
-
-					{#if $settings.customPrompts?.[model.id]}
-						<CarbonTextLongParagraph
-							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
-						/>
-					{/if}
-					{#if model.id === $settings.activeModel}
-						<div
-							class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
-						>
-							Active
+			<div class="masked-overflow relative min-h-0 shrink overflow-y-auto py-4">
+				{#each data.models
+					.filter((el) => !el.unlisted)
+					.filter((el) => {
+						const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
+						return queryTokens.every((q) => haystack.includes(q));
+					}) as model}
+					<a
+						href={`${base}/settings/${model.id}`}
+						class="group flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/60 md:rounded-xl md:px-3 {model.id ===
+						page.params.model
+							? '!bg-gray-100 !text-gray-800 dark:!bg-gray-700 dark:!text-gray-200'
+							: ''}"
+						data-model-id={model.id}
+						aria-label="Configure {model.displayName}"
+					>
+						<div class="mr-auto flex items-center gap-1 truncate">
+							<span class="truncate">{model.displayName}</span>
+							{#if model.isRouter}
+								<IconOmni />
+							{/if}
 						</div>
-					{/if}
-				</button>
-			{/each}
+
+						{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
+							<span
+								title="Supports image inputs (multimodal)"
+								class="grid size-[21px] flex-none place-items-center rounded-md border border-blue-700 dark:border-blue-500"
+								aria-label="Model is multimodal"
+								role="img"
+							>
+								<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
+							</span>
+						{/if}
+
+						{#if $settings.customPrompts?.[model.id]}
+							<CarbonTextLongParagraph
+								class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
+							/>
+						{/if}
+						{#if model.id === $settings.activeModel}
+							<div
+								class="flex h-[21px] items-center rounded-md bg-black/90 px-2 text-[11px] font-semibold leading-none text-white dark:bg-white dark:text-black"
+							>
+								Active
+							</div>
+						{/if}
+					</a>
+				{/each}
+			</div>
 
 			<button
 				type="button"
@@ -222,3 +223,81 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.masked-overflow {
+		/* scroll bar width, for use in mask calculations */
+		--scrollbar-width: 8px;
+
+		/* mask fade distance, for use in mask calculations */
+		--mask-height: 16px;
+
+		/* If content exceeds height of container, overflow! */
+		overflow-y: auto;
+
+		/* Our height limit */
+		/* height: 300px; */
+
+		/* Need to make sure container has bottom space,
+  otherwise content at the bottom is always faded out */
+		padding-bottom: var(--mask-height);
+
+		/* Keep some space between content and scrollbar */
+		padding-right: 20px;
+
+		/* The CSS mask */
+
+		/* The content mask is a linear gradient from top to bottom */
+		--mask-image-content: linear-gradient(
+			to bottom,
+			transparent,
+			black var(--mask-height),
+			black calc(100% - var(--mask-height)),
+			transparent
+		);
+
+		/* Here we scale the content gradient to the width of the container 
+  minus the scrollbar width. The height is the full container height */
+		--mask-size-content: calc(100% - var(--scrollbar-width)) 100%;
+
+		/* The scrollbar mask is a black pixel */
+		--mask-image-scrollbar: linear-gradient(black, black);
+
+		/* The width of our black pixel is the width of the scrollbar.
+  The height is the full container height */
+		--mask-size-scrollbar: var(--scrollbar-width) 100%;
+
+		/* Apply the mask image and mask size variables */
+		mask-image: var(--mask-image-content), var(--mask-image-scrollbar);
+		mask-size: var(--mask-size-content), var(--mask-size-scrollbar);
+
+		/* Position the content gradient in the top left, and the 
+  scroll gradient in the top right */
+		mask-position:
+			0 0,
+			100% 0;
+
+		/* We don't repeat our mask images */
+		mask-repeat: no-repeat, no-repeat;
+	}
+
+	/* Firefox */
+	.masked-overflow {
+		scrollbar-width: thin; /* can also be normal, or none, to not render scrollbar */
+		scrollbar-color: currentColor transparent; /* foreground background */
+	}
+
+	/* Webkit / Blink */
+	.masked-overflow::-webkit-scrollbar {
+		width: var(--scrollbar-width);
+	}
+
+	.masked-overflow::-webkit-scrollbar-thumb {
+		background-color: currentColor;
+		border-radius: 9999px; /* always round */
+	}
+
+	.masked-overflow::-webkit-scrollbar-track {
+		background-color: transparent;
+	}
+</style>

@@ -14,6 +14,10 @@ type MessageUpdateRequestOptions = {
 	isRetry: boolean;
 	isContinue: boolean;
 	files?: MessageFile[];
+	createdMessageIds?: {
+		userMessageId?: string;
+		assistantMessageId?: string;
+	};
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -30,6 +34,7 @@ export async function fetchMessageUpdates(
 		id: opts.messageId,
 		is_retry: opts.isRetry,
 		is_continue: opts.isContinue,
+		created_message_ids: opts.createdMessageIds,
 	});
 
 	opts.files?.forEach((file) => {

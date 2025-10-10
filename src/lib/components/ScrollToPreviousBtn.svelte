@@ -1,23 +1,17 @@
 <script lang="ts">
+	import { ScrollState } from "runed";
 	import { fade } from "svelte/transition";
-	import { onDestroy, untrack } from "svelte";
 	import IconChevron from "./icons/IconChevron.svelte";
 
-	let visible = $state(false);
 	interface Props {
 		scrollNode: HTMLElement;
 		class?: string;
 	}
 
 	let { scrollNode, class: className = "" }: Props = $props();
-	let observer: ResizeObserver | null = $state(null);
 
-	function updateVisibility() {
-		if (!scrollNode) return;
-		visible =
-			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight &&
-			scrollNode.scrollTop > 200;
-	}
+	const scrollState = new ScrollState({ element: () => scrollNode, offset: { top: 100 } });
+	const visible = $derived(!scrollState.arrived.top);
 
 	function scrollToPrevious() {
 		if (!scrollNode) return;
@@ -40,30 +34,6 @@
 			previousMessage.scrollIntoView({ behavior: "smooth", block: "start" });
 		}
 	}
-
-	function destroy() {
-		observer?.disconnect();
-		scrollNode?.removeEventListener("scroll", updateVisibility);
-	}
-
-	onDestroy(destroy);
-
-	$effect(() => {
-		scrollNode &&
-			untrack(() => {
-				if (scrollNode) {
-					destroy();
-
-					if (window.ResizeObserver) {
-						observer = new ResizeObserver(() => {
-							updateVisibility();
-						});
-						observer.observe(scrollNode);
-					}
-					scrollNode.addEventListener("scroll", updateVisibility);
-				}
-			});
-	});
 </script>
 
 {#if visible}

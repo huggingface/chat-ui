@@ -19,7 +19,7 @@
 	import { addChildren } from "$lib/utils/tree/addChildren";
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
-	import type { v4 } from "uuid";
+	import { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
 	import {
@@ -154,6 +154,7 @@
 			);
 
 			let messageToWriteToId: Message["id"] | undefined = undefined;
+			let createdMessageIds: { userMessageId?: string; assistantMessageId?: string } = {};
 			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 
 			if (isContinue && messageId) {
@@ -177,12 +178,19 @@
 				if (messageToRetry?.from === "user" && prompt) {
 					// add a sibling to this message from the user, with the alternative prompt
 					// add a children to that sibling, where we can write to
-					const newUserMessageId = addSibling(
+					const newUserMessageId = v4();
+					const newAssistantMessageId = v4();
+					createdMessageIds = {
+						userMessageId: newUserMessageId,
+						assistantMessageId: newAssistantMessageId,
+					};
+					addSibling(
 						{
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
 						{
+							id: newUserMessageId,
 							from: "user",
 							content: prompt,
 							files: messageToRetry.files,
@@ -194,30 +202,39 @@
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "" },
+						{ id: newAssistantMessageId, from: "assistant", content: "" },
 						newUserMessageId
 					);
 				} else if (messageToRetry?.from === "assistant") {
 					// we're retrying an assistant message, to generate a new answer
 					// just add a sibling to the assistant answer where we can write to
+					const newAssistantMessageId = v4();
+					createdMessageIds = { assistantMessageId: newAssistantMessageId };
 					messageToWriteToId = addSibling(
 						{
 							messages,
 							rootMessageId: data.rootMessageId,
 						},
-						{ from: "assistant", content: "" },
+						{ id: newAssistantMessageId, from: "assistant", content: "" },
 						messageId
 					);
 				}
 			} else {
 				// just a normal linear conversation, so we add the user message
 				// and the blank assistant message back to back
-				const newUserMessageId = addChildren(
+				const newUserMessageId = v4();
+				const newAssistantMessageId = v4();
+				createdMessageIds = {
+					userMessageId: newUserMessageId,
+					assistantMessageId: newAssistantMessageId,
+				};
+				addChildren(
 					{
 						messages,
 						rootMessageId: data.rootMessageId,
 					},
 					{
+						id: newUserMessageId,
 						from: "user",
 						content: prompt ?? "",
 						files: base64Files,
@@ -235,6 +252,7 @@
 						rootMessageId: data.rootMessageId,
 					},
 					{
+						id: newAssistantMessageId,
 						from: "assistant",
 						content: "",
 					},
@@ -259,6 +277,7 @@
 					isRetry,
 					isContinue,
 					files: isRetry ? userMessage?.files : base64Files,
+					createdMessageIds,
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
