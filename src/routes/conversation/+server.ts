@@ -9,6 +9,7 @@ import { models, validateModel } from "$lib/server/models";
 import { v4 } from "uuid";
 import { authCondition } from "$lib/server/auth";
 import { usageLimits } from "$lib/server/usageLimits";
+import { MetricsServer } from "$lib/server/metrics";
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const body = await request.text();
@@ -96,6 +97,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
 		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
 	});
+
+	if (MetricsServer.isEnabled()) {
+		MetricsServer.getMetrics().model.conversationsTotal.inc({ model: values.model });
+	}
 
 	return new Response(
 		JSON.stringify({
