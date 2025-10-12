@@ -43,7 +43,7 @@ async function generateTitle(
 		generateFromDefaultEndpoint({
 			messages: [{ from: "user", content: `User message: "${prompt}"` }],
 			preprompt: `You are a chat thread titling assistant.
-Goal: Produce a very short, descriptive title (2–5 words) that names the topic of the user's first message.
+Goal: Produce a very short, descriptive title (2–4 words) that names the topic of the user's first message.
 
 Rules:
 - Output ONLY the title text. No prefixes, labels, quotes, emojis, hashtags, or trailing punctuation.
@@ -60,7 +60,8 @@ User: "请解释Transformer是如何工作的" -> Transformer 工作原理
 User: "tell me more about you" -> About the assistant
 Return only the title text.`,
 			generateSettings: {
-				max_tokens: 30,
+				max_tokens: 24,
+				temperature: 0,
 			},
 			modelId,
 			locals,
