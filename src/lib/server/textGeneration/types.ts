@@ -10,11 +10,11 @@ export interface TextGenerationContext {
 	conv: Conversation;
 	messages: Message[];
 	assistant?: Pick<Assistant, "dynamicPrompt" | "generateSettings">;
-	isContinue: boolean;
 	promptedAt: Date;
 	ip: string;
 	username?: string;
 	/** Force-enable multimodal handling for endpoints that support it */
 	forceMultimodal?: boolean;
 	locals: App.Locals | undefined;
+	abortController: AbortController;
 }

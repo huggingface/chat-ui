@@ -12,11 +12,11 @@ export type EndpointMessage = Omit<Message, "id">;
 export interface EndpointParameters {
 	messages: EndpointMessage[];
 	preprompt?: Conversation["preprompt"];
-	continueMessage?: boolean; // used to signal that the last message will be extended
 	generateSettings?: Partial<Model["parameters"]>;
 	isMultimodal?: boolean;
 	conversationId?: ObjectId;
 	locals: App.Locals | undefined;
+	abortSignal?: AbortSignal;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

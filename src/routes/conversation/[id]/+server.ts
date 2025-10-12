@@ -23,6 +23,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
+import { AbortRegistry } from "$lib/server/abortRegistry";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -148,7 +149,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
-		is_continue: isContinue,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -159,7 +159,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
 			is_retry: z.optional(z.boolean()),
-			is_continue: z.optional(z.boolean()),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -220,15 +219,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (isContinue && messageId) {
-		// if it's the last message and we continue then we build the prompt up to the last message
-		// we will strip the end tokens afterwards when the prompt is built
-		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
-			error(400, "Can only continue the last message");
-		}
-		messageToWriteToId = messageId;
-		messagesForPrompt = buildSubtree(conv, messageId);
-	} else if (isRetry && messageId) {
+	if (isRetry && messageId) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message
 		// if we're retrying on an assistant message, newPrompt cannot be set
@@ -331,9 +322,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		);
 	};
 
+	const abortRegistry = AbortRegistry.getInstance();
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
+			const conversationKey = convId.toString();
+			const ctrl = new AbortController();
+			abortRegistry.register(conversationKey, ctrl);
+
+			let finalAnswerReceived = false;
+			let abortedByUser = false;
+
 			messageToWriteTo.updates ??= [];
 			async function update(event: MessageUpdate) {
 				if (!messageToWriteTo || !conv) {
@@ -372,6 +372,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
+					finalAnswerReceived = true;
 				}
 
 				// Add file
@@ -449,7 +450,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					conv,
 					messages: messagesForPrompt,
 					assistant: undefined,
-					isContinue: isContinue ?? false,
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
@@ -460,20 +460,50 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						]
 					),
 					locals,
+					abortController: ctrl,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
+				if (ctrl.signal.aborted) {
+					abortedByUser = true;
+				}
+				if (abortedByUser && !finalAnswerReceived) {
+					const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
+					await update({
+						type: MessageUpdateType.FinalAnswer,
+						text: partialText,
+						interrupted: true,
+					});
+				}
 			} catch (e) {
-				hasError = true;
-				await update({
-					type: MessageUpdateType.Status,
-					status: MessageUpdateStatus.Error,
-					message: (e as Error).message,
-				});
-				logger.error(e);
+				const err = e as Error;
+				const isAbortError =
+					err?.name === "AbortError" ||
+					err?.name === "APIUserAbortError" ||
+					err?.message === "Request was aborted.";
+				if (isAbortError || ctrl.signal.aborted) {
+					abortedByUser = true;
+					logger.info({ conversationId: conversationKey }, "Generation aborted by user");
+					if (!finalAnswerReceived) {
+						const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
+						await update({
+							type: MessageUpdateType.FinalAnswer,
+							text: partialText,
+							interrupted: true,
+						});
+					}
+				} else {
+					hasError = true;
+					await update({
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.Error,
+						message: err.message,
+					});
+					logger.error(err);
+				}
 			} finally {
 				// check if no output was generated
-				if (!hasError && messageToWriteTo.content === initialMessageContent) {
+				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
 					await update({
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
@@ -483,6 +513,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			await persistConversation();
+			abortRegistry.unregister(conversationKey, ctrl);
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;

@@ -131,12 +131,10 @@
 		prompt,
 		messageId = messagesPath.at(-1)?.id ?? undefined,
 		isRetry = false,
-		isContinue = false,
 	}: {
 		prompt?: string;
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
-		isContinue?: boolean;
 	}): Promise<void> {
 		try {
 			$isAborted = false;
@@ -156,13 +154,7 @@
 			let messageToWriteToId: Message["id"] | undefined = undefined;
 			// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 
-			if (isContinue && messageId) {
-				if ((messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
-					$error = "Can only continue the last message";
-				} else {
-					messageToWriteToId = messageId;
-				}
-			} else if (isRetry && messageId) {
+			if (isRetry && messageId) {
 				// two cases, if we're retrying a user message with a newPrompt set,
 				// it means we're editing a user message
 				// if we're retrying on an assistant message, newPrompt cannot be set
@@ -257,7 +249,6 @@
 					inputs: prompt,
 					messageId,
 					isRetry,
-					isContinue,
 					files: isRetry ? userMessage?.files : base64Files,
 				},
 				messageUpdatesAbortController.signal
@@ -422,25 +413,6 @@
 		messagesPath = createMessagesPath(messages, msgId);
 	}
 
-	async function onContinue(payload: { id: Message["id"] }) {
-		if (!data.shared) {
-			await writeMessage({ messageId: payload.id, isContinue: true });
-		} else {
-			await convFromShared()
-				.then(async (convId) => {
-					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
-				})
-				.then(
-					async () =>
-						await writeMessage({
-							messageId: payload.id,
-							isContinue: true,
-						})
-				)
-				.finally(() => (loading = false));
-		}
-	}
-
 	const settings = useSettingsStore();
 	let messages = $state(data.messages);
 	$effect(() => {
@@ -527,7 +499,6 @@
 	bind:files
 	onmessage={onMessage}
 	onretry={onRetry}
-	oncontinue={onContinue}
 	onshowAlternateMsg={onShowAlternateMsg}
 	onstop={async () => {
 		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {

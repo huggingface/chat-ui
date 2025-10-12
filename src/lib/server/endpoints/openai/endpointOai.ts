@@ -109,14 +109,13 @@ export async function endpointOai(
 		return async ({
 			messages,
 			preprompt,
-			continueMessage,
 			generateSettings,
 			conversationId,
 			locals,
+			abortSignal,
 		}) => {
 			const prompt = await buildPrompt({
 				messages,
-				continueMessage,
 				preprompt,
 				model,
 			});
@@ -141,6 +140,7 @@ export async function endpointOai(
 					"X-use-cache": "false",
 					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 				},
+				signal: abortSignal,
 			});
 
 			return openAICompletionToTextGenerationStream(openAICompletion);
@@ -153,6 +153,7 @@ export async function endpointOai(
 			conversationId,
 			isMultimodal,
 			locals,
+			abortSignal,
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
@@ -203,6 +204,7 @@ export async function endpointOai(
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 						},
+						signal: abortSignal,
 					}
 				);
 				return openAIChatToTextGenerationStream(openChatAICompletion, () => routerMetadata);
@@ -216,6 +218,7 @@ export async function endpointOai(
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 						},
+						signal: abortSignal,
 					}
 				);
 				return openAIChatToTextGenerationSingle(openChatAICompletion, () => routerMetadata);
