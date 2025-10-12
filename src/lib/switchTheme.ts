@@ -1,5 +1,37 @@
 export type ThemePreference = "light" | "dark" | "system";
 
+type ThemeState = {
+	preference: ThemePreference;
+	isDark: boolean;
+};
+
+type ThemeSubscriber = (state: ThemeState) => void;
+
+let currentPreference: ThemePreference = "system";
+const subscribers = new Set<ThemeSubscriber>();
+
+function notify(preference: ThemePreference, isDark: boolean) {
+	for (const subscriber of subscribers) {
+		subscriber({ preference, isDark });
+	}
+}
+
+export function subscribeToTheme(subscriber: ThemeSubscriber) {
+	subscribers.add(subscriber);
+
+	if (typeof document !== "undefined") {
+		const preference = getThemePreference();
+		const isDark = document.documentElement.classList.contains("dark");
+		subscriber({ preference, isDark });
+	} else {
+		subscriber({ preference: "system", isDark: false });
+	}
+
+	return () => {
+		subscribers.delete(subscriber);
+	};
+}
+
 function setMetaThemeColor(isDark: boolean) {
 	const metaTheme = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
 	if (!metaTheme) return;
@@ -11,11 +43,16 @@ function applyDarkClass(isDark: boolean) {
 	if (isDark) classList.add("dark");
 	else classList.remove("dark");
 	setMetaThemeColor(isDark);
+	notify(currentPreference, isDark);
 }
 
 export function getThemePreference(): ThemePreference {
 	const raw = typeof localStorage !== "undefined" ? localStorage.getItem("theme") : null;
-	if (raw === "light" || raw === "dark" || raw === "system") return raw;
+	if (raw === "light" || raw === "dark" || raw === "system") {
+		currentPreference = raw;
+		return raw;
+	}
+	currentPreference = "system";
 	return "system";
 }
 
@@ -33,6 +70,7 @@ export function setTheme(preference: ThemePreference) {
 	}
 
 	const mql = window.matchMedia("(prefers-color-scheme: dark)");
+	currentPreference = preference;
 	const resolve = () =>
 		applyDarkClass(preference === "dark" || (preference === "system" && mql.matches));
 

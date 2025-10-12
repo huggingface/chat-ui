@@ -13,8 +13,9 @@
 	import Logo from "$lib/components/icons/Logo.svelte";
 	import IconSun from "$lib/components/icons/IconSun.svelte";
 	import IconMoon from "$lib/components/icons/IconMoon.svelte";
-	import { switchTheme } from "$lib/switchTheme";
+	import { switchTheme, subscribeToTheme } from "$lib/switchTheme";
 	import { isAborted } from "$lib/stores/isAborted";
+	import { onDestroy } from "svelte";
 
 	import NavConversationItem from "./NavConversationItem.svelte";
 	import type { LayoutData } from "../../routes/$types";
@@ -100,7 +101,18 @@
 		}
 	});
 
-	let theme = $state(browser ? localStorage.theme : "light");
+	let isDark = $state(false);
+	let unsubscribeTheme: (() => void) | undefined;
+
+	if (browser) {
+		unsubscribeTheme = subscribeToTheme(({ isDark: nextIsDark }) => {
+			isDark = nextIsDark;
+		});
+	}
+
+	onDestroy(() => {
+		unsubscribeTheme?.();
+	});
 </script>
 
 <div
@@ -188,13 +200,12 @@
 		<button
 			onclick={() => {
 				switchTheme();
-				theme = localStorage.theme;
 			}}
 			aria-label="Toggle theme"
 			class="flex size-9 min-w-[1.5em] flex-none items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 		>
 			{#if browser}
-				{#if theme === "dark"}
+				{#if isDark}
 					<IconSun />
 				{:else}
 					<IconMoon />
