@@ -17,4 +17,5 @@ export interface TextGenerationContext {
 	/** Force-enable multimodal handling for endpoints that support it */
 	forceMultimodal?: boolean;
 	locals: App.Locals | undefined;
+	abortController: AbortController;
 }

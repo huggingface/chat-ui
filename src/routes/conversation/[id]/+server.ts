@@ -23,6 +23,7 @@ import { usageLimits } from "$lib/server/usageLimits";
 import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
+import { AbortRegistry } from "$lib/server/abortRegistry";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -331,9 +332,18 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		);
 	};
 
+	const abortRegistry = AbortRegistry.getInstance();
+
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
+			const conversationKey = convId.toString();
+			const ctrl = new AbortController();
+			abortRegistry.register(conversationKey, ctrl);
+
+			let finalAnswerReceived = false;
+			let abortedByUser = false;
+
 			messageToWriteTo.updates ??= [];
 			async function update(event: MessageUpdate) {
 				if (!messageToWriteTo || !conv) {
@@ -372,6 +382,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
+					finalAnswerReceived = true;
 				}
 
 				// Add file
@@ -460,20 +471,50 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						]
 					),
 					locals,
+					abortController: ctrl,
 				};
 				// run the text generation and send updates to the client
 				for await (const event of textGeneration(ctx)) await update(event);
+				if (ctrl.signal.aborted) {
+					abortedByUser = true;
+				}
+				if (abortedByUser && !finalAnswerReceived) {
+					const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
+					await update({
+						type: MessageUpdateType.FinalAnswer,
+						text: partialText,
+						interrupted: true,
+					});
+				}
 			} catch (e) {
-				hasError = true;
-				await update({
-					type: MessageUpdateType.Status,
-					status: MessageUpdateStatus.Error,
-					message: (e as Error).message,
-				});
-				logger.error(e);
+				const err = e as Error;
+				const isAbortError =
+					err?.name === "AbortError" ||
+					err?.name === "APIUserAbortError" ||
+					err?.message === "Request was aborted.";
+				if (isAbortError || ctrl.signal.aborted) {
+					abortedByUser = true;
+					logger.info({ conversationId: conversationKey }, "Generation aborted by user");
+					if (!finalAnswerReceived) {
+						const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
+						await update({
+							type: MessageUpdateType.FinalAnswer,
+							text: partialText,
+							interrupted: true,
+						});
+					}
+				} else {
+					hasError = true;
+					await update({
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.Error,
+						message: err.message,
+					});
+					logger.error(err);
+				}
 			} finally {
 				// check if no output was generated
-				if (!hasError && messageToWriteTo.content === initialMessageContent) {
+				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
 					await update({
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
@@ -483,6 +524,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}
 
 			await persistConversation();
+			abortRegistry.unregister(conversationKey, ctrl);
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
 			doneStreaming = true;

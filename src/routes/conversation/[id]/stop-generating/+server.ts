@@ -1,5 +1,6 @@
 import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
+import { AbortRegistry } from "$lib/server/abortRegistry";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 
@@ -17,6 +18,8 @@ export async function POST({ params, locals }) {
 	if (!conversation) {
 		error(404, "Conversation not found");
 	}
+
+	AbortRegistry.getInstance().abort(conversationId.toString());
 
 	await collections.abortedGenerations.updateOne(
 		{ conversationId },

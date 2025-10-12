@@ -17,6 +17,7 @@ export interface EndpointParameters {
 	isMultimodal?: boolean;
 	conversationId?: ObjectId;
 	locals: App.Locals | undefined;
+	abortSignal?: AbortSignal;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

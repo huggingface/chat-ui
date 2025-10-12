@@ -24,6 +24,7 @@ export async function* generate(
 		promptedAt,
 		forceMultimodal,
 		locals,
+		abortController,
 	}: GenerateContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
@@ -50,7 +51,7 @@ export async function* generate(
 		};
 	}
 
-	for await (const output of await endpoint({
+	const stream = await endpoint({
 		messages,
 		preprompt,
 		continueMessage: isContinue,
@@ -59,7 +60,10 @@ export async function* generate(
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,
 		locals,
-	})) {
+		abortSignal: abortController.signal,
+	});
+
+	for await (const output of stream) {
 		// Check if this output contains router metadata
 		if (
 			"routerMetadata" in output &&
@@ -248,6 +252,9 @@ Do not use prefixes such as Response: or Answer: when answering to the user.`,
 
 		if (date && date > promptedAt) {
 			logger.info(`Aborting generation for conversation ${conv._id}`);
+			if (!abortController.signal.aborted) {
+				abortController.abort();
+			}
 			break;
 		}
 
