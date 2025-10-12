@@ -20,7 +20,6 @@ export async function* generate(
 		conv,
 		messages,
 		assistant,
-		isContinue,
 		promptedAt,
 		forceMultimodal,
 		locals,
@@ -54,7 +53,6 @@ export async function* generate(
 	const stream = await endpoint({
 		messages,
 		preprompt,
-		continueMessage: isContinue,
 		generateSettings: assistant?.generateSettings,
 		// Allow user-level override to force multimodal
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,

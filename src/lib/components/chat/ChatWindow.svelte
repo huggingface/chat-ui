@@ -14,7 +14,6 @@
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
-	import ContinueBtn from "../ContinueBtn.svelte";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
@@ -49,7 +48,6 @@
 		onmessage?: (content: string) => void;
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
-		oncontinue?: (payload: { id: Message["id"] }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
 
@@ -66,7 +64,6 @@
 		onmessage,
 		onstop,
 		onretry,
-		oncontinue,
 		onshowAlternateMsg,
 	}: Props = $props();
 
@@ -461,18 +458,6 @@
 								}
 							}}
 						/>
-					{:else if messages && lastMessage && lastMessage.interrupted && !isReadOnly}
-						<div class="ml-auto gap-2">
-							<ContinueBtn
-								onClick={() => {
-									if (lastMessage && lastMessage.ancestors) {
-										oncontinue?.({
-											id: lastMessage?.id,
-										});
-									}
-								}}
-							/>
-						</div>
 					{/if}
 				{/if}
 			</div>

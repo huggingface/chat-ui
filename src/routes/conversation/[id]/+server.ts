@@ -149,7 +149,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
-		is_continue: isContinue,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -160,7 +159,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
 			is_retry: z.optional(z.boolean()),
-			is_continue: z.optional(z.boolean()),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -221,15 +219,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	// used for building the prompt, subtree of the conversation that goes from the latest message to the root
 	let messagesForPrompt: Message[] = [];
 
-	if (isContinue && messageId) {
-		// if it's the last message and we continue then we build the prompt up to the last message
-		// we will strip the end tokens afterwards when the prompt is built
-		if ((conv.messages.find((msg) => msg.id === messageId)?.children?.length ?? 0) > 0) {
-			error(400, "Can only continue the last message");
-		}
-		messageToWriteToId = messageId;
-		messagesForPrompt = buildSubtree(conv, messageId);
-	} else if (isRetry && messageId) {
+	if (isRetry && messageId) {
 		// two cases, if we're retrying a user message with a newPrompt set,
 		// it means we're editing a user message
 		// if we're retrying on an assistant message, newPrompt cannot be set
@@ -460,7 +450,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					conv,
 					messages: messagesForPrompt,
 					assistant: undefined,
-					isContinue: isContinue ?? false,
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,

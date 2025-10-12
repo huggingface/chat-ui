@@ -10,7 +10,6 @@ export interface TextGenerationContext {
 	conv: Conversation;
 	messages: Message[];
 	assistant?: Pick<Assistant, "dynamicPrompt" | "generateSettings">;
-	isContinue: boolean;
 	promptedAt: Date;
 	ip: string;
 	username?: string;

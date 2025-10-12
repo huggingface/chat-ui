@@ -109,7 +109,6 @@ export async function endpointOai(
 		return async ({
 			messages,
 			preprompt,
-			continueMessage,
 			generateSettings,
 			conversationId,
 			locals,
@@ -117,7 +116,6 @@ export async function endpointOai(
 		}) => {
 			const prompt = await buildPrompt({
 				messages,
-				continueMessage,
 				preprompt,
 				model,
 			});

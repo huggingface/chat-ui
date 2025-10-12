@@ -12,7 +12,6 @@ type MessageUpdateRequestOptions = {
 	inputs?: string;
 	messageId?: string;
 	isRetry: boolean;
-	isContinue: boolean;
 	files?: MessageFile[];
 };
 export async function fetchMessageUpdates(
@@ -29,7 +28,6 @@ export async function fetchMessageUpdates(
 		inputs: opts.inputs,
 		id: opts.messageId,
 		is_retry: opts.isRetry,
-		is_continue: opts.isContinue,
 	});
 
 	opts.files?.forEach((file) => {
