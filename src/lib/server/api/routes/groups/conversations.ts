@@ -23,21 +23,37 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			.get(
 				"",
 				async ({ locals, query }) => {
-					const convs = await collections.conversations
-						.find(authCondition(locals))
-						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
-							title: 1,
-							updatedAt: 1,
-							model: 1,
-						})
-						.sort({ updatedAt: -1 })
-						.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
-						.limit(CONV_NUM_PER_PAGE)
+					const page = query.p ?? 0;
+					const skip = page * CONV_NUM_PER_PAGE;
+					const [aggregated] = await collections.conversations
+						.aggregate<{
+							conversations: Pick<Conversation, "_id" | "title" | "updatedAt" | "model">[];
+							totals: { count: number }[];
+						}>([
+							{ $match: authCondition(locals) },
+							{
+								$facet: {
+									conversations: [
+										{ $sort: { updatedAt: -1 } },
+										{ $skip: skip },
+										{ $limit: CONV_NUM_PER_PAGE },
+										{
+											$project: {
+												_id: 1,
+												title: 1,
+												updatedAt: 1,
+												model: 1,
+											},
+										},
+									],
+									totals: [{ $count: "count" }],
+								},
+							},
+						])
 						.toArray();
 
-					const nConversations = await collections.conversations.countDocuments(
-						authCondition(locals)
-					);
+					const convs = aggregated?.conversations ?? [];
+					const nConversations = aggregated?.totals?.[0]?.count ?? 0;
 
 					const res = convs.map((conv) => ({
 						_id: conv._id,

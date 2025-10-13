@@ -9,6 +9,7 @@ import yazl from "yazl";
 import { downloadFile } from "$lib/server/files/downloadFile";
 import mimeTypes from "mime-types";
 import { logger } from "$lib/server/logger";
+import type { Document } from "mongodb";
 
 export interface FeatureFlags {
 	enableAssistants: boolean;
@@ -28,7 +29,35 @@ export const misc = new Elysia()
 		const messagesBeforeLogin = config.MESSAGES_BEFORE_LOGIN
 			? parseInt(config.MESSAGES_BEFORE_LOGIN)
 			: 0;
-		const nConversations = await collections.conversations.countDocuments(authCondition(locals));
+		let nConversations = 0;
+		let assistantMessages = 0;
+		const matchCondition = authCondition(locals);
+
+		if (requiresUser) {
+			const facetPipelines: Record<string, Document[]> = {
+				conversationCount: [{ $count: "count" }],
+			};
+
+			if (!locals.user && messagesBeforeLogin > 0) {
+				facetPipelines.assistantMessages = [
+					{ $project: { messages: 1 } },
+					{ $unwind: "$messages" },
+					{ $match: { "messages.from": "assistant" } },
+					{ $limit: messagesBeforeLogin + 1 },
+					{ $count: "count" },
+				];
+			}
+
+			const aggregation = await collections.conversations
+				.aggregate<{
+					conversationCount: { count: number }[];
+					assistantMessages?: { count: number }[];
+				}>([{ $match: matchCondition }, { $facet: facetPipelines }])
+				.next();
+
+			nConversations = aggregation?.conversationCount?.[0]?.count ?? 0;
+			assistantMessages = aggregation?.assistantMessages?.[0]?.count ?? 0;
+		}
 
 		if (requiresUser && !locals.user) {
 			if (messagesBeforeLogin === 0) {
@@ -36,22 +65,7 @@ export const misc = new Elysia()
 			} else if (nConversations >= messagesBeforeLogin) {
 				loginRequired = true;
 			} else {
-				// get the number of messages where `from === "assistant"` across all conversations.
-				const totalMessages =
-					(
-						await collections.conversations
-							.aggregate([
-								{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
-								{ $project: { messages: 1 } },
-								{ $limit: messagesBeforeLogin + 1 },
-								{ $unwind: "$messages" },
-								{ $match: { "messages.from": "assistant" } },
-								{ $count: "messages" },
-							])
-							.toArray()
-					)[0]?.messages ?? 0;
-
-				loginRequired = totalMessages >= messagesBeforeLogin;
+				loginRequired = assistantMessages >= messagesBeforeLogin;
 			}
 		}
 
