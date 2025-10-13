@@ -15,8 +15,7 @@ export async function* openAIChatToTextGenerationStream(
 	let metadataYielded = false;
 	let thinkOpen = false;
 
-	try {
-		for await (const completion of completionStream) {
+	for await (const completion of completionStream) {
 		const retyped = completion as { "x-router-metadata"?: { route: string; model: string } };
 		// Check if this chunk contains router metadata (first chunk from llm-router)
 		if (!metadataYielded && retyped["x-router-metadata"]) {
@@ -135,28 +134,24 @@ export async function* openAIChatToTextGenerationStream(
 		yield output;
 
 		// Tools removed: ignore tool_calls deltas
-		}
+	}
 
-		// If metadata wasn't yielded from chunks (e.g., from headers), yield it at the end
-		if (!metadataYielded && getRouterMetadata) {
-			const routerMetadata = getRouterMetadata();
-			if (routerMetadata && routerMetadata.route && routerMetadata.model) {
-				yield {
-					token: {
-						id: tokenId++,
-						text: "",
-						logprob: 0,
-						special: true,
-					},
-					generated_text: null,
-					details: null,
-					routerMetadata,
-				} as TextGenerationStreamOutput & { routerMetadata: { route?: string; model?: string } };
-			}
+	// If metadata wasn't yielded from chunks (e.g., from headers), yield it at the end
+	if (!metadataYielded && getRouterMetadata) {
+		const routerMetadata = getRouterMetadata();
+		if (routerMetadata && routerMetadata.route && routerMetadata.model) {
+			yield {
+				token: {
+					id: tokenId++,
+					text: "",
+					logprob: 0,
+					special: true,
+				},
+				generated_text: null,
+				details: null,
+				routerMetadata,
+			} as TextGenerationStreamOutput & { routerMetadata: { route?: string; model?: string } };
 		}
-	} catch (error: any) {
-		// Re-throw the error as-is to preserve the original error message
-		throw error;
 	}
 }
 

@@ -11,6 +11,7 @@ import { logger } from "$lib/server/logger";
 import { archSelectRoute } from "./arch";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
+import { ROUTER_FAILURE } from "./types";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -59,6 +60,32 @@ function extractUpstreamError(error: unknown): { message: string; statusCode?: n
 	}
 
 	return { message: String(error) };
+}
+
+/**
+ * Determines if an error is a policy/entitlement error that should be shown to users immediately
+ * (vs transient errors that should trigger fallback)
+ */
+function isPolicyError(statusCode?: number): boolean {
+	if (!statusCode) return false;
+	// 402: Payment Required, 401: Unauthorized, 403: Forbidden
+	return statusCode === 402 || statusCode === 401 || statusCode === 403;
+}
+
+/**
+ * Sanitize error messages before sending to clients to avoid leaking provider details
+ */
+function publicErrorMessage(message: string, statusCode?: number): string {
+	// Specific messages for known status codes
+	if (statusCode === 402) return "Payment required to continue.";
+	if (statusCode === 401) return "You are not authorized. Please sign in.";
+	if (statusCode === 403) return "Access to this feature is restricted.";
+	if (statusCode === 429) return "You're being rate-limited. Please try again shortly.";
+	if (statusCode && statusCode >= 500)
+		return "The AI provider is temporarily unavailable. Please try again.";
+
+	// For other errors, sanitize by replacing provider names
+	return message.replace(/OpenAI|Anthropic|Provider[A-Z]\w*/gi, "the AI provider");
 }
 
 function stripReasoningBlocks(text: string): string {
@@ -170,6 +197,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
 			} catch (e) {
 				const { message, statusCode } = extractUpstreamError(e);
+				const publicMsg = publicErrorMessage(message, statusCode);
 				logger.error(
 					{
 						route: ROUTER_MULTIMODAL_ROUTE,
@@ -179,20 +207,32 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					},
 					"[router] multimodal fallback failed"
 				);
-				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+				throw statusCode ? new HTTPError(publicMsg, statusCode) : new Error(publicMsg);
 			}
 		}
 
 		const routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
 
-		// If arch router failed with an error, throw it immediately with status code
-		if (routeSelection.routeName === "arch_router_failure" && routeSelection.error) {
+		// If arch router failed with an error, only hard-fail for policy errors (402/401/403)
+		// For transient errors (5xx, timeouts, network), allow fallback to continue
+		if (routeSelection.routeName === ROUTER_FAILURE && routeSelection.error) {
 			const { message, statusCode } = routeSelection.error;
-			logger.error(
+
+			if (isPolicyError(statusCode)) {
+				// Policy errors should be surfaced to the user immediately (e.g., subscription required)
+				const publicMsg = publicErrorMessage(message, statusCode);
+				logger.error(
+					{ err: message, ...(statusCode && { status: statusCode }) },
+					"[router] arch router failed with policy error, propagating to client"
+				);
+				throw statusCode ? new HTTPError(publicMsg, statusCode) : new Error(publicMsg);
+			}
+
+			// Transient errors: log and continue to fallback
+			logger.warn(
 				{ err: message, ...(statusCode && { status: statusCode }) },
-				"[router] arch router failed, propagating error"
+				"[router] arch router failed with transient error, attempting fallback"
 			);
-			throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 		}
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
@@ -225,8 +265,9 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		}
 
 		// Exhausted all candidates — throw to signal upstream failure
-		// Forward the actual upstream error directly to the client
+		// Sanitize and forward the upstream error to the client
 		const { message, statusCode } = extractUpstreamError(lastErr);
-		throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+		const publicMsg = publicErrorMessage(message, statusCode);
+		throw statusCode ? new HTTPError(publicMsg, statusCode) : new Error(publicMsg);
 	};
 }
