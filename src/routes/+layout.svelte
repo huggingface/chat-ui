@@ -267,8 +267,10 @@
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>
 	</MobileNav>
-	<div class="relative h-full max-md:hidden">
-		<nav class="grid h-full grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px]">
+	<div class="relative max-h-screen max-md:hidden">
+		<nav
+			class="grid max-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px]"
+		>
 			<NavMenu
 				{conversations}
 				user={data.user}
