@@ -19,7 +19,7 @@
 
 <Modal onclose={() => onclose?.()} width="!max-w-[400px] !m-4">
 	<div
-		class="from-primary-500/40 via-primary-500/10 to-primary-500/0 flex w-full flex-col items-center gap-6 bg-gradient-to-b px-5 pb-8 pt-9 text-center"
+		class="flex w-full flex-col items-center gap-6 bg-gradient-to-b from-gray-500/40 via-gray-500/10 to-gray-500/0 px-5 pb-8 pt-9 text-center"
 	>
 		<h2 class="flex items-center text-2xl font-semibold text-gray-800">
 			<Logo classNames="mr-1" />

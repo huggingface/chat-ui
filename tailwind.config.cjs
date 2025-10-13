@@ -9,7 +9,6 @@ module.exports = {
 	theme: {
 		extend: {
 			colors: {
-				primary: colors[process.env.PUBLIC_APP_COLOR],
 				gray: {
 					600: "#323843",
 					700: "#252a33",

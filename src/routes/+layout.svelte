@@ -17,7 +17,6 @@
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { loginModalOpen } from "$lib/stores/loginModal";
 	import LoginModal from "$lib/components/LoginModal.svelte";
-	import OverloadedModal from "$lib/components/OverloadedModal.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
@@ -39,8 +38,6 @@
 
 	let isNavCollapsed = $state(false);
 
-	let overloadedModalOpen = $state(false);
-
 	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | undefined = $state();
 
@@ -54,9 +51,6 @@
 
 		currentError = $error;
 
-		if (currentError === "Model is overloaded") {
-			overloadedModalOpen = true;
-		}
 		errorToastTimeout = setTimeout(() => {
 			$error = undefined;
 			currentError = undefined;
@@ -232,10 +226,6 @@
 			$loginModalOpen = false;
 		}}
 	/>
-{/if}
-
-{#if overloadedModalOpen && publicConfig.isHuggingChat}
-	<OverloadedModal onClose={() => (overloadedModalOpen = false)} />
 {/if}
 
 <BackgroundGenerationPoller />

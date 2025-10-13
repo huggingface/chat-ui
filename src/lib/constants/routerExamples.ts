@@ -28,10 +28,14 @@ export const routerExamples: RouterExample[] = [
 				prompt:
 					"Add a power-up mechanic to the Pong game so paddles temporarily grow when a player scores twice in a row.",
 			},
-
 			{
 				title: "CRT Screen",
 				prompt: "Add a CRT screen effect to the game",
+			},
+			{
+				title: "Explain collision logic",
+				prompt:
+					"Explain the collision detection algorithm in the pong game in simple terms with examples.",
 			},
 		],
 	},
@@ -61,7 +65,13 @@ export const routerExamples: RouterExample[] = [
 			},
 			{
 				title: "Translate to Italian",
-				prompt: "Translate the visible content of the page into italian",
+				prompt:
+					"Translate only the text content displayed to users (headings, paragraphs, buttons) into Italian. Keep all code, class names, and IDs unchanged.",
+			},
+			{
+				title: "Architecture review",
+				prompt:
+					"Review the architecture and suggest improvements for scalability, SEO optimization, and performance.",
 			},
 		],
 	},
@@ -72,7 +82,7 @@ export const routerExamples: RouterExample[] = [
 		followUps: [
 			{
 				title: "Psychological analysis",
-				prompt: "Provide a psychological analysis of Eminem’s emotions in this song.",
+				prompt: "Provide a psychological analysis of Eminem's emotions in this song.",
 			},
 			{
 				title: "Wired Article",
@@ -81,6 +91,10 @@ export const routerExamples: RouterExample[] = [
 			{
 				title: "Roleplay",
 				prompt: "Roleplay as Eminem so I can discuss the song with him.",
+			},
+			{
+				title: "Translate to Spanish",
+				prompt: "Translate the rap lyrics to Spanish while maintaining the rhyme scheme and flow.",
 			},
 		],
 	},
@@ -103,6 +117,11 @@ export const routerExamples: RouterExample[] = [
 				prompt:
 					"Rewrite the previous response from Yoda into plain English while keeping the same meaning.",
 			},
+			{
+				title: "Compare philosophies",
+				prompt:
+					"Compare Yoda's Jedi philosophy to Stoic philosophy from ancient Greece and explain the similarities and differences.",
+			},
 		],
 	},
 	{
@@ -111,12 +130,17 @@ export const routerExamples: RouterExample[] = [
 		followUps: [
 			{
 				title: "Turn into JSON",
-				prompt: `Generate a detailed JSON object for each prompt. Include fields for subjects (list of objects), scene (setting, environment, background details), actions (what’s happening), style (artistic style or medium)`,
+				prompt: `Generate a detailed JSON object for each prompt. Include fields for subjects (list of objects), scene (setting, environment, background details), actions (what's happening), style (artistic style or medium)`,
 			},
 			{
 				title: "Sci-fi portraits",
 				prompt:
 					"Produce five futuristic character portrait prompts with unique professions and settings.",
+			},
+			{
+				title: "Explain image generation",
+				prompt:
+					"Explain how text-to-image diffusion models work, covering the denoising process and how text prompts guide generation.",
 			},
 		],
 	},
@@ -139,11 +163,16 @@ export const routerExamples: RouterExample[] = [
 				prompt:
 					"Summarize the explanation of large language models for a high school student using relatable analogies.",
 			},
+			{
+				title: "Write a blog post",
+				prompt:
+					"Write a blog post about how transformers revolutionized NLP, targeting software engineers who are new to AI.",
+			},
 		],
 	},
 	{
 		title: "Translate in Italian",
-		prompt: `Translate in Italian: Some are born great, some achieve greatness, and some have greatness thrust upon ’em`,
+		prompt: `Translate in Italian: Some are born great, some achieve greatness, and some have greatness thrust upon 'em`,
 		followUps: [
 			{
 				title: "Back to English",
@@ -158,6 +187,11 @@ export const routerExamples: RouterExample[] = [
 				title: "Modernize",
 				prompt:
 					"Modernize the Italian translation into contemporary informal Italian suitable for social media.",
+			},
+			{
+				title: "Teach me Italian",
+				prompt:
+					"Help me practice Italian by conversing about this Shakespeare quote, correcting my grammar when needed.",
 			},
 		],
 	},

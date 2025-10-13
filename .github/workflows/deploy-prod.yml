@@ -47,7 +47,6 @@ jobs:
           build-args: |
             INCLUDE_DB=false
             APP_BASE=/chat
-            PUBLIC_APP_COLOR=yellow
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
   deploy:
     name: Deploy on prod
