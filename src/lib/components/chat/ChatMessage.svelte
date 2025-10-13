@@ -165,9 +165,11 @@
 						{#if part && part.startsWith("<think>")}
 							{@const isClosed = part.endsWith("</think>")}
 							{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
-							{@const summary = isClosed
-								? thinkContent.trim().split(/\n+/)[0] || "Reasoning"
-								: "Thinking..."}
+							{@const isInterrupted = !isClosed && !loading}
+							{@const summary =
+								isClosed || isInterrupted
+									? thinkContent.trim().split(/\n+/)[0] || "Reasoning"
+									: "Thinking..."}
 
 							<OpenReasoningResults
 								{summary}
