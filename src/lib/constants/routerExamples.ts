@@ -65,8 +65,7 @@ export const routerExamples: RouterExample[] = [
 			},
 			{
 				title: "Translate to Italian",
-				prompt:
-					"Translate only the text content displayed to users (headings, paragraphs, buttons) into Italian. Keep all code, class names, and IDs unchanged.",
+				prompt: "Translate only the text content displayed to users into Italian.",
 			},
 			{
 				title: "Architecture review",
