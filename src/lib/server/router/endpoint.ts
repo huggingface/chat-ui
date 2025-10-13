@@ -72,22 +72,6 @@ function isPolicyError(statusCode?: number): boolean {
 	return statusCode === 402 || statusCode === 401 || statusCode === 403;
 }
 
-/**
- * Sanitize error messages before sending to clients to avoid leaking provider details
- */
-function publicErrorMessage(message: string, statusCode?: number): string {
-	// Specific messages for known status codes
-	if (statusCode === 402) return "Payment required to continue.";
-	if (statusCode === 401) return "You are not authorized. Please sign in.";
-	if (statusCode === 403) return "Access to this feature is restricted.";
-	if (statusCode === 429) return "You're being rate-limited. Please try again shortly.";
-	if (statusCode && statusCode >= 500)
-		return "The AI provider is temporarily unavailable. Please try again.";
-
-	// For other errors, sanitize by replacing provider names
-	return message.replace(/OpenAI|Anthropic|Provider[A-Z]\w*/gi, "the AI provider");
-}
-
 function stripReasoningBlocks(text: string): string {
 	const stripped = text.replace(REASONING_BLOCK_REGEX, "");
 	return stripped === text ? text : stripped.trim();
@@ -197,7 +181,6 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
 			} catch (e) {
 				const { message, statusCode } = extractUpstreamError(e);
-				const publicMsg = publicErrorMessage(message, statusCode);
 				logger.error(
 					{
 						route: ROUTER_MULTIMODAL_ROUTE,
@@ -207,7 +190,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					},
 					"[router] multimodal fallback failed"
 				);
-				throw statusCode ? new HTTPError(publicMsg, statusCode) : new Error(publicMsg);
+				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 			}
 		}
 
@@ -220,12 +203,11 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 			if (isPolicyError(statusCode)) {
 				// Policy errors should be surfaced to the user immediately (e.g., subscription required)
-				const publicMsg = publicErrorMessage(message, statusCode);
 				logger.error(
 					{ err: message, ...(statusCode && { status: statusCode }) },
 					"[router] arch router failed with policy error, propagating to client"
 				);
-				throw statusCode ? new HTTPError(publicMsg, statusCode) : new Error(publicMsg);
+				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 			}
 
 			// Transient errors: log and continue to fallback
@@ -265,9 +247,8 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		}
 
 		// Exhausted all candidates — throw to signal upstream failure
-		// Sanitize and forward the upstream error to the client
+		// Forward the upstream error to the client
 		const { message, statusCode } = extractUpstreamError(lastErr);
-		const publicMsg = publicErrorMessage(message, statusCode);
-		throw statusCode ? new HTTPError(publicMsg, statusCode) : new Error(publicMsg);
+		throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 	};
 }
