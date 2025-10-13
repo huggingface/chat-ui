@@ -20,13 +20,4 @@ export interface Migration {
 	runEveryTime?: boolean;
 }
 
-export const migrations: Migration[] = [
-	updateSearchAssistant,
-	updateAssistantsModels,
-	updateMessageUpdates,
-	updateMessageFiles,
-	trimMessageUpdates,
-	updateFeaturedToReview,
-	deleteEmptyConversations,
-	updateReportsAssistantId,
-];
+export const migrations: Migration[] = [];
