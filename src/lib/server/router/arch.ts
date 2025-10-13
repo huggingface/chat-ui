@@ -1,7 +1,7 @@
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { EndpointMessage } from "../endpoints/endpoints";
-import type { Route, RouteConfig } from "./types";
+import type { Route, RouteConfig, RouteSelection } from "./types";
 import { getRoutes } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
 
@@ -71,7 +71,7 @@ export async function archSelectRoute(
 	messages: EndpointMessage[],
 	traceId: string | undefined,
 	locals: App.Locals | undefined
-): Promise<{ routeName: string }> {
+): Promise<RouteSelection> {
 	const routes = await getRoutes();
 	const prompt = toRouterPrompt(messages, routes);
 
@@ -107,7 +107,35 @@ export async function archSelectRoute(
 			signal: ctrl.signal,
 		});
 		clearTimeout(to);
-		if (!resp.ok) throw new Error(`arch-router ${resp.status}`);
+		if (!resp.ok) {
+			// Extract error message from response
+			let errorMessage = `arch-router ${resp.status}`;
+			try {
+				const errorData = await resp.json();
+				// Try to extract message from OpenAI-style error format
+				if (errorData.error?.message) {
+					errorMessage = errorData.error.message;
+				} else if (errorData.message) {
+					errorMessage = errorData.message;
+				}
+			} catch {
+				// If JSON parsing fails, use status text
+				errorMessage = resp.statusText || errorMessage;
+			}
+
+			logger.warn(
+				{ status: resp.status, error: errorMessage, traceId },
+				"[arch] router returned error"
+			);
+
+			return {
+				routeName: "arch_router_failure",
+				error: {
+					message: errorMessage,
+					statusCode: resp.status,
+				},
+			};
+		}
 		const data: { choices: { message: { content: string } }[] } = await resp.json();
 		const text = (data?.choices?.[0]?.message?.content ?? "").toString().trim();
 		const raw = parseRouteName(text);
@@ -118,7 +146,15 @@ export async function archSelectRoute(
 		return { routeName: exists ? chosen : "casual_conversation" };
 	} catch (e) {
 		clearTimeout(to);
+		const err = e as Error;
 		logger.warn({ err: String(e), traceId }, "arch router selection failed");
-		return { routeName: "arch_router_failure" };
+
+		// Return error with context but no status code (network/timeout errors)
+		return {
+			routeName: "arch_router_failure",
+			error: {
+				message: err.message || String(e),
+			},
+		};
 	}
 }

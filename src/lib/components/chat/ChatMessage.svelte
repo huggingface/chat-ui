@@ -196,7 +196,7 @@
 			<div
 				class="absolute -bottom-3.5 {message.routerMetadata && messageInfoWidth > messageWidth
 					? 'left-1 pl-1 lg:pl-7'
-					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5 overflow-hidden"
+					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
 				{#if message.routerMetadata && (!isLast || !loading)}

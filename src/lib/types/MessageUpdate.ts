@@ -28,6 +28,7 @@ export interface MessageStatusUpdate {
 	type: MessageUpdateType.Status;
 	status: MessageUpdateStatus;
 	message?: string;
+	statusCode?: number;
 }
 
 // Everything else

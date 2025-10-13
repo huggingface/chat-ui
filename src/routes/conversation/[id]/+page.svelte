@@ -30,12 +30,14 @@
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
+	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 
 	let { data = $bindable() } = $props();
 
 	let loading = $state(false);
 	let pending = $state(false);
 	let initialRun = true;
+	let showSubscribeModal = $state(false);
 
 	let files: File[] = $state([]);
 
@@ -302,7 +304,12 @@
 					update.type === MessageUpdateType.Status &&
 					update.status === MessageUpdateStatus.Error
 				) {
-					$error = update.message ?? "An error has occurred";
+					// Check if this is a 402 payment required error
+					if (update.statusCode === 402) {
+						showSubscribeModal = true;
+					} else {
+						$error = update.message ?? "An error has occurred";
+					}
 				} else if (update.type === MessageUpdateType.Title) {
 					const convInData = conversations.find(({ id }) => id === page.params.id);
 					if (convInData) {
@@ -518,3 +525,7 @@
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />
+
+{#if showSubscribeModal}
+	<SubscribeModal close={() => (showSubscribeModal = false)} />
+{/if}

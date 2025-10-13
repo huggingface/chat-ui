@@ -494,10 +494,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				} else {
 					hasError = true;
+					// Extract status code if available from HTTPError or APIError
+					const errObj = err as unknown as Record<string, unknown>;
+					const statusCode =
+						(typeof errObj.statusCode === "number" ? errObj.statusCode : undefined) ||
+						(typeof errObj.status === "number" ? errObj.status : undefined);
 					await update({
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,
 						message: err.message,
+						...(statusCode && { statusCode }),
 					});
 					logger.error(err);
 				}

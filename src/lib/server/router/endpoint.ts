@@ -11,10 +11,74 @@ import { logger } from "$lib/server/logger";
 import { archSelectRoute } from "./arch";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
+import { ROUTER_FAILURE } from "./types";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
 const ROUTER_MULTIMODAL_ROUTE = "multimodal";
+
+/**
+ * Custom error class that preserves HTTP status codes
+ */
+class HTTPError extends Error {
+	constructor(
+		message: string,
+		public statusCode?: number
+	) {
+		super(message);
+		this.name = "HTTPError";
+	}
+}
+
+/**
+ * Extract the actual error message and status from OpenAI SDK errors or other upstream errors
+ */
+function extractUpstreamError(error: unknown): { message: string; statusCode?: number } {
+	// Check if it's an OpenAI APIError with structured error info
+	if (error && typeof error === "object") {
+		const err = error as Record<string, unknown>;
+
+		// OpenAI SDK error with error.error.message and status
+		if (
+			err.error &&
+			typeof err.error === "object" &&
+			"message" in err.error &&
+			typeof err.error.message === "string"
+		) {
+			return {
+				message: err.error.message,
+				statusCode: typeof err.status === "number" ? err.status : undefined,
+			};
+		}
+
+		// HTTPError or error with statusCode
+		if (typeof err.statusCode === "number" && typeof err.message === "string") {
+			return { message: err.message, statusCode: err.statusCode };
+		}
+
+		// Error with status field
+		if (typeof err.status === "number" && typeof err.message === "string") {
+			return { message: err.message, statusCode: err.status };
+		}
+
+		// Direct error message
+		if (typeof err.message === "string") {
+			return { message: err.message };
+		}
+	}
+
+	return { message: String(error) };
+}
+
+/**
+ * Determines if an error is a policy/entitlement error that should be shown to users immediately
+ * (vs transient errors that should trigger fallback)
+ */
+function isPolicyError(statusCode?: number): boolean {
+	if (!statusCode) return false;
+	// 402: Payment Required, 401: Unauthorized, 403: Forbidden
+	return statusCode === 402 || statusCode === 401 || statusCode === 403;
+}
 
 function stripReasoningBlocks(text: string): string {
 	const stripped = text.replace(REASONING_BLOCK_REGEX, "");
@@ -124,32 +188,66 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				const gen = await ep({ ...params });
 				return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
 			} catch (e) {
+				const { message, statusCode } = extractUpstreamError(e);
 				logger.error(
-					{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate, err: String(e) },
+					{
+						route: ROUTER_MULTIMODAL_ROUTE,
+						model: multimodalCandidate,
+						err: message,
+						...(statusCode && { status: statusCode }),
+					},
 					"[router] multimodal fallback failed"
 				);
-				throw new Error(
-					"Failed to call the configured multimodal model. Remove the image or try again later."
-				);
+				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 			}
 		}
 
-		const { routeName } = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+		const routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+
+		// If arch router failed with an error, only hard-fail for policy errors (402/401/403)
+		// For transient errors (5xx, timeouts, network), allow fallback to continue
+		if (routeSelection.routeName === ROUTER_FAILURE && routeSelection.error) {
+			const { message, statusCode } = routeSelection.error;
+
+			if (isPolicyError(statusCode)) {
+				// Policy errors should be surfaced to the user immediately (e.g., subscription required)
+				logger.error(
+					{ err: message, ...(statusCode && { status: statusCode }) },
+					"[router] arch router failed with policy error, propagating to client"
+				);
+				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+			}
+
+			// Transient errors: log and continue to fallback
+			logger.warn(
+				{ err: message, ...(statusCode && { status: statusCode }) },
+				"[router] arch router failed with transient error, attempting fallback"
+			);
+		}
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
-		const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
+		const { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);
 
 		let lastErr: unknown = undefined;
 		for (const candidate of candidates) {
 			try {
-				logger.info({ route: routeName, model: candidate }, "[router] trying candidate");
+				logger.info(
+					{ route: routeSelection.routeName, model: candidate },
+					"[router] trying candidate"
+				);
 				const ep = await createCandidateEndpoint(candidate);
 				const gen = await ep({ ...params });
-				return metadataThenStream(gen, candidate, routeName);
+				return metadataThenStream(gen, candidate, routeSelection.routeName);
 			} catch (e) {
 				lastErr = e;
+				const { message: errMsg, statusCode: errStatus } = extractUpstreamError(e);
 				logger.warn(
-					{ route: routeName, model: candidate, err: String(e) },
+					{
+						route: routeSelection.routeName,
+						model: candidate,
+						err: errMsg,
+						...(errStatus && { status: errStatus }),
+					},
 					"[router] candidate failed"
 				);
 				continue;
@@ -157,6 +255,8 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		}
 
 		// Exhausted all candidates — throw to signal upstream failure
-		throw new Error(`Routing failed for route=${routeName}: ${String(lastErr)}`);
+		// Forward the upstream error to the client
+		const { message, statusCode } = extractUpstreamError(lastErr);
+		throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 	};
 }
