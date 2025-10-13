@@ -38,6 +38,7 @@
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
+	let pollingInterval: ReturnType<typeof setInterval> | undefined = undefined;
 
 	let files: File[] = $state([]);
 
@@ -373,6 +374,26 @@
 			await writeMessage({ prompt: $pendingMessage.content });
 			$pendingMessage = undefined;
 		}
+
+		// Check if conversation is actively generating after page refresh
+		const streaming = isConversationStreaming(messages);
+		if (streaming) {
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			loading = true;
+
+			// Poll for updates every 1.5 seconds to get new tokens from the database
+			pollingInterval = setInterval(async () => {
+				await invalidateAll();
+			}, 1500);
+		}
+
+		// Clean up interval on unmount
+		return () => {
+			if (pollingInterval) {
+				clearInterval(pollingInterval);
+				pollingInterval = undefined;
+			}
+		};
 	});
 
 	async function onMessage(content: string) {
@@ -450,6 +471,11 @@
 
 		if (!streaming && browser) {
 			removeBackgroundGeneration(page.params.id);
+			// Stop polling when generation completes
+			if (pollingInterval) {
+				clearInterval(pollingInterval);
+				pollingInterval = undefined;
+			}
 		}
 	});
 
@@ -475,15 +501,6 @@
 
 		$isAborted = true;
 		loading = false;
-	});
-
-	onMount(() => {
-		const hasBackgroundEntry = hasBackgroundGeneration(page.params.id);
-		const streaming = isConversationStreaming(messages);
-		if (hasBackgroundEntry && streaming) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
-			loading = true;
-		}
 	});
 
 	let title = $derived.by(() => {
