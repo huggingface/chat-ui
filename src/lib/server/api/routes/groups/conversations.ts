@@ -192,7 +192,11 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 								);
 
 								// Use matchedCount if available (newer drivers), fallback to modifiedCount for compatibility
-								if (typeof res.matchedCount === "number" ? res.matchedCount === 0 : res.modifiedCount === 0) {
+								if (
+									typeof res.matchedCount === "number"
+										? res.matchedCount === 0
+										: res.modifiedCount === 0
+								) {
 									throw new Error("Conversation not found");
 								}
 

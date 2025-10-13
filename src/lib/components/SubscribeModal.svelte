@@ -1,8 +1,5 @@
 <script lang="ts">
 	import Modal from "$lib/components/Modal.svelte";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-
-	const publicConfig = usePublicConfig();
 
 	interface Props {
 		close: () => void;

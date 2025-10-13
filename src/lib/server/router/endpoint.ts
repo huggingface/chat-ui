@@ -36,25 +36,33 @@ class HTTPError extends Error {
 function extractUpstreamError(error: unknown): { message: string; statusCode?: number } {
 	// Check if it's an OpenAI APIError with structured error info
 	if (error && typeof error === "object") {
-		const err = error as any;
+		const err = error as Record<string, unknown>;
 
 		// OpenAI SDK error with error.error.message and status
-		if (err.error?.message) {
-			return { message: err.error.message, statusCode: err.status };
+		if (
+			err.error &&
+			typeof err.error === "object" &&
+			"message" in err.error &&
+			typeof err.error.message === "string"
+		) {
+			return {
+				message: err.error.message,
+				statusCode: typeof err.status === "number" ? err.status : undefined,
+			};
 		}
 
 		// HTTPError or error with statusCode
-		if (err.statusCode && err.message) {
+		if (typeof err.statusCode === "number" && typeof err.message === "string") {
 			return { message: err.message, statusCode: err.statusCode };
 		}
 
 		// Error with status field
-		if (err.status && err.message) {
+		if (typeof err.status === "number" && typeof err.message === "string") {
 			return { message: err.message, statusCode: err.status };
 		}
 
 		// Direct error message
-		if (err.message) {
+		if (typeof err.message === "string") {
 			return { message: err.message };
 		}
 	}
