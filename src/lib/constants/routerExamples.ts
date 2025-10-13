@@ -47,7 +47,7 @@ export const routerExamples: RouterExample[] = [
 	{
 		title: "Landing page",
 		prompt:
-			"Build a responsive SaaS landing page using Tailwind CSS with a hero, features, testimonials, and pricing sections.",
+			"Build a responsive SaaS landing page for my AI coding assitant using Tailwind CSS. With a hero, features, testimonials, and pricing sections.",
 		followUps: [
 			{
 				title: "Dark mode",
