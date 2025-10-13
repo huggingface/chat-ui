@@ -398,7 +398,7 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples}
+		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples && !lastIsError}
 			<div
 				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
@@ -410,7 +410,7 @@
 				{/each}
 			</div>
 		{/if}
-		{#if shouldShowRouterFollowUps}
+		{#if shouldShowRouterFollowUps && !lastIsError}
 			<div
 				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
@@ -446,19 +446,17 @@
 
 		<div class="w-full">
 			<div class="flex w-full *:mb-3">
-				{#if !loading}
-					{#if lastIsError}
-						<RetryBtn
-							classNames="ml-auto"
-							onClick={() => {
-								if (lastMessage && lastMessage.ancestors) {
-									onretry?.({
-										id: lastMessage.id,
-									});
-								}
-							}}
-						/>
-					{/if}
+				{#if !loading && lastIsError}
+					<RetryBtn
+						classNames="ml-auto"
+						onClick={() => {
+							if (lastMessage && lastMessage.ancestors) {
+								onretry?.({
+									id: lastMessage.id,
+								});
+							}
+						}}
+					/>
 				{/if}
 			</div>
 			<form
