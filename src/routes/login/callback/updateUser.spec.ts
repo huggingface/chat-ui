@@ -25,7 +25,7 @@ const locals = {
 const token = {
 	access_token: "access_token",
 	refresh_token: "refresh_token",
-	expires_at: 1717334400,
+	expires_at: Math.floor(Date.now() / 1000) + 3600, // Expires 1 hour from now
 	expires_in: 3600,
 } as TokenSet;
 
@@ -98,6 +98,7 @@ describe("login", () => {
 	it("should create default settings for new user", async () => {
 		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
+		// updateUser creates a new sessionId, so we need to use the updated value
 		const user = (await findUser(locals.sessionId)).user;
 
 		assert.exists(user);
