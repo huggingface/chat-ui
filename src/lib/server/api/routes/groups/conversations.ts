@@ -191,7 +191,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 									}
 								);
 
-								if (res.modifiedCount === 0) {
+								if (res.matchedCount === 0) {
 									throw new Error("Conversation not found");
 								}
 

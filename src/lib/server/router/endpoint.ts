@@ -16,6 +16,51 @@ const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
 const ROUTER_MULTIMODAL_ROUTE = "multimodal";
 
+/**
+ * Custom error class that preserves HTTP status codes
+ */
+class HTTPError extends Error {
+	constructor(
+		message: string,
+		public statusCode?: number
+	) {
+		super(message);
+		this.name = "HTTPError";
+	}
+}
+
+/**
+ * Extract the actual error message and status from OpenAI SDK errors or other upstream errors
+ */
+function extractUpstreamError(error: unknown): { message: string; statusCode?: number } {
+	// Check if it's an OpenAI APIError with structured error info
+	if (error && typeof error === "object") {
+		const err = error as any;
+
+		// OpenAI SDK error with error.error.message and status
+		if (err.error?.message) {
+			return { message: err.error.message, statusCode: err.status };
+		}
+
+		// HTTPError or error with statusCode
+		if (err.statusCode && err.message) {
+			return { message: err.message, statusCode: err.statusCode };
+		}
+
+		// Error with status field
+		if (err.status && err.message) {
+			return { message: err.message, statusCode: err.status };
+		}
+
+		// Direct error message
+		if (err.message) {
+			return { message: err.message };
+		}
+	}
+
+	return { message: String(error) };
+}
+
 function stripReasoningBlocks(text: string): string {
 	const stripped = text.replace(REASONING_BLOCK_REGEX, "");
 	return stripped === text ? text : stripped.trim();
@@ -124,32 +169,55 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				const gen = await ep({ ...params });
 				return metadataThenStream(gen, multimodalCandidate, ROUTER_MULTIMODAL_ROUTE);
 			} catch (e) {
+				const { message, statusCode } = extractUpstreamError(e);
 				logger.error(
-					{ route: ROUTER_MULTIMODAL_ROUTE, model: multimodalCandidate, err: String(e) },
+					{
+						route: ROUTER_MULTIMODAL_ROUTE,
+						model: multimodalCandidate,
+						err: message,
+						...(statusCode && { status: statusCode }),
+					},
 					"[router] multimodal fallback failed"
 				);
-				throw new Error(
-					"Failed to call the configured multimodal model. Remove the image or try again later."
-				);
+				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 			}
 		}
 
-		const { routeName } = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+		const routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+
+		// If arch router failed with an error, throw it immediately with status code
+		if (routeSelection.routeName === "arch_router_failure" && routeSelection.error) {
+			const { message, statusCode } = routeSelection.error;
+			logger.error(
+				{ err: message, ...(statusCode && { status: statusCode }) },
+				"[router] arch router failed, propagating error"
+			);
+			throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+		}
 
 		const fallbackModel = config.LLM_ROUTER_FALLBACK_MODEL || routerModel.id;
-		const { candidates } = resolveRouteModels(routeName, routes, fallbackModel);
+		const { candidates } = resolveRouteModels(routeSelection.routeName, routes, fallbackModel);
 
 		let lastErr: unknown = undefined;
 		for (const candidate of candidates) {
 			try {
-				logger.info({ route: routeName, model: candidate }, "[router] trying candidate");
+				logger.info(
+					{ route: routeSelection.routeName, model: candidate },
+					"[router] trying candidate"
+				);
 				const ep = await createCandidateEndpoint(candidate);
 				const gen = await ep({ ...params });
-				return metadataThenStream(gen, candidate, routeName);
+				return metadataThenStream(gen, candidate, routeSelection.routeName);
 			} catch (e) {
 				lastErr = e;
+				const { message: errMsg, statusCode: errStatus } = extractUpstreamError(e);
 				logger.warn(
-					{ route: routeName, model: candidate, err: String(e) },
+					{
+						route: routeSelection.routeName,
+						model: candidate,
+						err: errMsg,
+						...(errStatus && { status: errStatus }),
+					},
 					"[router] candidate failed"
 				);
 				continue;
@@ -157,6 +225,8 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		}
 
 		// Exhausted all candidates — throw to signal upstream failure
-		throw new Error(`Routing failed for route=${routeName}: ${String(lastErr)}`);
+		// Forward the actual upstream error directly to the client
+		const { message, statusCode } = extractUpstreamError(lastErr);
+		throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 	};
 }

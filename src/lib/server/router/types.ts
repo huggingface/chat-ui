@@ -10,4 +10,12 @@ export interface RouteConfig {
 	description: string;
 }
 
+export interface RouteSelection {
+	routeName: string;
+	error?: {
+		message: string;
+		statusCode?: number;
+	};
+}
+
 export const ROUTER_FAILURE = "arch_router_failure";
