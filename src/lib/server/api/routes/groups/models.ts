@@ -70,12 +70,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 			}
 		})
 		.get("/old", async () => {
-			try {
-				const { oldModels } = await import("$lib/server/models");
-				return oldModels satisfies GETOldModelsResponse;
-			} catch (e) {
-				return [] as GETOldModelsResponse;
-			}
+			return [] as GETOldModelsResponse;
 		})
 		.group("/:namespace/:model?", (app) =>
 			app

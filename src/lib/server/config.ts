@@ -151,7 +151,7 @@ export const ready = (async () => {
 	}
 })();
 
-type ExtraConfigKeys = "HF_TOKEN" | "OLD_MODELS" | "ENABLE_ASSISTANTS";
+type ExtraConfigKeys = "HF_TOKEN" | "ENABLE_ASSISTANTS";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 

@@ -8,11 +8,10 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const client = useAPIClient({ fetch, origin: url.origin });
 
-	const [settings, models, oldModels, user, publicConfig, featureFlags, conversationsData] =
+	const [settings, models, user, publicConfig, featureFlags, conversationsData] =
 		await Promise.all([
 			client.user.settings.get().then(handleResponse),
 			client.models.get().then(handleResponse),
-			client.models.old.get().then(handleResponse),
 			client.user.get().then(handleResponse),
 			client["public-config"].get().then(handleResponse),
 			client["feature-flags"].get().then(handleResponse),
@@ -39,7 +38,7 @@ export const load = async ({ depends, fetch, url }) => {
 		nConversations,
 		conversations,
 		models,
-		oldModels,
+		oldModels: [],
 		user,
 		settings: {
 			...settings,

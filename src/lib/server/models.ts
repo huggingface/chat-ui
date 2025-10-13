@@ -340,21 +340,6 @@ export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...
 
 export const defaultModel = models[0];
 
-// Models that have been deprecated
-export const oldModels = config.OLD_MODELS
-	? z
-			.array(
-				z.object({
-					id: z.string().optional(),
-					name: z.string().min(1),
-					displayName: z.string().min(1).optional(),
-					transferTo: validModelIdSchema.optional(),
-				})
-			)
-			.parse(JSON5.parse(sanitizeJSONEnv(config.OLD_MODELS, "[]")))
-			.map((m) => ({ ...m, id: m.id || m.name, displayName: m.displayName || m.name }))
-	: [];
-
 export const validateModel = (_models: BackendModel[]) => {
 	// Zod enum function requires 2 parameters
 	return z.enum([_models[0].id, ..._models.slice(1).map((m) => m.id)]);
