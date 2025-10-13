@@ -2,6 +2,7 @@
 	import { onDestroy } from "svelte";
 
 	import CarbonCopy from "~icons/carbon/copy";
+	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import Tooltip from "./Tooltip.svelte";
 
 	interface Props {
@@ -67,6 +68,8 @@
 			clearTimeout(timeout);
 		}
 	});
+
+	const Icon = $derived(isSuccess ? CarbonCheckmark : CarbonCopy);
 </script>
 
 <button
@@ -79,8 +82,10 @@
 	}}
 >
 	<div class="relative">
-		{#if children}{@render children()}{:else}
-			<CarbonCopy class={iconClassNames} />
+		{#if children}
+			{@render children()}
+		{:else}
+			<Icon class={iconClassNames} />
 		{/if}
 
 		{#if showTooltip}
