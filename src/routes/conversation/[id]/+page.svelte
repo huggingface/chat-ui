@@ -38,7 +38,6 @@
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
-	let pollingInterval: ReturnType<typeof setInterval> | undefined = undefined;
 
 	let files: File[] = $state([]);
 
@@ -368,32 +367,17 @@
 	}
 
 	onMount(async () => {
-		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
 			await writeMessage({ prompt: $pendingMessage.content });
 			$pendingMessage = undefined;
 		}
 
-		// Check if conversation is actively generating after page refresh
 		const streaming = isConversationStreaming(messages);
 		if (streaming) {
 			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 			loading = true;
-
-			// Poll for updates every 1.5 seconds to get new tokens from the database
-			pollingInterval = setInterval(async () => {
-				await invalidateAll();
-			}, 1500);
 		}
-
-		// Clean up interval on unmount
-		return () => {
-			if (pollingInterval) {
-				clearInterval(pollingInterval);
-				pollingInterval = undefined;
-			}
-		};
 	});
 
 	async function onMessage(content: string) {
@@ -471,11 +455,6 @@
 
 		if (!streaming && browser) {
 			removeBackgroundGeneration(page.params.id);
-			// Stop polling when generation completes
-			if (pollingInterval) {
-				clearInterval(pollingInterval);
-				pollingInterval = undefined;
-			}
 		}
 	});
 
