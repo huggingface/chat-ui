@@ -8,6 +8,7 @@ type SimpleSource = {
 	link: string;
 };
 import hljs from "highlight.js";
+import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -199,8 +200,11 @@ type TextToken = {
 };
 
 export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
+	// Apply incomplete markdown preprocessing for smooth streaming
+	const processedContent = parseIncompleteMarkdown(content);
+
 	const marked = createMarkedInstance(sources);
-	const tokens = marked.lexer(content);
+	const tokens = marked.lexer(processedContent);
 
 	const processedTokens = await Promise.all(
 		tokens.map(async (token) => {
@@ -225,8 +229,11 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 }
 
 export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
+	// Apply incomplete markdown preprocessing for smooth streaming
+	const processedContent = parseIncompleteMarkdown(content);
+
 	const marked = createMarkedInstance(sources);
-	const tokens = marked.lexer(content);
+	const tokens = marked.lexer(processedContent);
 	return tokens.map((token) => {
 		if (token.type === "code") {
 			return {
