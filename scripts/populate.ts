@@ -22,8 +22,6 @@ import { generateSearchTokens } from "../src/lib/utils/searchTokens.ts";
 import { ReviewStatus } from "../src/lib/types/Review.ts";
 import fs from "fs";
 import path from "path";
-import { MessageUpdateType } from "../src/lib/types/MessageUpdate.ts";
-import { MessageReasoningUpdateType } from "../src/lib/types/MessageUpdate.ts";
 
 const rl = readline.createInterface({
 	input: process.stdin,
@@ -62,7 +60,6 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 		const convLength = faker.number.int({ min: 1, max: 25 }) * 2; // must always be even
 
 		for (let i = 0; i < convLength; i++) {
-			const hasReasoning = Math.random() < 0.2;
 			lastId = addChildren(
 				{
 					messages,
@@ -80,17 +77,6 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 							: ""),
 					createdAt: faker.date.recent({ days: 30 }),
 					updatedAt: faker.date.recent({ days: 30 }),
-					reasoning: hasReasoning ? faker.lorem.paragraphs(2) : undefined,
-					updates: hasReasoning
-						? [
-								{
-									type: MessageUpdateType.Reasoning,
-									subtype: MessageReasoningUpdateType.Status,
-									uuid: crypto.randomUUID(),
-									status: "thinking",
-								},
-							]
-						: [],
 					interrupted: !isUser && i === convLength - 1 && isInterrupted,
 				},
 				lastId
@@ -101,7 +87,6 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 		const convLength = faker.number.int({ min: 2, max: 200 });
 
 		for (let i = 0; i < convLength; i++) {
-			const hasReasoning = Math.random() < 0.2;
 			addChildren(
 				{
 					messages,
@@ -117,17 +102,6 @@ async function generateMessages(preprompt?: string): Promise<Message[]> {
 						(!isUser && Math.random() < 0.1
 							? "\n```\n" + faker.helpers.arrayElement(samples) + "\n```\n"
 							: ""),
-					reasoning: hasReasoning ? faker.lorem.paragraphs(2) : undefined,
-					updates: hasReasoning
-						? [
-								{
-									type: MessageUpdateType.Reasoning,
-									subtype: MessageReasoningUpdateType.Status,
-									uuid: crypto.randomUUID(),
-									status: "thinking",
-								},
-							]
-						: [],
 					createdAt: faker.date.recent({ days: 30 }),
 					updatedAt: faker.date.recent({ days: 30 }),
 					interrupted: !isUser && i === convLength - 1 && isInterrupted,

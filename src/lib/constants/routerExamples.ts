@@ -55,8 +55,7 @@ export const routerExamples: RouterExample[] = [
 		followUps: [
 			{
 				title: "Dark mode",
-				prompt:
-					"Extend the Tailwind CSS landing page with a toggleable dark mode that remembers the user's choice.",
+				prompt: "Add dark mode and make it the default",
 			},
 			{
 				title: "Add blog teasers",

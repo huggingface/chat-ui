@@ -8,7 +8,6 @@ import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import {
-	MessageReasoningUpdateType,
 	MessageUpdateStatus,
 	MessageUpdateType,
 	type MessageUpdate,
@@ -349,12 +348,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						lastTokenTimestamp = new Date();
 					}
 					lastTokenTimestamp = new Date();
-				} else if (
-					event.type === MessageUpdateType.Reasoning &&
-					event.subtype === MessageReasoningUpdateType.Stream
-				) {
-					messageToWriteTo.reasoning ??= "";
-					messageToWriteTo.reasoning += event.token;
 				}
 
 				// Set the title
@@ -399,10 +392,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					!(
 						event.type === MessageUpdateType.Status &&
 						event.status === MessageUpdateStatus.KeepAlive
-					) &&
-					!(
-						event.type === MessageUpdateType.Reasoning &&
-						event.subtype === MessageReasoningUpdateType.Stream
 					)
 				) {
 					messageToWriteTo?.updates?.push(event);

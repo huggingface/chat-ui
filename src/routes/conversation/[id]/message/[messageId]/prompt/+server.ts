@@ -59,7 +59,6 @@ export async function GET({ params, locals }) {
 			content: msg.content,
 			createdAt: msg.createdAt,
 			updatedAt: msg.updatedAt,
-			reasoning: msg.reasoning,
 			updates: msg.updates?.filter((u) => u.type === "title"),
 			files: msg.files,
 		})),

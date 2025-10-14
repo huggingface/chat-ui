@@ -86,12 +86,10 @@ function stripReasoningBlocks(text: string): string {
 }
 
 function stripReasoningFromMessage(message: EndpointMessage): EndpointMessage {
-	const { reasoning: _reasoning, ...rest } = message;
-	void _reasoning;
 	const content =
 		typeof message.content === "string" ? stripReasoningBlocks(message.content) : message.content;
 	return {
-		...rest,
+		...message,
 		content,
 	};
 }

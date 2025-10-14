@@ -8,7 +8,6 @@ export type Message = Partial<Timestamps> & {
 	content: string;
 	updates?: MessageUpdate[];
 
-	reasoning?: string;
 	score?: -1 | 0 | 1;
 	/**
 	 * Either contains the base64 encoded image data

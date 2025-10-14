@@ -28,7 +28,6 @@ export async function GET({ locals, params }) {
 					// websearch removed
 					files: message.files,
 					updates: message.updates,
-					reasoning: message.reasoning,
 				})),
 			};
 			return Response.json(res);

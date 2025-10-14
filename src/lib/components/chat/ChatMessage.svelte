@@ -12,11 +12,7 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
 
-	import {
-		MessageUpdateType,
-		type MessageReasoningUpdate,
-		MessageReasoningUpdateType,
-	} from "$lib/types/MessageUpdate";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
@@ -71,29 +67,9 @@
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
 	let editFormEl: HTMLFormElement | undefined = $state();
 
-	let reasoningUpdates = $derived(
-		(message.updates?.filter(({ type }) => type === MessageUpdateType.Reasoning) ??
-			[]) as MessageReasoningUpdate[]
-	);
-
-	// const messageFinalAnswer = $derived(
-	// 	message.updates?.find(
-	// 		({ type }) => type === MessageUpdateType.FinalAnswer
-	// 	) as MessageFinalAnswerUpdate
-	// );
-	// const urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
-	// let downloadLink = $derived(urlNotTrailing + `/message/${message.id}/prompt`);
-
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/g;
-	let thinkSegments = $derived.by(() => message.content.split(THINK_BLOCK_REGEX));
-	let hasServerReasoning = $derived(
-		reasoningUpdates &&
-			reasoningUpdates.length > 0 &&
-			!!message.reasoning &&
-			message.reasoning.trim().length > 0
-	);
-	let hasClientThink = $derived(!hasServerReasoning && thinkSegments.length > 1);
+	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	$effect(() => {
 		if (isCopied) {
@@ -141,18 +117,6 @@
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
-			{/if}
-
-			{#if hasServerReasoning}
-				{@const summaries = reasoningUpdates
-					.filter((u) => u.subtype === MessageReasoningUpdateType.Status)
-					.map((u) => u.status)}
-
-				<OpenReasoningResults
-					summary={summaries[summaries.length - 1] || ""}
-					content={message.reasoning || ""}
-					loading={loading && message.content.length === 0}
-				/>
 			{/if}
 
 			<div bind:this={contentEl}>

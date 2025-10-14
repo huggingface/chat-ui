@@ -15,21 +15,6 @@ const sanitizeJSONEnv = (val: string, fallback: string) => {
 	return unquoted || fallback;
 };
 
-const reasoningSchema = z.union([
-	z.object({
-		type: z.literal("regex"), // everything is reasoning, extract the answer from the regex
-		regex: z.string(),
-	}),
-	z.object({
-		type: z.literal("tokens"), // use beginning and end tokens that define the reasoning portion of the answer
-		beginToken: z.string(), // empty string means the model starts in reasoning mode
-		endToken: z.string(),
-	}),
-	z.object({
-		type: z.literal("summarize"), // everything is reasoning, summarize the answer
-	}),
-]);
-
 const modelConfig = z.object({
 	/** Used as an identifier in DB */
 	id: z.string().optional(),
@@ -75,7 +60,6 @@ const modelConfig = z.object({
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
 	systemRoleSupported: z.boolean().default(true),
-	reasoning: reasoningSchema.optional(),
 });
 
 type ModelConfig = z.infer<typeof modelConfig>;

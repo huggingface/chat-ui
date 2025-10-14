@@ -9,11 +9,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
-	import {
-		MessageReasoningUpdateType,
-		MessageUpdateStatus,
-		MessageUpdateType,
-	} from "$lib/types/MessageUpdate";
+	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -263,9 +259,6 @@
 			// Initialize lastUpdateTime outside the loop to persist between updates
 			let lastUpdateTime = new Date();
 
-			let reasoningBuffer = "";
-			let reasoningLastUpdate = new Date();
-
 			for await (const update of messageUpdatesIterator) {
 				if ($isAborted) {
 					messageUpdatesAbortController.abort();
@@ -279,8 +272,6 @@
 				}
 
 				const isHighFrequencyUpdate =
-					(update.type === MessageUpdateType.Reasoning &&
-						update.subtype === MessageReasoningUpdateType.Stream) ||
 					update.type === MessageUpdateType.Stream ||
 					(update.type === MessageUpdateType.Status &&
 						update.status === MessageUpdateStatus.KeepAlive);
@@ -324,21 +315,6 @@
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", value: update.sha, mime: update.mime, name: update.name },
 					];
-				} else if (update.type === MessageUpdateType.Reasoning) {
-					if (!messageToWriteTo.reasoning) {
-						messageToWriteTo.reasoning = "";
-					}
-					if (update.subtype === MessageReasoningUpdateType.Stream) {
-						reasoningBuffer += update.token;
-						if (
-							currentTime.getTime() - reasoningLastUpdate.getTime() >
-							updateDebouncer.maxUpdateTime
-						) {
-							messageToWriteTo.reasoning += reasoningBuffer;
-							reasoningBuffer = "";
-							reasoningLastUpdate = currentTime;
-						}
-					}
 				} else if (update.type === MessageUpdateType.RouterMetadata) {
 					// Update router metadata immediately when received
 					messageToWriteTo.routerMetadata = {

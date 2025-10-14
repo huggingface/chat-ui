@@ -13,7 +13,6 @@ export type GETModelsResponse = Array<{
 	datasetUrl?: string;
 	displayName: string;
 	description?: string;
-	reasoning: boolean;
 	logoUrl?: string;
 	providers?: Array<{ provider: string } & Record<string, unknown>>;
 	promptExamples?: { title: string; prompt: string }[];
@@ -50,7 +49,6 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 						datasetUrl: model.datasetUrl,
 						displayName: model.displayName,
 						description: model.description,
-						reasoning: !!model.reasoning,
 						logoUrl: model.logoUrl,
 						providers: model.providers as unknown as Array<
 							{ provider: string } & Record<string, unknown>
