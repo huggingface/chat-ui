@@ -6,7 +6,7 @@
 		"fallback_models": [
 			"deepseek-ai/DeepSeek-V3.1",
 			"moonshotai/Kimi-K2-Instruct-0905",
-			"zai-org/GLM-4.5"
+			"zai-org/GLM-4.6"
 		]
 	},
 	{
@@ -25,7 +25,7 @@
 		"name": "editing_rewrite",
 		"description": "Lightly proofread and rephrase text for tone, length, and clarity.",
 		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "google/gemma-3-27b-it", "zai-org/GLM-4.5"]
+		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "google/gemma-3-27b-it", "zai-org/GLM-4.6"]
 	},
 	{
 		"name": "qa_explanations",
@@ -86,7 +86,7 @@
 		"name": "agentic_orchestration",
 		"description": "Plan and execute tool/API calls with schemas, retries, and recovery.",
 		"primary_model": "openai/gpt-oss-120b",
-		"fallback_models": ["zai-org/GLM-4.5", "deepseek-ai/DeepSeek-V3.1"]
+		"fallback_models": ["zai-org/GLM-4.6", "deepseek-ai/DeepSeek-V3.1"]
 	},
 	{
 		"name": "code_generation",
@@ -98,7 +98,7 @@
 		"name": "frontend_ui",
 		"description": "Build accessible, responsive UI components and pages.",
 		"primary_model": "deepseek-ai/DeepSeek-R1-0528",
-		"fallback_models": ["Qwen/Qwen3-Coder-480B-A35B-Instruct", "zai-org/GLM-4.5"]
+		"fallback_models": ["Qwen/Qwen3-Coder-480B-A35B-Instruct", "zai-org/GLM-4.6"]
 	},
 	{
 		"name": "code_maintenance",
@@ -118,7 +118,7 @@
 	{
 		"name": "terminal_cli",
 		"description": "Solve Linux shell tasks with safe, idempotent commands.",
-		"primary_model": "zai-org/GLM-4.5",
+		"primary_model": "zai-org/GLM-4.6",
 		"fallback_models": ["meta-llama/Llama-4-Maverick-17B-128E-Instruct", "Qwen/Qwen3-32B"]
 	},
 	{
@@ -134,7 +134,7 @@
 		"name": "shopping_recommendations",
 		"description": "Compare products and recommend ranked picks with rationale.",
 		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-		"fallback_models": ["zai-org/GLM-4.5", "deepseek-ai/DeepSeek-V3.1"]
+		"fallback_models": ["zai-org/GLM-4.6", "deepseek-ai/DeepSeek-V3.1"]
 	},
 	{
 		"name": "meal_planning",
@@ -214,7 +214,7 @@
 	{
 		"name": "structured_data",
 		"description": "Extract structured JSON from text.",
-		"primary_model": "zai-org/GLM-4.5",
+		"primary_model": "zai-org/GLM-4.6",
 		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
 	}
 ]

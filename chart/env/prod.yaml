@@ -109,7 +109,7 @@ envVars:
       { "id": "Qwen/Qwen3-4B-Thinking-2507", "description": "Small Qwen that emits transparent step by step reasoning." },
       { "id": "moonshotai/Kimi-K2-Instruct", "description": "MoE assistant strong coding, reasoning, agentic tasks, long context." },
       { "id": "zai-org/GLM-4.5V", "description": "Vision language MoE state of the art multimodal reasoning." },
-      { "id": "zai-org/GLM-4.5", "description": "Hybrid reasoning model top choice for intelligent agent applications." },
+      { "id": "zai-org/GLM-4.6", "description": "Hybrid reasoning model top choice for intelligent agent applications." },
       { "id": "deepseek-ai/DeepSeek-V3.1", "description": "Supports direct and thinking style reasoning within one model." },
       { "id": "Qwen/Qwen3-8B", "description": "Efficient Qwen assistant strong multilingual skills and formatting." },
       { "id": "Qwen/Qwen3-30B-A3B-Thinking-2507", "description": "Thinking mode Qwen explicit reasoning for complex interpretable tasks." },
