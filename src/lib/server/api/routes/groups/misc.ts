@@ -4,7 +4,6 @@ import { requiresUser } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { config } from "$lib/server/config";
-import { Client } from "@gradio/client";
 import yazl from "yazl";
 import { downloadFile } from "$lib/server/files/downloadFile";
 import mimeTypes from "mime-types";
@@ -17,8 +16,6 @@ export interface FeatureFlags {
 	guestMode: boolean;
 	isAdmin: boolean;
 }
-
-export type ApiReturnType = Awaited<ReturnType<typeof Client.prototype.view_api>>;
 
 export const misc = new Elysia()
 	.use(authPlugin)

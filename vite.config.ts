@@ -41,7 +41,7 @@ export default defineConfig({
 		},
 	},
 	optimizeDeps: {
-		include: ["uuid", "sharp", "@gradio/client", "clsx"],
+		include: ["uuid", "sharp", "clsx"],
 	},
 	test: {
 		workspace: [
