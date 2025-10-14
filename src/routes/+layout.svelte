@@ -22,6 +22,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
+	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -226,6 +227,8 @@
 		}}
 	/>
 {/if}
+
+<BackgroundGenerationPoller />
 
 <div
 	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed

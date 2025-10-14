@@ -22,6 +22,11 @@
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { browser } from "$app/environment";
+	import {
+		addBackgroundGeneration,
+		hasBackgroundGeneration,
+		removeBackgroundGeneration,
+	} from "$lib/stores/backgroundGenerations";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
@@ -33,7 +38,6 @@
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
-	let pollingInterval: ReturnType<typeof setInterval> | undefined = undefined;
 
 	let files: File[] = $state([]);
 
@@ -371,18 +375,9 @@
 
 		const streaming = isConversationStreaming(messages);
 		if (streaming) {
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
 			loading = true;
-			pollingInterval = setInterval(async () => {
-				await invalidateAll();
-			}, 1000);
 		}
-
-		return () => {
-			if (pollingInterval) {
-				clearInterval(pollingInterval);
-				pollingInterval = undefined;
-			}
-		};
 	});
 
 	async function onMessage(content: string) {
@@ -458,9 +453,8 @@
 			loading = false;
 		}
 
-		if (!streaming && browser && pollingInterval) {
-			clearInterval(pollingInterval);
-			pollingInterval = undefined;
+		if (!streaming && browser) {
+			removeBackgroundGeneration(page.params.id);
 		}
 	});
 
@@ -474,8 +468,15 @@
 		}
 	});
 
-	beforeNavigate(() => {
+	beforeNavigate((navigation) => {
 		if (!page.params.id) return;
+
+		const navigatingAway =
+			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
+
+		if (loading && navigatingAway) {
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+		}
 
 		$isAborted = true;
 		loading = false;
