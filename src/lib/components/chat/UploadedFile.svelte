@@ -123,6 +123,7 @@
 			showModal = true;
 		}
 	}}
+	class="mt-4"
 	class:clickable={isClickable}
 	role="button"
 	tabindex="0"
