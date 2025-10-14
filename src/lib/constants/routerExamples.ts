@@ -58,9 +58,8 @@ export const routerExamples: RouterExample[] = [
 				prompt: "Add dark mode and make it the default",
 			},
 			{
-				title: "Add blog teasers",
-				prompt:
-					"Add a latest blog posts section to the Tailwind CSS landing page with three article cards and call-to-action buttons.",
+				title: "Write blog post",
+				prompt: "Write a blog post introducing my service.",
 			},
 			{
 				title: "Translate to Italian",
