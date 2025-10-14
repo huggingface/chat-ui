@@ -15,7 +15,6 @@
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import { Spring } from "svelte/motion";
-	import { pan, type GestureCustomEvent, type PanCustomEvent } from "svelte-gestures";
 	import { shareModal } from "$lib/stores/shareModal";
 	interface Props {
 		title: string | undefined;
@@ -27,10 +26,6 @@
 	let closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
 
-	let panX: number | undefined = $state(undefined);
-	let panStart: number | undefined = $state(undefined);
-	let panStartTime: number | undefined = undefined;
-
 	const isHuggingChat = $derived(Boolean(page.data?.publicConfig?.isHuggingChat));
 	const canShare = $derived(
 		isHuggingChat && Boolean(page.params?.id) && page.route.id?.startsWith("/conversation/")
@@ -41,9 +36,6 @@
 
 	const tween = Spring.of(
 		() => {
-			if (panX !== undefined) {
-				return panX;
-			}
 			if (isOpen) {
 				return 0 as number;
 			}
@@ -58,7 +50,6 @@
 
 	beforeNavigate(() => {
 		isOpen = false;
-		panX = undefined;
 	});
 
 	let shouldFocusClose = $derived(isOpen && closeEl);
@@ -75,7 +66,6 @@
 	// Function to close the drawer when background is tapped
 	function closeDrawer() {
 		isOpen = false;
-		panX = undefined;
 	}
 </script>
 
@@ -129,47 +119,6 @@
 {/if}
 
 <nav
-	use:pan={() => ({ delay: 0, preventdefault: true, touchAction: "pan-left" })}
-	onpanup={(e: GestureCustomEvent) => {
-		if (!panStart || !panStartTime || !panX) {
-			return;
-		}
-		// measure the pan velocity to determine if the menu should snap open or closed
-		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
-
-		const trueX = e.detail.x + (panX / 100) * drawerWidth;
-
-		const panDuration = Date.now() - panStartTime;
-		const panVelocity = (trueX - panStart) / panDuration;
-
-		panX = undefined;
-		panStart = undefined;
-		panStartTime = undefined;
-
-		if (panVelocity < -0.5 || trueX < 50) {
-			isOpen = !isOpen;
-		}
-	}}
-	onpan={(e: PanCustomEvent) => {
-		if (e.detail.pointerType !== "touch") {
-			panX = undefined;
-			panStart = undefined;
-			panStartTime = undefined;
-			return;
-		}
-
-		panX ??= 0;
-		panStart ??= e.detail.x;
-		panStartTime ??= Date.now();
-
-		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
-
-		const trueX = e.detail.x + (panX / 100) * drawerWidth;
-		const percentage = ((trueX - panStart) / drawerWidth) * 100;
-
-		panX = Math.max(-100, Math.min(0, percentage));
-		tween.set(panX, { instant: true });
-	}}
 	style="transform: translateX({Math.max(
 		-100,
 		Math.min(0, tween.current)
