@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { processTokens, processTokensSync, type Token } from "$lib/utils/marked";
+	import { processBlocks, processBlocksSync, type BlockToken } from "$lib/utils/marked";
 	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
-	import CodeBlock from "../CodeBlock.svelte";
+	import MarkdownBlock from "./MarkdownBlock.svelte";
 	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
 	import { browser } from "$app/environment";
 
@@ -19,48 +19,37 @@
 
 	let { content, sources = [], loading = false }: Props = $props();
 
-	let tokens: Token[] = $state(processTokensSync(content, sources));
+	let blocks: BlockToken[] = $state(processBlocksSync(content, sources));
 
 	async function processContent(
 		content: string,
 		sources: { title?: string; link: string }[]
-	): Promise<Token[]> {
-		if (worker) {
-			return new Promise((resolve) => {
-				if (!worker) {
-					throw new Error("Worker not initialized");
-				}
-				worker.onmessage = (event: MessageEvent<OutgoingMessage>) => {
-					if (event.data.type !== "processed") {
-						throw new Error("Invalid message type");
-					}
-					resolve(event.data.tokens);
-				};
-				worker.postMessage(
-					JSON.parse(JSON.stringify({ content, sources, type: "process" })) as IncomingMessage
-				);
-			});
-		} else {
-			return processTokens(content, sources);
-		}
+	): Promise<BlockToken[]> {
+		// Note: Worker support for blocks can be added later if needed
+		// For now, use direct processing which is still efficient due to block memoization
+		return processBlocks(content, sources);
 	}
 
 	$effect(() => {
 		if (!browser) {
-			tokens = processTokensSync(content, sources);
+			blocks = processBlocksSync(content, sources);
 		} else {
 			(async () => {
 				updateDebouncer.startRender();
-				tokens = await processContent(content, sources).then(
-					async (tokens) =>
-						await Promise.all(
-							tokens.map(async (token) => {
-								if (token.type === "text") {
-									token.html = DOMPurify.sanitize(await token.html);
-								}
-								return token;
-							})
-						)
+				blocks = await processContent(content, sources).then(async (processedBlocks) =>
+					Promise.all(
+						processedBlocks.map(async (block) => ({
+							...block,
+							tokens: await Promise.all(
+								block.tokens.map(async (token) => {
+									if (token.type === "text") {
+										token.html = DOMPurify.sanitize(await token.html);
+									}
+									return token;
+								})
+							),
+						}))
+					)
 				);
 
 				updateDebouncer.endRender();
@@ -81,11 +70,6 @@
 	});
 </script>
 
-{#each tokens as token}
-	{#if token.type === "text"}
-		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-		{@html token.html}
-	{:else if token.type === "code"}
-		<CodeBlock code={token.code} rawCode={token.rawCode} loading={loading && !token.isClosed} />
-	{/if}
+{#each blocks as block (block.id)}
+	<MarkdownBlock tokens={block.tokens} {loading} />
 {/each}
