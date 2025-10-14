@@ -67,7 +67,7 @@ envVars:
   PUBLIC_APP_NAME: "HuggingChat"
 
   TASK_MODEL: "Qwen/Qwen3-4B-Instruct-2507"
-  LM_ROUTER_ARCH_BASE_URL: "https://router.huggingface.co/v1"
+  LLM_ROUTER_ARCH_BASE_URL: "https://router.huggingface.co/v1"
   LLM_ROUTER_ROUTES_PATH: "static/huggingchat/routes.chat.json"
   LLM_ROUTER_ARCH_MODEL: "katanemo/Arch-Router-1.5B"
   LLM_ROUTER_OTHER_ROUTE: "casual_conversation"
