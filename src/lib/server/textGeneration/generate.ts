@@ -1,7 +1,4 @@
-import {
-	MessageUpdateType,
-	type MessageUpdate,
-} from "$lib/types/MessageUpdate";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import { AbortedGenerations } from "../abortedGenerations";
 import type { TextGenerationContext } from "./types";
 import type { EndpointMessage } from "../endpoints/endpoints";

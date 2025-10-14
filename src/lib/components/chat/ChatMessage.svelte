@@ -12,7 +12,6 @@
 	import CarbonPen from "~icons/carbon/pen";
 	import UploadedFile from "./UploadedFile.svelte";
 
-	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
