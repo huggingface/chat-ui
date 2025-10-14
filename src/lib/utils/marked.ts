@@ -9,6 +9,7 @@ type SimpleSource = {
 };
 import hljs from "highlight.js";
 import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
+import { parseMarkdownIntoBlocks } from "./parseBlocks";
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -249,3 +250,60 @@ export function processTokensSync(content: string, sources: SimpleSource[]): Tok
 }
 
 export type Token = CodeToken | TextToken;
+
+export type BlockToken = {
+	id: string;
+	content: string;
+	tokens: Token[];
+};
+
+/**
+ * Simple hash function for generating stable block IDs
+ */
+function hashString(str: string): string {
+	let hash = 0;
+	for (let i = 0; i < str.length; i++) {
+		const char = str.charCodeAt(i);
+		hash = (hash << 5) - hash + char;
+		hash = hash & hash; // Convert to 32bit integer
+	}
+	return Math.abs(hash).toString(36);
+}
+
+/**
+ * Process markdown content into blocks with stable IDs for efficient memoization.
+ * Each block is processed independently and assigned a content-based hash ID.
+ */
+export async function processBlocks(
+	content: string,
+	sources: SimpleSource[] = []
+): Promise<BlockToken[]> {
+	const blocks = parseMarkdownIntoBlocks(content);
+
+	return await Promise.all(
+		blocks.map(async (blockContent, index) => {
+			const tokens = await processTokens(blockContent, sources);
+			return {
+				id: `${index}-${hashString(blockContent)}`,
+				content: blockContent,
+				tokens,
+			};
+		})
+	);
+}
+
+/**
+ * Synchronous version of processBlocks for SSR
+ */
+export function processBlocksSync(content: string, sources: SimpleSource[] = []): BlockToken[] {
+	const blocks = parseMarkdownIntoBlocks(content);
+
+	return blocks.map((blockContent, index) => {
+		const tokens = processTokensSync(blockContent, sources);
+		return {
+			id: `${index}-${hashString(blockContent)}`,
+			content: blockContent,
+			tokens,
+		};
+	});
+}
