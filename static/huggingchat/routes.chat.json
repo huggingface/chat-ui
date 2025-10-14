@@ -24,7 +24,7 @@
 	{
 		"name": "editing_rewrite",
 		"description": "Lightly proofread and rephrase text for tone, length, and clarity.",
-		"primary_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+		"primary_model": "moonshotai/Kimi-K2-Instruct-0905",
 		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "google/gemma-3-27b-it", "zai-org/GLM-4.6"]
 	},
 	{
