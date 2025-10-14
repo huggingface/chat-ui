@@ -24,7 +24,6 @@
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
-		hasBackgroundGeneration,
 		removeBackgroundGeneration,
 	} from "$lib/stores/backgroundGenerations";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
