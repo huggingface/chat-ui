@@ -16,26 +16,26 @@ export type RouterExample = {
 
 export const routerExamples: RouterExample[] = [
 	{
-		title: "Pong game",
-		prompt: "Create a minimalist pong game using  HTML and tailwindcss",
+		title: "HTML game",
+		prompt: "Code a minimal Flappy Bird game using HTML and Canvas",
 		followUps: [
 			{
 				title: "README.md file",
-				prompt: "Create a comprehensive README.md for the Pong game project.",
-			},
-			{
-				title: "Add power-ups",
-				prompt:
-					"Add a power-up mechanic to the Pong game so paddles temporarily grow when a player scores twice in a row.",
+				prompt: "Create a comprehensive README.md for the Flappy Bird game project.",
 			},
 			{
 				title: "CRT Screen",
 				prompt: "Add a CRT screen effect to the game",
 			},
 			{
-				title: "Explain collision logic",
+				title: "Add power-ups",
 				prompt:
-					"Explain the collision detection algorithm in the pong game in simple terms with examples.",
+					"Add collectible coins between pipes that award bonus points and a shield power-up that allows one collision.",
+			},
+			{
+				title: "Explain collision detection",
+				prompt:
+					"Explain the collision detection algorithm for the bird and pipes in simple terms with examples.",
 			},
 		],
 	},
@@ -189,6 +189,20 @@ export const routerExamples: RouterExample[] = [
 				title: "Teach me Italian",
 				prompt:
 					"Help me practice Italian by conversing about this Shakespeare quote, correcting my grammar when needed.",
+			},
+		],
+	},
+	{
+		title: "Pelican on a bicycle",
+		prompt: "Draw an SVG of a pelican riding a bicycle",
+		followUps: [
+			{
+				title: "Add a top hat",
+				prompt: "Add a fancy top hat to the pelican and make it look distinguished",
+			},
+			{
+				title: "Make it animated",
+				prompt: "Add CSS animations to make the bicycle wheels spin and the pelican's wings flap",
 			},
 		],
 	},

@@ -38,7 +38,7 @@
 		>
 			{#if showPreview}
 				<button
-					class="btn h-7 gap-1 rounded-lg border px-2 text-xs shadow-sm backdrop-blur transition-none hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-600/50 dark:hover:border-gray-500"
+					class="btn h-7 gap-1 rounded-lg border px-2 text-xs shadow-sm backdrop-blur transition-none hover:border-gray-500 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-80 dark:border-gray-600 dark:bg-gray-600/50 dark:hover:border-gray-500"
 					disabled={loading}
 					onclick={() => {
 						if (!loading) {
