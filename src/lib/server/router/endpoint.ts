@@ -161,6 +161,27 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			try {
 				const mod = await import("../models");
 				const all = (mod as { models: ProcessedModel[] }).models;
+
+				// Check if a specific multimodal model is configured via env variable
+				const preferredModelId = config.LLM_ROUTER_MULTIMODAL_MODEL;
+				if (preferredModelId) {
+					const preferredModel = all?.find(
+						(m) => (m.id === preferredModelId || m.name === preferredModelId) && m.multimodal
+					);
+					if (preferredModel) {
+						logger.info(
+							{ model: preferredModel.id ?? preferredModel.name },
+							"[router] using configured multimodal model"
+						);
+						return preferredModel.id ?? preferredModel.name;
+					}
+					logger.warn(
+						{ configuredModel: preferredModelId },
+						"[router] configured multimodal model not found or not multimodal, falling back to first available"
+					);
+				}
+
+				// Fallback to first multimodal model
 				const first = all?.find((m) => !m.isRouter && m.multimodal);
 				return first?.id ?? first?.name;
 			} catch (e) {
