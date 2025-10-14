@@ -2,7 +2,7 @@ import { afterEach, assert, beforeAll, describe, expect, it } from "vitest";
 import { migrations } from "./routines";
 import { acquireLock, isDBLocked, refreshLock, releaseLock } from "./lock";
 import { Semaphores } from "$lib/types/Semaphore";
-import { collections } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 
 describe(
 	"migrations",
@@ -11,6 +11,7 @@ describe(
 	},
 	() => {
 		beforeAll(async () => {
+			await ready;
 			try {
 				await collections.semaphores.createIndex({ key: 1 }, { unique: true });
 			} catch (e) {
