@@ -35,11 +35,6 @@ export default defineConfig({
 		// Using leading dot matches subdomains per Vite's host check logic
 		allowedHosts: ["huggingface.ngrok.io"],
 	},
-	build: {
-		rollupOptions: {
-			external: ["jsdom"],
-		},
-	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "clsx"],
 	},
