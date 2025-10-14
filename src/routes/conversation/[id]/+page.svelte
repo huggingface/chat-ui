@@ -24,7 +24,6 @@
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
-		hasBackgroundGeneration,
 		removeBackgroundGeneration,
 	} from "$lib/stores/backgroundGenerations";
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
@@ -367,11 +366,16 @@
 	}
 
 	onMount(async () => {
-		// only used in case of creating new conversations (from the parent POST endpoint)
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
 			await writeMessage({ prompt: $pendingMessage.content });
 			$pendingMessage = undefined;
+		}
+
+		const streaming = isConversationStreaming(messages);
+		if (streaming) {
+			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			loading = true;
 		}
 	});
 
@@ -475,15 +479,6 @@
 
 		$isAborted = true;
 		loading = false;
-	});
-
-	onMount(() => {
-		const hasBackgroundEntry = hasBackgroundGeneration(page.params.id);
-		const streaming = isConversationStreaming(messages);
-		if (hasBackgroundEntry && streaming) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
-			loading = true;
-		}
 	});
 
 	let title = $derived.by(() => {
