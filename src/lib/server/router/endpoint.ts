@@ -76,8 +76,8 @@ function extractUpstreamError(error: unknown): { message: string; statusCode?: n
  */
 function isPolicyError(statusCode?: number): boolean {
 	if (!statusCode) return false;
-	// 402: Payment Required, 401: Unauthorized, 403: Forbidden
-	return statusCode === 402 || statusCode === 401 || statusCode === 403;
+	// 400: Bad Request, 402: Payment Required, 401: Unauthorized, 403: Forbidden
+	return statusCode === 400 || statusCode === 401 || statusCode === 402 || statusCode === 403;
 }
 
 function stripReasoningBlocks(text: string): string {
