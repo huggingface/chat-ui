@@ -40,8 +40,8 @@
 			<h1 class="text-2xl font-bold">Models</h1>
 			{#if publicConfig.isHuggingChat}
 				<a
-					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/372"
-					class="ml-auto dark:text-gray-400 dark:hover:text-gray-300"
+					href="https://huggingface.co/inference/models"
+					class="ml-auto text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
 					target="_blank"
 					aria-label="Hub discussion about models"
 				>
