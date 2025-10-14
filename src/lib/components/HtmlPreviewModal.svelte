@@ -117,7 +117,17 @@
 
 	let copied = $state(false);
 	let copyTimer: ReturnType<typeof setTimeout>;
+
+	function handleKeydown(event: KeyboardEvent) {
+		// Close preview on ESC key
+		if (event.key === "Escape") {
+			event.preventDefault();
+			onclose?.();
+		}
+	}
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <Modal width="max-w-[90dvw]" closeButton onclose={() => onclose?.()}>
 	<div class="p-4">
