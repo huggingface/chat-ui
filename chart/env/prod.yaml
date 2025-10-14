@@ -21,24 +21,29 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/healthcheck-path: "/healthcheck"
     alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
-    alb.ingress.kubernetes.io/group.name: "hub-prod"
-    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/load-balancer-name: "hub-utils-prod-cloudfront"
+    alb.ingress.kubernetes.io/group.name: "hub-utils-prod-cloudfront"
+    alb.ingress.kubernetes.io/scheme: "internal"
     alb.ingress.kubernetes.io/ssl-redirect: "443"
     alb.ingress.kubernetes.io/tags: "Env=prod,Project=hub,Terraform=true"
-    alb.ingress.kubernetes.io/target-node-labels: "role-hub-utils=true"
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:707930574880:certificate/5b25b145-75db-4837-b9f3-7f238ba8a9c7,arn:aws:acm:us-east-1:707930574880:certificate/bfdf509c-f44b-400f-b9e1-6f7a861abe91"
     kubernetes.io/ingress.class: "alb"
 
 ingressInternal:
   enabled: true
   path: "/chat"
   annotations:
-    alb.ingress.kubernetes.io/group.name: hub-prod-internal-public
     alb.ingress.kubernetes.io/healthcheck-path: "/healthcheck"
     alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
-    alb.ingress.kubernetes.io/load-balancer-name: hub-prod-internal-public
+    alb.ingress.kubernetes.io/group.name: "hub-prod-internal-public"
+    alb.ingress.kubernetes.io/load-balancer-name: "hub-prod-internal-public"
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/tags: "Env=prod,Project=hub,Terraform=true"
     alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
-    alb.ingress.kubernetes.io/target-node-labels: role-hub-lb=true
-    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:707930574880:certificate/5b25b145-75db-4837-b9f3-7f238ba8a9c7,arn:aws:acm:us-east-1:707930574880:certificate/bfdf509c-f44b-400f-b9e1-6f7a861abe91"
     kubernetes.io/ingress.class: "alb"
 
 envVars:
