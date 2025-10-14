@@ -61,7 +61,7 @@ export async function* generate(
 
 			yield {
 				type: MessageUpdateType.FinalAnswer,
-				text: text,
+				text,
 				interrupted,
 			};
 			continue;
