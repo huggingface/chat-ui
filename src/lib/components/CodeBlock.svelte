@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
-	import DOMPurify from "isomorphic-dompurify";
+	import sanitizeHtml from "sanitize-html";
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
 	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
 	import EosIconsLoading from "~icons/eos-icons/loading";
@@ -64,7 +64,69 @@
 		</div>
 	</div>
 	<pre class="scrollbar-custom overflow-auto px-5 font-mono transition-[height]"><code
-			><!-- eslint-disable svelte/no-at-html-tags -->{@html DOMPurify.sanitize(code)}</code
+			><!-- eslint-disable svelte/no-at-html-tags -->{@html sanitizeHtml(code, {
+				allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+					"svg",
+					"path",
+					"circle",
+					"rect",
+					"line",
+					"polyline",
+					"polygon",
+					"ellipse",
+					"g",
+					"defs",
+					"linearGradient",
+					"radialGradient",
+					"stop",
+					"use",
+					"symbol",
+					"text",
+					"tspan",
+					"image",
+					"clipPath",
+					"mask",
+					"pattern",
+				]),
+				allowedAttributes: {
+					...sanitizeHtml.defaults.allowedAttributes,
+					svg: [
+						"xmlns",
+						"viewBox",
+						"width",
+						"height",
+						"preserveAspectRatio",
+						"class",
+						"id",
+						"fill",
+						"stroke",
+					],
+					"*": [
+						"class",
+						"id",
+						"fill",
+						"stroke",
+						"stroke-width",
+						"d",
+						"cx",
+						"cy",
+						"r",
+						"x",
+						"y",
+						"x1",
+						"y1",
+						"x2",
+						"y2",
+						"points",
+						"transform",
+						"style",
+					],
+				},
+				parser: {
+					lowerCaseTags: false,
+					lowerCaseAttributeNames: false,
+				},
+			})}</code
 		></pre>
 
 	{#if previewOpen}

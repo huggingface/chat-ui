@@ -5,8 +5,7 @@
 	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
 	import { browser } from "$app/environment";
 
-	import DOMPurify from "isomorphic-dompurify";
-	import { onMount } from "svelte";
+	import sanitizeHtml from "sanitize-html";
 	import { updateDebouncer } from "$lib/utils/updates";
 
 	interface Props {
@@ -56,7 +55,80 @@
 						await Promise.all(
 							tokens.map(async (token) => {
 								if (token.type === "text") {
-									token.html = DOMPurify.sanitize(await token.html);
+									token.html = sanitizeHtml(await token.html, {
+										allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+											"img",
+											"svg",
+											"path",
+											"circle",
+											"rect",
+											"line",
+											"polyline",
+											"polygon",
+											"ellipse",
+											"g",
+											"defs",
+											"linearGradient",
+											"radialGradient",
+											"stop",
+											"use",
+											"symbol",
+											"text",
+											"tspan",
+											"clipPath",
+											"mask",
+											"pattern",
+										]),
+										allowedAttributes: {
+											...sanitizeHtml.defaults.allowedAttributes,
+											a: ["href", "target", "rel"],
+											img: ["src", "alt", "title", "width", "height"],
+											svg: [
+												"xmlns",
+												"viewBox",
+												"width",
+												"height",
+												"preserveAspectRatio",
+												"class",
+												"id",
+												"fill",
+												"stroke",
+											],
+											"*": [
+												"class",
+												"id",
+												"fill",
+												"stroke",
+												"stroke-width",
+												"d",
+												"cx",
+												"cy",
+												"r",
+												"x",
+												"y",
+												"x1",
+												"y1",
+												"x2",
+												"y2",
+												"points",
+												"transform",
+											],
+										},
+										transformTags: {
+											a: (tagName, attribs) => ({
+												tagName,
+												attribs: {
+													...attribs,
+													target: "_blank",
+													rel: "noreferrer",
+												},
+											}),
+										},
+										parser: {
+											lowerCaseTags: false,
+											lowerCaseAttributeNames: false,
+										},
+									});
 								}
 								return token;
 							})
@@ -66,18 +138,6 @@
 				updateDebouncer.endRender();
 			})();
 		}
-	});
-
-	onMount(() => {
-		// todo: fix worker, seems to be transmitting a lot of data
-		// worker = browser && window.Worker ? new MarkdownWorker() : null;
-
-		DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-			if (node.tagName === "A") {
-				node.setAttribute("target", "_blank");
-				node.setAttribute("rel", "noreferrer");
-			}
-		});
 	});
 </script>
 
