@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CopyToClipBoardBtn from "./CopyToClipBoardBtn.svelte";
-	import DOMPurify from "isomorphic-dompurify";
+	import DOMPurify from "$lib/utils/dompurify";
 	import HtmlPreviewModal from "./HtmlPreviewModal.svelte";
 	import PlayFilledAlt from "~icons/carbon/play-filled-alt";
 	import EosIconsLoading from "~icons/eos-icons/loading";

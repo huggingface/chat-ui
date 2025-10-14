@@ -5,7 +5,7 @@
 	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
 	import { browser } from "$app/environment";
 
-	import DOMPurify from "isomorphic-dompurify";
+	import DOMPurify from "$lib/utils/dompurify";
 	import { onMount } from "svelte";
 	import { updateDebouncer } from "$lib/utils/updates";
 
