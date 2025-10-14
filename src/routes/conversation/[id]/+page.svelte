@@ -341,6 +341,30 @@
 		}
 	}
 
+	async function stopGeneration() {
+		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
+			method: "POST",
+		}).then((r) => {
+			if (r.ok) {
+				setTimeout(() => {
+					$isAborted = true;
+					loading = false;
+				}, 500);
+			} else {
+				$isAborted = true;
+				loading = false;
+			}
+		});
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		// Stop generation on ESC key when loading
+		if (event.key === "Escape" && loading) {
+			event.preventDefault();
+			stopGeneration();
+		}
+	}
+
 	onMount(async () => {
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
@@ -463,6 +487,8 @@
 	});
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
+
 <svelte:head>
 	<title>{title}</title>
 </svelte:head>
@@ -478,21 +504,7 @@
 	onmessage={onMessage}
 	onretry={onRetry}
 	onshowAlternateMsg={onShowAlternateMsg}
-	onstop={async () => {
-		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
-			method: "POST",
-		}).then((r) => {
-			if (r.ok) {
-				setTimeout(() => {
-					$isAborted = true;
-					loading = false;
-				}, 500);
-			} else {
-				$isAborted = true;
-				loading = false;
-			}
-		});
-	}}
+	onstop={stopGeneration}
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />
