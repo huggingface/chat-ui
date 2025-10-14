@@ -19,7 +19,7 @@ serviceAccount:
 ingress:
   path: "/chat"
   annotations:
-    alb.ingress.kubernetes.io/healthcheck-path: "/chat//healthcheck"
+    alb.ingress.kubernetes.io/healthcheck-path: "/chat/healthcheck"
     alb.ingress.kubernetes.io/listen-ports: "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
     alb.ingress.kubernetes.io/load-balancer-name: "hub-utils-prod-cloudfront"
     alb.ingress.kubernetes.io/group.name: "hub-utils-prod-cloudfront"
