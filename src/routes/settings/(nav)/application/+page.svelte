@@ -174,11 +174,13 @@
 			{#if publicConfig.isHuggingChat}
 				<a
 					href="https://github.com/huggingface/chat-ui"
+					target="_blank"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					><CarbonLogoGithub class="mr-1.5 shrink-0 text-sm " /> Github repository</a
 				>
 				<a
 					href="https://huggingface.co/settings/inference-providers"
+					target="_blank"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Providers settings</a
 				>
