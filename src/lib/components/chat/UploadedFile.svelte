@@ -20,7 +20,8 @@
 
 	let showModal = $state(false);
 
-	let urlNotTrailing = $derived(page.url.pathname.replace(/\/$/, ""));
+	// Capture URL once at component creation to prevent reactive updates during navigation
+	let urlNotTrailing = page.url.pathname.replace(/\/$/, "");
 
 	function truncateMiddle(text: string, maxLength: number): string {
 		if (text.length <= maxLength) {
