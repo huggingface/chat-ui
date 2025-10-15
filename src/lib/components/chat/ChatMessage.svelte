@@ -184,7 +184,7 @@
 									<img
 										src={`https://huggingface.co/api/organizations/${modelAuthor}/avatar`}
 										alt="{modelAuthor} logo"
-										class="size-2.5 flex-none"
+										class="size-2.5 flex-none rounded-sm"
 										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
 									/>
 									{message.routerMetadata.model.split("/").pop()}
@@ -208,7 +208,7 @@
 								<img
 									src={`https://huggingface.co/api/organizations/${hubOrg}/avatar`}
 									alt="{message.routerMetadata.provider} logo"
-									class="size-2.5 flex-none"
+									class="size-2.5 flex-none rounded-sm"
 									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
 								/>
 								{message.routerMetadata.provider}
