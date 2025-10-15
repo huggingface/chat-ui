@@ -20,6 +20,7 @@ export type Message = Partial<Timestamps> & {
 	routerMetadata?: {
 		route: string;
 		model: string;
+		provider?: string;
 	};
 
 	// needed for conversation trees

@@ -74,4 +74,5 @@ export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;
 	route: string;
 	model: string;
+	provider?: string;
 }

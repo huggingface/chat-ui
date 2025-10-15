@@ -7,7 +7,7 @@ import type { Stream } from "openai/streaming";
  */
 export async function* openAIChatToTextGenerationStream(
 	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
-	getRouterMetadata?: () => { route?: string; model?: string }
+	getRouterMetadata?: () => { route?: string; model?: string; provider?: string }
 ) {
 	let generatedText = "";
 	let tokenId = 0;
@@ -16,7 +16,9 @@ export async function* openAIChatToTextGenerationStream(
 	let thinkOpen = false;
 
 	for await (const completion of completionStream) {
-		const retyped = completion as { "x-router-metadata"?: { route: string; model: string } };
+		const retyped = completion as {
+			"x-router-metadata"?: { route: string; model: string; provider?: string };
+		};
 		// Check if this chunk contains router metadata (first chunk from llm-router)
 		if (!metadataYielded && retyped["x-router-metadata"]) {
 			const metadata = retyped["x-router-metadata"];
@@ -32,8 +34,11 @@ export async function* openAIChatToTextGenerationStream(
 				routerMetadata: {
 					route: metadata.route,
 					model: metadata.model,
+					provider: metadata.provider,
 				},
-			} as TextGenerationStreamOutput & { routerMetadata: { route: string; model: string } };
+			} as TextGenerationStreamOutput & {
+				routerMetadata: { route: string; model: string; provider?: string };
+			};
 			metadataYielded = true;
 			// Skip processing this chunk as content since it's just metadata
 			if (
@@ -139,7 +144,11 @@ export async function* openAIChatToTextGenerationStream(
 	// If metadata wasn't yielded from chunks (e.g., from headers), yield it at the end
 	if (!metadataYielded && getRouterMetadata) {
 		const routerMetadata = getRouterMetadata();
-		if (routerMetadata && routerMetadata.route && routerMetadata.model) {
+		// Yield if we have either complete router metadata OR just provider info
+		if (
+			(routerMetadata && routerMetadata.route && routerMetadata.model) ||
+			routerMetadata?.provider
+		) {
 			yield {
 				token: {
 					id: tokenId++,
@@ -150,7 +159,9 @@ export async function* openAIChatToTextGenerationStream(
 				generated_text: null,
 				details: null,
 				routerMetadata,
-			} as TextGenerationStreamOutput & { routerMetadata: { route?: string; model?: string } };
+			} as TextGenerationStreamOutput & {
+				routerMetadata: { route?: string; model?: string; provider?: string };
+			};
 		}
 	}
 }
@@ -160,7 +171,7 @@ export async function* openAIChatToTextGenerationStream(
  */
 export async function* openAIChatToTextGenerationSingle(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
-	getRouterMetadata?: () => { route?: string; model?: string }
+	getRouterMetadata?: () => { route?: string; model?: string; provider?: string }
 ) {
 	const message: NonNullable<OpenAI.Chat.Completions.ChatCompletion.Choice>["message"] & {
 		reasoning?: string;
@@ -192,8 +203,12 @@ export async function* openAIChatToTextGenerationSingle(
 		...(getRouterMetadata
 			? (() => {
 					const metadata = getRouterMetadata();
-					return metadata && metadata.route && metadata.model ? { routerMetadata: metadata } : {};
+					return (metadata && metadata.route && metadata.model) || metadata?.provider
+						? { routerMetadata: metadata }
+						: {};
 				})()
 			: {}),
-	} as TextGenerationStreamOutput & { routerMetadata?: { route?: string; model?: string } };
+	} as TextGenerationStreamOutput & {
+		routerMetadata?: { route?: string; model?: string; provider?: string };
+	};
 }

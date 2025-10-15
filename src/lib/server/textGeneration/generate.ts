@@ -36,13 +36,14 @@ export async function* generate(
 		if (
 			"routerMetadata" in output &&
 			output.routerMetadata &&
-			output.routerMetadata.route &&
-			output.routerMetadata.model
+			((output.routerMetadata.route && output.routerMetadata.model) ||
+				output.routerMetadata.provider)
 		) {
 			yield {
 				type: MessageUpdateType.RouterMetadata,
-				route: output.routerMetadata.route,
-				model: output.routerMetadata.model,
+				route: output.routerMetadata.route || "",
+				model: output.routerMetadata.model || "",
+				provider: output.routerMetadata.provider,
 			};
 			continue;
 		}

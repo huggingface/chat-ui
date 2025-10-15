@@ -21,7 +21,7 @@ export interface EndpointParameters {
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken;
-	routerMetadata?: { route?: string; model?: string };
+	routerMetadata?: { route?: string; model?: string; provider?: string };
 };
 // type signature for the endpoint
 export type Endpoint = (

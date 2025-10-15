@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
 	import { tick } from "svelte";
+	import { base } from "$app/paths";
 
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	const publicConfig = usePublicConfig();
@@ -164,24 +165,42 @@
 					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
-				{#if message.routerMetadata && (!isLast || !loading)}
+				{#if message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
 					<div
 						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 sm:text-xs"
 					>
-						<span class="truncate rounded bg-gray-100 px-1 font-mono dark:bg-gray-800 sm:py-px">
-							{message.routerMetadata.route}
-						</span>
-						<span class="text-gray-500">with</span>
-						{#if publicConfig.isHuggingChat}
-							<a
-								href="/chat/settings/{message.routerMetadata.model}"
-								class="truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+						{#if message.routerMetadata.route && message.routerMetadata.model}
+							<span class="truncate rounded bg-gray-100 px-1 font-mono dark:bg-gray-800 sm:py-px">
+								{message.routerMetadata.route}
+							</span>
+							<span class="text-gray-500">with</span>
+							{#if publicConfig.isHuggingChat}
+								<a
+									href="/chat/settings/{message.routerMetadata.model}"
+									class="truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+								>
+									{message.routerMetadata.model.split("/").pop()}
+								</a>
+							{:else}
+								<span
+									class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px"
+								>
+									{message.routerMetadata.model.split("/").pop()}
+								</span>
+							{/if}
+						{/if}
+						{#if message.routerMetadata.provider}
+							<span class="text-gray-500 max-sm:hidden">via</span>
+							<span
+								class="flex items-center gap-1 truncate rounded bg-gray-100 pl-1 pr-1.5 font-mono dark:bg-gray-800 max-sm:hidden sm:py-px"
 							>
-								{message.routerMetadata.model.split("/").pop()}
-							</a>
-						{:else}
-							<span class="truncate rounded bg-gray-100 px-1.5 font-mono dark:bg-gray-800 sm:py-px">
-								{message.routerMetadata.model.split("/").pop()}
+								<img
+									src={`${base}/huggingchat/providers/${message.routerMetadata.provider}.svg`}
+									alt="{message.routerMetadata.provider} logo"
+									class="size-2.5 flex-none"
+									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+								/>
+								{message.routerMetadata.provider}
 							</span>
 						{/if}
 					</div>

@@ -376,12 +376,22 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					];
 				}
 
-				// Store router metadata if this is the virtual router (Omni)
+				// Store router metadata (for router models) or provider info (for all models)
 				else if (event.type === MessageUpdateType.RouterMetadata) {
+					// Merge metadata updates to preserve existing fields (router may send route/model first, then provider comes later)
 					if (model?.isRouter) {
 						messageToWriteTo.routerMetadata = {
-							route: event.route,
-							model: event.model,
+							route: event.route || messageToWriteTo.routerMetadata?.route || "",
+							model: event.model || messageToWriteTo.routerMetadata?.model || "",
+							provider: event.provider || messageToWriteTo.routerMetadata?.provider,
+						};
+					}
+					// Store provider-only metadata for non-router models if available
+					else if (event.provider) {
+						messageToWriteTo.routerMetadata = {
+							route: messageToWriteTo.routerMetadata?.route || "",
+							model: messageToWriteTo.routerMetadata?.model || "",
+							provider: event.provider,
 						};
 					}
 				}

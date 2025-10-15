@@ -75,7 +75,7 @@ export async function endpointOai(
 	}
 
 	// Store router metadata if captured
-	let routerMetadata: { route?: string; model?: string } = {};
+	let routerMetadata: { route?: string; model?: string; provider?: string } = {};
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
@@ -84,11 +84,18 @@ export async function endpointOai(
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");
 		const modelHeader = response.headers.get("X-Router-Model");
+		const providerHeader = response.headers.get("x-inference-provider");
 
 		if (routeHeader && modelHeader) {
 			routerMetadata = {
 				route: routeHeader,
 				model: modelHeader,
+				provider: providerHeader || undefined,
+			};
+		} else if (providerHeader) {
+			// Even without router metadata, capture provider info
+			routerMetadata = {
+				provider: providerHeader,
 			};
 		}
 
