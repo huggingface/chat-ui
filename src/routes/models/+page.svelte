@@ -81,7 +81,7 @@
 							<img
 								class="aspect-square size-6 rounded border bg-white dark:border-gray-700"
 								src={model.logoUrl}
-								alt="{model.displayName} logo"
+								alt=""
 							/>
 						{:else}
 							<div
