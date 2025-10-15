@@ -17,6 +17,17 @@ const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
 const ROUTER_MULTIMODAL_ROUTE = "multimodal";
 
+// Cache models at module level to avoid redundant dynamic imports on every request
+let cachedModels: ProcessedModel[] | undefined;
+
+async function getModels(): Promise<ProcessedModel[]> {
+	if (!cachedModels) {
+		const mod = await import("../models");
+		cachedModels = (mod as { models: ProcessedModel[] }).models;
+	}
+	return cachedModels;
+}
+
 /**
  * Custom error class that preserves HTTP status codes
  */
@@ -115,8 +126,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			// Try to use the real candidate model config if present in chat-ui's model list
 			let modelForCall: ProcessedModel | undefined;
 			try {
-				const mod = await import("../models");
-				const all = (mod as { models: ProcessedModel[] }).models;
+				const all = await getModels();
 				modelForCall = all?.find((m) => m.id === candidateModelId || m.name === candidateModelId);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for candidate lookup");
@@ -159,8 +169,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 
 		async function findFirstMultimodalCandidateId(): Promise<string | undefined> {
 			try {
-				const mod = await import("../models");
-				const all = (mod as { models: ProcessedModel[] }).models;
+				const all = await getModels();
 
 				// Check if a specific multimodal model is configured via env variable
 				const preferredModelId = config.LLM_ROUTER_MULTIMODAL_MODEL;
