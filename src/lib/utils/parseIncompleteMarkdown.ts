@@ -18,27 +18,29 @@ const hasCompleteCodeBlock = (text: string): boolean => {
 	return tripleBackticks > 0 && tripleBackticks % 2 === 0 && text.includes("\n");
 };
 
-// Helper function to check if a position is inside an incomplete code block
-const isInsideIncompleteCodeBlock = (text: string, markerIndex: number): boolean => {
-	const tripleBackticks = (text.match(/```/g) || []).length;
-	// If even number or no backticks, no incomplete code block
-	if (tripleBackticks === 0 || tripleBackticks % 2 === 0) {
-		return false;
-	}
-	// Find the position of the last (opening) ```
-	let lastBacktickIndex = -1;
-	let count = 0;
-	for (let i = 0; i <= text.length - 3; i++) {
-		if (text.substring(i, i + 3) === "```") {
-			count++;
-			if (count === tripleBackticks) {
-				lastBacktickIndex = i;
-				break;
-			}
+// Returns the start index of the currently open fenced code block, or -1 if none
+const getOpenCodeFenceIndex = (text: string): number => {
+	let openFenceIndex = -1;
+	let inFence = false;
+
+	for (const match of text.matchAll(/```/g)) {
+		const index = match.index ?? -1;
+		if (index === -1) {
+			continue;
+		}
+
+		if (inFence) {
+			// This fence closes the current block
+			inFence = false;
+			openFenceIndex = -1;
+		} else {
+			// This fence opens a new block
+			inFence = true;
+			openFenceIndex = index;
 		}
 	}
-	// If the marker is after the last ```, it's inside the incomplete code block
-	return markerIndex > lastBacktickIndex;
+
+	return openFenceIndex;
 };
 
 // Handles incomplete links and images by preserving them with a special marker
@@ -109,7 +111,8 @@ const handleIncompleteBold = (text: string): string => {
 		const markerIndex = text.lastIndexOf(boldMatch[1]);
 
 		// Don't process if the marker is inside an incomplete code block
-		if (isInsideIncompleteCodeBlock(text, markerIndex)) {
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && markerIndex > openFenceIndex) {
 			return text;
 		}
 		const beforeMarker = text.substring(0, markerIndex);
@@ -160,7 +163,8 @@ const handleIncompleteDoubleUnderscoreItalic = (text: string): string => {
 		const markerIndex = text.lastIndexOf(italicMatch[1]);
 
 		// Don't process if the marker is inside an incomplete code block
-		if (isInsideIncompleteCodeBlock(text, markerIndex)) {
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && markerIndex > openFenceIndex) {
 			return text;
 		}
 		const beforeMarker = text.substring(0, markerIndex);
@@ -249,7 +253,8 @@ const handleIncompleteSingleAsteriskItalic = (text: string): string => {
 		}
 
 		// Don't process if the marker is inside an incomplete code block
-		if (isInsideIncompleteCodeBlock(text, firstSingleAsteriskIndex)) {
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && firstSingleAsteriskIndex > openFenceIndex) {
 			return text;
 		}
 
@@ -373,7 +378,8 @@ const handleIncompleteSingleUnderscoreItalic = (text: string): string => {
 		}
 
 		// Don't process if the marker is inside an incomplete code block
-		if (isInsideIncompleteCodeBlock(text, firstSingleUnderscoreIndex)) {
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && firstSingleUnderscoreIndex > openFenceIndex) {
 			return text;
 		}
 
@@ -587,7 +593,8 @@ const handleIncompleteBoldItalic = (text: string): string => {
 		const markerIndex = text.lastIndexOf(boldItalicMatch[1]);
 
 		// Don't process if the marker is inside an incomplete code block
-		if (isInsideIncompleteCodeBlock(text, markerIndex)) {
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && markerIndex > openFenceIndex) {
 			return text;
 		}
 
