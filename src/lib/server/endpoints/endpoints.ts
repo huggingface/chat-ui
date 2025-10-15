@@ -1,6 +1,10 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
-import type { TextGenerationStreamOutput, TextGenerationStreamToken } from "@huggingface/inference";
+import type {
+	TextGenerationStreamOutput,
+	TextGenerationStreamToken,
+	InferenceProvider,
+} from "@huggingface/inference";
 import { z } from "zod";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import type { Model } from "$lib/types/Model";
@@ -21,7 +25,7 @@ export interface EndpointParameters {
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {
 	token: TextGenerationStreamToken;
-	routerMetadata?: { route?: string; model?: string; provider?: string };
+	routerMetadata?: { route?: string; model?: string; provider?: InferenceProvider };
 };
 // type signature for the endpoint
 export type Endpoint = (
