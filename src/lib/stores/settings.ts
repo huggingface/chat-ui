@@ -77,11 +77,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}
 	}
 
-	async function initValue<K extends keyof SettingsStore>(
-		key: K,
-		nestedKey: string,
-		value: any
-	) {
+	async function initValue<K extends keyof SettingsStore>(key: K, nestedKey: string, value: any) {
 		const currentStore = get(baseStore);
 		const currentNestedObject = currentStore[key] as Record<string, any>;
 
