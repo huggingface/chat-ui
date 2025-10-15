@@ -183,7 +183,7 @@
 		showRouterDetails = false;
 		routerDetailsTimeout = setTimeout(() => {
 			showRouterDetails = true;
-		}, 1000);
+		}, 500);
 	});
 
 	let sources = $derived(
