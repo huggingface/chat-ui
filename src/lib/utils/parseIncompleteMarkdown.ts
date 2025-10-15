@@ -451,6 +451,7 @@ const handleIncompleteStrikethrough = (text: string): string => {
 };
 
 // Counts single dollar signs that are not part of double dollar signs and not escaped
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _countSingleDollarSigns = (text: string): number => {
 	return text.split("").reduce((acc, char, index) => {
 		if (char === "$") {

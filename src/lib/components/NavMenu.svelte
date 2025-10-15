@@ -24,7 +24,6 @@
 	import { page } from "$app/state";
 	import InfiniteScroll from "./InfiniteScroll.svelte";
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
-	import { goto } from "$app/navigation";
 	import { browser } from "$app/environment";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
