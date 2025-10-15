@@ -136,7 +136,7 @@
 						? `data:${file.mime};base64,${file.value}`
 						: urlNotTrailing + "/output/" + file.value}
 					alt={file.name}
-					class="h-full w-full bg-gray-200 object-cover dark:bg-gray-800"
+					class="h-36 bg-gray-200 object-cover dark:bg-gray-800"
 				/>
 			</div>
 		{:else if isAudio(file.mime)}
