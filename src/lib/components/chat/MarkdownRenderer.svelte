@@ -70,6 +70,6 @@
 	});
 </script>
 
-{#each blocks as block (block.id)}
-	<MarkdownBlock tokens={block.tokens} {loading} />
+{#each blocks as block, index (loading && index === blocks.length - 1 ? `stream-${index}` : block.id)}
+    <MarkdownBlock tokens={block.tokens} {loading} />
 {/each}
