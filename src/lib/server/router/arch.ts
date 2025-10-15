@@ -78,8 +78,8 @@ function toRouterPrompt(messages: EndpointMessage[], routes: Route[]) {
 		name: r.name,
 		description: r.description,
 	}));
-	const maxAssistantLength = parseInt(config.LLM_ROUTER_MAX_ASSISTANT_LENGTH || "500", 10);
-	const maxPrevUserLength = parseInt(config.LLM_ROUTER_MAX_PREV_USER_LENGTH || "400", 10);
+	const maxAssistantLength = parseInt(config.LLM_ROUTER_MAX_ASSISTANT_LENGTH || "1000", 10);
+	const maxPrevUserLength = parseInt(config.LLM_ROUTER_MAX_PREV_USER_LENGTH || "1000", 10);
 
 	const convo = messages
 		.map((m) => ({ role: m.from, content: m.content }))
