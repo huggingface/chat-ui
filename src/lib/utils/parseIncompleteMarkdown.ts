@@ -18,6 +18,29 @@ const hasCompleteCodeBlock = (text: string): boolean => {
 	return tripleBackticks > 0 && tripleBackticks % 2 === 0 && text.includes("\n");
 };
 
+// Helper function to check if a position is inside an incomplete code block
+const isInsideIncompleteCodeBlock = (text: string, markerIndex: number): boolean => {
+	const tripleBackticks = (text.match(/```/g) || []).length;
+	// If even number or no backticks, no incomplete code block
+	if (tripleBackticks === 0 || tripleBackticks % 2 === 0) {
+		return false;
+	}
+	// Find the position of the last (opening) ```
+	let lastBacktickIndex = -1;
+	let count = 0;
+	for (let i = 0; i <= text.length - 3; i++) {
+		if (text.substring(i, i + 3) === "```") {
+			count++;
+			if (count === tripleBackticks) {
+				lastBacktickIndex = i;
+				break;
+			}
+		}
+	}
+	// If the marker is after the last ```, it's inside the incomplete code block
+	return markerIndex > lastBacktickIndex;
+};
+
 // Handles incomplete links and images by preserving them with a special marker
 const handleIncompleteLinksAndImages = (text: string): string => {
 	// First check for incomplete URLs: [text](partial-url or ![text](partial-url without closing )
@@ -84,6 +107,11 @@ const handleIncompleteBold = (text: string): string => {
 		// Check if the bold marker is in a list item context
 		// Find the position of the matched bold marker
 		const markerIndex = text.lastIndexOf(boldMatch[1]);
+
+		// Don't process if the marker is inside an incomplete code block
+		if (isInsideIncompleteCodeBlock(text, markerIndex)) {
+			return text;
+		}
 		const beforeMarker = text.substring(0, markerIndex);
 		const lastNewlineBeforeMarker = beforeMarker.lastIndexOf("\n");
 		const lineStart = lastNewlineBeforeMarker === -1 ? 0 : lastNewlineBeforeMarker + 1;
@@ -111,6 +139,11 @@ const handleIncompleteBold = (text: string): string => {
 
 // Completes incomplete italic formatting with double underscores (__)
 const handleIncompleteDoubleUnderscoreItalic = (text: string): string => {
+	// Don't process if inside a complete code block
+	if (hasCompleteCodeBlock(text)) {
+		return text;
+	}
+
 	const italicMatch = text.match(italicPattern);
 
 	if (italicMatch) {
@@ -125,6 +158,11 @@ const handleIncompleteDoubleUnderscoreItalic = (text: string): string => {
 		// Check if the underscore marker is in a list item context
 		// Find the position of the matched underscore marker
 		const markerIndex = text.lastIndexOf(italicMatch[1]);
+
+		// Don't process if the marker is inside an incomplete code block
+		if (isInsideIncompleteCodeBlock(text, markerIndex)) {
+			return text;
+		}
 		const beforeMarker = text.substring(0, markerIndex);
 		const lastNewlineBeforeMarker = beforeMarker.lastIndexOf("\n");
 		const lineStart = lastNewlineBeforeMarker === -1 ? 0 : lastNewlineBeforeMarker + 1;
@@ -207,6 +245,11 @@ const handleIncompleteSingleAsteriskItalic = (text: string): string => {
 		}
 
 		if (firstSingleAsteriskIndex === -1) {
+			return text;
+		}
+
+		// Don't process if the marker is inside an incomplete code block
+		if (isInsideIncompleteCodeBlock(text, firstSingleAsteriskIndex)) {
 			return text;
 		}
 
@@ -326,6 +369,11 @@ const handleIncompleteSingleUnderscoreItalic = (text: string): string => {
 		}
 
 		if (firstSingleUnderscoreIndex === -1) {
+			return text;
+		}
+
+		// Don't process if the marker is inside an incomplete code block
+		if (isInsideIncompleteCodeBlock(text, firstSingleUnderscoreIndex)) {
 			return text;
 		}
 
@@ -532,6 +580,14 @@ const handleIncompleteBoldItalic = (text: string): string => {
 		// Check if content is only whitespace or other emphasis markers
 		const contentAfterMarker = boldItalicMatch[2];
 		if (!contentAfterMarker || /^[\s_~*`]*$/.test(contentAfterMarker)) {
+			return text;
+		}
+
+		// Find the position of the matched bold-italic marker
+		const markerIndex = text.lastIndexOf(boldItalicMatch[1]);
+
+		// Don't process if the marker is inside an incomplete code block
+		if (isInsideIncompleteCodeBlock(text, markerIndex)) {
 			return text;
 		}
 
