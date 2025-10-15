@@ -158,13 +158,7 @@
 	class="flex touch-none flex-col gap-1 rounded-r-xl border border-l-0 border-gray-100 p-3 text-sm dark:border-transparent md:mt-3 md:bg-gradient-to-l md:from-gray-50 md:dark:from-gray-800/30"
 >
 	{#if user?.username || user?.email}
-		<button
-			onclick={async () => {
-				await fetch(`${base}/logout`, {
-					method: "POST",
-				});
-				await goto(base + "/", { invalidateAll: true });
-			}}
+		<div
 			class="group flex items-center gap-1.5 rounded-lg pl-2.5 pr-2 hover:bg-gray-100 dark:hover:bg-gray-700"
 		>
 			<span
@@ -177,7 +171,7 @@
 				class="ml-auto size-4 rounded-full border bg-gray-500 dark:border-white/40"
 				alt=""
 			/>
-		</button>
+		</div>
 	{/if}
 	<a
 		href="{base}/models"
