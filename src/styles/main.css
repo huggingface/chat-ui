@@ -71,6 +71,37 @@
 	.prose pre {
 		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
 	}
+
+	/* Override prose-sm title sizes - 55% of original */
+	.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+		font-size: 1.17857em; /* 55% */
+		@apply font-semibold;
+	}
+
+	.prose-sm :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+		font-size: 0.78571em; /* 55% */
+		@apply font-semibold;
+	}
+
+	.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+		font-size: 0.70714em; /* 55% */
+		@apply font-semibold;
+	}
+
+	.prose-sm :where(h4):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+		font-size: 0.58929em; /* 55% */
+		@apply font-semibold;
+	}
+
+	.prose-sm :where(h5):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+		font-size: 0.55em; /* 55% */
+		@apply font-semibold;
+	}
+
+	.prose-sm :where(h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+		font-size: 0.55em; /* 55% */
+		@apply font-semibold;
+	}
 }
 
 .katex-display {
