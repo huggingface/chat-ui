@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, tick } from "svelte";
 
+	import { afterNavigate } from "$app/navigation";
+
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
 	import { page } from "$app/state";
@@ -46,10 +48,35 @@
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
 
-	onMount(() => {
-		if (!isVirtualKeyboard()) {
-			textareaElement?.focus();
+	const waitForAnimationFrame = () =>
+		typeof requestAnimationFrame === "function"
+			? new Promise<void>((resolve) => {
+					requestAnimationFrame(() => resolve());
+				})
+			: Promise.resolve();
+
+	async function focusTextarea() {
+		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
+		if (typeof document !== "undefined" && document.activeElement === textareaElement) return;
+
+		await tick();
+
+		if (typeof requestAnimationFrame === "function") {
+			await waitForAnimationFrame();
+			await waitForAnimationFrame();
 		}
+
+		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
+
+		try {
+			textareaElement.focus({ preventScroll: true });
+		} catch {
+			textareaElement.focus();
+		}
+	}
+
+	onMount(() => {
+		void focusTextarea();
 		function onFormSubmit() {
 			adjustTextareaHeight();
 		}
@@ -59,6 +86,10 @@
 		return () => {
 			formEl?.removeEventListener("submit", onFormSubmit);
 		};
+	});
+
+	afterNavigate(() => {
+		void focusTextarea();
 	});
 
 	function adjustTextareaHeight() {
