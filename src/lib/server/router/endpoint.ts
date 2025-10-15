@@ -104,11 +104,13 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		const sanitizedMessages = params.messages.map(stripReasoningFromMessage);
 		const routerMultimodalEnabled =
 			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
-		const hasImageInput = sanitizedMessages.some((message) =>
-			(message.files ?? []).some(
+		// Check only the latest user message for images (not entire history)
+		const lastUserMessage = sanitizedMessages.findLast((message) => message.from === "user");
+		const hasImageInput =
+			lastUserMessage &&
+			(lastUserMessage.files ?? []).some(
 				(file) => typeof file?.mime === "string" && file.mime.startsWith("image/")
-			)
-		);
+			);
 
 		// Helper to create an OpenAI endpoint for a specific candidate model id
 		async function createCandidateEndpoint(candidateModelId: string): Promise<Endpoint> {
@@ -218,6 +220,38 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					"[router] multimodal fallback failed"
 				);
 				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+			}
+		}
+
+		// Check if this is a follow-up message (contains assistant responses)
+		const hasAssistantMessages = sanitizedMessages.some((message) => message.from === "assistant");
+		if (hasAssistantMessages) {
+			// Try follow-up model first, fall back to multimodal model
+			const followupModelId =
+				config.LLM_ROUTER_FOLLOWUP_MODEL || config.LLM_ROUTER_MULTIMODAL_MODEL;
+
+			if (followupModelId) {
+				try {
+					logger.info(
+						{ route: "followup", model: followupModelId },
+						"[router] follow-up message detected; using follow-up model"
+					);
+					const ep = await createCandidateEndpoint(followupModelId);
+					const gen = await ep({ ...params });
+					return metadataThenStream(gen, followupModelId, "followup");
+				} catch (e) {
+					const { message, statusCode } = extractUpstreamError(e);
+					logger.warn(
+						{
+							route: "followup",
+							model: followupModelId,
+							err: message,
+							...(statusCode && { status: statusCode }),
+						},
+						"[router] follow-up model failed, falling back to Arch routing"
+					);
+					// Fall through to Arch routing
+				}
 			}
 		}
 
