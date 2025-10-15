@@ -20,6 +20,11 @@ type SettingsStore = {
 
 type SettingsStoreWritable = Writable<SettingsStore> & {
 	instantSet: (settings: Partial<SettingsStore>) => Promise<void>;
+	initValue: <K extends keyof SettingsStore>(
+		key: K,
+		nestedKey: string,
+		value: any
+	) => Promise<void>;
 };
 
 export function useSettingsStore() {
@@ -30,6 +35,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 	const baseStore = writable({ ...initialValue, recentlySaved: false });
 
 	let timeoutId: NodeJS.Timeout;
+	let showSavedOnNextSync = false;
 
 	async function setSettings(settings: Partial<SettingsStore>) {
 		baseStore.update((s) => ({
@@ -38,6 +44,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}));
 
 		if (browser) {
+			showSavedOnNextSync = true; // User edit, should show "Saved"
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
 				await fetch(`${base}/settings`, {
@@ -45,26 +52,84 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 					headers: {
 						"Content-Type": "application/json",
 					},
-					body: JSON.stringify({
-						...get(baseStore),
-						...settings,
-					}),
+					body: JSON.stringify(get(baseStore)),
 				});
 
 				invalidate(UrlDependency.ConversationList);
-				// set savedRecently to true for 3s
-				baseStore.update((s) => ({
-					...s,
-					recentlySaved: true,
-				}));
-				setTimeout(() => {
+
+				if (showSavedOnNextSync) {
+					// set savedRecently to true for 3s
 					baseStore.update((s) => ({
 						...s,
-						recentlySaved: false,
+						recentlySaved: true,
 					}));
-				}, 3000);
+					setTimeout(() => {
+						baseStore.update((s) => ({
+							...s,
+							recentlySaved: false,
+						}));
+					}, 3000);
+				}
+
+				showSavedOnNextSync = false;
 			}, 300);
 			// debounce server calls by 300ms
+		}
+	}
+
+	async function initValue<K extends keyof SettingsStore>(
+		key: K,
+		nestedKey: string,
+		value: any
+	) {
+		const currentStore = get(baseStore);
+		const currentNestedObject = currentStore[key] as Record<string, any>;
+
+		// Only initialize if undefined
+		if (currentNestedObject?.[nestedKey] !== undefined) {
+			return;
+		}
+
+		// Update the store
+		const newNestedObject = {
+			...(currentNestedObject || {}),
+			[nestedKey]: value,
+		};
+
+		baseStore.update((s) => ({
+			...s,
+			[key]: newNestedObject,
+		}));
+
+		// Save to server (debounced) - note: we don't set showSavedOnNextSync
+		if (browser) {
+			clearTimeout(timeoutId);
+			timeoutId = setTimeout(async () => {
+				await fetch(`${base}/settings`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(get(baseStore)),
+				});
+
+				invalidate(UrlDependency.ConversationList);
+
+				if (showSavedOnNextSync) {
+					baseStore.update((s) => ({
+						...s,
+						recentlySaved: true,
+					}));
+					setTimeout(() => {
+						baseStore.update((s) => ({
+							...s,
+							recentlySaved: false,
+						}));
+					}, 3000);
+				}
+
+				showSavedOnNextSync = false;
+			}, 300);
 		}
 	}
 	async function instantSet(settings: Partial<SettingsStore>) {
@@ -92,6 +157,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		subscribe: baseStore.subscribe,
 		set: setSettings,
 		instantSet,
+		initValue,
 		update: (fn: (s: SettingsStore) => SettingsStore) => {
 			setSettings(fn(get(baseStore)));
 		},

@@ -21,13 +21,9 @@
 	type RouterProvider = { provider: string } & Record<string, unknown>;
 
 	$effect(() => {
-		if ($settings.customPrompts[page.params.model] === undefined) {
-			$settings.customPrompts = {
-				...$settings.customPrompts,
-				[page.params.model]:
-					page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt || "",
-			};
-		}
+		const defaultPreprompt =
+			page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt || "";
+		settings.initValue("customPrompts", page.params.model, defaultPreprompt);
 	});
 
 	let hasCustomPreprompt = $derived(
@@ -40,31 +36,15 @@
 
 	// Initialize multimodal override for this model if not set yet
 	$effect(() => {
-		if (!$settings.multimodalOverrides) {
-			$settings.multimodalOverrides = {};
-		}
-		const modelId = page.params.model;
-		if ($settings.multimodalOverrides[modelId] === undefined && model) {
+		if (model) {
 			// Default to the model's advertised capability
-			$settings.multimodalOverrides = {
-				...$settings.multimodalOverrides,
-				[modelId]: !!model.multimodal,
-			};
+			settings.initValue("multimodalOverrides", page.params.model, !!model.multimodal);
 		}
 	});
 
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
-		if (!$settings.hidePromptExamples) {
-			$settings.hidePromptExamples = {};
-		}
-		const modelId = page.params.model;
-		if ($settings.hidePromptExamples[modelId] === undefined) {
-			$settings.hidePromptExamples = {
-				...$settings.hidePromptExamples,
-				[modelId]: false,
-			};
-		}
+		settings.initValue("hidePromptExamples", page.params.model, false);
 	});
 </script>
 
