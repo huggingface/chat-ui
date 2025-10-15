@@ -109,10 +109,8 @@ export async function* openAIChatToTextGenerationStream(
 
 		if (content && content.length > 0) {
 			const trimmed = content.trim();
-			// If provider sends a lone closing tag with no prior <think>, drop it.
-			if (!thinkOpen && trimmed === "</think>") {
-				// ignore stray closing tag
-			} else if (thinkOpen && trimmed === "</think>") {
+			// Allow <think> tags in content to pass through (for models like DeepSeek R1)
+			if (thinkOpen && trimmed === "</think>") {
 				// close once without duplicating the tag
 				combined += "</think>";
 				thinkOpen = false;
