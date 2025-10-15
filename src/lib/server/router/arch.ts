@@ -6,6 +6,41 @@ import { getRoutes } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
 
 const DEFAULT_LAST_TURNS = 16;
+
+/**
+ * Trim a message by keeping start and end, replacing middle with minimal indicator.
+ * Uses simple ellipsis since router only needs context for intent classification, not exact content.
+ * @param content - The message content to trim
+ * @param maxLength - Maximum total length (including indicator)
+ * @returns Trimmed content with start, ellipsis, and end
+ */
+function trimMiddle(content: string, maxLength: number): string {
+	if (content.length <= maxLength) return content;
+
+	const indicator = "…";
+	const availableLength = maxLength - indicator.length;
+
+	if (availableLength <= 0) {
+		// If no room even for indicator, just hard truncate
+		return content.slice(0, maxLength);
+	}
+
+	// Reserve more space for the start (typically contains context)
+	const startLength = Math.ceil(availableLength * 0.6);
+	const endLength = availableLength - startLength;
+
+	// Bug fix: slice(-0) returns entire string, so check for endLength <= 0
+	if (endLength <= 0) {
+		// Not enough space for end portion, just use start + indicator
+		return content.slice(0, availableLength) + indicator;
+	}
+
+	const start = content.slice(0, startLength);
+	const end = content.slice(-endLength);
+
+	return start + indicator + end;
+}
+
 const PROMPT_TEMPLATE = `
 You are a helpful assistant designed to find the best suited route.
 You are provided with route description within <routes></routes> XML tags:
@@ -43,12 +78,43 @@ function toRouterPrompt(messages: EndpointMessage[], routes: Route[]) {
 		name: r.name,
 		description: r.description,
 	}));
+	const maxAssistantLength = parseInt(config.LLM_ROUTER_MAX_ASSISTANT_LENGTH || "500", 10);
+	const maxPrevUserLength = parseInt(config.LLM_ROUTER_MAX_PREV_USER_LENGTH || "400", 10);
+
 	const convo = messages
 		.map((m) => ({ role: m.from, content: m.content }))
 		.filter((m) => typeof m.content === "string" && m.content.trim() !== "");
+
+	// Find the last user message index to preserve its full content
+	const lastUserIndex = convo.findLastIndex((m) => m.role === "user");
+
+	const trimmedConvo = convo.map((m, idx) => {
+		if (typeof m.content !== "string") return m;
+
+		// Trim assistant messages to reduce routing prompt size and improve latency
+		// Keep start and end for better context understanding
+		if (m.role === "assistant") {
+			return {
+				...m,
+				content: trimMiddle(m.content, maxAssistantLength),
+			};
+		}
+
+		// Trim previous user messages, but keep the latest user message full
+		// Keep start and end to preserve both context and question
+		if (m.role === "user" && idx !== lastUserIndex) {
+			return {
+				...m,
+				content: trimMiddle(m.content, maxPrevUserLength),
+			};
+		}
+
+		return m;
+	});
+
 	return PROMPT_TEMPLATE.replace("{routes}", JSON.stringify(simpleRoutes)).replace(
 		"{conversation}",
-		JSON.stringify(lastNTurns(convo))
+		JSON.stringify(lastNTurns(trimmedConvo))
 	);
 }
 
