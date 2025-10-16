@@ -137,7 +137,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		!auth.user &&
 		config.AUTOMATIC_LOGIN === "true" &&
 		!event.url.pathname.startsWith(`${base}/`) &&
-		!event.url.pathname.startsWith(`${base}/oauth`) &&
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/healthcheck`)
 	) {

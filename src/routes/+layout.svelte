@@ -99,7 +99,7 @@
 		settings.set({ welcomeModalSeen: true });
 
 		if (!data.user && data.loginEnabled) {
-			goto(`${base}/oauth`, { invalidateAll: true });
+			goto(`${base}/login`, { invalidateAll: true });
 		}
 	}
 
