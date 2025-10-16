@@ -105,7 +105,10 @@ export async function endpointOai(
 	const openai = new OpenAI({
 		apiKey: apiKey || "sk-",
 		baseURL,
-		defaultHeaders,
+		defaultHeaders: {
+			...(config.PUBLIC_APP_NAME === "HuggingChat" && { "User-Agent": "huggingchat" }),
+			...defaultHeaders,
+		},
 		defaultQuery,
 		fetch: customFetch,
 	});
