@@ -95,6 +95,14 @@
 			});
 	}
 
+	function closeWelcomeModal() {
+		settings.set({ welcomeModalSeen: true });
+
+		if (!data.user && data.loginEnabled) {
+			goto(`${base}/oauth`, { invalidateAll: true });
+		}
+	}
+
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
 	});
@@ -216,8 +224,8 @@
 	{/if}
 </svelte:head>
 
-{#if showWelcome}
-	<WelcomeModal close={() => settings.set({ welcomeModalSeen: true })} />
+{#if showWelcome || (!data.user && data.loginEnabled)}
+	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
 {#if $loginModalOpen}
