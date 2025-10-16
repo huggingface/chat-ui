@@ -94,17 +94,6 @@
 					</div>
 				{/if}
 
-				<div class="flex items-start justify-between py-3">
-					<div>
-						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Disable streaming tokens
-						</div>
-						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Show responses only when complete.
-						</p>
-					</div>
-					<Switch name="disableStream" bind:checked={$settings.disableStream} />
-				</div>
 
 				<div class="flex items-start justify-between py-3">
 					<div>

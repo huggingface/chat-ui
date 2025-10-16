@@ -27,7 +27,6 @@ export interface Settings extends Timestamps {
 	 */
 	hidePromptExamples?: Record<string, boolean>;
 
-	disableStream: boolean;
 	directPaste: boolean;
 }
 
@@ -39,6 +38,5 @@ export const DEFAULT_SETTINGS = {
 	customPrompts: {},
 	multimodalOverrides: {},
 	hidePromptExamples: {},
-	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;

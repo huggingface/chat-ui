@@ -13,7 +13,6 @@ type SettingsStore = {
 	customPrompts: Record<string, string>;
 	multimodalOverrides: Record<string, boolean>;
 	recentlySaved: boolean;
-	disableStream: boolean;
 	directPaste: boolean;
 	hidePromptExamples: Record<string, boolean>;
 };

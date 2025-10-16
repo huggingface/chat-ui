@@ -281,7 +281,7 @@
 				}
 				const currentTime = new Date();
 
-				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
+				if (update.type === MessageUpdateType.Stream) {
 					buffer += update.token;
 					// Check if this is the first update or if enough time has passed
 					if (currentTime.getTime() - lastUpdateTime.getTime() > updateDebouncer.maxUpdateTime) {

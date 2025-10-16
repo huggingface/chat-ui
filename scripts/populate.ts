@@ -160,7 +160,6 @@ async function seed() {
 				activeModel: faker.helpers.arrayElement(modelIds),
 				createdAt: faker.date.recent({ days: 30 }),
 				updatedAt: faker.date.recent({ days: 30 }),
-				disableStream: faker.datatype.boolean(0.25),
 				directPaste: faker.datatype.boolean(0.25),
 				hidePromptExamples: {},
 				customPrompts: {},
