@@ -65,6 +65,8 @@ envVars:
   MESSAGES_BEFORE_LOGIN: "999"
   PUBLIC_APP_ASSETS: "huggingchat"
   PUBLIC_APP_NAME: "HuggingChat"
+  PUBLIC_ORIGIN: "https://huggingface.co"
+  PUBLIC_PLAUSIBLE_SCRIPT_URL: "/js/script.js"
 
   TASK_MODEL: "Qwen/Qwen3-4B-Instruct-2507"
   LLM_ROUTER_ARCH_BASE_URL: "https://router.huggingface.co/v1"
