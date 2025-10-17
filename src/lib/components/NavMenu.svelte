@@ -125,7 +125,7 @@
 		{publicConfig.PUBLIC_APP_NAME}
 	</a>
 	<a
-		href={`${base}/`}
+		href={!page.data.user && page.data.loginEnabled ? `${base}/login` : `${base}/`}
 		onclick={handleNewChatClick}
 		class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
 		title="Ctrl/Cmd + Shift + O"
