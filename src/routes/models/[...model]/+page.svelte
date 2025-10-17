@@ -15,6 +15,7 @@
 
 	let loading = $state(false);
 	let files: File[] = $state([]);
+	let draft = $state("");
 
 	const settings = useSettingsStore();
 	const modelId = page.params.model;
@@ -59,9 +60,23 @@
 		}
 	}
 
-	onMount(async () => {
+	onMount(() => {
 		const query = page.url.searchParams.get("q");
-		if (query) createConversation(query);
+		if (query) {
+			void createConversation(query);
+			const url = new URL(page.url);
+			url.searchParams.delete("q");
+			history.replaceState({}, "", url);
+			return;
+		}
+
+		const promptQuery = page.url.searchParams.get("prompt");
+		if (promptQuery && !draft) {
+			draft = promptQuery;
+			const url = new URL(page.url);
+			url.searchParams.delete("prompt");
+			history.replaceState({}, "", url);
+		}
 
 		settings.instantSet({ activeModel: modelId });
 	});
@@ -85,4 +100,5 @@
 	currentModel={findCurrentModel(data.models, data.oldModels, modelId)}
 	models={data.models}
 	bind:files
+	bind:draft
 />
