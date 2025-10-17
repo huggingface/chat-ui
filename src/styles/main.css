@@ -32,6 +32,16 @@
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	}
 
+	.scrollbar-custom::-webkit-scrollbar {
+		background-color: transparent;
+		width: 8px;
+		height: 8px;
+	}
+
+	.dark .scrollbar-custom::-webkit-scrollbar {
+		background-color: rgba(17, 17, 17, 0.85);
+	}
+
 	/* Rounded top/bottom caps for vertical scrollbars (Chrome/Edge/Safari) */
 	.scrollbar-custom::-webkit-scrollbar-track {
 		@apply rounded-full bg-clip-padding; /* clip bg to padding so caps look round */
