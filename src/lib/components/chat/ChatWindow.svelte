@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, tick } from "svelte";
+	import { getContext, onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
@@ -34,6 +34,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+	import IconShare from "../icons/IconShare.svelte";
 
 	interface Props {
 		messages?: Message[];
@@ -73,6 +74,12 @@
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
+
+	const canShare = $derived(
+		page.data.publicConfig.isHuggingChat &&
+			Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/")
+	);
 
 	const handleSubmit = () => {
 		if (loading) return;
@@ -326,6 +333,19 @@
 />
 
 <div class="relative z-[-1] min-h-0 min-w-0">
+	{#if canShare}
+		<button
+			type="button"
+			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex {loading
+				? 'cursor-not-allowed opacity-50'
+				: ''}"
+			onclick={() => shareModal.open()}
+			aria-label="Share conversation"
+			disabled={loading}
+		>
+			<IconShare />
+		</button>
+	{/if}
 	{#if shareModalOpen}
 		<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
 	{/if}

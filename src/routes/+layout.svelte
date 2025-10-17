@@ -20,8 +20,6 @@
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
-	import IconShare from "$lib/components/icons/IconShare.svelte";
-	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 
 	let { data = $bindable(), children } = $props();
@@ -56,12 +54,6 @@
 			currentError = undefined;
 		}, 5000);
 	}
-
-	const canShare = $derived(
-		publicConfig.isHuggingChat &&
-			Boolean(page.params?.id) &&
-			page.route.id?.startsWith("/conversation/")
-	);
 
 	async function deleteConversation(id: string) {
 		client
@@ -250,17 +242,6 @@
 			? 'left-[290px]'
 			: 'left-0'} *:transition-transform"
 	/>
-
-	{#if canShare}
-		<button
-			type="button"
-			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex"
-			onclick={() => shareModal.open()}
-			aria-label="Share conversation"
-		>
-			<IconShare />
-		</button>
-	{/if}
 
 	<MobileNav title={mobileNavTitle}>
 		<NavMenu
