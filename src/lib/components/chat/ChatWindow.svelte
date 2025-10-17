@@ -27,7 +27,6 @@
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import { routerExamples } from "$lib/constants/routerExamples";
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
-	import { shareModal } from "$lib/stores/shareModal";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -204,13 +203,7 @@
 		)
 	);
 
-	const unsubscribeShareModal = shareModal.subscribe((value) => {
-		shareModalOpen = value;
-	});
-
 	onDestroy(() => {
-		unsubscribeShareModal();
-		shareModal.close();
 		if (routerDetailsTimeout) {
 			clearTimeout(routerDetailsTimeout);
 		}
@@ -339,7 +332,7 @@
 			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex {loading
 				? 'cursor-not-allowed opacity-50'
 				: ''}"
-			onclick={() => shareModal.open()}
+			onclick={() => (shareModalOpen = true)}
 			aria-label="Share conversation"
 			disabled={loading}
 		>
@@ -347,7 +340,7 @@
 		</button>
 	{/if}
 	{#if shareModalOpen}
-		<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
+		<ShareConversationModal open={shareModalOpen} onclose={() => (shareModalOpen = false)} />
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
