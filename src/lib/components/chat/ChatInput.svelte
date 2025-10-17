@@ -47,6 +47,7 @@
 
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
+	let blurTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
 	const waitForAnimationFrame = () =>
 		typeof requestAnimationFrame === "function"
@@ -120,6 +121,30 @@
 		}
 	}
 
+	function handleFocus() {
+		if (blurTimeout) {
+			clearTimeout(blurTimeout);
+			blurTimeout = null;
+		}
+		focused = true;
+	}
+
+	function handleBlur() {
+		if (!isVirtualKeyboard()) {
+			focused = false;
+			return;
+		}
+
+		if (blurTimeout) {
+			clearTimeout(blurTimeout);
+		}
+
+		blurTimeout = setTimeout(() => {
+			blurTimeout = null;
+			focused = false;
+		});
+	}
+
 	// Tools removed; only show file upload when applicable
 	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
 	let showNoTools = $derived(!showFileUpload);
@@ -146,8 +171,8 @@
 		}}
 		{placeholder}
 		{disabled}
-		onfocus={() => (focused = true)}
-		onblur={() => (focused = false)}
+		onfocus={handleFocus}
+		onblur={handleBlur}
 	></textarea>
 
 	{#if !showNoTools}
