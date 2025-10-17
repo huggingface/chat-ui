@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { getContext, onDestroy, tick } from "svelte";
+	import { onDestroy, tick } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";

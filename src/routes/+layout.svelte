@@ -169,7 +169,7 @@
 	);
 
 	// Show the welcome modal once on first app load
-	let showWelcome = $derived(!$settings.welcomeModalSeen && !(page.data.shared === true));
+	let showWelcome = $derived(!page.data.shared && !$settings.welcomeModalSeen);
 </script>
 
 <svelte:head>
@@ -216,7 +216,7 @@
 	{/if}
 </svelte:head>
 
-{#if showWelcome || (!data.user && data.loginEnabled)}
+{#if showWelcome}
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
