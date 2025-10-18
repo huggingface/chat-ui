@@ -23,12 +23,26 @@ export async function downloadFile(
 
 	const fileStream = collections.bucket.openDownloadStream(file._id);
 
-	const buffer = await new Promise<Buffer>((resolve, reject) => {
-		const chunks: Uint8Array[] = [];
-		fileStream.on("data", (chunk) => chunks.push(chunk));
-		fileStream.on("error", reject);
-		fileStream.on("end", () => resolve(Buffer.concat(chunks)));
-	});
+	try {
+		const buffer = await new Promise<Buffer>((resolve, reject) => {
+			const chunks: Uint8Array[] = [];
+			const onData = (chunk: Uint8Array) => chunks.push(chunk);
+			const onError = (err: unknown) => {
+				fileStream.removeListener("data", onData);
+				reject(err instanceof Error ? err : new Error("Failed to read file stream"));
+			};
+			const onEnd = () => {
+				fileStream.removeListener("data", onData);
+				resolve(Buffer.concat(chunks));
+			};
 
-	return { type: "base64", name, value: buffer.toString("base64"), mime };
+			fileStream.on("data", onData);
+			fileStream.once("error", onError);
+			fileStream.once("end", onEnd);
+		});
+
+		return { type: "base64", name, value: buffer.toString("base64"), mime };
+	} finally {
+		fileStream.destroy();
+	}
 }
