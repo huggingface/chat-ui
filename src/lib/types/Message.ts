@@ -23,6 +23,9 @@ export type Message = Partial<Timestamps> & {
 		provider?: string;
 	};
 
+	// Web search sources for citations
+	webSearchSources?: { title?: string; link: string }[];
+
 	// needed for conversation trees
 	ancestors?: Message["id"][];
 

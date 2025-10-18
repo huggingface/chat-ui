@@ -9,6 +9,7 @@ import {
 import { generate } from "./generate";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
+import { handleWebSearch, enhanceMessageWithWebSearch } from "./webSearchIntegration";
 
 async function* keepAlive(done: AbortSignal): AsyncGenerator<MessageUpdate, undefined, undefined> {
 	while (!done.aborted) {
@@ -46,7 +47,44 @@ async function* textGenerationWithoutTitle(
 
 	const preprompt = conv.preprompt;
 
+	// Handle web search if needed
+	let webSearchSources: { title?: string; link: string }[] = [];
+	const lastMessage = messages[messages.length - 1];
+	
+	if (lastMessage && lastMessage.from === 'user') {
+		// Create a mock update function for web search
+		const webSearchUpdate = async (event: MessageUpdate) => {
+			// This will be handled by the main update function in the conversation endpoint
+			// For now, we'll just collect the sources
+			if (event.type === MessageUpdateType.WebSearchSources) {
+				webSearchSources = event.sources;
+			}
+		};
+
+		// Process web search
+		const webSearchResult = await handleWebSearch(
+			await preprocessMessages(messages, convId),
+			webSearchUpdate
+		).next();
+		
+		if (webSearchResult.value?.sources) {
+			webSearchSources = webSearchResult.value.sources;
+		}
+	}
+
 	const processedMessages = await preprocessMessages(messages, convId);
+	
+	// Enhance the last message with web search context if we have results
+	if (webSearchSources.length > 0 && processedMessages.length > 0) {
+		const lastProcessedMessage = processedMessages[processedMessages.length - 1];
+		if (lastProcessedMessage.role === 'user') {
+			lastProcessedMessage.content = enhanceMessageWithWebSearch(
+				lastProcessedMessage.content,
+				webSearchSources
+			);
+		}
+	}
+
 	yield* generate({ ...ctx, messages: processedMessages }, preprompt);
 	done.abort();
 }
