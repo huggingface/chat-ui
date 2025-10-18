@@ -211,12 +211,8 @@
 	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
 	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
 
-	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig.PUBLIC_ORIGIN}
-		<script
-			defer
-			data-domain={new URL(publicConfig.PUBLIC_ORIGIN).hostname}
-			src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		></script>
+	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		<script async src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}></script>
 	{/if}
 
 	{#if publicConfig.PUBLIC_APPLE_APP_ID}
@@ -290,7 +286,7 @@
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		<script>
 			window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
-			plausible.init()
+			plausible.init();
 		</script>
 	{/if}
 </div>
