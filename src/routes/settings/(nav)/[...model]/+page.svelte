@@ -10,6 +10,8 @@
 	import CarbonCopy from "~icons/carbon/copy";
 	import CarbonChat from "~icons/carbon/chat";
 	import CarbonCode from "~icons/carbon/code";
+	import CarbonCheckmarkFilled from "~icons/carbon/checkmark-filled";
+	import CarbonCloseFilled from "~icons/carbon/close-filled";
 
 	import { goto } from "$app/navigation";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -35,8 +37,9 @@
 	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
 
 	// Initialize multimodal override for this model if not set yet
+	// Skip initialization for HuggingChat where multimodal is controlled by the endpoint
 	$effect(() => {
-		if (model) {
+		if (model && !publicConfig.isHuggingChat) {
 			// Default to the model's advertised capability
 			settings.initValue("multimodalOverrides", page.params.model, !!model.multimodal);
 		}
@@ -182,16 +185,28 @@
 				<div class="flex items-start justify-between py-3">
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Supports image inputs (multimodal)
+							Multimodal support (image inputs)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Enable image uploads and send images to this model.
+							{#if publicConfig.isHuggingChat}
+								This capability is determined by the model.
+							{:else}
+								Enable image uploads and send images to this model.
+							{/if}
 						</p>
 					</div>
-					<Switch
-						name="forceMultimodal"
-						bind:checked={$settings.multimodalOverrides[page.params.model]}
-					/>
+					{#if publicConfig.isHuggingChat}
+						{#if model.multimodal}
+							<CarbonCheckmarkFilled class="text-blue-600 dark:text-blue-500" />
+						{:else}
+							<CarbonCloseFilled class="text-gray-400 dark:text-gray-600" />
+						{/if}
+					{:else}
+						<Switch
+							name="forceMultimodal"
+							bind:checked={$settings.multimodalOverrides[page.params.model]}
+						/>
+					{/if}
 				</div>
 
 				{#if model?.isRouter}

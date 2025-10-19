@@ -453,11 +453,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					ip: getClientAddress(),
 					username: locals.user?.username,
 					// Force-enable multimodal if user settings say so for this model
-					forceMultimodal: Boolean(
-						(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
-							model.id
-						]
-					),
+					// In HuggingChat, ignore user overrides - multimodal is controlled by the endpoint
+					forceMultimodal: config.isHuggingChat
+						? false
+						: Boolean(
+								(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
+									model.id
+								]
+							),
 					locals,
 					abortController: ctrl,
 				};
