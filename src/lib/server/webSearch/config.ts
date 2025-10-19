@@ -28,64 +28,79 @@ export const defaultWebSearchConfig: WebSearchConfig = {
 			priority: 1,
 			rateLimit: {
 				requestsPerMinute: 10,
-				requestsPerDay: 100
+				requestsPerDay: 100,
 			},
 			apiKey: process.env.GOOGLE_SEARCH_API_KEY,
 			additionalConfig: {
-				searchEngineId: process.env.GOOGLE_SEARCH_ENGINE_ID
-			}
+				searchEngineId: process.env.GOOGLE_SEARCH_ENGINE_ID,
+			},
+		},
+		exa: {
+			name: "Exa MCP",
+			enabled: true,
+			priority: 2,
+			rateLimit: {
+				requestsPerMinute: 20,
+				requestsPerDay: 1000,
+			},
+			apiKey: process.env.EXA_API_KEY,
+			additionalConfig: {
+				mcpEndpoint: process.env.EXA_MCP_ENDPOINT || "https://mcp.exa.ai/mcp",
+			},
 		},
 		bing: {
 			name: "Bing Search API",
 			enabled: true,
-			priority: 2,
+			priority: 3,
 			rateLimit: {
 				requestsPerMinute: 15,
-				requestsPerDay: 1000
+				requestsPerDay: 1000,
 			},
-			apiKey: process.env.BING_SEARCH_API_KEY
+			apiKey: process.env.BING_SEARCH_API_KEY,
 		},
 		serpapi: {
 			name: "SerpAPI",
 			enabled: true,
-			priority: 3,
+			priority: 4,
 			rateLimit: {
 				requestsPerMinute: 20,
-				requestsPerDay: 100
+				requestsPerDay: 100,
 			},
-			apiKey: process.env.SERPAPI_API_KEY
+			apiKey: process.env.SERPAPI_API_KEY,
 		},
 		duckduckgo: {
 			name: "DuckDuckGo",
 			enabled: true,
-			priority: 4,
+			priority: 5,
 			rateLimit: {
 				requestsPerMinute: 30,
-				requestsPerDay: 1000
-			}
+				requestsPerDay: 1000,
+			},
 		},
 		brave: {
 			name: "Brave Search API",
 			enabled: true,
-			priority: 5,
+			priority: 6,
 			rateLimit: {
 				requestsPerMinute: 20,
-				requestsPerDay: 2000
+				requestsPerDay: 2000,
 			},
-			apiKey: process.env.BRAVE_SEARCH_API_KEY
-		}
+			apiKey: process.env.BRAVE_SEARCH_API_KEY,
+		},
 	},
 	fallbackToMock: true,
 	maxResults: 10,
 	timeout: 10000, // 10 seconds
 	cacheEnabled: true,
-	cacheTTL: 300 // 5 minutes
+	cacheTTL: 300, // 5 minutes
 };
 
 // Get enabled providers sorted by priority
-export function getEnabledProviders(config: WebSearchConfig = defaultWebSearchConfig): SearchProviderConfig[] {
+export function getEnabledProviders(
+	config: WebSearchConfig = defaultWebSearchConfig
+): SearchProviderConfig[] {
 	return Object.values(config.providers)
-		.filter(provider => provider.enabled && provider.apiKey)
+		.filter((provider) => provider.enabled && provider.apiKey)
 		.sort((a, b) => a.priority - b.priority);
 }
 
@@ -93,4 +108,3 @@ export function getEnabledProviders(config: WebSearchConfig = defaultWebSearchCo
 export function hasAvailableProviders(config: WebSearchConfig = defaultWebSearchConfig): boolean {
 	return getEnabledProviders(config).length > 0;
 }
-

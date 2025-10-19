@@ -7,9 +7,10 @@ A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat 
 0. [Quickstart](#quickstart)
 1. [Database Options](#database-options)
 2. [Launch](#launch)
-3. [Optional Docker Image](#optional-docker-image)
-4. [Extra parameters](#extra-parameters)
-5. [Building](#building)
+3. [Web Search](#web-search)
+4. [Optional Docker Image](#optional-docker-image)
+5. [Extra parameters](#extra-parameters)
+6. [Building](#building)
 
 > [!NOTE]
 > Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc. will work by default).
@@ -87,6 +88,76 @@ npm run dev
 ```
 
 The dev server listens on `http://localhost:5173` by default. Use `npm run build` / `npm run preview` for production builds.
+
+## Web Search
+
+Chat UI includes a powerful web search feature with support for **7 search providers** including **Exa MCP (Model Context Protocol)** integration via Smithery.
+
+### Quick Setup
+
+Add at least one search provider API key to your `.env.local`:
+
+```env
+# Exa MCP (AI-Powered Neural Search - Recommended!)
+EXA_API_KEY=your_exa_api_key
+
+# Google Custom Search (Also Recommended)
+GOOGLE_SEARCH_API_KEY=your_google_api_key
+GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id
+
+# Other providers (optional)
+BING_SEARCH_API_KEY=your_bing_key
+SERPAPI_API_KEY=your_serpapi_key
+BRAVE_SEARCH_API_KEY=your_brave_key
+YOUCOM_API_KEY=your_youcom_key
+# DuckDuckGo is free and enabled by default
+```
+
+### Supported Providers
+
+1. **Google Custom Search** - Most reliable, good results
+2. **Exa MCP (Smithery)** - 🆕 AI-powered neural search with MCP support
+3. **Bing Search API** - Microsoft's search
+4. **SerpAPI** - Easy setup, good for development
+5. **DuckDuckGo** - Free, no API key required
+6. **Brave Search** - Privacy-focused
+7. **You.com** - AI-powered search
+
+### Features
+
+- ✅ **Intelligent Fallback**: Automatically tries providers in priority order
+- ✅ **Rate Limiting**: Per-minute and daily limits for each provider
+- ✅ **Analytics**: Real-time monitoring and health reports
+- ✅ **MCP Integration**: Full Model Context Protocol support via Exa
+- ✅ **Customizable Patterns**: 12+ detection patterns
+- ✅ **Mock Data**: Works even without API keys for testing
+
+### Usage
+
+Simply include web search triggers in your messages:
+
+```
+🌐 using web search what is quantum computing?
+web search latest AI news
+search the web for blockchain information
+```
+
+### Documentation
+
+- 📘 **[WEB_SEARCH_SETUP.md](./WEB_SEARCH_SETUP.md)** - Complete setup guide for all providers
+- 📗 **[WEB_SEARCH_COMPLETE.md](./WEB_SEARCH_COMPLETE.md)** - Implementation details and features
+- 🆕 **[WEB_SEARCH_MCP_EXA.md](./WEB_SEARCH_MCP_EXA.md)** - Exa MCP integration guide
+
+### Exa MCP (New!)
+
+Exa MCP provides AI-powered neural search with:
+
+- 🧠 **Neural Search**: AI understanding of query intent and context
+- 🎯 **High-Quality Results**: Fresh, relevant content from trusted sources
+- 💻 **Code Context**: Specialized search for programming queries
+- 🔌 **MCP Support**: Full Model Context Protocol integration
+
+Get your Exa API key from [exa.ai](https://exa.ai) or [Smithery](https://smithery.ai/server/exa).
 
 ## Optional Docker Image
 
