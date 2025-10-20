@@ -233,14 +233,6 @@
 	/>
 {/if}
 
-{#if $loading}
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/10 text-red-600 dark:bg-black/30"
-	>
-		LOADING
-	</div>
-{/if}
-
 <BackgroundGenerationPoller />
 
 <div
@@ -296,7 +288,16 @@
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		<script>
-			window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+			(window.plausible =
+				window.plausible ||
+				function () {
+					(plausible.q = plausible.q || []).push(arguments);
+				}),
+				(plausible.init =
+					plausible.init ||
+					function (i) {
+						plausible.o = i || {};
+					});
 			plausible.init();
 		</script>
 	{/if}
