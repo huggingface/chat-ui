@@ -12,18 +12,18 @@
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { findCurrentModel } from "$lib/utils/models";
 	import { onMount } from "svelte";
+	import { loading } from "$lib/stores/loading.js";
 
 	let { data } = $props();
 
 	let hasModels = $derived(Boolean(data.models?.length));
-	let loading = $state(false);
 	let files: File[] = $state([]);
 
 	const settings = useSettingsStore();
 
 	async function createConversation(message: string) {
 		try {
-			loading = true;
+			$loading = true;
 
 			// check if $settings.activeModel is a valid model
 			// else check if it's an assistant, and use that model
@@ -69,7 +69,7 @@
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
 		} finally {
-			loading = false;
+			$loading = false;
 		}
 	}
 
@@ -89,7 +89,7 @@
 {#if hasModels}
 	<ChatWindow
 		onmessage={(message) => createConversation(message)}
-		{loading}
+		loading={$loading}
 		{currentModel}
 		models={data.models}
 		bind:files

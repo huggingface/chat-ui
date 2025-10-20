@@ -21,6 +21,9 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
+	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import { shareModal } from "$lib/stores/shareModal";
+	import { loading } from "$lib/stores/loading";
 
 	let { data = $bindable(), children } = $props();
 
@@ -54,6 +57,12 @@
 			currentError = undefined;
 		}, 5000);
 	}
+
+	const canShare = $derived(
+		publicConfig.isHuggingChat &&
+			Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/")
+	);
 
 	async function deleteConversation(id: string) {
 		client
@@ -224,6 +233,14 @@
 	/>
 {/if}
 
+{#if $loading}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/10 text-red-600 dark:bg-black/30"
+	>
+		LOADING
+	</div>
+{/if}
+
 <BackgroundGenerationPoller />
 
 <div
@@ -238,6 +255,19 @@
 			? 'left-[290px]'
 			: 'left-0'} *:transition-transform"
 	/>
+
+	{#if canShare}
+		<button
+			type="button"
+			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex
+				{$loading ? 'cursor-not-allowed opacity-50' : ''}"
+			onclick={() => shareModal.open()}
+			aria-label="Share conversation"
+			disabled={$loading}
+		>
+			<IconShare />
+		</button>
+	{/if}
 
 	<MobileNav title={mobileNavTitle}>
 		<NavMenu
