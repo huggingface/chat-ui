@@ -165,7 +165,7 @@
 					: 'right-1'} flex max-w-[calc(100dvw-40px)] items-center gap-0.5"
 				bind:offsetWidth={messageInfoWidth}
 			>
-				{#if messageInfoWidth && message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
+				{#if message.routerMetadata && (message.routerMetadata.route || message.routerMetadata.model || message.routerMetadata.provider) && (!isLast || !loading)}
 					<div
 						class="mr-2 flex items-center gap-1.5 truncate whitespace-nowrap text-[.65rem] text-gray-400 dark:text-gray-400 sm:text-xs"
 					>
