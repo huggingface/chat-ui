@@ -26,10 +26,10 @@
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
-	import { loading } from "$lib/stores/loading.js";
 
 	let { data = $bindable() } = $props();
 
+	let loading = $state(false);
 	let pending = $state(false);
 	let initialRun = true;
 	let showSubscribeModal = $state(false);
@@ -96,7 +96,7 @@
 
 	async function convFromShared() {
 		try {
-			$loading = true;
+			loading = true;
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {
@@ -135,7 +135,7 @@
 	}): Promise<void> {
 		try {
 			$isAborted = false;
-			$loading = true;
+			loading = true;
 			pending = true;
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
@@ -335,7 +335,7 @@
 			}
 			console.error(err);
 		} finally {
-			$loading = false;
+			loading = false;
 			pending = false;
 			await invalidateAll();
 		}
@@ -348,11 +348,11 @@
 			if (r.ok) {
 				setTimeout(() => {
 					$isAborted = true;
-					$loading = false;
+					loading = false;
 				}, 500);
 			} else {
 				$isAborted = true;
-				$loading = false;
+				loading = false;
 			}
 		});
 	}
@@ -375,7 +375,7 @@
 		const streaming = isConversationStreaming(messages);
 		if (streaming) {
 			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
-			$loading = true;
+			loading = true;
 		}
 	});
 
@@ -388,7 +388,7 @@
 					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
 				})
 				.then(async () => await writeMessage({ prompt: content }))
-				.finally(() => ($loading = false));
+				.finally(() => (loading = false));
 		}
 	}
 
@@ -415,7 +415,7 @@
 							isRetry: true,
 						})
 				)
-				.finally(() => ($loading = false));
+				.finally(() => (loading = false));
 		}
 	}
 
@@ -447,9 +447,9 @@
 	$effect(() => {
 		const streaming = isConversationStreaming(messages);
 		if (streaming) {
-			$loading = true;
+			loading = true;
 		} else if (!pending) {
-			$loading = false;
+			loading = false;
 		}
 
 		if (!streaming && browser) {
@@ -478,7 +478,7 @@
 		}
 
 		$isAborted = true;
-		$loading = false;
+		loading = false;
 	});
 
 	let title = $derived.by(() => {
@@ -494,7 +494,7 @@
 </svelte:head>
 
 <ChatWindow
-	loading={$loading}
+	{loading}
 	{pending}
 	messages={messagesPath as Message[]}
 	{messagesAlternatives}

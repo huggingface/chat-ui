@@ -20,10 +20,9 @@
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
-	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
-	import { loading } from "$lib/stores/loading";
+	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 
 	let { data = $bindable(), children } = $props();
 
@@ -99,7 +98,7 @@
 	function closeWelcomeModal() {
 		settings.set({ welcomeModalSeen: true });
 
-		if (page.data.loginRequired && !data.user) {
+		if (!data.user && data.loginEnabled) {
 			goto(`${base}/login`, { invalidateAll: true });
 		}
 	}
@@ -178,7 +177,7 @@
 	);
 
 	// Show the welcome modal once on first app load
-	let showWelcome = $derived(!page.data.shared && !$settings.welcomeModalSeen);
+	let showWelcome = $derived(!$settings.welcomeModalSeen && !(page.data.shared === true));
 </script>
 
 <svelte:head>
@@ -197,18 +196,22 @@
 		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
 	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
-	<link
-		rel="icon"
-		href="{publicConfig.assetPath}/favicon.svg"
-		type="image/svg+xml"
-		media="(prefers-color-scheme: light)"
-	/>
-	<link
-		rel="icon"
-		href="{publicConfig.assetPath}/favicon-dark.svg"
-		type="image/svg+xml"
-		media="(prefers-color-scheme: dark)"
-	/>
+	{#if publicConfig.PUBLIC_ORIGIN}
+		<link
+			rel="icon"
+			href="{publicConfig.assetPath}/favicon.svg"
+			type="image/svg+xml"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			rel="icon"
+			href="{publicConfig.assetPath}/favicon-dark.svg"
+			type="image/svg+xml"
+			media="(prefers-color-scheme: dark)"
+		/>
+	{:else}
+		<link rel="icon" href="{publicConfig.assetPath}/favicon-dev.svg" type="image/svg+xml" />
+	{/if}
 	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
 	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
 
@@ -221,7 +224,7 @@
 	{/if}
 </svelte:head>
 
-{#if showWelcome}
+{#if showWelcome || (!data.user && data.loginEnabled)}
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
@@ -251,11 +254,9 @@
 	{#if canShare}
 		<button
 			type="button"
-			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex
-				{$loading ? 'cursor-not-allowed opacity-50' : ''}"
+			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex"
 			onclick={() => shareModal.open()}
 			aria-label="Share conversation"
-			disabled={$loading}
 		>
 			<IconShare />
 		</button>
@@ -288,16 +289,7 @@
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		<script>
-			(window.plausible =
-				window.plausible ||
-				function () {
-					(plausible.q = plausible.q || []).push(arguments);
-				}),
-				(plausible.init =
-					plausible.init ||
-					function (i) {
-						plausible.o = i || {};
-					});
+			window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
 			plausible.init();
 		</script>
 	{/if}
