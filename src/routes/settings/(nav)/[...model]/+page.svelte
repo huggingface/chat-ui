@@ -182,7 +182,7 @@
 				<div class="flex items-start justify-between py-3">
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Supports image inputs (multimodal)
+							Multimodal support (image inputs)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
 							Enable image uploads and send images to this model.
