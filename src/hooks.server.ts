@@ -18,6 +18,7 @@ import { initExitHandler } from "$lib/server/exitHandler";
 import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
 import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
+import { MetricsServer } from "$lib/server/metrics";
 
 export const init: ServerInit = async () => {
 	// Wait for config to be fully loaded
@@ -40,6 +41,10 @@ export const init: ServerInit = async () => {
 
 		logger.info("Starting server...");
 		initExitHandler();
+
+		if (config.METRICS_ENABLED === "true") {
+			MetricsServer.getInstance();
+		}
 
 		checkAndRunMigrations();
 		refreshConversationStats();

@@ -58,7 +58,7 @@ envVars:
   COOKIE_SAMESITE: "lax"
   COOKIE_SECURE: "true"
   EXPOSE_API: "true"
-  METRICS_PORT: "5565"
+  METRICS_ENABLED: "true"
   LOG_LEVEL: "debug"
 
   OPENAI_BASE_URL: "https://router.huggingface.co/v1"
