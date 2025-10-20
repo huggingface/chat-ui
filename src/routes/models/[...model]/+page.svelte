@@ -10,11 +10,13 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 
 	let { data } = $props();
 
 	let loading = $state(false);
 	let files: File[] = $state([]);
+	let draft = $state("");
 
 	const settings = useSettingsStore();
 	const modelId = page.params.model;
@@ -59,9 +61,27 @@
 		}
 	}
 
-	onMount(async () => {
-		const query = page.url.searchParams.get("q");
-		if (query) createConversation(query);
+	onMount(() => {
+		try {
+			const query = sanitizeUrlParam(page.url.searchParams.get("q"));
+			if (query) {
+				void createConversation(query);
+				const url = new URL(page.url);
+				url.searchParams.delete("q");
+				history.replaceState({}, "", url);
+				return;
+			}
+
+			const promptQuery = sanitizeUrlParam(page.url.searchParams.get("prompt"));
+			if (promptQuery && !draft) {
+				draft = promptQuery;
+				const url = new URL(page.url);
+				url.searchParams.delete("prompt");
+				history.replaceState({}, "", url);
+			}
+		} catch (err) {
+			console.error("Failed to process URL parameters:", err);
+		}
 
 		settings.instantSet({ activeModel: modelId });
 	});
@@ -85,4 +105,5 @@
 	currentModel={findCurrentModel(data.models, data.oldModels, modelId)}
 	models={data.models}
 	bind:files
+	bind:draft
 />

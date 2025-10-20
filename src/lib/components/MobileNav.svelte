@@ -16,6 +16,7 @@
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import { Spring } from "svelte/motion";
 	import { shareModal } from "$lib/stores/shareModal";
+	import { loading } from "$lib/stores/loading";
 	interface Props {
 		title: string | undefined;
 		children?: import("svelte").Snippet;
@@ -28,7 +29,10 @@
 
 	const isHuggingChat = $derived(Boolean(page.data?.publicConfig?.isHuggingChat));
 	const canShare = $derived(
-		isHuggingChat && Boolean(page.params?.id) && page.route.id?.startsWith("/conversation/")
+		!$loading &&
+			isHuggingChat &&
+			Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/")
 	);
 
 	// Define the width for the drawer (less than 100% to create the gap)

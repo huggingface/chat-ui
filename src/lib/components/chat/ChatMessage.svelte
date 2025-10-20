@@ -17,6 +17,8 @@
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 
 	interface Props {
 		message: Message;
@@ -62,6 +64,14 @@
 		if (e.key === "Escape") {
 			editMsdgId = null;
 		}
+	}
+
+	function handleRetry() {
+		if (page.data.loginRequired && !page.data.user) {
+			goto(`${base}/login`, { invalidateAll: true });
+			return;
+		}
+		onretry?.({ id: message.id });
 	}
 
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
@@ -218,9 +228,7 @@
 						class="btn rounded-sm p-1 text-xs text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
 						title="Retry"
 						type="button"
-						onclick={() => {
-							onretry?.({ id: message.id });
-						}}
+						onclick={handleRetry}
 					>
 						<CarbonRotate360 />
 					</button>

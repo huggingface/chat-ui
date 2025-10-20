@@ -7,23 +7,26 @@
 	const publicConfig = usePublicConfig();
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { useSettingsStore } from "$lib/stores/settings.js";
 	import { findCurrentModel } from "$lib/utils/models";
+	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 	import { onMount } from "svelte";
+	import { loading } from "$lib/stores/loading.js";
 
 	let { data } = $props();
 
 	let hasModels = $derived(Boolean(data.models?.length));
-	let loading = $state(false);
 	let files: File[] = $state([]);
+	let draft = $state("");
 
 	const settings = useSettingsStore();
 
 	async function createConversation(message: string) {
 		try {
-			loading = true;
+			$loading = true;
 
 			// check if $settings.activeModel is a valid model
 			// else check if it's an assistant, and use that model
@@ -69,14 +72,31 @@
 			error.set((err as Error).message || ERROR_MESSAGES.default);
 			console.error(err);
 		} finally {
-			loading = false;
+			$loading = false;
 		}
 	}
 
 	onMount(() => {
-		// check if there's a ?q query param with a message
-		const query = page.url.searchParams.get("q");
-		if (query) createConversation(query);
+		try {
+			const query = sanitizeUrlParam(page.url.searchParams.get("q"));
+			if (query) {
+				void createConversation(query);
+				const url = new URL(page.url);
+				url.searchParams.delete("q");
+				history.replaceState({}, "", url);
+				return;
+			}
+
+			const promptQuery = sanitizeUrlParam(page.url.searchParams.get("prompt"));
+			if (promptQuery && !draft) {
+				draft = promptQuery;
+				const url = new URL(page.url);
+				url.searchParams.delete("prompt");
+				history.replaceState({}, "", url);
+			}
+		} catch (err) {
+			console.error("Failed to process URL parameters:", err);
+		}
 	});
 
 	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
@@ -89,10 +109,11 @@
 {#if hasModels}
 	<ChatWindow
 		onmessage={(message) => createConversation(message)}
-		{loading}
+		loading={$loading}
 		{currentModel}
 		models={data.models}
 		bind:files
+		bind:draft
 	/>
 {:else}
 	<div class="mx-auto my-20 max-w-xl rounded-xl border p-6 text-center dark:border-gray-700">
