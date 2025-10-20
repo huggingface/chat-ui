@@ -246,12 +246,27 @@ async function prepareMessages(
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	return Promise.all(
 		messages.map(async (message) => {
-			if (message.from === "user" && isMultimodal) {
-				const imageParts = await prepareFiles(imageProcessor, message.files ?? []);
-				if (imageParts.length) {
-					const parts = [{ type: "text" as const, text: message.content }, ...imageParts];
+			if (message.from === "user" && message.files && message.files.length > 0) {
+				const { imageParts, textContent } = await prepareFiles(
+					imageProcessor,
+					message.files,
+					isMultimodal
+				);
+
+				// If we have text files, prepend their content to the message
+				let messageText = message.content;
+				if (textContent.length > 0) {
+					messageText = textContent + "\n\n" + message.content;
+				}
+
+				// If we have images and multimodal is enabled, use structured content
+				if (imageParts.length > 0 && isMultimodal) {
+					const parts = [{ type: "text" as const, text: messageText }, ...imageParts];
 					return { role: message.from, content: parts };
 				}
+
+				// Otherwise just use the text (possibly with injected file content)
+				return { role: message.from, content: messageText };
 			}
 			return { role: message.from, content: message.content };
 		})
@@ -260,18 +275,48 @@ async function prepareMessages(
 
 async function prepareFiles(
 	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	files: MessageFile[]
-): Promise<OpenAI.Chat.Completions.ChatCompletionContentPartImage[]> {
-	const processedFiles = await Promise.all(
-		files.filter((file) => file.mime.startsWith("image/")).map(imageProcessor)
+	files: MessageFile[],
+	isMultimodal: boolean
+): Promise<{
+	imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[];
+	textContent: string;
+}> {
+	// Separate image and text files
+	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
+	const textFiles = files.filter(
+		(file) =>
+			file.mime.startsWith("text/") ||
+			file.mime === "application/json" ||
+			file.mime === "application/xml" ||
+			file.mime === "application/csv"
 	);
-	return processedFiles.map((file) => ({
-		type: "image_url" as const,
-		image_url: {
-			url: `data:${file.mime};base64,${file.image.toString("base64")}`,
-			// Improves compatibility with some OpenAI-compatible servers
-			// that expect an explicit detail setting.
-			detail: "auto",
-		},
-	}));
+
+	// Process images if multimodal is enabled
+	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
+	if (isMultimodal && imageFiles.length > 0) {
+		const processedFiles = await Promise.all(imageFiles.map(imageProcessor));
+		imageParts = processedFiles.map((file) => ({
+			type: "image_url" as const,
+			image_url: {
+				url: `data:${file.mime};base64,${file.image.toString("base64")}`,
+				// Improves compatibility with some OpenAI-compatible servers
+				// that expect an explicit detail setting.
+				detail: "auto",
+			},
+		}));
+	}
+
+	// Process text files - inject their content
+	let textContent = "";
+	if (textFiles.length > 0) {
+		const textParts = await Promise.all(
+			textFiles.map(async (file) => {
+				const content = Buffer.from(file.value, "base64").toString("utf-8");
+				return `<document name="${file.name}" type="${file.mime}">\n${content}\n</document>`;
+			})
+		);
+		textContent = textParts.join("\n\n");
+	}
+
+	return { imageParts, textContent };
 }
