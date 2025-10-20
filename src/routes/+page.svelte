@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
+	import { goto, replaceState } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -7,12 +7,12 @@
 	const publicConfig = usePublicConfig();
 
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
-import { ERROR_MESSAGES, error } from "$lib/stores/errors";
-import { pendingMessage } from "$lib/stores/pendingMessage";
-import { useSettingsStore } from "$lib/stores/settings.js";
-import { findCurrentModel } from "$lib/utils/models";
-import { sanitizeUrlParam } from "$lib/utils/urlParams";
-import { onMount } from "svelte";
+	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+	import { pendingMessage } from "$lib/stores/pendingMessage";
+	import { useSettingsStore } from "$lib/stores/settings.js";
+	import { findCurrentModel } from "$lib/utils/models";
+	import { sanitizeUrlParam } from "$lib/utils/urlParams";
+	import { onMount, tick } from "svelte";
 
 	let { data } = $props();
 
@@ -82,7 +82,9 @@ import { onMount } from "svelte";
 				void createConversation(query);
 				const url = new URL(page.url);
 				url.searchParams.delete("q");
-				history.replaceState({}, "", url);
+				tick().then(() => {
+					replaceState(url, page.state);
+				});
 				return;
 			}
 
@@ -91,7 +93,9 @@ import { onMount } from "svelte";
 				draft = promptQuery;
 				const url = new URL(page.url);
 				url.searchParams.delete("prompt");
-				history.replaceState({}, "", url);
+				tick().then(() => {
+					replaceState(url, page.state);
+				});
 			}
 		} catch (err) {
 			console.error("Failed to process URL parameters:", err);
