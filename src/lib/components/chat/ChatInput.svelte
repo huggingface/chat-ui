@@ -46,7 +46,7 @@
 		files = [...files, ...(target.files ?? [])];
 	};
 
-	const isLoggedIn = $derived(!page.data.loginRequired && page.data.user);
+	const requireLogin = $derived(page.data.loginRequired && !page.data.user);
 
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
@@ -60,7 +60,7 @@
 			: Promise.resolve();
 
 	async function focusTextarea() {
-		if (!isLoggedIn) return;
+		if (requireLogin) return;
 		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
 		if (typeof document !== "undefined" && document.activeElement === textareaElement) return;
 
@@ -122,7 +122,7 @@
 	}
 
 	function handleFocus() {
-		if (!isLoggedIn) {
+		if (requireLogin) {
 			goto(`${base}/login`, { invalidateAll: true });
 			return;
 		}

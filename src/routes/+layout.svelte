@@ -99,7 +99,7 @@
 	function closeWelcomeModal() {
 		settings.set({ welcomeModalSeen: true });
 
-		if (!data.user && data.loginEnabled) {
+		if (page.data.loginRequired && !data.user) {
 			goto(`${base}/login`, { invalidateAll: true });
 		}
 	}
