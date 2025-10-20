@@ -11,7 +11,6 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { sanitizeUrlParam } from "$lib/utils/urlParams";
-	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 
 	let { data } = $props();
 
@@ -62,27 +61,8 @@
 		}
 	}
 
-	onMount(async () => {
+	onMount(() => {
 		try {
-			// Handle attachments parameter first
-			if (page.url.searchParams.has("attachments")) {
-				const result = await loadAttachmentsFromUrls(page.url.searchParams);
-				files = result.files;
-
-				// Show errors if any
-				if (result.errors.length > 0) {
-					console.error("Failed to load some attachments:", result.errors);
-					error.set(
-						`Failed to load ${result.errors.length} attachment(s). Check console for details.`
-					);
-				}
-
-				// Clean up URL
-				const url = new URL(page.url);
-				url.searchParams.delete("attachments");
-				history.replaceState({}, "", url);
-			}
-
 			const query = sanitizeUrlParam(page.url.searchParams.get("q"));
 			if (query) {
 				void createConversation(query);
