@@ -1,50 +1,91 @@
 <!doctype html>
 <html lang="en" class="h-full">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="theme-color" content="rgb(249, 250, 251)" />
-		<script>
-			(function () {
-				try {
-					var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-					var stored = localStorage.getItem("theme");
-					var followSystem = stored === null || stored === "system";
-					var isDark = stored === "dark" || (followSystem && prefersDark);
-					if (isDark) {
-						document.documentElement.classList.add("dark");
-						document.querySelector('meta[name="theme-color"]').setAttribute("content", "#07090d");
-					}
-				} catch (e) {}
-			})();
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="rgb(249, 250, 251)" />
+    <script>
+        // Handle dark mode
+        (function () {
+            try {
+                var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                var stored = localStorage.getItem("theme");
+                var followSystem = stored === null || stored === "system";
+                var isDark = stored === "dark" || (followSystem && prefersDark);
+                if (isDark) {
+                    document.documentElement.classList.add("dark");
+                    document.querySelector('meta[name="theme-color"]').setAttribute("content", "#07090d");
+                }
+            } catch (e) {}
+        })();
 
-			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
-			window.gaId = "%gaId%";
-		</script>
-		%sveltekit.head%
-	</head>
-	<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">
-		<div id="app" class="contents h-full">%sveltekit.body%</div>
+        // For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
+        window.gaId = "%gaId%";
+    </script>
+    %sveltekit.head%
+</head>
+<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">
+    <div id="app" class="contents h-full">%sveltekit.body%</div>
 
-		<!-- Google Tag Manager -->
-		<script>
-			if (window.gaId) {
-				const script = document.createElement("script");
-				script.src = "https://www.googletagmanager.com/gtag/js?id=" + window.gaId;
-				script.async = true;
-				document.head.appendChild(script);
+    <!-- Google Tag Manager -->
+    <script>
+        if (window.gaId) {
+            const script = document.createElement("script");
+            script.src = "https://www.googletagmanager.com/gtag/js?id=" + window.gaId;
+            script.async = true;
+            document.head.appendChild(script);
 
-				window.dataLayer = window.dataLayer || [];
-				function gtag() {
-					dataLayer.push(arguments);
-				}
-				gtag("js", new Date());
-				/// ^ See https://developers.google.com/tag-platform/gtagjs/install
-				gtag("config", window.gaId);
-				gtag("consent", "default", { ad_storage: "denied", analytics_storage: "denied" });
-				/// ^ See https://developers.google.com/tag-platform/gtagjs/reference#consent
-				/// TODO: ask the user for their consent and update this with gtag('consent', 'update')
-			}
-		</script>
-	</body>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag("js", new Date());
+            gtag("config", window.gaId);
+
+            // Default deny analytics until user consent
+            gtag("consent", "default", { ad_storage: "denied", analytics_storage: "denied" });
+
+            // Check if consent was already given
+            const savedConsent = localStorage.getItem('gaConsent');
+            if (savedConsent === 'granted') {
+                gtag('consent', 'update', { ad_storage: 'granted', analytics_storage: 'granted' });
+            } else if (savedConsent === 'denied') {
+                gtag('consent', 'update', { ad_storage: 'denied', analytics_storage: 'denied' });
+            }
+        }
+    </script>
+
+    <!-- Consent Banner -->
+    <div id="consent-banner" style="position:fixed; bottom:0; left:0; width:100%; background:#f9fafb; padding:1rem; display:flex; justify-content:space-between; align-items:center; box-shadow:0 -2px 5px rgba(0,0,0,0.1); z-index:999;">
+        <span>We use cookies for analytics. Do you consent to analytics tracking?</span>
+        <div>
+            <button id="consent-yes" style="margin-right:0.5rem; padding:0.5rem 1rem;">Yes</button>
+            <button id="consent-no" style="padding:0.5rem 1rem;">No</button>
+        </div>
+    </div>
+
+    <script>
+        const consentBanner = document.getElementById('consent-banner');
+        if (consentBanner && window.gaId) {
+            const yesBtn = document.getElementById('consent-yes');
+            const noBtn = document.getElementById('consent-no');
+
+            // Hide banner if consent already saved
+            const savedConsent = localStorage.getItem('gaConsent');
+            if (savedConsent) {
+                consentBanner.style.display = 'none';
+            }
+
+            yesBtn.addEventListener('click', () => {
+                gtag('consent', 'update', { ad_storage: 'granted', analytics_storage: 'granted' });
+                localStorage.setItem('gaConsent', 'granted');
+                consentBanner.style.display = 'none';
+            });
+
+            noBtn.addEventListener('click', () => {
+                gtag('consent', 'update', { ad_storage: 'denied', analytics_storage: 'denied' });
+                localStorage.setItem('gaConsent', 'denied');
+                consentBanner.style.display = 'none';
+            });
+        }
+    </script>
+</body>
 </html>
