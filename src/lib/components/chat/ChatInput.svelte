@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from "svelte";
 
-	import { afterNavigate } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
@@ -9,6 +9,7 @@
 	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+	import { base } from "$app/paths";
 	interface Props {
 		files?: File[];
 		mimeTypes?: string[];
@@ -45,6 +46,8 @@
 		files = [...files, ...(target.files ?? [])];
 	};
 
+	const requireLogin = $derived(page.data.loginRequired && !page.data.user);
+
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
 	let blurTimeout: ReturnType<typeof setTimeout> | null = $state(null);
@@ -57,6 +60,7 @@
 			: Promise.resolve();
 
 	async function focusTextarea() {
+		if (requireLogin) return;
 		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
 		if (typeof document !== "undefined" && document.activeElement === textareaElement) return;
 
@@ -118,6 +122,10 @@
 	}
 
 	function handleFocus() {
+		if (requireLogin) {
+			goto(`${base}/login`, { invalidateAll: true });
+			return;
+		}
 		if (blurTimeout) {
 			clearTimeout(blurTimeout);
 			blurTimeout = null;

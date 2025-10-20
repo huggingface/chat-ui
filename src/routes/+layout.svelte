@@ -20,9 +20,10 @@
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
+	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
-	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
+	import { loading } from "$lib/stores/loading";
 
 	let { data = $bindable(), children } = $props();
 
@@ -98,7 +99,7 @@
 	function closeWelcomeModal() {
 		settings.set({ welcomeModalSeen: true });
 
-		if (!data.user && data.loginEnabled) {
+		if (page.data.loginRequired && !data.user) {
 			goto(`${base}/login`, { invalidateAll: true });
 		}
 	}
@@ -177,7 +178,7 @@
 	);
 
 	// Show the welcome modal once on first app load
-	let showWelcome = $derived(!$settings.welcomeModalSeen && !(page.data.shared === true));
+	let showWelcome = $derived(!page.data.shared && !$settings.welcomeModalSeen);
 </script>
 
 <svelte:head>
@@ -220,7 +221,7 @@
 	{/if}
 </svelte:head>
 
-{#if showWelcome || (!data.user && data.loginEnabled)}
+{#if showWelcome}
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
@@ -250,9 +251,11 @@
 	{#if canShare}
 		<button
 			type="button"
-			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex"
+			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex
+				{$loading ? 'cursor-not-allowed opacity-50' : ''}"
 			onclick={() => shareModal.open()}
 			aria-label="Share conversation"
+			disabled={$loading}
 		>
 			<IconShare />
 		</button>
@@ -285,7 +288,16 @@
 
 	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
 		<script>
-			window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+			(window.plausible =
+				window.plausible ||
+				function () {
+					(plausible.q = plausible.q || []).push(arguments);
+				}),
+				(plausible.init =
+					plausible.init ||
+					function (i) {
+						plausible.o = i || {};
+					});
 			plausible.init();
 		</script>
 	{/if}
