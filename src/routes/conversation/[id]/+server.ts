@@ -1,5 +1,4 @@
-import { config } from "$lib/server/config";
-import { authCondition, requiresUser } from "$lib/server/auth";
+import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
@@ -79,30 +78,6 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
-	const messagesBeforeLogin = config.MESSAGES_BEFORE_LOGIN
-		? parseInt(config.MESSAGES_BEFORE_LOGIN)
-		: 0;
-
-	// guest mode check
-	if (!locals.user?._id && requiresUser && messagesBeforeLogin) {
-		const totalMessages =
-			(
-				await collections.conversations
-					.aggregate([
-						{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
-						{ $project: { messages: 1 } },
-						{ $limit: messagesBeforeLogin + 1 },
-						{ $unwind: "$messages" },
-						{ $match: { "messages.from": "assistant" } },
-						{ $count: "messages" },
-					])
-					.toArray()
-			)[0]?.messages ?? 0;
-
-		if (totalMessages > messagesBeforeLogin) {
-			error(429, "Exceeded number of messages before login");
-		}
-	}
 	if (usageLimits?.messagesPerMinute) {
 		// check if the user is rate limited
 		const nEvents = Math.max(
@@ -355,10 +330,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						metrics.model.tokenCountTotal.inc(metricsLabels);
 
 						if (!firstTokenObserved) {
-							metrics.model.timeToFirstToken.observe(
-								metricsLabels,
-								now - promptedAt.getTime()
-							);
+							metrics.model.timeToFirstToken.observe(metricsLabels, now - promptedAt.getTime());
 							firstTokenObserved = true;
 						}
 

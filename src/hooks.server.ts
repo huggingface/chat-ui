@@ -4,8 +4,8 @@ import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
 import {
 	authenticateRequest,
+	loginEnabled,
 	refreshSessionCookie,
-	requiresUser,
 	triggerOauthFlow,
 } from "$lib/server/auth";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
@@ -141,7 +141,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (
 		!auth.user &&
 		config.AUTOMATIC_LOGIN === "true" &&
-		!event.url.pathname.startsWith(`${base}/`) &&
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/healthcheck`)
 	) {
@@ -199,20 +198,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (
+		loginEnabled &&
+		!event.locals.user &&
 		!event.url.pathname.startsWith(`${base}/login`) &&
 		!event.url.pathname.startsWith(`${base}/admin`) &&
 		!event.url.pathname.startsWith(`${base}/settings`) &&
 		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
 	) {
-		if (
-			!event.locals.user &&
-			requiresUser &&
-			!((config.MESSAGES_BEFORE_LOGIN ? parseInt(config.MESSAGES_BEFORE_LOGIN) : 0) > 0)
-		) {
-			return errorResponse(401, ERROR_MESSAGES.authOnly);
-		}
-
-		// Ethics disclaimer gating removed
+		return errorResponse(401, ERROR_MESSAGES.authOnly);
 	}
 
 	let replaced = false;
