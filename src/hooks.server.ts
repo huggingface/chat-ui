@@ -139,6 +139,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.sessionId = auth.sessionId;
 
 	if (
+		loginEnabled &&
 		!auth.user &&
 		config.AUTOMATIC_LOGIN === "true" &&
 		!event.url.pathname.startsWith(`${base}/login`) &&
