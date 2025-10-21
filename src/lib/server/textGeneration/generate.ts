@@ -13,6 +13,7 @@ export async function* generate(
 		conv,
 		messages,
 		assistant,
+		userModelParameters,
 		promptedAt,
 		forceMultimodal,
 		locals,
@@ -20,10 +21,17 @@ export async function* generate(
 	}: GenerateContext,
 	preprompt?: string
 ): AsyncIterable<MessageUpdate> {
+	// Merge parameters with priority: model defaults < user settings < assistant settings
+	// (model.parameters is merged in the endpoint itself)
+	const mergedGenerateSettings = {
+		...userModelParameters,
+		...assistant?.generateSettings,
+	};
+
 	const stream = await endpoint({
 		messages,
 		preprompt,
-		generateSettings: assistant?.generateSettings,
+		generateSettings: mergedGenerateSettings,
 		// Allow user-level override to force multimodal
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
 		conversationId: conv._id,

@@ -6,9 +6,10 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonClose from "~icons/carbon/close";
-	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
+	import CarbonChat from "~icons/carbon/chat";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
+	import CarbonToolsAlt from "~icons/carbon/tools-alt";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
@@ -185,8 +186,15 @@
 					{/if}
 
 					{#if $settings.customPrompts?.[model.id]}
-						<CarbonTextLongParagraph
+						<CarbonChat
 							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
+							alt="Using a custom System Prompt"
+						/>
+					{/if}
+					{#if $settings.modelParameters?.[model.id] && Object.keys($settings.modelParameters[model.id]).length > 0}
+						<CarbonToolsAlt
+							class="size-6 rounded-md border border-gray-300 p-1 text-gray-800 dark:border-gray-600 dark:text-gray-200"
+							alt="Using custom model paramaters"
 						/>
 					{/if}
 					{#if model.id === $settings.activeModel}

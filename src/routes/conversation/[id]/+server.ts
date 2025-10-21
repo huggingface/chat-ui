@@ -355,10 +355,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						metrics.model.tokenCountTotal.inc(metricsLabels);
 
 						if (!firstTokenObserved) {
-							metrics.model.timeToFirstToken.observe(
-								metricsLabels,
-								now - promptedAt.getTime()
-							);
+							metrics.model.timeToFirstToken.observe(metricsLabels, now - promptedAt.getTime());
 							firstTokenObserved = true;
 						}
 
@@ -468,21 +465,21 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const initialMessageContent = messageToWriteTo.content;
 
 			try {
+				// Fetch user settings once for both multimodal and parameters
+				const userSettings = await collections.settings.findOne(authCondition(locals));
+
 				const ctx: TextGenerationContext = {
 					model,
 					endpoint: await model.getEndpoint(),
 					conv,
 					messages: messagesForPrompt,
 					assistant: undefined,
+					userModelParameters: userSettings?.modelParameters?.[model.id],
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
 					// Force-enable multimodal if user settings say so for this model
-					forceMultimodal: Boolean(
-						(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
-							model.id
-						]
-					),
+					forceMultimodal: Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					locals,
 					abortController: ctrl,
 				};
