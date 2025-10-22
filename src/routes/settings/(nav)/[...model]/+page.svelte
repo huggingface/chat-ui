@@ -14,6 +14,7 @@
 	import { goto } from "$app/navigation";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Switch from "$lib/components/Switch.svelte";
+	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 
 	const publicConfig = usePublicConfig();
 	const settings = useSettingsStore();
@@ -231,15 +232,17 @@
 				</div>
 				<ul class="mb-0.5 flex flex-wrap gap-2">
 					{#each providerList as prov, i (prov.provider || i)}
+						{@const hubOrg = PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
 						<li>
 							<span
 								class="flex items-center gap-1 rounded-md bg-gray-100 py-0.5 pl-1.5 pr-2 text-xs text-gray-700 dark:bg-gray-700/60 dark:text-gray-200"
 							>
-								{#if prov.provider}
+								{#if hubOrg}
 									<img
-										class="h-[14px] w-auto"
-										src={`${base}/huggingchat/providers/${prov.provider}.svg`}
+										src="https://huggingface.co/api/organizations/{hubOrg}/avatar"
 										alt="{prov.provider} logo"
+										class="size-2.5 flex-none rounded-sm"
+										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
 									/>
 								{/if}
 								{prov.provider}
