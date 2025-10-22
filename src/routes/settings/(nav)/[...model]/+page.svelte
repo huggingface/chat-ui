@@ -232,7 +232,7 @@
 				</div>
 				<ul class="mb-0.5 flex flex-wrap gap-2">
 					{#each providerList as prov, i (prov.provider || i)}
-						{@const hubOrg = PROVIDERS_HUB_ORGS[prov.provider]}
+						{@const hubOrg = PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
 						<li>
 							<span
 								class="flex items-center gap-1 rounded-md bg-gray-100 py-0.5 pl-1.5 pr-2 text-xs text-gray-700 dark:bg-gray-700/60 dark:text-gray-200"
