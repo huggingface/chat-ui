@@ -2,7 +2,6 @@
 	import { processBlocks, processBlocksSync, type BlockToken } from "$lib/utils/marked";
 	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import MarkdownBlock from "./MarkdownBlock.svelte";
-	import type { IncomingMessage, OutgoingMessage } from "$lib/workers/markdownWorker";
 	import { browser } from "$app/environment";
 
 	import DOMPurify from "isomorphic-dompurify";
@@ -14,8 +13,6 @@
 		sources?: { title?: string; link: string }[];
 		loading?: boolean;
 	}
-
-	let worker: Worker | null = null;
 
 	let { content, sources = [], loading = false }: Props = $props();
 

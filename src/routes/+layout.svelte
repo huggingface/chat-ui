@@ -95,6 +95,14 @@
 			});
 	}
 
+	function closeWelcomeModal() {
+		settings.set({ welcomeModalSeen: true });
+
+		if (!data.user && data.loginEnabled) {
+			goto(`${base}/login`, { invalidateAll: true });
+		}
+	}
+
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
 	});
@@ -188,27 +196,27 @@
 		<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
 	{/if}
 	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
-	<link
-		rel="icon"
-		href="{publicConfig.assetPath}/favicon.svg"
-		type="image/svg+xml"
-		media="(prefers-color-scheme: light)"
-	/>
-	<link
-		rel="icon"
-		href="{publicConfig.assetPath}/favicon-dark.svg"
-		type="image/svg+xml"
-		media="(prefers-color-scheme: dark)"
-	/>
+	{#if publicConfig.PUBLIC_ORIGIN}
+		<link
+			rel="icon"
+			href="{publicConfig.assetPath}/favicon.svg"
+			type="image/svg+xml"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			rel="icon"
+			href="{publicConfig.assetPath}/favicon-dark.svg"
+			type="image/svg+xml"
+			media="(prefers-color-scheme: dark)"
+		/>
+	{:else}
+		<link rel="icon" href="{publicConfig.assetPath}/favicon-dev.svg" type="image/svg+xml" />
+	{/if}
 	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
 	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
 
-	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL && publicConfig.PUBLIC_ORIGIN}
-		<script
-			defer
-			data-domain={new URL(publicConfig.PUBLIC_ORIGIN).hostname}
-			src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		></script>
+	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		<script async src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}></script>
 	{/if}
 
 	{#if publicConfig.PUBLIC_APPLE_APP_ID}
@@ -216,8 +224,8 @@
 	{/if}
 </svelte:head>
 
-{#if showWelcome}
-	<WelcomeModal close={() => settings.set({ welcomeModalSeen: true })} />
+{#if showWelcome || (!data.user && data.loginEnabled)}
+	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
 {#if $loginModalOpen}
@@ -278,4 +286,11 @@
 		<Toast message={currentError} />
 	{/if}
 	{@render children?.()}
+
+	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
+		<script>
+			window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+			plausible.init();
+		</script>
+	{/if}
 </div>

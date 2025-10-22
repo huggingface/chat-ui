@@ -175,7 +175,7 @@
 
 					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 						<span
-							title="Supports image inputs (multimodal)"
+							title="Multimodal support (image inputs)"
 							class="grid size-[21px] flex-none place-items-center rounded-md border border-blue-700 dark:border-blue-500"
 							aria-label="Model is multimodal"
 							role="img"

@@ -18,6 +18,31 @@ const hasCompleteCodeBlock = (text: string): boolean => {
 	return tripleBackticks > 0 && tripleBackticks % 2 === 0 && text.includes("\n");
 };
 
+// Returns the start index of the currently open fenced code block, or -1 if none
+const getOpenCodeFenceIndex = (text: string): number => {
+	let openFenceIndex = -1;
+	let inFence = false;
+
+	for (const match of text.matchAll(/```/g)) {
+		const index = match.index ?? -1;
+		if (index === -1) {
+			continue;
+		}
+
+		if (inFence) {
+			// This fence closes the current block
+			inFence = false;
+			openFenceIndex = -1;
+		} else {
+			// This fence opens a new block
+			inFence = true;
+			openFenceIndex = index;
+		}
+	}
+
+	return openFenceIndex;
+};
+
 // Handles incomplete links and images by preserving them with a special marker
 const handleIncompleteLinksAndImages = (text: string): string => {
 	// First check for incomplete URLs: [text](partial-url or ![text](partial-url without closing )
@@ -84,6 +109,12 @@ const handleIncompleteBold = (text: string): string => {
 		// Check if the bold marker is in a list item context
 		// Find the position of the matched bold marker
 		const markerIndex = text.lastIndexOf(boldMatch[1]);
+
+		// Don't process if the marker is inside an incomplete code block
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && markerIndex > openFenceIndex) {
+			return text;
+		}
 		const beforeMarker = text.substring(0, markerIndex);
 		const lastNewlineBeforeMarker = beforeMarker.lastIndexOf("\n");
 		const lineStart = lastNewlineBeforeMarker === -1 ? 0 : lastNewlineBeforeMarker + 1;
@@ -111,6 +142,11 @@ const handleIncompleteBold = (text: string): string => {
 
 // Completes incomplete italic formatting with double underscores (__)
 const handleIncompleteDoubleUnderscoreItalic = (text: string): string => {
+	// Don't process if inside a complete code block
+	if (hasCompleteCodeBlock(text)) {
+		return text;
+	}
+
 	const italicMatch = text.match(italicPattern);
 
 	if (italicMatch) {
@@ -125,6 +161,12 @@ const handleIncompleteDoubleUnderscoreItalic = (text: string): string => {
 		// Check if the underscore marker is in a list item context
 		// Find the position of the matched underscore marker
 		const markerIndex = text.lastIndexOf(italicMatch[1]);
+
+		// Don't process if the marker is inside an incomplete code block
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && markerIndex > openFenceIndex) {
+			return text;
+		}
 		const beforeMarker = text.substring(0, markerIndex);
 		const lastNewlineBeforeMarker = beforeMarker.lastIndexOf("\n");
 		const lineStart = lastNewlineBeforeMarker === -1 ? 0 : lastNewlineBeforeMarker + 1;
@@ -207,6 +249,12 @@ const handleIncompleteSingleAsteriskItalic = (text: string): string => {
 		}
 
 		if (firstSingleAsteriskIndex === -1) {
+			return text;
+		}
+
+		// Don't process if the marker is inside an incomplete code block
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && firstSingleAsteriskIndex > openFenceIndex) {
 			return text;
 		}
 
@@ -326,6 +374,12 @@ const handleIncompleteSingleUnderscoreItalic = (text: string): string => {
 		}
 
 		if (firstSingleUnderscoreIndex === -1) {
+			return text;
+		}
+
+		// Don't process if the marker is inside an incomplete code block
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && firstSingleUnderscoreIndex > openFenceIndex) {
 			return text;
 		}
 
@@ -451,6 +505,7 @@ const handleIncompleteStrikethrough = (text: string): string => {
 };
 
 // Counts single dollar signs that are not part of double dollar signs and not escaped
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _countSingleDollarSigns = (text: string): number => {
 	return text.split("").reduce((acc, char, index) => {
 		if (char === "$") {
@@ -531,6 +586,15 @@ const handleIncompleteBoldItalic = (text: string): string => {
 		// Check if content is only whitespace or other emphasis markers
 		const contentAfterMarker = boldItalicMatch[2];
 		if (!contentAfterMarker || /^[\s_~*`]*$/.test(contentAfterMarker)) {
+			return text;
+		}
+
+		// Find the position of the matched bold-italic marker
+		const markerIndex = text.lastIndexOf(boldItalicMatch[1]);
+
+		// Don't process if the marker is inside an incomplete code block
+		const openFenceIndex = getOpenCodeFenceIndex(text);
+		if (openFenceIndex !== -1 && markerIndex > openFenceIndex) {
 			return text;
 		}
 

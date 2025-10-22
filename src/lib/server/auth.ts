@@ -473,7 +473,6 @@ export async function authenticateRequest(
 }
 
 export async function triggerOauthFlow({
-	request,
 	url,
 	locals,
 }: {
@@ -481,8 +480,9 @@ export async function triggerOauthFlow({
 	url: URL;
 	locals: App.Locals;
 }): Promise<Response> {
-	const referer = request.headers.get("referer");
-	let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
+	// const referer = request.headers.get("referer");
+	// let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
+	let redirectURI = `${url.origin}${base}/login/callback`;
 
 	// TODO: Handle errors if provider is not responding
 

@@ -49,6 +49,7 @@
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
+		draft?: string;
 	}
 
 	let {
@@ -61,6 +62,7 @@
 		models,
 		preprompt = undefined,
 		files = $bindable([]),
+		draft = $bindable(""),
 		onmessage,
 		onstop,
 		onretry,
@@ -69,15 +71,14 @@
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
 
-	let message: string = $state("");
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
 	const handleSubmit = () => {
-		if (loading) return;
-		onmessage?.(message);
-		message = "";
+		if (loading || !draft) return;
+		onmessage?.(draft);
+		draft = "";
 	};
 
 	let lastTarget: EventTarget | null = null;
@@ -248,7 +249,7 @@
 	);
 	let routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
 	let shouldShowRouterFollowUps = $derived(
-		!message.length &&
+		!draft.length &&
 			activeRouterExamplePrompt &&
 			routerFollowUps.length > 0 &&
 			routerUserMessages.length === 1 &&
@@ -279,7 +280,7 @@
 			$loginModalOpen = true;
 			return;
 		}
-		message = prompt;
+		draft = prompt;
 		handleSubmit();
 	}
 
@@ -398,7 +399,7 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !message.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples && !lastIsError}
+		{#if !draft.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples && !lastIsError}
 			<div
 				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
@@ -485,7 +486,7 @@
 							<ChatInput
 								placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
 								{loading}
-								bind:value={message}
+								bind:value={draft}
 								bind:files
 								mimeTypes={activeMimeTypes}
 								onsubmit={handleSubmit}
@@ -504,11 +505,11 @@
 							/>
 						{:else}
 							<button
-								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!message ||
+								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
 								isReadOnly
 									? ''
 									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
-								disabled={!message || isReadOnly}
+								disabled={!draft || isReadOnly}
 								type="submit"
 								aria-label="Send message"
 								name="submit"
@@ -581,7 +582,7 @@
 						{currentModel.id}
 					</span>
 				{/if}
-				{#if !messages.length}
+				{#if !messages.length && !loading}
 					<span>Generated content may be inaccurate or false.</span>
 				{/if}
 			</div>

@@ -40,9 +40,9 @@ export const endpointOAIParametersSchema = z.object({
 					"image/jpeg",
 				],
 				preferredMimeType: "image/jpeg",
-				maxSizeInMB: 3,
-				maxWidth: 2048,
-				maxHeight: 2048,
+				maxSizeInMB: 1,
+				maxWidth: 1024,
+				maxHeight: 1024,
 			}),
 		})
 		.default({}),
@@ -105,7 +105,10 @@ export async function endpointOai(
 	const openai = new OpenAI({
 		apiKey: apiKey || "sk-",
 		baseURL,
-		defaultHeaders,
+		defaultHeaders: {
+			...(config.PUBLIC_APP_NAME === "HuggingChat" && { "User-Agent": "huggingchat" }),
+			...defaultHeaders,
+		},
 		defaultQuery,
 		fetch: customFetch,
 	});

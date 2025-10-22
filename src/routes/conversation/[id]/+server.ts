@@ -23,6 +23,7 @@ import { textGeneration } from "$lib/server/textGeneration";
 import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import { MetricsServer } from "$lib/server/metrics";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -313,6 +314,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	let clientDetached = false;
 
 	let lastTokenTimestamp: undefined | Date = undefined;
+	let firstTokenObserved = false;
+	const metricsEnabled = MetricsServer.isEnabled();
+	const metrics = metricsEnabled ? MetricsServer.getMetrics() : undefined;
+	const metricsModelId = model.id ?? model.name ?? conv.model;
+	const metricsLabels = { model: metricsModelId };
 
 	const persistConversation = async () => {
 		await collections.conversations.updateOne(
@@ -344,9 +350,24 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					if (event.token === "") return;
 					messageToWriteTo.content += event.token;
 
-					if (!lastTokenTimestamp) {
-						lastTokenTimestamp = new Date();
+					if (metricsEnabled && metrics) {
+						const now = Date.now();
+						metrics.model.tokenCountTotal.inc(metricsLabels);
+
+						if (!firstTokenObserved) {
+							metrics.model.timeToFirstToken.observe(
+								metricsLabels,
+								now - promptedAt.getTime()
+							);
+							firstTokenObserved = true;
+						}
+
+						const previousTimestamp = lastTokenTimestamp
+							? lastTokenTimestamp.getTime()
+							: promptedAt.getTime();
+						metrics.model.timePerOutputToken.observe(metricsLabels, now - previousTimestamp);
 					}
+
 					lastTokenTimestamp = new Date();
 				}
 
@@ -366,6 +387,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					messageToWriteTo.interrupted = event.interrupted;
 					messageToWriteTo.content = initialMessageContent + event.text;
 					finalAnswerReceived = true;
+
+					if (metricsEnabled && metrics) {
+						metrics.model.latency.observe(metricsLabels, Date.now() - promptedAt.getTime());
+					}
 				}
 
 				// Add file
@@ -532,6 +557,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			await persistConversation();
 		},
 	});
+
+	if (metricsEnabled && metrics) {
+		metrics.model.messagesTotal.inc(metricsLabels);
+	}
 
 	// Todo: maybe we should wait for the message to be saved before ending the response - in case of errors
 	return new Response(stream, {

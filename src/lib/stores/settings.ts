@@ -23,7 +23,7 @@ type SettingsStoreWritable = Writable<SettingsStore> & {
 	initValue: <K extends keyof SettingsStore>(
 		key: K,
 		nestedKey: string,
-		value: any
+		value: string | boolean
 	) => Promise<void>;
 };
 
@@ -77,9 +77,13 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}
 	}
 
-	async function initValue<K extends keyof SettingsStore>(key: K, nestedKey: string, value: any) {
+	async function initValue<K extends keyof SettingsStore>(
+		key: K,
+		nestedKey: string,
+		value: string | boolean
+	) {
 		const currentStore = get(baseStore);
-		const currentNestedObject = currentStore[key] as Record<string, any>;
+		const currentNestedObject = currentStore[key] as Record<string, string | boolean>;
 
 		// Only initialize if undefined
 		if (currentNestedObject?.[nestedKey] !== undefined) {

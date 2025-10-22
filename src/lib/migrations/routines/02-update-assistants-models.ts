@@ -7,6 +7,7 @@ const updateAssistantsModels: Migration = {
 	name: "Update deprecated models in assistants with the default model",
 	up: async () => {
 		const models = (await import("$lib/server/models")).models;
+		//@ts-expect-error the property doesn't exist anymore, keeping the script for reference
 		const oldModels = (await import("$lib/server/models")).oldModels;
 		const { assistants } = collections;
 
@@ -20,7 +21,7 @@ const updateAssistantsModels: Migration = {
 				// has an old model
 				let newModelId = defaultModelId;
 
-				const oldModel = oldModels.find((m) => m.id === assistant.modelId);
+				const oldModel = oldModels.find((m: (typeof models)[number]) => m.id === assistant.modelId);
 				if (oldModel && oldModel.transferTo && !!models.find((m) => m.id === oldModel.transferTo)) {
 					newModelId = oldModel.transferTo;
 				}

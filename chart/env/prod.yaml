@@ -58,13 +58,16 @@ envVars:
   COOKIE_SAMESITE: "lax"
   COOKIE_SECURE: "true"
   EXPOSE_API: "true"
-  METRICS_PORT: "5565"
+  METRICS_ENABLED: "true"
   LOG_LEVEL: "debug"
 
   OPENAI_BASE_URL: "https://router.huggingface.co/v1"
   MESSAGES_BEFORE_LOGIN: "999"
   PUBLIC_APP_ASSETS: "huggingchat"
   PUBLIC_APP_NAME: "HuggingChat"
+  PUBLIC_APP_DESCRIPTION: "Making the community's best AI chat models available to everyone"
+  PUBLIC_ORIGIN: "https://huggingface.co"
+  PUBLIC_PLAUSIBLE_SCRIPT_URL: "https://plausible.io/js/pa-Io_oigECawqdlgpf5qvHb.js"
 
   TASK_MODEL: "Qwen/Qwen3-4B-Instruct-2507"
   LLM_ROUTER_ARCH_BASE_URL: "https://router.huggingface.co/v1"

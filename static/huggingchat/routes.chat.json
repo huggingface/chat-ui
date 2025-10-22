@@ -216,5 +216,11 @@
 		"description": "Extract structured JSON from text.",
 		"primary_model": "zai-org/GLM-4.6",
 		"fallback_models": ["deepseek-ai/DeepSeek-V3.1", "Qwen/Qwen3-235B-A22B-Instruct-2507"]
+	},
+	{
+		"name": "spell_checker",
+		"description": "Fix spelling, capitalization, punctuation, and obvious grammar errors.",
+		"primary_model": "CohereLabs/aya-expanse-32b",
+		"fallback_models": ["moonshotai/Kimi-K2-Instruct-0905", "google/gemma-3-27b-it"]
 	}
 ]

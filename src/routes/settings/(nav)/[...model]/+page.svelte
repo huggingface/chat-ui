@@ -182,7 +182,7 @@
 				<div class="flex items-start justify-between py-3">
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Supports image inputs (multimodal)
+							Multimodal support (image inputs)
 						</div>
 						<p class="text-[12px] text-gray-500 dark:text-gray-400">
 							Enable image uploads and send images to this model.
@@ -219,10 +219,14 @@
 			>
 				<div>
 					<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-						Providers serving this model
+						Inference Providers
 					</div>
 					<p class="text-[12px] text-gray-500 dark:text-gray-400">
-						Your requests for this model will be routed through one of the available providers.
+						Providers serving this model. You can enable/disable some providers from <a
+							class="underline decoration-gray-400 hover:decoration-gray-700 dark:decoration-gray-500 dark:hover:decoration-gray-500"
+							target="_blank"
+							href="https://huggingface.co/settings/inference-providers/settings">your settings</a
+						>.
 					</p>
 				</div>
 				<ul class="mb-0.5 flex flex-wrap gap-2">
