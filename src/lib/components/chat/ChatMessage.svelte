@@ -180,12 +180,6 @@
 									href="/chat/settings/{message.routerMetadata.model}"
 									class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
 								>
-									<img
-										src={`https://huggingface.co/api/organizations/${modelAuthor}/avatar`}
-										alt="{modelAuthor} logo"
-										class="size-2.5 flex-none rounded-sm"
-										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-									/>
 									{message.routerMetadata.model.split("/").pop()}
 								</a>
 							{:else}
@@ -201,8 +195,8 @@
 							<span class="text-gray-500 max-sm:hidden">via</span>
 							<a
 								target="_blank"
-								href="https://huggingface.co/${hubOrg}"
-								class="flex items-center gap-1 truncate rounded bg-gray-100 pl-1 pr-1.5 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
+								href="https://huggingface.co/{hubOrg}"
+								class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
 							>
 								<img
 									src="https://huggingface.co/api/organizations/{hubOrg}/avatar"
