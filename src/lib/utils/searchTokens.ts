@@ -1,33 +1,41 @@
-const PUNCTUATION_REGEX = /\p{P}/gu;
+import type { Message } from "$lib/types/Message";
 
-function removeDiacritics(s: string, form: "NFD" | "NFKD" = "NFD"): string {
-	return s.normalize(form).replace(/[\u0300-\u036f]/g, "");
+/**
+ * Escapes characters in a string that have special meaning in regular expressions.
+ * @param str The string to escape.
+ * @returns The escaped string.
+ */
+function escapeRegExp(str: string): string {
+	// $& means the whole matched string
+	return str.replace(/[.*+?^${}()|[\]\]/g, "\$&");
 }
 
-export function generateSearchTokens(value: string): string[] {
-	const fullTitleToken = removeDiacritics(value)
-		.replace(PUNCTUATION_REGEX, "")
-		.replaceAll(/\s+/g, "")
-		.toLowerCase();
-	return [
-		...new Set([
-			...removeDiacritics(value)
-				.split(/\s+/)
-				.map((word) => word.replace(PUNCTUATION_REGEX, "").toLowerCase())
-				.filter((word) => word.length),
-			...(fullTitleToken.length ? [fullTitleToken] : []),
-		]),
-	];
-}
+export function searchTokens(
+	tokens: Pick<Message, "content" | "from" | "id">[],
+	query: string
+): Pick<Message, "content" | "from" | "id">[] {
+	if (!query) {
+		return tokens;
+	}
 
-function escapeForRegExp(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
-}
+	const results: Pick<Message, "content" | "from" | "id">[] = [];
+	const queryTokens = query.toLowerCase().split(" ");
 
-export function generateQueryTokens(query: string): RegExp[] {
-	return removeDiacritics(query)
-		.split(/\s+/)
-		.map((word) => word.replace(PUNCTUATION_REGEX, "").toLowerCase())
-		.filter((word) => word.length)
-		.map((token) => new RegExp(`^${escapeForRegExp(token)}`));
+	for (const token of tokens) {
+		if (
+			queryTokens.every((queryToken) => {
+				if (queryToken.startsWith("-")) {
+					const regex = new RegExp(escapeRegExp(queryToken.substring(1)), "i");
+					return !regex.test(token.content);
+				} else {
+					const regex = new RegExp(escapeRegExp(queryToken), "i");
+					return regex.test(token.content);
+				}
+			})
+		) {
+			results.push(token);
+		}
+	}
+
+	return results;
 }
