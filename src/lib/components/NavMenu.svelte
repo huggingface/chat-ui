@@ -33,7 +33,6 @@
 
 	interface Props {
 		conversations: ConvSidebar[];
-		canLogin: boolean;
 		user: LayoutData["user"];
 		p?: number;
 		ondeleteConversation?: (id: string) => void;

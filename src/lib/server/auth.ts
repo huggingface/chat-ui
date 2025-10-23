@@ -54,7 +54,7 @@ export const OIDConfig = z
 	})
 	.parse(JSON5.parse(config.OPENID_CONFIG || "{}"));
 
-export const requiresUser = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
+export const loginEnabled = !!OIDConfig.CLIENT_ID && !!OIDConfig.CLIENT_SECRET;
 
 const sameSite = z
 	.enum(["lax", "none", "strict"])
