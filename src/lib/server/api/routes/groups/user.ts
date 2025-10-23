@@ -71,6 +71,7 @@ export const userGroup = new Elysia()
 
 					customPrompts: settings?.customPrompts ?? {},
 					multimodalOverrides: settings?.multimodalOverrides ?? {},
+					modelParameters: settings?.modelParameters ?? DEFAULT_SETTINGS.modelParameters,
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {

@@ -3,6 +3,7 @@ import type { Endpoint } from "../endpoints/endpoints";
 import type { Conversation } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type { Assistant } from "$lib/types/Assistant";
+import type { Model } from "$lib/types/Model";
 
 export interface TextGenerationContext {
 	model: ProcessedModel;
@@ -10,6 +11,8 @@ export interface TextGenerationContext {
 	conv: Conversation;
 	messages: Message[];
 	assistant?: Pick<Assistant, "dynamicPrompt" | "generateSettings">;
+	/** User's per-model parameter overrides from settings */
+	userModelParameters?: Partial<Model["parameters"]>;
 	promptedAt: Date;
 	ip: string;
 	username?: string;
