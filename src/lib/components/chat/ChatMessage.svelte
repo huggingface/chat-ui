@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Message } from "$lib/types/Message";
 	import { tick } from "svelte";
-	import { base } from "$app/paths";
 
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	const publicConfig = usePublicConfig();
@@ -17,6 +16,7 @@
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
+	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 
 	interface Props {
 		message: Message;
@@ -177,7 +177,7 @@
 							{#if publicConfig.isHuggingChat}
 								<a
 									href="/chat/settings/{message.routerMetadata.model}"
-									class="truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
+									class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 sm:py-px"
 								>
 									{message.routerMetadata.model.split("/").pop()}
 								</a>
@@ -190,18 +190,21 @@
 							{/if}
 						{/if}
 						{#if message.routerMetadata.provider}
+							{@const hubOrg = PROVIDERS_HUB_ORGS[message.routerMetadata.provider]}
 							<span class="text-gray-500 max-sm:hidden">via</span>
-							<span
-								class="flex items-center gap-1 truncate rounded bg-gray-100 pl-1 pr-1.5 font-mono dark:bg-gray-800 max-sm:hidden sm:py-px"
+							<a
+								target="_blank"
+								href="https://huggingface.co/{hubOrg}"
+								class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
 							>
 								<img
-									src={`${base}/huggingchat/providers/${message.routerMetadata.provider}.svg`}
+									src="https://huggingface.co/api/organizations/{hubOrg}/avatar"
 									alt="{message.routerMetadata.provider} logo"
-									class="size-2.5 flex-none"
+									class="size-2.5 flex-none rounded-sm"
 									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
 								/>
 								{message.routerMetadata.provider}
-							</span>
+							</a>
 						{/if}
 					</div>
 				{/if}

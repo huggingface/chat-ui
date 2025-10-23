@@ -40,7 +40,7 @@ export const endpointOAIParametersSchema = z.object({
 					"image/jpeg",
 				],
 				preferredMimeType: "image/jpeg",
-				maxSizeInMB: 3,
+				maxSizeInMB: 1,
 				maxWidth: 1024,
 				maxHeight: 1024,
 			}),

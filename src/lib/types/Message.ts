@@ -1,3 +1,4 @@
+import type { InferenceProvider } from "@huggingface/inference";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { v4 } from "uuid";
@@ -20,7 +21,7 @@ export type Message = Partial<Timestamps> & {
 	routerMetadata?: {
 		route: string;
 		model: string;
-		provider?: string;
+		provider?: InferenceProvider;
 	};
 
 	// needed for conversation trees
