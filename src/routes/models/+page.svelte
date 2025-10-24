@@ -42,7 +42,7 @@
 			<h1 class="text-2xl font-bold">Models</h1>
 			{#if publicConfig.isHuggingChat}
 				<a
-					href="https://huggingface.co/inference/models"
+					href="https://huggingface.co/docs/inference-providers"
 					class="ml-auto text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
 					target="_blank"
 					aria-label="Hub discussion about models"
@@ -51,7 +51,14 @@
 				</a>
 			{/if}
 		</div>
-		<h2 class="text-gray-500">All models available on {publicConfig.PUBLIC_APP_NAME}</h2>
+		<h2 class="text-gray-500">
+			All models available{#if publicConfig.isHuggingChat}&nbsp;via <a
+					target="_blank"
+					href="https://huggingface.co/inference/models"
+					class="underline decoration-gray-300 hover:decoration-gray-500 dark:decoration-gray-600 dark:hover:decoration-gray-500"
+					>Inference Providers</a
+				>{/if}
+		</h2>
 
 		<!-- Filter input -->
 		<input

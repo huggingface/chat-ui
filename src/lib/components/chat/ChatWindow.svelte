@@ -9,7 +9,6 @@
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
-	import { page } from "$app/state";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
@@ -31,7 +30,6 @@
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
-	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 
@@ -276,10 +274,6 @@
 
 	function triggerPrompt(prompt: string) {
 		if (loading) return;
-		if (page.data.loginRequired) {
-			$loginModalOpen = true;
-			return;
-		}
 		draft = prompt;
 		handleSubmit();
 	}
@@ -377,11 +371,7 @@
 				<ChatIntroduction
 					{currentModel}
 					onmessage={(content) => {
-						if (page.data.loginRequired) {
-							$loginModalOpen = true;
-						} else {
-							onmessage?.(content);
-						}
+						onmessage?.(content);
 					}}
 				/>
 			{/if}

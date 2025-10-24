@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { authPlugin } from "../../authPlugin";
-import { requiresUser } from "$lib/server/auth";
+import { loginEnabled } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { config } from "$lib/server/config";
@@ -12,8 +12,6 @@ import { logger } from "$lib/server/logger";
 export interface FeatureFlags {
 	enableAssistants: boolean;
 	loginEnabled: boolean;
-	loginRequired: boolean;
-	guestMode: boolean;
 	isAdmin: boolean;
 }
 
@@ -21,42 +19,9 @@ export const misc = new Elysia()
 	.use(authPlugin)
 	.get("/public-config", async () => config.getPublicConfig())
 	.get("/feature-flags", async ({ locals }) => {
-		let loginRequired = false;
-		const messagesBeforeLogin = config.MESSAGES_BEFORE_LOGIN
-			? parseInt(config.MESSAGES_BEFORE_LOGIN)
-			: 0;
-		const nConversations = await collections.conversations.countDocuments(authCondition(locals));
-
-		if (requiresUser && !locals.user) {
-			if (messagesBeforeLogin === 0) {
-				loginRequired = true;
-			} else if (nConversations >= messagesBeforeLogin) {
-				loginRequired = true;
-			} else {
-				// get the number of messages where `from === "assistant"` across all conversations.
-				const totalMessages =
-					(
-						await collections.conversations
-							.aggregate([
-								{ $match: { ...authCondition(locals), "messages.from": "assistant" } },
-								{ $project: { messages: 1 } },
-								{ $limit: messagesBeforeLogin + 1 },
-								{ $unwind: "$messages" },
-								{ $match: { "messages.from": "assistant" } },
-								{ $count: "messages" },
-							])
-							.toArray()
-					)[0]?.messages ?? 0;
-
-				loginRequired = totalMessages >= messagesBeforeLogin;
-			}
-		}
-
 		return {
 			enableAssistants: config.ENABLE_ASSISTANTS === "true",
-			loginEnabled: requiresUser, // misnomer, this is actually whether the feature is available, not required
-			loginRequired,
-			guestMode: requiresUser && messagesBeforeLogin > 0,
+			loginEnabled, // login feature is on when OID is configured
 			isAdmin: locals.isAdmin,
 		} satisfies FeatureFlags;
 	})

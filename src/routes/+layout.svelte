@@ -15,8 +15,6 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
-	import { loginModalOpen } from "$lib/stores/loginModal";
-	import LoginModal from "$lib/components/LoginModal.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
@@ -57,7 +55,7 @@
 		}, 5000);
 	}
 
-	let canShare = $derived(
+	const canShare = $derived(
 		publicConfig.isHuggingChat &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
@@ -228,14 +226,6 @@
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 
-{#if $loginModalOpen}
-	<LoginModal
-		onclose={() => {
-			$loginModalOpen = false;
-		}}
-	/>
-{/if}
-
 <BackgroundGenerationPoller />
 
 <div
@@ -266,7 +256,6 @@
 		<NavMenu
 			{conversations}
 			user={data.user}
-			canLogin={!data.user && data.loginEnabled}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>
@@ -277,7 +266,6 @@
 		<NavMenu
 			{conversations}
 			user={data.user}
-			canLogin={!data.user && data.loginEnabled}
 			ondeleteConversation={(id) => deleteConversation(id)}
 			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
 		/>

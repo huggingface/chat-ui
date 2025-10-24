@@ -5,8 +5,6 @@
 
 	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
-	import { page } from "$app/state";
-	import { loginModalOpen } from "$lib/stores/loginModal";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	interface Props {
@@ -158,12 +156,6 @@
 		onkeydown={handleKeydown}
 		oncompositionstart={() => (isCompositionOn = true)}
 		oncompositionend={() => (isCompositionOn = false)}
-		onbeforeinput={(ev) => {
-			if (page.data.loginRequired) {
-				ev.preventDefault();
-				$loginModalOpen = true;
-			}
-		}}
 		{placeholder}
 		{disabled}
 		onfocus={handleFocus}

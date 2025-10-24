@@ -11,5 +11,11 @@ spec:
     port: 80
     protocol: TCP
     targetPort: http
+  {{- if eq "true" $.Values.envVars.METRICS_ENABLED }}
+  - name: metrics
+    port: {{ $.Values.envVars.METRICS_PORT | default 5565 | int }}
+    protocol: TCP
+    targetPort: metrics
+  {{- end }}
   selector: {{ include "labels.standard" . | nindent 4 }}
   type: {{.Values.service.type}}

@@ -50,7 +50,7 @@ envVars:
   COUPLE_SESSION_WITH_COOKIE_NAME: "token"
   OPENID_SCOPES: "openid profile inference-api"
   USE_USER_TOKEN: "true"
-  AUTOMATIC_LOGIN: "true"
+  AUTOMATIC_LOGIN: "false"
 
   ADDRESS_HEADER: "X-Forwarded-For"
   APP_BASE: "/chat"
@@ -58,11 +58,10 @@ envVars:
   COOKIE_SAMESITE: "lax"
   COOKIE_SECURE: "true"
   EXPOSE_API: "true"
-  METRICS_PORT: "5565"
+  METRICS_ENABLED: "true"
   LOG_LEVEL: "debug"
 
   OPENAI_BASE_URL: "https://router.huggingface.co/v1"
-  MESSAGES_BEFORE_LOGIN: "999"
   PUBLIC_APP_ASSETS: "huggingchat"
   PUBLIC_APP_NAME: "HuggingChat"
   PUBLIC_APP_DESCRIPTION: "Making the community's best AI chat models available to everyone"

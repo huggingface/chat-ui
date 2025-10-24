@@ -1,3 +1,5 @@
+import type { InferenceProvider } from "@huggingface/inference";
+
 export type MessageUpdate =
 	| MessageStatusUpdate
 	| MessageTitleUpdate
@@ -78,7 +80,7 @@ export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;
 	route: string;
 	model: string;
-	provider?: string;
+	provider?: InferenceProvider;
 }
 
 // Web Search Updates
