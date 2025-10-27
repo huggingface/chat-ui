@@ -32,6 +32,7 @@
 	import { cubicInOut } from "svelte/easing";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	interface Props {
 		messages?: Message[];
@@ -74,6 +75,7 @@
 	let pastedLongContent = $state(false);
 
 	const handleSubmit = () => {
+		requireAuthUser();
 		if (loading || !draft) return;
 		onmessage?.(draft);
 		draft = "";

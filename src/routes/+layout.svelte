@@ -96,10 +96,6 @@
 
 	function closeWelcomeModal() {
 		settings.set({ welcomeModalSeen: true });
-
-		if (!data.user && data.loginEnabled) {
-			goto(`${base}/login`, { invalidateAll: true });
-		}
 	}
 
 	onDestroy(() => {
@@ -223,7 +219,7 @@
 	{/if}
 </svelte:head>
 
-{#if showWelcome || (!data.user && data.loginEnabled)}
+{#if showWelcome}
 	<WelcomeModal close={closeWelcomeModal} />
 {/if}
 

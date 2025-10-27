@@ -138,16 +138,37 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	event.locals.sessionId = auth.sessionId;
 
-	if (
-		loginEnabled &&
-		!auth.user &&
-		config.AUTOMATIC_LOGIN === "true" &&
-		!event.url.pathname.startsWith(`${base}/login`) &&
-		!event.url.pathname.startsWith(`${base}/healthcheck`)
-	) {
-		// To get the same CSRF token after callback
-		refreshSessionCookie(event.cookies, auth.secretSessionId);
-		return await triggerOauthFlow({ request: event.request, url: event.url, locals: event.locals });
+	if (loginEnabled && !auth.user) {
+		if (config.AUTOMATIC_LOGIN === "true") {
+			/// Redirect to OAuth flow unless already on login or healthcheck pages
+			if (
+				!event.url.pathname.startsWith(`${base}/login`) &&
+				!event.url.pathname.startsWith(`${base}/healthcheck`)
+			) {
+				// To get the same CSRF token after callback
+				refreshSessionCookie(event.cookies, auth.secretSessionId);
+				return await triggerOauthFlow({
+					request: event.request,
+					url: event.url,
+					locals: event.locals,
+				});
+			}
+		} else {
+			// Redirect to OAuth flow unless on the authorized pages (home, login, healthcheck, shared conversation)
+			if (
+				event.url.pathname !== `${base}/` &&
+				event.url.pathname !== `${base}` &&
+				!event.url.pathname.startsWith(`${base}/login`) &&
+				!event.url.pathname.startsWith(`${base}/login/callback`) &&
+				!event.url.pathname.startsWith(`${base}/healthcheck`) &&
+				!event.url.pathname.startsWith(`${base}/r/`) &&
+				!event.url.pathname.startsWith(`${base}/conversation/`) &&
+				!event.url.pathname.startsWith(`${base}/api`)
+			) {
+				refreshSessionCookie(event.cookies, auth.secretSessionId);
+				return triggerOauthFlow({ request: event.request, url: event.url, locals: event.locals });
+			}
+		}
 	}
 
 	event.locals.user = auth.user || undefined;
