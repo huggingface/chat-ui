@@ -68,7 +68,7 @@
 	let editFormEl: HTMLFormElement | undefined = $state();
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
-		const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
+	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
 	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	// Strip think blocks for clipboard copy (always, regardless of detection)
