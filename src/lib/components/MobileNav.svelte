@@ -17,6 +17,7 @@
 	import { Spring } from "svelte/motion";
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
+	import { requireAuthUser } from "$lib/utils/auth";
 	interface Props {
 		title: string | undefined;
 		children?: import("svelte").Snippet;
@@ -105,7 +106,15 @@
 				<IconShare classNames={!canShare ? "opacity-40" : ""} />
 			</button>
 		{/if}
-		<a href="{base}/" class="flex size-8 shrink-0 items-center justify-center text-lg">
+		<a
+			href="{base}/"
+			class="flex size-8 shrink-0 items-center justify-center text-lg"
+			onclick={(e) => {
+				if (requireAuthUser()) {
+					e.preventDefault();
+				}
+			}}
+		>
 			<IconNew />
 		</a>
 	</div>
