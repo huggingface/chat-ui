@@ -197,6 +197,11 @@
 								aria-label="Upload file"
 								type="file"
 								onchange={onFileChange}
+								onclick={(e) => {
+									if (requireAuthUser()) {
+										e.preventDefault();
+									}
+								}}
 								accept={mimeTypes.join(",")}
 							/>
 							<IconPaperclip classNames="text-xl" />

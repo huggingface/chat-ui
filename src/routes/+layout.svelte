@@ -22,6 +22,7 @@
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	let { data = $bindable(), children } = $props();
 
@@ -95,6 +96,7 @@
 	}
 
 	function closeWelcomeModal() {
+		if (requireAuthUser()) return;
 		settings.set({ welcomeModalSeen: true });
 	}
 
@@ -157,6 +159,7 @@
 			if (oPressed && e.shiftKey && metaOrCtrl) {
 				e.preventDefault();
 				isAborted.set(true);
+				if (requireAuthUser()) return;
 				goto(`${base}/`, { invalidateAll: true });
 			}
 		};
@@ -172,7 +175,10 @@
 	);
 
 	// Show the welcome modal once on first app load
-	let showWelcome = $derived(!$settings.welcomeModalSeen && !(page.data.shared === true));
+	let showWelcome = $derived(
+		!$settings.welcomeModalSeen &&
+			!(page.data.shared === true && page.route.id?.startsWith("/conversation/"))
+	);
 </script>
 
 <svelte:head>

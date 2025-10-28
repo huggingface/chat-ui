@@ -140,7 +140,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (loginEnabled && !auth.user) {
 		if (config.AUTOMATIC_LOGIN === "true") {
-			/// Redirect to OAuth flow unless already on login or healthcheck pages
+			// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login or healthcheck pages)
 			if (
 				!event.url.pathname.startsWith(`${base}/login`) &&
 				!event.url.pathname.startsWith(`${base}/healthcheck`)
@@ -154,7 +154,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				});
 			}
 		} else {
-			// Redirect to OAuth flow unless on the authorized pages (home, login, healthcheck, shared conversation)
+			// Redirect to OAuth flow unless on the authorized pages (home, shared conversation, login, healthcheck)
 			if (
 				event.url.pathname !== `${base}/` &&
 				event.url.pathname !== `${base}` &&

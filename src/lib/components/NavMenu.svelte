@@ -50,10 +50,12 @@
 
 	let hasMore = $state(true);
 
-	function handleNewChatClick() {
+	function handleNewChatClick(e: MouseEvent) {
 		isAborted.set(true);
 
-		requireAuthUser();
+		if (requireAuthUser()) {
+			e.preventDefault();
+		}
 	}
 
 	function handleNavItemClick(e: MouseEvent) {

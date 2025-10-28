@@ -394,7 +394,7 @@
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {
-		requireAuthUser();
+		if (requireAuthUser()) return;
 
 		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);

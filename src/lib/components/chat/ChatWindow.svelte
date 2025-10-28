@@ -75,8 +75,7 @@
 	let pastedLongContent = $state(false);
 
 	const handleSubmit = () => {
-		requireAuthUser();
-		if (loading || !draft) return;
+		if (requireAuthUser() || loading || !draft) return;
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -275,12 +274,13 @@
 	});
 
 	function triggerPrompt(prompt: string) {
-		if (loading) return;
+		if (requireAuthUser() || loading) return;
 		draft = prompt;
 		handleSubmit();
 	}
 
 	async function startExample(example: RouterExample) {
+		if (requireAuthUser()) return;
 		activeRouterExamplePrompt = example.prompt;
 
 		if (browser && example.attachments?.length) {
@@ -535,6 +535,11 @@
 					{#if !currentModel.isRouter || !loading}
 						<a
 							href="{base}/settings/{currentModel.id}"
+							onclick={(e) => {
+								if (requireAuthUser()) {
+									e.preventDefault();
+								}
+							}}
 							class="inline-flex items-center gap-1 hover:underline"
 						>
 							{#if currentModel.isRouter}
