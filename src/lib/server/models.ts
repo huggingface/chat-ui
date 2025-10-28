@@ -76,143 +76,30 @@ const overrideEntrySchema = modelConfig
 
 type ModelOverride = z.infer<typeof overrideEntrySchema>;
 
-// ggufModelsConfig unused in this build
-
-// Source models exclusively from an OpenAI-compatible endpoint.
-let modelsRaw: ModelConfig[] = [];
-
-// Require explicit base URL; no implicit default here
 const openaiBaseUrl = config.OPENAI_BASE_URL
 	? config.OPENAI_BASE_URL.replace(/\/$/, "")
 	: undefined;
 const isHFRouter = openaiBaseUrl === "https://router.huggingface.co/v1";
 
-if (openaiBaseUrl) {
-	try {
-		const baseURL = openaiBaseUrl;
-		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
-
-		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
-		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN;
-
-		// Try unauthenticated request first (many model lists are public, e.g. HF router)
-		let response = await fetch(`${baseURL}/models`);
-		logger.info({ status: response.status }, "[models] First fetch status");
-		if (response.status === 401 || response.status === 403) {
-			// Retry with Authorization header if available
-			response = await fetch(`${baseURL}/models`, {
-				headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
-			});
-			logger.info({ status: response.status }, "[models] Retried fetch status");
-		}
-		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
-			);
-		}
-		const json = await response.json();
-		logger.info({ keys: Object.keys(json || {}) }, "[models] Response keys");
-
-		const listSchema = z
-			.object({
-				data: z.array(
-					z.object({
-						id: z.string(),
-						description: z.string().optional(),
-						providers: z
-							.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
-							.optional(),
-						architecture: z
-							.object({
-								input_modalities: z.array(z.string()).optional(),
-							})
-							.passthrough()
-							.optional(),
+const listSchema = z
+	.object({
+		data: z.array(
+			z.object({
+				id: z.string(),
+				description: z.string().optional(),
+				providers: z
+					.array(z.object({ supports_tools: z.boolean().optional() }).passthrough())
+					.optional(),
+				architecture: z
+					.object({
+						input_modalities: z.array(z.string()).optional(),
 					})
-				),
+					.passthrough()
+					.optional(),
 			})
-			.passthrough();
-
-		const parsed = listSchema.parse(json);
-		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
-
-		modelsRaw = parsed.data.map((m) => {
-			let logoUrl: string | undefined = undefined;
-			if (isHFRouter && m.id.includes("/")) {
-				const org = m.id.split("/")[0];
-				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
-			}
-
-			const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
-				modality.toLowerCase()
-			);
-			const supportsImageInput =
-				inputModalities.includes("image") || inputModalities.includes("vision");
-			return {
-				id: m.id,
-				name: m.id,
-				displayName: m.id,
-				description: m.description,
-				logoUrl,
-				providers: m.providers,
-				multimodal: supportsImageInput,
-				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
-				endpoints: [
-					{
-						type: "openai" as const,
-						baseURL,
-						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
-					},
-				],
-			} as ModelConfig;
-		}) as ModelConfig[];
-	} catch (e) {
-		logger.error(e, "Failed to load models from OpenAI base URL");
-		throw e;
-	}
-} else {
-	logger.error(
-		"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
-	);
-	throw new Error("OPENAI_BASE_URL not set");
-}
-
-let modelOverrides: ModelOverride[] = [];
-const overridesEnv = (Reflect.get(config, "MODELS") as string | undefined) ?? "";
-
-if (overridesEnv.trim()) {
-	try {
-		modelOverrides = z
-			.array(overrideEntrySchema)
-			.parse(JSON5.parse(sanitizeJSONEnv(overridesEnv, "[]")));
-	} catch (error) {
-		logger.error(error, "[models] Failed to parse MODELS overrides");
-	}
-}
-
-if (modelOverrides.length) {
-	const overrideMap = new Map<string, ModelOverride>();
-	for (const override of modelOverrides) {
-		for (const key of [override.id, override.name]) {
-			const trimmed = key?.trim();
-			if (trimmed) overrideMap.set(trimmed, override);
-		}
-	}
-
-	modelsRaw = modelsRaw.map((model) => {
-		const override = overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
-		if (!override) return model;
-
-		const { id, name, ...rest } = override;
-		void id;
-		void name;
-
-		return {
-			...model,
-			...rest,
-		};
-	});
-}
+		),
+	})
+	.passthrough();
 
 function getChatPromptRender(_m: ModelConfig): (inputs: ChatTemplateInput) => string {
 	// Minimal template to support legacy "completions" flow if ever used.
@@ -254,75 +141,334 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	},
 });
 
+type InternalProcessedModel = Awaited<ReturnType<typeof addEndpoint>> & {
+	isRouter: boolean;
+	hasInferenceAPI: boolean;
+};
+
 const inferenceApiIds: string[] = [];
 
-const builtModels = await Promise.all(
-	modelsRaw.map((e) =>
-		processModel(e)
-			.then(addEndpoint)
-			.then(async (m) => ({
-				...m,
-				hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
-				// router decoration added later
-				isRouter: false as boolean,
-			}))
-	)
-);
+const getModelOverrides = (): ModelOverride[] => {
+	const overridesEnv = (Reflect.get(config, "MODELS") as string | undefined) ?? "";
 
-// Inject a synthetic router alias ("Omni") if Arch router is configured
-const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
-const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
-const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
-const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
-const routerMultimodalEnabled =
-	(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
-
-let decorated = builtModels as ProcessedModel[];
-
-if (archBase) {
-	// Build a minimal model config for the alias
-	const aliasRaw: ModelConfig = {
-		id: routerAliasId,
-		name: routerAliasId,
-		displayName: routerLabel,
-		logoUrl: routerLogo || undefined,
-		preprompt: "",
-		endpoints: [
-			{
-				type: "openai" as const,
-				baseURL: openaiBaseUrl,
-			},
-		],
-		// Keep the alias visible
-		unlisted: false,
-	} as ProcessedModel;
-
-	if (routerMultimodalEnabled) {
-		aliasRaw.multimodal = true;
-		aliasRaw.multimodalAcceptedMimetypes = ["image/*"];
+	if (!overridesEnv.trim()) {
+		return [];
 	}
 
-	const aliasBase = await processModel(aliasRaw);
-	// Create a self-referential ProcessedModel for the router endpoint
-	const aliasModel: ProcessedModel = {
-		...aliasBase,
-		isRouter: true,
-		// getEndpoint uses the router wrapper regardless of the endpoints array
-		getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
-	} as ProcessedModel;
+	try {
+		return z.array(overrideEntrySchema).parse(JSON5.parse(sanitizeJSONEnv(overridesEnv, "[]")));
+	} catch (error) {
+		logger.error(error, "[models] Failed to parse MODELS overrides");
+		return [];
+	}
+};
 
-	// Put alias first
-	decorated = [aliasModel, ...decorated];
-}
+export type ModelsRefreshSummary = {
+	refreshedAt: Date;
+	durationMs: number;
+	added: string[];
+	removed: string[];
+	changed: string[];
+	total: number;
+};
 
-export const models = decorated as typeof builtModels;
+export type ProcessedModel = InternalProcessedModel;
 
-export type ProcessedModel = (typeof models)[number] & { isRouter?: boolean };
+export let models: ProcessedModel[] = [];
+export let defaultModel!: ProcessedModel;
+export let taskModel!: ProcessedModel;
+export let validModelIdSchema: z.ZodType<string> = z.string();
+export let lastModelRefresh = new Date(0);
+export let lastModelRefreshDurationMs = 0;
+export let lastModelRefreshSummary: ModelsRefreshSummary = {
+	refreshedAt: new Date(0),
+	durationMs: 0,
+	added: [],
+	removed: [],
+	changed: [],
+	total: 0,
+};
 
-// super ugly but not sure how to make typescript happier
-export const validModelIdSchema = z.enum(models.map((m) => m.id) as [string, ...string[]]);
+let inflightRefresh: Promise<ModelsRefreshSummary> | null = null;
 
-export const defaultModel = models[0];
+const createValidModelIdSchema = (modelList: ProcessedModel[]): z.ZodType<string> => {
+	if (modelList.length === 0) {
+		throw new Error("No models available to build validation schema");
+	}
+	const ids = new Set(modelList.map((m) => m.id));
+	return z.string().refine((value) => ids.has(value), "Invalid model id");
+};
+
+const resolveTaskModel = (modelList: ProcessedModel[]) => {
+	if (modelList.length === 0) {
+		throw new Error("No models available to select task model");
+	}
+
+	if (config.TASK_MODEL) {
+		const preferred = modelList.find(
+			(m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL
+		);
+		if (preferred) {
+			return preferred;
+		}
+	}
+
+	return modelList[0];
+};
+
+const signatureForModel = (model: ProcessedModel) =>
+	JSON.stringify({
+		description: model.description,
+		displayName: model.displayName,
+		providers: model.providers,
+		parameters: model.parameters,
+		preprompt: model.preprompt,
+		prepromptUrl: model.prepromptUrl,
+		endpoints:
+			model.endpoints?.map((endpoint) => {
+				if (endpoint.type === "openai") {
+					const { type, baseURL } = endpoint;
+					return { type, baseURL };
+				}
+				return { type: endpoint.type };
+			}) ?? null,
+		multimodal: model.multimodal,
+		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+		isRouter: model.isRouter,
+		hasInferenceAPI: model.hasInferenceAPI,
+	});
+
+const applyModelState = (newModels: ProcessedModel[], startedAt: number): ModelsRefreshSummary => {
+	if (newModels.length === 0) {
+		throw new Error("Failed to load any models from upstream");
+	}
+
+	const previousIds = new Set(models.map((m) => m.id));
+	const previousSignatures = new Map(models.map((m) => [m.id, signatureForModel(m)]));
+	const refreshedAt = new Date();
+	const durationMs = Date.now() - startedAt;
+
+	models = newModels;
+	defaultModel = models[0];
+	taskModel = resolveTaskModel(models);
+	validModelIdSchema = createValidModelIdSchema(models);
+	lastModelRefresh = refreshedAt;
+	lastModelRefreshDurationMs = durationMs;
+
+	const added = newModels.map((m) => m.id).filter((id) => !previousIds.has(id));
+	const removed = Array.from(previousIds).filter(
+		(id) => !newModels.some((model) => model.id === id)
+	);
+	const changed = newModels
+		.filter((model) => {
+			const previousSignature = previousSignatures.get(model.id);
+			return previousSignature !== undefined && previousSignature !== signatureForModel(model);
+		})
+		.map((model) => model.id);
+
+	const summary: ModelsRefreshSummary = {
+		refreshedAt,
+		durationMs,
+		added,
+		removed,
+		changed,
+		total: models.length,
+	};
+
+	lastModelRefreshSummary = summary;
+
+	logger.info(
+		{
+			total: summary.total,
+			added: summary.added,
+			removed: summary.removed,
+			changed: summary.changed,
+			durationMs: summary.durationMs,
+		},
+		"[models] Model cache refreshed"
+	);
+
+	return summary;
+};
+
+const buildModels = async (): Promise<ProcessedModel[]> => {
+	if (!openaiBaseUrl) {
+		logger.error(
+			"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
+		);
+		throw new Error("OPENAI_BASE_URL not set");
+	}
+
+	try {
+		const baseURL = openaiBaseUrl;
+		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
+
+		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
+		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN;
+
+		// Try unauthenticated request first (many model lists are public, e.g. HF router)
+		let response = await fetch(`${baseURL}/models`);
+		logger.info({ status: response.status }, "[models] First fetch status");
+		if (response.status === 401 || response.status === 403) {
+			// Retry with Authorization header if available
+			response = await fetch(`${baseURL}/models`, {
+				headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+			});
+			logger.info({ status: response.status }, "[models] Retried fetch status");
+		}
+		if (!response.ok) {
+			throw new Error(
+				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
+			);
+		}
+		const json = await response.json();
+		logger.info({ keys: Object.keys(json || {}) }, "[models] Response keys");
+
+		const parsed = listSchema.parse(json);
+		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
+
+		let modelsRaw = parsed.data.map((m) => {
+			let logoUrl: string | undefined = undefined;
+			if (isHFRouter && m.id.includes("/")) {
+				const org = m.id.split("/")[0];
+				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
+			}
+
+			const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
+				modality.toLowerCase()
+			);
+			const supportsImageInput =
+				inputModalities.includes("image") || inputModalities.includes("vision");
+			return {
+				id: m.id,
+				name: m.id,
+				displayName: m.id,
+				description: m.description,
+				logoUrl,
+				providers: m.providers,
+				multimodal: supportsImageInput,
+				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
+				endpoints: [
+					{
+						type: "openai" as const,
+						baseURL,
+						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+					},
+				],
+			} as ModelConfig;
+		}) as ModelConfig[];
+
+		const overrides = getModelOverrides();
+
+		if (overrides.length) {
+			const overrideMap = new Map<string, ModelOverride>();
+			for (const override of overrides) {
+				for (const key of [override.id, override.name]) {
+					const trimmed = key?.trim();
+					if (trimmed) overrideMap.set(trimmed, override);
+				}
+			}
+
+			modelsRaw = modelsRaw.map((model) => {
+				const override = overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
+				if (!override) return model;
+
+				const { id, name, ...rest } = override;
+				void id;
+				void name;
+
+				return {
+					...model,
+					...rest,
+				};
+			});
+		}
+
+		const builtModels = await Promise.all(
+			modelsRaw.map((e) =>
+				processModel(e)
+					.then(addEndpoint)
+					.then(async (m) => ({
+						...m,
+						hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
+						// router decoration added later
+						isRouter: false as boolean,
+					}))
+			)
+		);
+
+		const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
+		const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
+		const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
+		const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
+		const routerMultimodalEnabled =
+			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
+
+		let decorated = builtModels as ProcessedModel[];
+
+		if (archBase) {
+			// Build a minimal model config for the alias
+			const aliasRaw = {
+				id: routerAliasId,
+				name: routerAliasId,
+				displayName: routerLabel,
+				logoUrl: routerLogo || undefined,
+				preprompt: "",
+				endpoints: [
+					{
+						type: "openai" as const,
+						baseURL: openaiBaseUrl,
+					},
+				],
+				// Keep the alias visible
+				unlisted: false,
+			} as ModelConfig;
+
+			if (routerMultimodalEnabled) {
+				aliasRaw.multimodal = true;
+				aliasRaw.multimodalAcceptedMimetypes = ["image/*"];
+			}
+
+			const aliasBase = await processModel(aliasRaw);
+			// Create a self-referential ProcessedModel for the router endpoint
+			const aliasModel: ProcessedModel = {
+				...aliasBase,
+				isRouter: true,
+				hasInferenceAPI: false,
+				// getEndpoint uses the router wrapper regardless of the endpoints array
+				getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
+			} as ProcessedModel;
+
+			// Put alias first
+			decorated = [aliasModel, ...decorated];
+		}
+
+		return decorated;
+	} catch (e) {
+		logger.error(e, "Failed to load models from OpenAI base URL");
+		throw e;
+	}
+};
+
+const rebuildModels = async (): Promise<ModelsRefreshSummary> => {
+	const startedAt = Date.now();
+	const newModels = await buildModels();
+	return applyModelState(newModels, startedAt);
+};
+
+await rebuildModels();
+
+export const refreshModels = async (): Promise<ModelsRefreshSummary> => {
+	if (inflightRefresh) {
+		return inflightRefresh;
+	}
+
+	inflightRefresh = rebuildModels().finally(() => {
+		inflightRefresh = null;
+	});
+
+	return inflightRefresh;
+};
 
 export const validateModel = (_models: BackendModel[]) => {
 	// Zod enum function requires 2 parameters
@@ -330,13 +476,6 @@ export const validateModel = (_models: BackendModel[]) => {
 };
 
 // if `TASK_MODEL` is string & name of a model in `MODELS`, then we use `MODELS[TASK_MODEL]`, else we try to parse `TASK_MODEL` as a model config itself
-
-export const taskModel = addEndpoint(
-	config.TASK_MODEL
-		? (models.find((m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL) ??
-				defaultModel)
-		: defaultModel
-);
 
 export type BackendModel = Optional<
 	typeof defaultModel,
