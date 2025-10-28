@@ -1,4 +1,5 @@
-import { Elysia } from "elysia";
+import { Elysia, status } from "elysia";
+import { refreshModels, lastModelRefreshSummary } from "$lib/server/models";
 import type { BackendModel } from "$lib/server/models";
 import { authPlugin } from "../../authPlugin";
 import { authCondition } from "$lib/server/auth";
@@ -70,6 +71,42 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 		.get("/old", async () => {
 			return [] as GETOldModelsResponse;
 		})
+		.group("/refresh", (app) =>
+			app.use(authPlugin).post("", async ({ locals }) => {
+				if (!locals.user && !locals.sessionId) {
+					throw status(401, "Unauthorized");
+				}
+				if (!locals.isAdmin) {
+					throw status(403, "Admin privileges required");
+				}
+
+				const previous = lastModelRefreshSummary;
+
+				try {
+					const summary = await refreshModels();
+
+					return {
+						refreshedAt: summary.refreshedAt.toISOString(),
+						durationMs: summary.durationMs,
+						added: summary.added,
+						removed: summary.removed,
+						changed: summary.changed,
+						total: summary.total,
+						hadChanges:
+							summary.added.length > 0 || summary.removed.length > 0 || summary.changed.length > 0,
+						previous:
+							previous.refreshedAt.getTime() > 0
+								? {
+										refreshedAt: previous.refreshedAt.toISOString(),
+										total: previous.total,
+									}
+								: null,
+					};
+				} catch (err) {
+					throw status(502, "Model refresh failed");
+				}
+			})
+		)
 		.group("/:namespace/:model?", (app) =>
 			app
 				.derive(async ({ params, error }) => {
