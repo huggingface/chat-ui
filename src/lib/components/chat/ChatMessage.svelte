@@ -68,8 +68,13 @@
 	let editFormEl: HTMLFormElement | undefined = $state();
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
-	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/g;
+		const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
 	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
+
+	// Strip think blocks for clipboard copy (always, regardless of detection)
+	let contentWithoutThink = $derived.by(() =>
+		message.content.replace(THINK_BLOCK_REGEX, "").trim()
+	);
 
 	$effect(() => {
 		if (isCopied) {
@@ -214,7 +219,7 @@
 							isCopied = true;
 						}}
 						classNames="btn rounded-sm p-1 text-sm text-gray-400 hover:text-gray-500 focus:ring-0 dark:text-gray-400 dark:hover:text-gray-300"
-						value={message.content}
+						value={contentWithoutThink}
 						iconClassNames="text-xs"
 					/>
 					<button
