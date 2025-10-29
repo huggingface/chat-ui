@@ -27,6 +27,7 @@
 	import { browser } from "$app/environment";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -49,8 +50,18 @@
 
 	let hasMore = $state(true);
 
-	function handleNewChatClick() {
+	function handleNewChatClick(e: MouseEvent) {
 		isAborted.set(true);
+
+		if (requireAuthUser()) {
+			e.preventDefault();
+		}
+	}
+
+	function handleNavItemClick(e: MouseEvent) {
+		if (requireAuthUser()) {
+			e.preventDefault();
+		}
 	}
 
 	const dateRanges = [
@@ -174,6 +185,7 @@
 	<a
 		href="{base}/models"
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+		onclick={handleNavItemClick}
 	>
 		Models
 		<span
@@ -186,6 +198,7 @@
 		<a
 			href="{base}/settings/application"
 			class="flex h-9 flex-none flex-grow items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+			onclick={handleNavItemClick}
 		>
 			Settings
 		</a>

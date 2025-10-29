@@ -9,6 +9,7 @@
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	interface Props {
 		conv: ConvSidebar;
@@ -49,6 +50,7 @@
 				title="Cancel delete action"
 				onclick={(e) => {
 					e.preventDefault();
+					if (requireAuthUser()) return;
 					confirmDelete = false;
 				}}
 			>
@@ -60,6 +62,7 @@
 				title="Confirm delete action"
 				onclick={(e) => {
 					e.preventDefault();
+					if (requireAuthUser()) return;
 					confirmDelete = false;
 					ondeleteConversation?.(conv.id.toString());
 				}}
@@ -75,6 +78,7 @@
 				title="Edit conversation title"
 				onclick={(e) => {
 					e.preventDefault();
+					if (requireAuthUser()) return;
 					renameOpen = true;
 				}}
 			>
@@ -87,6 +91,7 @@
 				title="Delete conversation"
 				onclick={(event) => {
 					event.preventDefault();
+					if (requireAuthUser()) return;
 					if (event.shiftKey) {
 						ondeleteConversation?.(conv.id.toString());
 					} else {

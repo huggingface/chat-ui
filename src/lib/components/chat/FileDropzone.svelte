@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { requireAuthUser } from "$lib/utils/auth";
 	import CarbonImage from "~icons/carbon/image";
 
 	interface Props {
@@ -18,7 +19,7 @@
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
-		if (event.dataTransfer && event.dataTransfer.items) {
+		if (!requireAuthUser() && event.dataTransfer && event.dataTransfer.items) {
 			// Use DataTransferItemList interface to access the file(s)
 			if (files.length > 0) {
 				files = [];
