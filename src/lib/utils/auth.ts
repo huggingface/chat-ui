@@ -8,7 +8,10 @@ import { page } from "$app/state";
  */
 export function requireAuthUser(): boolean {
 	if (page.data.loginEnabled && !page.data.user) {
-		goto(`${base}/login`, { invalidateAll: true });
+		const url = page.data.shared
+			? `${base}/login?next=${encodeURIComponent(page.url.pathname + page.url.search)}`
+			: `${base}/login`;
+		goto(url, { invalidateAll: true });
 		return true;
 	}
 	return false;
