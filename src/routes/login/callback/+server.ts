@@ -86,5 +86,11 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		ip: getClientAddress(),
 	});
 
+	// Prefer returning the user to their original in-app path when provided.
+	// `validatedToken.next` is sanitized server-side to avoid protocol-relative redirects.
+	const next = validatedToken.next;
+	if (next) {
+		return redirect(302, next);
+	}
 	return redirect(302, `${base}/`);
 }

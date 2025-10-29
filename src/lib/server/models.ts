@@ -306,15 +306,17 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
 		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN;
 
-		// Try unauthenticated request first (many model lists are public, e.g. HF router)
-		let response = await fetch(`${baseURL}/models`);
+		// Use auth token from the start if available to avoid rate limiting issues
+		// Some APIs rate-limit unauthenticated requests more aggressively
+		let response = await fetch(`${baseURL}/models`, {
+			headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+		});
 		logger.info({ status: response.status }, "[models] First fetch status");
-		if (response.status === 401 || response.status === 403) {
-			// Retry with Authorization header if available
-			response = await fetch(`${baseURL}/models`, {
-				headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
-			});
-			logger.info({ status: response.status }, "[models] Retried fetch status");
+		if (!response.ok && response.status === 401 && !authToken) {
+			// If we get 401 and didn't have a token, there's nothing we can do
+			throw new Error(
+				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText} (no auth token available)`
+			);
 		}
 		if (!response.ok) {
 			throw new Error(

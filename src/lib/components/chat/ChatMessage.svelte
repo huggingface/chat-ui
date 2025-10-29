@@ -17,6 +17,7 @@
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { requireAuthUser } from "$lib/utils/auth";
 
 	interface Props {
 		message: Message;
@@ -329,7 +330,10 @@
 						class="hidden cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 group-hover:flex hover:flex hover:text-gray-500 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-300 lg:-right-2"
 						title="Edit"
 						type="button"
-						onclick={() => (editMsdgId = message.id)}
+						onclick={() => {
+							if (requireAuthUser()) return;
+							editMsdgId = message.id;
+						}}
 					>
 						<CarbonPen />
 						Edit
