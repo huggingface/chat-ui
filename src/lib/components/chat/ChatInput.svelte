@@ -7,6 +7,8 @@
 	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
+	import { requireAuthUser } from "$lib/utils/auth";
+
 	interface Props {
 		files?: File[];
 		mimeTypes?: string[];
@@ -160,6 +162,7 @@
 		{disabled}
 		onfocus={handleFocus}
 		onblur={handleBlur}
+		onbeforeinput={requireAuthUser}
 	></textarea>
 
 	{#if !showNoTools}
@@ -194,6 +197,11 @@
 								aria-label="Upload file"
 								type="file"
 								onchange={onFileChange}
+								onclick={(e) => {
+									if (requireAuthUser()) {
+										e.preventDefault();
+									}
+								}}
 								accept={mimeTypes.join(",")}
 							/>
 							<IconPaperclip classNames="text-xl" />

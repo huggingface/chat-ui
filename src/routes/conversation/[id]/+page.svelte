@@ -27,6 +27,7 @@
 	import { updateDebouncer } from "$lib/utils/updates.js";
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
+	import { requireAuthUser } from "$lib/utils/auth.js";
 
 	let { data = $bindable() } = $props();
 
@@ -393,6 +394,8 @@
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {
+		if (requireAuthUser()) return;
+
 		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);
 
