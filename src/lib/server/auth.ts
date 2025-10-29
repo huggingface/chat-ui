@@ -66,6 +66,19 @@ const secure = z
 	.default(!(dev || config.ALLOW_INSECURE_COOKIES === "true"))
 	.parse(config.COOKIE_SECURE === "" ? undefined : config.COOKIE_SECURE === "true");
 
+function sanitizeReturnPath(path: string | undefined | null): string | undefined {
+	if (!path) {
+		return undefined;
+	}
+	if (path.startsWith("//")) {
+		return undefined;
+	}
+	if (!path.startsWith("/")) {
+		return undefined;
+	}
+	return path;
+}
+
 export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 	cookies.set(config.COOKIE_NAME, sessionId, {
 		path: "/",
@@ -197,10 +210,20 @@ export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
 /**
  * Generates a CSRF token using the user sessionId. Note that we don't need a secret because sessionId is enough.
  */
-export async function generateCsrfToken(sessionId: string, redirectUrl: string): Promise<string> {
+export async function generateCsrfToken(
+	sessionId: string,
+	redirectUrl: string,
+	next?: string
+): Promise<string> {
+	const sanitizedNext = sanitizeReturnPath(next);
 	const data = {
 		expiration: addHours(new Date(), 1).getTime(),
 		redirectUrl,
+		...(sanitizedNext ? { next: sanitizedNext } : {}),
+	} as {
+		expiration: number;
+		redirectUrl: string;
+		next?: string;
 	};
 
 	return Buffer.from(
@@ -249,10 +272,14 @@ async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 
 export async function getOIDCAuthorizationUrl(
 	settings: OIDCSettings,
-	params: { sessionId: string }
+	params: { sessionId: string; next?: string }
 ): Promise<string> {
 	const client = await getOIDCClient(settings);
-	const csrfToken = await generateCsrfToken(params.sessionId, settings.redirectURI);
+	const csrfToken = await generateCsrfToken(
+		params.sessionId,
+		settings.redirectURI,
+		sanitizeReturnPath(params.next)
+	);
 
 	return client.authorizationUrl({
 		scope: OIDConfig.SCOPES,
@@ -291,6 +318,8 @@ export async function validateAndParseCsrfToken(
 ): Promise<{
 	/** This is the redirect url that was passed to the OIDC provider */
 	redirectUrl: string;
+	/** Relative path (within this app) to return to after login */
+	next?: string;
 } | null> {
 	try {
 		const { data, signature } = z
@@ -298,6 +327,7 @@ export async function validateAndParseCsrfToken(
 				data: z.object({
 					expiration: z.number().int(),
 					redirectUrl: z.string().url(),
+					next: z.string().optional(),
 				}),
 				signature: z.string().length(64),
 			})
@@ -306,7 +336,7 @@ export async function validateAndParseCsrfToken(
 		const reconstructSign = await sha256(JSON.stringify(data) + "##" + sessionId);
 
 		if (data.expiration > Date.now() && signature === reconstructSign) {
-			return { redirectUrl: data.redirectUrl };
+			return { redirectUrl: data.redirectUrl, next: sanitizeReturnPath(data.next) };
 		}
 	} catch (e) {
 		logger.error(e);
@@ -493,9 +523,23 @@ export async function triggerOauthFlow({
 		}
 	}
 
+	// Preserve a safe in-app return path after login.
+	// Priority: explicit ?next=... (must be an absolute path), else the current path (when auto-login kicks in).
+	let next: string | undefined = undefined;
+	const nextParam = sanitizeReturnPath(url.searchParams.get("next"));
+	if (nextParam) {
+		// Only accept absolute in-app paths to prevent open redirects
+		next = nextParam;
+	} else if (!url.pathname.startsWith(`${base}/login`)) {
+		// For automatic login on protected pages, return to the page the user was on
+		next = sanitizeReturnPath(`${url.pathname}${url.search}`) ?? `${base}/`;
+	} else {
+		next = sanitizeReturnPath(`${base}/`) ?? "/";
+	}
+
 	const authorizationUrl = await getOIDCAuthorizationUrl(
 		{ redirectURI },
-		{ sessionId: locals.sessionId }
+		{ sessionId: locals.sessionId, next }
 	);
 
 	throw redirect(302, authorizationUrl);
