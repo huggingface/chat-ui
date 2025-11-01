@@ -2,6 +2,14 @@ import { defaultModel } from "$lib/server/models";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
+/**
+ * Per-model parameter overrides (Tier 1: most commonly customized)
+ */
+export interface ModelParameterOverrides {
+	temperature?: number;
+	max_tokens?: number;
+}
+
 export interface Settings extends Timestamps {
 	userId?: User["_id"];
 	sessionId?: string;
@@ -27,6 +35,12 @@ export interface Settings extends Timestamps {
 	 */
 	hidePromptExamples?: Record<string, boolean>;
 
+	/**
+	 * Per-model parameter customization (temperature, max_tokens, etc.)
+	 * Empty/undefined values fall back to model defaults.
+	 */
+	modelParameters?: Record<string, ModelParameterOverrides>;
+
 	disableStream: boolean;
 	directPaste: boolean;
 }
@@ -39,6 +53,7 @@ export const DEFAULT_SETTINGS = {
 	customPrompts: {},
 	multimodalOverrides: {},
 	hidePromptExamples: {},
+	modelParameters: {},
 	disableStream: false,
 	directPaste: false,
 } satisfies SettingsEditable;
