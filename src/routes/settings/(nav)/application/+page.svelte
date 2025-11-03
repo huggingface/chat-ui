@@ -84,7 +84,7 @@
 					try {
 						refreshing = true;
 						refreshMessage = null;
-						const res = (await client.models.refresh.post().then(handleResponse)) as any;
+						const res = await client.models.refresh.post().then(handleResponse);
 						const delta = `+${res.added.length} −${res.removed.length} ~${res.changed.length}`;
 						refreshMessage = `Refreshed in ${res.durationMs} ms • ${delta} • total ${res.total}`;
 						await goto(page.url.pathname, { invalidateAll: true });
