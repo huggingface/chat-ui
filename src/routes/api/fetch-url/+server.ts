@@ -48,16 +48,11 @@ export async function GET({ url, fetch }) {
 
 		const response = await fetch(targetUrl, {
 			signal: controller.signal,
-			redirect: "manual",
+			redirect: "error", // Block all redirects
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
 			},
 		}).finally(() => clearTimeout(timeoutId));
-
-		// Explicitly block redirects
-		if (response.status >= 300 && response.status < 400) {
-			throw error(400, "Redirects are not allowed");
-		}
 
 		if (!response.ok) {
 			throw error(response.status, `Failed to fetch: ${response.statusText}`);
