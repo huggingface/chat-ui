@@ -21,7 +21,7 @@
 
 	const client = useAPIClient();
 
-	let OPENAI_BASE_URL: string | null = null;
+	let OPENAI_BASE_URL: string | null = $state(null);
 	onMount(async () => {
 		try {
 			const cfg = await client.debug.config.get().then(handleResponse);
@@ -31,7 +31,7 @@
 		}
 	});
 
-	let themePref: ThemePreference = browser ? getThemePreference() : "system";
+	let themePref: ThemePreference = $state(browser ? getThemePreference() : "system");
 
 	// Admin: model refresh UI state
 	let refreshing: boolean = $state(false);
