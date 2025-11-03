@@ -8,6 +8,7 @@
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { page } from "$app/state";
 
 	interface Props {
 		files?: File[];
@@ -57,6 +58,7 @@
 			: Promise.resolve();
 
 	async function focusTextarea() {
+		if (page.data.shared && page.data.loginEnabled && !page.data.user) return;
 		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
 		if (typeof document !== "undefined" && document.activeElement === textareaElement) return;
 
@@ -118,6 +120,9 @@
 	}
 
 	function handleFocus() {
+		if (requireAuthUser()) {
+			return;
+		}
 		if (blurTimeout) {
 			clearTimeout(blurTimeout);
 			blurTimeout = null;
