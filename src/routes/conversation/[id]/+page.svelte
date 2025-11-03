@@ -4,7 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
+	import { beforeNavigate, invalidateAll, replaceState } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -37,6 +37,7 @@
 
 	let files: File[] = $state([]);
 
+	let conversationId = page.params.id;
 	let conversations = $state(data.conversations);
 	$effect(() => {
 		conversations = data.conversations;
@@ -241,7 +242,7 @@
 			const messageUpdatesAbortController = new AbortController();
 
 			const messageUpdatesIterator = await fetchMessageUpdates(
-				page.params.id,
+				conversationId,
 				{
 					base,
 					inputs: prompt,
@@ -302,13 +303,13 @@
 						$error = update.message ?? "An error has occurred";
 					}
 				} else if (update.type === MessageUpdateType.Title) {
-					const convInData = conversations.find(({ id }) => id === page.params.id);
+					const convInData = conversations.find(({ id }) => id === conversationId);
 					if (convInData) {
 						convInData.title = update.title;
 
 						$titleUpdate = {
 							title: update.title,
-							convId: page.params.id,
+							convId: conversationId,
 						};
 					}
 				} else if (update.type === MessageUpdateType.File) {
@@ -343,7 +344,7 @@
 	}
 
 	async function stopGeneration() {
-		await fetch(`${base}/conversation/${page.params.id}/stop-generating`, {
+		await fetch(`${base}/conversation/${conversationId}/stop-generating`, {
 			method: "POST",
 		}).then((r) => {
 			if (r.ok) {
@@ -367,6 +368,7 @@
 	}
 
 	onMount(async () => {
+		conversationId = page.params.id;
 		if ($pendingMessage) {
 			files = $pendingMessage.files;
 			await writeMessage({ prompt: $pendingMessage.content });
@@ -375,7 +377,7 @@
 
 		const streaming = isConversationStreaming(messages);
 		if (streaming) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: conversationId, startedAt: Date.now() });
 			$loading = true;
 		}
 	});
@@ -384,12 +386,13 @@
 		if (!data.shared) {
 			await writeMessage({ prompt: content });
 		} else {
-			await convFromShared()
-				.then(async (convId) => {
-					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
-				})
-				.then(async () => await writeMessage({ prompt: content }))
-				.finally(() => ($loading = false));
+			try {
+				conversationId = await convFromShared();
+				replaceState(`${base}/conversation/${conversationId}`, page.state);
+				await writeMessage({ prompt: content });
+			} finally {
+				$loading = false;
+			}
 		}
 	}
 
@@ -406,19 +409,17 @@
 				isRetry: true,
 			});
 		} else {
-			await convFromShared()
-				.then(async (convId) => {
-					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
-				})
-				.then(
-					async () =>
-						await writeMessage({
-							prompt: payload.content,
-							messageId: payload.id,
-							isRetry: true,
-						})
-				)
-				.finally(() => ($loading = false));
+			try {
+				const conversationId = await convFromShared();
+				replaceState(`${base}/conversation/${conversationId}`, page.state);
+				await writeMessage({
+					prompt: payload.content,
+					messageId: payload.id,
+					isRetry: true,
+				});
+			} finally {
+				$loading = false;
+			}
 		}
 	}
 
@@ -456,7 +457,7 @@
 		}
 
 		if (!streaming && browser) {
-			removeBackgroundGeneration(page.params.id);
+			removeBackgroundGeneration(conversationId);
 		}
 	});
 
@@ -471,13 +472,13 @@
 	});
 
 	beforeNavigate((navigation) => {
-		if (!page.params.id) return;
+		if (!conversationId) return;
 
 		const navigatingAway =
-			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
+			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== conversationId;
 
 		if (loading && navigatingAway) {
-			addBackgroundGeneration({ id: page.params.id, startedAt: Date.now() });
+			addBackgroundGeneration({ id: conversationId, startedAt: Date.now() });
 		}
 
 		$isAborted = true;
@@ -485,7 +486,7 @@
 	});
 
 	let title = $derived.by(() => {
-		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
+		const rawTitle = conversations.find((conv) => conv.id === conversationId)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});
 </script>
