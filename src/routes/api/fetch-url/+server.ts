@@ -48,6 +48,7 @@ export async function GET({ url, fetch }) {
 
 		const response = await fetch(targetUrl, {
 			signal: controller.signal,
+			redirect: "error", // Block all redirects
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
 			},
