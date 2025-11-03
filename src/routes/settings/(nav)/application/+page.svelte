@@ -21,7 +21,7 @@
 
 	const client = useAPIClient();
 
-	let OPENAI_BASE_URL: string | null = null;
+	let OPENAI_BASE_URL: string | null = $state(null);
 	onMount(async () => {
 		try {
 			const cfg = await client.debug.config.get().then(handleResponse);
@@ -31,7 +31,7 @@
 		}
 	});
 
-	let themePref: ThemePreference = browser ? getThemePreference() : "system";
+	let themePref: ThemePreference = $state(browser ? getThemePreference() : "system");
 
 	// Admin: model refresh UI state
 	let refreshing: boolean = $state(false);
@@ -84,7 +84,7 @@
 					try {
 						refreshing = true;
 						refreshMessage = null;
-						const res = (await client.models.refresh.post().then(handleResponse)) as any;
+						const res = await client.models.refresh.post().then(handleResponse);
 						const delta = `+${res.added.length} −${res.removed.length} ~${res.changed.length}`;
 						refreshMessage = `Refreshed in ${res.durationMs} ms • ${delta} • total ${res.total}`;
 						await goto(page.url.pathname, { invalidateAll: true });
