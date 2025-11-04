@@ -2,6 +2,7 @@ import { browser } from "$app/environment";
 import { invalidate } from "$app/navigation";
 import { base } from "$app/paths";
 import { UrlDependency } from "$lib/types/UrlDependency";
+import type { ModelParameterOverrides } from "$lib/types/Settings";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
 
@@ -12,6 +13,7 @@ type SettingsStore = {
 	activeModel: string;
 	customPrompts: Record<string, string>;
 	multimodalOverrides: Record<string, boolean>;
+	modelParameters: Record<string, ModelParameterOverrides>;
 	recentlySaved: boolean;
 	disableStream: boolean;
 	directPaste: boolean;
@@ -32,7 +34,11 @@ export function useSettingsStore() {
 }
 
 export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlySaved">) {
-	const baseStore = writable({ ...initialValue, recentlySaved: false });
+	const baseStore = writable({
+		...initialValue,
+		modelParameters: initialValue.modelParameters ?? {},
+		recentlySaved: false,
+	});
 
 	let timeoutId: NodeJS.Timeout;
 	let showSavedOnNextSync = false;
@@ -83,7 +89,7 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		value: string | boolean
 	) {
 		const currentStore = get(baseStore);
-		const currentNestedObject = currentStore[key] as Record<string, string | boolean>;
+		const currentNestedObject = currentStore[key] as Record<string, string | boolean> | undefined;
 
 		// Only initialize if undefined
 		if (currentNestedObject?.[nestedKey] !== undefined) {
@@ -91,14 +97,14 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}
 
 		// Update the store
-		const newNestedObject = {
+		const newNestedObject: Record<string, string | boolean> = {
 			...(currentNestedObject || {}),
 			[nestedKey]: value,
 		};
 
 		baseStore.update((s) => ({
 			...s,
-			[key]: newNestedObject,
+			[key]: newNestedObject as SettingsStore[K],
 		}));
 
 		// Save to server (debounced) - note: we don't set showSavedOnNextSync

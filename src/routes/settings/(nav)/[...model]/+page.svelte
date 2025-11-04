@@ -3,12 +3,13 @@
 	import { base } from "$app/paths";
 
 	import type { BackendModel } from "$lib/server/models";
+	import type { ModelParameterOverrides } from "$lib/types/Settings";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import CarbonArrowUpRight from "~icons/carbon/arrow-up-right";
 	import CarbonCopy from "~icons/carbon/copy";
-	import CarbonChat from "~icons/carbon/chat";
+	import IconNew from "$lib/components/icons/IconNew.svelte";
 	import CarbonCode from "~icons/carbon/code";
 
 	import { goto } from "$app/navigation";
@@ -28,8 +29,10 @@
 	});
 
 	let hasCustomPreprompt = $derived(
-		$settings.customPrompts[page.params.model] !==
-			page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt
+		$settings.customPrompts[page.params.model] !== undefined &&
+			$settings.customPrompts[page.params.model] !== "" &&
+			$settings.customPrompts[page.params.model] !==
+				page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt
 	);
 
 	let model = $derived(page.data.models.find((el: BackendModel) => el.id === page.params.model));
@@ -47,6 +50,104 @@
 	$effect(() => {
 		settings.initValue("hidePromptExamples", page.params.model, false);
 	});
+
+	let modelId = $derived(page.params.model);
+
+	// Track whether model parameters details is expanded per model
+	let parametersExpanded = $state(false);
+
+	type ParameterKey = keyof ModelParameterOverrides;
+
+	type ParameterConfig = {
+		key: ParameterKey;
+		label: string;
+		description: string;
+		min: number;
+		max?: number;
+		step: number;
+		integer?: boolean;
+	};
+
+	const parameterConfigs: ParameterConfig[] = [
+		{
+			key: "temperature",
+			label: "Temperature",
+			description: "Controls randomness (low = focused, high = creative)",
+			min: 0,
+			max: 2,
+			step: 0.1,
+		},
+		{
+			key: "max_tokens",
+			label: "Max Tokens",
+			description: "Maximum number of total generated tokens",
+			min: 1,
+			step: 1,
+			integer: true,
+		},
+	];
+
+	function hasCustomParameter(param: ParameterKey) {
+		const overrides = $settings.modelParameters?.[modelId];
+		if (!overrides) return false;
+
+		const userValue = overrides[param];
+		const modelDefault = model?.parameters?.[param];
+		return userValue !== undefined && userValue !== modelDefault;
+	}
+
+	function updateParameter(param: ParameterKey, value: number | undefined) {
+		const normalized = value === undefined || Number.isNaN(value) ? undefined : value;
+		const currentOverrides = $settings.modelParameters?.[modelId];
+
+		if (normalized === undefined) {
+			if (!currentOverrides || currentOverrides[param] === undefined) {
+				return;
+			}
+		} else if (currentOverrides?.[param] === normalized) {
+			return;
+		}
+
+		settings.update((state) => {
+			const overridesInState = state.modelParameters?.[modelId];
+			const updatedOverrides: ModelParameterOverrides = { ...(overridesInState ?? {}) };
+
+			if (normalized === undefined) {
+				delete updatedOverrides[param];
+			} else {
+				updatedOverrides[param] = normalized;
+			}
+
+			const nextModelParameters = { ...(state.modelParameters ?? {}) };
+
+			if (Object.keys(updatedOverrides).length === 0) {
+				delete nextModelParameters[modelId];
+			} else {
+				nextModelParameters[modelId] = updatedOverrides;
+			}
+
+			return {
+				...state,
+				modelParameters: nextModelParameters,
+			};
+		});
+	}
+
+	function handleParameterInput(param: ParameterKey, rawValue: string, integer = false) {
+		const trimmed = rawValue.trim();
+
+		if (trimmed === "") {
+			updateParameter(param, undefined);
+			return;
+		}
+
+		const parsed = integer ? Number.parseInt(trimmed, 10) : Number.parseFloat(trimmed);
+		if (Number.isNaN(parsed)) {
+			return;
+		}
+
+		updateParameter(param, parsed);
+	}
 </script>
 
 <div class="flex flex-col items-start">
@@ -75,7 +176,7 @@
 				goto(`${base}/`);
 			}}
 		>
-			<CarbonChat class="mr-1.5 text-sm" />
+			<IconNew classNames="mr-1.5 text-sm" />
 			New chat
 		</button>
 
@@ -175,11 +276,68 @@
 			class="w-full resize-none rounded-md border border-gray-200 bg-gray-50 p-2 text-[13px] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
 			bind:value={$settings.customPrompts[page.params.model]}
 		></textarea>
+
 		<!-- Capabilities -->
 		<div
 			class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 		>
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
+				{#if !model?.isRouter}
+					<details class="group py-3" bind:open={parametersExpanded}>
+						<summary class="flex cursor-pointer list-none items-start justify-between">
+							<div>
+								<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+									Model Parameters
+								</div>
+								<p class="text-[12px] text-gray-500 dark:text-gray-400">
+									Customize generation parameters.
+								</p>
+							</div>
+						</summary>
+
+						<div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+							{#each parameterConfigs as config (config.key)}
+								<div>
+									<div class="mb-1 flex w-full flex-row items-center justify-between">
+										<label
+											for="{String(config.key)}-{modelId}"
+											class="text-[13px] font-medium text-gray-700 dark:text-gray-300"
+										>
+											{config.label}
+										</label>
+										{#if hasCustomParameter(config.key)}
+											<button
+												class="text-xs underline decoration-gray-300 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
+												onclick={() => updateParameter(config.key, undefined)}
+											>
+												Reset
+											</button>
+										{/if}
+									</div>
+									<input
+										id="{String(config.key)}-{modelId}"
+										type="number"
+										min={config.min}
+										max={config.max ?? undefined}
+										step={config.step}
+										value={$settings.modelParameters?.[modelId]?.[config.key] ?? ""}
+										oninput={(e) =>
+											handleParameterInput(
+												config.key,
+												e.currentTarget.value,
+												Boolean(config.integer)
+											)}
+										class="w-full rounded border border-gray-200 px-2 py-1 text-[13px] dark:border-gray-700 dark:bg-gray-900"
+									/>
+									<p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+										{config.description}
+									</p>
+								</div>
+							{/each}
+						</div>
+					</details>
+				{/if}
+
 				<div class="flex items-start justify-between py-3">
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
