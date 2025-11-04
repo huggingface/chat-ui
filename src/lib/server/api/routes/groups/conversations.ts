@@ -69,9 +69,6 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					params: t.Object({
 						id: t.String(),
 					}),
-					query: t.Object({
-						fromShare: t.Optional(t.String()),
-					}),
 				},
 				(app) => {
 					return app
@@ -128,19 +125,29 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 
 							return { conversation: convertedConv };
 						})
-						.get("", async ({ conversation }) => {
-							return {
-								messages: conversation.messages,
-								title: conversation.title,
-								model: conversation.model,
-								preprompt: conversation.preprompt,
-								rootMessageId: conversation.rootMessageId,
-								id: conversation._id.toString(),
-								updatedAt: conversation.updatedAt,
-								modelId: conversation.model,
-								shared: conversation.shared,
-							};
-						})
+						.get(
+							"",
+							async ({ conversation }) => {
+								return {
+									messages: conversation.messages,
+									title: conversation.title,
+									model: conversation.model,
+									preprompt: conversation.preprompt,
+									rootMessageId: conversation.rootMessageId,
+									id: conversation._id.toString(),
+									updatedAt: conversation.updatedAt,
+									modelId: conversation.model,
+									shared: conversation.shared,
+								};
+							},
+							{
+								query: t.Optional(
+									t.Object({
+										fromShare: t.Optional(t.String()),
+									})
+								),
+							}
+						)
 						.post("", () => {
 							// todo: post new message
 							throw new Error("Not implemented");

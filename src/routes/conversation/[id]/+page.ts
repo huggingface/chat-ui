@@ -10,7 +10,7 @@ export const load = async ({ params, depends, fetch, url }) => {
 	try {
 		return await client
 			.conversations({ id: params.id })
-			.get({ query: { fromShare: url.searchParams.get("fromShare") } })
+			.get({ query: { fromShare: url.searchParams.get("fromShare") ?? undefined } })
 			.then(handleResponse);
 	} catch {
 		redirect(302, "/");
