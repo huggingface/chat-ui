@@ -73,8 +73,11 @@
 				/>
 			{/if}
 		{:else if isPlainText(file.mime)}
-			<div class="relative flex h-full w-full flex-col gap-4 p-4">
-				<h3 class="-mb-4 pt-2 text-xl font-bold">{file.name}</h3>
+			<div class="relative flex h-full w-full flex-col gap-2 p-4">
+				<div class="flex items-center gap-1">
+					<CarbonDocument />
+					<h3 class="text-lg font-semibold">{file.name}</h3>
+				</div>
 				{#if file.mime === "application/vnd.chatui.clipboard"}
 					<p class="text-sm text-gray-500">
 						If you prefer to inject clipboard content directly in the chat, you can disable this
@@ -95,7 +98,7 @@
 						</div>
 					{:then result}
 						<pre
-							class="w-full whitespace-pre-wrap break-words pt-0 text-sm"
+							class="w-full whitespace-pre-wrap break-words pt-0 text-xs"
 							class:font-sans={file.mime === "text/plain" ||
 								file.mime === "application/vnd.chatui.clipboard"}
 							class:font-mono={file.mime !== "text/plain" &&
@@ -103,7 +106,7 @@
 					{/await}
 				{:else}
 					<pre
-						class="w-full whitespace-pre-wrap break-words pt-0 text-sm"
+						class="w-full whitespace-pre-wrap break-words pt-0 text-xs"
 						class:font-sans={file.mime === "text/plain" ||
 							file.mime === "application/vnd.chatui.clipboard"}
 						class:font-mono={file.mime !== "text/plain" &&
@@ -124,7 +127,6 @@
 			showModal = true;
 		}
 	}}
-	class="mt-4"
 	class:clickable={isClickable}
 	role="button"
 	tabindex="0"
@@ -161,7 +163,7 @@
 			</div>
 		{:else if isPlainText(file.mime)}
 			<div
-				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
+				class="flex h-14 w-64 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900 2xl:w-72"
 				class:file-hoverable={isClickable}
 			>
 				<div
