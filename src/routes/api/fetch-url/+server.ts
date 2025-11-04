@@ -1,4 +1,5 @@
 import { error } from "@sveltejs/kit";
+import { logger } from "$lib/server/logger.js";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -87,11 +88,14 @@ export async function GET({ url, fetch }) {
 	} catch (err) {
 		if (err instanceof Error) {
 			if (err.name === "AbortError") {
+				logger.error(err, `Request timeout`);
 				throw error(504, "Request timeout");
 			}
-			console.error("Error fetching URL:", err);
+
+			logger.error(err, `Error fetching URL`);
 			throw error(500, `Failed to fetch URL: ${err.message}`);
 		}
+		logger.error(err, `Error fetching URL`);
 		throw error(500, "Failed to fetch URL");
 	}
 }
