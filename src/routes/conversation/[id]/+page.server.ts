@@ -4,10 +4,9 @@ import { loginEnabled } from "$lib/server/auth";
 import { createConversationFromShare } from "$lib/server/conversation";
 
 export const load: PageServerLoad = async ({ url, params, locals, request }) => {
-	const leafId = url.searchParams.get("leafId");
-
-	/// if logged in and valid share ID, create conversation from share
-	if (loginEnabled && locals.user && params.id) {
+	/// if logged in and valid share ID, create conversation from share, usually occurs after login
+	if (loginEnabled && locals.user && params.id.length === 7) {
+		const leafId = url.searchParams.get("leafId");
 		const conversationId = await createConversationFromShare(
 			params.id,
 			locals,
@@ -19,5 +18,4 @@ export const load: PageServerLoad = async ({ url, params, locals, request }) => 
 			`../conversation/${conversationId}?leafId=${leafId}&fromShare=${params.id}`
 		);
 	}
-	return redirect(302, `../conversation/${params.id}?leafId=${leafId}`);
 };

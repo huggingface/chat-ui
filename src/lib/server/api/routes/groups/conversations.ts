@@ -69,21 +69,23 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 					params: t.Object({
 						id: t.String(),
 					}),
+					query: t.Object({
+						fromShare: t.Optional(t.String()),
+					}),
 				},
 				(app) => {
 					return app
-						.derive(async ({ locals, params }) => {
+						.derive(async ({ locals, params, query }) => {
 							let conversation;
 							let shared = false;
 
-							// if the conver
+							// if the conversation is shared
 							if (params.id.length === 7) {
 								// shared link of length 7
 								conversation = await collections.sharedConversations.findOne({
 									_id: params.id,
 								});
 								shared = true;
-
 								if (!conversation) {
 									throw new Error("Conversation not found");
 								}
@@ -112,6 +114,9 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 									}
 
 									throw new Error("Conversation not found.");
+								}
+								if (query.fromShare && conversation.meta?.fromShareId === query.fromShare) {
+									shared = true;
 								}
 							}
 
