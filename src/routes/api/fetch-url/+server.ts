@@ -88,14 +88,14 @@ export async function GET({ url, fetch }) {
 	} catch (err) {
 		if (err instanceof Error) {
 			if (err.name === "AbortError") {
-				logger.error(`Request timeout: ${err.message}`);
+				logger.error(err, `Request timeout`);
 				throw error(504, "Request timeout");
 			}
 
-			logger.error(`Error fetching URL: ${err.message}`);
+			logger.error(err, `Error fetching URL`);
 			throw error(500, `Failed to fetch URL: ${err.message}`);
 		}
-		logger.error(`Error fetching URL: ${err}`);
+		logger.error(err, `Error fetching URL`);
 		throw error(500, "Failed to fetch URL");
 	}
 }
