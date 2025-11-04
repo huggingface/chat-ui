@@ -60,6 +60,7 @@ envVars:
   EXPOSE_API: "true"
   METRICS_ENABLED: "true"
   LOG_LEVEL: "debug"
+  NODE_LOG_STRUCTURED_DATA: "true"
 
   OPENAI_BASE_URL: "https://router.huggingface.co/v1"
   PUBLIC_APP_ASSETS: "huggingchat"
