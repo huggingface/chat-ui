@@ -95,7 +95,7 @@ export async function GET({ url, fetch }) {
 			logger.error(`Error fetching URL: ${err.message}`);
 			throw error(500, `Failed to fetch URL: ${err.message}`);
 		}
-		logger.error(`Error fetching URL: ${err.message}`);
+		logger.error(`Error fetching URL: ${err}`);
 		throw error(500, "Failed to fetch URL");
 	}
 }
