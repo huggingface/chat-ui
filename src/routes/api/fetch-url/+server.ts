@@ -17,7 +17,6 @@ function isValidUrl(urlString: string): boolean {
 			hostname === "localhost" ||
 			hostname.startsWith("127.") ||
 			hostname.startsWith("192.168.") ||
-			hostname.startsWith("10.") ||
 			hostname.startsWith("172.16.") ||
 			hostname === "[::1]" ||
 			hostname === "0.0.0.0"
