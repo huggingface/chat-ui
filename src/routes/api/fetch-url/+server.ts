@@ -56,7 +56,10 @@ export async function GET({ url, fetch }) {
 			},
 		}).finally(() => clearTimeout(timeoutId));
 
-		logger.debug({ targetUrl, responseHeaders: response.headers }, "URL fetch debug");
+		logger.debug(
+			{ targetUrl, responseHeaders: JSON.stringify(response.headers) },
+			"URL fetch debug"
+		);
 
 		if (!response.ok) {
 			logger.error({ targetUrl, response }, `Error fetching URL. Response not ok.`);
