@@ -34,10 +34,12 @@ export async function GET({ url, fetch }) {
 	const targetUrl = url.searchParams.get("url");
 
 	if (!targetUrl) {
+		logger.warn("Missing 'url' parameter");
 		throw error(400, "Missing 'url' parameter");
 	}
 
 	if (!isValidUrl(targetUrl)) {
+		logger.warn({ targetUrl }, "Invalid or unsafe URL (only HTTPS is supported)");
 		throw error(400, "Invalid or unsafe URL (only HTTPS is supported)");
 	}
 
@@ -46,6 +48,7 @@ export async function GET({ url, fetch }) {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
+		logger.debug("Fetching url: " + targetUrl);
 		const response = await fetch(targetUrl, {
 			signal: controller.signal,
 			redirect: "error", // Block all redirects
@@ -55,6 +58,7 @@ export async function GET({ url, fetch }) {
 		}).finally(() => clearTimeout(timeoutId));
 
 		if (!response.ok) {
+			logger.error({ targetUrl }, `Error fetching URL`);
 			throw error(response.status, `Failed to fetch: ${response.statusText}`);
 		}
 
