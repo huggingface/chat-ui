@@ -52,9 +52,7 @@ export async function createConversationFromShare(
 	// New conversation expects files to be stored under its own id prefix
 	const newConvId = res.insertedId.toString();
 	const sharedId = fromShareId;
-	const files = await collections.bucket
-		.find({ filename: { $regex: `^${sharedId}-` } })
-		.toArray();
+	const files = await collections.bucket.find({ filename: { $regex: `^${sharedId}-` } }).toArray();
 
 	await Promise.all(
 		files.map(

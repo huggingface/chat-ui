@@ -283,17 +283,17 @@ async function prepareFiles(
 	textContent: string;
 }> {
 	// Separate image and text files
-    const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
-    const textFiles = files.filter((file) => {
-        const mime = (file.mime || "").toLowerCase();
-        const [fileType, fileSubtype] = mime.split("/");
-        return TEXT_MIME_ALLOWLIST.some((allowed) => {
-            const [type, subtype] = allowed.toLowerCase().split("/");
-            const typeOk = type === "*" || type === fileType;
-            const subOk = subtype === "*" || subtype === fileSubtype;
-            return typeOk && subOk;
-        });
-    });
+	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
+	const textFiles = files.filter((file) => {
+		const mime = (file.mime || "").toLowerCase();
+		const [fileType, fileSubtype] = mime.split("/");
+		return TEXT_MIME_ALLOWLIST.some((allowed) => {
+			const [type, subtype] = allowed.toLowerCase().split("/");
+			const typeOk = type === "*" || type === fileType;
+			const subOk = subtype === "*" || subtype === fileSubtype;
+			return typeOk && subOk;
+		});
+	});
 
 	// Process images if multimodal is enabled
 	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];

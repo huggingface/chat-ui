@@ -239,7 +239,7 @@
 			new Set([
 				...TEXT_MIME_ALLOWLIST,
 				...(modelIsMultimodal
-					? currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT]
+					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
 					: []),
 			])
 		)
