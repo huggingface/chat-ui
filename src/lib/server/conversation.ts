@@ -47,6 +47,37 @@ export async function createConversationFromShare(
 		meta: { fromShareId },
 	});
 
+	// Copy files from shared conversation bucket entries to the new conversation
+	// Shared files are stored with filenames "${sharedId}-${sha}" and metadata.conversation = sharedId
+	// New conversation expects files to be stored under its own id prefix
+	const newConvId = res.insertedId.toString();
+	const sharedId = fromShareId;
+	const files = await collections.bucket
+		.find({ filename: { $regex: `^${sharedId}-` } })
+		.toArray();
+
+	await Promise.all(
+		files.map(
+			(file) =>
+				new Promise<void>((resolve, reject) => {
+					try {
+						const newFilename = file.filename.replace(`${sharedId}-`, `${newConvId}-`);
+						const downloadStream = collections.bucket.openDownloadStream(file._id);
+						const uploadStream = collections.bucket.openUploadStream(newFilename, {
+							metadata: { ...file.metadata, conversation: newConvId },
+						});
+						downloadStream
+							.on("error", reject)
+							.pipe(uploadStream)
+							.on("error", reject)
+							.on("finish", () => resolve());
+					} catch (e) {
+						reject(e);
+					}
+				})
+		)
+	);
+
 	if (MetricsServer.isEnabled()) {
 		MetricsServer.getMetrics().model.conversationsTotal.inc({ model: conversation.model });
 	}
