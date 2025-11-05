@@ -35,6 +35,17 @@ module.exports = {
 				argsIgnorePattern: "^_",
 			},
 		],
+		// Enforce safer, consistent TS/JS patterns across src/
+		"@typescript-eslint/consistent-type-imports": [
+			"error",
+			{ prefer: "type-imports", fixStyle: "separate-type-imports" },
+		],
+		eqeqeq: ["error", "smart"],
+		"no-console": ["warn", { allow: ["warn", "error"] }],
+		"no-debugger": "error",
+		"prefer-const": "error",
+		"no-var": "error",
+		curly: ["error", "all"],
 		"object-shorthand": ["error", "always"],
 	},
 	env: {

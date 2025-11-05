@@ -1,0 +1,174 @@
+version = 1
+index_path = ".codanna/index"
+workspace_root = "/Users/sukbeom/Desktop/workspace/huggingface-ui"
+debug = false
+
+[indexing]
+parallel_threads = 12
+tantivy_heap_mb = 50
+max_retry_attempts = 3
+ignore_patterns = [
+    "target/**",
+    "node_modules/**",
+    ".git/**",
+    "*.generated.*",
+]
+indexed_paths = ["/Users/sukbeom/Desktop/workspace/huggingface-ui"]
+
+[languages.cpp]
+enabled = true
+extensions = [
+    "cpp",
+    "hpp",
+    "cc",
+    "cxx",
+    "hxx",
+]
+config_files = []
+
+[languages.c]
+enabled = true
+extensions = [
+    "c",
+    "h",
+]
+config_files = []
+
+[languages.kotlin]
+enabled = true
+extensions = [
+    "kt",
+    "kts",
+]
+config_files = []
+
+[languages.python]
+enabled = true
+extensions = [
+    "py",
+    "pyi",
+]
+config_files = []
+
+[languages.rust]
+enabled = true
+extensions = ["rs"]
+config_files = []
+
+[languages.typescript]
+enabled = true
+extensions = [
+    "ts",
+    "tsx",
+    "mts",
+    "cts",
+]
+config_files = []
+
+[languages.go]
+enabled = true
+extensions = ["go"]
+config_files = []
+
+[languages.csharp]
+enabled = true
+extensions = [
+    "cs",
+    "csx",
+    "cshtml",
+]
+config_files = []
+
+[languages.gdscript]
+enabled = true
+extensions = ["gd"]
+config_files = []
+
+[languages.php]
+enabled = true
+extensions = [
+    "php",
+    "php3",
+    "php4",
+    "php5",
+    "php7",
+    "php8",
+    "phps",
+    "phtml",
+]
+config_files = []
+
+[mcp]
+max_context_size = 100000
+debug = false
+
+[semantic_search]
+enabled = true
+model = "MultilingualE5Large"
+threshold = 0.6
+
+[file_watch]
+enabled = true
+debounce_ms = 500
+
+[server]
+mode = "stdio"
+bind = "127.0.0.1:8080"
+watch_interval = 5
+
+[guidance]
+enabled = true
+
+[guidance.templates.find_symbol]
+no_results = "Symbol not found. Use 'search_symbols' with fuzzy matching or 'semantic_search_docs' for broader search."
+single_result = "Symbol found with full context. Explore 'get_calls' to see what it calls, 'find_callers' to see usage, or 'analyze_impact' to understand change implications."
+multiple_results = "Found {result_count} symbols with that name. Review each to find the one you're looking for."
+
+[guidance.templates.search_symbols]
+no_results = "No symbols match your query. Try 'semantic_search_docs' for natural language search or adjust your pattern."
+single_result = "Found exactly one match. Use 'find_symbol' to get full details about this symbol."
+multiple_results = "Found {result_count} matching symbols. Use 'find_symbol' on specific results for full context or narrow your search with 'kind' parameter."
+
+[guidance.templates.get_calls]
+no_results = "No function calls found. This might be a leaf function or data structure."
+single_result = "Found 1 function call. Use 'find_symbol' to explore this dependency."
+multiple_results = "Found {result_count} function calls. Consider using 'find_symbol' on key dependencies or 'analyze_impact' to trace the call chain further."
+
+[guidance.templates.find_callers]
+no_results = "No callers found. This might be an entry point, unused code, or called dynamically."
+single_result = "Found 1 caller. Use 'find_symbol' to explore where this function is used."
+multiple_results = "Found {result_count} callers. Consider 'analyze_impact' for complete dependency graph or investigate specific callers with 'find_symbol'."
+
+[guidance.templates.get_index_info]
+single_result = "Index statistics loaded. Use search tools to explore the codebase."
+
+[guidance.templates.semantic_search_with_context]
+no_results = "No semantic matches found. Try different phrasing or ensure documentation exists for the concepts you're searching."
+single_result = "Found one match with full context. Review the relationships to understand how this fits into the codebase."
+multiple_results = "Rich context provided for {result_count} matches. Investigate specific relationships using targeted tools like 'get_calls' or 'find_callers'."
+
+[guidance.templates.semantic_search_docs]
+no_results = "No results found. Try broader search terms or check if the codebase is indexed."
+single_result = "Found one match. Consider using 'find_symbol' or 'get_calls' to explore this symbol's relationships."
+multiple_results = "Found {result_count} matches. Consider using 'find_symbol' on the most relevant result for detailed analysis, or refine your search query."
+
+[[guidance.templates.semantic_search_docs.custom]]
+min = 10
+template = "Found {result_count} matches. Consider refining your search with more specific terms."
+
+[guidance.templates.analyze_impact]
+no_results = "No impact detected. This symbol appears isolated. Consider using the codanna-navigator agent for comprehensive multi-hop analysis of complex relationships."
+single_result = "Minimal impact radius. This symbol has limited dependencies."
+multiple_results = "Impact analysis shows {result_count} affected symbols. Focus on critical paths or use 'find_symbol' on key dependencies."
+
+[[guidance.templates.analyze_impact.custom]]
+min = 2
+max = 5
+template = "Limited impact radius with {result_count} affected symbols. This change is relatively contained."
+
+[[guidance.templates.analyze_impact.custom]]
+min = 20
+template = "Significant impact with {result_count} affected symbols. Consider breaking this change into smaller parts."
+
+[guidance.variables]
+project = "codanna"

@@ -1,0 +1,61 @@
+{
+	"version": "1.0.0",
+	"profiles": {
+		"claude": {
+			"name": "claude",
+			"version": "1.0.0",
+			"installed_at": "2025-11-23T04:23:48Z",
+			"files": [
+				"CLAUDE.md.codanna",
+				".claude/agents/codanna/research-agent.md",
+				".claude/settings.local.codanna.json",
+				".claude/hooks/codanna/stop.js",
+				".claude/hooks/codanna/skill-activation-prompt.ts",
+				".claude/hooks/codanna/post_tool_use.js",
+				".claude/hooks/codanna/tests/test-read-allow.json",
+				".claude/hooks/codanna/tests/test-post-tool.json",
+				".claude/hooks/codanna/tests/test-prompt-input.json",
+				".claude/hooks/codanna/tests/test-read-block.json",
+				".claude/hooks/codanna/tests/test-read-warn.json",
+				".claude/hooks/codanna/README.md",
+				".claude/hooks/codanna/subagent-stop.js",
+				".claude/hooks/codanna/package-lock.json",
+				".claude/hooks/codanna/package.json",
+				".claude/hooks/codanna/tsconfig.json",
+				".claude/hooks/codanna/pre_read_use.js",
+				".claude/hooks/codanna/hooks-config.json",
+				".claude/scripts/codanna/formatters/symbol.js",
+				".claude/scripts/codanna/formatters/semantic.js",
+				".claude/scripts/codanna/schemas/semantic_search.json",
+				".claude/scripts/codanna/schemas/symbol.json",
+				".claude/scripts/codanna/README.md",
+				".claude/scripts/codanna/lib/config-resolver.js",
+				".claude/scripts/codanna/lib/validator.js",
+				".claude/scripts/codanna/lib/executor.js",
+				".claude/scripts/codanna/context-provider.js",
+				".claude/commands/codanna/symbol.md",
+				".claude/commands/codanna/x-ray.md",
+				".claude/skills/codebase-explorer/SKILL.md",
+				".claude/skills/skill-developer/HOOK_MECHANISMS.md",
+				".claude/skills/skill-developer/SKILL_RULES_REFERENCE.md",
+				".claude/skills/skill-developer/TROUBLESHOOTING.md",
+				".claude/skills/skill-developer/ADVANCED.md",
+				".claude/skills/skill-developer/SKILL.md",
+				".claude/skills/skill-developer/PATTERNS_LIBRARY.md",
+				".claude/skills/skill-developer/TRIGGER_TYPES.md",
+				".claude/skills/add-language/SKILL.md",
+				".claude/skills/add-language/language-support.md",
+				".claude/skills/add-language/language-architecture.md",
+				".claude/skills/add-language/language-patterns.md",
+				".claude/skills/skill-rules.json"
+			],
+			"integrity": "0749262db6280c794060f7bdd9740ccaf13daff4e01354c6f39ab59cf7357c7b",
+			"commit": "f6671d7b53ed057b789cf5d6be8fdccb7a5dd1f8",
+			"provider_id": "codanna-profiles",
+			"source": {
+				"type": "github",
+				"repo": "bartolli/codanna-profiles"
+			}
+		}
+	}
+}

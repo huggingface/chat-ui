@@ -1,0 +1,10 @@
+- src/lib/server/**: server-only modules and $api
+- src/lib/components/**: Svelte UI components
+- src/lib/stores/**: Svelte stores for cross-component state
+- src/lib/types/**: shared TS types
+- src/routes/**: SvelteKit routes (pages/layouts and +server endpoints)
+- src/routes/api/**/+server.ts: API endpoints
+- scripts/**: utility scripts, vitest setups
+- Config roots: svelte.config.js, vite.config.ts, tsconfig.json, .eslintrc.cjs, tailwind.config.cjs
+- static/**: app icons/manifests
+- models/**: placeholder for models

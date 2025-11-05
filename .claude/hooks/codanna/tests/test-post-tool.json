@@ -1,0 +1,7 @@
+{
+	"session_id": "test-session-123",
+	"tool_name": "Read",
+	"tool_input": {
+		"file_path": "src/services/user.ts"
+	}
+}

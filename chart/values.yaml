@@ -4,7 +4,7 @@ image:
   tag: 0.0.0-latest
   pullPolicy: IfNotPresent
 
-replicas: 3
+replicas: 1
 
 domain: huggingface.co
 

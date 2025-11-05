@@ -1,0 +1,89 @@
+{
+	"version": "1.0",
+	"description": "Skill activation triggers for Claude Code. Controls when skills automatically suggest or block actions.",
+	"skills": {
+		"skill-developer": {
+			"type": "domain",
+			"enforcement": "suggest",
+			"priority": "high",
+			"description": "Meta-skill for creating and managing Claude Code skills",
+			"promptTriggers": {
+				"keywords": [
+					"skill system",
+					"create skill",
+					"add skill",
+					"skill triggers",
+					"skill rules",
+					"hook system",
+					"skill development",
+					"skill-rules.json"
+				],
+				"intentPatterns": [
+					"(how do|how does|explain).*?skill",
+					"(create|add|modify|build).*?skill",
+					"skill.*?(work|trigger|activate|system)"
+				]
+			}
+		},
+		"codebase-explorer": {
+			"type": "domain",
+			"enforcement": "suggest",
+			"priority": "high",
+			"description": "Meta-skill for exploring local codebase using codanna",
+			"promptTriggers": {
+				"keywords": ["investigate", "understand code", "explore", "codabase", "use codanna"],
+				"intentPatterns": [
+					"(how do|how does|explain).*?code",
+					"(create|add|modify|build).*?method",
+					"(create|add|modify|build).*?class",
+					"(create|add|modify|build).*?function",
+					"code.*?(work|trigger|structure|system)"
+				]
+			}
+		},
+		"add-language": {
+			"type": "domain",
+			"enforcement": "suggest",
+			"priority": "high",
+			"description": "Guide for implementing new language parser in Codanna",
+			"promptTriggers": {
+				"keywords": [
+					"add language",
+					"new language",
+					"language support",
+					"implement parser",
+					"create parser",
+					"language implementation",
+					"add support for",
+					"parser implementation",
+					"language parser",
+					"tree-sitter"
+				],
+				"intentPatterns": [
+					"(add|implement|create).*?(language|parser)",
+					"(new|support).*?language",
+					"language.*?(support|implementation|parser)",
+					"(how do|how to).*?add.*?language"
+				]
+			}
+		}
+	},
+	"notes": {
+		"enforcement_types": {
+			"suggest": "Skill suggestion appears but doesn't block execution",
+			"block": "Requires skill to be used before proceeding (guardrail)",
+			"warn": "Shows warning but allows proceeding"
+		},
+		"priority_levels": {
+			"critical": "Highest - Always trigger when matched",
+			"high": "Important - Trigger for most matches",
+			"medium": "Moderate - Trigger for clear matches",
+			"low": "Optional - Trigger only for explicit matches"
+		},
+		"customization": {
+			"pathPatterns": "Adjust to match your project structure (blog-api, auth-service, etc.)",
+			"keywords": "Add domain-specific terms relevant to your project",
+			"intentPatterns": "Use regex for flexible user intent matching"
+		}
+	}
+}

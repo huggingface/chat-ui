@@ -71,6 +71,7 @@
 		"@huggingface/inference": "^4.11.3",
 		"@iconify-json/bi": "^1.1.21",
 		"@resvg/resvg-js": "^2.6.2",
+		"@sinclair/typebox": "^0.34.41",
 		"autoprefixer": "^10.4.14",
 		"date-fns": "^2.29.3",
 		"dotenv": "^16.5.0",

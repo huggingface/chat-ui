@@ -1,0 +1,61 @@
+{
+	"$schema": "https://json.schemastore.org/claude-code-settings.json",
+	"hooks": {
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "npm run --prefix \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/codanna hook:prompt"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "npm run --prefix \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/codanna hook:post-tool",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "npm run --prefix \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/codanna hook:stop",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "npm run --prefix \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/codanna hook:subagent-stop",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Read",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "npm run --prefix \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/codanna hook:read",
+						"timeout": 30
+					}
+				]
+			}
+		]
+	}
+}

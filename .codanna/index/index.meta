@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "data_source": {
+    "Tantivy": {
+      "path": "/Users/sukbeom/Desktop/workspace/huggingface-ui/.codanna/index/tantivy",
+      "doc_count": 6290,
+      "timestamp": 1762317281
+    }
+  },
+  "symbol_count": 2625,
+  "file_count": 371,
+  "last_modified": 1762317281,
+  "indexed_paths": [
+    "/Users/sukbeom/Desktop/workspace/huggingface-ui"
+  ]
+}

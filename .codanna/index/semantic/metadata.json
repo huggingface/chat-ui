@@ -1,0 +1,8 @@
+{
+  "model_name": "MultilingualE5Large",
+  "dimension": 1024,
+  "embedding_count": 78,
+  "created_at": 1762319513,
+  "updated_at": 1762319513,
+  "version": 1
+}

@@ -1,0 +1,9 @@
+- TypeScript strict; export APIs with explicit types
+- Type-only imports required (@typescript-eslint/consistent-type-imports)
+- Forbid: any, non-null assertions (!), unused vars (prefix _ for intentionally unused)
+- Enforce: eqeqeq (smart), prefer-const, no-var, curly (all), object-shorthand (always)
+- Console: allow console.warn/error only
+- Prettier: use tabs, printWidth 100; do not reformat unrelated code; keep Svelte and Tailwind plugins
+- Svelte 5: prefer $state/$derived/$props; minimal colocated reactive state; avoid direct DOM manipulation
+- Security in markup: use DOMPurify.sanitize for any {@html}; never inject unsanitized HTML
+- Follow patterns in src/lib/APIClient.ts and src/lib/components/CodeBlock.svelte

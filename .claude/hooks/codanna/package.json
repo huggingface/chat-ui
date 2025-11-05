@@ -1,0 +1,26 @@
+{
+	"name": "claude-hooks",
+	"version": "1.0.0",
+	"description": "TypeScript hooks for Claude Code skill auto-activation",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"check": "tsc --noEmit",
+		"hook:prompt": "tsx skill-activation-prompt.ts",
+		"hook:read": "node pre_read_use.js",
+		"hook:post-tool": "node post_tool_use.js",
+		"hook:stop": "node stop.js",
+		"hook:subagent-stop": "node subagent-stop.js",
+		"test:prompt": "tsx skill-activation-prompt.ts < tests/test-prompt-input.json",
+		"test:read-allow": "node pre_read_use.js < tests/test-read-allow.json",
+		"test:read-warn": "node pre_read_use.js < tests/test-read-warn.json",
+		"test:read-block": "node pre_read_use.js < tests/test-read-block.json",
+		"test:post-tool": "node post_tool_use.js < tests/test-post-tool.json",
+		"test:all": "npm run test:prompt && npm run test:read-allow && npm run test:read-warn && npm run test:post-tool"
+	},
+	"dependencies": {
+		"@types/node": "^20.11.0",
+		"tsx": "^4.7.0",
+		"typescript": "^5.3.3"
+	}
+}

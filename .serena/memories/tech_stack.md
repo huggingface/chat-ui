@@ -1,0 +1,7 @@
+- Frameworks: SvelteKit v2, Svelte 5, Vite v6, TypeScript (strict)
+- Styling: Tailwind CSS (+ typography plugin)
+- Testing: Vitest workspaces (client/browser, ssr, server)
+- Server: @sveltejs/adapter-node, pino, prom-client
+- Utilities: unplugin-icons, isomorphic-dompurify, zod, sharp
+- Data/others: mongodb (driver), uuid, date-fns
+- Tooling: ESLint, Prettier (svelte + tailwind plugins)

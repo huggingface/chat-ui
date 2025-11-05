@@ -1,0 +1,16 @@
+{
+	"read_validator": {
+		"max_read_lines": 400,
+		"tolerance_lines": 200,
+		"thresholds": {
+			"block": {
+				"exit_code": 2,
+				"message": "Read operation blocked: exceeds maximum allowed lines.\nSuggestion: Split into smaller reads or use Grep to find specific content first."
+			},
+			"warn": {
+				"exit_code": 1,
+				"message": "Large read detected. Read size logged for analysis - consider optimization if pattern repeats."
+			}
+		}
+	}
+}

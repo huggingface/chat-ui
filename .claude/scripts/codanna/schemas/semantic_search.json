@@ -1,0 +1,188 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Codanna Semantic Search Response",
+	"type": "object",
+	"properties": {
+		"status": {
+			"type": "string",
+			"enum": ["success", "not_found", "error"]
+		},
+		"code": {
+			"type": "string"
+		},
+		"message": {
+			"type": "string"
+		},
+		"system_message": {
+			"type": ["string", "null"]
+		},
+		"data": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"symbol": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "number"
+							},
+							"name": {
+								"type": "string"
+							},
+							"kind": {
+								"type": "string"
+							},
+							"file_id": {
+								"type": "number"
+							},
+							"range": {
+								"type": "object",
+								"properties": {
+									"start_line": {
+										"type": "number"
+									},
+									"start_column": {
+										"type": "number"
+									},
+									"end_line": {
+										"type": "number"
+									},
+									"end_column": {
+										"type": "number"
+									}
+								},
+								"required": ["start_line", "start_column", "end_line", "end_column"]
+							},
+							"signature": {
+								"type": "string"
+							},
+							"doc_comment": {
+								"type": ["string", "null"]
+							},
+							"module_path": {
+								"type": "string"
+							},
+							"visibility": {
+								"type": "string"
+							},
+							"scope_context": {
+								"type": "string"
+							},
+							"language_id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"id",
+							"name",
+							"kind",
+							"file_id",
+							"range",
+							"signature",
+							"doc_comment",
+							"module_path",
+							"visibility",
+							"scope_context",
+							"language_id"
+						]
+					},
+					"score": {
+						"type": "number"
+					},
+					"context": {
+						"type": "object",
+						"properties": {
+							"symbol": {
+								"type": "object",
+								"properties": {
+									"id": {
+										"type": "number"
+									},
+									"name": {
+										"type": "string"
+									},
+									"kind": {
+										"type": "string"
+									},
+									"file_id": {
+										"type": "number"
+									},
+									"range": {
+										"type": "object",
+										"properties": {
+											"start_line": {
+												"type": "number"
+											},
+											"start_column": {
+												"type": "number"
+											},
+											"end_line": {
+												"type": "number"
+											},
+											"end_column": {
+												"type": "number"
+											}
+										},
+										"required": ["start_line", "start_column", "end_line", "end_column"]
+									},
+									"signature": {
+										"type": "string"
+									},
+									"doc_comment": {
+										"type": ["string", "null"]
+									},
+									"module_path": {
+										"type": "string"
+									},
+									"visibility": {
+										"type": "string"
+									},
+									"scope_context": {
+										"type": "string"
+									},
+									"language_id": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"id",
+									"name",
+									"kind",
+									"file_id",
+									"range",
+									"signature",
+									"doc_comment",
+									"module_path",
+									"visibility",
+									"scope_context",
+									"language_id"
+								]
+							},
+							"file_path": {
+								"type": "string"
+							},
+							"relationships": {
+								"type": "object",
+								"properties": {
+									"implements": { "type": ["array", "null"] },
+									"implemented_by": { "type": ["array", "null"] },
+									"defines": { "type": ["array", "null"] },
+									"calls": { "type": ["array", "null"] },
+									"called_by": { "type": ["array", "null"] }
+								},
+								"required": ["implements", "implemented_by", "defines", "calls", "called_by"]
+							}
+						},
+						"required": ["symbol", "file_path", "relationships"]
+					}
+				},
+				"required": ["symbol", "score", "context"]
+			}
+		},
+		"exit_code": {
+			"type": "number"
+		}
+	},
+	"required": ["status", "code", "message", "system_message", "data", "exit_code"]
+}
