@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 ARG INCLUDE_DB=false
 
-FROM node:20-slim AS base
+FROM node:24-slim AS base
 
 # install dotenv-cli
 RUN npm install -g dotenv-cli
@@ -36,7 +36,7 @@ COPY --chown=1000 package-lock.json /app/package-lock.json
 
 RUN chmod +x /app/entrypoint.sh
 
-FROM node:20 AS builder
+FROM node:24 AS builder
 
 WORKDIR /app
 
