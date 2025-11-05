@@ -50,14 +50,16 @@ export async function GET({ url, fetch }) {
 
 		logger.debug({ targetUrl }, "Fetching url");
 		const response = await fetch(targetUrl, {
-			signal: controller.signal, // Block all redirects
+			signal: controller.signal,
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
 			},
 		}).finally(() => clearTimeout(timeoutId));
 
+		logger.debug({ targetUrl, responseHeaders: response.headers }, "URL fetch debug");
+
 		if (!response.ok) {
-			logger.error({ targetUrl }, `Error fetching URL`);
+			logger.error({ targetUrl, response }, `Error fetching URL. Response not ok.`);
 			throw error(response.status, `Failed to fetch: ${response.statusText}`);
 		}
 
@@ -99,6 +101,6 @@ export async function GET({ url, fetch }) {
 			throw error(500, `Failed to fetch URL: ${err.message}`);
 		}
 		logger.error(err, `Error fetching URL`);
-		throw error(500, "Failed to fetch URL");
+		throw error(500, "Failed to fetch URL.");
 	}
 }
