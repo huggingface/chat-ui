@@ -9,6 +9,7 @@
 	import AudioPlayer from "../players/AudioPlayer.svelte";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import { base } from "$app/paths";
+	import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 
 	interface Props {
 		file: MessageFile;
@@ -43,20 +44,28 @@
 	const isVideo = (mime: string) =>
 		mime.startsWith("video/") || mime === "mp4" || mime === "x-mpeg";
 
+	function matchesAllowed(contentType: string, allowed: readonly string[]): boolean {
+		const ct = contentType.split(";")[0]?.trim().toLowerCase();
+		if (!ct) return false;
+		const [ctType, ctSubtype] = ct.split("/");
+		for (const a of allowed) {
+			const [aType, aSubtype] = a.toLowerCase().split("/");
+			const typeOk = aType === "*" || aType === ctType;
+			const subOk = aSubtype === "*" || aSubtype === ctSubtype;
+			if (typeOk && subOk) return true;
+		}
+		return false;
+	}
+
 	const isPlainText = (mime: string) =>
-		mime === "text/plain" ||
-		mime === "text/csv" ||
-		mime === "text/markdown" ||
-		mime === "application/json" ||
-		mime === "application/xml" ||
-		mime === "application/vnd.chatui.clipboard";
+		mime === "application/vnd.chatui.clipboard" || matchesAllowed(mime, TEXT_MIME_ALLOWLIST);
 
 	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
 </script>
 
 {#if showModal && isClickable}
 	<!-- show the image file full screen, click outside to exit -->
-	<Modal width="sm:max-w-[800px]" onclose={() => (showModal = false)}>
+	<Modal width="xl:max-w-[75dvw]" onclose={() => (showModal = false)}>
 		{#if isImage(file.mime)}
 			{#if file.type === "hash"}
 				<img
@@ -182,7 +191,7 @@
 					{/if}
 				</dl>
 			</div>
-		{:else if file.mime === "octet-stream"}
+		{:else if file.mime === "application/octet-stream"}
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
 				class:file-hoverable={isClickable}
