@@ -232,18 +232,15 @@
 	let modelIsMultimodal = $derived((modelIsMultimodalOverride ?? currentModel.multimodal) === true);
 
 	// Always allow common text-like files; add images only when model is multimodal
-	const ALWAYS_TEXT_MIME_TYPES = [
-		"text/*",
-		"application/json",
-		"application/xml",
-		"application/csv",
-	];
+	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...ALWAYS_TEXT_MIME_TYPES,
-				...(modelIsMultimodal ? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"]) : []),
+				...TEXT_MIME_ALLOWLIST,
+				...(modelIsMultimodal
+					? currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT]
+					: []),
 			])
 		)
 	);

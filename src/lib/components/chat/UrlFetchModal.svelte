@@ -136,7 +136,7 @@
 
 				<div class="flex flex-col gap-2">
 					<label class="text-sm text-gray-600 dark:text-gray-400" for="fetch-url-input"
-						>HTTPS URL</label
+						>Enter URL</label
 					>
 					<input
 						id="fetch-url-input"

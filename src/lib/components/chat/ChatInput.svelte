@@ -11,6 +11,7 @@
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
+	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -73,13 +74,14 @@
 	function openFilePickerText() {
 		const textAccept =
 			mimeTypes.filter((m) => !(m === "image/*" || m.startsWith("image/"))).join(",") ||
-			"text/*,application/json,application/xml,application/csv";
+			TEXT_MIME_ALLOWLIST.join(",");
 		openPickerWithAccept(textAccept);
 	}
 
 	function openFilePickerImage() {
 		const imageAccept =
-			mimeTypes.filter((m) => m === "image/*" || m.startsWith("image/")).join(",") || "image/*";
+			mimeTypes.filter((m) => m === "image/*" || m.startsWith("image/")).join(",") ||
+			IMAGE_MIME_ALLOWLIST_DEFAULT.join(",");
 		openPickerWithAccept(imageAccept);
 	}
 

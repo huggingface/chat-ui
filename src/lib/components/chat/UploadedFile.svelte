@@ -182,7 +182,7 @@
 					{/if}
 				</dl>
 			</div>
-		{:else if file.mime === "octet-stream"}
+{:else if file.mime === "application/octet-stream"}
 			<div
 				class="flex h-14 w-72 items-center gap-2 overflow-hidden rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
 				class:file-hoverable={isClickable}

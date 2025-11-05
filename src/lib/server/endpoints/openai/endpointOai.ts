@@ -14,6 +14,7 @@ import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
+import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "../endpoints";
 // uuid import removed (no tool call ids)
@@ -282,14 +283,17 @@ async function prepareFiles(
 	textContent: string;
 }> {
 	// Separate image and text files
-	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
-	const textFiles = files.filter(
-		(file) =>
-			file.mime.startsWith("text/") ||
-			file.mime === "application/json" ||
-			file.mime === "application/xml" ||
-			file.mime === "application/csv"
-	);
+    const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
+    const textFiles = files.filter((file) => {
+        const mime = (file.mime || "").toLowerCase();
+        const [fileType, fileSubtype] = mime.split("/");
+        return TEXT_MIME_ALLOWLIST.some((allowed) => {
+            const [type, subtype] = allowed.toLowerCase().split("/");
+            const typeOk = type === "*" || type === fileType;
+            const subOk = subtype === "*" || subtype === fileSubtype;
+            return typeOk && subOk;
+        });
+    });
 
 	// Process images if multimodal is enabled
 	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
