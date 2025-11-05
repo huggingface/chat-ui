@@ -8,6 +8,12 @@
 - Node adapter deployment. Aliases: `$api -> src/lib/server/api`.
 - Lint and format enforced via npm scripts. Testing via Vitest workspaces.
 
+### Related Rule Files
+
+- [.cursor/rules/cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc)
+- [.cursor/rules/RIPER-5.mdc](mdc:.cursor/rules/RIPER-5.mdc)
+- [.cursor/rules/initial_config_mandate.mdc](mdc:.cursor/rules/initial_config_mandate.mdc)
+
 ## Architecture & Paths
 
 - Source root: `src/`
