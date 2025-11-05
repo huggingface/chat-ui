@@ -1,5 +1,6 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
+import { fetch } from "undici";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -30,7 +31,7 @@ function isValidUrl(urlString: string): boolean {
 	}
 }
 
-export async function GET({ url, fetch }) {
+export async function GET({ url }) {
 	const targetUrl = url.searchParams.get("url");
 
 	if (!targetUrl) {
@@ -48,18 +49,12 @@ export async function GET({ url, fetch }) {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-		logger.debug({ targetUrl }, "Fetching url");
 		const response = await fetch(targetUrl, {
 			signal: controller.signal,
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
 			},
 		}).finally(() => clearTimeout(timeoutId));
-
-		logger.debug(
-			{ targetUrl, responseHeaders: JSON.stringify(response.headers) },
-			"URL fetch debug"
-		);
 
 		if (!response.ok) {
 			logger.error({ targetUrl, response }, `Error fetching URL. Response not ok.`);

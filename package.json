@@ -100,6 +100,7 @@
 		"sharp": "^0.33.4",
 		"tailwind-scrollbar": "^3.0.0",
 		"tailwindcss": "^3.4.0",
+		"undici": "^7.16.0",
 		"uuid": "^10.0.0",
 		"vitest-browser-svelte": "^0.1.0",
 		"zod": "^3.22.3"
