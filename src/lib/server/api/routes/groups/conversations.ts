@@ -72,18 +72,17 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 				},
 				(app) => {
 					return app
-						.derive(async ({ locals, params }) => {
+						.derive(async ({ locals, params, query }) => {
 							let conversation;
 							let shared = false;
 
-							// if the conver
+							// if the conversation is shared
 							if (params.id.length === 7) {
 								// shared link of length 7
 								conversation = await collections.sharedConversations.findOne({
 									_id: params.id,
 								});
 								shared = true;
-
 								if (!conversation) {
 									throw new Error("Conversation not found");
 								}
@@ -113,6 +112,9 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 
 									throw new Error("Conversation not found.");
 								}
+								if (query.fromShare && conversation.meta?.fromShareId === query.fromShare) {
+									shared = true;
+								}
 							}
 
 							const convertedConv = {
@@ -123,19 +125,29 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 
 							return { conversation: convertedConv };
 						})
-						.get("", async ({ conversation }) => {
-							return {
-								messages: conversation.messages,
-								title: conversation.title,
-								model: conversation.model,
-								preprompt: conversation.preprompt,
-								rootMessageId: conversation.rootMessageId,
-								id: conversation._id.toString(),
-								updatedAt: conversation.updatedAt,
-								modelId: conversation.model,
-								shared: conversation.shared,
-							};
-						})
+						.get(
+							"",
+							async ({ conversation }) => {
+								return {
+									messages: conversation.messages,
+									title: conversation.title,
+									model: conversation.model,
+									preprompt: conversation.preprompt,
+									rootMessageId: conversation.rootMessageId,
+									id: conversation._id.toString(),
+									updatedAt: conversation.updatedAt,
+									modelId: conversation.model,
+									shared: conversation.shared,
+								};
+							},
+							{
+								query: t.Optional(
+									t.Object({
+										fromShare: t.Optional(t.String()),
+									})
+								),
+							}
+						)
 						.post("", () => {
 							// todo: post new message
 							throw new Error("Not implemented");
