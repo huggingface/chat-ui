@@ -59,8 +59,8 @@ References: [ESLint config](mdc:.eslintrc.cjs), [tsconfig.json](mdc:tsconfig.jso
 
 ```svelte
 <script lang="ts">
-	import DOMPurify from "isomorphic-dompurify";
-	export let html: string;
+ import DOMPurify from "isomorphic-dompurify";
+ export let html: string;
 </script>
 
 {@html DOMPurify.sanitize(html)}
@@ -180,7 +180,7 @@ import type { ApiResponse } from "$api/types";
 ```ts
 // Do
 if (count === 0) {
-	const value = 1;
+ const value = 1;
 }
 
 // Don’t
@@ -194,7 +194,7 @@ if (count === 0) {
 ```ts
 // Do: src/routes/api/widgets/+server.ts
 export async function POST({ request }) {
-	// validate with zod, return json
+ // validate with zod, return json
 }
 
 // Don’t: put server handlers in non-+server files

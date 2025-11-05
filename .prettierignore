@@ -12,3 +12,6 @@ node_modules
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+*.md
+*.mdc
+*.md.codanna

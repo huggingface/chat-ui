@@ -18,13 +18,15 @@ codanna mcp semantic_search_with_context query:"your search" limit:5
 ```
 
 Returns:
-```
+
+```bash
 1. unified - Method at src/io/output.rs:257-301 [symbol_id:896]
    Similarity Score: 0.726
    Documentation: Output a UnifiedOutput structure...
 ```
 
 You get:
+
 - Line ranges: `257-301`
 - Symbol ID: `[symbol_id:896]`
 - Relevance score (focus on > 0.6)
@@ -36,7 +38,8 @@ Use line ranges to read only what you need:
 **Formula:** `limit = end_line - start_line + 1`
 
 **Example:** For range `257-301`:
-```
+
+```toml
 Read tool with:
   file_path: "src/io/output.rs"
   offset: 257
@@ -44,6 +47,7 @@ Read tool with:
 ```
 
 **Alternative (Unix/macOS):**
+
 ```bash
 sed -n '257,301p' src/io/output.rs
 ```
@@ -75,22 +79,26 @@ Run semantic search again with refined terms.
 ## Quick Reference
 
 **Semantic search (start here):**
+
 ```bash
 codanna mcp semantic_search_with_context query:"..." limit:5
 ```
 
 **Explore symbol:**
+
 ```bash
 codanna retrieve describe <name|symbol_id:XXX>
 ```
 
 **Relationships:**
+
 ```bash
 codanna retrieve callers <name|symbol_id:XXX>
 codanna retrieve calls <name|symbol_id:XXX>
 ```
 
 **Direct lookup:**
+
 ```bash
 codanna retrieve symbol <name>
 ```
