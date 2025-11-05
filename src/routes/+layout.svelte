@@ -57,7 +57,7 @@
 		}, 5000);
 	}
 
-	const canShare = $derived(
+	let canShare = $derived(
 		publicConfig.isHuggingChat &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")

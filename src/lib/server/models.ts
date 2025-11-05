@@ -308,7 +308,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 		// Use auth token from the start if available to avoid rate limiting issues
 		// Some APIs rate-limit unauthenticated requests more aggressively
-		let response = await fetch(`${baseURL}/models`, {
+		const response = await fetch(`${baseURL}/models`, {
 			headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
 		});
 		logger.info({ status: response.status }, "[models] First fetch status");

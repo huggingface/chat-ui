@@ -15,4 +15,12 @@ if (dev) {
 	};
 }
 
-export const logger = pino({ ...options, level: config.LOG_LEVEL || "info" });
+export const logger = pino({
+	...options,
+	level: config.LOG_LEVEL || "info",
+	formatters: {
+		level: (label) => {
+			return { level: label };
+		},
+	},
+});
