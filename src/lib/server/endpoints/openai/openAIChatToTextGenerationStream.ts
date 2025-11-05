@@ -61,10 +61,10 @@ export async function* openAIChatToTextGenerationStream(
 				: typeof delta?.reasoning_content === "string"
 					? (delta.reasoning_content as string)
 					: "";
-		const last = choices[0]?.finish_reason === "stop" || choices[0]?.finish_reason === "length";
+		const last = choices?.[0]?.finish_reason === "stop" || choices?.[0]?.finish_reason === "length";
 
 		// if the last token is a stop and the tool buffer is not empty, yield it as a generated_text
-		if (choices[0]?.finish_reason === "stop" && toolBuffer.length > 0) {
+		if (choices?.[0]?.finish_reason === "stop" && toolBuffer.length > 0) {
 			yield {
 				token: {
 					id: tokenId++,
@@ -79,7 +79,7 @@ export async function* openAIChatToTextGenerationStream(
 		}
 
 		// weird bug where the parameters are streamed in like this
-		if (choices[0]?.delta?.tool_calls) {
+		if (choices?.[0]?.delta?.tool_calls) {
 			const calls = Array.isArray(choices[0].delta.tool_calls)
 				? choices[0].delta.tool_calls
 				: [choices[0].delta.tool_calls];
