@@ -48,10 +48,9 @@ export async function GET({ url, fetch }) {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-		logger.debug("Fetching url: " + targetUrl);
+		logger.debug({ targetUrl }, "Fetching url");
 		const response = await fetch(targetUrl, {
-			signal: controller.signal,
-			redirect: "error", // Block all redirects
+			signal: controller.signal, // Block all redirects
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
 			},
