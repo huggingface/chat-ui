@@ -64,7 +64,7 @@
 			log("poll", id);
 
 			try {
-				const response = await client.conversations({ id }).get();
+				const response = await client.conversations({ id }).get({ query: {} });
 				const conversation = handleResponse(response);
 				const messages = conversation?.messages ?? [];
 				const lastAssistant = [...messages]

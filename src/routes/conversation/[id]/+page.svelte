@@ -4,7 +4,7 @@
 	import { isAborted } from "$lib/stores/isAborted";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
-	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
+	import { beforeNavigate, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
@@ -95,35 +95,6 @@
 		return alternatives;
 	}
 
-	async function convFromShared() {
-		try {
-			$loading = true;
-			const res = await fetch(`${base}/conversation`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					fromShare: page.params.id,
-					model: data.model,
-				}),
-			});
-
-			if (!res.ok) {
-				error.set(await res.text());
-				console.error("Error while creating conversation: " + (await res.text()));
-				return;
-			}
-
-			const { conversationId } = await res.json();
-
-			return conversationId;
-		} catch (err) {
-			error.set(ERROR_MESSAGES.default);
-			console.error(String(err));
-			throw err;
-		}
-	}
 	// this function is used to send new message to the backends
 	async function writeMessage({
 		prompt,
@@ -381,16 +352,7 @@
 	});
 
 	async function onMessage(content: string) {
-		if (!data.shared) {
-			await writeMessage({ prompt: content });
-		} else {
-			await convFromShared()
-				.then(async (convId) => {
-					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
-				})
-				.then(async () => await writeMessage({ prompt: content }))
-				.finally(() => ($loading = false));
-		}
+		await writeMessage({ prompt: content });
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {
@@ -399,27 +361,11 @@
 		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);
 
-		if (!data.shared) {
-			await writeMessage({
-				prompt: payload.content,
-				messageId: payload.id,
-				isRetry: true,
-			});
-		} else {
-			await convFromShared()
-				.then(async (convId) => {
-					await goto(`${base}/conversation/${convId}`, { invalidateAll: true });
-				})
-				.then(
-					async () =>
-						await writeMessage({
-							prompt: payload.content,
-							messageId: payload.id,
-							isRetry: true,
-						})
-				)
-				.finally(() => ($loading = false));
-		}
+		await writeMessage({
+			prompt: payload.content,
+			messageId: payload.id,
+			isRetry: true,
+		});
 	}
 
 	async function onShowAlternateMsg(payload: { id: Message["id"] }) {
