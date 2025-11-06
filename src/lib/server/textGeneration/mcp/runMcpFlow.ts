@@ -24,42 +24,47 @@ export type RunMcpFlowContext = Pick<
 > & { messages: EndpointMessage[] };
 
 export async function* runMcpFlow({
-    model,
-    conv,
-    messages,
-    assistant,
-    forceMultimodal,
-    locals,
-    preprompt,
-    abortSignal,
+	model,
+	conv,
+	messages,
+	assistant,
+	forceMultimodal,
+	locals,
+	preprompt,
+	abortSignal,
 }: RunMcpFlowContext & { preprompt?: string; abortSignal?: AbortSignal }): AsyncGenerator<
-    MessageUpdate,
-    boolean,
-    undefined
+	MessageUpdate,
+	boolean,
+	undefined
 > {
-    // Start from env-configured servers
-    let servers = getMcpServers();
+	// Start from env-configured servers
+	let servers = getMcpServers();
 
-    // Merge in request-provided custom servers (if any)
+	// Merge in request-provided custom servers (if any)
 	try {
-		const reqMcp = (locals as unknown as {
-			mcp?: {
-				selectedServers?: Array<{ name: string; url: string; headers?: Record<string, string> }>;
-				selectedServerNames?: string[];
-			};
-		})?.mcp;
+		const reqMcp = (
+			locals as unknown as {
+				mcp?: {
+					selectedServers?: Array<{ name: string; url: string; headers?: Record<string, string> }>;
+					selectedServerNames?: string[];
+				};
+			}
+		)?.mcp;
 		const custom = Array.isArray(reqMcp?.selectedServers) ? reqMcp?.selectedServers : [];
 		if (custom.length > 0) {
 			// Invalidate cached tool list when the set of servers changes at request-time
 			resetMcpToolsCache();
-            // Deduplicate by server name (request takes precedence)
-            const byName = new Map<string, { name: string; url: string; headers?: Record<string, string> }>();
-            for (const s of servers) byName.set(s.name, s);
-            for (const s of custom) byName.set(s.name, s);
-            servers = [...byName.values()];
-        }
+			// Deduplicate by server name (request takes precedence)
+			const byName = new Map<
+				string,
+				{ name: string; url: string; headers?: Record<string, string> }
+			>();
+			for (const s of servers) byName.set(s.name, s);
+			for (const s of custom) byName.set(s.name, s);
+			servers = [...byName.values()];
+		}
 
-        // If the client specified a selection by name, filter to those
+		// If the client specified a selection by name, filter to those
 		const names = Array.isArray(reqMcp?.selectedServerNames)
 			? reqMcp?.selectedServerNames
 			: undefined;
@@ -70,9 +75,9 @@ export async function* runMcpFlow({
 		// ignore selection merge errors and proceed with env servers
 	}
 	logger.debug({ count: servers.length }, "[mcp] servers configured");
-    if (servers.length === 0) {
-        return false;
-    }
+	if (servers.length === 0) {
+		return false;
+	}
 
 	const hasImageInput = messages.some((msg) =>
 		(msg.files ?? []).some(

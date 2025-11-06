@@ -13,7 +13,7 @@
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTrash from "~icons/carbon/trash-can";
 	import IconTools from "~icons/carbon/tools";
-    import { authServerIds } from "$lib/stores/mcpServers";
+	import { authServerIds } from "$lib/stores/mcpServers";
 
 	interface Props {
 		server: MCPServer;
@@ -22,7 +22,7 @@
 
 	let { server, isSelected }: Props = $props();
 
-    let hasAuth = $derived($authServerIds.has(server.id));
+	let hasAuth = $derived($authServerIds.has(server.id));
 
 	let isLoadingHealth = $state(false);
 

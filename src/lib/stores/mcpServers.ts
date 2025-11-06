@@ -91,24 +91,24 @@ const AUTH_HEADERS_KEY = "mcp:auth_headers";
 type AuthHeadersMap = Record<string, { key: string; value: string }[]>;
 
 function loadAuthHeaders(): AuthHeadersMap {
-  if (!browser) return {};
-  try {
-    return JSON.parse(localStorage.getItem(AUTH_HEADERS_KEY) || "{}");
-  } catch {
-    return {};
-  }
+	if (!browser) return {};
+	try {
+		return JSON.parse(localStorage.getItem(AUTH_HEADERS_KEY) || "{}");
+	} catch {
+		return {};
+	}
 }
 const authServerIds = writable<Set<string>>(new Set());
 
 function refreshAuthServerIdsFrom(map: AuthHeadersMap) {
-  const ids = new Set<string>(Object.keys(map).filter((k) => (map[k]?.length ?? 0) > 0));
-  authServerIds.set(ids);
+	const ids = new Set<string>(Object.keys(map).filter((k) => (map[k]?.length ?? 0) > 0));
+	authServerIds.set(ids);
 }
 
 function saveAuthHeaders(map: AuthHeadersMap) {
-  if (!browser) return;
-  localStorage.setItem(AUTH_HEADERS_KEY, JSON.stringify(map));
-  refreshAuthServerIdsFrom(map);
+	if (!browser) return;
+	localStorage.setItem(AUTH_HEADERS_KEY, JSON.stringify(map));
+	refreshAuthServerIdsFrom(map);
 }
 
 // initialize auth ids on module load
@@ -116,21 +116,24 @@ if (browser) refreshAuthServerIdsFrom(loadAuthHeaders());
 
 export { authServerIds };
 
-function mergeHeaders(baseHeaders: KeyValuePair[] | undefined, extra: KeyValuePair[] | undefined): KeyValuePair[] | undefined {
-  const out: Record<string, string> = {};
-  for (const h of baseHeaders ?? []) out[h.key] = h.value;
-  for (const h of extra ?? []) out[h.key] = h.value;
-  const entries = Object.entries(out).map(([key, value]) => ({ key, value }));
-  return entries.length ? entries : undefined;
+function mergeHeaders(
+	baseHeaders: KeyValuePair[] | undefined,
+	extra: KeyValuePair[] | undefined
+): KeyValuePair[] | undefined {
+	const out: Record<string, string> = {};
+	for (const h of baseHeaders ?? []) out[h.key] = h.value;
+	for (const h of extra ?? []) out[h.key] = h.value;
+	const entries = Object.entries(out).map(([key, value]) => ({ key, value }));
+	return entries.length ? entries : undefined;
 }
 
 // Derived: include stored auth headers (e.g., Authorization) with enabled servers
 export const enabledServersWithAuth = derived([enabledServers], ([$enabled]) => {
-  const authMap = loadAuthHeaders();
-  return $enabled.map((s) => ({
-    ...s,
-    headers: mergeHeaders(s.headers, authMap[s.id]),
-  }));
+	const authMap = loadAuthHeaders();
+	return $enabled.map((s) => ({
+		...s,
+		headers: mergeHeaders(s.headers, authMap[s.id]),
+	}));
 });
 
 /**
@@ -227,35 +230,35 @@ export function deleteCustomServer(id: string) {
  * Update server status (from health check)
  */
 export function updateServerStatus(
-    id: string,
-    status: ServerStatus,
-    errorMessage?: string,
-    tools?: MCPTool[],
-    authRequired?: boolean
+	id: string,
+	status: ServerStatus,
+	errorMessage?: string,
+	tools?: MCPTool[],
+	authRequired?: boolean
 ) {
-    allMcpServers.update(($servers) =>
-        $servers.map((s) =>
-            s.id === id
-                ? {
-                        ...s,
-                        status,
-                        errorMessage,
-                        tools,
-                        authRequired,
-                    }
-                : s
-        )
-    );
+	allMcpServers.update(($servers) =>
+		$servers.map((s) =>
+			s.id === id
+				? {
+						...s,
+						status,
+						errorMessage,
+						tools,
+						authRequired,
+					}
+				: s
+		)
+	);
 }
 
 /**
  * Run health check on a server
  */
 export async function healthCheckServer(
-    server: MCPServer
+	server: MCPServer
 ): Promise<{ ready: boolean; tools?: MCPTool[]; error?: string }> {
-    try {
-        updateServerStatus(server.id, "connecting");
+	try {
+		updateServerStatus(server.id, "connecting");
 
 		// merge any stored auth headers for this server
 		const withAuth: MCPServer = (() => {
@@ -269,15 +272,15 @@ export async function healthCheckServer(
 			body: JSON.stringify({ url: withAuth.url, headers: withAuth.headers }),
 		});
 
-        const result = await response.json();
+		const result = await response.json();
 
-        if (result.ready && result.tools) {
-            updateServerStatus(server.id, "connected", undefined, result.tools, false);
-            return { ready: true, tools: result.tools };
-        } else {
-            updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
-            return { ready: false, error: result.error };
-        }
+		if (result.ready && result.tools) {
+			updateServerStatus(server.id, "connected", undefined, result.tools, false);
+			return { ready: true, tools: result.tools };
+		} else {
+			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
+			return { ready: false, error: result.error };
+		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : "Unknown error";
 		updateServerStatus(server.id, "error", errorMessage);
@@ -292,50 +295,52 @@ if (browser) {
 
 // --- OAuth helpers ---
 export async function authenticateServer(server: MCPServer): Promise<void> {
-  if (!browser) return;
-  const callbackUrl = new URL(`${base}/oauth/callback`, window.location.origin).toString();
-  const provider = new BrowserOAuthClientProvider(server.url, {
-    clientName: "chat-ui",
-    callbackUrl,
-  });
+	if (!browser) return;
+	const callbackUrl = new URL(`${base}/oauth/callback`, window.location.origin).toString();
+	const provider = new BrowserOAuthClientProvider(server.url, {
+		clientName: "chat-ui",
+		callbackUrl,
+	});
 
-  // Listen for the popup callback message to finalize and persist header
-  const onMessage = async (evt: MessageEvent) => {
-    if (evt.origin !== window.location.origin) return;
-    const data = evt.data as { type?: string; success?: boolean; error?: string };
-    if (data?.type !== 'mcp_auth_callback') return;
-    window.removeEventListener('message', onMessage);
-    if (!data.success) {
-      console.error('[mcp] OAuth failed:', data.error);
-      return;
-    }
-    try {
-      const tokens = await provider.tokens();
-      if (!tokens?.access_token) return;
-      const tokenType = (tokens as any).token_type || 'Bearer';
-      const authHeader: KeyValuePair = { key: 'Authorization', value: `${tokenType} ${tokens.access_token}` };
-      const map = loadAuthHeaders();
-      map[server.id] = mergeHeaders(map[server.id], [authHeader]) ?? [];
-      saveAuthHeaders(map);
-      // Re-run health check to reflect status
-      await healthCheckServer(server);
-    } catch (e) {
-      console.error('[mcp] Failed to store tokens', e);
-    }
-  };
-  window.addEventListener('message', onMessage);
+	// Listen for the popup callback message to finalize and persist header
+	const onMessage = async (evt: MessageEvent) => {
+		if (evt.origin !== window.location.origin) return;
+		const data = evt.data as { type?: string; success?: boolean; error?: string };
+		if (data?.type !== "mcp_auth_callback") return;
+		window.removeEventListener("message", onMessage);
+		if (!data.success) {
+			console.error("[mcp] OAuth failed:", data.error);
+			return;
+		}
+		try {
+			const tokens = await provider.tokens();
+			if (!tokens?.access_token) return;
+			const authHeader: KeyValuePair = {
+				key: "Authorization",
+				value: `${tokens.token_type} ${tokens.access_token}`,
+			};
+			const map = loadAuthHeaders();
+			map[server.id] = mergeHeaders(map[server.id], [authHeader]) ?? [];
+			saveAuthHeaders(map);
+			// Re-run health check to reflect status
+			await healthCheckServer(server);
+		} catch (e) {
+			console.error("[mcp] Failed to store tokens", e);
+		}
+	};
+	window.addEventListener("message", onMessage);
 
-  try {
-    await auth(provider, { serverUrl: server.url });
-  } catch (e) {
-    console.error('[mcp] auth() initiation failed', e);
-    window.removeEventListener('message', onMessage);
-  }
+	try {
+		await auth(provider, { serverUrl: server.url });
+	} catch (e) {
+		console.error("[mcp] auth() initiation failed", e);
+		window.removeEventListener("message", onMessage);
+	}
 }
 
 export function clearServerAuthentication(serverId: string) {
-  if (!browser) return;
-  const map = loadAuthHeaders();
-  delete map[serverId];
-  saveAuthHeaders(map);
+	if (!browser) return;
+	const map = loadAuthHeaders();
+	delete map[serverId];
+	saveAuthHeaders(map);
 }

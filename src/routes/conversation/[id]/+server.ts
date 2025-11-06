@@ -555,7 +555,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							conversationId: conversationKey,
 							updatesCount: messageToWriteTo.updates?.length ?? 0,
 							filesCount: messageToWriteTo.files?.length ?? 0,
-							reasoningLen: (messageToWriteTo as any).reasoning?.length ?? 0,
+							reasoningLen: messageToWriteTo.reasoning?.length ?? 0,
 							initialLen: initialMessageContent.length,
 							finalLen: messageToWriteTo.content.length,
 						},

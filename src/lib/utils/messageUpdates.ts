@@ -14,16 +14,16 @@ import { page } from "$app/state";
 import type { KeyValuePair } from "$lib/types/Tool";
 
 type MessageUpdateRequestOptions = {
-    base: string;
-    inputs?: string;
-    messageId?: string;
-    isRetry: boolean;
-    isContinue?: boolean;
-    files?: MessageFile[];
-    // Optional: pass selected MCP server names (client-side selection)
-    selectedMcpServerNames?: string[];
-    // Optional: pass selected MCP server configs (for custom client-defined servers)
-    selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
+	base: string;
+	inputs?: string;
+	messageId?: string;
+	isRetry: boolean;
+	isContinue?: boolean;
+	files?: MessageFile[];
+	// Optional: pass selected MCP server names (client-side selection)
+	selectedMcpServerNames?: string[];
+	// Optional: pass selected MCP server configs (for custom client-defined servers)
+	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -35,15 +35,15 @@ export async function fetchMessageUpdates(
 
 	const form = new FormData();
 
-    const optsJSON = JSON.stringify({
-        inputs: opts.inputs,
-        id: opts.messageId,
-        is_retry: opts.isRetry,
-        is_continue: Boolean(opts.isContinue),
-        // Will be ignored server-side if unsupported
-        selectedMcpServerNames: opts.selectedMcpServerNames,
-        selectedMcpServers: opts.selectedMcpServers,
-    });
+	const optsJSON = JSON.stringify({
+		inputs: opts.inputs,
+		id: opts.messageId,
+		is_retry: opts.isRetry,
+		is_continue: Boolean(opts.isContinue),
+		// Will be ignored server-side if unsupported
+		selectedMcpServerNames: opts.selectedMcpServerNames,
+		selectedMcpServers: opts.selectedMcpServers,
+	});
 
 	opts.files?.forEach((file) => {
 		const name = file.type + ";" + file.name;
