@@ -13,6 +13,7 @@
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTrash from "~icons/carbon/trash-can";
 	import IconTools from "~icons/carbon/tools";
+    import { authServerIds } from "$lib/stores/mcpServers";
 
 	interface Props {
 		server: MCPServer;
@@ -20,6 +21,8 @@
 	}
 
 	let { server, isSelected }: Props = $props();
+
+    let hasAuth = $derived($authServerIds.has(server.id));
 
 	let isLoadingHealth = $state(false);
 
@@ -79,9 +82,7 @@
 	}
 
 	function handleDelete() {
-		if (confirm(`Delete "${server.name}"?`)) {
-			deleteCustomServer(server.id);
-		}
+		deleteCustomServer(server.id);
 	}
 
 	async function handleAuthenticate() {
@@ -91,6 +92,8 @@
 	function handleSignOut() {
 		if (confirm(`Remove saved credentials for "${server.name}"?`)) {
 			clearServerAuthentication(server.id);
+			// Refresh status
+			handleHealthCheck();
 		}
 	}
 </script>
@@ -160,12 +163,29 @@
 			</div>
 		{/if}
 
-		<!-- Error Message -->
+		<!-- Error Message & Auth Badge -->
 		{#if server.errorMessage}
-			<div
-				class="mb-2 rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
-			>
-				{server.errorMessage}
+			<div class="mb-2 flex items-center gap-2">
+				<div
+					class="rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
+				>
+					{server.errorMessage}
+				</div>
+				{#if server.authRequired}
+					<span
+						class="inline-flex rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+					>
+						Requires Auth
+					</span>
+				{/if}
+			</div>
+		{:else if server.authRequired}
+			<div class="mb-2">
+				<span
+					class="inline-flex rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+				>
+					Requires Auth
+				</span>
 			</div>
 		{/if}
 
@@ -180,19 +200,23 @@
 				Health Check
 			</button>
 
-			<button
-				onclick={handleAuthenticate}
-				class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-			>
-				Authenticate
-			</button>
-
-			<button
-				onclick={handleSignOut}
-				class="flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-600 dark:bg-gray-700 dark:text-red-300 dark:hover:bg-gray-800"
-			>
-				Sign out
-			</button>
+			{#if server.authRequired}
+				{#if !hasAuth}
+					<button
+						onclick={handleAuthenticate}
+						class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+					>
+						Authenticate
+					</button>
+				{:else}
+					<button
+						onclick={handleSignOut}
+						class="flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-600 dark:bg-gray-700 dark:text-red-300 dark:hover:bg-gray-800"
+					>
+						Sign out
+					</button>
+				{/if}
+			{/if}
 
 			{#if server.type === "custom"}
 				<button

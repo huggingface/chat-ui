@@ -10,13 +10,14 @@ interface HealthCheckRequest {
 }
 
 interface HealthCheckResponse {
-	ready: boolean;
-	tools?: Array<{
-		name: string;
-		description?: string;
-		inputSchema?: unknown;
-	}>;
-	error?: string;
+    ready: boolean;
+    tools?: Array<{
+        name: string;
+        description?: string;
+        inputSchema?: unknown;
+    }>;
+    error?: string;
+    authRequired?: boolean;
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -63,8 +64,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		let lastError: Error | undefined;
 
-		// Try Streamable HTTP transport first
-		try {
+        // Try Streamable HTTP transport first
+        try {
 			console.log(`[MCP Health] Trying HTTP transport for ${url}`);
 			client = new Client({
 				name: "chat-ui-health-check",
@@ -79,38 +80,40 @@ export const POST: RequestHandler = async ({ request }) => {
 			// Connection successful, get tools
 			const toolsResponse = await client.listTools();
 
-			// Disconnect after getting tools
-			await client.close();
+            // Disconnect after getting tools
+            await client.close();
 
 			if (toolsResponse && toolsResponse.tools) {
-				const response: HealthCheckResponse = {
-					ready: true,
-					tools: toolsResponse.tools.map((tool) => ({
-						name: tool.name,
-						description: tool.description,
-						inputSchema: tool.inputSchema,
-					})),
-				};
+                const response: HealthCheckResponse = {
+                    ready: true,
+                    tools: toolsResponse.tools.map((tool) => ({
+                        name: tool.name,
+                        description: tool.description,
+                        inputSchema: tool.inputSchema,
+                    })),
+                    authRequired: false,
+                };
 
 				return new Response(JSON.stringify(response), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
 				});
 			} else {
-				return new Response(
-					JSON.stringify({
-						ready: false,
-						error: "Connected but no tools available",
-					} as HealthCheckResponse),
+                return new Response(
+                    JSON.stringify({
+                        ready: false,
+                        error: "Connected but no tools available",
+                        authRequired: false,
+                    } as HealthCheckResponse),
 					{
 						status: 503,
 						headers: { "Content-Type": "application/json" },
 					}
 				);
 			}
-		} catch (error) {
-			lastError = error instanceof Error ? error : new Error(String(error));
-			console.log("Streamable HTTP failed, trying SSE transport...", lastError.message);
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            console.log("Streamable HTTP failed, trying SSE transport...", lastError.message);
 
 			// Close failed client
 			try {
@@ -119,8 +122,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				// Ignore
 			}
 
-			// Try SSE transport
-			try {
+            // Try SSE transport
+            try {
 				console.log(`[MCP Health] Trying SSE transport for ${url}`);
 				client = new Client({
 					name: "chat-ui-health-check",
@@ -135,46 +138,58 @@ export const POST: RequestHandler = async ({ request }) => {
 				// Connection successful, get tools
 				const toolsResponse = await client.listTools();
 
-				// Disconnect after getting tools
-				await client.close();
+                // Disconnect after getting tools
+                await client.close();
 
 				if (toolsResponse && toolsResponse.tools) {
-					const response: HealthCheckResponse = {
-						ready: true,
-						tools: toolsResponse.tools.map((tool) => ({
-							name: tool.name,
-							description: tool.description,
-							inputSchema: tool.inputSchema,
-						})),
-					};
+                    const response: HealthCheckResponse = {
+                        ready: true,
+                        tools: toolsResponse.tools.map((tool) => ({
+                            name: tool.name,
+                            description: tool.description,
+                            inputSchema: tool.inputSchema,
+                        })),
+                        authRequired: false,
+                    };
 
 					return new Response(JSON.stringify(response), {
 						status: 200,
 						headers: { "Content-Type": "application/json" },
 					});
 				} else {
-					return new Response(
-						JSON.stringify({
-							ready: false,
-							error: "Connected but no tools available",
-						} as HealthCheckResponse),
+                    return new Response(
+                        JSON.stringify({
+                            ready: false,
+                            error: "Connected but no tools available",
+                            authRequired: false,
+                        } as HealthCheckResponse),
 						{
 							status: 503,
 							headers: { "Content-Type": "application/json" },
 						}
 					);
 				}
-			} catch (sseError) {
-				lastError = sseError instanceof Error ? sseError : new Error(String(sseError));
-				console.error("Both transports failed. Last error:", lastError);
-			}
-		}
+            } catch (sseError) {
+                lastError = sseError instanceof Error ? sseError : new Error(String(sseError));
+                console.error("Both transports failed. Last error:", lastError);
+            }
+        }
 
-		// Both transports failed
-		let errorMessage = lastError?.message || "Failed to connect to MCP server";
+        // Both transports failed
+        let errorMessage = lastError?.message || "Failed to connect to MCP server";
+
+        // Detect unauthorized to signal auth requirement
+        const lower = (errorMessage || '').toLowerCase();
+        const authRequired =
+            lower.includes('unauthorized') ||
+            lower.includes('forbidden') ||
+            lower.includes('401') ||
+            lower.includes('403');
 
 		// Provide more helpful error messages
-		if (errorMessage.includes("not valid JSON")) {
+		if (authRequired) {
+			errorMessage = "Authentication required. Click 'Authenticate' to connect.";
+		} else if (errorMessage.includes("not valid JSON")) {
 			errorMessage =
 				"Server returned invalid response. This might not be a valid MCP endpoint. MCP servers should respond to POST requests at /mcp with JSON-RPC messages.";
 		} else if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {
@@ -183,11 +198,12 @@ export const POST: RequestHandler = async ({ request }) => {
 			errorMessage = `CORS error. The MCP server needs to allow requests from this origin.`;
 		}
 
-		return new Response(
-			JSON.stringify({
-				ready: false,
-				error: errorMessage,
-			} as HealthCheckResponse),
+        return new Response(
+            JSON.stringify({
+                ready: false,
+                error: errorMessage,
+                authRequired,
+            } as HealthCheckResponse),
 			{
 				status: 503,
 				headers: { "Content-Type": "application/json" },

@@ -54,16 +54,18 @@ export interface MCPTool {
 }
 
 export interface MCPServer {
-	id: string;
-	name: string;
-	url: string;
-	type: "base" | "custom";
-	headers?: KeyValuePair[];
-	env?: KeyValuePair[];
-	status?: ServerStatus;
-	isLocked?: boolean;
-	tools?: MCPTool[];
-	errorMessage?: string;
+    id: string;
+    name: string;
+    url: string;
+    type: "base" | "custom";
+    headers?: KeyValuePair[];
+    env?: KeyValuePair[];
+    status?: ServerStatus;
+    isLocked?: boolean;
+    tools?: MCPTool[];
+    errorMessage?: string;
+    // Indicates server reports or appears to require OAuth or other auth
+    authRequired?: boolean;
 }
 
 export interface MCPServerApi {

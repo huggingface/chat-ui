@@ -98,10 +98,23 @@ function loadAuthHeaders(): AuthHeadersMap {
     return {};
   }
 }
+const authServerIds = writable<Set<string>>(new Set());
+
+function refreshAuthServerIdsFrom(map: AuthHeadersMap) {
+  const ids = new Set<string>(Object.keys(map).filter((k) => (map[k]?.length ?? 0) > 0));
+  authServerIds.set(ids);
+}
+
 function saveAuthHeaders(map: AuthHeadersMap) {
   if (!browser) return;
   localStorage.setItem(AUTH_HEADERS_KEY, JSON.stringify(map));
+  refreshAuthServerIdsFrom(map);
 }
+
+// initialize auth ids on module load
+if (browser) refreshAuthServerIdsFrom(loadAuthHeaders());
+
+export { authServerIds };
 
 function mergeHeaders(baseHeaders: KeyValuePair[] | undefined, extra: KeyValuePair[] | undefined): KeyValuePair[] | undefined {
   const out: Record<string, string> = {};
@@ -214,33 +227,35 @@ export function deleteCustomServer(id: string) {
  * Update server status (from health check)
  */
 export function updateServerStatus(
-	id: string,
-	status: ServerStatus,
-	errorMessage?: string,
-	tools?: MCPTool[]
+    id: string,
+    status: ServerStatus,
+    errorMessage?: string,
+    tools?: MCPTool[],
+    authRequired?: boolean
 ) {
-	allMcpServers.update(($servers) =>
-		$servers.map((s) =>
-			s.id === id
-				? {
-						...s,
-						status,
-						errorMessage,
-						tools,
-					}
-				: s
-		)
-	);
+    allMcpServers.update(($servers) =>
+        $servers.map((s) =>
+            s.id === id
+                ? {
+                        ...s,
+                        status,
+                        errorMessage,
+                        tools,
+                        authRequired,
+                    }
+                : s
+        )
+    );
 }
 
 /**
  * Run health check on a server
  */
 export async function healthCheckServer(
-	server: MCPServer
+    server: MCPServer
 ): Promise<{ ready: boolean; tools?: MCPTool[]; error?: string }> {
-	try {
-		updateServerStatus(server.id, "connecting");
+    try {
+        updateServerStatus(server.id, "connecting");
 
 		// merge any stored auth headers for this server
 		const withAuth: MCPServer = (() => {
@@ -254,15 +269,15 @@ export async function healthCheckServer(
 			body: JSON.stringify({ url: withAuth.url, headers: withAuth.headers }),
 		});
 
-		const result = await response.json();
+        const result = await response.json();
 
-		if (result.ready && result.tools) {
-			updateServerStatus(server.id, "connected", undefined, result.tools);
-			return { ready: true, tools: result.tools };
-		} else {
-			updateServerStatus(server.id, "error", result.error);
-			return { ready: false, error: result.error };
-		}
+        if (result.ready && result.tools) {
+            updateServerStatus(server.id, "connected", undefined, result.tools, false);
+            return { ready: true, tools: result.tools };
+        } else {
+            updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
+            return { ready: false, error: result.error };
+        }
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : "Unknown error";
 		updateServerStatus(server.id, "error", errorMessage);
