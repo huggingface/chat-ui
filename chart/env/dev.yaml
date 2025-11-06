@@ -2,14 +2,14 @@ image:
   repository: huggingface
   name: chat-ui
 
-nodeSelector:
-  role-huggingchat: "true"
-
-tolerations:
-  - key: "huggingface.co/huggingchat"
-    operator: "Equal"
-    value: "true"
-    effect: "NoSchedule"
+#nodeSelector:
+#  role-huggingchat: "true"
+#
+#tolerations:
+#  - key: "huggingface.co/huggingchat"
+#    operator: "Equal"
+#    value: "true"
+#    effect: "NoSchedule"
 
 serviceAccount:
   enabled: true
@@ -190,7 +190,7 @@ envVars:
 
 infisical:
   enabled: true
-  env: "prod-us-east-1"
+  env: "ephemeral-us-east-1"
 
 autoscaling:
   enabled: true
