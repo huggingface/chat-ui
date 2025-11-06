@@ -18,6 +18,8 @@
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import ToolUpdate from "./ToolUpdate.svelte";
+	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 
 	interface Props {
 		message: Message;
@@ -77,6 +79,17 @@
 		message.content.replace(THINK_BLOCK_REGEX, "").trim()
 	);
 
+	// Group tool updates (if any) by uuid for display
+	let toolUpdateGroups = $derived.by(() => {
+		const groups: Record<string, import("$lib/types/MessageUpdate").MessageToolUpdate[]> = {};
+		for (const u of message.updates ?? []) {
+			if (!isMessageToolUpdate(u)) continue;
+			(groups[u.uuid] ||= []).push(u);
+		}
+		return groups;
+	});
+	let hasToolUpdates = $derived(Object.keys(toolUpdateGroups).length > 0);
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
@@ -123,6 +136,16 @@
 						<UploadedFile {file} canClose={false} />
 					{/each}
 				</div>
+			{/if}
+
+			{#if hasToolUpdates}
+				{#each Object.values(toolUpdateGroups) as group}
+					{#if group.length}
+						{#key group[0].uuid}
+							<ToolUpdate tool={group} {loading} />
+						{/key}
+					{/if}
+				{/each}
 			{/if}
 
 			<div bind:this={contentEl}>

@@ -1,0 +1,158 @@
+<script lang="ts">
+	import Modal from "$lib/components/Modal.svelte";
+	import ServerCard from "./ServerCard.svelte";
+	import AddServerForm from "./AddServerForm.svelte";
+	import {
+		allMcpServers,
+		selectedServerIds,
+		addCustomServer,
+		refreshMcpServers,
+	} from "$lib/stores/mcpServers";
+	import type { KeyValuePair } from "$lib/types/Tool";
+	import IconAdd from "~icons/carbon/add";
+	import IconRefresh from "~icons/carbon/renew";
+	import IconTools from "~icons/carbon/tools";
+
+	interface Props {
+		onclose: () => void;
+	}
+
+	let { onclose }: Props = $props();
+
+	type View = "list" | "add";
+	let currentView = $state<View>("list");
+
+	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
+	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
+	const enabledCount = $derived($selectedServerIds.size);
+
+	function handleAddServer(serverData: { name: string; url: string; headers?: KeyValuePair[] }) {
+		addCustomServer(serverData);
+		currentView = "list";
+	}
+
+	function handleCancel() {
+		currentView = "list";
+	}
+
+	async function handleRefresh() {
+		await refreshMcpServers();
+	}
+</script>
+
+<Modal width="max-w-4xl" {onclose} closeButton>
+	<div class="p-6">
+		<!-- Header -->
+		<div class="mb-6">
+			<h2 class="mb-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">MCP Servers</h2>
+			<p class="text-sm text-gray-600 dark:text-gray-400">
+				Manage Model Context Protocol servers to extend your assistant with external tools.
+			</p>
+		</div>
+
+		<!-- Summary Bar -->
+		<div
+			class="mb-6 flex items-center justify-between rounded-lg bg-blue-50 p-4 dark:bg-blue-900/10"
+		>
+			<div class="flex items-center gap-2">
+				<IconTools class="size-5 text-blue-600 dark:text-blue-400" />
+				<div>
+					<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+						{$allMcpServers.length}
+						{$allMcpServers.length === 1 ? "server" : "servers"} configured
+					</p>
+					<p class="text-xs text-gray-600 dark:text-gray-400">
+						{enabledCount} enabled
+					</p>
+				</div>
+			</div>
+
+			<div class="flex gap-2">
+				<button
+					onclick={handleRefresh}
+					class="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+				>
+					<IconRefresh class="size-4" />
+					Refresh
+				</button>
+				{#if currentView === "list"}
+					<button
+						onclick={() => (currentView = "add")}
+						class="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+					>
+						<IconAdd class="size-4" />
+						Add Server
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Content -->
+		{#if currentView === "list"}
+			<div class="space-y-6">
+				<!-- Base Servers -->
+				{#if baseServers.length > 0}
+					<div>
+						<h3 class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+							Base Servers ({baseServers.length})
+						</h3>
+						<div class="space-y-3">
+							{#each baseServers as server (server.id)}
+								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Custom Servers -->
+				<div>
+					<h3 class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+						Custom Servers ({customServers.length})
+					</h3>
+					{#if customServers.length === 0}
+						<div
+							class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-8 dark:border-gray-700"
+						>
+							<IconTools class="mb-3 size-12 text-gray-400" />
+							<p class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+								No custom servers yet
+							</p>
+							<p class="mb-4 text-xs text-gray-600 dark:text-gray-400">
+								Add your own MCP servers with custom tools
+							</p>
+							<button
+								onclick={() => (currentView = "add")}
+								class="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+							>
+								<IconAdd class="size-4" />
+								Add Your First Server
+							</button>
+						</div>
+					{:else}
+						<div class="space-y-3">
+							{#each customServers as server (server.id)}
+								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- Help Text -->
+				<div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+					<h4 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">💡 Quick Tips</h4>
+					<ul class="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+						<li>• Enable servers to make their tools available in chat</li>
+						<li>• Use the Health Check button to verify server connectivity</li>
+						<li>• Add HTTP headers for authentication (e.g., Authorization, X-API-Key)</li>
+						<li>• Base servers are configured by admins via environment variables</li>
+					</ul>
+				</div>
+			</div>
+		{:else if currentView === "add"}
+			<div>
+				<h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Add Custom Server</h3>
+				<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+			</div>
+		{/if}
+	</div>
+</Modal>

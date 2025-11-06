@@ -16,7 +16,8 @@
 	import { addSibling } from "$lib/utils/tree/addSibling";
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
-	import { useSettingsStore } from "$lib/stores/settings.js";
+import { useSettingsStore } from "$lib/stores/settings.js";
+import { enabledServers } from "$lib/stores/mcpServers";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -27,7 +28,7 @@
 	import { updateDebouncer } from "$lib/utils/updates.js";
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
-	import { requireAuthUser } from "$lib/utils/auth.js";
+import { requireAuthUser } from "$lib/utils/auth.js";
 
 	let { data = $bindable() } = $props();
 
@@ -211,19 +212,25 @@
 
 			const messageUpdatesAbortController = new AbortController();
 
-			const messageUpdatesIterator = await fetchMessageUpdates(
-				page.params.id,
-				{
-					base,
-					inputs: prompt,
-					messageId,
-					isRetry,
-					files: isRetry ? userMessage?.files : base64Files,
-				},
-				messageUpdatesAbortController.signal
-			).catch((err) => {
-				error.set(err.message);
-			});
+            const messageUpdatesIterator = await fetchMessageUpdates(
+                page.params.id,
+                {
+                    base,
+                    inputs: prompt,
+                    messageId,
+                    isRetry,
+                    files: isRetry ? userMessage?.files : base64Files,
+                    selectedMcpServerNames: $enabledServers.map((s) => s.name),
+                    selectedMcpServers: $enabledServers.map((s) => ({
+                        name: s.name,
+                        url: s.url,
+                        headers: s.headers,
+                    })),
+                },
+                messageUpdatesAbortController.signal
+            ).catch((err) => {
+                error.set(err.message);
+            });
 			if (messageUpdatesIterator === undefined) return;
 
 			files = [];

@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
 	MessageUpdateStatus,
 	MessageUpdateType,
+	MessageReasoningUpdateType,
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
@@ -124,6 +125,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		inputs: newPrompt,
 		id: messageId,
 		is_retry: isRetry,
+		selectedMcpServerNames,
+		selectedMcpServers,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -134,6 +137,20 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					.transform((s) => s.replace(/\r\n/g, "\n"))
 			),
 			is_retry: z.optional(z.boolean()),
+			selectedMcpServerNames: z.optional(z.array(z.string())),
+			selectedMcpServers: z
+				.optional(
+					z.array(
+						z.object({
+							name: z.string(),
+							url: z.string(),
+							headers: z
+								.optional(z.array(z.object({ key: z.string(), value: z.string() })))
+								.default([]),
+						})
+					)
+				)
+				.default([]),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -146,6 +163,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			),
 		})
 		.parse(JSON.parse(json));
+
+	// Attach MCP selection to locals so the text generation pipeline can consume it
+	try {
+		(locals as unknown as Record<string, unknown>).mcp = {
+			selectedServerNames: selectedMcpServerNames,
+			selectedServers: (selectedMcpServers ?? []).map((s) => ({
+				name: s.name,
+				url: s.url,
+				headers:
+					s.headers && s.headers.length > 0
+						? Object.fromEntries(s.headers.map((h) => [h.key, h.value]))
+						: undefined,
+			})),
+		};
+	} catch {
+		// ignore attachment errors, pipeline will just use env servers
+	}
 
 	const inputFiles = await Promise.all(
 		form
@@ -343,6 +377,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					lastTokenTimestamp = new Date();
 				}
 
+				// Append reasoning stream tokens to message.reasoning (server-side)
+				else if (
+					event.type === MessageUpdateType.Reasoning &&
+					event.subtype === MessageReasoningUpdateType.Stream &&
+					"token" in event
+				) {
+					messageToWriteTo.reasoning ??= "";
+					messageToWriteTo.reasoning += event.token;
+				}
+
 				// Set the title
 				else if (event.type === MessageUpdateType.Title) {
 					// Always strip <think> markers from titles when saving
@@ -506,6 +550,17 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			} finally {
 				// check if no output was generated
 				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
+					logger.warn(
+						{
+							conversationId: conversationKey,
+							updatesCount: messageToWriteTo.updates?.length ?? 0,
+							filesCount: messageToWriteTo.files?.length ?? 0,
+							reasoningLen: (messageToWriteTo as any).reasoning?.length ?? 0,
+							initialLen: initialMessageContent.length,
+							finalLen: messageToWriteTo.content.length,
+						},
+						"No output generated after streaming; emitting error status"
+					);
 					await update({
 						type: MessageUpdateType.Status,
 						status: MessageUpdateStatus.Error,

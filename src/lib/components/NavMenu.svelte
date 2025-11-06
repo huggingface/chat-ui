@@ -28,6 +28,9 @@
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { enabledServersCount } from "$lib/stores/mcpServers";
+	import MCPServerManager from "./mcp/MCPServerManager.svelte";
+	import IconTools from "~icons/carbon/tools";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -112,6 +115,7 @@
 
 	let isDark = $state(false);
 	let unsubscribeTheme: (() => void) | undefined;
+	let showMcpModal = $state(false);
 
 	if (browser) {
 		unsubscribeTheme = subscribeToTheme(({ isDark: nextIsDark }) => {
@@ -194,6 +198,21 @@
 		>
 	</a>
 
+	<button
+		onclick={() => (showMcpModal = true)}
+		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+	>
+		<IconTools class="size-4" />
+		MCP Servers
+		{#if $enabledServersCount > 0}
+			<span
+				class="ml-auto rounded-md bg-blue-500/10 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+			>
+				{$enabledServersCount}
+			</span>
+		{/if}
+	</button>
+
 	<span class="flex gap-1">
 		<a
 			href="{base}/settings/application"
@@ -219,3 +238,7 @@
 		</button>
 	</span>
 </div>
+
+{#if showMcpModal}
+	<MCPServerManager onclose={() => (showMcpModal = false)} />
+{/if}

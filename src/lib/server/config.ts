@@ -156,7 +156,8 @@ type ExtraConfigKeys =
 	| "OLD_MODELS"
 	| "ENABLE_ASSISTANTS"
 	| "METRICS_ENABLED"
-	| "METRICS_PORT";
+	| "METRICS_PORT"
+	| "MCP_SERVERS";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 
