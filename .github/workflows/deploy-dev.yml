@@ -1,9 +1,11 @@
-name: Deploy to k8s
+name: Deploy to ephemeral
 on:
   pull_request:
+    types: [ labeled ]
 
 jobs:
   build-and-publish-huggingchat-image:
+    if: ${{ github.event.label.name == 'preview' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
