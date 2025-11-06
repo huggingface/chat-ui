@@ -14,7 +14,7 @@ image:
 serviceAccount:
   enabled: true
   create: true
-  name: huggingchat-prod
+  name: huggingchat-ephemeral
 
 ingress:
   enabled: false
