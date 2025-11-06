@@ -12,10 +12,13 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.21'
+        go-version: '1.25'
 
     - name: Generate slug
       id: generate
