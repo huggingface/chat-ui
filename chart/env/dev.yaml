@@ -17,7 +17,7 @@ serviceAccount:
   name: huggingchat-prod
 
 ingress:
-  enable: false
+  enabled: false
 
 ingressInternal:
   enabled: true
