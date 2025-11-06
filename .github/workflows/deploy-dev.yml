@@ -30,7 +30,7 @@ jobs:
           images: |
             huggingface/chat-ui
           tags: |
-            type=raw,value=sha-${{ env.GITHUB_SHA_SHORT }}
+            type=raw,value=dev-${{ env.GITHUB_SHA_SHORT }}
 #            type=sha,enable=true,prefix=dev-,format=short,sha-len=8
 
       - name: Set up Docker Buildx
