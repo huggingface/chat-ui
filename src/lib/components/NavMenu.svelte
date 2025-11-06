@@ -30,7 +30,6 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { enabledServersCount } from "$lib/stores/mcpServers";
 	import MCPServerManager from "./mcp/MCPServerManager.svelte";
-	import IconTools from "~icons/carbon/tools";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -202,7 +201,6 @@
 		onclick={() => (showMcpModal = true)}
 		class="flex h-9 flex-none items-center gap-1.5 rounded-lg pl-2.5 pr-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
 	>
-		<IconTools class="size-4" />
 		MCP Servers
 		{#if $enabledServersCount > 0}
 			<span

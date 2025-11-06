@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { MCPServer } from "$lib/types/Tool";
-	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
+	import {
+		toggleServer,
+		healthCheckServer,
+		deleteCustomServer,
+		authenticateServer,
+		clearServerAuthentication,
+	} from "$lib/stores/mcpServers";
 	import IconCheckmark from "~icons/carbon/checkmark-filled";
 	import IconWarning from "~icons/carbon/warning-filled";
 	import IconPending from "~icons/carbon/pending-filled";
@@ -75,6 +81,16 @@
 	function handleDelete() {
 		if (confirm(`Delete "${server.name}"?`)) {
 			deleteCustomServer(server.id);
+		}
+	}
+
+	async function handleAuthenticate() {
+		await authenticateServer(server);
+	}
+
+	function handleSignOut() {
+		if (confirm(`Remove saved credentials for "${server.name}"?`)) {
+			clearServerAuthentication(server.id);
 		}
 	}
 </script>
@@ -154,7 +170,7 @@
 		{/if}
 
 		<!-- Actions -->
-		<div class="flex gap-2">
+		<div class="flex flex-wrap gap-2">
 			<button
 				onclick={handleHealthCheck}
 				disabled={isLoadingHealth}
@@ -162,6 +178,20 @@
 			>
 				<IconRefresh class="size-3 {isLoadingHealth ? 'animate-spin' : ''}" />
 				Health Check
+			</button>
+
+			<button
+				onclick={handleAuthenticate}
+				class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+			>
+				Authenticate
+			</button>
+
+			<button
+				onclick={handleSignOut}
+				class="flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-600 dark:bg-gray-700 dark:text-red-300 dark:hover:bg-gray-800"
+			>
+				Sign out
 			</button>
 
 			{#if server.type === "custom"}

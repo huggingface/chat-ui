@@ -7,7 +7,9 @@
 import { writable, derived } from "svelte/store";
 import { base } from "$app/paths";
 import { browser } from "$app/environment";
-import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
+import { BrowserOAuthClientProvider } from "$lib/mcp/auth/browserProvider";
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import type { MCPServer, ServerStatus, MCPTool, KeyValuePair } from "$lib/types/Tool";
 
 const STORAGE_KEYS = {
 	CUSTOM_SERVERS: "mcp:custom-servers",
@@ -83,6 +85,40 @@ export const enabledServers = derived([allMcpServers, selectedServerIds], ([$all
 
 // Derived store: count of enabled servers
 export const enabledServersCount = derived(enabledServers, ($enabled) => $enabled.length);
+
+// Persist auth headers per server id
+const AUTH_HEADERS_KEY = "mcp:auth_headers";
+type AuthHeadersMap = Record<string, { key: string; value: string }[]>;
+
+function loadAuthHeaders(): AuthHeadersMap {
+  if (!browser) return {};
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_HEADERS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveAuthHeaders(map: AuthHeadersMap) {
+  if (!browser) return;
+  localStorage.setItem(AUTH_HEADERS_KEY, JSON.stringify(map));
+}
+
+function mergeHeaders(baseHeaders: KeyValuePair[] | undefined, extra: KeyValuePair[] | undefined): KeyValuePair[] | undefined {
+  const out: Record<string, string> = {};
+  for (const h of baseHeaders ?? []) out[h.key] = h.value;
+  for (const h of extra ?? []) out[h.key] = h.value;
+  const entries = Object.entries(out).map(([key, value]) => ({ key, value }));
+  return entries.length ? entries : undefined;
+}
+
+// Derived: include stored auth headers (e.g., Authorization) with enabled servers
+export const enabledServersWithAuth = derived([enabledServers], ([$enabled]) => {
+  const authMap = loadAuthHeaders();
+  return $enabled.map((s) => ({
+    ...s,
+    headers: mergeHeaders(s.headers, authMap[s.id]),
+  }));
+});
 
 /**
  * Refresh base servers from API and merge with custom servers
@@ -206,13 +242,16 @@ export async function healthCheckServer(
 	try {
 		updateServerStatus(server.id, "connecting");
 
+		// merge any stored auth headers for this server
+		const withAuth: MCPServer = (() => {
+			const authMap = loadAuthHeaders();
+			return { ...server, headers: mergeHeaders(server.headers, authMap[server.id]) };
+		})();
+
 		const response = await fetch(`${base}/api/mcp/health`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				url: server.url,
-				headers: server.headers,
-			}),
+			body: JSON.stringify({ url: withAuth.url, headers: withAuth.headers }),
 		});
 
 		const result = await response.json();
@@ -234,4 +273,54 @@ export async function healthCheckServer(
 // Initialize on module load
 if (browser) {
 	refreshMcpServers();
+}
+
+// --- OAuth helpers ---
+export async function authenticateServer(server: MCPServer): Promise<void> {
+  if (!browser) return;
+  const callbackUrl = new URL(`${base}/oauth/callback`, window.location.origin).toString();
+  const provider = new BrowserOAuthClientProvider(server.url, {
+    clientName: "chat-ui",
+    callbackUrl,
+  });
+
+  // Listen for the popup callback message to finalize and persist header
+  const onMessage = async (evt: MessageEvent) => {
+    if (evt.origin !== window.location.origin) return;
+    const data = evt.data as { type?: string; success?: boolean; error?: string };
+    if (data?.type !== 'mcp_auth_callback') return;
+    window.removeEventListener('message', onMessage);
+    if (!data.success) {
+      console.error('[mcp] OAuth failed:', data.error);
+      return;
+    }
+    try {
+      const tokens = await provider.tokens();
+      if (!tokens?.access_token) return;
+      const tokenType = (tokens as any).token_type || 'Bearer';
+      const authHeader: KeyValuePair = { key: 'Authorization', value: `${tokenType} ${tokens.access_token}` };
+      const map = loadAuthHeaders();
+      map[server.id] = mergeHeaders(map[server.id], [authHeader]) ?? [];
+      saveAuthHeaders(map);
+      // Re-run health check to reflect status
+      await healthCheckServer(server);
+    } catch (e) {
+      console.error('[mcp] Failed to store tokens', e);
+    }
+  };
+  window.addEventListener('message', onMessage);
+
+  try {
+    await auth(provider, { serverUrl: server.url });
+  } catch (e) {
+    console.error('[mcp] auth() initiation failed', e);
+    window.removeEventListener('message', onMessage);
+  }
+}
+
+export function clearServerAuthentication(serverId: string) {
+  if (!browser) return;
+  const map = loadAuthHeaders();
+  delete map[serverId];
+  saveAuthHeaders(map);
 }
