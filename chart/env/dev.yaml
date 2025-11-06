@@ -36,6 +36,7 @@ ingressInternal:
     kubernetes.io/ingress.class: "alb"
 
 envVars:
+  TEST: "test"
   COUPLE_SESSION_WITH_COOKIE_NAME: "token"
   OPENID_SCOPES: "openid profile inference-api"
   USE_USER_TOKEN: "true"
