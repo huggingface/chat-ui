@@ -55,18 +55,21 @@ type ListedTool = {
 	annotations?: { title?: string };
 };
 
-async function listServerTools(server: McpServerConfig): Promise<ListedTool[]> {
+async function listServerTools(
+	server: McpServerConfig,
+	opts: { signal?: AbortSignal } = {}
+): Promise<ListedTool[]> {
 	const url = new URL(server.url);
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	try {
 		try {
 			const transport = new StreamableHTTPClientTransport(url, {
-				requestInit: { headers: server.headers },
+				requestInit: { headers: server.headers, signal: opts.signal },
 			});
 			await client.connect(transport);
 		} catch {
 			const transport = new SSEClientTransport(url, {
-				requestInit: { headers: server.headers },
+				requestInit: { headers: server.headers, signal: opts.signal },
 			});
 			await client.connect(transport);
 		}
@@ -84,7 +87,7 @@ async function listServerTools(server: McpServerConfig): Promise<ListedTool[]> {
 
 export async function getOpenAiToolsForMcp(
 	servers: McpServerConfig[],
-	{ ttlMs = DEFAULT_TTL_MS }: { ttlMs?: number } = {}
+	{ ttlMs = DEFAULT_TTL_MS, signal }: { ttlMs?: number; signal?: AbortSignal } = {}
 ): Promise<{ tools: OpenAiTool[]; mapping: Record<string, McpToolMapping> }> {
 	const now = Date.now();
 	const cacheKey = buildCacheKey(servers);
@@ -115,9 +118,15 @@ export async function getOpenAiToolsForMcp(
 		seenNames.add(name);
 	};
 
-	for (const server of servers) {
-		try {
-			const serverTools = await listServerTools(server);
+	// Fetch tools in parallel; tolerate individual failures
+	const tasks = servers.map((server) => listServerTools(server, { signal }));
+	const results = await Promise.allSettled(tasks);
+
+	for (let i = 0; i < results.length; i++) {
+		const server = servers[i];
+		const r = results[i];
+		if (r.status === "fulfilled") {
+			const serverTools = r.value;
 			for (const tool of serverTools) {
 				if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
 					continue;
@@ -146,8 +155,8 @@ export async function getOpenAiToolsForMcp(
 					};
 				}
 			}
-		} catch {
-			// Ignore individual server failures
+		} else {
+			// ignore failure for this server
 			continue;
 		}
 	}

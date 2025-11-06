@@ -1,6 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { getClient } from "./clientPool";
 
 export interface McpServerConfig {
 	name: string;
@@ -10,65 +9,74 @@ export interface McpServerConfig {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-function toUrl(value: string): URL {
-	try {
-		return new URL(value);
-	} catch (error) {
-		throw new Error(`Invalid MCP server URL: ${value}`, { cause: error });
-	}
+interface AbortSignalWithTimeout {
+	timeout?: (ms: number) => AbortSignal;
+}
+function makeTimeoutSignal(ms: number): AbortSignal {
+	const AS = AbortSignal as unknown as AbortSignalWithTimeout;
+	if (typeof AS.timeout === "function") return AS.timeout(ms);
+	const c = new AbortController();
+	setTimeout(() => c.abort(), ms);
+	return c.signal;
 }
 
 export async function callMcpTool(
 	server: McpServerConfig,
 	tool: string,
 	args: unknown = {},
-	{ timeoutMs = DEFAULT_TIMEOUT_MS }: { timeoutMs?: number } = {}
+	{
+		timeoutMs = DEFAULT_TIMEOUT_MS,
+		signal,
+		client,
+	}: { timeoutMs?: number; signal?: AbortSignal; client?: Client } = {}
 ): Promise<string> {
-	const url = toUrl(server.url);
 	const normalizedArgs =
 		typeof args === "object" && args !== null && !Array.isArray(args)
 			? (args as Record<string, unknown>)
 			: undefined;
 
-	async function connect(kind: "streamable" | "sse", signal: AbortSignal, client: Client) {
-		const requestInit: RequestInit = { headers: server.headers, signal };
-		const transport =
-			kind === "streamable"
-				? new StreamableHTTPClientTransport(url, { requestInit })
-				: new SSEClientTransport(url, { requestInit });
-		await client.connect(transport);
-	}
+	// Get a (possibly pooled) client. The client itself was connected with a signal
+	// that already composes outer cancellation. We still enforce a per-call timeout here.
+	const activeClient = client ?? (await getClient(server, signal));
 
-	let lastError: unknown;
+	const timeoutSignal = makeTimeoutSignal(timeoutMs);
 
-	for (const kind of ["streamable", "sse"] as const) {
-		const controller = new AbortController();
-		const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
-		const timeout = setTimeout(() => controller.abort(), timeoutMs);
+	// Per-call timeout wrapper; does not guarantee server abort, but prevents hanging our turn.
+	const withTimeout = <T>(p: Promise<T>): Promise<T> =>
+		new Promise<T>((resolve, reject) => {
+			let settled = false;
+			const onAbort = () => {
+				if (!settled) {
+					settled = true;
+					reject(new Error("MCP tool call timed out"));
+				}
+			};
+			timeoutSignal.addEventListener("abort", onAbort);
+			p.then((v) => {
+				if (!settled) {
+					settled = true;
+					timeoutSignal.removeEventListener("abort", onAbort);
+					resolve(v);
+				}
+			}).catch((e) => {
+				if (!settled) {
+					settled = true;
+					timeoutSignal.removeEventListener("abort", onAbort);
+					reject(e);
+				}
+			});
+		});
 
-		try {
-			await connect(kind, controller.signal, client);
-			const response = await client.callTool({ name: tool, arguments: normalizedArgs });
-			const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
-			const textParts = parts
-				.filter((part): part is { type: "text"; text: string } => {
-					if (typeof part !== "object" || part === null) return false;
-					const obj = part as Record<string, unknown>;
-					return obj["type"] === "text" && typeof obj["text"] === "string";
-				})
-				.map((p) => p.text);
-			return textParts.join("\n");
-		} catch (err) {
-			lastError = err;
-		} finally {
-			clearTimeout(timeout);
-			try {
-				await client.close?.();
-			} catch {
-				// ignore close errors
-			}
-		}
-	}
-
-	throw lastError instanceof Error ? lastError : new Error(String(lastError));
+	const response = await withTimeout(
+		activeClient.callTool({ name: tool, arguments: normalizedArgs })
+	);
+	const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
+	const textParts = parts
+		.filter((part): part is { type: "text"; text: string } => {
+			if (typeof part !== "object" || part === null) return false;
+			const obj = part as Record<string, unknown>;
+			return obj["type"] === "text" && typeof obj["text"] === "string";
+		})
+		.map((p) => p.text);
+	return textParts.join("\n");
 }

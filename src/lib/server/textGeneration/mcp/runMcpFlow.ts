@@ -15,6 +15,7 @@ import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
+import { drainPool } from "$lib/server/mcp/clientPool";
 import { logger } from "../../logger";
 import type { TextGenerationContext } from "../types";
 
@@ -98,7 +99,7 @@ export async function* runMcpFlow({
 		return false;
 	}
 
-	const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers);
+	const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, { signal: abortSignal });
 	logger.debug({ tools: oaTools.length }, "[mcp] openai tool defs built");
 	if (oaTools.length === 0) {
 		return false;
@@ -324,14 +325,30 @@ export async function* runMcpFlow({
 			);
 
 			if (Object.keys(toolCallState).length > 0) {
-				const calls: NormalizedToolCall[] = Object.values(toolCallState)
-					.map((c) => (c?.id && c?.name ? c : undefined))
-					.filter(Boolean)
-					.map((c) => ({
-						id: c?.id ?? "",
-						name: c?.name ?? "",
-						arguments: c?.arguments ?? "",
-					})) as NormalizedToolCall[];
+				// If any streamed call is missing id, perform a quick non-stream retry to recover full tool_calls with ids
+				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
+				let calls: NormalizedToolCall[];
+				if (missingId) {
+					const nonStream = await openai.chat.completions.create(
+						{ ...completionBase, messages: messagesOpenAI, stream: false },
+						{ signal: abortSignal }
+					);
+					const tc = nonStream.choices?.[0]?.message?.tool_calls ?? [];
+					calls = tc.map((t) => ({
+						id: t.id,
+						name: t.function?.name ?? "",
+						arguments: t.function?.arguments ?? "",
+					}));
+				} else {
+					calls = Object.values(toolCallState)
+						.map((c) => (c?.id && c?.name ? c : undefined))
+						.filter(Boolean)
+						.map((c) => ({
+							id: c?.id ?? "",
+							name: c?.name ?? "",
+							arguments: c?.arguments ?? "",
+						})) as NormalizedToolCall[];
+				}
 
 				// Include the assistant message with tool_calls so the next round
 				// sees both the calls and their outputs, matching MCP branch behavior.
@@ -354,6 +371,7 @@ export async function* runMcpFlow({
 					parseArgs,
 					toPrimitive,
 					processToolOutput,
+					abortSignal,
 				});
 				let toolMsgCount = 0;
 				let toolRunCount = 0;
@@ -393,6 +411,9 @@ export async function* runMcpFlow({
 		logger.warn("[mcp] exceeded tool-followup loops; falling back");
 	} catch (err) {
 		logger.warn({ err: String(err) }, "[mcp] flow failed, falling back to default endpoint");
+	} finally {
+		// ensure MCP clients are closed after the turn
+		await drainPool();
 	}
 
 	return false;
