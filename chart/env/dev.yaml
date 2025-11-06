@@ -32,7 +32,7 @@ ingressInternal:
     alb.ingress.kubernetes.io/tags: "Env=prod,Project=hub,Terraform=true"
     alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
     alb.ingress.kubernetes.io/target-type: "ip"
-    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:707930574880:certificate/f7adc8ee-4cf9-465c-9aa8-d3fc23461244"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:707930574880:certificate/bc3eb446-1c04-432c-ac6b-946a88d725da"
     kubernetes.io/ingress.class: "alb"
 
 envVars:
