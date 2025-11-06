@@ -1,4 +1,4 @@
-name: Generate Slug
+name: Generate Branch Slug
 
 on:
   workflow_call:
@@ -27,8 +27,12 @@ jobs:
       - name: Generate slug
         id: slugify
         run: |
-          # Créer un script Go temporaire
-          cat > /tmp/slugify.go << 'EOF'
+          # Create working directory
+          mkdir -p $HOME/slugify
+          cd $HOME/slugify
+          
+          # Create Go script
+          cat > main.go << 'EOF'
           package main
           
           import (
@@ -49,18 +53,20 @@ jobs:
           }
           EOF
           
-          # Compiler
-          cd /tmp
+          # Initialize module and install dependency
           go mod init slugify
+          go mod tidy
           go get github.com/gosimple/slug
-          go build -o slugify slugify.go
           
-          # Générer le slug
-          BRANCH_NAME="${{ inputs.branch-name }}"
-          echo "Input branch: $BRANCH_NAME"
+          # Build
+          go build -o slugify main.go
           
-          SLUG=$(/tmp/slugify "$BRANCH_NAME")
+          # Generate slug
+          VALUE="${{ inputs.value }}"
+          echo "Input value: $VALUE"
+          
+          SLUG=$(./slugify "$VALUE")
           echo "Generated slug: $SLUG"
           
-          # Exporter
+          # Export
           echo "slug=$SLUG" >> $GITHUB_OUTPUT
