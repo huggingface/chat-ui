@@ -31,7 +31,6 @@ jobs:
             huggingface/chat-ui
           tags: |
             type=raw,value=dev-${{ env.GITHUB_SHA_SHORT }}
-#            type=sha,enable=true,prefix=dev-,format=short,sha-len=8
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
