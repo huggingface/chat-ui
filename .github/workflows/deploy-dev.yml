@@ -6,6 +6,9 @@ jobs:
   build-and-publish-huggingchat-image:
     if: contains(github.event.pull_request.labels.*.name, 'preview')
     runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ steps.branch_slug.outputs.slug }}.chat-dev.huggingface.tech
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,3 +54,9 @@ jobs:
             INCLUDE_DB=false
             APP_BASE=/chat
             PUBLIC_COMMIT_SHA=${{ env.GITHUB_SHA_SHORT }}
+
+      - name: Get branch slug
+        id: branch_slug
+        uses: ./.github/workflows/branch-slug.yaml
+        with:
+          branch-name: ${{ github.head_ref }}
