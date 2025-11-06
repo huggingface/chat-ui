@@ -40,7 +40,7 @@
 	}
 </script>
 
-<Modal width="max-w-4xl" {onclose} closeButton>
+<Modal width="w-[600px]" {onclose} closeButton>
 	<div class="p-6">
 		<!-- Header -->
 		<div class="mb-6">
@@ -138,7 +138,7 @@
 				</div>
 
 				<!-- Help Text -->
-				<div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+				<div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
 					<h4 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">💡 Quick Tips</h4>
 					<ul class="space-y-1 text-xs text-gray-600 dark:text-gray-400">
 						<li>• Enable servers to make their tools available in chat</li>
