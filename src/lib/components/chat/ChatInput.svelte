@@ -235,7 +235,7 @@
 
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
-							class="btn size-7 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-black"
+							class="btn size-7 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600"
 							disabled={loading}
 							aria-label="Add attachment"
 						>
