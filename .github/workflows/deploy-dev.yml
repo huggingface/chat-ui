@@ -4,7 +4,7 @@ on:
 
 jobs:
   build-and-publish-huggingchat-image:
-    if: ${{ github.event.label.name == 'preview' }}
+    if: contains(github.event.pull_request.labels.*.name, 'preview')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
