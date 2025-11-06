@@ -192,12 +192,9 @@ infisical:
   enabled: true
   env: "ephemeral-us-east-1"
 
+replicas: 1
 autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 30
-  targetMemoryUtilizationPercentage: "50"
-  targetCPUUtilizationPercentage: "50"
+  enabled: false
 
 resources:
   requests:
