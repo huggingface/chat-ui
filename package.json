@@ -66,6 +66,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@aws-sdk/credential-providers": "^3.925.0",
 		"@elysiajs/swagger": "^1.3.0",
 		"@huggingface/hub": "^2.2.0",
 		"@huggingface/inference": "^4.11.3",
