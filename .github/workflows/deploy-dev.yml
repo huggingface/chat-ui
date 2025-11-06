@@ -16,6 +16,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4.5.0
+
+      - name: Set GITHUB_SHA_SHORT from PR
+        if: env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT != null
+        run: echo "GITHUB_SHA_SHORT=${{ env.GITHUB_EVENT_PULL_REQUEST_HEAD_SHA_SHORT }}" >> $GITHUB_ENV
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -23,13 +30,11 @@ jobs:
           images: |
             huggingface/chat-ui
           tags: |
-            type=sha,enable=true,prefix=dev-,format=short,sha-len=8
+            type=raw,value=sha-${{ env.GITHUB_SHA_SHORT }}
+#            type=sha,enable=true,prefix=dev-,format=short,sha-len=8
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4.5.0
 
       - name: Build and Publish HuggingChat image
         uses: docker/build-push-action@v5
