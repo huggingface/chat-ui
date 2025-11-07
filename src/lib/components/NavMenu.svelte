@@ -205,7 +205,7 @@
 			MCP Servers
 			{#if $enabledServersCount > 0}
 				<span
-					class="ml-auto rounded-md bg-blue-500/10 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+					class="ml-auto rounded-md bg-blue-600/10 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-600/20 dark:text-blue-400"
 				>
 					{$enabledServersCount}
 				</span>

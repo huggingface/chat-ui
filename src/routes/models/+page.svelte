@@ -101,11 +101,11 @@
 							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 								<span
 									title="This model is multimodal and supports image inputs natively."
-									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-500"
+									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-600"
 									aria-label="Model is multimodal"
 									role="img"
 								>
-									<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
+									<CarbonView class="text-xxs text-blue-700 dark:text-blue-600" />
 								</span>
 							{/if}
 							<button

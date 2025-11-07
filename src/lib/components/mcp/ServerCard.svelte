@@ -14,6 +14,7 @@
 	import IconTrash from "~icons/carbon/trash-can";
 	import IconTools from "~icons/carbon/tools";
 	import { authServerIds } from "$lib/stores/mcpServers";
+	import Switch from "$lib/components/Switch.svelte";
 
 	interface Props {
 		server: MCPServer;
@@ -60,16 +61,11 @@
 		}
 	});
 
-	function handleToggle() {
-		// Capture current selection state before toggling because props update
-		// reactively and could flip within this handler.
-		const wasSelected = isSelected;
+	// Switch setter handles enable/disable (simple, idiomatic)
+	function setEnabled(v: boolean) {
+		if (v === isSelected) return;
 		toggleServer(server.id);
-
-		// If enabling (was not selected) and not connected, run health check
-		if (!wasSelected && server.status !== "connected") {
-			handleHealthCheck();
-		}
+		if (v && server.status !== "connected") handleHealthCheck();
 	}
 
 	async function handleHealthCheck() {
@@ -100,7 +96,7 @@
 
 <div
 	class="rounded-lg border transition-colors {isSelected
-		? 'border-blue-500 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/10'
+		? 'border-blue-600 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/10'
 		: 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'}"
 >
 	<div class="p-4">
@@ -124,22 +120,15 @@
 				</p>
 			</div>
 
-			<!-- Toggle Button -->
-			<button
-				onclick={handleToggle}
-				class="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {isSelected
-					? 'bg-green-500 text-white hover:bg-green-600'
-					: 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'}"
-			>
-				{isSelected ? "Enabled" : "Enable"}
-			</button>
+			<!-- Enable Switch (function binding per Svelte 5 docs) -->
+			<Switch name={`enable-${server.id}`} bind:checked={() => isSelected, setEnabled} />
 		</div>
 
 		<!-- Status -->
 		{#if server.status}
 			<div class="mb-2 flex items-center gap-2">
 				<span
-					class="inline-flex items-center gap-1.5 rounded-full {statusInfo.bgColor} px-2 py-0.5 text-xs font-medium {statusInfo.color}"
+					class="inline-flex items-center gap-1 rounded-full {statusInfo.bgColor} py-0.5 pl-1.5 pr-2 text-xs font-medium {statusInfo.color}"
 				>
 					{#if server.status === "connected"}
 						<IconCheckmark class="size-3" />

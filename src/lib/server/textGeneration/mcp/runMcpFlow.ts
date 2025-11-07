@@ -246,7 +246,7 @@ export async function* runMcpFlow({
 			);
 		}
 
-		for (let loop = 0; loop < 5; loop += 1) {
+		for (let loop = 0; loop < 10; loop += 1) {
 			lastAssistantContent = "";
 			streamedContent = false;
 

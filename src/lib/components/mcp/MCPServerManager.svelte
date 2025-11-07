@@ -70,7 +70,7 @@
 			<div class="flex gap-2">
 				<button
 					onclick={handleRefresh}
-					class="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+					class="btn gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 				>
 					<IconRefresh class="size-4" />
 					Refresh
@@ -78,7 +78,7 @@
 				{#if currentView === "list"}
 					<button
 						onclick={() => (currentView = "add")}
-						class="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+						class="btn flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
 					>
 						<IconAdd class="size-4" />
 						Add Server
@@ -122,7 +122,7 @@
 							</p>
 							<button
 								onclick={() => (currentView = "add")}
-								class="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+								class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
 							>
 								<IconAdd class="size-4" />
 								Add Your First Server

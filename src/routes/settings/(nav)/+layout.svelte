@@ -176,11 +176,11 @@
 					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 						<span
 							title="Multimodal support (image inputs)"
-							class="grid size-[21px] flex-none place-items-center rounded-md border border-blue-700 dark:border-blue-500"
+							class="grid size-[21px] flex-none place-items-center rounded-md border border-blue-700 dark:border-blue-600"
 							aria-label="Model is multimodal"
 							role="img"
 						>
-							<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
+							<CarbonView class="text-xxs text-blue-700 dark:text-blue-600" />
 						</span>
 					{/if}
 
