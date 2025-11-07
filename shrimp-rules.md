@@ -13,6 +13,10 @@
 - [.cursor/rules/cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc)
 - [.cursor/rules/RIPER-5.mdc](mdc:.cursor/rules/RIPER-5.mdc)
 - [.cursor/rules/initial_config_mandate.mdc](mdc:.cursor/rules/initial_config_mandate.mdc)
+- [.cursor/rules/serena/serena_mcp_mandate.mdc](mdc:.cursor/rules/serena/serena_mcp_mandate.mdc)
+- [.cursor/rules/codanna/codanna_usage.mdc](mdc:.cursor/rules/codanna/codanna_usage.mdc)
+- [.cursor/rules/shrimp/sdd_workflow_mandate.mdc](mdc:.cursor/rules/shrimp/sdd_workflow_mandate.mdc)
+- [.cursor/rules/self_improve.mdc](mdc:.cursor/rules/self_improve.mdc)
 
 ## Architecture & Paths
 
@@ -55,6 +59,7 @@ References: [ESLint config](mdc:.eslintrc.cjs), [tsconfig.json](mdc:tsconfig.jso
 - Rendering raw HTML requires sanitization.
   - Mandatory: sanitize with DOMPurify before using `{@html ...}`.
   - Allowed exception: only when content is already sanitized in the same file.
+  - Inline rule disable for `svelte/no-at-html-tags` is allowed only alongside `DOMPurify.sanitize(...)` in the same line/block.
 - Example:
 
 ```svelte
@@ -73,6 +78,19 @@ Do NOT:
 ```
 
 References: [CodeBlock.svelte](mdc:src/lib/components/CodeBlock.svelte)
+
+### Security-in-Markup Scanner (Plan)
+
+- Purpose: Detect unsafe `{@html ...}` usage and enforce `DOMPurify.sanitize(...)`.
+- Scope: `src/**/*.svelte` (exclude `src/lib/server/**`).
+- Detection rules:
+  - Violation: `{@html <expr>}` where `<expr>` is NOT `DOMPurify.sanitize(...)`.
+  - Normal: `{@html DOMPurify.sanitize(expr)}`.
+  - Exception (explicitly allowed): same-file justification comment present — `<!-- safe-html: reason -->`.
+- Output: console table or JSONL (`file:line:summary`). Exit code 1 if violations, 0 otherwise.
+- Execution (planned): `scripts/scan-html.ts` with `npm run scan:html` (add in CI once implemented).
+- Acceptance criteria: 0 violations required for merge; exceptions must include justification comment.
+- Limitations: static scan; indirect/dynamic constructions may need manual review.
 
 ## Server & API Standards
 
@@ -132,6 +150,63 @@ References: [vite.config.ts](mdc:vite.config.ts), [scripts/setups](mdc:scripts/s
   - `npm test`
 - Keep changes atomic and scoped; update related files in the same edit.
 
+### Combined Check (Optional)
+
+- `npm run rules:check` (runs: check → lint → test)
+
+## MCP Servers & Restart Procedure
+
+- Registered MCP servers (see [.cursor/mcp.json](mdc:.cursor/mcp.json)):
+  - Serena: `uvx --from git+https://github.com/oraios/serena serena start-mcp-server --context ide-assistant --mode interactive`
+  - Codanna: `codanna serve --watch`
+  - Shrimp Task Manager: `node /Users/sukbeom/Documents/mcp-shrimp-task-manager/dist/index.js` (env: `DATA_DIR`, `TEMPLATES_USE=ko`, `ENABLE_GUI=true`)
+
+- Restart / Reload:
+  - Command Palette: “Model Context Protocol: Restart MCP Servers”
+  - Or: “Developer: Reload Window”
+  - After editing `.cursor/mcp.json`, reload is required.
+
+- Codanna Indexing:
+  - Run: `codanna index "/Users/sukbeom/Desktop/workspace/huggingface-ui"`
+  - If MCP still shows stale/0 symbols: restart MCP servers and re-check
+  - Settings reference: [.codanna/settings.toml](mdc:.codanna/settings.toml)
+
+- Guardrails:
+  - Do not broaden `vite.server.allowedHosts` in `vite.config.ts` without security review.
+  - Restart MCP servers after changes to `.cursor/mcp.json` or `.codanna/settings.toml`.
+  - Keep `ALLOW_IFRAME` gating in `svelte.config.js` unchanged unless explicitly required.
+
+- Troubleshooting:
+  - CLI index updated but MCP shows 0 symbols → restart MCP servers.
+  - Ensure `.codanna/settings.toml` `indexed_paths` includes the workspace root.
+
+## Codanna Index Maintenance
+
+- When to (Re)Index:
+  - First-time setup or after large refactors / mass file moves
+  - MCP shows outdated/0 symbols vs CLI output
+  - After changing `.codanna/settings.toml` (e.g., `indexed_paths`, `ignore_patterns`)
+
+- Commands:
+  - Initial/Manual index:
+    - `codanna index "/Users/sukbeom/Desktop/workspace/huggingface-ui"`
+  - Verify index via MCP:
+    - Restart MCP servers, then use Codanna “Get Index Info” to check symbol counts
+
+- Settings Reference:
+  - [.codanna/settings.toml](mdc:.codanna/settings.toml)
+  - Ensure `indexed_paths` includes the project root
+  - Keep `ignore_patterns` strict (e.g., `node_modules/**`, `.git/**`) for performance
+
+- Operational Notes:
+  - Keep `codanna serve --watch` running (registered in `.cursor/mcp.json`)
+  - After editing `.cursor/mcp.json` or `.codanna/settings.toml`, restart MCP servers
+
+- Troubleshooting:
+  - “CLI index OK, MCP shows 0” → Restart MCP servers and re-check
+  - “Slow or partial index” → Review `ignore_patterns`, reduce scope, re-run index
+  - “Wrong path indexed” → Confirm absolute workspace path in the index command and settings
+
 ## Key File Interaction Standards
 
 - When updating `$api` request/response types:
@@ -144,6 +219,20 @@ References: [vite.config.ts](mdc:vite.config.ts), [scripts/setups](mdc:scripts/s
 - When introducing `@html` in any component:
   - Add DOMPurify sanitization as shown above.
 
+## API Contract Change Checklist
+
+- Update shared types under `src/lib/types/**` (request/response DTOs, enums, type aliases).
+- Update server handlers under `src/routes/api/**/+server.ts` and validate inputs/outputs with `zod`.
+- Update client usage in `src/lib/APIClient.ts` and all callers to match the new types/contracts.
+- Update affected UI/data loaders (e.g., `+page.ts`, components) that depend on the changed contract.
+- Update tests across workspaces:
+  - Client/browser (`src/**/*.svelte.{test,spec}.{ts}`)
+  - SSR (`src/**/*.ssr.{test,spec}.{ts}`)
+  - Server/node (`src/**/*.{test,spec}.{ts}` excluding Svelte tests)
+- Backward compatibility & release notes:
+  - For breaking changes, add deprecation/migration notes in PR description and team release notes.
+- Run combined checks: `npm run rules:check` (check → lint → test) and ensure build/preview if needed.
+
 ## AI Decision-Making Standards
 
 - Prefer modifying existing utilities in `src/lib/**` before adding new ones.
@@ -152,6 +241,7 @@ References: [vite.config.ts](mdc:vite.config.ts), [scripts/setups](mdc:scripts/s
 - For API consumption on the client, prefer existing patterns in [APIClient.ts](mdc:src/lib/APIClient.ts).
 - If a change affects types + server handlers + client usage, update all three in one PR/edit.
 - Do not alter CSP or dev server host settings without explicit instruction and reasoning.
+- For search/analysis, do not use grep or whole-file scans; use Codanna (semantic/symbol) and Serena symbol tools per RIPER-5 S2/S3.
 
 ## Prohibited Actions
 

@@ -1,50 +1,51 @@
-# Chat UI
+# Chat UI (한국어)
 
-![Chat UI repository thumbnail](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/chat-ui-2026.png)
+![Chat UI 저장소 썸네일](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/chat-ui/chat-ui-2026.png)
 
-A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat app on hf.co/chat](https://huggingface.co/chat).
+로컬 또는 클라우드에서 호스팅되는 LLM(OpenAI 호환 API)을 연결해 사용하는 채팅 UI 프로젝트입니다. 이 애플리케이션은 SvelteKit 기반이며, [HuggingChat (hf.co/chat)](https://huggingface.co/chat)을 구동합니다.
 
-0. [Quickstart](#quickstart)
-1. [Database Options](#database-options)
-2. [Launch](#launch)
-3. [Optional Docker Image](#optional-docker-image)
-4. [Extra parameters](#extra-parameters)
-5. [Building](#building)
+> 참고
+>
+> - Chat UI는 OpenAI 호환 API만 지원합니다. `OPENAI_BASE_URL`과 `/models` 엔드포인트를 통해 동작합니다.
+> - 레거시 분기는 [legacy 브랜치](https://github.com/huggingface/chat-ui/tree/legacy)에서 확인할 수 있습니다.
 
-> [!NOTE]
-> Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc. will work by default).
+목차
+0. [빠른 시작](#빠른-시작-quickstart)
 
-> [!NOTE]
-> The old version is still available on the [legacy branch](https://github.com/huggingface/chat-ui/tree/legacy)
+1. [데이터베이스 옵션](#데이터베이스-옵션-database-options)
+2. [실행](#실행-launch)
+3. [선택 항목: Docker 이미지](#선택-항목-docker-이미지-docker-image)
+4. [추가 매개변수](#추가-매개변수-extra-parameters)
+5. [빌드](#빌드-building)
 
-## Quickstart
+## 빠른 시작 (Quickstart)
 
-Chat UI speaks to OpenAI-compatible APIs only. The fastest way to get running is with the Hugging Face Inference Providers router plus your personal Hugging Face access token.
+Chat UI는 OpenAI 호환 API만 사용합니다. 가장 간단한 방법은 Hugging Face Inference Providers router와 개인 Hugging Face 토큰을 사용하는 것입니다.
 
-**Step 1 – Create `.env.local`:**
+1) `.env.local` 생성:
 
 ```env
 OPENAI_BASE_URL=https://router.huggingface.co/v1
 OPENAI_API_KEY=hf_************************
-# Fill in once you pick a database option below
+# 아래 데이터베이스 옵션 중 하나를 선택해 설정
 MONGODB_URL=
 ```
 
-`OPENAI_API_KEY` can come from any OpenAI-compatible endpoint you plan to call. Pick the combo that matches your setup and drop the values into `.env.local`:
+`OPENAI_API_KEY`는 사용하려는 OpenAI 호환 엔드포인트에서 제공받은 키를 사용합니다. 환경에 맞는 예시는 다음과 같습니다.
 
-| Provider                                      | Example `OPENAI_BASE_URL`          | Example key env                                                         |
-| --------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| Hugging Face Inference Providers router       | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` (or `HF_TOKEN` legacy alias)                    |
-| llama.cpp server (`llama.cpp --server --api`) | `http://127.0.0.1:8080/v1`         | `OPENAI_API_KEY=sk-local-demo` (any string works; llama.cpp ignores it) |
-| Ollama (with OpenAI-compatible bridge)        | `http://127.0.0.1:11434/v1`        | `OPENAI_API_KEY=ollama`                                                 |
-| OpenRouter                                    | `https://openrouter.ai/api/v1`     | `OPENAI_API_KEY=sk-or-v1-...`                                           |
-| Poe                                           | `https://api.poe.com/v1`           | `OPENAI_API_KEY=pk_...`                                                 |
+| 제공자 | 예시 `OPENAI_BASE_URL` | 예시 Key |
+|---|---|---|
+| Hugging Face Inference Providers router | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` (`HF_TOKEN` 과거 호환) |
+| llama.cpp server (`llama.cpp --server --api`) | `http://127.0.0.1:8080/v1` | `OPENAI_API_KEY=sk-local-demo` (임의 문자열) |
+| Ollama (OpenAI 호환 브릿지) | `http://127.0.0.1:11434/v1` | `OPENAI_API_KEY=ollama` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `OPENAI_API_KEY=sk-or-v1-...` |
+| Poe | `https://api.poe.com/v1` | `OPENAI_API_KEY=pk_...` |
 
-Check the root [`.env` template](./.env) for the full list of optional variables you can override.
+루트 [`.env` 템플릿](./.env)에서 선택적으로 사용할 수 있는 변수 목록을 확인할 수 있습니다.
 
-**Step 2 – Choose where MongoDB lives:** Either provision a managed cluster (for example MongoDB Atlas) or run a local container. Both approaches are described in [Database Options](#database-options). After you have the URI, drop it into `MONGODB_URL` (and, if desired, set `MONGODB_DB_NAME`).
+1) MongoDB 위치 선택: Atlas(관리형) 또는 로컬 컨테이너 중 하나를 선택합니다. URI를 확보한 뒤 `MONGODB_URL`에 설정하고, 필요 시 `MONGODB_DB_NAME`을 지정합니다.
 
-**Step 3 – Install and launch the dev server:**
+1) 설치 및 개발 서버 실행:
 
 ```bash
 git clone https://github.com/huggingface/chat-ui
@@ -53,45 +54,43 @@ npm install
 npm run dev -- --open
 ```
 
-You now have Chat UI running against the Hugging Face router without needing to host MongoDB yourself.
+## 데이터베이스 옵션 (Database options)
 
-## Database Options
+채팅 기록, 사용자, 설정, 파일, 통계는 MongoDB에 저장됩니다. MongoDB 6/7 배포판을 사용할 수 있습니다.
 
-Chat history, users, settings, files, and stats all live in MongoDB. You can point Chat UI at any MongoDB 6/7 deployment.
+### MongoDB Atlas (관리형)
 
-### MongoDB Atlas (managed)
+1. [mongodb.com](https://www.mongodb.com/pricing)에서 무료 클러스터 생성
+2. 네트워크 접근 허용(IP 또는 개발용 `0.0.0.0/0`)
+3. 데이터베이스 사용자 생성 및 연결 문자열 복사
+4. `.env.local`의 `MONGODB_URL`에 붙여넣기 (필요 시 `MONGODB_DB_NAME=chat-ui` 유지/변경)
 
-1. Create a free cluster at [mongodb.com](https://www.mongodb.com/pricing).
-2. Add your IP (or `0.0.0.0/0` for development) to the network access list.
-3. Create a database user and copy the connection string.
-4. Paste that string into `MONGODB_URL` in `.env.local`. Keep the default `MONGODB_DB_NAME=chat-ui` or change it per environment.
+Atlas는 로컬 환경을 건드리지 않고 팀/클라우드에 적합합니다.
 
-Atlas keeps MongoDB off your laptop, which is ideal for teams or cloud deployments.
+### 로컬 MongoDB (컨테이너)
 
-### Local MongoDB (container)
-
-If you prefer to run MongoDB locally:
+로컬에서 MongoDB를 구동하려면:
 
 ```bash
 docker run -d -p 27017:27017 --name mongo-chatui mongo:latest
 ```
 
-Then set `MONGODB_URL=mongodb://localhost:27017` in `.env.local`. You can also supply `MONGO_STORAGE_PATH` if you want Chat UI’s fallback in-memory server to persist under a specific folder.
+이후 `.env.local`에 `MONGODB_URL=mongodb://localhost:27017`를 설정하세요. 필요 시 `MONGO_STORAGE_PATH`로 임시 메모리 서버의 영속화 경로를 지정할 수 있습니다.
 
-## Launch
+## 실행 (Launch)
 
-After configuring your environment variables, start Chat UI with:
+환경 변수 설정 후 다음 명령으로 시작합니다:
 
 ```bash
 npm install
 npm run dev
 ```
 
-The dev server listens on `http://localhost:5173` by default. Use `npm run build` / `npm run preview` for production builds.
+기본 개발 서버 주소는 `http://localhost:5173` 입니다. 프로덕션 빌드는 `npm run build` / `npm run preview`로 수행합니다.
 
-## Optional Docker Image
+## 선택 항목: Docker 이미지 (Docker image)
 
-Prefer containerized setup? You can run everything in one container as long as you supply a MongoDB URI (local or hosted):
+컨테이너로 실행하려면 MongoDB URI만 제공하면 됩니다(로컬 또는 Atlas). 예:
 
 ```bash
 docker run \
@@ -103,13 +102,13 @@ docker run \
   ghcr.io/huggingface/chat-ui-db:latest
 ```
 
-`host.docker.internal` lets the container reach a MongoDB instance on your host machine; swap it for your Atlas URI if you use the hosted option. All environment variables accepted in `.env.local` can be provided as `-e` flags.
+`host.docker.internal`은 컨테이너에서 호스트의 MongoDB에 접근할 때 사용합니다. Atlas를 사용할 경우 해당 URI로 대체하세요. `.env.local`에서 지원하는 모든 변수는 `-e`로 전달할 수 있습니다.
 
-## Extra parameters
+## 추가 매개변수 (Extra parameters)
 
-### Theming
+### 테마 (Theming)
 
-You can use a few environment variables to customize the look and feel of chat-ui. These are by default:
+다음 환경 변수로 UI 이름/에셋/설명을 변경할 수 있습니다.
 
 ```env
 PUBLIC_APP_NAME=ChatUI
@@ -118,38 +117,42 @@ PUBLIC_APP_DESCRIPTION="Making the community's best AI chat models available to 
 PUBLIC_APP_DATA_SHARING=
 ```
 
-- `PUBLIC_APP_NAME` The name used as a title throughout the app.
-- `PUBLIC_APP_ASSETS` Is used to find logos & favicons in `static/$PUBLIC_APP_ASSETS`, current options are `chatui` and `huggingchat`.
-- `PUBLIC_APP_DATA_SHARING` Can be set to 1 to add a toggle in the user settings that lets your users opt-in to data sharing with models creator.
+- `PUBLIC_APP_NAME`: 앱 전역 타이틀
+- `PUBLIC_APP_ASSETS`: `static/$PUBLIC_APP_ASSETS`에서 로고/파비콘을 찾습니다. 기본값은 `chatui`(옵션: `huggingchat`).
+- `PUBLIC_APP_DATA_SHARING`: `1`로 설정하면 사용자 설정에서 데이터 공유 옵트인 토글을 노출합니다.
 
-### Models
+### 모델 (Models)
 
-This build does not use the `MODELS` env var or GGUF discovery. Configure models via `OPENAI_BASE_URL` only; Chat UI will fetch `${OPENAI_BASE_URL}/models` and populate the list automatically. Authorization uses `OPENAI_API_KEY` (preferred). `HF_TOKEN` remains a legacy alias.
+이 빌드는 `MODELS` 환경 변수나 GGUF 디스커버리를 사용하지 않습니다. `OPENAI_BASE_URL`의 `/models` 응답으로 모델 목록을 구성합니다. 인증은 `OPENAI_API_KEY`(권장)이며, `HF_TOKEN`은 레거시 별칭입니다.
 
-### LLM Router (Optional)
+### LLM 라우터 (선택)
 
-Chat UI can perform client-side routing [katanemo/Arch-Router-1.5B](https://huggingface.co/katanemo/Arch-Router-1.5B) as the routing model without running a separate router service. The UI exposes a virtual model alias called "Omni" (configurable) that, when selected, chooses the best route/model for each message.
+별도 라우터 서비스를 띄우지 않고 클라이언트 사이드 라우팅을 사용할 수 있습니다(Arch Router 기반). UI에는 가상 모델 별칭(기본 `Omni`)이 노출되며, 선택 시 최근 대화를 바탕으로 적절한 라우트/모델을 고릅니다.
 
-- Provide a routes policy JSON via `LLM_ROUTER_ROUTES_PATH`. No sample file ships with this branch, so you must point the variable to a JSON array you create yourself (for example, commit one in your project like `config/routes.chat.json`). Each route entry needs `name`, `description`, `primary_model`, and optional `fallback_models`.
-- Configure the Arch router selection endpoint with `LLM_ROUTER_ARCH_BASE_URL` (OpenAI-compatible `/chat/completions`) and `LLM_ROUTER_ARCH_MODEL` (e.g. `router/omni`). The Arch call reuses `OPENAI_API_KEY` for auth.
-- Map `other` to a concrete route via `LLM_ROUTER_OTHER_ROUTE` (default: `casual_conversation`). If Arch selection fails, calls fall back to `LLM_ROUTER_FALLBACK_MODEL`.
-- Selection timeout can be tuned via `LLM_ROUTER_ARCH_TIMEOUT_MS` (default 10000).
-- Omni alias configuration: `PUBLIC_LLM_ROUTER_ALIAS_ID` (default `omni`), `PUBLIC_LLM_ROUTER_DISPLAY_NAME` (default `Omni`), and optional `PUBLIC_LLM_ROUTER_LOGO_URL`.
+- 라우팅 정책 JSON 제공: `LLM_ROUTER_ROUTES_PATH` (자체 JSON 배열 준비 필요)
+- Arch 선택 엔드포인트(OpenAI 호환 `/chat/completions`): `LLM_ROUTER_ARCH_BASE_URL`, 모델: `LLM_ROUTER_ARCH_MODEL`
+- 기타 라우트 매핑: `LLM_ROUTER_OTHER_ROUTE` (기본 `casual_conversation`), 실패 시 `LLM_ROUTER_FALLBACK_MODEL`
+- 타임아웃: `LLM_ROUTER_ARCH_TIMEOUT_MS` (기본 10000)
+- 별칭/표시명/로고: `PUBLIC_LLM_ROUTER_ALIAS_ID`(기본 `omni`), `PUBLIC_LLM_ROUTER_DISPLAY_NAME`(기본 `Omni`), `PUBLIC_LLM_ROUTER_LOGO_URL`(선택)
 
-When you select Omni in the UI, Chat UI will:
+동작 개요:
 
-- Call the Arch endpoint once (non-streaming) to pick the best route for the last turns.
-- Emit RouterMetadata immediately (route and actual model used) so the UI can display it.
-- Stream from the selected model via your configured `OPENAI_BASE_URL`. On errors, it tries route fallbacks.
+- 최근 턴을 기반으로 Arch 엔드포인트에 1회 호출(논-스트리밍)하여 라우트를 선정
+- 선택 결과(라우트/실제 모델)를 즉시 UI에 표시
+- 선택된 모델로 스트리밍, 오류 시 라우트 폴백 시도
 
-## Building
+## 빌드 (Building)
 
-To create a production version of your app:
+프로덕션 빌드 생성:
 
 ```bash
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+프로덕션 빌드 프리뷰:
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+```bash
+npm run preview
+```
+
+배포 시 대상 환경에 맞는 [adapter](https://kit.svelte.dev/docs/adapters)가 필요할 수 있습니다.
