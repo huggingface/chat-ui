@@ -21,6 +21,10 @@
 			// For some reason, Sveltekit doesn't let us load env variables from .env here, so we load it from hooks.server.ts
 			window.gaId = "%gaId%";
 		</script>
+		<!-- Inert polyfill for better mobile browser support -->
+		<script type="module">
+			import 'wicg-inert';
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="h-full dark:bg-gray-900">

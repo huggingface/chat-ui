@@ -46,7 +46,13 @@
 	}
 
 	onMount(() => {
-		document.getElementById("app")?.setAttribute("inert", "true");
+		const appEl = document.getElementById("app");
+		if (appEl) {
+			appEl.setAttribute("inert", "true");
+			// Fallback for browsers with poor inert support
+			appEl.style.pointerEvents = "none";
+			appEl.setAttribute("aria-hidden", "true");
+		}
 		modalEl?.focus();
 		// Ensure Escape closes even if focus isn't within modal
 		window.addEventListener("keydown", handleKeydown, { capture: true });
@@ -54,7 +60,13 @@
 
 	onDestroy(() => {
 		if (!browser) return;
-		document.getElementById("app")?.removeAttribute("inert");
+		const appEl = document.getElementById("app");
+		if (appEl) {
+			appEl.removeAttribute("inert");
+			// Remove fallback styles
+			appEl.style.pointerEvents = "";
+			appEl.removeAttribute("aria-hidden");
+		}
 		window.removeEventListener("keydown", handleKeydown, { capture: true });
 	});
 </script>
