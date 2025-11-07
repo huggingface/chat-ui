@@ -107,9 +107,23 @@ export async function* runMcpFlow({
 
 	try {
 		const { OpenAI } = await import("openai");
+
+		// Capture provider header (x-inference-provider) from the upstream OpenAI-compatible server.
+		let providerHeader: string | undefined;
+		const captureProviderFetch = async (
+			input: RequestInfo | URL,
+			init?: RequestInit
+		): Promise<Response> => {
+			const res = await fetch(input, init);
+			const p = res.headers.get("x-inference-provider");
+			if (p && !providerHeader) providerHeader = p;
+			return res;
+		};
+
 		const openai = new OpenAI({
 			apiKey: config.OPENAI_API_KEY || config.HF_TOKEN || "sk-",
 			baseURL: config.OPENAI_BASE_URL,
+			fetch: captureProviderFetch,
 		});
 
 		const mmEnabled = (forceMultimodal ?? false) || targetModel.multimodal;
@@ -265,6 +279,17 @@ export async function* runMcpFlow({
 					},
 				}
 			);
+
+			// If provider header was exposed, notify UI so it can render "via {provider}".
+			if (providerHeader) {
+				yield {
+					type: MessageUpdateType.RouterMetadata,
+					route: "",
+					model: "",
+					provider: providerHeader,
+				};
+				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
+			}
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let sawToolCall = false;

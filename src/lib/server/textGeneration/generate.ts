@@ -63,20 +63,21 @@ export async function* generate(
 	});
 
 	for await (const output of stream) {
-		// Check if this output contains router metadata
-		if (
-			"routerMetadata" in output &&
-			output.routerMetadata &&
-			output.routerMetadata.route &&
-			output.routerMetadata.model
-		) {
-			yield {
-				type: MessageUpdateType.RouterMetadata,
-				route: output.routerMetadata.route,
-				model: output.routerMetadata.model,
-				provider: output.routerMetadata.provider,
-			};
-			continue;
+		// Check if this output contains router metadata. Emit if either:
+		// 1) route+model are present (router models), or
+		// 2) provider-only is present (non-router models exposing x-inference-provider)
+		if ("routerMetadata" in output && output.routerMetadata) {
+			const hasRouteModel = Boolean(output.routerMetadata.route && output.routerMetadata.model);
+			const hasProviderOnly = Boolean(output.routerMetadata.provider);
+			if (hasRouteModel || hasProviderOnly) {
+				yield {
+					type: MessageUpdateType.RouterMetadata,
+					route: output.routerMetadata.route,
+					model: output.routerMetadata.model,
+					provider: output.routerMetadata.provider,
+				};
+				continue;
+			}
 		}
 		// text generation completed
 		if (output.generated_text) {
