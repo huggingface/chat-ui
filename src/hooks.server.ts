@@ -163,10 +163,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				!event.url.pathname.startsWith(`${base}/healthcheck`) &&
 				!event.url.pathname.startsWith(`${base}/r/`) &&
 				!event.url.pathname.startsWith(`${base}/conversation/`) &&
-				!(
-					event.url.pathname.startsWith(`${base}/models/`) &&
-					event.url.pathname.endsWith("/thumbnail.png")
-				) &&
+				!event.url.pathname.startsWith(`${base}/models/`) &&
 				!event.url.pathname.startsWith(`${base}/api`)
 			) {
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
