@@ -107,13 +107,6 @@
 					<h3 class="truncate font-semibold text-gray-900 dark:text-gray-100">
 						{server.name}
 					</h3>
-					{#if server.type === "base"}
-						<span
-							class="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
-						>
-							Base
-						</span>
-					{/if}
 				</div>
 				<p class="truncate text-sm text-gray-600 dark:text-gray-400">
 					{server.url}
