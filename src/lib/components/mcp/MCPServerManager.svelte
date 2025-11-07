@@ -13,7 +13,6 @@
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTools from "~icons/carbon/tools";
-	// Warning moved into AddServerForm to appear after headers
 
 	interface Props {
 		onclose: () => void;
@@ -42,11 +41,11 @@
 	}
 </script>
 
-<Modal width="w-[600px]" {onclose} closeButton>
+<Modal width={currentView === "list" ? "w-[800px]" : "w-[600px]"} {onclose} closeButton>
 	<div class="p-6">
 		<!-- Header -->
 		<div class="mb-6">
-			<h2 class="mb-2 text-xl font-semibold text-gray-900 dark:text-gray-200">
+			<h2 class="mb-1 text-xl font-semibold text-gray-900 dark:text-gray-200">
 				{#if currentView === "list"}
 					MCP Servers
 				{:else}
@@ -55,7 +54,7 @@
 			</h2>
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				{#if currentView === "list"}
-					Manage MCP servers to extend your assistant with external tools.
+					Manage MCP servers to extend HuggingChat with external tools.
 				{:else}
 					Add a custom MCP server to the application
 				{/if}
@@ -65,10 +64,33 @@
 		<!-- Content -->
 		{#if currentView === "list"}
 			<div
-				class="mb-6 flex items-center justify-between rounded-lg bg-blue-50 p-4 dark:bg-blue-900/10"
+				class="mb-6 flex items-center justify-between rounded-lg p-4 {!enabledCount
+					? 'bg-gray-100 dark:bg-white/5'
+					: 'bg-blue-50 dark:bg-blue-900/10'}"
 			>
-				<div class="flex items-center gap-2">
-					<IconTools class="size-5 text-blue-600 dark:text-blue-400" />
+				<div class="flex items-center gap-3">
+					<div
+						class="flex size-10 items-center justify-center rounded-xl bg-blue-500/10"
+						class:grayscale={!enabledCount}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="1em"
+							height="1em"
+							viewBox="0 0 24 24"
+							class="size-8 text-blue-600 dark:text-blue-500"
+							><!-- Icon from Huge Icons by Hugeicons - undefined --><g
+								fill="none"
+								stroke="currentColor"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="1.5"
+								><path
+									d="m3.5 11.75l8.172-8.171a2.828 2.828 0 1 1 4 4m0 0L9.5 13.75m6.172-6.171a2.828 2.828 0 0 1 4 4l-6.965 6.964a1 1 0 0 0 0 1.414L14 21.25"
+								/><path d="m17.5 9.75l-6.172 6.171a2.829 2.829 0 0 1-4-4L13.5 5.749" /></g
+							></svg
+						>
+					</div>
 					<div>
 						<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
 							{$allMcpServers.length}
@@ -97,14 +119,14 @@
 					</button>
 				</div>
 			</div>
-			<div class="space-y-6">
+			<div class="space-y-5">
 				<!-- Base Servers -->
 				{#if baseServers.length > 0}
 					<div>
 						<h3 class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
 							Base Servers ({baseServers.length})
 						</h3>
-						<div class="space-y-3">
+						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each baseServers as server (server.id)}
 								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
 							{/each}
@@ -122,7 +144,7 @@
 							class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-8 dark:border-gray-700"
 						>
 							<IconTools class="mb-3 size-12 text-gray-400" />
-							<p class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+							<p class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
 								No custom servers yet
 							</p>
 							<p class="mb-4 text-xs text-gray-600 dark:text-gray-400">
@@ -137,7 +159,7 @@
 							</button>
 						</div>
 					{:else}
-						<div class="space-y-3">
+						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each customServers as server (server.id)}
 								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
 							{/each}
