@@ -14,6 +14,7 @@
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
+	import CarbonDownload from "~icons/carbon/download";
 	import { Spring } from "svelte/motion";
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
@@ -32,6 +33,11 @@
 	const canShare = $derived(
 		isHuggingChat &&
 			!$loading &&
+			Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/")
+	);
+	const canDownload = $derived(
+		!$loading &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
 	);
@@ -72,6 +78,27 @@
 	function closeDrawer() {
 		isOpen = false;
 	}
+
+	async function handleDownload() {
+		if (!canDownload || requireAuthUser()) return;
+
+		try {
+			const response = await fetch(`${base}/conversation/${page.params.id}/download`);
+			if (!response.ok) throw new Error("Failed to download conversation");
+
+			const blob = await response.blob();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = response.headers.get("content-disposition")?.split("filename=")[1]?.replace(/"/g, "") || `conversation-${page.params.id}.json`;
+			document.body.appendChild(a);
+			a.click();
+			window.URL.revokeObjectURL(url);
+			document.body.removeChild(a);
+		} catch (error) {
+			console.error("Error downloading conversation:", error);
+		}
+	}
 </script>
 
 <nav
@@ -92,6 +119,15 @@
 		{/if}
 	</div>
 	<div class="flex items-center">
+		<button
+			type="button"
+			class="flex size-8 shrink-0 items-center justify-center text-lg"
+			disabled={!canDownload}
+			onclick={handleDownload}
+			aria-label="Download conversation"
+		>
+			<CarbonDownload class={!canDownload ? "opacity-40" : ""} />
+		</button>
 		{#if isHuggingChat}
 			<button
 				type="button"
