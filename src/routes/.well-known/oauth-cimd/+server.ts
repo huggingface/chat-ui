@@ -2,6 +2,9 @@ import { base } from "$app/paths";
 import { OIDConfig } from "$lib/server/auth";
 import { config } from "$lib/server/config";
 
+/**
+ * See https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/
+ */
 export const GET = ({ url }) => {
 	if (!OIDConfig.CLIENT_ID) {
 		return new Response("Client ID not found", { status: 404 });

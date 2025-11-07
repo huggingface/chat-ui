@@ -266,6 +266,7 @@ async function getOIDCClient(settings: OIDCSettings, url: URL): Promise<BaseClie
 	};
 
 	if (OIDConfig.CLIENT_ID === "__CIMD__") {
+		// See https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/
 		client_config.client_id = new URL(
 			`${base}/.well-known/oauth-cimd`,
 			config.PUBLIC_ORIGIN || url.origin
