@@ -47,7 +47,14 @@ export async function onMcpAuthorization() {
 			window.location.assign("/");
 		}
 	} catch (e) {
-		const message = e instanceof Error ? e.message : String(e);
+		// Sanitize message to safely embed in HTML
+		const __rawMessage = e instanceof Error ? e.message : String(e);
+		const message = __rawMessage
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/\"/g, "&quot;")
+			.replace(/'/g, "&#39;");
 		console.error("[mcp-callback] error", e);
 		if (window.opener && !window.opener.closed) {
 			window.opener.postMessage(
