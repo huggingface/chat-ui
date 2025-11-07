@@ -150,7 +150,15 @@ export async function refreshMcpServers() {
 		const customServers = loadCustomServers();
 
 		// Merge base and custom servers
-		allMcpServers.set([...baseServers, ...customServers]);
+		const merged = [...baseServers, ...customServers];
+		allMcpServers.set(merged);
+
+		// Prune selected IDs that no longer correspond to existing servers
+		const validIds = new Set(merged.map((s) => s.id));
+		selectedServerIds.update(($ids) => {
+			const filtered = new Set([...$ids].filter((id) => validIds.has(id)));
+			return filtered;
+		});
 	} catch (error) {
 		console.error("Failed to refresh MCP servers:", error);
 		// On error, just use custom servers

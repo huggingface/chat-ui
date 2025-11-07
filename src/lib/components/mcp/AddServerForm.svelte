@@ -9,6 +9,7 @@
 	import IconEyeOff from "~icons/carbon/view-off";
 	import IconTrash from "~icons/carbon/trash-can";
 	import IconAdd from "~icons/carbon/add";
+	import IconWarning from "~icons/carbon/warning";
 
 	interface Props {
 		onsubmit: (server: { name: string; url: string; headers?: KeyValuePair[] }) => void;
@@ -63,7 +64,7 @@
 
 		const urlValidation = validateMcpServerUrl(url);
 		if (!urlValidation) {
-			error = "Invalid URL format. Please use http:// or https:// URLs.";
+			error = "Invalid URL.";
 			return false;
 		}
 
@@ -111,7 +112,7 @@
 			type="text"
 			bind:value={name}
 			placeholder="My MCP Server"
-			class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+			class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 		/>
 	</div>
 
@@ -125,16 +126,16 @@
 			type="url"
 			bind:value={url}
 			placeholder="https://example.com/mcp"
-			class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+			class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 		/>
-		<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-			e.g., http://localhost:5101 for local development
-		</p>
+		<!-- <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+			Only HTTPS is supported (e.g., https://localhost:5101).
+		</p> -->
 	</div>
 
 	<!-- HTTP Headers -->
 	<details class="rounded-lg border border-gray-200 dark:border-gray-700">
-		<summary class="cursor-pointer px-4 py-2 font-medium text-gray-700 dark:text-gray-300">
+		<summary class="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">
 			HTTP Headers (Optional)
 		</summary>
 		<div class="space-y-2 border-t border-gray-200 p-4 dark:border-gray-700">
@@ -202,6 +203,23 @@
 			</p>
 		</div>
 	</details>
+
+	<!-- Security warning about custom MCP servers -->
+	<div
+		class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-yellow-900/40 dark:bg-yellow-900/20 dark:text-yellow-100"
+	>
+		<div class="flex items-start gap-3">
+			<IconWarning class="mt-0.5 size-4 flex-none text-amber-600 dark:text-yellow-300" />
+			<div class="text-sm leading-5">
+				<p class="font-medium">Be careful with custom MCP servers.</p>
+				<p class="mt-1 text-[13px] text-amber-800 dark:text-yellow-100/90">
+					They receive your requests (including conversation context and any headers you add) and
+					can run powerful tools on your behalf. Only add servers you trust and review their source.
+					Never share confidental informations.
+				</p>
+			</div>
+		</div>
+	</div>
 
 	<!-- Error message -->
 	{#if error}

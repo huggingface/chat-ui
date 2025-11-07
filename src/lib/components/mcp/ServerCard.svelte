@@ -99,12 +99,12 @@
 		? 'border-blue-600/20 bg-blue-50 bg-gradient-to-r from-blue-500/5 to-transparent dark:border-blue-700/60 dark:bg-blue-900/10 dark:from-blue-900/20'
 		: 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'}"
 >
-	<div class="p-4">
+	<div class="px-4 py-3.5">
 		<!-- Header -->
 		<div class="mb-3 flex items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
-				<div class="mb-1 flex items-center gap-2">
-					<h3 class="truncate font-medium text-gray-900 dark:text-gray-100">
+				<div class="mb-0.5 flex items-center gap-2">
+					<h3 class="truncate font-semibold text-gray-900 dark:text-gray-100">
 						{server.name}
 					</h3>
 					{#if server.type === "base"}
