@@ -23,11 +23,12 @@
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let eta = $derived(tool.find((update) => update.subtype === MessageToolUpdateType.ETA)?.eta);
 
-	const toolsData = page.data as { tools?: ToolFront[] } | undefined;
-	const availableTools: ToolFront[] = toolsData?.tools ?? [];
+	const availableTools: ToolFront[] = $derived.by(
+		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
+	);
 
-	let loadingBarEl: HTMLDivElement | undefined = $state();
-	let animation: Animation | undefined = $state();
+	let loadingBarEl: HTMLDivElement | undefined = $state(undefined);
+	let animation: Animation | undefined = $state(undefined);
 	let showingLoadingBar = $state(false);
 
 	const formatValue = (value: unknown): string => {
