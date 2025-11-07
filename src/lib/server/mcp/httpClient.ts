@@ -78,5 +78,14 @@ export async function callMcpTool(
 			return obj["type"] === "text" && typeof obj["text"] === "string";
 		})
 		.map((p) => p.text);
-	return textParts.join("\n");
+
+	// Minimal enhancement: if the server provided structuredContent, append its JSON
+	// to the textual output so downstream consumers can optionally parse it.
+	const text = textParts.join("\n");
+	const structured = (response as unknown as { structuredContent?: unknown })?.structuredContent;
+	if (structured !== undefined) {
+		const json = typeof structured === "string" ? structured : JSON.stringify(structured);
+		return text ? `${text}\n\n${json}` : json;
+	}
+	return text;
 }
