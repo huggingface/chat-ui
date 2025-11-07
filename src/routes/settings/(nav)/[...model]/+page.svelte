@@ -43,6 +43,17 @@
 		}
 	});
 
+	// Initialize tools override for this model if not set yet
+	$effect(() => {
+		if (model) {
+			settings.initValue(
+				"toolsOverrides",
+				page.params.model,
+				Boolean((model as unknown as { supportsTools?: boolean }).supportsTools)
+			);
+		}
+	});
+
 	// Ensure hidePromptExamples has an entry for this model so the switch can bind safely
 	$effect(() => {
 		settings.initValue("hidePromptExamples", page.params.model, false);
@@ -179,21 +190,36 @@
 		<div
 			class="mt-3 rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 		>
-			<div class="divide-y divide-gray-200 dark:divide-gray-700">
-				<div class="flex items-start justify-between py-3">
-					<div>
-						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Multimodal support (image inputs)
+				<div class="divide-y divide-gray-200 dark:divide-gray-700">
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Tool calling (functions)
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								Enable tools and allow the model to call them in chat.
+							</p>
 						</div>
-						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Enable image uploads and send images to this model.
-						</p>
+						<Switch
+							name="forceTools"
+							bind:checked={$settings.toolsOverrides[page.params.model]}
+						/>
 					</div>
-					<Switch
-						name="forceMultimodal"
-						bind:checked={$settings.multimodalOverrides[page.params.model]}
-					/>
-				</div>
+
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Multimodal support (image inputs)
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								Enable image uploads and send images to this model.
+							</p>
+						</div>
+						<Switch
+							name="forceMultimodal"
+							bind:checked={$settings.multimodalOverrides[page.params.model]}
+						/>
+					</div>
 
 				{#if model?.isRouter}
 					<div class="flex items-start justify-between py-3">

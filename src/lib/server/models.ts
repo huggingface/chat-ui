@@ -56,6 +56,8 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
+	// Aggregated tool-calling capability across providers (HF router)
+	supportsTools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
@@ -234,6 +236,7 @@ const signatureForModel = (model: ProcessedModel) =>
 			}) ?? null,
 		multimodal: model.multimodal,
 		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+		supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
 		isRouter: model.isRouter,
 		hasInferenceAPI: model.hasInferenceAPI,
 	});
@@ -329,36 +332,40 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		const parsed = listSchema.parse(json);
 		logger.info({ count: parsed.data.length }, "[models] Parsed models count");
 
-		let modelsRaw = parsed.data.map((m) => {
-			let logoUrl: string | undefined = undefined;
-			if (isHFRouter && m.id.includes("/")) {
-				const org = m.id.split("/")[0];
-				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
-			}
+			let modelsRaw = parsed.data.map((m) => {
+				let logoUrl: string | undefined = undefined;
+				if (isHFRouter && m.id.includes("/")) {
+					const org = m.id.split("/")[0];
+					logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
+				}
 
-			const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
-				modality.toLowerCase()
-			);
-			const supportsImageInput =
-				inputModalities.includes("image") || inputModalities.includes("vision");
-			return {
-				id: m.id,
-				name: m.id,
-				displayName: m.id,
-				description: m.description,
-				logoUrl,
-				providers: m.providers,
-				multimodal: supportsImageInput,
-				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
-				endpoints: [
-					{
-						type: "openai" as const,
-						baseURL,
-						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
-					},
-				],
-			} as ModelConfig;
-		}) as ModelConfig[];
+				const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
+					modality.toLowerCase()
+				);
+				const supportsImageInput =
+					inputModalities.includes("image") || inputModalities.includes("vision");
+
+				// If any provider supports tools, consider the model as supporting tools
+				const supportsTools = Boolean((m.providers ?? []).some((p) => p?.supports_tools === true));
+				return {
+					id: m.id,
+					name: m.id,
+					displayName: m.id,
+					description: m.description,
+					logoUrl,
+					providers: m.providers,
+					multimodal: supportsImageInput,
+					multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
+					supportsTools,
+					endpoints: [
+						{
+							type: "openai" as const,
+							baseURL,
+							// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+						},
+					],
+				} as ModelConfig;
+			}) as ModelConfig[];
 
 		const overrides = getModelOverrides();
 

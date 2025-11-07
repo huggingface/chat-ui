@@ -57,6 +57,7 @@ async function* textGenerationWithoutTitle(
 			messages: processedMessages,
 			assistant: ctx.assistant,
 			forceMultimodal: ctx.forceMultimodal,
+			forceTools: ctx.forceTools,
 			locals: ctx.locals,
 			preprompt,
 			abortSignal: ctx.abortController.signal,

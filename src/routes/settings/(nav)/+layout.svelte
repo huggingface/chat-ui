@@ -9,6 +9,7 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
+ 	import CarbonTools from "~icons/carbon/tools";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
@@ -172,6 +173,17 @@
 							<IconOmni />
 						{/if}
 					</div>
+
+					{#if $settings.toolsOverrides?.[model.id] ?? (model as any).supportsTools}
+						<span
+							title="Tool calling supported"
+							class="grid size-[21px] flex-none place-items-center rounded-md border border-purple-700 dark:border-purple-600"
+							aria-label="Model supports tools"
+							role="img"
+						>
+							<CarbonTools class="text-xxs text-purple-700 dark:text-purple-500" />
+						</span>
+					{/if}
 
 					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 						<span

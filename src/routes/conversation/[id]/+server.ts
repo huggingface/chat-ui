@@ -499,6 +499,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 							model.id
 						]
 					),
+					// Force-enable tools if user settings say so for this model
+					forceTools: Boolean(
+						(await collections.settings.findOne(authCondition(locals)))?.toolsOverrides?.[
+							model.id
+						]
+					),
 					locals,
 					abortController: ctrl,
 				};

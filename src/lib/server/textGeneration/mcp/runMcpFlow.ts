@@ -21,7 +21,7 @@ import type { TextGenerationContext } from "../types";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
-	"model" | "conv" | "assistant" | "forceMultimodal" | "locals"
+	"model" | "conv" | "assistant" | "forceMultimodal" | "forceTools" | "locals"
 > & { messages: EndpointMessage[] };
 
 export async function* runMcpFlow({
@@ -30,6 +30,7 @@ export async function* runMcpFlow({
 	messages,
 	assistant,
 	forceMultimodal,
+	forceTools,
 	locals,
 	preprompt,
 	abortSignal,
@@ -78,6 +79,18 @@ export async function* runMcpFlow({
 	logger.debug({ count: servers.length }, "[mcp] servers configured");
 	if (servers.length === 0) {
 		return false;
+	}
+
+	// Gate MCP flow based on model tool support (aggregated) with user override
+	try {
+		const supportsTools = Boolean((model as unknown as { supportsTools?: boolean }).supportsTools);
+		const toolsEnabled = Boolean(forceTools) || supportsTools;
+		if (!toolsEnabled) {
+			logger.debug({ model: model.id }, "[mcp] tools disabled for model; skipping MCP flow");
+			return false;
+		}
+	} catch {
+		// If anything goes wrong reading the flag, proceed (previous behavior)
 	}
 
 	const hasImageInput = messages.some((msg) =>
@@ -281,15 +294,15 @@ export async function* runMcpFlow({
 			);
 
 			// If provider header was exposed, notify UI so it can render "via {provider}".
-			if (providerHeader) {
-				yield {
-					type: MessageUpdateType.RouterMetadata,
-					route: "",
-					model: "",
-					provider: providerHeader,
-				};
-				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
-			}
+				if (providerHeader) {
+					yield {
+						type: MessageUpdateType.RouterMetadata,
+						route: "",
+						model: "",
+						provider: providerHeader as unknown as any,
+					};
+					logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
+				}
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let sawToolCall = false;

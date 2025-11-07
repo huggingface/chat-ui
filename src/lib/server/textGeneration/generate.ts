@@ -72,9 +72,9 @@ export async function* generate(
 			if (hasRouteModel || hasProviderOnly) {
 				yield {
 					type: MessageUpdateType.RouterMetadata,
-					route: output.routerMetadata.route,
-					model: output.routerMetadata.model,
-					provider: output.routerMetadata.provider,
+					route: output.routerMetadata.route || "",
+					model: output.routerMetadata.model || "",
+					provider: (output.routerMetadata.provider as unknown as any) || undefined,
 				};
 				continue;
 			}

@@ -7,6 +7,7 @@
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonView from "~icons/carbon/view";
+ 	import CarbonTools from "~icons/carbon/tools";
 	import CarbonSettings from "~icons/carbon/settings";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
@@ -98,10 +99,20 @@
 							></div>
 						{/if}
 						<div class="flex items-center gap-1">
+							{#if $settings.toolsOverrides?.[model.id] ?? (model as any).supportsTools}
+								<span
+									title="This model supports tool calling (functions)."
+									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-purple-700 dark:border-purple-600"
+									aria-label="Model supports tools"
+									role="img"
+								>
+									<CarbonTools class="text-xxs text-purple-700 dark:text-purple-500" />
+								</span>
+							{/if}
 							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 								<span
 									title="This model is multimodal and supports image inputs natively."
-									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-600"
+									class="flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-600"
 									aria-label="Model is multimodal"
 									role="img"
 								>
