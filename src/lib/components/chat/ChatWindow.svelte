@@ -335,7 +335,7 @@
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
-		use:snapScrollToBottom={scrollSignal}
+		use:snapScrollToBottom={{ dependency: scrollSignal, skipInitialScroll: shared }}
 		bind:this={chatContainer}
 	>
 		<div
