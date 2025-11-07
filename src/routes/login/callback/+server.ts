@@ -55,7 +55,8 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 	const { userData, token } = await getOIDCUserData(
 		{ redirectURI: validatedToken.redirectUrl },
 		code,
-		iss
+		iss,
+		url
 	);
 
 	// Filter by allowed user emails or domains

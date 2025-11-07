@@ -92,7 +92,8 @@ export function refreshSessionCookie(cookies: Cookies, sessionId: string) {
 
 export async function findUser(
 	sessionId: string,
-	coupledCookieHash?: string
+	coupledCookieHash: string | undefined,
+	url: URL
 ): Promise<{
 	user: User | null;
 	invalidateSession: boolean;
@@ -121,7 +122,8 @@ export async function findUser(
 					// Attempt to refresh the token
 					const newTokenSet = await refreshOAuthToken(
 						{ redirectURI: `${config.PUBLIC_ORIGIN}${base}/login/callback` },
-						session.oauth.refreshToken
+						session.oauth.refreshToken,
+						url
 					);
 
 					if (!newTokenSet || !newTokenSet.access_token) {
@@ -236,7 +238,7 @@ export async function generateCsrfToken(
 
 let lastIssuer: Issuer<BaseClient> | null = null;
 let lastIssuerFetchedAt: Date | null = null;
-async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
+async function getOIDCClient(settings: OIDCSettings, url: URL): Promise<BaseClient> {
 	if (
 		lastIssuer &&
 		lastIssuerFetchedAt &&
@@ -261,6 +263,13 @@ async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 		id_token_signed_response_alg: OIDConfig.ID_TOKEN_SIGNED_RESPONSE_ALG || undefined,
 	};
 
+	if (OIDConfig.CLIENT_ID === "__CIMD__") {
+		OIDConfig.CLIENT_ID = new URL(
+			"/.well-known/oauth-cimd",
+			config.PUBLIC_ORIGIN || url.origin
+		).toString();
+	}
+
 	const alg_supported = issuer.metadata["id_token_signing_alg_values_supported"];
 
 	if (Array.isArray(alg_supported)) {
@@ -272,9 +281,9 @@ async function getOIDCClient(settings: OIDCSettings): Promise<BaseClient> {
 
 export async function getOIDCAuthorizationUrl(
 	settings: OIDCSettings,
-	params: { sessionId: string; next?: string }
+	params: { sessionId: string; next?: string; url: URL }
 ): Promise<string> {
-	const client = await getOIDCClient(settings);
+	const client = await getOIDCClient(settings, params.url);
 	const csrfToken = await generateCsrfToken(
 		params.sessionId,
 		settings.redirectURI,
@@ -291,9 +300,10 @@ export async function getOIDCAuthorizationUrl(
 export async function getOIDCUserData(
 	settings: OIDCSettings,
 	code: string,
-	iss?: string
+	iss: string | undefined,
+	url: URL
 ): Promise<OIDCUserInfo> {
-	const client = await getOIDCClient(settings);
+	const client = await getOIDCClient(settings, url);
 	const token = await client.callback(settings.redirectURI, { code, iss });
 	const userData = await client.userinfo(token);
 
@@ -305,9 +315,10 @@ export async function getOIDCUserData(
  */
 export async function refreshOAuthToken(
 	settings: OIDCSettings,
-	refreshToken: string
+	refreshToken: string,
+	url: URL
 ): Promise<TokenSet | null> {
-	const client = await getOIDCClient(settings);
+	const client = await getOIDCClient(settings, url);
 	const tokenSet = await client.refresh(refreshToken);
 	return tokenSet;
 }
@@ -371,6 +382,7 @@ export async function getCoupledCookieHash(cookie: CookieRecord): Promise<string
 export async function authenticateRequest(
 	headers: HeaderRecord,
 	cookie: CookieRecord,
+	url: URL,
 	isApi?: boolean
 ): Promise<App.Locals & { secretSessionId: string }> {
 	// once the entire API has been moved to elysia
@@ -415,7 +427,7 @@ export async function authenticateRequest(
 		secretSessionId = token;
 		sessionId = await sha256(token);
 
-		const result = await findUser(sessionId, await getCoupledCookieHash(cookie));
+		const result = await findUser(sessionId, await getCoupledCookieHash(cookie), url);
 
 		if (result.invalidateSession) {
 			secretSessionId = crypto.randomUUID();
@@ -539,7 +551,7 @@ export async function triggerOauthFlow({
 
 	const authorizationUrl = await getOIDCAuthorizationUrl(
 		{ redirectURI },
-		{ sessionId: locals.sessionId, next }
+		{ sessionId: locals.sessionId, next, url }
 	);
 
 	throw redirect(302, authorizationUrl);
