@@ -53,7 +53,7 @@ export async function onMcpAuthorization() {
 			.replace(/&/g, "&amp;")
 			.replace(/</g, "&lt;")
 			.replace(/>/g, "&gt;")
-			.replace(/\"/g, "&quot;")
+			.replace(/"/g, "&quot;")
 			.replace(/'/g, "&#39;");
 		console.error("[mcp-callback] error", e);
 		if (window.opener && !window.opener.closed) {

@@ -7,7 +7,7 @@
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonView from "~icons/carbon/view";
- 	import CarbonTools from "~icons/carbon/tools";
+	import CarbonTools from "~icons/carbon/tools";
 	import CarbonSettings from "~icons/carbon/settings";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
@@ -99,7 +99,7 @@
 							></div>
 						{/if}
 						<div class="flex items-center gap-1">
-							{#if $settings.toolsOverrides?.[model.id] ?? (model as any).supportsTools}
+							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 								<span
 									title="This model supports tool calling (functions)."
 									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-purple-700 dark:border-purple-600"

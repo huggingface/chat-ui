@@ -294,15 +294,15 @@ export async function* runMcpFlow({
 			);
 
 			// If provider header was exposed, notify UI so it can render "via {provider}".
-				if (providerHeader) {
-					yield {
-						type: MessageUpdateType.RouterMetadata,
-						route: "",
-						model: "",
-						provider: providerHeader as unknown as any,
-					};
-					logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
-				}
+			if (providerHeader) {
+				yield {
+					type: MessageUpdateType.RouterMetadata,
+					route: "",
+					model: "",
+					provider: providerHeader as unknown as import("@huggingface/inference").InferenceProvider,
+				};
+				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
+			}
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let sawToolCall = false;

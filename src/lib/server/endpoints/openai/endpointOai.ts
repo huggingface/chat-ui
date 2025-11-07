@@ -171,12 +171,10 @@ export async function endpointOai(
 				await prepareMessages(messages, imageProcessor, isMultimodal ?? model.multimodal);
 
 			// Normalize preprompt and handle empty values
-			const normalizedPreprompt =
-				typeof preprompt === "string" ? preprompt.trim() : "";
+			const normalizedPreprompt = typeof preprompt === "string" ? preprompt.trim() : "";
 
-				// Check if a system message already exists as the first message
-				const hasSystemMessage =
-					messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
+			// Check if a system message already exists as the first message
+			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
 
 			if (hasSystemMessage) {
 				// Prepend normalized preprompt to existing system content when non-empty
@@ -188,15 +186,12 @@ export async function endpointOai(
 					messagesOpenAI[0].content =
 						normalizedPreprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
 				}
-				} else {
-					// Insert a system message only if the preprompt is non-empty
-					if (normalizedPreprompt) {
-						messagesOpenAI = [
-							{ role: "system", content: normalizedPreprompt },
-							...messagesOpenAI,
-						];
-					}
+			} else {
+				// Insert a system message only if the preprompt is non-empty
+				if (normalizedPreprompt) {
+					messagesOpenAI = [{ role: "system", content: normalizedPreprompt }, ...messagesOpenAI];
 				}
+			}
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };

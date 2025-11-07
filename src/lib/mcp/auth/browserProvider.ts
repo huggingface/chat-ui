@@ -21,10 +21,10 @@ function sanitizeUrl(input: string): string {
 
 // Generate cryptographically-strong random state for OAuth
 function randomState(len = 32): string {
-    const a = new Uint8Array(len);
-    // Web Crypto API (available in modern browsers)
-    crypto.getRandomValues(a);
-    return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+	const a = new Uint8Array(len);
+	// Web Crypto API (available in modern browsers)
+	crypto.getRandomValues(a);
+	return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export class BrowserOAuthClientProvider implements OAuthClientProvider {
@@ -123,9 +123,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 		return v;
 	}
 
-    async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
-        if (!browser) return authorizationUrl.toString();
-        const state = randomState();
+	async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
+		if (!browser) return authorizationUrl.toString();
+		const state = randomState();
 		const stateKey = `${this.storageKeyPrefix}:state_${state}`;
 		const expiry = Date.now() + 5 * 60 * 1000;
 		const stored: StoredState = {

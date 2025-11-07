@@ -74,7 +74,10 @@ export async function* generate(
 					type: MessageUpdateType.RouterMetadata,
 					route: output.routerMetadata.route || "",
 					model: output.routerMetadata.model || "",
-					provider: (output.routerMetadata.provider as unknown as any) || undefined,
+					provider:
+						(output.routerMetadata
+							.provider as unknown as import("@huggingface/inference").InferenceProvider) ||
+						undefined,
 				};
 				continue;
 			}

@@ -9,7 +9,7 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
- 	import CarbonTools from "~icons/carbon/tools";
+	import CarbonTools from "~icons/carbon/tools";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
@@ -174,7 +174,7 @@
 						{/if}
 					</div>
 
-					{#if $settings.toolsOverrides?.[model.id] ?? (model as any).supportsTools}
+					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
 						<span
 							title="Tool calling supported"
 							class="grid size-[21px] flex-none place-items-center rounded-md border border-purple-700 dark:border-purple-600"

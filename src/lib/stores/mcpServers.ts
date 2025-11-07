@@ -313,13 +313,13 @@ export async function authenticateServer(server: MCPServer): Promise<void> {
 			return;
 		}
 		try {
-				const tokens = await provider.tokens();
-				if (!tokens?.access_token) return;
-				const type = tokens.token_type?.trim() || "Bearer";
-				const authHeader: KeyValuePair = {
-					key: "Authorization",
-					value: `${type} ${tokens.access_token}`,
-				};
+			const tokens = await provider.tokens();
+			if (!tokens?.access_token) return;
+			const type = tokens.token_type?.trim() || "Bearer";
+			const authHeader: KeyValuePair = {
+				key: "Authorization",
+				value: `${type} ${tokens.access_token}`,
+			};
 			const map = loadAuthHeaders();
 			map[server.id] = mergeHeaders(map[server.id], [authHeader]) ?? [];
 			saveAuthHeaders(map);

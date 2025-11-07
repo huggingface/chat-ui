@@ -29,7 +29,7 @@ const cache = new Map<string, CacheEntry>();
 // Dots are not universally accepted (e.g., MiniMax via HF router rejects them).
 // Normalize any disallowed characters (including ".") to underscore and trim to 64 chars.
 function sanitizeName(name: string) {
-    return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+	return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 }
 
 function buildCacheKey(servers: McpServerConfig[]): string {
