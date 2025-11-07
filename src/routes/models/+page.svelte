@@ -140,7 +140,9 @@
 						{model.displayName}
 					</span>
 					<span class="line-clamp-4 whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
-						{model.isRouter ? "Routes your messages to the best model for your request." : model.description || "-"}
+						{model.isRouter
+							? "Routes your messages to the best model for your request."
+							: model.description || "-"}
 					</span>
 				</a>
 			{/each}
@@ -155,8 +157,11 @@
 		background-image:
 			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.16), transparent 60%),
 			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.16), transparent 60%),
-			linear-gradient(135deg, rgba(236, 72, 153, 0.10), rgba(59, 130, 246, 0.08));
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(59, 130, 246, 0.12), 0 2px 8px rgba(236, 72, 153, 0.10);
+			linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(59, 130, 246, 0.08));
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.06),
+			0 6px 18px rgba(59, 130, 246, 0.12),
+			0 2px 8px rgba(236, 72, 153, 0.1);
 	}
 
 	:global(.dark) .omni-gradient {
@@ -164,8 +169,10 @@
 			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.12), transparent 60%),
 			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.12), transparent 60%),
 			linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(59, 130, 246, 0.06));
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 28px rgba(0, 0, 0, 0.25);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.04),
+			0 10px 28px rgba(0, 0, 0, 0.25);
 	}
 
-/* Active border handled via Tailwind utilities (see .active-model in src/styles/main.css) */
+	/* Active border handled via Tailwind utilities (see .active-model in src/styles/main.css) */
 </style>

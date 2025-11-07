@@ -291,6 +291,86 @@ const applyModelState = (newModels: ProcessedModel[], startedAt: number): Models
 	return summary;
 };
 
+/**
+ * Fetches a URL with exponential backoff retry logic for transient errors.
+ * Retries on 429 (rate limit), 500, 502, 503, 504 (server errors).
+ */
+async function fetchWithRetry(
+	url: string,
+	options: RequestInit = {},
+	maxRetries = 5
+): Promise<Response> {
+	let lastError: Error | null = null;
+
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			const response = await fetch(url, options);
+
+			// If successful or non-retryable error, return immediately
+			if (response.ok || (response.status !== 429 && response.status < 500)) {
+				if (attempt > 0) {
+					logger.info({ attempt, status: response.status }, "[models] Fetch succeeded after retry");
+				}
+				return response;
+			}
+
+			// For retryable errors (429, 5xx), prepare to retry
+			const isLastAttempt = attempt === maxRetries;
+			if (isLastAttempt) {
+				// Don't retry on last attempt, just return the response
+				return response;
+			}
+
+			// Calculate exponential backoff with jitter
+			// Base delay: 1s, 2s, 4s, 8s, 16s
+			const baseDelay = Math.min(1000 * Math.pow(2, attempt), 30000);
+			const jitter = Math.random() * 1000; // Add up to 1s jitter
+			const delay = baseDelay + jitter;
+
+			logger.warn(
+				{
+					attempt: attempt + 1,
+					maxRetries,
+					status: response.status,
+					statusText: response.statusText,
+					retryAfterMs: Math.round(delay),
+				},
+				"[models] Retryable error, will retry after delay"
+			);
+
+			// Wait before retrying
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+			const isLastAttempt = attempt === maxRetries;
+
+			if (isLastAttempt) {
+				throw lastError;
+			}
+
+			// Calculate exponential backoff with jitter for network errors too
+			const baseDelay = Math.min(1000 * Math.pow(2, attempt), 30000);
+			const jitter = Math.random() * 1000;
+			const delay = baseDelay + jitter;
+
+			logger.warn(
+				{
+					attempt: attempt + 1,
+					maxRetries,
+					error: lastError.message,
+					retryAfterMs: Math.round(delay),
+				},
+				"[models] Network error, will retry after delay"
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		}
+	}
+
+	// This should never be reached, but TypeScript needs it
+	throw lastError || new Error("Fetch failed after all retries");
+}
+
 const buildModels = async (): Promise<ProcessedModel[]> => {
 	if (!openaiBaseUrl) {
 		logger.error(
@@ -308,10 +388,14 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 		// Use auth token from the start if available to avoid rate limiting issues
 		// Some APIs rate-limit unauthenticated requests more aggressively
-		const response = await fetch(`${baseURL}/models`, {
-			headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
-		});
-		logger.info({ status: response.status }, "[models] First fetch status");
+		const response = await fetchWithRetry(
+			`${baseURL}/models`,
+			{
+				headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+			},
+			5 // Max 5 retries
+		);
+		logger.info({ status: response.status }, "[models] Fetch completed with status");
 		if (!response.ok && response.status === 401 && !authToken) {
 			// If we get 401 and didn't have a token, there's nothing we can do
 			throw new Error(
