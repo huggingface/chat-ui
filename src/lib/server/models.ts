@@ -412,6 +412,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
 		const routerMultimodalEnabled =
 			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
+		const routerToolsEnabled = (config.LLM_ROUTER_ENABLE_TOOLS || "").toLowerCase() === "true";
 
 		let decorated = builtModels as ProcessedModel[];
 
@@ -437,6 +438,10 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			if (routerMultimodalEnabled) {
 				aliasRaw.multimodal = true;
 				aliasRaw.multimodalAcceptedMimetypes = ["image/*"];
+			}
+
+			if (routerToolsEnabled) {
+				aliasRaw.supportsTools = true;
 			}
 
 			const aliasBase = await processModel(aliasRaw);
