@@ -111,7 +111,7 @@
 			type="text"
 			bind:value={name}
 			placeholder="My MCP Server"
-			class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+			class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 		/>
 	</div>
 
@@ -125,7 +125,7 @@
 			type="url"
 			bind:value={url}
 			placeholder="https://example.com/mcp"
-			class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+			class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 		/>
 		<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
 			e.g., http://localhost:5101 for local development

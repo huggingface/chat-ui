@@ -96,7 +96,7 @@
 
 <div
 	class="rounded-lg border transition-colors {isSelected
-		? 'border-blue-600 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/10'
+		? 'border-blue-600/40 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/10'
 		: 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'}"
 >
 	<div class="p-4">
