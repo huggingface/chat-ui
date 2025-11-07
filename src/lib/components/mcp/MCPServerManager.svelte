@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
 	import AddServerForm from "./AddServerForm.svelte";
@@ -13,6 +14,9 @@
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTools from "~icons/carbon/tools";
+	import IconMCP from "$lib/components/icons/IconMCP.svelte";
+
+	const publicConfig = usePublicConfig();
 
 	interface Props {
 		onclose: () => void;
@@ -54,9 +58,9 @@
 			</h2>
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				{#if currentView === "list"}
-					Manage MCP servers to extend HuggingChat with external tools.
+					Manage MCP servers to extend {publicConfig.PUBLIC_APP_NAME} with external tools.
 				{:else}
-					Add a custom MCP server to the application
+					Add a custom MCP server to {publicConfig.PUBLIC_APP_NAME}.
 				{/if}
 			</p>
 		</div>
@@ -73,23 +77,7 @@
 						class="flex size-10 items-center justify-center rounded-xl bg-blue-500/10"
 						class:grayscale={!enabledCount}
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="1em"
-							height="1em"
-							viewBox="0 0 24 24"
-							class="size-8 text-blue-600 dark:text-blue-500"
-							><!-- Icon from Huge Icons by Hugeicons - undefined --><g
-								fill="none"
-								stroke="currentColor"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="1.5"
-								><path
-									d="m3.5 11.75l8.172-8.171a2.828 2.828 0 1 1 4 4m0 0L9.5 13.75m6.172-6.171a2.828 2.828 0 0 1 4 4l-6.965 6.964a1 1 0 0 0 0 1.414L14 21.25"
-								/><path d="m17.5 9.75l-6.172 6.171a2.829 2.829 0 0 1-4-4L13.5 5.749" /></g
-							></svg
-						>
+						<IconMCP classNames="size-8 text-blue-600 dark:text-blue-500" />
 					</div>
 					<div>
 						<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
