@@ -144,7 +144,6 @@
 						<li>• Enable servers to make their tools available in chat</li>
 						<li>• Use the Health Check button to verify server connectivity</li>
 						<li>• Add HTTP headers for authentication (e.g., Authorization, X-API-Key)</li>
-						<li>• Base servers are configured by admins via environment variables</li>
 					</ul>
 				</div>
 			</div>
