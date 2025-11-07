@@ -11,11 +11,10 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
 	}): Promise<{
 		locals: App.Locals;
 	}> => {
-		request.url;
 		const auth = await authenticateRequest(
 			{ type: "elysia", value: headers },
 			{ type: "elysia", value: cookie },
-			new URL(request.url, config.PUBLIC_ORIGIN),
+			new URL(request.url, config.PUBLIC_ORIGIN || undefined),
 			true
 		);
 		return {
