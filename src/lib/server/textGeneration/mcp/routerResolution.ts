@@ -1,6 +1,12 @@
 import { config } from "$lib/server/config";
 import { archSelectRoute } from "$lib/server/router/arch";
 import { getRoutes, resolveRouteModels } from "$lib/server/router/policy";
+import {
+	hasActiveToolsSelection,
+	isRouterToolsBypassEnabled,
+	pickToolsCapableModel,
+	ROUTER_TOOLS_ROUTE,
+} from "$lib/server/router/toolsRoute";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { stripReasoningFromMessageForRouting } from "../utils/routing";
 import type { ProcessedModel } from "../../models";
@@ -53,6 +59,21 @@ export async function resolveRouterTarget({
 				runMcp = false;
 			}
 		} else {
+			// If tools are enabled and at least one MCP server is active, prefer a tools-capable model
+			const toolsEnabled = isRouterToolsBypassEnabled();
+			const hasToolsActive = hasActiveToolsSelection(locals);
+
+			if (toolsEnabled && hasToolsActive) {
+				const found = pickToolsCapableModel(allModels);
+				if (found) {
+					targetModel = found;
+					candidateModelId = found.id ?? found.name;
+					resolvedRoute = ROUTER_TOOLS_ROUTE;
+					// Continue; runMcp remains true
+					return { runMcp, targetModel, candidateModelId, resolvedRoute };
+				}
+				// No tools-capable model found; fall back to normal Arch routing below
+			}
 			const routes = await getRoutes();
 			const sanitized = messages.map(stripReasoningFromMessageForRouting);
 			const { routeName } = await archSelectRoute(sanitized, conversationId, locals);

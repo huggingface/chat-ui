@@ -142,6 +142,11 @@ When you select Omni in the UI, Chat UI will:
 - Emit RouterMetadata immediately (route and actual model used) so the UI can display it.
 - Stream from the selected model via your configured `OPENAI_BASE_URL`. On errors, it tries route fallbacks.
 
+Tool and multimodal shortcuts:
+
+- Multimodal: If `LLM_ROUTER_ENABLE_MULTIMODAL=true` and the user sends an image, the router bypasses Arch and uses `LLM_ROUTER_MULTIMODAL_MODEL` (or the first multimodal model). Route name: `multimodal`.
+- Tools: If `LLM_ROUTER_ENABLE_TOOLS=true` and the user has at least one MCP server enabled, the router bypasses Arch and uses `LLM_ROUTER_TOOLS_MODEL`. If that model is missing or misconfigured, it falls back to Arch routing. Route name: `tools`.
+
 ## Building
 
 To create a production version of your app:
