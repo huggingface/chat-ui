@@ -10,11 +10,15 @@
 	import CarbonUpload from "~icons/carbon/upload";
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonClose from "~icons/carbon/close";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+    import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
+    import IconMCP from "$lib/components/icons/IconMCP.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { enabledServersCount, selectedServerIds } from "$lib/stores/mcpServers";
 
 	interface Props {
 		files?: File[];
@@ -62,6 +66,7 @@
 
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let isUrlModalOpen = $state(false);
+    let isMcpManagerOpen = $state(false);
 
 	function openPickerWithAccept(accept: string) {
 		if (!fileInputEl) return;
@@ -288,11 +293,54 @@
 											<CarbonLink class="size-4 opacity-90 dark:opacity-80" />
 											Fetch from URL
 										</DropdownMenu.Item>
+								</DropdownMenu.SubContent>
+								</DropdownMenu.Sub>
+
+								<!-- MCP Servers submenu -->
+								<DropdownMenu.Sub>
+									<DropdownMenu.SubTrigger
+										class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 data-[state=open]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 dark:data-[state=open]:bg-white/10"
+									>
+										<div class="flex items-center gap-1">
+											<IconMCP classNames="size-4 opacity-90 dark:opacity-80" />
+											MCP Servers
+										</div>
+										<div class="ml-auto flex items-center">
+											<CarbonChevronRight class="size-4 opacity-70 dark:opacity-80" />
+										</div>
+									</DropdownMenu.SubTrigger>
+									<DropdownMenu.SubContent
+										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100 dark:supports-[backdrop-filter]:bg-gray-800/80"
+										sideOffset={10}
+									>
+										<DropdownMenu.Item
+											class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+											onSelect={() => (isMcpManagerOpen = true)}
+										>
+											Manage MCP servers
+										</DropdownMenu.Item>
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
 							</DropdownMenu.Content>
 						</DropdownMenu.Portal>
 					</DropdownMenu.Root>
+
+					{#if $enabledServersCount > 0}
+						<div
+							class="ml-2 inline-flex h-7 items-center gap-2 rounded-full bg-blue-600/10 px-3 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400"
+							title="MCP servers enabled"
+						>
+							<span class="leading-none">MCP ({$enabledServersCount})</span>
+							<button
+								class="grid size-5 place-items-center rounded-full bg-blue-600/15 text-blue-700 transition-colors hover:bg-blue-600/25 dark:bg-blue-600/25 dark:text-blue-300 dark:hover:bg-blue-600/35"
+								aria-label="Disable all MCP servers"
+								onclick={() => selectedServerIds.set(new Set())}
+								type="button"
+							>
+								<CarbonClose class="text-[10px]" />
+							</button>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -304,6 +352,10 @@
 		acceptMimeTypes={mimeTypes}
 		onfiles={handleFetchedFiles}
 	/>
+
+	{#if isMcpManagerOpen}
+		<MCPServerManager onclose={() => (isMcpManagerOpen = false)} />
+	{/if}
 </div>
 
 <style lang="postcss">
