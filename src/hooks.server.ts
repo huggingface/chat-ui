@@ -158,7 +158,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				});
 			}
 		} else {
-			// Redirect to OAuth flow unless on the authorized pages (home, shared conversation, login, healthcheck)
+			// Redirect to OAuth flow unless on the authorized pages (home, shared conversation, login, healthcheck, model thumbnails)
 			if (
 				event.url.pathname !== `${base}/` &&
 				event.url.pathname !== `${base}` &&
@@ -167,6 +167,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				!event.url.pathname.startsWith(`${base}/healthcheck`) &&
 				!event.url.pathname.startsWith(`${base}/r/`) &&
 				!event.url.pathname.startsWith(`${base}/conversation/`) &&
+				!event.url.pathname.startsWith(`${base}/models/`) &&
 				!event.url.pathname.startsWith(`${base}/api`)
 			) {
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
