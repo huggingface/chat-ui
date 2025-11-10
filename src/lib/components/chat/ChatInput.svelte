@@ -257,6 +257,9 @@
 								side="top"
 								sideOffset={8}
 								align="start"
+								trapFocus={false}
+								onCloseAutoFocus={(e) => e.preventDefault()}
+								interactOutsideBehavior="defer-otherwise-close"
 							>
 								{#if modelIsMultimodal}
 									<DropdownMenu.Item
@@ -283,6 +286,9 @@
 									<DropdownMenu.SubContent
 										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
 										sideOffset={10}
+										trapFocus={false}
+										onCloseAutoFocus={(e) => e.preventDefault()}
+										interactOutsideBehavior="defer-otherwise-close"
 									>
 										<DropdownMenu.Item
 											class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
@@ -317,6 +323,9 @@
 									<DropdownMenu.SubContent
 										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
 										sideOffset={10}
+										trapFocus={false}
+										onCloseAutoFocus={(e) => e.preventDefault()}
+										interactOutsideBehavior="defer-otherwise-close"
 									>
 										{#each $allMcpServers as server (server.id)}
 											<DropdownMenu.CheckboxItem
