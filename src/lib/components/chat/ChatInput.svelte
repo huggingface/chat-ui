@@ -3,8 +3,15 @@
 
 	import { afterNavigate } from "$app/navigation";
 
-	import HoverTooltip from "$lib/components/HoverTooltip.svelte";
-	import IconPaperclip from "$lib/components/icons/IconPaperclip.svelte";
+	import { DropdownMenu } from "bits-ui";
+	import CarbonAdd from "~icons/carbon/add";
+	import CarbonImage from "~icons/carbon/image";
+	import CarbonDocument from "~icons/carbon/document";
+	import CarbonUpload from "~icons/carbon/upload";
+	import CarbonLink from "~icons/carbon/link";
+	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import UrlFetchModal from "./UrlFetchModal.svelte";
+	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -42,12 +49,41 @@
 	const onFileChange = async (e: Event) => {
 		if (!e.target) return;
 		const target = e.target as HTMLInputElement;
-		files = [...files, ...(target.files ?? [])];
+		const selected = Array.from(target.files ?? []);
+		if (selected.length === 0) return;
+		files = [...files, ...selected];
+		await tick();
+		void focusTextarea();
 	};
 
 	let textareaElement: HTMLTextAreaElement | undefined = $state();
 	let isCompositionOn = $state(false);
 	let blurTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+
+	let fileInputEl: HTMLInputElement | undefined = $state();
+	let isUrlModalOpen = $state(false);
+
+	function openPickerWithAccept(accept: string) {
+		if (!fileInputEl) return;
+		const allAccept = mimeTypes.join(",");
+		fileInputEl.setAttribute("accept", accept);
+		fileInputEl.click();
+		queueMicrotask(() => fileInputEl?.setAttribute("accept", allAccept));
+	}
+
+	function openFilePickerText() {
+		const textAccept =
+			mimeTypes.filter((m) => !(m === "image/*" || m.startsWith("image/"))).join(",") ||
+			TEXT_MIME_ALLOWLIST.join(",");
+		openPickerWithAccept(textAccept);
+	}
+
+	function openFilePickerImage() {
+		const imageAccept =
+			mimeTypes.filter((m) => m === "image/*" || m.startsWith("image/")).join(",") ||
+			IMAGE_MIME_ALLOWLIST_DEFAULT.join(",");
+		openPickerWithAccept(imageAccept);
+	}
 
 	const waitForAnimationFrame = () =>
 		typeof requestAnimationFrame === "function"
@@ -74,6 +110,15 @@
 		} catch {
 			textareaElement.focus();
 		}
+	}
+
+	function handleFetchedFiles(newFiles: File[]) {
+		if (!newFiles?.length) return;
+		files = [...files, ...newFiles];
+		queueMicrotask(async () => {
+			await tick();
+			void focusTextarea();
+		});
 	}
 
 	onMount(() => {
@@ -141,8 +186,8 @@
 		});
 	}
 
-	// Tools removed; only show file upload when applicable
-	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
+	// Show file upload when any mime is allowed (text always; images if multimodal)
+	let showFileUpload = $derived(mimeTypes.length > 0);
 	let showNoTools = $derived(!showFileUpload);
 </script>
 
@@ -172,46 +217,93 @@
 			]}
 		>
 			{#if showFileUpload}
-				{@const mimeTypesString = mimeTypes
-					.map((m) => {
-						// if the mime type ends in *, grab the first part so image/* becomes image
-						if (m.endsWith("*")) {
-							return m.split("/")[0];
-						}
-						// otherwise, return the second part for example application/pdf becomes pdf
-						return m.split("/")[1];
-					})
-					.join(", ")}
 				<div class="flex items-center">
-					<HoverTooltip
-						label={mimeTypesString.includes("*")
-							? "Upload any file"
-							: `Upload ${mimeTypesString} files`}
-						position="top"
-						TooltipClassNames="text-xs !text-left !w-auto whitespace-nowrap !py-1 !mb-0 max-sm:hidden"
-					>
-						<label class="base-tool relative">
-							<input
-								disabled={loading}
-								class="absolute hidden size-0"
-								aria-label="Upload file"
-								type="file"
-								onchange={onFileChange}
-								onclick={(e) => {
-									if (requireAuthUser()) {
-										e.preventDefault();
-									}
-								}}
-								accept={mimeTypes.join(",")}
-							/>
-							<IconPaperclip classNames="text-xl" />
-						</label>
-					</HoverTooltip>
+					<input
+						bind:this={fileInputEl}
+						disabled={loading}
+						class="absolute hidden size-0"
+						aria-label="Upload file"
+						type="file"
+						onchange={onFileChange}
+						onclick={(e) => {
+							if (requireAuthUser()) {
+								e.preventDefault();
+							}
+						}}
+						accept={mimeTypes.join(",")}
+					/>
+
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class="btn size-7 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600"
+							disabled={loading}
+							aria-label="Add attachment"
+						>
+							<CarbonAdd class="text-base" />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Portal>
+							<DropdownMenu.Content
+								class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100 dark:supports-[backdrop-filter]:bg-gray-800/80"
+								side="top"
+								sideOffset={8}
+								align="start"
+							>
+								{#if modelIsMultimodal}
+									<DropdownMenu.Item
+										class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+										onSelect={() => openFilePickerImage()}
+									>
+										<CarbonImage class="size-4 opacity-90 dark:opacity-80" />
+										Add image
+									</DropdownMenu.Item>
+								{/if}
+
+								<DropdownMenu.Sub>
+									<DropdownMenu.SubTrigger
+										class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 data-[state=open]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 dark:data-[state=open]:bg-white/10"
+									>
+										<div class="flex items-center gap-1">
+											<CarbonDocument class="size-4 opacity-90 dark:opacity-80" />
+											Add text file
+										</div>
+										<div class="ml-auto flex items-center">
+											<CarbonChevronRight class="size-4 opacity-70 dark:opacity-80" />
+										</div>
+									</DropdownMenu.SubTrigger>
+									<DropdownMenu.SubContent
+										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100 dark:supports-[backdrop-filter]:bg-gray-800/80"
+										sideOffset={10}
+									>
+										<DropdownMenu.Item
+											class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+											onSelect={() => openFilePickerText()}
+										>
+											<CarbonUpload class="size-4 opacity-90 dark:opacity-80" />
+											Upload from device
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
+											onSelect={() => (isUrlModalOpen = true)}
+										>
+											<CarbonLink class="size-4 opacity-90 dark:opacity-80" />
+											Fetch from URL
+										</DropdownMenu.Item>
+									</DropdownMenu.SubContent>
+								</DropdownMenu.Sub>
+							</DropdownMenu.Content>
+						</DropdownMenu.Portal>
+					</DropdownMenu.Root>
 				</div>
 			{/if}
 		</div>
 	{/if}
 	{@render children?.()}
+
+	<UrlFetchModal
+		bind:open={isUrlModalOpen}
+		acceptMimeTypes={mimeTypes}
+		onfiles={handleFetchedFiles}
+	/>
 </div>
 
 <style lang="postcss">

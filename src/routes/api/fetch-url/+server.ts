@@ -1,5 +1,6 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
+import { fetch } from "undici";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -30,14 +31,16 @@ function isValidUrl(urlString: string): boolean {
 	}
 }
 
-export async function GET({ url, fetch }) {
+export async function GET({ url }) {
 	const targetUrl = url.searchParams.get("url");
 
 	if (!targetUrl) {
+		logger.warn("Missing 'url' parameter");
 		throw error(400, "Missing 'url' parameter");
 	}
 
 	if (!isValidUrl(targetUrl)) {
+		logger.warn({ targetUrl }, "Invalid or unsafe URL (only HTTPS is supported)");
 		throw error(400, "Invalid or unsafe URL (only HTTPS is supported)");
 	}
 
@@ -48,13 +51,13 @@ export async function GET({ url, fetch }) {
 
 		const response = await fetch(targetUrl, {
 			signal: controller.signal,
-			redirect: "error", // Block all redirects
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",
 			},
 		}).finally(() => clearTimeout(timeoutId));
 
 		if (!response.ok) {
+			logger.error({ targetUrl, response }, `Error fetching URL. Response not ok.`);
 			throw error(response.status, `Failed to fetch: ${response.statusText}`);
 		}
 
@@ -96,6 +99,6 @@ export async function GET({ url, fetch }) {
 			throw error(500, `Failed to fetch URL: ${err.message}`);
 		}
 		logger.error(err, `Error fetching URL`);
-		throw error(500, "Failed to fetch URL");
+		throw error(500, "Failed to fetch URL.");
 	}
 }

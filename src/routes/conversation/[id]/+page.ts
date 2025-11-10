@@ -8,7 +8,10 @@ export const load = async ({ params, depends, fetch, url }) => {
 	const client = useAPIClient({ fetch, origin: url.origin });
 
 	try {
-		return await client.conversations({ id: params.id }).get().then(handleResponse);
+		return await client
+			.conversations({ id: params.id })
+			.get({ query: { fromShare: url.searchParams.get("fromShare") ?? undefined } })
+			.then(handleResponse);
 	} catch {
 		redirect(302, "/");
 	}

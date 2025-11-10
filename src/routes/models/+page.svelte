@@ -81,6 +81,7 @@
 					href="{base}/models/{model.id}"
 					aria-label="Model card"
 					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
+					class:omni-gradient={model.isRouter}
 					class:active-model={model.id === $settings.activeModel}
 				>
 					<div class="flex items-center justify-between gap-1">
@@ -139,10 +140,32 @@
 						{model.displayName}
 					</span>
 					<span class="line-clamp-4 whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
-						{model.description || "-"}
+						{model.isRouter ? "Routes your messages to the best model for your request." : model.description || "-"}
 					</span>
 				</a>
 			{/each}
 		</div>
 	</div>
 </div>
+
+<style>
+	/* Subtle highlight for the router (Omni) tile */
+	.omni-gradient {
+		/* layered gradients to keep readable on both themes */
+		background-image:
+			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.16), transparent 60%),
+			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.16), transparent 60%),
+			linear-gradient(135deg, rgba(236, 72, 153, 0.10), rgba(59, 130, 246, 0.08));
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(59, 130, 246, 0.12), 0 2px 8px rgba(236, 72, 153, 0.10);
+	}
+
+	:global(.dark) .omni-gradient {
+		background-image:
+			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.12), transparent 60%),
+			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.12), transparent 60%),
+			linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(59, 130, 246, 0.06));
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 28px rgba(0, 0, 0, 0.25);
+	}
+
+/* Active border handled via Tailwind utilities (see .active-model in src/styles/main.css) */
+</style>

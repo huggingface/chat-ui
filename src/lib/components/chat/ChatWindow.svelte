@@ -230,10 +230,17 @@
 	// Respect per‑model multimodal toggle from settings (force enable)
 	let modelIsMultimodalOverride = $derived($settings.multimodalOverrides?.[currentModel.id]);
 	let modelIsMultimodal = $derived((modelIsMultimodalOverride ?? currentModel.multimodal) === true);
+
+	// Always allow common text-like files; add images only when model is multimodal
+	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
-				...(modelIsMultimodal ? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"]) : []),
+				...TEXT_MIME_ALLOWLIST,
+				...(modelIsMultimodal
+					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
+					: []),
 			])
 		)
 	);
