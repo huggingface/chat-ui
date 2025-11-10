@@ -260,6 +260,9 @@ export async function* runMcpFlow({
 
 		let lastAssistantContent = "";
 		let streamedContent = false;
+		// Track whether we're inside a <think> block when the upstream streams
+		// provider-specific reasoning tokens (e.g. `reasoning` or `reasoning_content`).
+		let thinkOpen = false;
 
 		if (resolvedRoute && candidateModelId) {
 			yield {
@@ -348,12 +351,43 @@ export async function* runMcpFlow({
 					return "";
 				})();
 
-				if (deltaContent) {
-					lastAssistantContent += deltaContent;
+				// Provider-dependent reasoning fields (e.g., `reasoning` or `reasoning_content`).
+				const deltaReasoning: string =
+					(typeof (delta as unknown as Record<string, unknown>)?.reasoning === "string"
+						?
+							((delta as unknown as { reasoning?: string }).reasoning as string)
+						: typeof (delta as unknown as Record<string, unknown>)?.reasoning_content === "string"
+						?
+							((delta as unknown as { reasoning_content?: string }).reasoning_content as string)
+						: "");
+
+				// Merge reasoning + content into a single combined token stream, mirroring
+				// the OpenAI adapter so the UI can auto-detect <think> blocks.
+				let combined = "";
+				if (deltaReasoning && deltaReasoning.length > 0) {
+					if (!thinkOpen) {
+						combined += "<think>" + deltaReasoning;
+						thinkOpen = true;
+					} else {
+						combined += deltaReasoning;
+					}
+				}
+
+				if (deltaContent && deltaContent.length > 0) {
+					if (thinkOpen) {
+						combined += "</think>" + deltaContent;
+						thinkOpen = false;
+					} else {
+						combined += deltaContent;
+					}
+				}
+
+				if (combined.length > 0) {
+					lastAssistantContent += combined;
 					if (!sawToolCall) {
 						streamedContent = true;
-						yield { type: MessageUpdateType.Stream, token: deltaContent };
-						tokenCount += deltaContent.length;
+						yield { type: MessageUpdateType.Stream, token: combined };
+						tokenCount += combined.length;
 					}
 				}
 			}
@@ -396,9 +430,12 @@ export async function* runMcpFlow({
 					function: { name: call.name, arguments: call.arguments },
 				}));
 
+				// Avoid sending <think> content back to the model alongside tool_calls
+				// to prevent confusing follow-up reasoning. Strip any think blocks.
+				const assistantContentForToolMsg = lastAssistantContent.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "");
 				const assistantToolMessage: ChatCompletionMessageParam = {
 					role: "assistant",
-					content: lastAssistantContent,
+					content: assistantContentForToolMsg,
 					tool_calls: toolCalls,
 				};
 
@@ -434,10 +471,15 @@ export async function* runMcpFlow({
 				continue;
 			}
 
-			// No tool calls: finalize and return
-			if (!streamedContent && lastAssistantContent.trim().length > 0) {
-				yield { type: MessageUpdateType.Stream, token: lastAssistantContent };
-			}
+				// No tool calls: finalize and return
+				// If a <think> block is still open, close it for the final output
+				if (thinkOpen) {
+					lastAssistantContent += "</think>";
+					thinkOpen = false;
+				}
+				if (!streamedContent && lastAssistantContent.trim().length > 0) {
+					yield { type: MessageUpdateType.Stream, token: lastAssistantContent };
+				}
 			yield {
 				type: MessageUpdateType.FinalAnswer,
 				text: lastAssistantContent,
