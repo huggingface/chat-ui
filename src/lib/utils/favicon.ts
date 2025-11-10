@@ -11,9 +11,7 @@ export function getMcpServerFaviconUrl(serverUrl: string, size: number = 64): st
 		// Google's favicon service needs the root domain, not subdomains
 		const hostnameParts = parsed.hostname.split(".");
 		const rootDomain =
-			hostnameParts.length >= 2
-				? hostnameParts.slice(-2).join(".")
-				: parsed.hostname;
+			hostnameParts.length >= 2 ? hostnameParts.slice(-2).join(".") : parsed.hostname;
 		const domain = `${parsed.protocol}//${rootDomain}`;
 		return `https://www.google.com/s2/favicons?sz=${size}&domain_url=${encodeURIComponent(domain)}`;
 	} catch {

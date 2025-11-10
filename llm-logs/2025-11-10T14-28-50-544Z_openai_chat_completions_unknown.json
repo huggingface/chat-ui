@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-11-10T14:28:50.544Z",
+  "provider": "openai",
+  "baseURL": "https://router.huggingface.co/v1",
+  "completion": "chat_completions",
+  "model": "Qwen/Qwen3-4B-Instruct-2507",
+  "streaming": true,
+  "conversationId": "unknown",
+  "body": {
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a chat thread titling assistant.\nGoal: Produce a very short, descriptive title (2–4 words) that names the topic of the user's first message.\n\nRules:\n- Output ONLY the title text. No prefixes, labels, quotes, emojis, hashtags, or trailing punctuation.\n- Use the user's language.\n- Write a noun phrase that names the topic. Do not write instructions.\n- Never output just a pronoun (me/you/I/we/us/myself/yourself). Prefer a neutral subject (e.g., \"Assistant\", \"model\", or the concrete topic).\n- Never include meta-words: Summarize, Summary, Title, Prompt, Topic, Subject, About, Question, Request, Chat.\n\nExamples:\nUser: \"Summarize hello\" -> Hello\nUser: \"How do I reverse a string in Python?\" -> Python string reversal\nUser: \"help me plan a NYC weekend\" -> NYC weekend plan\nUser: \"请解释Transformer是如何工作的\" -> Transformer 工作原理\nUser: \"tell me more about you\" -> About the assistant\nReturn only the title text."
+      },
+      {
+        "role": "user",
+        "content": "User message: \"hello\""
+      }
+    ],
+    "stream": true,
+    "max_tokens": 24,
+    "temperature": 0
+  },
+  "headers": {
+    "ChatUI-Conversation-ID": "",
+    "X-use-cache": "false",
+    "Authorization": "[REDACTED]"
+  }
+}
