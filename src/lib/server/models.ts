@@ -414,6 +414,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				id: routerAliasId,
 				name: routerAliasId,
 				displayName: routerLabel,
+				description: "Automatically routes your messages to the best model for your request.",
 				logoUrl: routerLogo || undefined,
 				preprompt: "",
 				endpoints: [

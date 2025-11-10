@@ -14,6 +14,7 @@ import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
+import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "../endpoints";
 // uuid import removed (no tool call ids)
@@ -169,22 +170,33 @@ export async function endpointOai(
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
 				await prepareMessages(messages, imageProcessor, isMultimodal ?? model.multimodal);
 
-			// Check if a system message already exists as the first message
-			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
+			// Normalize preprompt and handle empty values
+			const normalizedPreprompt =
+				typeof preprompt === "string" ? preprompt.trim() : "";
+
+				// Check if a system message already exists as the first message
+				const hasSystemMessage =
+					messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
 
 			if (hasSystemMessage) {
-				// System message exists - preserve user configuration
-				if (preprompt !== undefined) {
-					// Prepend preprompt to existing system message if preprompt exists
-					const userSystemPrompt = messagesOpenAI[0].content || "";
+				// Prepend normalized preprompt to existing system content when non-empty
+				if (normalizedPreprompt) {
+					const userSystemPrompt =
+						(typeof messagesOpenAI[0].content === "string"
+							? (messagesOpenAI[0].content as string)
+							: "") || "";
 					messagesOpenAI[0].content =
-						preprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
+						normalizedPreprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
 				}
-				// If no preprompt, user's system message remains unchanged
-			} else {
-				// No system message exists - create a new one with preprompt or empty string
-				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
-			}
+				} else {
+					// Insert a system message only if the preprompt is non-empty
+					if (normalizedPreprompt) {
+						messagesOpenAI = [
+							{ role: "system", content: normalizedPreprompt },
+							...messagesOpenAI,
+						];
+					}
+				}
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
@@ -283,13 +295,16 @@ async function prepareFiles(
 }> {
 	// Separate image and text files
 	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
-	const textFiles = files.filter(
-		(file) =>
-			file.mime.startsWith("text/") ||
-			file.mime === "application/json" ||
-			file.mime === "application/xml" ||
-			file.mime === "application/csv"
-	);
+	const textFiles = files.filter((file) => {
+		const mime = (file.mime || "").toLowerCase();
+		const [fileType, fileSubtype] = mime.split("/");
+		return TEXT_MIME_ALLOWLIST.some((allowed) => {
+			const [type, subtype] = allowed.toLowerCase().split("/");
+			const typeOk = type === "*" || type === fileType;
+			const subOk = subtype === "*" || subtype === fileSubtype;
+			return typeOk && subOk;
+		});
+	});
 
 	// Process images if multimodal is enabled
 	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];

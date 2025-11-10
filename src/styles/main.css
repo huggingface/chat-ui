@@ -10,7 +10,8 @@
 	}
 
 	.active-model {
-		@apply border-black dark:border-white;
+		/* Ensure active border wins over defaults/utilities in both themes */
+		@apply !border-black dark:!border-white/60;
 	}
 
 	.file-hoverable {
