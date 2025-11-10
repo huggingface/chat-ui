@@ -238,9 +238,9 @@
 		}
 	}
 
-	.loading-path {
-		/* nearly full dash with a tiny traveling gap for continuity */
-		stroke-dasharray: 96 4; /* 96% dash, 4% gap */
-		animation: loading 1.6s linear infinite;
-	}
+.loading-path {
+	/* larger traveling gap for clearer motion */
+	stroke-dasharray: 80 20; /* 80% dash, 20% gap */
+	animation: loading 1.6s linear infinite;
+}
 </style>

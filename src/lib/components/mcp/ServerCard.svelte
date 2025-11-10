@@ -15,6 +15,7 @@
 	import IconTools from "~icons/carbon/tools";
 	import { authServerIds } from "$lib/stores/mcpServers";
 	import Switch from "$lib/components/Switch.svelte";
+	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
 
 	interface Props {
 		server: MCPServer;
@@ -104,6 +105,11 @@
 		<div class="mb-3 flex items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
 				<div class="mb-0.5 flex items-center gap-2">
+					<img
+						src={getMcpServerFaviconUrl(server.url)}
+						alt=""
+						class="size-4 flex-shrink-0 rounded"
+					/>
 					<h3 class="truncate font-semibold text-gray-900 dark:text-gray-100">
 						{server.name}
 					</h3>

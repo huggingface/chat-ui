@@ -2,7 +2,7 @@ import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { ProcessedModel } from "../models";
 
-export const ROUTER_TOOLS_ROUTE = "tools";
+export const ROUTER_TOOLS_ROUTE = "agentic";
 
 type LocalsWithMcp = App.Locals & {
 	mcp?: {
