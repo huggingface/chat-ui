@@ -35,6 +35,8 @@
 		disabled?: boolean;
 		// tools removed
 		modelIsMultimodal?: boolean;
+		// Whether the currently selected model supports tool calling (incl. overrides)
+		modelSupportsTools?: boolean;
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
@@ -50,6 +52,7 @@
 		disabled = false,
 
 		modelIsMultimodal = false,
+		modelSupportsTools = true,
 		children,
 		onPaste,
 		focused = $bindable(false),
@@ -380,9 +383,14 @@
 					{#if $enabledServersCount > 0}
 						<div
 							class="ml-2 inline-flex h-7 items-center gap-1.5 rounded-full border border-blue-500/10 bg-blue-600/10 pl-3 pr-1 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400"
-							title="MCP servers enabled"
+							class:grayscale={!modelSupportsTools}
+							class:opacity-60={!modelSupportsTools}
+							class:cursor-help={!modelSupportsTools}
+							title={modelSupportsTools ? "MCP servers enabled" : "Current model doesn’t support tools"}
 						>
-							<span class="leading-none">MCP ({$enabledServersCount})</span>
+							<span class="leading-none" class:line-through={!modelSupportsTools}
+								>MCP ({$enabledServersCount})</span
+							>
 							<button
 								class="grid size-5 place-items-center rounded-full bg-blue-600/15 text-blue-700 transition-colors hover:bg-blue-600/25 dark:bg-blue-600/25 dark:text-blue-300 dark:hover:bg-blue-600/35"
 								aria-label="Disable all MCP servers"

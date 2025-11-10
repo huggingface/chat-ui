@@ -231,6 +231,11 @@
 	let modelIsMultimodalOverride = $derived($settings.multimodalOverrides?.[currentModel.id]);
 	let modelIsMultimodal = $derived((modelIsMultimodalOverride ?? currentModel.multimodal) === true);
 
+	// Determine tool support for the current model (server-provided capability with user override)
+	let modelSupportsTools = $derived(
+		($settings.toolsOverrides?.[currentModel.id] ?? (currentModel as unknown as { supportsTools?: boolean }).supportsTools) === true
+	);
+
 	// Always allow common text-like files; add images only when model is multimodal
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
@@ -492,6 +497,7 @@
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
 								{modelIsMultimodal}
+								modelSupportsTools={modelSupportsTools}
 								bind:focused
 							/>
 						{/if}
