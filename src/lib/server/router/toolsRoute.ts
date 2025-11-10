@@ -18,7 +18,8 @@ export function isRouterToolsBypassEnabled(): boolean {
 export function hasActiveToolsSelection(locals: App.Locals | undefined): boolean {
 	try {
 		const reqMcp = (locals as LocalsWithMcp | undefined)?.mcp;
-		const byConfig = Array.isArray(reqMcp?.selectedServers) && (reqMcp?.selectedServers?.length ?? 0) > 0;
+		const byConfig =
+			Array.isArray(reqMcp?.selectedServers) && (reqMcp?.selectedServers?.length ?? 0) > 0;
 		const byName =
 			Array.isArray(reqMcp?.selectedServerNames) && (reqMcp?.selectedServerNames?.length ?? 0) > 0;
 		return Boolean(byConfig || byName);
@@ -27,7 +28,9 @@ export function hasActiveToolsSelection(locals: App.Locals | undefined): boolean
 	}
 }
 
-export function pickToolsCapableModel(models: ProcessedModel[] | undefined): ProcessedModel | undefined {
+export function pickToolsCapableModel(
+	models: ProcessedModel[] | undefined
+): ProcessedModel | undefined {
 	const preferredRaw = (config as unknown as Record<string, string>).LLM_ROUTER_TOOLS_MODEL;
 	const preferred = preferredRaw?.trim();
 	if (!preferred) {
