@@ -80,7 +80,7 @@
 						<IconMCP classNames="size-8 text-blue-600 dark:text-blue-500" />
 					</div>
 					<div>
-						<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+						<p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
 							{$allMcpServers.length}
 							{$allMcpServers.length === 1 ? "server" : "servers"} configured
 						</p>
@@ -162,7 +162,7 @@
 						<li>• Only connect to servers you trust</li>
 						<li>• Enable servers to make their tools available in chat</li>
 						<li>• Use the Health Check button to verify server connectivity</li>
-						<li>• Add HTTP headers for authentication (e.g., Authorization, X-API-Key)</li>
+						<li>• HTTP Oauth is supported you can also add HTTP headers for authentication</li>
 					</ul>
 				</div>
 			</div>

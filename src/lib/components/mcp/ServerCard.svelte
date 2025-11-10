@@ -54,7 +54,7 @@
 			case "disconnected":
 			default:
 				return {
-					label: "Disconnected",
+					label: "Unknown",
 					color: "text-gray-600 dark:text-gray-400",
 					bgColor: "bg-gray-100 dark:bg-gray-700",
 					icon: IconPending,
@@ -178,11 +178,11 @@
 		{/if}
 
 		<!-- Actions -->
-		<div class="flex flex-wrap gap-2">
+		<div class="flex flex-wrap gap-1">
 			<button
 				onclick={handleHealthCheck}
 				disabled={isLoadingHealth}
-				class="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+				class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
 			>
 				<IconRefresh class="size-3 {isLoadingHealth ? 'animate-spin' : ''}" />
 				Health Check
@@ -192,14 +192,14 @@
 				{#if !hasAuth}
 					<button
 						onclick={handleAuthenticate}
-						class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+						class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
 						Authenticate
 					</button>
 				{:else}
 					<button
 						onclick={handleSignOut}
-						class="flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-600 dark:bg-gray-700 dark:text-red-300 dark:hover:bg-gray-800"
+						class="flex items-center gap-1.5 rounded-lg border border-red-500/15 bg-white px-2.5 py-[.29rem] text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-500/25 dark:bg-gray-700 dark:text-red-300 dark:hover:bg-gray-800"
 					>
 						Sign out
 					</button>
@@ -209,7 +209,7 @@
 			{#if server.type === "custom"}
 				<button
 					onclick={handleDelete}
-					class="flex items-center gap-1.5 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+					class="flex items-center gap-1.5 rounded-lg border border-red-500/15 bg-red-50 px-2.5 py-[.29rem] text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
 				>
 					<IconTrash class="size-3" />
 					Delete
