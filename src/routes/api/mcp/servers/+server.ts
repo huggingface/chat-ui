@@ -23,9 +23,7 @@ export async function GET() {
 		name: server.name,
 		url: server.url,
 		type: "base" as const,
-		headers: server.headers
-			? Object.entries(server.headers).map(([key, value]) => ({ key, value }))
-			: undefined,
+		// headers intentionally omitted
 		isLocked: false, // Base servers can be toggled by users
 		status: undefined, // Status determined client-side via health check
 	}));
