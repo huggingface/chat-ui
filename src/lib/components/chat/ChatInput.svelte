@@ -335,7 +335,7 @@
 												class="flex h-9 select-none items-center gap-2 rounded-md px-2 text-sm leading-none text-gray-800 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-100 dark:data-[highlighted]:bg-white/10"
 											>
 												{#snippet children({ checked })}
-													<span class="truncate py-1">{server.name}</span>
+													<span class="max-w-52 truncate py-1">{server.name}</span>
 													<div class="ml-auto flex items-center">
 														<!-- Toggle visual -->
 														<span

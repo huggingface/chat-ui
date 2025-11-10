@@ -90,6 +90,21 @@
 	});
 	let hasToolUpdates = $derived(Object.keys(toolUpdateGroups).length > 0);
 
+	// Flatten to ordered array and keep a navigation index (defaults to last)
+	let toolGroups = $derived(Object.values(toolUpdateGroups));
+	let toolNavIndex = $state(0);
+	$effect(() => {
+		const len = toolGroups.length;
+		if (len === 0) {
+			toolNavIndex = 0;
+			return;
+		}
+		// Clamp if groups shrink or grow
+		if (toolNavIndex > len - 1) toolNavIndex = len - 1;
+		// While streaming, default to most recent group
+		if (isLast && loading) toolNavIndex = len - 1;
+	});
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
@@ -139,13 +154,17 @@
 			{/if}
 
 			{#if hasToolUpdates}
-				{#each Object.values(toolUpdateGroups) as group}
-					{#if group.length}
-						{#key group[0].uuid}
-							<ToolUpdate tool={group} {loading} />
-						{/key}
-					{/if}
-				{/each}
+				{#if toolGroups.length}
+					{@const group = toolGroups[toolNavIndex]}
+					<ToolUpdate
+						tool={group}
+						{loading}
+						index={toolNavIndex}
+						total={toolGroups.length}
+						onprev={() => (toolNavIndex = Math.max(0, toolNavIndex - 1))}
+						onnext={() => (toolNavIndex = Math.min(toolGroups.length - 1, toolNavIndex + 1))}
+					/>
+				{/if}
 			{/if}
 
 			<div bind:this={contentEl}>

@@ -10,13 +10,20 @@
 	import { page } from "$app/state";
 	import { onDestroy } from "svelte";
 	import { browser } from "$app/environment";
+	import CarbonChevronLeft from "~icons/carbon/chevron-left";
+	import CarbonChevronRight from "~icons/carbon/chevron-right";
 
 	interface Props {
 		tool: MessageToolUpdate[];
 		loading?: boolean;
+		// Optional navigation props when multiple tool groups exist
+		index?: number;
+		total?: number;
+		onprev?: () => void;
+		onnext?: () => void;
 	}
 
-	let { tool, loading = false }: Props = $props();
+	let { tool, loading = false, index, total, onprev, onnext }: Props = $props();
 
 	const toolFnName = tool.find(isMessageToolCallUpdate)?.call.name;
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
@@ -75,7 +82,10 @@
 
 {#if toolFnName}
 	<details
-		class="group/tool my-2.5 w-fit max-w-full cursor-pointer rounded-lg border border-gray-200 bg-white pl-1 pr-2.5 text-sm shadow-sm first:mt-0 open:mb-3 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-2"
+		class="group/tool my-2.5 w-fit max-w-full cursor-pointer rounded-lg border border-gray-200 bg-white px-1 {(total ??
+			0) > 1
+			? ''
+			: 'pr-2'} text-sm shadow-sm first:mt-0 open:mb-3 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-2"
 	>
 		<summary
 			class="relative flex select-none list-none items-center gap-1.5 py-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"
@@ -100,6 +110,7 @@
 					<path
 						class="loading-path"
 						d="M8 2.5H30C30 2.5 35.5 2.5 35.5 8V30C35.5 30 35.5 35.5 30 35.5H8C8 35.5 2.5 35.5 2.5 30V8C2.5 8 2.5 2.5 8 2.5Z"
+						pathLength="100"
 						stroke="currentColor"
 						stroke-width="1"
 						stroke-linecap="round"
@@ -116,6 +127,51 @@
 						toolFnName}</span
 				>
 			</span>
+
+			{#if (total ?? 0) > 1}
+				<div class="ml-auto flex items-center gap-1.5">
+					<div
+						class="flex items-center divide-x rounded-md border border-gray-200 bg-gray-50 dark:divide-gray-700 dark:border-gray-800 dark:bg-gray-800"
+					>
+						<button
+							type="button"
+							class="btn size-5 text-xs text-gray-500 hover:text-gray-700 focus:ring-0 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-200"
+							title="Previous tool"
+							aria-label="Previous tool"
+							disabled={(index ?? 0) <= 0}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onprev?.();
+							}}
+						>
+							<CarbonChevronLeft />
+						</button>
+
+						<span
+							class="select-none px-1 text-center text-[10px] font-medium text-gray-500 dark:text-gray-400"
+							aria-live="polite"
+						>
+							{(index ?? 0) + 1} <span class="text-gray-300 dark:text-gray-500">/</span>
+							{total}
+						</span>
+						<button
+							type="button"
+							class="btn size-5 text-xs text-gray-500 hover:text-gray-700 focus:ring-0 disabled:opacity-40 dark:text-gray-400 dark:hover:text-gray-200"
+							title="Next tool"
+							aria-label="Next tool"
+							disabled={(index ?? 0) >= (total ?? 1) - 1}
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onnext?.();
+							}}
+						>
+							<CarbonChevronRight />
+						</button>
+					</div>
+				</div>
+			{/if}
 		</summary>
 
 		{#each tool as update}
@@ -176,16 +232,15 @@
 	}
 
 	@keyframes loading {
-		0% {
-			stroke-dashoffset: 61.45;
-		}
-		100% {
-			stroke-dashoffset: 0;
+		to {
+			/* move one full perimeter, normalized via pathLength=100 */
+			stroke-dashoffset: -100;
 		}
 	}
 
 	.loading-path {
-		stroke-dasharray: 61.45;
-		animation: loading 2s linear infinite;
+		/* nearly full dash with a tiny traveling gap for continuity */
+		stroke-dasharray: 96 4; /* 96% dash, 4% gap */
+		animation: loading 1.6s linear infinite;
 	}
 </style>

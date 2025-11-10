@@ -131,27 +131,27 @@ export async function getOpenAiToolsForMcp(
 		const r = results[i];
 		if (r.status === "fulfilled") {
 			const serverTools = r.value;
-    for (const tool of serverTools) {
-        if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
-            continue;
-        }
+			for (const tool of serverTools) {
+				if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
+					continue;
+				}
 
-        const parameters =
-            tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
-        const description = tool.description ?? tool.annotations?.title;
-        const toolName = tool.name;
+				const parameters =
+					tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : undefined;
+				const description = tool.description ?? tool.annotations?.title;
+				const toolName = tool.name;
 
-        // Emit only the plain tool name (no namespaced alias)
-        const plainName = sanitizeName(toolName);
-        if (!(plainName in mapping)) {
-            pushToolDefinition(plainName, description, parameters);
-            mapping[plainName] = {
-                fnName: plainName,
-                server: server.name,
-                tool: toolName,
-            };
-        }
-    }
+				// Emit only the plain tool name (no namespaced alias)
+				const plainName = sanitizeName(toolName);
+				if (!(plainName in mapping)) {
+					pushToolDefinition(plainName, description, parameters);
+					mapping[plainName] = {
+						fnName: plainName,
+						server: server.name,
+						tool: toolName,
+					};
+				}
+			}
 		} else {
 			// ignore failure for this server
 			continue;
