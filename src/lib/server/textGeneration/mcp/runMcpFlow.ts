@@ -490,12 +490,23 @@ export async function* runMcpFlow({
 			return true;
 		}
 		logger.warn("[mcp] exceeded tool-followup loops; falling back");
-	} catch (err) {
-		logger.warn({ err: String(err) }, "[mcp] flow failed, falling back to default endpoint");
-	} finally {
-		// ensure MCP clients are closed after the turn
-		await drainPool();
-	}
+  } catch (err) {
+    const msg = String(err ?? "");
+    const isAbort =
+      (abortSignal && abortSignal.aborted) ||
+      msg.includes("AbortError") ||
+      msg.includes("APIUserAbortError") ||
+      msg.includes("Request was aborted");
+    if (isAbort) {
+      // Expected on user stop; keep logs quiet and do not treat as error
+      logger.debug("[mcp] aborted by user");
+      return false;
+    }
+    logger.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
+  } finally {
+    // ensure MCP clients are closed after the turn
+    await drainPool();
+  }
 
 	return false;
 }
