@@ -557,7 +557,7 @@
 							{/if}
 							<CarbonCaretDown class="-ml-0.5 text-xxs" />
 						</a>
-					{:else if showRouterDetails && streamingRouterMetadata}
+					{:else if showRouterDetails && streamingRouterMetadata?.route}
 						<div
 							class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-[.70rem] text-xs leading-none text-gray-400 dark:text-gray-400"
 						>
