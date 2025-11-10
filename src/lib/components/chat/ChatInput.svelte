@@ -13,12 +13,17 @@
 	import CarbonClose from "~icons/carbon/close";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
-    import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
-    import IconMCP from "$lib/components/icons/IconMCP.svelte";
+	import MCPServerManager from "$lib/components/mcp/MCPServerManager.svelte";
+	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
-	import { enabledServersCount, selectedServerIds } from "$lib/stores/mcpServers";
+	import {
+		enabledServersCount,
+		selectedServerIds,
+		allMcpServers,
+		toggleServer,
+	} from "$lib/stores/mcpServers";
 
 	interface Props {
 		files?: File[];
@@ -66,7 +71,7 @@
 
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let isUrlModalOpen = $state(false);
-    let isMcpManagerOpen = $state(false);
+	let isMcpManagerOpen = $state(false);
 
 	function openPickerWithAccept(accept: string) {
 		if (!fileInputEl) return;
@@ -248,7 +253,7 @@
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Portal>
 							<DropdownMenu.Content
-								class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100 dark:supports-[backdrop-filter]:bg-gray-800/80"
+								class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
 								side="top"
 								sideOffset={8}
 								align="start"
@@ -276,7 +281,7 @@
 										</div>
 									</DropdownMenu.SubTrigger>
 									<DropdownMenu.SubContent
-										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100 dark:supports-[backdrop-filter]:bg-gray-800/80"
+										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
 										sideOffset={10}
 									>
 										<DropdownMenu.Item
@@ -293,7 +298,7 @@
 											<CarbonLink class="size-4 opacity-90 dark:opacity-80" />
 											Fetch from URL
 										</DropdownMenu.Item>
-								</DropdownMenu.SubContent>
+									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
 
 								<!-- MCP Servers submenu -->
@@ -310,14 +315,46 @@
 										</div>
 									</DropdownMenu.SubTrigger>
 									<DropdownMenu.SubContent
-										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100 dark:supports-[backdrop-filter]:bg-gray-800/80"
+										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
 										sideOffset={10}
 									>
+										{#each $allMcpServers as server (server.id)}
+											<DropdownMenu.CheckboxItem
+												checked={$selectedServerIds.has(server.id)}
+												onCheckedChange={() => toggleServer(server.id)}
+												closeOnSelect={false}
+												class="flex h-9 select-none items-center gap-2 rounded-md px-2 text-sm leading-none text-gray-800 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-100 dark:data-[highlighted]:bg-white/10"
+											>
+												{#snippet children({ checked })}
+													<span class="truncate py-1">{server.name}</span>
+													<div class="ml-auto flex items-center">
+														<!-- Toggle visual -->
+														<span
+															class={[
+																"relative mt-px flex h-4 w-7 items-center self-center rounded-full transition-colors",
+																checked ? "bg-blue-600/80" : "bg-gray-300 dark:bg-gray-700",
+															]}
+														>
+															<span
+																class={[
+																	"block size-3 translate-x-0.5 rounded-full bg-white shadow transition-transform",
+																	checked ? "translate-x-[14px]" : "translate-x-0.5",
+																]}
+															></span>
+														</span>
+													</div>
+												{/snippet}
+											</DropdownMenu.CheckboxItem>
+										{/each}
+
+										{#if $allMcpServers.length > 0}
+											<DropdownMenu.Separator class="my-1 h-px bg-gray-200 dark:bg-gray-700/60" />
+										{/if}
 										<DropdownMenu.Item
 											class="flex h-8 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10"
 											onSelect={() => (isMcpManagerOpen = true)}
 										>
-											Manage MCP servers
+											Manage MCP Servers
 										</DropdownMenu.Item>
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
@@ -327,7 +364,7 @@
 
 					{#if $enabledServersCount > 0}
 						<div
-							class="ml-2 inline-flex h-7 items-center gap-2 rounded-full bg-blue-600/10 px-3 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400"
+							class="ml-2 inline-flex h-7 items-center gap-1.5 rounded-full border border-blue-500/10 bg-blue-600/10 pl-3 pr-1 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400"
 							title="MCP servers enabled"
 						>
 							<span class="leading-none">MCP ({$enabledServersCount})</span>
@@ -337,7 +374,7 @@
 								onclick={() => selectedServerIds.set(new Set())}
 								type="button"
 							>
-								<CarbonClose class="text-[10px]" />
+								<CarbonClose class="size-3.5" />
 							</button>
 						</div>
 					{/if}
