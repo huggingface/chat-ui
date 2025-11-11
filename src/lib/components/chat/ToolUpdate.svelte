@@ -25,7 +25,7 @@
 
 	let { tool, loading = false, index, total, onprev, onnext }: Props = $props();
 
-	const toolFnName = tool.find(isMessageToolCallUpdate)?.call.name;
+	let toolFnName = $derived(tool.find(isMessageToolCallUpdate)?.call.name);
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let eta = $derived(tool.find((update) => update.subtype === MessageToolUpdateType.ETA)?.eta);
@@ -92,7 +92,7 @@
 		>
 			<div
 				bind:this={loadingBarEl}
-				class="absolute -m-1 hidden h-full w-[calc(100%+1rem)] rounded-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
+				class="absolute -m-1 hidden h-full w-full rounded-lg bg-purple-500/5 transition-all dark:bg-purple-500/10"
 			></div>
 
 			<div
@@ -120,7 +120,7 @@
 				<CarbonTools class="text-xs text-purple-700 dark:text-purple-500" />
 			</div>
 
-			<span>
+			<span class="relative">
 				{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
 				<span class="font-semibold"
 					>{availableTools.find((entry) => entry.name === toolFnName)?.displayName ??
@@ -129,7 +129,7 @@
 			</span>
 
 			{#if (total ?? 0) > 1}
-				<div class="ml-auto flex items-center gap-1.5">
+				<div class="relative ml-auto flex items-center gap-1.5">
 					<div
 						class="flex items-center divide-x rounded-md border border-gray-200 bg-gray-50 dark:divide-gray-700 dark:border-gray-800 dark:bg-gray-800"
 					>
