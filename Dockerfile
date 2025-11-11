@@ -48,7 +48,7 @@ ENV BODY_SIZE_LIMIT=15728640
 
 RUN --mount=type=cache,target=/app/.npm \
     npm set cache /app/.npm && \
-    npm ci
+    npm install --legacy-peer-deps
 
 COPY --link --chown=1000 . .
 
