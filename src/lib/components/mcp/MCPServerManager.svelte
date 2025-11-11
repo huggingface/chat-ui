@@ -93,7 +93,7 @@
 				<div class="flex gap-2">
 					<button
 						onclick={handleRefresh}
-						class="btn gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+						class="btn gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 					>
 						<IconRefresh class="size-4" />
 						Refresh
