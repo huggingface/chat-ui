@@ -68,7 +68,7 @@
 		<!-- Content -->
 		{#if currentView === "list"}
 			<div
-				class="mb-6 flex items-center justify-between rounded-lg p-4 {!enabledCount
+				class="mb-6 flex justify-between rounded-lg p-4 max-sm:flex-col max-sm:gap-4 sm:items-center {!enabledCount
 					? 'bg-gray-100 dark:bg-white/5'
 					: 'bg-blue-50 dark:bg-blue-900/10'}"
 			>

@@ -388,9 +388,15 @@
 							class:cursor-help={!modelSupportsTools}
 							title={modelSupportsTools ? "MCP servers enabled" : "Current model doesn’t support tools"}
 						>
-							<span class="leading-none" class:line-through={!modelSupportsTools}
-								>MCP ({$enabledServersCount})</span
+							<button
+								class="leading-none cursor-pointer select-none bg-transparent p-0 text-current focus:outline-none"
+								type="button"
+								title="Manage MCP Servers"
+								onclick={() => (isMcpManagerOpen = true)}
+								class:line-through={!modelSupportsTools}
 							>
+								MCP ({$enabledServersCount})
+							</button>
 							<button
 								class="grid size-5 place-items-center rounded-full bg-blue-600/15 text-blue-700 transition-colors hover:bg-blue-600/25 dark:bg-blue-600/25 dark:text-blue-300 dark:hover:bg-blue-600/35"
 								aria-label="Disable all MCP servers"
