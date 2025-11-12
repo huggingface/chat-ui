@@ -7,6 +7,7 @@
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTrash from "~icons/carbon/trash-can";
 	import IconTools from "~icons/carbon/tools";
+	import IconSettings from "~icons/carbon/settings";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
 
@@ -18,6 +19,16 @@
 	let { server, isSelected }: Props = $props();
 
 	let isLoadingHealth = $state(false);
+
+	// Show a quick-access link to Hugging Face MCP settings
+	const isHfMcp = $derived.by(() => {
+		try {
+			const u = new URL(server.url);
+			return u.hostname === "huggingface.co";
+		} catch {
+			return /huggingface\.co/.test(server.url);
+		}
+	});
 
 	const statusInfo = $derived.by(() => {
 		switch (server.status) {
@@ -151,6 +162,19 @@
 				<IconRefresh class="size-3 {isLoadingHealth ? 'animate-spin' : ''}" />
 				Health Check
 			</button>
+
+			{#if isHfMcp}
+				<a
+					href="https://huggingface.co/settings/mcp"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-[.29rem] text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+					aria-label="Open Hugging Face MCP settings"
+				>
+					<IconSettings class="size-3" />
+					Settings
+				</a>
+			{/if}
 
 			{#if server.type === "custom"}
 				<button
