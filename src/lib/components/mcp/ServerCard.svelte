@@ -20,15 +20,9 @@
 
 	let isLoadingHealth = $state(false);
 
-	// Show a quick-access link to Hugging Face MCP settings
-	const isHfMcp = $derived.by(() => {
-		try {
-			const u = new URL(server.url);
-			return u.hostname === "huggingface.co";
-		} catch {
-			return /huggingface\.co/.test(server.url);
-		}
-	});
+	// Show a quick-access link ONLY for the exact HF MCP login endpoint
+	import { isStrictHfMcpLogin as isStrictHfMcpLoginUrl } from "$lib/utils/hf";
+	const isHfMcp = $derived.by(() => isStrictHfMcpLoginUrl(server.url));
 
 	const statusInfo = $derived.by(() => {
 		switch (server.status) {
