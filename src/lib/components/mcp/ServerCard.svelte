@@ -1,10 +1,6 @@
 <script lang="ts">
 	import type { MCPServer } from "$lib/types/Tool";
-	import {
-		toggleServer,
-		healthCheckServer,
-		deleteCustomServer,
-	} from "$lib/stores/mcpServers";
+	import { toggleServer, healthCheckServer, deleteCustomServer } from "$lib/stores/mcpServers";
 	import IconCheckmark from "~icons/carbon/checkmark-filled";
 	import IconWarning from "~icons/carbon/warning-filled";
 	import IconPending from "~icons/carbon/pending-filled";
@@ -76,7 +72,6 @@
 	function handleDelete() {
 		deleteCustomServer(server.id);
 	}
-
 </script>
 
 <div
@@ -156,7 +151,6 @@
 				<IconRefresh class="size-3 {isLoadingHealth ? 'animate-spin' : ''}" />
 				Health Check
 			</button>
-
 
 			{#if server.type === "custom"}
 				<button
