@@ -100,6 +100,12 @@ export async function* runMcpFlow({
 		// ignore selection merge errors and proceed with env servers
 	}
 
+	// If selection/merge yielded no servers, bail early with clearer log
+	if (servers.length === 0) {
+		console.warn("[mcp] no MCP servers selected after merge/name filter");
+		return false;
+	}
+
 	// Enforce server-side safety (public HTTPS only, no private ranges)
 	{
 		const before = servers.slice();
@@ -121,7 +127,7 @@ export async function* runMcpFlow({
 		} catch {}
 	}
 	if (servers.length === 0) {
-	console.warn("[mcp] all selected servers rejected by URL safety guard");
+		console.warn("[mcp] all selected MCP servers rejected by URL safety guard");
 		return false;
 	}
 

@@ -1,7 +1,7 @@
 // Shared server-side URL safety helper (exact behavior preserved)
 export function isValidUrl(urlString: string): boolean {
 	try {
-		const url = new URL(urlString);
+		const url = new URL(urlString.trim());
 		// Only allow HTTPS protocol
 		if (url.protocol !== "https:") {
 			return false;
