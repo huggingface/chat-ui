@@ -11,5 +11,5 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		month: "long",
 		day: "numeric",
 	});
-	return `You can use the following tools if helpful: ${names.join(", ")}. Today's date: ${currentDate}. If a tool generates an image, you can inline it in your response using markdown syntax: ![alt text](image_url).`;
+	return `You can use the following tools if helpful: ${names.join(", ")}. Today's date: ${currentDate}. If a tool generates an image, you can inline it directly: ![alt text](image_url).`;
 }
