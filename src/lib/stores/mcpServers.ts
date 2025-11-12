@@ -21,8 +21,8 @@ const baseLabel = toKeyPart(typeof base === "string" ? base : "");
 const KEY_PREFIX = appLabel || baseLabel || "app";
 
 const STORAGE_KEYS = {
-	CUSTOM_SERVERS: `${KEY_PREFIX}:custom-servers`,
-	SELECTED_IDS: `${KEY_PREFIX}:selected-ids`,
+	CUSTOM_SERVERS: `${KEY_PREFIX}:mcp:custom-servers`,
+	SELECTED_IDS: `${KEY_PREFIX}:mcp:selected-ids`,
 } as const;
 
 // No migration needed per request — read/write only namespaced keys
