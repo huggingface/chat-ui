@@ -18,6 +18,8 @@
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import ToolUpdate from "./ToolUpdate.svelte";
+	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 
 	interface Props {
 		message: Message;
@@ -77,6 +79,41 @@
 		message.content.replace(THINK_BLOCK_REGEX, "").trim()
 	);
 
+	// Group tool updates (if any) by uuid for display
+	let toolUpdateGroups = $derived.by(() => {
+		const groups: Record<string, import("$lib/types/MessageUpdate").MessageToolUpdate[]> = {};
+		for (const u of message.updates ?? []) {
+			if (!isMessageToolUpdate(u)) continue;
+			(groups[u.uuid] ||= []).push(u);
+		}
+		return groups;
+	});
+	let hasToolUpdates = $derived(Object.keys(toolUpdateGroups).length > 0);
+
+	// Flatten to ordered array and keep a navigation index (defaults to last)
+	let toolGroups = $derived(Object.values(toolUpdateGroups));
+	let toolNavIndex = $state(0);
+	// Auto-follow newest tool group while streaming until user navigates manually
+	let toolAutoFollowLatest = $state(true);
+	$effect(() => {
+		const len = toolGroups.length;
+		if (len === 0) {
+			toolNavIndex = 0;
+			return;
+		}
+		// Clamp if groups shrink or grow
+		if (toolNavIndex > len - 1) toolNavIndex = len - 1;
+		// While streaming, default to most recent group unless user navigated away
+		if (isLast && loading && toolAutoFollowLatest) toolNavIndex = len - 1;
+	});
+
+	// When streaming ends, re-enable auto-follow for the next turn
+	$effect(() => {
+		if (!loading) {
+			toolAutoFollowLatest = true;
+		}
+	});
+
 	$effect(() => {
 		if (isCopied) {
 			setTimeout(() => {
@@ -125,6 +162,27 @@
 				</div>
 			{/if}
 
+			{#if hasToolUpdates}
+				{#if toolGroups.length}
+					{@const group = toolGroups[toolNavIndex]}
+					<ToolUpdate
+						tool={group}
+						{loading}
+						index={toolNavIndex}
+						total={toolGroups.length}
+						onprev={() => {
+							toolAutoFollowLatest = false;
+							toolNavIndex = Math.max(0, toolNavIndex - 1);
+						}}
+						onnext={() => {
+							toolNavIndex = Math.min(toolGroups.length - 1, toolNavIndex + 1);
+							// If user moves back to the newest group, resume auto-follow
+							toolAutoFollowLatest = toolNavIndex === toolGroups.length - 1;
+						}}
+					/>
+				{/if}
+			{/if}
+
 			<div bind:this={contentEl}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
@@ -148,7 +206,7 @@
 							/>
 						{:else if part && part.trim().length > 0}
 							<div
-								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 							>
 								<MarkdownRenderer content={part} loading={isLast && loading} />
 							</div>
@@ -156,7 +214,7 @@
 					{/each}
 				{:else}
 					<div
-						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 					>
 						<MarkdownRenderer content={message.content} loading={isLast && loading} />
 					</div>

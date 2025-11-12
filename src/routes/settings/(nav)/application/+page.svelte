@@ -19,6 +19,26 @@
 	const publicConfig = usePublicConfig();
 	let settings = useSettingsStore();
 
+	// Functional bindings for store fields (Svelte 5): avoid mutating $settings directly
+	function getShareWithAuthors() {
+		return $settings.shareConversationsWithModelAuthors;
+	}
+	function setShareWithAuthors(v: boolean) {
+		settings.update((s) => ({ ...s, shareConversationsWithModelAuthors: v }));
+	}
+	function getDisableStream() {
+		return $settings.disableStream;
+	}
+	function setDisableStream(v: boolean) {
+		settings.update((s) => ({ ...s, disableStream: v }));
+	}
+	function getDirectPaste() {
+		return $settings.directPaste;
+	}
+	function setDirectPaste(v: boolean) {
+		settings.update((s) => ({ ...s, directPaste: v }));
+	}
+
 	const client = useAPIClient();
 
 	let OPENAI_BASE_URL: string | null = $state(null);
@@ -121,7 +141,7 @@
 						</div>
 						<Switch
 							name="shareConversationsWithModelAuthors"
-							bind:checked={$settings.shareConversationsWithModelAuthors}
+							bind:checked={getShareWithAuthors, setShareWithAuthors}
 						/>
 					</div>
 				{/if}
@@ -135,7 +155,7 @@
 							Show responses only when complete.
 						</p>
 					</div>
-					<Switch name="disableStream" bind:checked={$settings.disableStream} />
+					<Switch name="disableStream" bind:checked={getDisableStream, setDisableStream} />
 				</div>
 
 				<div class="flex items-start justify-between py-3">
@@ -147,7 +167,7 @@
 							Paste long text directly into chat instead of a file.
 						</p>
 					</div>
-					<Switch name="directPaste" bind:checked={$settings.directPaste} />
+					<Switch name="directPaste" bind:checked={getDirectPaste, setDirectPaste} />
 				</div>
 
 				<!-- Theme selector -->

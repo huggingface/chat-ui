@@ -2,17 +2,28 @@ import type { MessageFile } from "$lib/types/Message";
 import {
 	type MessageUpdate,
 	type MessageStreamUpdate,
+	type MessageToolUpdate,
+	type MessageToolCallUpdate,
+	type MessageToolResultUpdate,
+	type MessageToolErrorUpdate,
 	MessageUpdateType,
+	MessageToolUpdateType,
 } from "$lib/types/MessageUpdate";
 
 import { page } from "$app/state";
+import type { KeyValuePair } from "$lib/types/Tool";
 
 type MessageUpdateRequestOptions = {
 	base: string;
 	inputs?: string;
 	messageId?: string;
 	isRetry: boolean;
+	isContinue?: boolean;
 	files?: MessageFile[];
+	// Optional: pass selected MCP server names (client-side selection)
+	selectedMcpServerNames?: string[];
+	// Optional: pass selected MCP server configs (for custom client-defined servers)
+	selectedMcpServers?: Array<{ name: string; url: string; headers?: KeyValuePair[] }>;
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -28,6 +39,10 @@ export async function fetchMessageUpdates(
 		inputs: opts.inputs,
 		id: opts.messageId,
 		is_retry: opts.isRetry,
+		is_continue: Boolean(opts.isContinue),
+		// Will be ignored server-side if unsupported
+		selectedMcpServerNames: opts.selectedMcpServerNames,
+		selectedMcpServers: opts.selectedMcpServers,
 	});
 
 	opts.files?.forEach((file) => {
@@ -224,6 +239,21 @@ async function* smoothAsyncIterator<T>(iterator: AsyncGenerator<T>): AsyncGenera
 		yield valuesBuffer.shift()!;
 	}
 }
+
+// Tool update type guards for UI rendering
+export const isMessageToolUpdate = (update: MessageUpdate): update is MessageToolUpdate =>
+	update.type === MessageUpdateType.Tool;
+
+export const isMessageToolCallUpdate = (update: MessageUpdate): update is MessageToolCallUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Call;
+
+export const isMessageToolResultUpdate = (
+	update: MessageUpdate
+): update is MessageToolResultUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Result;
+
+export const isMessageToolErrorUpdate = (update: MessageUpdate): update is MessageToolErrorUpdate =>
+	isMessageToolUpdate(update) && update.subtype === MessageToolUpdateType.Error;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const waitForEvent = (eventTarget: EventTarget, eventName: string) =>

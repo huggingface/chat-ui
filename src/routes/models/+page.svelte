@@ -7,6 +7,7 @@
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
 	import CarbonView from "~icons/carbon/view";
+	import CarbonTools from "~icons/carbon/tools";
 	import CarbonSettings from "~icons/carbon/settings";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
@@ -98,14 +99,24 @@
 							></div>
 						{/if}
 						<div class="flex items-center gap-1">
+							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
+								<span
+									title="This model supports tool calling (functions)."
+									class="background ml-auto flex size-[21px] items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-500"
+									aria-label="Model supports tools"
+									role="img"
+								>
+									<CarbonTools class="text-xxs" />
+								</span>
+							{/if}
 							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 								<span
 									title="This model is multimodal and supports image inputs natively."
-									class="ml-auto flex size-[21px] items-center justify-center rounded-lg border border-blue-700 dark:border-blue-500"
+									class="flex size-[21px] items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-500"
 									aria-label="Model is multimodal"
 									role="img"
 								>
-									<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
+									<CarbonView class="text-xxs" />
 								</span>
 							{/if}
 							<button
@@ -140,7 +151,9 @@
 						{model.displayName}
 					</span>
 					<span class="line-clamp-4 whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
-						{model.isRouter ? "Routes your messages to the best model for your request." : model.description || "-"}
+						{model.isRouter
+							? "Routes your messages to the best model for your request."
+							: model.description || "-"}
 					</span>
 				</a>
 			{/each}
@@ -155,8 +168,11 @@
 		background-image:
 			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.16), transparent 60%),
 			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.16), transparent 60%),
-			linear-gradient(135deg, rgba(236, 72, 153, 0.10), rgba(59, 130, 246, 0.08));
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(59, 130, 246, 0.12), 0 2px 8px rgba(236, 72, 153, 0.10);
+			linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(59, 130, 246, 0.08));
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.06),
+			0 6px 18px rgba(59, 130, 246, 0.12),
+			0 2px 8px rgba(236, 72, 153, 0.1);
 	}
 
 	:global(.dark) .omni-gradient {
@@ -164,8 +180,10 @@
 			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.12), transparent 60%),
 			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.12), transparent 60%),
 			linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(59, 130, 246, 0.06));
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 28px rgba(0, 0, 0, 0.25);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.04),
+			0 10px 28px rgba(0, 0, 0, 0.25);
 	}
 
-/* Active border handled via Tailwind utilities (see .active-model in src/styles/main.css) */
+	/* Active border handled via Tailwind utilities (see .active-model in src/styles/main.css) */
 </style>

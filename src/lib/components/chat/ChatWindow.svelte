@@ -27,12 +27,20 @@
 	import { routerExamples } from "$lib/constants/routerExamples";
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
 	import { shareModal } from "$lib/stores/shareModal";
+	import CarbonTools from "~icons/carbon/tools";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { page } from "$app/state";
+	import {
+		isMessageToolCallUpdate,
+		isMessageToolErrorUpdate,
+		isMessageToolResultUpdate,
+	} from "$lib/utils/messageUpdates";
+	import type { ToolFront } from "$lib/types/Tool";
 
 	interface Props {
 		messages?: Message[];
@@ -163,6 +171,26 @@
 			? (streamingRouterMetadata.model.split("/").pop() ?? streamingRouterMetadata.model)
 			: ""
 	);
+
+	// Expose currently running tool call name (if any) from the streaming assistant message
+	const availableTools: ToolFront[] = $derived.by(
+		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
+	);
+	let streamingToolCallName = $derived.by(() => {
+		const updates = streamingAssistantMessage?.updates ?? [];
+		if (!updates.length) return null;
+		const done = new Set<string>();
+		for (const u of updates) {
+			if (isMessageToolResultUpdate(u) || isMessageToolErrorUpdate(u)) done.add(u.uuid);
+		}
+		for (let i = updates.length - 1; i >= 0; i -= 1) {
+			const u = updates[i];
+			if (isMessageToolCallUpdate(u) && !done.has(u.uuid)) {
+				return u.call.name;
+			}
+		}
+		return null;
+	});
 	let showRouterDetails = $state(false);
 	let routerDetailsTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -230,6 +258,12 @@
 	// Respect per‑model multimodal toggle from settings (force enable)
 	let modelIsMultimodalOverride = $derived($settings.multimodalOverrides?.[currentModel.id]);
 	let modelIsMultimodal = $derived((modelIsMultimodalOverride ?? currentModel.multimodal) === true);
+
+	// Determine tool support for the current model (server-provided capability with user override)
+	let modelSupportsTools = $derived(
+		($settings.toolsOverrides?.[currentModel.id] ??
+			(currentModel as unknown as { supportsTools?: boolean }).supportsTools) === true
+	);
 
 	// Always allow common text-like files; add images only when model is multimodal
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
@@ -492,6 +526,7 @@
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
 								{modelIsMultimodal}
+								{modelSupportsTools}
 								bind:focused
 							/>
 						{/if}
@@ -539,7 +574,16 @@
 				}}
 			>
 				{#if models.find((m) => m.id === currentModel.id)}
-					{#if !currentModel.isRouter || !loading}
+					{#if loading && streamingToolCallName}
+						<span class="inline-flex items-center gap-1 whitespace-nowrap text-xs">
+							<CarbonTools class="text-[11px]" />
+							Calling tool
+							<span class="loading-dots font-medium">
+								{availableTools.find((t) => t.name === streamingToolCallName)?.displayName ??
+									streamingToolCallName}
+							</span>
+						</span>
+					{:else if !currentModel.isRouter || !loading}
 						<a
 							href="{base}/settings/{currentModel.id}"
 							onclick={(e) => {
@@ -557,7 +601,7 @@
 							{/if}
 							<CarbonCaretDown class="-ml-0.5 text-xxs" />
 						</a>
-					{:else if showRouterDetails && streamingRouterMetadata}
+					{:else if showRouterDetails && streamingRouterMetadata?.route}
 						<div
 							class="mr-2 flex items-center gap-1.5 whitespace-nowrap text-[.70rem] text-xs leading-none text-gray-400 dark:text-gray-400"
 						>

@@ -9,6 +9,7 @@
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonView from "~icons/carbon/view";
+	import CarbonTools from "~icons/carbon/tools";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
@@ -173,14 +174,25 @@
 						{/if}
 					</div>
 
+					{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
+						<span
+							title="Tool calling supported"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-500"
+							aria-label="Model supports tools"
+							role="img"
+						>
+							<CarbonTools class="text-xxs" />
+						</span>
+					{/if}
+
 					{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
 						<span
 							title="Multimodal support (image inputs)"
-							class="grid size-[21px] flex-none place-items-center rounded-md border border-blue-700 dark:border-blue-500"
+							class="grid size-[21px] flex-none place-items-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-500"
 							aria-label="Model is multimodal"
 							role="img"
 						>
-							<CarbonView class="text-xxs text-blue-700 dark:text-blue-500" />
+							<CarbonView class="text-xxs" />
 						</span>
 					{/if}
 

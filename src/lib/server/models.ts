@@ -56,6 +56,8 @@ const modelConfig = z.object({
 		.optional(),
 	multimodal: z.boolean().default(false),
 	multimodalAcceptedMimetypes: z.array(z.string()).optional(),
+	// Aggregated tool-calling capability across providers (HF router)
+	supportsTools: z.boolean().default(false),
 	unlisted: z.boolean().default(false),
 	embeddingModel: z.never().optional(),
 	/** Used to enable/disable system prompt usage */
@@ -234,6 +236,7 @@ const signatureForModel = (model: ProcessedModel) =>
 			}) ?? null,
 		multimodal: model.multimodal,
 		multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+		supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
 		isRouter: model.isRouter,
 		hasInferenceAPI: model.hasInferenceAPI,
 	});
@@ -341,6 +344,9 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			);
 			const supportsImageInput =
 				inputModalities.includes("image") || inputModalities.includes("vision");
+
+			// If any provider supports tools, consider the model as supporting tools
+			const supportsTools = Boolean((m.providers ?? []).some((p) => p?.supports_tools === true));
 			return {
 				id: m.id,
 				name: m.id,
@@ -350,6 +356,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				providers: m.providers,
 				multimodal: supportsImageInput,
 				multimodalAcceptedMimetypes: supportsImageInput ? ["image/*"] : undefined,
+				supportsTools,
 				endpoints: [
 					{
 						type: "openai" as const,
@@ -405,6 +412,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
 		const routerMultimodalEnabled =
 			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
+		const routerToolsEnabled = (config.LLM_ROUTER_ENABLE_TOOLS || "").toLowerCase() === "true";
 
 		let decorated = builtModels as ProcessedModel[];
 
@@ -430,6 +438,10 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			if (routerMultimodalEnabled) {
 				aliasRaw.multimodal = true;
 				aliasRaw.multimodalAcceptedMimetypes = ["image/*"];
+			}
+
+			if (routerToolsEnabled) {
+				aliasRaw.supportsTools = true;
 			}
 
 			const aliasBase = await processModel(aliasRaw);
