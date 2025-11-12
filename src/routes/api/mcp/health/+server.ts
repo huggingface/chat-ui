@@ -4,29 +4,8 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { KeyValuePair } from "$lib/types/Tool";
 import { config } from "$lib/server/config";
 import type { RequestHandler } from "./$types";
+import { isValidUrl } from "$lib/server/urlSafety";
 import { isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
-
-// URL validation – match rules used by /api/fetch-url (security-reviewed)
-function isValidUrl(urlString: string): boolean {
-	try {
-		const u = new URL(urlString);
-		if (u.protocol !== "https:") return false; // HTTPS only
-		const hostname = u.hostname.toLowerCase();
-		if (
-			hostname === "localhost" ||
-			hostname.startsWith("127.") ||
-			hostname.startsWith("192.168.") ||
-			hostname.startsWith("172.16.") ||
-			hostname === "[::1]" ||
-			hostname === "0.0.0.0"
-		) {
-			return false;
-		}
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 interface HealthCheckRequest {
 	url: string;

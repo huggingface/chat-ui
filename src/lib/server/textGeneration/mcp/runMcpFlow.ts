@@ -2,6 +2,7 @@ import { config } from "$lib/server/config";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { getMcpServers } from "$lib/server/mcp/registry";
+import { isValidUrl } from "$lib/server/urlSafety";
 import { resetMcpToolsCache } from "$lib/server/mcp/tools";
 import { getOpenAiToolsForMcp } from "$lib/server/mcp/tools";
 import type {
@@ -76,6 +77,19 @@ export async function* runMcpFlow({
 		}
 	} catch {
 		// ignore selection merge errors and proceed with env servers
+	}
+
+	// Enforce server-side safety (public HTTPS only, no private ranges)
+	servers = servers.filter((s) => {
+		try {
+			return isValidUrl(s.url);
+		} catch {
+			return false;
+		}
+	});
+	if (servers.length === 0) {
+		logger.warn("[mcp] all selected servers rejected by URL safety guard");
+		return false;
 	}
 
 	// Optionally attach the logged-in user's HF token to the official HF MCP server only.

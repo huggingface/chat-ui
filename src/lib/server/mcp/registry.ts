@@ -7,7 +7,7 @@ let cachedRaw: string | null = null;
 let cachedServers: McpServerConfig[] = [];
 
 function parseServers(raw: string): McpServerConfig[] {
-	if (!raw) return [];
+    if (!raw) return [];
 
 	try {
 		const parsed = JSON.parse(raw);
