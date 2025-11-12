@@ -401,7 +401,40 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				// Set the final text and the interrupted flag
 				else if (event.type === MessageUpdateType.FinalAnswer) {
 					messageToWriteTo.interrupted = event.interrupted;
-					messageToWriteTo.content = initialMessageContent + event.text;
+					// Default behavior: replace the streamed text with the provider's final text.
+					// However, when tools (MCP/function calls) were used, providers often stream
+					// some content (e.g., a story) before triggering tools, then return a
+					// different follow‑up message afterwards (e.g., an image caption). Our
+					// previous logic overwrote the pre‑tool content. Preserve it by merging in
+					// the pre‑tool stream when tool updates occurred and the final text does
+					// not already include the streamed prefix.
+					const hadTools = (messageToWriteTo.updates ?? []).some(
+						(u) => u.type === MessageUpdateType.Tool
+					);
+
+					if (hadTools) {
+						const existing = messageToWriteTo.content.slice(initialMessageContent.length);
+						if (existing && existing.length > 0) {
+							// A. If we already streamed the same final text, keep as-is.
+							if (event.text && existing.endsWith(event.text)) {
+								messageToWriteTo.content = initialMessageContent + existing;
+							}
+							// B. If the final text already includes the streamed prefix, use it verbatim.
+							else if (event.text && event.text.startsWith(existing)) {
+								messageToWriteTo.content = initialMessageContent + event.text;
+							}
+							// C. Otherwise, merge with a paragraph break for readability.
+							else {
+								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(event.text ?? "");
+								messageToWriteTo.content =
+									initialMessageContent + existing + (needsGap ? "\n\n" : "") + (event.text ?? "");
+							}
+						} else {
+							messageToWriteTo.content = initialMessageContent + (event.text ?? "");
+						}
+					} else {
+						messageToWriteTo.content = initialMessageContent + event.text;
+					}
 					finalAnswerReceived = true;
 
 					if (metricsEnabled && metrics) {
