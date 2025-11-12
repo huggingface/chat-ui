@@ -93,6 +93,8 @@
 	// Flatten to ordered array and keep a navigation index (defaults to last)
 	let toolGroups = $derived(Object.values(toolUpdateGroups));
 	let toolNavIndex = $state(0);
+	// Auto-follow newest tool group while streaming until user navigates manually
+	let toolAutoFollowLatest = $state(true);
 	$effect(() => {
 		const len = toolGroups.length;
 		if (len === 0) {
@@ -101,8 +103,15 @@
 		}
 		// Clamp if groups shrink or grow
 		if (toolNavIndex > len - 1) toolNavIndex = len - 1;
-		// While streaming, default to most recent group
-		if (isLast && loading) toolNavIndex = len - 1;
+		// While streaming, default to most recent group unless user navigated away
+		if (isLast && loading && toolAutoFollowLatest) toolNavIndex = len - 1;
+	});
+
+	// When streaming ends, re-enable auto-follow for the next turn
+	$effect(() => {
+		if (!loading) {
+			toolAutoFollowLatest = true;
+		}
 	});
 
 	$effect(() => {
@@ -161,8 +170,15 @@
 						{loading}
 						index={toolNavIndex}
 						total={toolGroups.length}
-						onprev={() => (toolNavIndex = Math.max(0, toolNavIndex - 1))}
-						onnext={() => (toolNavIndex = Math.min(toolGroups.length - 1, toolNavIndex + 1))}
+						onprev={() => {
+							toolAutoFollowLatest = false;
+							toolNavIndex = Math.max(0, toolNavIndex - 1);
+						}}
+						onnext={() => {
+							toolNavIndex = Math.min(toolGroups.length - 1, toolNavIndex + 1);
+							// If user moves back to the newest group, resume auto-follow
+							toolAutoFollowLatest = toolNavIndex === toolGroups.length - 1;
+						}}
 					/>
 				{/if}
 			{/if}
