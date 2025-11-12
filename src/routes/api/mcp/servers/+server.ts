@@ -1,9 +1,9 @@
 import type { MCPServer } from "$lib/types/Tool";
-import { env } from "$env/dynamic/private";
+import { config } from "$lib/server/config";
 
 export async function GET() {
-	// Parse MCP_SERVERS environment variable
-	const mcpServersEnv = env.MCP_SERVERS || "[]";
+    // Parse MCP_SERVERS environment variable
+    const mcpServersEnv = config.MCP_SERVERS || "[]";
 
 	let servers: Array<{ name: string; url: string; headers?: Record<string, string> }> = [];
 
