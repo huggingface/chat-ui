@@ -157,7 +157,7 @@ Configure servers (base list for all users):
 # JSON array of servers: name, url, optional headers
 MCP_SERVERS=[
   {"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"},
-  {"name": "Hugging Face MCP Login", "url": "https://huggingface.co/mcp?login"}
+  {"name": "Hugging Face MCP Login", "url": "https://hf.co/mcp?login"}
 ]
 
 # Forward the signed-in user's Hugging Face token to the official HF MCP login endpoint
