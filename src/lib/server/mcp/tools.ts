@@ -141,16 +141,31 @@ export async function getOpenAiToolsForMcp(
 				const description = tool.description ?? tool.annotations?.title;
 				const toolName = tool.name;
 
-				// Emit only the plain tool name (no namespaced alias)
-				const plainName = sanitizeName(toolName);
-				if (!(plainName in mapping)) {
-					pushToolDefinition(plainName, description, parameters);
-					mapping[plainName] = {
-						fnName: plainName,
-						server: server.name,
-						tool: toolName,
-					};
+				// Emit a collision-aware function name.
+				// Prefer the plain tool name; on conflict, suffix with server name.
+				let plainName = sanitizeName(toolName);
+				if (plainName in mapping) {
+					const suffix = sanitizeName(server.name);
+					const candidate = `${plainName}_${suffix}`.slice(0, 64);
+					if (!(candidate in mapping)) {
+						plainName = candidate;
+					} else {
+						let i = 2;
+						let next = `${candidate}_${i}`;
+						while (i < 10 && next in mapping) {
+							i += 1;
+							next = `${candidate}_${i}`;
+						}
+						plainName = next.slice(0, 64);
+					}
 				}
+
+				pushToolDefinition(plainName, description, parameters);
+				mapping[plainName] = {
+					fnName: plainName,
+					server: server.name,
+					tool: toolName,
+				};
 			}
 		} else {
 			// ignore failure for this server
