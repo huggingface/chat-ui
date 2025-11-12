@@ -2,28 +2,30 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { KeyValuePair } from "$lib/types/Tool";
+import { config } from "$lib/server/config";
 import type { RequestHandler } from "./$types";
+import { isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
 
 // URL validation – match rules used by /api/fetch-url (security-reviewed)
 function isValidUrl(urlString: string): boolean {
-    try {
-        const u = new URL(urlString);
-        if (u.protocol !== "https:") return false; // HTTPS only
-        const hostname = u.hostname.toLowerCase();
-        if (
-            hostname === "localhost" ||
-            hostname.startsWith("127.") ||
-            hostname.startsWith("192.168.") ||
-            hostname.startsWith("172.16.") ||
-            hostname === "[::1]" ||
-            hostname === "0.0.0.0"
-        ) {
-            return false;
-        }
-        return true;
-    } catch {
-        return false;
-    }
+	try {
+		const u = new URL(urlString);
+		if (u.protocol !== "https:") return false; // HTTPS only
+		const hostname = u.hostname.toLowerCase();
+		if (
+			hostname === "localhost" ||
+			hostname.startsWith("127.") ||
+			hostname.startsWith("192.168.") ||
+			hostname.startsWith("172.16.") ||
+			hostname === "[::1]" ||
+			hostname === "0.0.0.0"
+		) {
+			return false;
+		}
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 interface HealthCheckRequest {
@@ -42,7 +44,7 @@ interface HealthCheckResponse {
 	authRequired?: boolean;
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	let client: Client | undefined;
 
 	try {
@@ -56,7 +58,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			});
 		}
 
-        // URL validation handled above
+		// URL validation handled above
 
 		if (!isValidUrl(url)) {
 			return new Response(
@@ -70,14 +72,27 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const baseUrl = new URL(url);
 
-		// Convert KeyValuePair[] to Record<string, string>
+		// Minimal header handling
 		const headersRecord: Record<string, string> = headers?.length
 			? Object.fromEntries(headers.map((h) => [h.key, h.value]))
 			: {};
-
-		// Add required Accept header for MCP servers (like Exa)
 		if (!headersRecord["Accept"]) {
 			headersRecord["Accept"] = "application/json, text/event-stream";
+		}
+
+		// If enabled, attach the logged-in user's HF token only for the official HF MCP endpoint
+		try {
+			const shouldForward = config.MCP_FORWARD_HF_USER_TOKEN === "true";
+			const userToken =
+				(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+				(locals as unknown as { token?: string } | undefined)?.token;
+			const hasAuth = typeof headersRecord["Authorization"] === "string";
+			const isHfMcpTarget = isStrictHfMcpLogin(url);
+			if (shouldForward && !hasAuth && isHfMcpTarget && hasNonEmptyToken(userToken)) {
+				headersRecord["Authorization"] = `Bearer ${userToken}`;
+			}
+		} catch {
+			// best-effort overlay
 		}
 
 		// Add an abort timeout to outbound requests (align with fetch-url: 30s)
@@ -222,10 +237,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			lower.includes("403");
 
 		// Provide more helpful error messages
-        if (authRequired) {
-            errorMessage =
-                "Authentication required. Provide appropriate Authorization headers in the server configuration.";
-        } else if (errorMessage.includes("not valid JSON")) {
+		if (authRequired) {
+			errorMessage =
+				"Authentication required. Provide appropriate Authorization headers in the server configuration.";
+		} else if (errorMessage.includes("not valid JSON")) {
 			errorMessage =
 				"Server returned invalid response. This might not be a valid MCP endpoint. MCP servers should respond to POST requests at /mcp with JSON-RPC messages.";
 		} else if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {

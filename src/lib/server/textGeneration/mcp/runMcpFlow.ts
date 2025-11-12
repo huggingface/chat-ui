@@ -18,6 +18,7 @@ import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
 import { logger } from "../../logger";
 import type { TextGenerationContext } from "../types";
+import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -75,6 +76,33 @@ export async function* runMcpFlow({
 		}
 	} catch {
 		// ignore selection merge errors and proceed with env servers
+	}
+
+	// Optionally attach the logged-in user's HF token to the official HF MCP server only.
+	// Never override an explicit Authorization header, and require token to look like an HF token.
+	try {
+		const shouldForward = config.MCP_FORWARD_HF_USER_TOKEN === "true";
+		const userToken =
+			(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
+			(locals as unknown as { token?: string } | undefined)?.token;
+
+		if (shouldForward && hasNonEmptyToken(userToken)) {
+			servers = servers.map((s) => {
+				try {
+					if (isStrictHfMcpLogin(s.url) && !hasAuthHeader(s.headers)) {
+						return {
+							...s,
+							headers: { ...(s.headers ?? {}), Authorization: `Bearer ${userToken}` },
+						};
+					}
+				} catch {
+					// ignore URL parse errors and leave server unchanged
+				}
+				return s;
+			});
+		}
+	} catch {
+		// best-effort overlay; continue if anything goes wrong
 	}
 	logger.debug({ count: servers.length }, "[mcp] servers configured");
 	if (servers.length === 0) {

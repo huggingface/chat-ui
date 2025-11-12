@@ -7,7 +7,7 @@
 import { writable, derived } from "svelte/store";
 import { base } from "$app/paths";
 import { browser } from "$app/environment";
-import type { MCPServer, ServerStatus, MCPTool, KeyValuePair } from "$lib/types/Tool";
+import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
 
 const STORAGE_KEYS = {
 	CUSTOM_SERVERS: "mcp:custom-servers",
@@ -78,13 +78,14 @@ if (browser) {
 
 // Derived store: only enabled servers
 export const enabledServers = derived([allMcpServers, selectedServerIds], ([$all, $selected]) =>
-    $all.filter((s) => $selected.has(s.id))
+	$all.filter((s) => $selected.has(s.id))
 );
 
 // Derived store: count of enabled servers
 export const enabledServersCount = derived(enabledServers, ($enabled) => $enabled.length);
 
-// No additional OAuth header overlay; rely solely on server.headers.
+// Note: Authorization overlay (with user's HF token) for the Hugging Face MCP host
+// is applied server-side when enabled via MCP_FORWARD_HF_USER_TOKEN.
 
 /**
  * Refresh base servers from API and merge with custom servers
@@ -213,34 +214,34 @@ export function updateServerStatus(
  * Run health check on a server
  */
 export async function healthCheckServer(
-    server: MCPServer
+	server: MCPServer
 ): Promise<{ ready: boolean; tools?: MCPTool[]; error?: string }> {
-    try {
-        updateServerStatus(server.id, "connecting");
+	try {
+		updateServerStatus(server.id, "connecting");
 
-        const response = await fetch(`${base}/api/mcp/health`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: server.url, headers: server.headers }),
-        });
+		const response = await fetch(`${base}/api/mcp/health`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ url: server.url, headers: server.headers }),
+		});
 
 		const result = await response.json();
 
-        if (result.ready && result.tools) {
-            updateServerStatus(server.id, "connected", undefined, result.tools, false);
-            return { ready: true, tools: result.tools };
-        } else {
-            updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
-            return { ready: false, error: result.error };
-        }
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        updateServerStatus(server.id, "error", errorMessage);
-        return { ready: false, error: errorMessage };
-    }
+		if (result.ready && result.tools) {
+			updateServerStatus(server.id, "connected", undefined, result.tools, false);
+			return { ready: true, tools: result.tools };
+		} else {
+			updateServerStatus(server.id, "error", result.error, undefined, Boolean(result.authRequired));
+			return { ready: false, error: result.error };
+		}
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : "Unknown error";
+		updateServerStatus(server.id, "error", errorMessage);
+		return { ready: false, error: errorMessage };
+	}
 }
 
 // Initialize on module load
 if (browser) {
-    refreshMcpServers();
+	refreshMcpServers();
 }
