@@ -9,6 +9,7 @@
 		enabledServersCount,
 		addCustomServer,
 		refreshMcpServers,
+		healthCheckServer,
 	} from "$lib/stores/mcpServers";
 	import type { KeyValuePair } from "$lib/types/Tool";
 	import IconAddLarge from "~icons/carbon/add-large";
@@ -26,6 +27,7 @@
 
 	type View = "list" | "add";
 	let currentView = $state<View>("list");
+	let isRefreshing = $state(false);
 
 	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
 	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
@@ -41,7 +43,16 @@
 	}
 
 	async function handleRefresh() {
-		await refreshMcpServers();
+		if (isRefreshing) return;
+		isRefreshing = true;
+		try {
+			await refreshMcpServers();
+			// After refreshing the list, re-run health checks for all known servers
+			const servers = $allMcpServers;
+			await Promise.allSettled(servers.map((s) => healthCheckServer(s)));
+		} finally {
+			isRefreshing = false;
+		}
 	}
 </script>
 
@@ -93,10 +104,11 @@
 				<div class="flex gap-2">
 					<button
 						onclick={handleRefresh}
-						class="btn gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+						disabled={isRefreshing}
+						class="btn gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 					>
-						<IconRefresh class="size-4" />
-						Refresh
+						<IconRefresh class="size-4 {isRefreshing ? 'animate-spin' : ''}" />
+						{isRefreshing ? "Refreshing…" : "Refresh"}
 					</button>
 					<button
 						onclick={() => (currentView = "add")}

@@ -6,7 +6,7 @@ import { ToolResultStatus } from "$lib/types/Tool";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
-import { callMcpTool } from "$lib/server/mcp/httpClient";
+import { callMcpTool, type McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import type { Client } from "@modelcontextprotocol/sdk/client";
 
@@ -75,6 +75,8 @@ export async function* executeToolCalls({
 	type TaskResult = {
 		index: number;
 		output?: string;
+		structured?: unknown;
+		blocks?: unknown[];
 		error?: string;
 		uuid: string;
 		paramsClean: Record<string, Primitive>;
@@ -192,17 +194,29 @@ export async function* executeToolCalls({
 				{ server: mappingEntry.server, tool: mappingEntry.tool, parameters: p.paramsClean },
 				"[mcp] invoking tool"
 			);
-			const outputRaw = await callMcpTool(serverCfg, mappingEntry.tool, p.argsObj, {
-				client,
-				signal: abortSignal,
-				timeoutMs: toolTimeoutMs,
-			});
-			const { annotated } = processToolOutput(outputRaw);
+			const toolResponse: McpToolTextResponse = await callMcpTool(
+				serverCfg,
+				mappingEntry.tool,
+				p.argsObj,
+				{
+					client,
+					signal: abortSignal,
+					timeoutMs: toolTimeoutMs,
+				}
+			);
+			const { annotated } = processToolOutput(toolResponse.text ?? "");
 			logger.debug(
 				{ server: mappingEntry.server, tool: mappingEntry.tool },
 				"[mcp] tool call completed"
 			);
-			q.push({ index, output: annotated, uuid: p.uuid, paramsClean: p.paramsClean });
+			q.push({
+				index,
+				output: annotated,
+				structured: toolResponse.structured,
+				blocks: toolResponse.content,
+				uuid: p.uuid,
+				paramsClean: p.paramsClean,
+			});
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			logger.warn(
@@ -241,7 +255,9 @@ export async function* executeToolCalls({
 						call: { name: prepared[r.index].call.name, parameters: r.paramsClean },
 						outputs: [
 							{
-								content: r.output ?? "",
+								text: r.output ?? "",
+								structured: r.structured,
+								content: r.blocks,
 							} as unknown as Record<string, unknown>,
 						],
 						display: true,
@@ -259,6 +275,7 @@ export async function* executeToolCalls({
 		if (!r.error) {
 			const output = r.output ?? "";
 			toolRuns.push({ name, parameters: r.paramsClean, output });
+			// For the LLM follow-up call, we keep only the textual output
 			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
 		}
 	}

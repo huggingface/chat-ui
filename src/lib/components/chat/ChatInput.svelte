@@ -386,10 +386,12 @@
 							class:grayscale={!modelSupportsTools}
 							class:opacity-60={!modelSupportsTools}
 							class:cursor-help={!modelSupportsTools}
-							title={modelSupportsTools ? "MCP servers enabled" : "Current model doesn’t support tools"}
+							title={modelSupportsTools
+								? "MCP servers enabled"
+								: "Current model doesn’t support tools"}
 						>
 							<button
-								class="leading-none cursor-pointer select-none bg-transparent p-0 text-current focus:outline-none"
+								class="cursor-pointer select-none bg-transparent p-0 leading-none text-current focus:outline-none"
 								type="button"
 								title="Manage MCP Servers"
 								onclick={() => (isMcpManagerOpen = true)}

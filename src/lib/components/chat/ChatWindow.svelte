@@ -233,7 +233,8 @@
 
 	// Determine tool support for the current model (server-provided capability with user override)
 	let modelSupportsTools = $derived(
-		($settings.toolsOverrides?.[currentModel.id] ?? (currentModel as unknown as { supportsTools?: boolean }).supportsTools) === true
+		($settings.toolsOverrides?.[currentModel.id] ??
+			(currentModel as unknown as { supportsTools?: boolean }).supportsTools) === true
 	);
 
 	// Always allow common text-like files; add images only when model is multimodal
@@ -497,7 +498,7 @@
 								{onPaste}
 								disabled={isReadOnly || lastIsError}
 								{modelIsMultimodal}
-								modelSupportsTools={modelSupportsTools}
+								{modelSupportsTools}
 								bind:focused
 							/>
 						{/if}
