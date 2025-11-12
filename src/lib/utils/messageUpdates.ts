@@ -13,7 +13,7 @@ import {
 import { page } from "$app/state";
 import type { KeyValuePair } from "$lib/types/Tool";
 
-type MessageUpdateRequestOptions = {
+export type MessageUpdateRequestOptions = {
 	base: string;
 	inputs?: string;
 	messageId?: string;

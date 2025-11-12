@@ -7,7 +7,8 @@
 	import { beforeNavigate, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
-	import { findCurrentModel } from "$lib/utils/models";
+    import { findCurrentModel } from "$lib/utils/models";
+    import type { MessageUpdateRequestOptions } from "$lib/utils/messageUpdates";
 	import type { Message } from "$lib/types/Message";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
@@ -212,21 +213,23 @@
 
 			const messageUpdatesAbortController = new AbortController();
 
+			// Build payload and only include selectedMcpServerNames when non-empty
+			const enabled = $enabledServers;
+			const payload: MessageUpdateRequestOptions = {
+				base,
+				inputs: prompt,
+				messageId,
+				isRetry,
+				files: isRetry ? userMessage?.files : base64Files,
+				selectedMcpServers: enabled.map((s) => ({ name: s.name, url: s.url, headers: s.headers })),
+			};
+			if (enabled.length > 0) {
+				payload.selectedMcpServerNames = enabled.map((s) => s.name);
+			}
+
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
-				{
-					base,
-					inputs: prompt,
-					messageId,
-					isRetry,
-					files: isRetry ? userMessage?.files : base64Files,
-					selectedMcpServerNames: $enabledServers.map((s) => s.name),
-					selectedMcpServers: $enabledServers.map((s) => ({
-						name: s.name,
-						url: s.url,
-						headers: s.headers,
-					})),
-				},
+				payload,
 				messageUpdatesAbortController.signal
 			).catch((err) => {
 				error.set(err.message);
