@@ -174,7 +174,7 @@
 						<li>• Only connect to servers you trust</li>
 						<li>• Enable servers to make their tools available in chat</li>
 						<li>• Use the Health Check button to verify server connectivity</li>
-						<li>• HTTP Oauth is supported you can also add HTTP headers for authentication</li>
+						<li>• You can add HTTP headers for authentication when required</li>
 					</ul>
 				</div>
 			</div>

@@ -222,9 +222,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			lower.includes("403");
 
 		// Provide more helpful error messages
-		if (authRequired) {
-			errorMessage = "Authentication required. Click 'Authenticate' to connect.";
-		} else if (errorMessage.includes("not valid JSON")) {
+        if (authRequired) {
+            errorMessage =
+                "Authentication required. Provide appropriate Authorization headers in the server configuration.";
+        } else if (errorMessage.includes("not valid JSON")) {
 			errorMessage =
 				"Server returned invalid response. This might not be a valid MCP endpoint. MCP servers should respond to POST requests at /mcp with JSON-RPC messages.";
 		} else if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {
