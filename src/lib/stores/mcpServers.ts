@@ -6,39 +6,52 @@
 
 import { writable, derived } from "svelte/store";
 import { base } from "$app/paths";
+import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
 import type { MCPServer, ServerStatus, MCPTool } from "$lib/types/Tool";
 
+// Namespace storage by app identity to avoid collisions across apps
+function toKeyPart(s: string | undefined): string {
+    return (s || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+}
+
+const appLabel = toKeyPart(publicEnv.PUBLIC_APP_ASSETS || publicEnv.PUBLIC_APP_NAME);
+const baseLabel = toKeyPart(typeof base === "string" ? base : "");
+// Final prefix format requested: "huggingchat:key" (no mcp:/chat)
+const KEY_PREFIX = appLabel || baseLabel || "app";
+
 const STORAGE_KEYS = {
-	CUSTOM_SERVERS: "mcp:custom-servers",
-	SELECTED_IDS: "mcp:selected-ids",
+	CUSTOM_SERVERS: `${KEY_PREFIX}:custom-servers`,
+	SELECTED_IDS: `${KEY_PREFIX}:selected-ids`,
 } as const;
+
+// No migration needed per request — read/write only namespaced keys
 
 // Load custom servers from localStorage
 function loadCustomServers(): MCPServer[] {
-	if (!browser) return [];
+    if (!browser) return [];
 
-	try {
-		const json = localStorage.getItem(STORAGE_KEYS.CUSTOM_SERVERS);
-		return json ? JSON.parse(json) : [];
-	} catch (error) {
-		console.error("Failed to load custom MCP servers from localStorage:", error);
-		return [];
-	}
+    try {
+        const json = localStorage.getItem(STORAGE_KEYS.CUSTOM_SERVERS);
+        return json ? JSON.parse(json) : [];
+    } catch (error) {
+        console.error("Failed to load custom MCP servers from localStorage:", error);
+        return [];
+    }
 }
 
 // Load selected server IDs from localStorage
 function loadSelectedIds(): Set<string> {
-	if (!browser) return new Set();
+    if (!browser) return new Set();
 
-	try {
-		const json = localStorage.getItem(STORAGE_KEYS.SELECTED_IDS);
-		const ids: string[] = json ? JSON.parse(json) : [];
-		return new Set(ids);
-	} catch (error) {
-		console.error("Failed to load selected MCP server IDs from localStorage:", error);
-		return new Set();
-	}
+    try {
+        const json = localStorage.getItem(STORAGE_KEYS.SELECTED_IDS);
+        const ids: string[] = json ? JSON.parse(json) : [];
+        return new Set(ids);
+    } catch (error) {
+        console.error("Failed to load selected MCP server IDs from localStorage:", error);
+        return new Set();
+    }
 }
 
 // Save custom servers to localStorage
