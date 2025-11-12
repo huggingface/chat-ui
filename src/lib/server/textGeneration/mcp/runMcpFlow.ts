@@ -43,10 +43,6 @@ export async function* runMcpFlow({
 > {
 	// Start from env-configured servers
 	let servers = getMcpServers();
-	logger.debug(
-		{ servers: servers.map((s) => ({ name: s.name, url: s.url })) },
-		"[mcp] loaded servers from env"
-	);
 
 	// Merge in request-provided custom servers (if any)
 	try {
@@ -72,53 +68,27 @@ export async function* runMcpFlow({
 			servers = [...byName.values()];
 		}
 
-		// If the client specified a non-empty selection by name, filter to those
+		// If the client specified a selection by name, filter to those
 		const names = Array.isArray(reqMcp?.selectedServerNames)
 			? reqMcp?.selectedServerNames
 			: undefined;
-		if (Array.isArray(names) && names.length > 0) {
-			logger.debug(
-				{ selectedNames: names, beforeFilter: servers.length },
-				"[mcp] filtering servers by name"
-			);
+		if (Array.isArray(names)) {
 			servers = servers.filter((s) => names.includes(s.name));
-			logger.debug({ afterFilter: servers.length }, "[mcp] servers after name filter");
-		} else if (Array.isArray(names) && names.length === 0) {
-			// Be resilient: an empty array means "no explicit selection"; do not filter.
-			logger.debug("[mcp] empty selectedServerNames provided; skipping name filter");
 		}
 	} catch {
 		// ignore selection merge errors and proceed with env servers
 	}
 
-	// If no servers remain after selection/merge, exit early with an accurate message
-	if (servers.length === 0) {
-		logger.warn("[mcp] no MCP servers available after selection; skipping MCP flow");
-		return false;
-	}
-
 	// Enforce server-side safety (public HTTPS only, no private ranges)
-	const beforeFilter = servers.length;
 	servers = servers.filter((s) => {
 		try {
-			const isValid = isValidUrl(s.url);
-			if (!isValid) {
-				logger.warn({ name: s.name, url: s.url }, "[mcp] server rejected by URL safety");
-			}
-			return isValid;
-		} catch (err) {
-			logger.warn(
-				{ name: s.name, url: s.url, error: String(err) },
-				"[mcp] server URL validation error"
-			);
+			return isValidUrl(s.url);
+		} catch {
 			return false;
 		}
 	});
 	if (servers.length === 0) {
-		logger.warn(
-			{ beforeFilter, afterFilter: servers.length },
-			"[mcp] all servers rejected by URL safety guard"
-		);
+		logger.warn("[mcp] all selected servers rejected by URL safety guard");
 		return false;
 	}
 
