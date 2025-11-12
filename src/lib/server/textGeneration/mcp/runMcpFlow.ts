@@ -248,6 +248,7 @@ export async function* runMcpFlow({
 				route: resolvedRoute,
 				candidateModelId,
 				toolCount: oaTools.length,
+				hasUserToken: Boolean((locals as any)?.token),
 			},
 			"[mcp] starting completion with tools"
 		);
@@ -402,6 +403,7 @@ export async function* runMcpFlow({
 					headers: {
 						"ChatUI-Conversation-ID": conv._id.toString(),
 						"X-use-cache": "false",
+						...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 					},
 				}
 			);
@@ -523,7 +525,14 @@ export async function* runMcpFlow({
 					console.debug({ loop }, "[mcp] missing tool_call id in stream; retrying non-stream to recover ids");
 					const nonStream = await openai.chat.completions.create(
 						{ ...completionBase, messages: messagesOpenAI, stream: false },
-						{ signal: abortSignal }
+						{
+							signal: abortSignal,
+							headers: {
+								"ChatUI-Conversation-ID": conv._id.toString(),
+								"X-use-cache": "false",
+								...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							},
+						}
 					);
 					const tc = nonStream.choices?.[0]?.message?.tool_calls ?? [];
 					calls = tc.map((t) => ({
