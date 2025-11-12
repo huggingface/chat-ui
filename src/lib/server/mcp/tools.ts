@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { McpServerConfig } from "./httpClient";
+// use console.* for lightweight diagnostics in production logs
 
 export type OpenAiTool = {
 	type: "function";
@@ -60,31 +61,38 @@ type ListedTool = {
 };
 
 async function listServerTools(
-	server: McpServerConfig,
-	opts: { signal?: AbortSignal } = {}
+    server: McpServerConfig,
+    opts: { signal?: AbortSignal } = {}
 ): Promise<ListedTool[]> {
-	const url = new URL(server.url);
-	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
-	try {
-		try {
-			const transport = new StreamableHTTPClientTransport(url, {
-				requestInit: { headers: server.headers, signal: opts.signal },
-			});
-			await client.connect(transport);
-		} catch {
-			const transport = new SSEClientTransport(url, {
-				requestInit: { headers: server.headers, signal: opts.signal },
-			});
-			await client.connect(transport);
-		}
+    const url = new URL(server.url);
+    const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
+    try {
+        try {
+            const transport = new StreamableHTTPClientTransport(url, {
+                requestInit: { headers: server.headers, signal: opts.signal },
+            });
+            await client.connect(transport);
+        } catch {
+            const transport = new SSEClientTransport(url, {
+                requestInit: { headers: server.headers, signal: opts.signal },
+            });
+            await client.connect(transport);
+        }
 
-		const response = await client.listTools({});
-		return Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
-	} finally {
-		try {
-			await client.close?.();
-		} catch {
-			// ignore close errors
+        const response = await client.listTools({});
+        const tools = Array.isArray(response?.tools) ? (response.tools as ListedTool[]) : [];
+        try {
+            console.debug(
+                { server: server.name, url: server.url, count: tools.length, toolNames: tools.map((t) => t?.name).filter(Boolean) },
+                "[mcp] listed tools from server"
+            );
+        } catch {}
+        return tools;
+    } finally {
+        try {
+            await client.close?.();
+        } catch {
+            // ignore close errors
 		}
 	}
 }

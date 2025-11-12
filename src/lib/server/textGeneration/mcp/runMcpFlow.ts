@@ -17,7 +17,6 @@ import { buildToolPreprompt } from "../utils/toolPrompt";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
-import { logger } from "../../logger";
 import type { TextGenerationContext } from "../types";
 import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
 
@@ -43,6 +42,12 @@ export async function* runMcpFlow({
 > {
 	// Start from env-configured servers
 	let servers = getMcpServers();
+    try {
+        console.debug(
+            { baseServers: servers.map((s) => ({ name: s.name, url: s.url })), count: servers.length },
+            "[mcp] base servers loaded"
+        );
+    } catch {}
 
 	// Merge in request-provided custom servers (if any)
 	try {
@@ -66,6 +71,15 @@ export async function* runMcpFlow({
 			for (const s of servers) byName.set(s.name, s);
 			for (const s of custom) byName.set(s.name, s);
 			servers = [...byName.values()];
+			try {
+				console.debug(
+					{
+						customProvidedCount: custom.length,
+						mergedServers: servers.map((s) => ({ name: s.name, url: s.url, hasAuth: !!s.headers?.Authorization })),
+					},
+					"[mcp] merged request-provided servers"
+				);
+			} catch {}
 		}
 
 		// If the client specified a selection by name, filter to those
@@ -73,22 +87,41 @@ export async function* runMcpFlow({
 			? reqMcp?.selectedServerNames
 			: undefined;
 		if (Array.isArray(names)) {
+			const before = servers.map((s) => s.name);
 			servers = servers.filter((s) => names.includes(s.name));
+			try {
+				console.debug(
+					{ selectedNames: names, before, after: servers.map((s) => s.name) },
+					"[mcp] applied name selection"
+				);
+			} catch {}
 		}
 	} catch {
 		// ignore selection merge errors and proceed with env servers
 	}
 
 	// Enforce server-side safety (public HTTPS only, no private ranges)
-	servers = servers.filter((s) => {
+	{
+		const before = servers.slice();
+		servers = servers.filter((s) => {
+			try {
+				return isValidUrl(s.url);
+			} catch {
+				return false;
+			}
+		});
 		try {
-			return isValidUrl(s.url);
-		} catch {
-			return false;
-		}
-	});
+			const rejected = before.filter((b) => !servers.includes(b));
+			if (rejected.length > 0) {
+				console.warn(
+					{ rejected: rejected.map((r) => ({ name: r.name, url: r.url })) },
+					"[mcp] rejected servers by URL safety"
+				);
+			}
+		} catch {}
+	}
 	if (servers.length === 0) {
-		logger.warn("[mcp] all selected servers rejected by URL safety guard");
+	console.warn("[mcp] all selected servers rejected by URL safety guard");
 		return false;
 	}
 
@@ -101,9 +134,11 @@ export async function* runMcpFlow({
 			(locals as unknown as { token?: string } | undefined)?.token;
 
 		if (shouldForward && hasNonEmptyToken(userToken)) {
+			const overlayApplied: string[] = [];
 			servers = servers.map((s) => {
 				try {
 					if (isStrictHfMcpLogin(s.url) && !hasAuthHeader(s.headers)) {
+						overlayApplied.push(s.name);
 						return {
 							...s,
 							headers: { ...(s.headers ?? {}), Authorization: `Bearer ${userToken}` },
@@ -114,11 +149,16 @@ export async function* runMcpFlow({
 				}
 				return s;
 			});
+			if (overlayApplied.length > 0) {
+				try {
+					console.debug({ overlayApplied }, "[mcp] forwarded HF token to servers");
+				} catch {}
+			}
 		}
 	} catch {
 		// best-effort overlay; continue if anything goes wrong
 	}
-	logger.debug({ count: servers.length }, "[mcp] servers configured");
+	console.debug({ count: servers.length, servers: servers.map((s) => s.name) }, "[mcp] servers configured");
 	if (servers.length === 0) {
 		return false;
 	}
@@ -127,8 +167,12 @@ export async function* runMcpFlow({
 	try {
 		const supportsTools = Boolean((model as unknown as { supportsTools?: boolean }).supportsTools);
 		const toolsEnabled = Boolean(forceTools) || supportsTools;
+	console.debug(
+			{ model: model.id ?? model.name, supportsTools, forceTools: Boolean(forceTools), toolsEnabled },
+			"[mcp] tools gate evaluation"
+		);
 		if (!toolsEnabled) {
-			logger.debug({ model: model.id }, "[mcp] tools disabled for model; skipping MCP flow");
+			console.info({ model: model.id ?? model.name }, "[mcp] tools disabled for model; skipping MCP flow");
 			return false;
 		}
 	} catch {
@@ -150,13 +194,22 @@ export async function* runMcpFlow({
 	});
 
 	if (!runMcp) {
-		logger.debug("[mcp] runMcp=false (router did not select tools path)");
+		console.info(
+			{ model: targetModel.id ?? targetModel.name, resolvedRoute },
+			"[mcp] runMcp=false (routing chose non-tools candidate)"
+		);
 		return false;
 	}
 
 	const { tools: oaTools, mapping } = await getOpenAiToolsForMcp(servers, { signal: abortSignal });
-	logger.debug({ tools: oaTools.length }, "[mcp] openai tool defs built");
+	try {
+		console.info(
+			{ toolCount: oaTools.length, toolNames: oaTools.map((t) => t.function.name) },
+			"[mcp] openai tool defs built"
+		);
+	} catch {}
 	if (oaTools.length === 0) {
+		console.warn("[mcp] zero tools available after listing; skipping MCP flow");
 		return false;
 	}
 
@@ -182,7 +235,16 @@ export async function* runMcpFlow({
 		});
 
 		const mmEnabled = (forceMultimodal ?? false) || targetModel.multimodal;
-		logger.debug({ model: targetModel.id ?? targetModel.name, mmEnabled }, "[mcp] target model");
+		console.info(
+			{
+				targetModel: targetModel.id ?? targetModel.name,
+				mmEnabled,
+				route: resolvedRoute,
+				candidateModelId,
+				toolCount: oaTools.length,
+			},
+			"[mcp] starting completion with tools"
+		);
 		const toOpenAiMessage = (msg: EndpointMessage): ChatCompletionMessageParam => {
 			if (msg.from === "user" && mmEnabled) {
 				const parts: ChatCompletionContentPart[] = [{ type: "text", text: msg.content }];
@@ -312,7 +374,7 @@ export async function* runMcpFlow({
 				route: resolvedRoute,
 				model: candidateModelId,
 			};
-			logger.debug(
+			console.debug(
 				{ route: resolvedRoute, model: candidateModelId },
 				"[mcp] router metadata emitted"
 			);
@@ -327,7 +389,7 @@ export async function* runMcpFlow({
 				messages: messagesOpenAI,
 			};
 
-			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
+		const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
 				completionRequest,
 				{
 					signal: abortSignal,
@@ -346,10 +408,11 @@ export async function* runMcpFlow({
 					model: "",
 					provider: providerHeader as unknown as import("@huggingface/inference").InferenceProvider,
 				};
-				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
+				console.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
 			}
 
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
+			let firstToolDeltaLogged = false;
 			let sawToolCall = false;
 			let tokenCount = 0;
 			for await (const chunk of completionStream) {
@@ -372,6 +435,16 @@ export async function* runMcpFlow({
 						if (toolCall.function?.name) current.name = toolCall.function.name;
 						if (toolCall.function?.arguments) current.arguments += toolCall.function.arguments;
 						toolCallState[index] = current;
+					}
+					if (!firstToolDeltaLogged) {
+						try {
+							const first = toolCallState[Object.keys(toolCallState).map((k) => Number(k)).sort((a,b)=>a-b)[0] ?? 0];
+							console.info(
+								{ firstCallName: first?.name, hasId: Boolean(first?.id) },
+								"[mcp] observed streamed tool_call delta"
+							);
+							firstToolDeltaLogged = true;
+						} catch {}
 					}
 				}
 
@@ -431,7 +504,7 @@ export async function* runMcpFlow({
 					}
 				}
 			}
-			logger.debug(
+			console.info(
 				{ sawToolCalls: Object.keys(toolCallState).length > 0, tokens: tokenCount, loop },
 				"[mcp] completion stream closed"
 			);
@@ -441,6 +514,7 @@ export async function* runMcpFlow({
 				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
 				let calls: NormalizedToolCall[];
 				if (missingId) {
+					console.debug({ loop }, "[mcp] missing tool_call id in stream; retrying non-stream to recover ids");
 					const nonStream = await openai.chat.completions.create(
 						{ ...completionBase, messages: messagesOpenAI, stream: false },
 						{ signal: abortSignal }
@@ -504,10 +578,10 @@ export async function* runMcpFlow({
 						];
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
-						logger.debug(
-							{ toolMsgCount, toolRunCount },
-							"[mcp] tools executed; continuing loop for follow-up completion"
-						);
+					console.info(
+						{ toolMsgCount, toolRunCount },
+						"[mcp] tools executed; continuing loop for follow-up completion"
+					);
 					}
 				}
 				// Continue loop: next iteration will use tool messages to get the final content
@@ -528,10 +602,10 @@ export async function* runMcpFlow({
 				text: lastAssistantContent,
 				interrupted: false,
 			};
-			logger.debug({ length: lastAssistantContent.length, loop }, "[mcp] final answer emitted");
+			console.info({ length: lastAssistantContent.length, loop }, "[mcp] final answer emitted (no tool_calls)");
 			return true;
 		}
-		logger.warn("[mcp] exceeded tool-followup loops; falling back");
+		console.warn("[mcp] exceeded tool-followup loops; falling back");
 	} catch (err) {
 		const msg = String(err ?? "");
 		const isAbort =
@@ -541,10 +615,10 @@ export async function* runMcpFlow({
 			msg.includes("Request was aborted");
 		if (isAbort) {
 			// Expected on user stop; keep logs quiet and do not treat as error
-			logger.debug("[mcp] aborted by user");
+			console.debug("[mcp] aborted by user");
 			return false;
 		}
-		logger.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
+		console.warn({ err: msg }, "[mcp] flow failed, falling back to default endpoint");
 	} finally {
 		// ensure MCP clients are closed after the turn
 		await drainPool();
