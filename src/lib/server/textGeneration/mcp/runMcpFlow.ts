@@ -42,12 +42,12 @@ export async function* runMcpFlow({
 > {
 	// Start from env-configured servers
 	let servers = getMcpServers();
-    try {
-        console.debug(
-            { baseServers: servers.map((s) => ({ name: s.name, url: s.url })), count: servers.length },
-            "[mcp] base servers loaded"
-        );
-    } catch {}
+	try {
+		console.debug(
+			{ baseServers: servers.map((s) => ({ name: s.name, url: s.url })), count: servers.length },
+			"[mcp] base servers loaded"
+		);
+	} catch {}
 
 	// Merge in request-provided custom servers (if any)
 	try {
@@ -75,7 +75,11 @@ export async function* runMcpFlow({
 				console.debug(
 					{
 						customProvidedCount: custom.length,
-						mergedServers: servers.map((s) => ({ name: s.name, url: s.url, hasAuth: !!s.headers?.Authorization })),
+						mergedServers: servers.map((s) => ({
+							name: s.name,
+							url: s.url,
+							hasAuth: !!s.headers?.Authorization,
+						})),
 					},
 					"[mcp] merged request-provided servers"
 				);
@@ -164,7 +168,10 @@ export async function* runMcpFlow({
 	} catch {
 		// best-effort overlay; continue if anything goes wrong
 	}
-	console.debug({ count: servers.length, servers: servers.map((s) => s.name) }, "[mcp] servers configured");
+	console.debug(
+		{ count: servers.length, servers: servers.map((s) => s.name) },
+		"[mcp] servers configured"
+	);
 	if (servers.length === 0) {
 		return false;
 	}
@@ -173,12 +180,20 @@ export async function* runMcpFlow({
 	try {
 		const supportsTools = Boolean((model as unknown as { supportsTools?: boolean }).supportsTools);
 		const toolsEnabled = Boolean(forceTools) || supportsTools;
-	console.debug(
-			{ model: model.id ?? model.name, supportsTools, forceTools: Boolean(forceTools), toolsEnabled },
+		console.debug(
+			{
+				model: model.id ?? model.name,
+				supportsTools,
+				forceTools: Boolean(forceTools),
+				toolsEnabled,
+			},
 			"[mcp] tools gate evaluation"
 		);
 		if (!toolsEnabled) {
-			console.info({ model: model.id ?? model.name }, "[mcp] tools disabled for model; skipping MCP flow");
+			console.info(
+				{ model: model.id ?? model.name },
+				"[mcp] tools disabled for model; skipping MCP flow"
+			);
 			return false;
 		}
 	} catch {
@@ -248,7 +263,7 @@ export async function* runMcpFlow({
 				route: resolvedRoute,
 				candidateModelId,
 				toolCount: oaTools.length,
-				hasUserToken: Boolean((locals as any)?.token),
+				hasUserToken: Boolean((locals as unknown as { token?: string })?.token),
 			},
 			"[mcp] starting completion with tools"
 		);
@@ -396,7 +411,7 @@ export async function* runMcpFlow({
 				messages: messagesOpenAI,
 			};
 
-		const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
+			const completionStream: Stream<ChatCompletionChunk> = await openai.chat.completions.create(
 				completionRequest,
 				{
 					signal: abortSignal,
@@ -446,7 +461,12 @@ export async function* runMcpFlow({
 					}
 					if (!firstToolDeltaLogged) {
 						try {
-							const first = toolCallState[Object.keys(toolCallState).map((k) => Number(k)).sort((a,b)=>a-b)[0] ?? 0];
+							const first =
+								toolCallState[
+									Object.keys(toolCallState)
+										.map((k) => Number(k))
+										.sort((a, b) => a - b)[0] ?? 0
+								];
 							console.info(
 								{ firstCallName: first?.name, hasId: Boolean(first?.id) },
 								"[mcp] observed streamed tool_call delta"
@@ -522,7 +542,10 @@ export async function* runMcpFlow({
 				const missingId = Object.values(toolCallState).some((c) => c?.name && !c?.id);
 				let calls: NormalizedToolCall[];
 				if (missingId) {
-					console.debug({ loop }, "[mcp] missing tool_call id in stream; retrying non-stream to recover ids");
+					console.debug(
+						{ loop },
+						"[mcp] missing tool_call id in stream; retrying non-stream to recover ids"
+					);
 					const nonStream = await openai.chat.completions.create(
 						{ ...completionBase, messages: messagesOpenAI, stream: false },
 						{
@@ -593,10 +616,10 @@ export async function* runMcpFlow({
 						];
 						toolMsgCount = event.summary.toolMessages?.length ?? 0;
 						toolRunCount = event.summary.toolRuns?.length ?? 0;
-					console.info(
-						{ toolMsgCount, toolRunCount },
-						"[mcp] tools executed; continuing loop for follow-up completion"
-					);
+						console.info(
+							{ toolMsgCount, toolRunCount },
+							"[mcp] tools executed; continuing loop for follow-up completion"
+						);
 					}
 				}
 				// Continue loop: next iteration will use tool messages to get the final content
@@ -617,7 +640,10 @@ export async function* runMcpFlow({
 				text: lastAssistantContent,
 				interrupted: false,
 			};
-			console.info({ length: lastAssistantContent.length, loop }, "[mcp] final answer emitted (no tool_calls)");
+			console.info(
+				{ length: lastAssistantContent.length, loop },
+				"[mcp] final answer emitted (no tool_calls)"
+			);
 			return true;
 		}
 		console.warn("[mcp] exceeded tool-followup loops; falling back");
