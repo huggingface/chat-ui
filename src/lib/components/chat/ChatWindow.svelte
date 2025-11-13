@@ -147,13 +147,6 @@
 		const last = messages.at(-1) as Message | undefined;
 		return last ? `${last.id}:${last.content.length}:${messages.length}` : `${messages.length}:0`;
 	});
-	let lastIsError = $derived(
-		lastMessage &&
-			!loading &&
-			(lastMessage.from === "user" ||
-				lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1)
-	);
-
 	let streamingAssistantMessage = $derived(
 		(() => {
 			for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -170,6 +163,13 @@
 		streamingRouterMetadata?.model
 			? (streamingRouterMetadata.model.split("/").pop() ?? streamingRouterMetadata.model)
 			: ""
+	);
+
+	let lastIsError = $derived(
+		!loading &&
+			(streamingAssistantMessage?.updates?.findIndex(
+				(u) => u.type === "status" && u.status === "error"
+			) ?? -1) !== -1
 	);
 
 	// Expose currently running tool call name (if any) from the streaming assistant message
