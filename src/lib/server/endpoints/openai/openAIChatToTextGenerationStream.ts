@@ -1,4 +1,4 @@
-import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import type { TextGenerationStreamOutput, InferenceProvider } from "@huggingface/inference";
 import type OpenAI from "openai";
 import type { Stream } from "openai/streaming";
 
@@ -34,10 +34,10 @@ export async function* openAIChatToTextGenerationStream(
 				routerMetadata: {
 					route: metadata.route,
 					model: metadata.model,
-					provider: metadata.provider,
+					provider: metadata.provider as InferenceProvider | undefined,
 				},
 			} as TextGenerationStreamOutput & {
-				routerMetadata: { route: string; model: string; provider?: string };
+				routerMetadata: { route: string; model: string; provider?: InferenceProvider };
 			};
 			metadataYielded = true;
 			// Skip processing this chunk as content since it's just metadata
@@ -156,9 +156,15 @@ export async function* openAIChatToTextGenerationStream(
 				},
 				generated_text: null,
 				details: null,
-				routerMetadata,
+				routerMetadata: routerMetadata
+					? {
+							route: routerMetadata.route,
+							model: routerMetadata.model,
+							provider: routerMetadata.provider as InferenceProvider | undefined,
+						}
+					: undefined,
 			} as TextGenerationStreamOutput & {
-				routerMetadata: { route?: string; model?: string; provider?: string };
+				routerMetadata?: { route?: string; model?: string; provider?: InferenceProvider };
 			};
 		}
 	}
@@ -244,11 +250,17 @@ export async function* openAIChatToTextGenerationSingle(
 			? (() => {
 					const metadata = getRouterMetadata();
 					return (metadata && metadata.route && metadata.model) || metadata?.provider
-						? { routerMetadata: metadata }
+						? {
+								routerMetadata: {
+									route: metadata.route,
+									model: metadata.model,
+									provider: metadata.provider as InferenceProvider | undefined,
+								},
+							}
 						: {};
 				})()
 			: {}),
 	} as TextGenerationStreamOutput & {
-		routerMetadata?: { route?: string; model?: string; provider?: string };
+		routerMetadata?: { route?: string; model?: string; provider?: InferenceProvider };
 	};
 }
