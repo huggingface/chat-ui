@@ -642,13 +642,16 @@ export async function POST({
 						err?.message === "Request was aborted.";
 
 					if (!isAbortError && !ctrl.signal.aborted) {
-						// Generate dummy LLM response based on user message
+						// Generate dummy LLM response based on Security API response (or original message if no Security API)
 						// LLM 더미 응답: LLM API 호출 실패 시 반환
-						const lastUserMessage = messagesForPrompt[messagesForPrompt.length - 1];
-						const dummyLlmResponse =
-							lastUserMessage?.from === "user"
-								? `[LLM 더미 응답] LLM API가 사용 불가능하여 더미 응답을 반환합니다. 사용자 메시지: "${lastUserMessage.content.substring(0, 50)}${lastUserMessage.content.length > 50 ? "..." : ""}"`
-								: "[LLM 더미 응답] LLM API가 사용 불가능하여 더미 응답을 반환합니다.";
+						// Use Security API response content if available (which may be dummy response)
+						// This is the message that was actually sent to LLM
+						const messageForLlm = messagesForPrompt[messagesForPrompt.length - 1];
+						const userMessageContent =
+							messageForLlm?.from === "user" ? messageForLlm.content : undefined;
+						const dummyLlmResponse = userMessageContent
+							? `[LLM 더미 응답] LLM API가 사용 불가능하여 더미 응답을 반환합니다. 사용자 메시지: "${userMessageContent}"`
+							: "[LLM 더미 응답] LLM API가 사용 불가능하여 더미 응답을 반환합니다.";
 
 						// Stream the dummy LLM response token by token
 						const tokens = dummyLlmResponse.split(" ");

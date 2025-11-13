@@ -58,13 +58,12 @@ export async function callSecurityApi(
 		// Return dummy response in OpenAI ChatCompletion format
 		// Security API 더미 응답: Security API URL/Key가 없을 때 반환
 		const lastUserMessage = messagesOpenAI[messagesOpenAI.length - 1];
-		const contentPreview =
+		const originalContent =
 			lastUserMessage?.role === "user" && typeof lastUserMessage.content === "string"
-				? lastUserMessage.content.substring(0, 100) +
-					(lastUserMessage.content.length > 100 ? "..." : "")
+				? lastUserMessage.content
 				: "";
-		const securityDummyContent = contentPreview
-			? `[Security API 더미 응답] Security API가 설정되지 않아 더미 응답을 반환합니다. 원본 메시지: "${contentPreview}"`
+		const securityDummyContent = originalContent
+			? `[Security API 더미 응답] Security API가 설정되지 않아 더미 응답을 반환합니다. 원본 메시지: "${originalContent}"`
 			: "[Security API 더미 응답] Security API가 설정되지 않아 더미 응답을 반환합니다.";
 
 		const dummyResponse: OpenAI.Chat.Completions.ChatCompletion = {
@@ -81,6 +80,7 @@ export async function callSecurityApi(
 						refusal: null,
 					},
 					finish_reason: "stop",
+					logprobs: null,
 				},
 			],
 			usage: {

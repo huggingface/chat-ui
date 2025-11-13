@@ -40,7 +40,7 @@ export default defineConfig({
 		},
 	},
 	optimizeDeps: {
-		include: ["uuid", "sharp", "clsx"],
+		include: ["uuid", "clsx"],
 		// Exclude server-only dependencies from client bundle
 		exclude: [
 			"sharp",
