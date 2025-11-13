@@ -4,6 +4,7 @@ import { base } from "$app/paths";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
+import { saveSettings } from "$lib/storage/settings";
 
 type SettingsStore = {
 	shareConversationsWithModelAuthors: boolean;
@@ -16,6 +17,11 @@ type SettingsStore = {
 	disableStream: boolean;
 	directPaste: boolean;
 	hidePromptExamples: Record<string, boolean>;
+	securityApiEnabled: boolean;
+	securityApiUrl: string;
+	securityApiKey: string;
+	llmApiUrl: string;
+	llmApiKey: string;
 };
 
 type SettingsStoreWritable = Writable<SettingsStore> & {
@@ -47,33 +53,35 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			showSavedOnNextSync = true; // User edit, should show "Saved"
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
-				await fetch(`${base}/settings`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(get(baseStore)),
-				});
+				try {
+					const currentSettings = get(baseStore);
+					await saveSettings({
+						...currentSettings,
+						welcomeModalSeenAt: currentSettings.welcomeModalSeen ? new Date() : null,
+					});
 
-				invalidate(UrlDependency.ConversationList);
+					invalidate(UrlDependency.ConversationList);
 
-				if (showSavedOnNextSync) {
-					// set savedRecently to true for 3s
-					baseStore.update((s) => ({
-						...s,
-						recentlySaved: true,
-					}));
-					setTimeout(() => {
+					if (showSavedOnNextSync) {
+						// set savedRecently to true for 3s
 						baseStore.update((s) => ({
 							...s,
-							recentlySaved: false,
+							recentlySaved: true,
 						}));
-					}, 3000);
-				}
+						setTimeout(() => {
+							baseStore.update((s) => ({
+								...s,
+								recentlySaved: false,
+							}));
+						}, 3000);
+					}
 
-				showSavedOnNextSync = false;
+					showSavedOnNextSync = false;
+				} catch (err) {
+					console.error("Failed to save settings:", err);
+				}
 			}, 300);
-			// debounce server calls by 300ms
+			// debounce saves by 300ms
 		}
 	}
 
@@ -101,34 +109,36 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			[key]: newNestedObject,
 		}));
 
-		// Save to server (debounced) - note: we don't set showSavedOnNextSync
+		// Save to IndexedDB (debounced) - note: we don't set showSavedOnNextSync
 		if (browser) {
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(async () => {
-				await fetch(`${base}/settings`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(get(baseStore)),
-				});
+				try {
+					const currentSettings = get(baseStore);
+					await saveSettings({
+						...currentSettings,
+						welcomeModalSeenAt: currentSettings.welcomeModalSeen ? new Date() : null,
+					});
 
-				invalidate(UrlDependency.ConversationList);
+					invalidate(UrlDependency.ConversationList);
 
-				if (showSavedOnNextSync) {
-					baseStore.update((s) => ({
-						...s,
-						recentlySaved: true,
-					}));
-					setTimeout(() => {
+					if (showSavedOnNextSync) {
 						baseStore.update((s) => ({
 							...s,
-							recentlySaved: false,
+							recentlySaved: true,
 						}));
-					}, 3000);
-				}
+						setTimeout(() => {
+							baseStore.update((s) => ({
+								...s,
+								recentlySaved: false,
+							}));
+						}, 3000);
+					}
 
-				showSavedOnNextSync = false;
+					showSavedOnNextSync = false;
+				} catch (err) {
+					console.error("Failed to save settings:", err);
+				}
 			}, 300);
 		}
 	}
@@ -139,17 +149,16 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		}));
 
 		if (browser) {
-			await fetch(`${base}/settings`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					...get(baseStore),
-					...settings,
-				}),
-			});
-			invalidate(UrlDependency.ConversationList);
+			try {
+				const currentSettings = get(baseStore);
+				await saveSettings({
+					...currentSettings,
+					welcomeModalSeenAt: currentSettings.welcomeModalSeen ? new Date() : null,
+				});
+				invalidate(UrlDependency.ConversationList);
+			} catch (err) {
+				console.error("Failed to save settings:", err);
+			}
 		}
 	}
 

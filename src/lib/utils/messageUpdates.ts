@@ -7,12 +7,22 @@ import {
 
 import { page } from "$app/state";
 
+import type { Conversation } from "$lib/types/Conversation";
+
 type MessageUpdateRequestOptions = {
 	base: string;
 	inputs?: string;
 	messageId?: string;
 	isRetry: boolean;
 	files?: MessageFile[];
+	conversation?: Conversation;
+	globalSettings?: {
+		securityApiEnabled?: boolean;
+		securityApiUrl?: string;
+		securityApiKey?: string;
+		llmApiUrl?: string;
+		llmApiKey?: string;
+	};
 };
 export async function fetchMessageUpdates(
 	conversationId: string,
@@ -37,6 +47,16 @@ export async function fetchMessageUpdates(
 	});
 
 	form.append("data", optsJSON);
+	
+	// Add conversation data for server-side processing
+	if (opts.conversation) {
+		form.append("conversation", JSON.stringify(opts.conversation));
+	}
+
+	// Add global settings for server-side processing
+	if (opts.globalSettings) {
+		form.append("globalSettings", JSON.stringify(opts.globalSettings));
+	}
 
 	const response = await fetch(`${opts.base}/conversation/${conversationId}`, {
 		method: "POST",

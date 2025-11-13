@@ -1,22 +1,10 @@
 import { config, ready } from "$lib/server/config";
 import type { Handle, HandleServerError, ServerInit, HandleFetch } from "@sveltejs/kit";
-import { collections } from "$lib/server/database";
 import { base } from "$app/paths";
-import {
-	authenticateRequest,
-	loginEnabled,
-	refreshSessionCookie,
-	triggerOauthFlow,
-} from "$lib/server/auth";
-import { ERROR_MESSAGES } from "$lib/stores/errors";
-import { addWeeks } from "date-fns";
-import { checkAndRunMigrations } from "$lib/migrations/migrations";
+import { authenticateRequest, refreshSessionCookie } from "$lib/server/auth";
 import { building, dev } from "$app/environment";
 import { logger } from "$lib/server/logger";
-import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { initExitHandler } from "$lib/server/exitHandler";
-import { refreshConversationStats } from "$lib/jobs/refresh-conversation-stats";
-import { adminTokenManager } from "$lib/server/adminToken";
 import { isHostLocalhost } from "$lib/server/isURLLocal";
 import { MetricsServer } from "$lib/server/metrics";
 
@@ -26,38 +14,11 @@ export const init: ServerInit = async () => {
 
 	// TODO: move this code on a started server hook, instead of using a "building" flag
 	if (!building) {
-		// Ensure legacy env expected by some libs: map OPENAI_API_KEY -> HF_TOKEN if absent
-		const canonicalToken = config.OPENAI_API_KEY || config.HF_TOKEN;
-		if (canonicalToken) {
-			process.env.HF_TOKEN ??= canonicalToken;
-		}
-
-		// Warn if legacy-only var is used
-		if (!config.OPENAI_API_KEY && config.HF_TOKEN) {
-			logger.warn(
-				"HF_TOKEN is deprecated in favor of OPENAI_API_KEY. Please migrate to OPENAI_API_KEY."
-			);
-		}
-
 		logger.info("Starting server...");
 		initExitHandler();
 
 		if (config.METRICS_ENABLED === "true") {
 			MetricsServer.getInstance();
-		}
-
-		checkAndRunMigrations();
-		refreshConversationStats();
-
-		// Init AbortedGenerations refresh process
-		AbortedGenerations.getInstance();
-
-		adminTokenManager.displayToken();
-
-		if (config.EXPOSE_API) {
-			logger.warn(
-				"The EXPOSE_API flag has been deprecated. The API is now required for chat-ui to work."
-			);
 		}
 	}
 };
@@ -119,63 +80,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		});
 	}
 
-	if (event.url.pathname.startsWith(`${base}/admin/`) || event.url.pathname === `${base}/admin`) {
-		const ADMIN_SECRET = config.ADMIN_API_SECRET || config.PARQUET_EXPORT_SECRET;
-
-		if (!ADMIN_SECRET) {
-			return errorResponse(500, "Admin API is not configured");
-		}
-
-		if (event.request.headers.get("Authorization") !== `Bearer ${ADMIN_SECRET}`) {
-			return errorResponse(401, "Unauthorized");
-		}
-	}
-
 	const auth = await authenticateRequest(
 		{ type: "svelte", value: event.request.headers },
 		{ type: "svelte", value: event.cookies }
 	);
 
 	event.locals.sessionId = auth.sessionId;
-
-	if (loginEnabled && !auth.user) {
-		if (config.AUTOMATIC_LOGIN === "true") {
-			// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login or healthcheck pages)
-			if (
-				!event.url.pathname.startsWith(`${base}/login`) &&
-				!event.url.pathname.startsWith(`${base}/healthcheck`)
-			) {
-				// To get the same CSRF token after callback
-				refreshSessionCookie(event.cookies, auth.secretSessionId);
-				return await triggerOauthFlow({
-					request: event.request,
-					url: event.url,
-					locals: event.locals,
-				});
-			}
-		} else {
-			// Redirect to OAuth flow unless on the authorized pages (home, shared conversation, login, healthcheck)
-			if (
-				event.url.pathname !== `${base}/` &&
-				event.url.pathname !== `${base}` &&
-				!event.url.pathname.startsWith(`${base}/login`) &&
-				!event.url.pathname.startsWith(`${base}/login/callback`) &&
-				!event.url.pathname.startsWith(`${base}/healthcheck`) &&
-				!event.url.pathname.startsWith(`${base}/r/`) &&
-				!event.url.pathname.startsWith(`${base}/conversation/`) &&
-				!event.url.pathname.startsWith(`${base}/api`)
-			) {
-				refreshSessionCookie(event.cookies, auth.secretSessionId);
-				return triggerOauthFlow({ request: event.request, url: event.url, locals: event.locals });
-			}
-		}
-	}
-
-	event.locals.user = auth.user || undefined;
-	event.locals.token = auth.token;
-
-	event.locals.isAdmin =
-		event.locals.user?.isAdmin || adminTokenManager.isAdmin(event.locals.sessionId);
+	event.locals.isAdmin = false;
 
 	// CSRF protection
 	const requestContentType = event.request.headers.get("content-type")?.split(";")[0] ?? "";
@@ -205,29 +116,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	if (
-		event.request.method === "POST" ||
-		event.url.pathname.startsWith(`${base}/login`) ||
-		event.url.pathname.startsWith(`${base}/login/callback`)
-	) {
-		// if the request is a POST request or login-related we refresh the cookie
+	if (event.request.method === "POST") {
+		// Refresh the cookie on POST requests
 		refreshSessionCookie(event.cookies, auth.secretSessionId);
-
-		await collections.sessions.updateOne(
-			{ sessionId: auth.sessionId },
-			{ $set: { updatedAt: new Date(), expiresAt: addWeeks(new Date(), 2) } }
-		);
-	}
-
-	if (
-		loginEnabled &&
-		!event.locals.user &&
-		!event.url.pathname.startsWith(`${base}/login`) &&
-		!event.url.pathname.startsWith(`${base}/admin`) &&
-		!event.url.pathname.startsWith(`${base}/settings`) &&
-		!["GET", "OPTIONS", "HEAD"].includes(event.request.method)
-	) {
-		return errorResponse(401, ERROR_MESSAGES.authOnly);
 	}
 
 	let replaced = false;
@@ -252,12 +143,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 	}
 
-	if (
-		event.url.pathname.startsWith(`${base}/login/callback`) ||
-		event.url.pathname.startsWith(`${base}/login`)
-	) {
-		response.headers.append("Cache-Control", "no-store");
-	}
 
 	if (event.url.pathname.startsWith(`${base}/api/`)) {
 		// get origin from the request

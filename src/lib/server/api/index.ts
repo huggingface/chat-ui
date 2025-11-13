@@ -20,7 +20,15 @@ export const app = new Elysia({ prefix })
 		if (request.url.endsWith("/export")) {
 			return response as unknown as Response;
 		}
-		return new Response(superjson.stringify(response), {
+		// Extract the actual data from the response
+		// Elysia returns the handler's return value directly, so we need to stringify it
+		const data = response instanceof Response ? response : response;
+		// If response is already a Response, return it as-is
+		if (data instanceof Response) {
+			return data;
+		}
+		// Otherwise, stringify the data
+		return new Response(superjson.stringify(data), {
 			headers: {
 				"Content-Type": "application/json",
 			},

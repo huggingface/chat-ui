@@ -1,9 +1,8 @@
-import type { ObjectId } from "bson";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
 export interface Session extends Timestamps {
-	_id: ObjectId;
+	_id: string;
 	sessionId: string;
 	userId: User["_id"];
 	userAgent?: string;

@@ -1,18 +1,16 @@
 import type { Message } from "$lib/types/Message";
 import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
-import type { ObjectId } from "mongodb";
-
 export async function preprocessMessages(
 	messages: Message[],
-	convId: ObjectId
+	convId: string
 ): Promise<EndpointMessage[]> {
 	return Promise.resolve(messages)
 		.then((msgs) => downloadFiles(msgs, convId))
 		.then((msgs) => injectClipboardFiles(msgs));
 }
 
-async function downloadFiles(messages: Message[], convId: ObjectId): Promise<EndpointMessage[]> {
+async function downloadFiles(messages: Message[], convId: string): Promise<EndpointMessage[]> {
 	return Promise.all(
 		messages.map<Promise<EndpointMessage>>((message) =>
 			Promise.all((message.files ?? []).map((file) => downloadFile(file.value, convId))).then(

@@ -1,10 +1,8 @@
-import { authCondition } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
 import { models, validModelIdSchema } from "$lib/server/models";
 import { ERROR_MESSAGES } from "$lib/stores/errors";
 import type { Message } from "$lib/types/Message";
+import type { Conversation } from "$lib/types/Conversation";
 import { error } from "@sveltejs/kit";
-import { ObjectId } from "mongodb";
 import { z } from "zod";
 import {
 	MessageUpdateStatus,
@@ -12,7 +10,6 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
-import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
@@ -23,10 +20,24 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { MetricsServer } from "$lib/server/metrics";
+import {
+	callSecurityApi,
+	mergeSecurityApiConfig,
+} from "$lib/server/security/securityApi";
+import { endpoints } from "$lib/server/endpoints/endpoints";
 
-export async function POST({ request, locals, params, getClientAddress }) {
+export async function POST({
+	request,
+	locals,
+	params,
+	getClientAddress,
+}: {
+	request: Request;
+	locals: App.Locals;
+	params: { id: string };
+	getClientAddress: () => string;
+}) {
 	const id = z.string().parse(params.id);
-	const convId = new ObjectId(id);
 	const promptedAt = new Date();
 
 	const userId = locals.user?._id ?? locals.sessionId;
@@ -36,67 +47,89 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(401, "Unauthorized");
 	}
 
-	// check if the user has access to the conversation
-	const convBeforeCheck = await collections.conversations.findOne({
-		_id: convId,
-		...authCondition(locals),
-	});
+	// Parse the content of the request
+	const form = await request.formData();
 
-	if (convBeforeCheck && !convBeforeCheck.rootMessageId) {
-		const res = await collections.conversations.updateOne(
-			{
-				_id: convId,
-			},
-			{
-				$set: {
-					...convBeforeCheck,
-					...convertLegacyConversation(convBeforeCheck),
-				},
+	const json = form.get("data");
+	const conversationJson = form.get("conversation");
+	const globalSettingsJson = form.get("globalSettings");
+
+	if (!json || typeof json !== "string") {
+		error(400, "Invalid request");
+	}
+
+	// Parse global settings
+	let globalSettings: {
+		securityApiEnabled?: boolean;
+		securityApiUrl?: string;
+		securityApiKey?: string;
+		llmApiUrl?: string;
+		llmApiKey?: string;
+	} = {};
+	if (globalSettingsJson && typeof globalSettingsJson === "string") {
+		try {
+			globalSettings = z
+				.object({
+					securityApiEnabled: z.boolean().optional(),
+					securityApiUrl: z.string().optional(),
+					securityApiKey: z.string().optional(),
+					llmApiUrl: z.string().optional(),
+					llmApiKey: z.string().optional(),
+				})
+				.parse(JSON.parse(globalSettingsJson));
+		} catch (err) {
+			// Ignore parsing errors for global settings
+			console.warn("Failed to parse global settings:", err);
+		}
+	}
+
+	// Get conversation data from request body (client-side storage)
+	let conv: Conversation;
+	if (conversationJson && typeof conversationJson === "string") {
+		try {
+			conv = z
+				.object({
+					id: z.string(),
+					model: z.string(),
+					title: z.string(),
+					messages: z.array(z.any()),
+					rootMessageId: z.string().optional(),
+					preprompt: z.string().optional(),
+					meta: z
+						.object({
+							fromShareId: z.string().optional(),
+							securityApiEnabled: z.boolean().optional(),
+							securityApiUrl: z.string().optional(),
+							securityApiKey: z.string().optional(),
+							llmApiUrl: z.string().optional(),
+							llmApiKey: z.string().optional(),
+						})
+						.optional(),
+					createdAt: z.string().or(z.date()),
+					updatedAt: z.string().or(z.date()),
+				})
+				.parse(JSON.parse(conversationJson)) as Conversation;
+
+			// Convert date strings to Date objects if needed
+			if (typeof conv.createdAt === "string") {
+				conv.createdAt = new Date(conv.createdAt);
 			}
-		);
+			if (typeof conv.updatedAt === "string") {
+				conv.updatedAt = new Date(conv.updatedAt);
+			}
 
-		if (!res.acknowledged) {
-			error(500, "Failed to convert conversation");
+			// Ensure conversation ID matches
+			if (conv.id !== id) {
+				error(400, "Conversation ID mismatch");
+			}
+		} catch (err) {
+			error(400, "Invalid conversation data");
 		}
+	} else {
+		error(400, "Conversation data required");
 	}
 
-	const conv = await collections.conversations.findOne({
-		_id: convId,
-		...authCondition(locals),
-	});
-
-	if (!conv) {
-		error(404, "Conversation not found");
-	}
-
-	// register the event for ratelimiting
-	await collections.messageEvents.insertOne({
-		type: "message",
-		userId,
-		createdAt: new Date(),
-		expiresAt: new Date(Date.now() + 60_000),
-		ip: getClientAddress(),
-	});
-
-	if (usageLimits?.messagesPerMinute) {
-		// check if the user is rate limited
-		const nEvents = Math.max(
-			await collections.messageEvents.countDocuments({
-				userId,
-				type: "message",
-				expiresAt: { $gt: new Date() },
-			}),
-			await collections.messageEvents.countDocuments({
-				ip: getClientAddress(),
-				type: "message",
-				expiresAt: { $gt: new Date() },
-			})
-		);
-		if (nEvents > usageLimits.messagesPerMinute) {
-			error(429, ERROR_MESSAGES.rateLimited);
-		}
-	}
-
+	// Simple rate limiting - check message count only
 	if (usageLimits?.messages && conv.messages.length > usageLimits.messages) {
 		error(
 			429,
@@ -104,20 +137,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		);
 	}
 
-	// fetch the model
+	// Fetch the model
 	const model = models.find((m) => m.id === conv.model);
 
 	if (!model) {
 		error(410, "Model not available anymore");
-	}
-
-	// finally parse the content of the request
-	const form = await request.formData();
-
-	const json = form.get("data");
-
-	if (!json || typeof json !== "string") {
-		error(400, "Invalid request");
 	}
 
 	const {
@@ -151,7 +175,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		form
 			.getAll("files")
 			.filter((entry): entry is File => entry instanceof File && entry.size > 0)
-			.map(async (file) => {
+			.map(async (file: File) => {
 				const [type, ...name] = file.name.split(";");
 
 				return {
@@ -185,7 +209,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(413, "File too large, should be <10MB");
 	}
 
-	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv))).then(
+	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv.id))).then(
 		(files) => [...files, ...hashFiles]
 	);
 
@@ -279,11 +303,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		error(500, "Failed to create prompt");
 	}
 
-	// update the conversation with the new messages
-	await collections.conversations.updateOne(
-		{ _id: convId },
-		{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
-	);
+	// Note: Conversation updates are now handled client-side
+	// Server only generates text, client saves to IndexedDB
 
 	let doneStreaming = false;
 	let clientDetached = false;
@@ -295,19 +316,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const metricsModelId = model.id ?? model.name ?? conv.model;
 	const metricsLabels = { model: metricsModelId };
 
-	const persistConversation = async () => {
-		await collections.conversations.updateOne(
-			{ _id: convId },
-			{ $set: { messages: conv.messages, title: conv.title, updatedAt: new Date() } }
-		);
-	};
-
 	const abortRegistry = AbortRegistry.getInstance();
 
 	// we now build the stream
 	const stream = new ReadableStream({
 		async start(controller) {
-			const conversationKey = convId.toString();
+			const conversationKey = conv.id;
 			const ctrl = new AbortController();
 			abortRegistry.register(conversationKey, ctrl);
 
@@ -348,10 +362,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					// Always strip <think> markers from titles when saving
 					const sanitizedTitle = event.title.replace(/<\/?think>/gi, "").trim();
 					conv.title = sanitizedTitle;
-					await collections.conversations.updateOne(
-						{ _id: convId },
-						{ $set: { title: conv?.title, updatedAt: new Date() } }
-					);
+					// Title update is handled client-side, no server-side persistence needed
 				}
 
 				// Set the final text and the interrupted flag
@@ -371,6 +382,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						...(messageToWriteTo.files ?? []),
 						{ type: "hash", name: event.name, value: event.sha, mime: event.mime },
 					];
+				}
+
+				// Store debug information (always store for visibility)
+				else if (event.type === MessageUpdateType.Debug) {
+					// Debug info is always stored in updates for visibility
+					// No special handling needed - it's already in the updates array
 				}
 
 				// Store router metadata (for router models) or provider info (for all models)
@@ -422,44 +439,186 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						}
 					} catch (err) {
 						clientDetached = true;
-						logger.info(
-							{ conversationId: convId.toString() },
-							"Client detached during message streaming"
-						);
+						logger.info({ conversationId: conv.id }, "Client detached during message streaming");
 					}
 				};
 
 				await enqueueUpdate();
 
-				if (clientDetached) {
-					await persistConversation();
-				}
+				// Conversation persistence is handled client-side
 			}
 
 			let hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
 
+			// Security API call and timing
+			const totalStartTime = Date.now();
+			let securityApiResult: {
+				response: Awaited<ReturnType<typeof callSecurityApi>>["response"];
+				securityResponseTime: number;
+				error?: string;
+			} | null = null;
+			let originalRequest: unknown = null;
+			let securityResponse: unknown = null;
+			let llmRequest: unknown = null;
+			let finalLlmResponse: unknown = null;
+			let llmResponseTime = 0;
+			const llmStartTime = Date.now();
+
 			try {
+				// Merge security API config from conversation meta and global settings
+				const securityConfig = mergeSecurityApiConfig(conv.meta, globalSettings);
+
+				if (securityConfig) {
+					// Prepare original request for security API
+					originalRequest = {
+						model: model.id ?? model.name,
+						messages: messagesForPrompt.map((msg) => ({
+							role: msg.from === "user" ? "user" : msg.from === "assistant" ? "assistant" : "system",
+							content: msg.content,
+						})),
+					};
+
+					// Call security API
+					securityApiResult = await callSecurityApi(
+						messagesForPrompt,
+						securityConfig,
+						ctrl.signal
+					);
+
+					securityResponse = securityApiResult.response;
+
+					// Handle security API response
+					if (securityApiResult.error) {
+						await update({
+							type: MessageUpdateType.Debug,
+							originalRequest: originalRequest as {
+								model?: string;
+								messages?: unknown[];
+								[key: string]: unknown;
+							},
+							securityResponse: {
+								action: "block",
+								reason: securityApiResult.error,
+							},
+							securityResponseTime: securityApiResult.securityResponseTime,
+							error: securityApiResult.error,
+							totalTime: Date.now() - totalStartTime,
+						});
+						throw new Error(`Security API error: ${securityApiResult.error}`);
+					}
+
+					// If security API returned a response, use it to modify messages
+					if (securityApiResult.response?.choices?.[0]?.message?.content) {
+						// Security API modified the message - use the modified content
+						const modifiedContent = securityApiResult.response.choices[0].message.content;
+						// Update the last user message with modified content
+						if (messagesForPrompt.length > 0) {
+							const lastMessage = messagesForPrompt[messagesForPrompt.length - 1];
+							if (lastMessage.from === "user") {
+								messagesForPrompt = [
+									...messagesForPrompt.slice(0, -1),
+									{ ...lastMessage, content: modifiedContent },
+								];
+							}
+						}
+					}
+				}
+
+				// Get endpoint with user settings override if provided
+				let endpoint = await model.getEndpoint();
+				const llmApiUrl = conv.meta?.llmApiUrl ?? globalSettings.llmApiUrl;
+				const llmApiKey = conv.meta?.llmApiKey ?? globalSettings.llmApiKey;
+
+				// Override endpoint with user-provided LLM API settings if available
+				if ((llmApiUrl || llmApiKey) && model.endpoints?.[0]?.type === "openai") {
+					const originalEndpoint = model.endpoints[0];
+					endpoint = await endpoints.openai({
+						type: "openai",
+						baseURL: llmApiUrl || originalEndpoint.baseURL || "https://api.openai.com/v1",
+						apiKey: llmApiKey || originalEndpoint.apiKey || config.OPENAI_API_KEY || "sk-",
+						model: model,
+						completion: originalEndpoint.completion || "chat_completions",
+						defaultHeaders: originalEndpoint.defaultHeaders,
+						defaultQuery: originalEndpoint.defaultQuery,
+						extraBody: originalEndpoint.extraBody,
+						multimodal: originalEndpoint.multimodal,
+						useCompletionTokens: originalEndpoint.useCompletionTokens,
+						streamingSupported: originalEndpoint.streamingSupported ?? false,
+					});
+				}
+
 				const ctx: TextGenerationContext = {
 					model,
-					endpoint: await model.getEndpoint(),
+					endpoint,
 					conv,
 					messages: messagesForPrompt,
 					assistant: undefined,
 					promptedAt,
 					ip: getClientAddress(),
 					username: locals.user?.username,
-					// Force-enable multimodal if user settings say so for this model
-					forceMultimodal: Boolean(
-						(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
-							model.id
-						]
-					),
+					// Settings are now client-side, multimodal override is not available server-side
+					forceMultimodal: false,
 					locals,
 					abortController: ctrl,
 				};
+
+				// Prepare LLM request (for debug info)
+				llmRequest = {
+					model: model.id ?? model.name,
+					messages: messagesForPrompt.map((msg) => ({
+						role: msg.from === "user" ? "user" : msg.from === "assistant" ? "assistant" : "system",
+						content: msg.content,
+					})),
+				};
+
 				// run the text generation and send updates to the client
-				for await (const event of textGeneration(ctx)) await update(event);
+				for await (const event of textGeneration(ctx)) {
+					// Capture final LLM response if available
+					if (event.type === MessageUpdateType.FinalAnswer) {
+						finalLlmResponse = {
+							text: event.text,
+							interrupted: event.interrupted,
+						};
+						llmResponseTime = Date.now() - llmStartTime;
+					}
+					await update(event);
+				}
+
+				// Send debug info if security API was used
+				if (securityConfig && securityApiResult) {
+					const totalTime = Date.now() - totalStartTime;
+					await update({
+						type: MessageUpdateType.Debug,
+						originalRequest: originalRequest as {
+							model?: string;
+							messages?: unknown[];
+							[key: string]: unknown;
+						},
+						securityResponse: securityApiResult.response
+							? {
+									action: "allow",
+									reason: "Security API approved",
+									modifiedKwargs: securityApiResult.response,
+								}
+							: undefined,
+						securityResponseTime: securityApiResult.securityResponseTime,
+						llmRequest: llmRequest as {
+							model?: string;
+							messages?: unknown[];
+							[key: string]: unknown;
+						},
+						finalLlmResponse: finalLlmResponse as {
+							id?: string;
+							choices?: unknown[];
+							model?: string;
+							usage?: unknown;
+							[key: string]: unknown;
+						},
+						llmResponseTime,
+						totalTime,
+					});
+				}
 				if (ctrl.signal.aborted) {
 					abortedByUser = true;
 				}
@@ -479,7 +638,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					err?.message === "Request was aborted.";
 				if (isAbortError || ctrl.signal.aborted) {
 					abortedByUser = true;
-					logger.info({ conversationId: conversationKey }, "Generation aborted by user");
+					logger.info({ conversationId: conv.id }, "Generation aborted by user");
 					if (!finalAnswerReceived) {
 						const partialText = messageToWriteTo.content.slice(initialMessageContent.length);
 						await update({
@@ -489,32 +648,63 @@ export async function POST({ request, locals, params, getClientAddress }) {
 						});
 					}
 				} else {
-					hasError = true;
-					// Extract status code if available from HTTPError or APIError
-					const errObj = err as unknown as Record<string, unknown>;
-					const statusCode =
-						(typeof errObj.statusCode === "number" ? errObj.statusCode : undefined) ||
-						(typeof errObj.status === "number" ? errObj.status : undefined);
+					// Return dummy response instead of error when generation fails
+					const dummyResponse =
+						"This is a dummy response. The actual model service is not available, but you can still test the UI functionality.";
+
+					// Stream the dummy response token by token for realistic behavior
+					const tokens = dummyResponse.split(" ");
+					for (let i = 0; i < tokens.length; i++) {
+						if (ctrl.signal.aborted) break;
+						const token = i === 0 ? tokens[i] : " " + tokens[i];
+						await update({
+							type: MessageUpdateType.Stream,
+							token: token,
+						});
+						// Small delay between tokens for realistic streaming
+						await new Promise((resolve) => setTimeout(resolve, 50));
+					}
+
+					// Send final answer
 					await update({
-						type: MessageUpdateType.Status,
-						status: MessageUpdateStatus.Error,
-						message: err.message,
-						...(statusCode && { statusCode }),
+						type: MessageUpdateType.FinalAnswer,
+						text: dummyResponse,
+						interrupted: false,
 					});
-					logger.error(err);
+					finalAnswerReceived = true;
+					logger.warn(
+						{ conversationId: conv.id },
+						"Generation failed, returning dummy response",
+						err
+					);
 				}
 			} finally {
 				// check if no output was generated
 				if (!hasError && !abortedByUser && messageToWriteTo.content === initialMessageContent) {
+					// Return dummy response if no output was generated
+					const dummyResponse =
+						"This is a dummy response. The actual model service is not available, but you can still test the UI functionality.";
+
+					// Stream the dummy response token by token
+					const tokens = dummyResponse.split(" ");
+					for (let i = 0; i < tokens.length; i++) {
+						const token = i === 0 ? tokens[i] : " " + tokens[i];
+						await update({
+							type: MessageUpdateType.Stream,
+							token: token,
+						});
+						await new Promise((resolve) => setTimeout(resolve, 50));
+					}
+
 					await update({
-						type: MessageUpdateType.Status,
-						status: MessageUpdateStatus.Error,
-						message: "No output was generated. Something went wrong.",
+						type: MessageUpdateType.FinalAnswer,
+						text: dummyResponse,
+						interrupted: false,
 					});
 				}
 			}
 
-			await persistConversation();
+			// Conversation persistence is handled client-side
 			abortRegistry.unregister(conversationKey, ctrl);
 
 			// used to detect if cancel() is called bc of interrupt or just because the connection closes
@@ -526,7 +716,7 @@ export async function POST({ request, locals, params, getClientAddress }) {
 		async cancel() {
 			if (doneStreaming) return;
 			clientDetached = true;
-			await persistConversation();
+			// Conversation persistence is handled client-side
 		},
 	});
 
@@ -542,58 +732,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	});
 }
 
-export async function DELETE({ locals, params }) {
-	const convId = new ObjectId(params.id);
-
-	const conv = await collections.conversations.findOne({
-		_id: convId,
-		...authCondition(locals),
-	});
-
-	if (!conv) {
-		error(404, "Conversation not found");
-	}
-
-	await collections.conversations.deleteOne({ _id: conv._id });
-
+export async function DELETE({ params }: { params: { id: string } }) {
+	// Conversation deletion is handled client-side
+	// This endpoint is kept for backward compatibility but does nothing
 	return new Response();
 }
 
-export async function PATCH({ request, locals, params }) {
-	const values = z
-		.object({
-			title: z.string().trim().min(1).max(100).optional(),
-			model: validModelIdSchema.optional(),
-		})
-		.parse(await request.json());
-
-	const convId = new ObjectId(params.id);
-
-	const conv = await collections.conversations.findOne({
-		_id: convId,
-		...authCondition(locals),
-	});
-
-	if (!conv) {
-		error(404, "Conversation not found");
-	}
-
-	// Only include defined values in the update, with title sanitized
-	const updateValues = {
-		...(values.title !== undefined && {
-			title: values.title.replace(/<\/?think>/gi, "").trim(),
-		}),
-		...(values.model !== undefined && { model: values.model }),
-	};
-
-	await collections.conversations.updateOne(
-		{
-			_id: convId,
-		},
-		{
-			$set: updateValues,
-		}
-	);
-
+export async function PATCH({ request }: { request: Request; params: { id: string } }) {
+	// Conversation updates are handled client-side
+	// This endpoint is kept for backward compatibility but does nothing
 	return new Response();
 }

@@ -4,13 +4,13 @@ import {
 	openAIChatToTextGenerationSingle,
 	openAIChatToTextGenerationStream,
 } from "./openAIChatToTextGenerationStream";
-import type { CompletionCreateParamsStreaming } from "openai/resources/completions";
 import type {
 	ChatCompletionCreateParamsNonStreaming,
 	ChatCompletionCreateParamsStreaming,
 } from "openai/resources/chat/completions";
 import { buildPrompt } from "$lib/buildPrompt";
 import { config } from "$lib/server/config";
+import { env as serverEnv } from "$env/dynamic/private";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
@@ -23,8 +23,7 @@ export const endpointOAIParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("openai"),
 	baseURL: z.string().url().default("https://api.openai.com/v1"),
-	// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
-	apiKey: z.string().default(config.OPENAI_API_KEY || config.HF_TOKEN || "sk-"),
+	apiKey: z.string().default(config.OPENAI_API_KEY || "sk-"),
 	completion: z
 		.union([z.literal("completions"), z.literal("chat_completions")])
 		.default("chat_completions"),
@@ -48,7 +47,7 @@ export const endpointOAIParametersSchema = z.object({
 		.default({}),
 	/* enable use of max_completion_tokens in place of max_tokens */
 	useCompletionTokens: z.boolean().default(false),
-	streamingSupported: z.boolean().default(true),
+	streamingSupported: z.boolean().default(false), // Disabled for security handler compatibility
 });
 
 export async function endpointOai(
@@ -76,8 +75,19 @@ export async function endpointOai(
 
 	// Store router metadata if captured
 	let routerMetadata: { route?: string; model?: string; provider?: string } = {};
+	// Store debug information from litellm security handler
+	let debugInfo: {
+		originalRequest?: unknown;
+		securityResponse?: { action: string; reason?: string; modifiedKwargs?: unknown };
+		securityResponseTime?: number;
+		llmRequest?: unknown;
+		finalLlmResponse?: unknown;
+		llmResponseTime?: number;
+		totalTime?: number;
+		error?: string;
+	} = {};
 
-	// Custom fetch wrapper to capture response headers for router metadata
+	// Custom fetch wrapper to capture response headers and handle custom JSON responses
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
 		const response = await fetch(url, init);
 
@@ -99,8 +109,83 @@ export async function endpointOai(
 			};
 		}
 
+		// Check if this is a non-streaming response that might contain custom JSON from litellm security handler
+		const contentType = response.headers.get("content-type");
+		if (contentType?.includes("application/json") && init?.method !== "GET") {
+			try {
+				const clonedResponse = response.clone();
+				const jsonData = await clonedResponse.json();
+
+				// Check if this is a litellm security handler response (has original_request, security_response, etc.)
+				if (
+					jsonData &&
+					typeof jsonData === "object" &&
+					("original_request" in jsonData ||
+						"security_response" in jsonData ||
+						"final_llm_response" in jsonData)
+				) {
+					debugInfo = {
+						originalRequest: jsonData.original_request,
+						securityResponse: jsonData.security_response,
+						securityResponseTime: jsonData.security_response_time,
+						llmRequest: jsonData.llm_request,
+						finalLlmResponse: jsonData.final_llm_response,
+						llmResponseTime: jsonData.llm_response_time,
+						totalTime: jsonData.total_time,
+						error: jsonData.error,
+					};
+
+					// If there's an error or blocked response, throw an error
+					if (jsonData.error) {
+						const errorMessage = jsonData.error;
+						const securityAction = jsonData.security_response?.action;
+
+						// Map security handler errors to appropriate status codes
+						let statusCode = 500;
+						if (securityAction === "block") {
+							statusCode = 403;
+						} else if (errorMessage.includes("missing") || errorMessage.includes("invalid")) {
+							statusCode = 400;
+						} else if (errorMessage.includes("upstream") || errorMessage.includes("502")) {
+							statusCode = 502;
+						}
+
+						throw new Error(errorMessage);
+					}
+
+					// Extract the actual LLM response from the custom JSON structure
+					if (jsonData.final_llm_response) {
+						// Create a new Response with the LLM response content
+						const llmResponse = jsonData.final_llm_response;
+						return new Response(JSON.stringify(llmResponse), {
+							status: response.status,
+							statusText: response.statusText,
+							headers: response.headers,
+						});
+					}
+				}
+			} catch (e) {
+				// If JSON parsing fails or error extraction fails, continue with original response
+				if (e instanceof Error && (e.message.includes("blocked") || e.message.includes("Blocked"))) {
+					throw e; // Re-throw security errors
+				}
+			}
+		}
+
 		return response;
 	};
+
+	// Build security payload if enabled
+	const securityEnabled = serverEnv.SECURITY_ENABLED === "true";
+	const securityPayload: Record<string, unknown> = securityEnabled
+		? {
+				security_params: {
+					enabled: true,
+					...(serverEnv.SECURITY_API_URL ? { api_url: serverEnv.SECURITY_API_URL } : {}),
+					...(serverEnv.SECURITY_API_TOKEN ? { api_token: serverEnv.SECURITY_API_TOKEN } : {}),
+				},
+			}
+		: {};
 
 	const openai = new OpenAI({
 		apiKey: apiKey || "sk-",
@@ -131,10 +216,10 @@ export async function endpointOai(
 			});
 
 			const parameters = { ...model.parameters, ...generateSettings };
-			const body: CompletionCreateParamsStreaming = {
+			const body = {
 				model: model.id ?? model.name,
 				prompt,
-				stream: true,
+				stream: false, // Force non-streaming for security handler compatibility
 				max_tokens: parameters?.max_tokens,
 				stop: parameters?.stop,
 				temperature: parameters?.temperature,
@@ -144,7 +229,7 @@ export async function endpointOai(
 			};
 
 			const openAICompletion = await openai.completions.create(body, {
-				body: { ...body, ...extraBody },
+				body: { ...body, ...extraBody, ...securityPayload },
 				headers: {
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
@@ -188,10 +273,14 @@ export async function endpointOai(
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
-			const body = {
+
+			// Force non-streaming mode when security payload is enabled
+			// litellm security handler requires non-streaming to return custom JSON responses
+			// According to litellm-custom-handler-readme.md: "스트리밍 강제 비활성화: 이 커스텀 JSON 응답 구조를 위해 stream=True 요청을 감지하면 자동으로 stream=False로 변경하여 실행합니다."
+			const body: ChatCompletionCreateParamsNonStreaming = {
 				model: model.id ?? model.name,
 				messages: messagesOpenAI,
-				stream: streamingSupported,
+				stream: false, // Always use non-streaming when security is enabled, or respect streamingSupported otherwise
 				// Support two different ways of specifying token limits depending on the model
 				...(useCompletionTokens
 					? { max_completion_tokens: parameters?.max_tokens }
@@ -203,36 +292,26 @@ export async function endpointOai(
 				presence_penalty: parameters?.presence_penalty,
 			};
 
-			// Handle both streaming and non-streaming responses with appropriate processors
-			if (streamingSupported) {
-				const openChatAICompletion = await openai.chat.completions.create(
-					body as ChatCompletionCreateParamsStreaming,
-					{
-						body: { ...body, ...extraBody },
-						headers: {
-							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
-							"X-use-cache": "false",
-							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
-						},
-						signal: abortSignal,
-					}
-				);
-				return openAIChatToTextGenerationStream(openChatAICompletion, () => routerMetadata);
-			} else {
-				const openChatAICompletion = await openai.chat.completions.create(
-					body as ChatCompletionCreateParamsNonStreaming,
-					{
-						body: { ...body, ...extraBody },
-						headers: {
-							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
-							"X-use-cache": "false",
-							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
-						},
-						signal: abortSignal,
-					}
-				);
-				return openAIChatToTextGenerationSingle(openChatAICompletion, () => routerMetadata);
-			}
+			// Force non-streaming mode for security handler compatibility
+			// Always use non-streaming to support custom JSON responses from litellm security handler
+			// When security is enabled, litellm handler will return a single JSON object, not a stream
+			const openChatAICompletion = await openai.chat.completions.create(
+				body,
+				{
+					body: { ...body, ...extraBody, ...securityPayload, stream: false }, // Always force non-streaming in request body
+					headers: {
+						"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+						"X-use-cache": "false",
+						...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+					},
+					signal: abortSignal,
+				}
+			);
+			return openAIChatToTextGenerationSingle(
+				openChatAICompletion,
+				() => routerMetadata,
+				() => debugInfo
+			);
 		};
 	} else {
 		throw new Error("Invalid completion type");

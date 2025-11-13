@@ -1,4 +1,7 @@
-import { GridFSBucket, MongoClient } from "mongodb";
+// MongoDB has been removed - this file provides stub collections for backward compatibility
+// All data is now stored client-side in IndexedDB
+
+import { building } from "$app/environment";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
@@ -12,302 +15,133 @@ import type { ConversationStats } from "$lib/types/ConversationStats";
 import type { MigrationResult } from "$lib/types/MigrationResult";
 import type { Semaphore } from "$lib/types/Semaphore";
 import type { AssistantStats } from "$lib/types/AssistantStats";
-import { MongoMemoryServer } from "mongodb-memory-server";
-import { logger } from "$lib/server/logger";
-import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
-import { onExit } from "./exitHandler";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { existsSync, mkdirSync } from "fs";
-import { findRepoRoot } from "./findRepoRoot";
 import type { ConfigKey } from "$lib/types/ConfigKey";
-import { config } from "$lib/server/config";
 
 export const CONVERSATION_STATS_COLLECTION = "conversations.stats";
 
-export class Database {
-	private client?: MongoClient;
-	private mongoServer?: MongoMemoryServer;
-
-	private static instance: Database;
-
-	private async init() {
-		const DB_FOLDER =
-			config.MONGO_STORAGE_PATH ||
-			join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), "db");
-
-		if (!config.MONGODB_URL) {
-			logger.warn("No MongoDB URL found, using in-memory server");
-
-			logger.info(`Using database path: ${DB_FOLDER}`);
-			// Create db directory if it doesn't exist
-			if (!existsSync(DB_FOLDER)) {
-				logger.info(`Creating database directory at ${DB_FOLDER}`);
-				mkdirSync(DB_FOLDER, { recursive: true });
-			}
-
-			this.mongoServer = await MongoMemoryServer.create({
-				instance: {
-					dbName: config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""),
-					dbPath: DB_FOLDER,
-				},
-				binary: {
-					version: "7.0.18",
-				},
-			});
-			this.client = new MongoClient(this.mongoServer.getUri(), {
-				directConnection: config.MONGODB_DIRECT_CONNECTION === "true",
-			});
-		} else {
-			this.client = new MongoClient(config.MONGODB_URL, {
-				directConnection: config.MONGODB_DIRECT_CONNECTION === "true",
-			});
-		}
-
-		try {
-			logger.info("Connecting to database");
-			await this.client.connect();
-			logger.info("Connected to database");
-			this.client.db(config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : ""));
-			await this.initDatabase();
-		} catch (err) {
-			logger.error(err, "Connection error");
-			process.exit(1);
-		}
-
-		// Disconnect DB on exit
-		onExit(async () => {
-			logger.info("Closing database connection");
-			await this.client?.close(true);
-			await this.mongoServer?.stop();
-		});
-	}
-
-	public static async getInstance(): Promise<Database> {
-		if (!Database.instance) {
-			Database.instance = new Database();
-			await Database.instance.init();
-		}
-
-		return Database.instance;
-	}
-
-	/**
-	 * Return mongoClient
-	 */
-	public getClient(): MongoClient {
-		if (!this.client) {
-			throw new Error("Database not initialized");
-		}
-
-		return this.client;
-	}
-
-	/**
-	 * Return map of database's collections
-	 */
-	public getCollections() {
-		if (!this.client) {
-			throw new Error("Database not initialized");
-		}
-
-		const db = this.client.db(
-			config.MONGODB_DB_NAME + (import.meta.env.MODE === "test" ? "-test" : "")
-		);
-
-		const conversations = db.collection<Conversation>("conversations");
-		const conversationStats = db.collection<ConversationStats>(CONVERSATION_STATS_COLLECTION);
-		const assistants = db.collection<Assistant>("assistants");
-		const assistantStats = db.collection<AssistantStats>("assistants.stats");
-		const reports = db.collection<Report>("reports");
-		const sharedConversations = db.collection<SharedConversation>("sharedConversations");
-		const abortedGenerations = db.collection<AbortedGeneration>("abortedGenerations");
-		const settings = db.collection<Settings>("settings");
-		const users = db.collection<User>("users");
-		const sessions = db.collection<Session>("sessions");
-		const messageEvents = db.collection<MessageEvent>("messageEvents");
-		const bucket = new GridFSBucket(db, { bucketName: "files" });
-		const migrationResults = db.collection<MigrationResult>("migrationResults");
-		const semaphores = db.collection<Semaphore>("semaphores");
-		const tokenCaches = db.collection<TokenCache>("tokens");
-		const tools = db.collection("tools");
-		const configCollection = db.collection<ConfigKey>("config");
-
-		return {
-			conversations,
-			conversationStats,
-			assistants,
-			assistantStats,
-			reports,
-			sharedConversations,
-			abortedGenerations,
-			settings,
-			users,
-			sessions,
-			messageEvents,
-			bucket,
-			migrationResults,
-			semaphores,
-			tokenCaches,
-			tools,
-			config: configCollection,
+// Stub collection type for backward compatibility
+type StubCollection<T> = {
+	find: (query?: unknown) => {
+		toArray: () => Promise<T[]>;
+		sort: (sort: unknown) => { toArray: () => Promise<T[]> };
+		project: <P>(projection: unknown) => {
+			sort: (sort: unknown) => { skip: (n: number) => { limit: (n: number) => { toArray: () => Promise<P[]> } } };
+			toArray: () => Promise<P[]>;
 		};
-	}
+		skip: (n: number) => { limit: (n: number) => { toArray: () => Promise<T[]> } };
+		limit: (n: number) => { toArray: () => Promise<T[]> };
+	};
+	findOne: (query?: unknown) => Promise<T | null>;
+	insertOne: (doc: T) => Promise<{ insertedId: string; acknowledged: boolean }>;
+	updateOne: (
+		query: unknown,
+		update: unknown,
+		options?: unknown
+	) => Promise<{ acknowledged: boolean; modifiedCount: number; matchedCount: number }>;
+	deleteOne: (query: unknown) => Promise<{ deletedCount: number }>;
+	deleteMany: (query: unknown) => Promise<{ deletedCount: number }>;
+	countDocuments: (query?: unknown) => Promise<number>;
+	createIndex: (keys: unknown, options?: unknown) => Promise<string>;
+	clear: () => Promise<void>;
+};
 
-	/**
-	 * Init database once connected: Index creation
-	 * @private
-	 */
-	private initDatabase() {
-		const {
-			conversations,
-			conversationStats,
-			assistants,
-			assistantStats,
-			reports,
-			sharedConversations,
-			abortedGenerations,
-			settings,
-			users,
-			sessions,
-			messageEvents,
-			semaphores,
-			tokenCaches,
-			config,
-		} = this.getCollections();
+type StubGridFSBucket = {
+	find: (query: unknown) => {
+		next: () => Promise<{ _id: string } | null>;
+	};
+	openDownloadStream: (id: unknown) => {
+		on: (event: string, handler: (chunk: unknown) => void) => void;
+	};
+};
 
-		conversations
-			.createIndex(
-				{ sessionId: 1, updatedAt: -1 },
-				{ partialFilterExpression: { sessionId: { $exists: true } } }
-			)
-			.catch((e) => logger.error(e));
-		conversations
-			.createIndex(
-				{ userId: 1, updatedAt: -1 },
-				{ partialFilterExpression: { userId: { $exists: true } } }
-			)
-			.catch((e) => logger.error(e));
-		conversations
-			.createIndex(
-				{ "message.id": 1, "message.ancestors": 1 },
-				{ partialFilterExpression: { userId: { $exists: true } } }
-			)
-			.catch((e) => logger.error(e));
-		// Not strictly necessary, could use _id, but more convenient. Also for stats
-		// To do stats on conversation messages
-		conversations
-			.createIndex({ "messages.createdAt": 1 }, { sparse: true })
-			.catch((e) => logger.error(e));
-		// Unique index for stats
-		conversationStats
-			.createIndex(
-				{
-					type: 1,
-					"date.field": 1,
-					"date.span": 1,
-					"date.at": 1,
-					distinct: 1,
-				},
-				{ unique: true }
-			)
-			.catch((e) => logger.error(e));
-		// Allow easy check of last computed stat for given type/dateField
-		conversationStats
-			.createIndex({
-				type: 1,
-				"date.field": 1,
-				"date.at": 1,
-			})
-			.catch((e) => logger.error(e));
-		abortedGenerations
-			.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 30 })
-			.catch((e) => logger.error(e));
-		abortedGenerations
-			.createIndex({ conversationId: 1 }, { unique: true })
-			.catch((e) => logger.error(e));
-		sharedConversations.createIndex({ hash: 1 }, { unique: true }).catch((e) => logger.error(e));
-		settings
-			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
-			.catch((e) => logger.error(e));
-		settings
-			.createIndex({ userId: 1 }, { unique: true, sparse: true })
-			.catch((e) => logger.error(e));
-		settings.createIndex({ assistants: 1 }).catch((e) => logger.error(e));
-		users.createIndex({ hfUserId: 1 }, { unique: true }).catch((e) => logger.error(e));
-		users
-			.createIndex({ sessionId: 1 }, { unique: true, sparse: true })
-			.catch((e) => logger.error(e));
-		// No unicity because due to renames & outdated info from oauth provider, there may be the same username on different users
-		users.createIndex({ username: 1 }).catch((e) => logger.error(e));
-		messageEvents
-			.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 1 })
-			.catch((e) => logger.error(e));
-		sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch((e) => logger.error(e));
-		sessions.createIndex({ sessionId: 1 }, { unique: true }).catch((e) => logger.error(e));
-		assistants.createIndex({ createdById: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ userCount: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ review: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ modelId: 1, userCount: -1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ searchTokens: 1 }).catch((e) => logger.error(e));
-		assistants.createIndex({ last24HoursCount: 1 }).catch((e) => logger.error(e));
-		assistants
-			.createIndex({ last24HoursUseCount: -1, useCount: -1, _id: 1 })
-			.catch((e) => logger.error(e));
-		assistantStats
-			// Order of keys is important for the queries
-			.createIndex({ "date.span": 1, "date.at": 1, assistantId: 1 }, { unique: true })
-			.catch((e) => logger.error(e));
-		reports.createIndex({ assistantId: 1 }).catch((e) => logger.error(e));
-		reports.createIndex({ createdBy: 1, assistantId: 1 }).catch((e) => logger.error(e));
+type Collections = {
+	conversations: StubCollection<Conversation>;
+	conversationStats: StubCollection<ConversationStats>;
+	assistants: StubCollection<Assistant>;
+	assistantStats: StubCollection<AssistantStats>;
+	reports: StubCollection<Report>;
+	sharedConversations: StubCollection<SharedConversation>;
+	abortedGenerations: StubCollection<AbortedGeneration>;
+	settings: StubCollection<Settings>;
+	users: StubCollection<User>;
+	sessions: StubCollection<Session>;
+	messageEvents: StubCollection<MessageEvent>;
+	bucket: StubGridFSBucket;
+	migrationResults: StubCollection<MigrationResult>;
+	semaphores: StubCollection<Semaphore>;
+	tokenCaches: StubCollection<TokenCache>;
+	tools: StubCollection<unknown>;
+	config: StubCollection<ConfigKey>;
+};
 
-		// Unique index for semaphore and migration results
-		semaphores.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
-		semaphores
-			.createIndex({ deleteAt: 1 }, { expireAfterSeconds: 1 })
-			.catch((e) => logger.error(e));
-		tokenCaches
-			.createIndex({ createdAt: 1 }, { expireAfterSeconds: 5 * 60 })
-			.catch((e) => logger.error(e));
-		tokenCaches.createIndex({ tokenHash: 1 }).catch((e) => logger.error(e));
-		// Tools removed: skipping tools indexes
+// Create stub collections that return empty results
+const createStubCollection = <T>(): StubCollection<T> => ({
+	find: () => ({
+		toArray: async () => [],
+		sort: () => ({
+			toArray: async () => [],
+		}),
+		project: () => ({
+			sort: () => ({
+				skip: () => ({
+					limit: () => ({
+						toArray: async () => [],
+					}),
+				}),
+			}),
+			toArray: async () => [],
+		}),
+		skip: () => ({
+			limit: () => ({
+				toArray: async () => [],
+			}),
+		}),
+		limit: () => ({
+			toArray: async () => [],
+		}),
+	}),
+	findOne: async () => null,
+	insertOne: async () => ({ insertedId: "", acknowledged: false }),
+	updateOne: async () => ({ acknowledged: false, modifiedCount: 0, matchedCount: 0 }),
+	deleteOne: async () => ({ deletedCount: 0 }),
+	deleteMany: async () => ({ deletedCount: 0 }),
+	countDocuments: async () => 0,
+	createIndex: async () => "",
+	clear: async () => {},
+});
 
-		conversations
-			.createIndex({
-				"messages.from": 1,
-				createdAt: 1,
-			})
-			.catch((e) => logger.error(e));
+const createStubBucket = (): StubGridFSBucket => ({
+	find: () => ({
+		next: async () => null,
+	}),
+	openDownloadStream: () => ({
+		on: () => {},
+	}),
+});
 
-		conversations
-			.createIndex({
-				userId: 1,
-				sessionId: 1,
-			})
-			.catch((e) => logger.error(e));
+export const collections: Collections = {
+	conversations: createStubCollection<Conversation>(),
+	conversationStats: createStubCollection<ConversationStats>(),
+	assistants: createStubCollection<Assistant>(),
+	assistantStats: createStubCollection<AssistantStats>(),
+	reports: createStubCollection<Report>(),
+	sharedConversations: createStubCollection<SharedConversation>(),
+	abortedGenerations: createStubCollection<AbortedGeneration>(),
+	settings: createStubCollection<Settings>(),
+	users: createStubCollection<User>(),
+	sessions: createStubCollection<Session>(),
+	messageEvents: createStubCollection<MessageEvent>(),
+	bucket: createStubBucket(),
+	migrationResults: createStubCollection<MigrationResult>(),
+	semaphores: createStubCollection<Semaphore>(),
+	tokenCaches: createStubCollection<TokenCache>(),
+	tools: createStubCollection<unknown>(),
+	config: createStubCollection<ConfigKey>(),
+};
 
-		config.createIndex({ key: 1 }, { unique: true }).catch((e) => logger.error(e));
-	}
-}
+export const ready = Promise.resolve();
 
-export let collections: ReturnType<typeof Database.prototype.getCollections>;
-
-export const ready = (async () => {
-	if (!building) {
-		const db = await Database.getInstance();
-		collections = db.getCollections();
-	} else {
-		collections = {} as unknown as ReturnType<typeof Database.prototype.getCollections>;
-	}
-})();
-
-export async function getCollectionsEarly(): Promise<
-	ReturnType<typeof Database.prototype.getCollections>
-> {
-	await ready;
-	if (!collections) {
-		throw new Error("Database not initialized");
-	}
+export async function getCollectionsEarly(): Promise<Collections> {
 	return collections;
 }

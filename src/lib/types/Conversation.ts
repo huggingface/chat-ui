@@ -1,14 +1,9 @@
-import type { ObjectId } from "mongodb";
 import type { Message } from "./Message";
 import type { Timestamps } from "./Timestamps";
-import type { User } from "./User";
 import type { Assistant } from "./Assistant";
 
 export interface Conversation extends Timestamps {
-	_id: ObjectId;
-
-	sessionId?: string;
-	userId?: User["_id"];
+	id: string;
 
 	model: string;
 
@@ -18,6 +13,12 @@ export interface Conversation extends Timestamps {
 
 	meta?: {
 		fromShareId?: string;
+		// Conversation-specific API settings (override global settings)
+		securityApiEnabled?: boolean;
+		securityApiUrl?: string;
+		securityApiKey?: string;
+		llmApiUrl?: string;
+		llmApiKey?: string;
 	};
 
 	preprompt?: string;

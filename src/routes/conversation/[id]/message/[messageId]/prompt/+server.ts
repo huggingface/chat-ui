@@ -1,25 +1,35 @@
 import { buildPrompt } from "$lib/buildPrompt";
-import { authCondition } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { error } from "@sveltejs/kit";
-import { ObjectId } from "mongodb";
+import type { Conversation } from "$lib/types/Conversation";
+import { z } from "zod";
 
-export async function GET({ params, locals }) {
-	const conv =
-		params.id.length === 7
-			? await collections.sharedConversations.findOne({
-					_id: params.id,
-				})
-			: await collections.conversations.findOne({
-					_id: new ObjectId(params.id),
-					...authCondition(locals),
-				});
+export async function GET({ params, request }) {
+	// Get conversation data from query parameter (client-side storage)
+	const conversationJson = new URL(request.url).searchParams.get("conversation");
+	
+	if (!conversationJson) {
+		error(400, "Conversation data required");
+	}
 
-	if (conv === null) {
-		error(404, "Conversation not found");
+	let conv: Conversation;
+	try {
+		conv = z
+			.object({
+				id: z.string(),
+				model: z.string(),
+				messages: z.array(z.any()),
+				preprompt: z.string().optional(),
+			})
+			.parse(JSON.parse(conversationJson)) as Conversation;
+		
+		if (conv.id !== params.id) {
+			error(400, "Conversation ID mismatch");
+		}
+	} catch (err) {
+		error(400, "Invalid conversation data");
 	}
 
 	const messageId = params.messageId;

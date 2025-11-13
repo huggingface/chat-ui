@@ -45,7 +45,19 @@ export function handleResponse<T extends Record<number, unknown>>(
 		throw new Error(JSON.stringify(response.error));
 	}
 
-	return superjson.parse(
+	// Parse superjson response
+	const parsed = superjson.parse(
 		typeof response.data === "string" ? response.data : JSON.stringify(response.data)
-	) as T[200];
+	);
+
+	// Unwrap superjson's json wrapper if present
+	// superjson.stringify wraps arrays/objects in {"json": [...]} format
+	if (parsed && typeof parsed === "object" && "json" in parsed && Array.isArray(parsed.json)) {
+		return parsed.json as T[200];
+	}
+	if (parsed && typeof parsed === "object" && "json" in parsed) {
+		return parsed.json as T[200];
+	}
+
+	return parsed as T[200];
 }

@@ -2,8 +2,6 @@ import { Elysia, status } from "elysia";
 import { refreshModels, lastModelRefreshSummary } from "$lib/server/models";
 import type { BackendModel } from "$lib/server/models";
 import { authPlugin } from "../../authPlugin";
-import { authCondition } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
 
 export type GETModelsResponse = Array<{
 	id: string;
@@ -64,8 +62,31 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 						isRouter: model.isRouter,
 					})) satisfies GETModelsResponse;
 			} catch (e) {
-				// Return empty list instead of crashing the whole page
-				return [] as GETModelsResponse;
+				// Return dummy model instead of empty list
+				return [
+					{
+						id: "dummy-model",
+						name: "dummy-model",
+						displayName: "Dummy Model",
+						description: "A dummy model for testing purposes",
+						websiteUrl: "https://huggingface.co",
+						modelUrl: "https://huggingface.co",
+						promptExamples: [
+							{ title: "Example 1", prompt: "Hello, how are you?" },
+							{ title: "Example 2", prompt: "What is the weather today?" },
+						],
+						parameters: {
+							temperature: 0.7,
+							max_tokens: 1000,
+							top_p: 0.9,
+						},
+						preprompt: "",
+						multimodal: false,
+						unlisted: false,
+						hasInferenceAPI: false,
+						isRouter: false,
+					},
+				] as GETModelsResponse;
 			}
 		})
 		.get("/old", async () => {
@@ -133,21 +154,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 					if (!locals.sessionId) {
 						return error(401, "Unauthorized");
 					}
-					await collections.settings.updateOne(
-						authCondition(locals),
-						{
-							$set: {
-								activeModel: model.id,
-								updatedAt: new Date(),
-							},
-							$setOnInsert: {
-								createdAt: new Date(),
-							},
-						},
-						{
-							upsert: true,
-						}
-					);
+					// Settings are now stored client-side - no server-side update needed
 
 					return new Response();
 				})

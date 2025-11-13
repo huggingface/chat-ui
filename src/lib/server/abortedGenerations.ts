@@ -1,7 +1,5 @@
 // Shouldn't be needed if we dove into sveltekit internals, see https://github.com/huggingface/chat-ui/pull/88#issuecomment-1523173850
 
-import { logger } from "$lib/server/logger";
-import { collections } from "$lib/server/database";
 import { onExit } from "./exitHandler";
 
 export class AbortedGenerations {
@@ -10,10 +8,8 @@ export class AbortedGenerations {
 	private abortedGenerations: Record<string, Date> = {};
 
 	private constructor() {
-		const interval = setInterval(() => this.updateList(), 1000);
-		onExit(() => clearInterval(interval));
-
-		this.updateList();
+		// Memory-based abort tracking - MongoDB removed
+		// Aborts are tracked in memory only
 	}
 
 	public static getInstance(): AbortedGenerations {
@@ -28,15 +24,7 @@ export class AbortedGenerations {
 		return this.abortedGenerations[conversationId];
 	}
 
-	private async updateList() {
-		try {
-			const aborts = await collections.abortedGenerations.find({}).sort({ createdAt: 1 }).toArray();
-
-			this.abortedGenerations = Object.fromEntries(
-				aborts.map((abort) => [abort.conversationId.toString(), abort.createdAt])
-			);
-		} catch (err) {
-			logger.error(err);
-		}
+	public setAbortTime(conversationId: string, date: Date) {
+		this.abortedGenerations[conversationId] = date;
 	}
 }

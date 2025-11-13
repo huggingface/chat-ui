@@ -1,11 +1,6 @@
 import { Elysia } from "elysia";
 import { authPlugin } from "$api/authPlugin";
-import { defaultModel } from "$lib/server/models";
-import { collections } from "$lib/server/database";
-import { authCondition } from "$lib/server/auth";
-import { models, validateModel } from "$lib/server/models";
-import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
-import { z } from "zod";
+import { DEFAULT_SETTINGS } from "$lib/types/Settings";
 
 export const userGroup = new Elysia()
 	.use(authPlugin)
@@ -35,93 +30,28 @@ export const userGroup = new Elysia()
 						}
 					: null;
 			})
-			.get("/settings", async ({ locals }) => {
-				const settings = await collections.settings.findOne(authCondition(locals));
-
-				if (settings && !validateModel(models).safeParse(settings?.activeModel).success) {
-					settings.activeModel = defaultModel.id;
-					await collections.settings.updateOne(authCondition(locals), {
-						$set: { activeModel: defaultModel.id },
-					});
-				}
-
-				// if the model is unlisted, set the active model to the default model
-				if (
-					settings?.activeModel &&
-					models.find((m) => m.id === settings?.activeModel)?.unlisted === true
-				) {
-					settings.activeModel = defaultModel.id;
-					await collections.settings.updateOne(authCondition(locals), {
-						$set: { activeModel: defaultModel.id },
-					});
-				}
-
-				// todo: get user settings
+			.get("/settings", async () => {
+				// Settings are now stored client-side in IndexedDB
+				// Return default settings - client loads from IndexedDB
 				return {
-					welcomeModalSeen: !!settings?.welcomeModalSeenAt,
-					welcomeModalSeenAt: settings?.welcomeModalSeenAt ?? null,
-
-					activeModel: settings?.activeModel ?? DEFAULT_SETTINGS.activeModel,
-					disableStream: settings?.disableStream ?? DEFAULT_SETTINGS.disableStream,
-					directPaste: settings?.directPaste ?? DEFAULT_SETTINGS.directPaste,
-					hidePromptExamples: settings?.hidePromptExamples ?? DEFAULT_SETTINGS.hidePromptExamples,
-					shareConversationsWithModelAuthors:
-						settings?.shareConversationsWithModelAuthors ??
-						DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
-
-					customPrompts: settings?.customPrompts ?? {},
-					multimodalOverrides: settings?.multimodalOverrides ?? {},
+					welcomeModalSeen: false,
+					welcomeModalSeenAt: null,
+					activeModel: "", // Will be set from models list on client side
+					disableStream: DEFAULT_SETTINGS.disableStream,
+					directPaste: DEFAULT_SETTINGS.directPaste,
+					hidePromptExamples: DEFAULT_SETTINGS.hidePromptExamples,
+					shareConversationsWithModelAuthors: DEFAULT_SETTINGS.shareConversationsWithModelAuthors,
+					customPrompts: {},
+					multimodalOverrides: {},
 				};
 			})
-			.post("/settings", async ({ locals, request }) => {
-				const body = await request.json();
-
-				const { welcomeModalSeen, ...settings } = z
-					.object({
-						shareConversationsWithModelAuthors: z
-							.boolean()
-							.default(DEFAULT_SETTINGS.shareConversationsWithModelAuthors),
-						welcomeModalSeen: z.boolean().optional(),
-						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
-						customPrompts: z.record(z.string()).default({}),
-						multimodalOverrides: z.record(z.boolean()).default({}),
-						disableStream: z.boolean().default(false),
-						directPaste: z.boolean().default(false),
-						hidePromptExamples: z.record(z.boolean()).default({}),
-					})
-					.parse(body) satisfies SettingsEditable;
-
-				// Tools removed: ignore tools updates
-
-				await collections.settings.updateOne(
-					authCondition(locals),
-					{
-						$set: {
-							...settings,
-							...(welcomeModalSeen && { welcomeModalSeenAt: new Date() }),
-							updatedAt: new Date(),
-						},
-						$setOnInsert: {
-							createdAt: new Date(),
-						},
-					},
-					{
-						upsert: true,
-					}
-				);
-				// return ok response
+			.post("/settings", async () => {
+				// Settings are now stored client-side in IndexedDB
+				// This endpoint is kept for backward compatibility but does nothing
 				return new Response();
 			})
-			.get("/reports", async ({ locals }) => {
-				if (!locals.user || !locals.sessionId) {
-					return [];
-				}
-
-				const reports = await collections.reports
-					.find({
-						createdBy: locals.user?._id ?? locals.sessionId,
-					})
-					.toArray();
-				return reports;
+			.get("/reports", async () => {
+				// Reports functionality is not required
+				return [];
 			});
 	});

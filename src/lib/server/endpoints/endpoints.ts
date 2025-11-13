@@ -8,7 +8,6 @@ import type {
 import { z } from "zod";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import type { Model } from "$lib/types/Model";
-import type { ObjectId } from "mongodb";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -18,7 +17,7 @@ export interface EndpointParameters {
 	preprompt?: Conversation["preprompt"];
 	generateSettings?: Partial<Model["parameters"]>;
 	isMultimodal?: boolean;
-	conversationId?: ObjectId;
+	conversationId?: string;
 	locals: App.Locals | undefined;
 	abortSignal?: AbortSignal;
 }

@@ -18,6 +18,8 @@
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import DebugInfo from "./DebugInfo.svelte";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 
 	interface Props {
 		message: Message;
@@ -129,6 +131,13 @@
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
+
+				<!-- Debug Information (always visible) -->
+				{#each (message.updates || []) as update}
+					{#if update.type === MessageUpdateType.Debug}
+						<DebugInfo debugUpdate={update} />
+					{/if}
+				{/each}
 
 				{#if hasClientThink}
 					{#each message.content.split(THINK_BLOCK_REGEX) as part, _i}

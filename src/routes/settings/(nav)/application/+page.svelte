@@ -36,6 +36,22 @@
 	// Admin: model refresh UI state
 	let refreshing: boolean = $state(false);
 	let refreshMessage: string | null = $state(null);
+
+	// Auto-save security API settings when changed (debounced)
+	let settingsTimeout: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		clearTimeout(settingsTimeout);
+		settingsTimeout = setTimeout(() => {
+			settings.set({
+				securityApiEnabled: $settings.securityApiEnabled,
+				securityApiUrl: $settings.securityApiUrl,
+				securityApiKey: $settings.securityApiKey,
+				llmApiUrl: $settings.llmApiUrl,
+				llmApiKey: $settings.llmApiKey,
+			});
+		}, 300);
+		return () => clearTimeout(settingsTimeout);
+	});
 </script>
 
 <div class="flex w-full flex-col gap-4">
@@ -197,6 +213,112 @@
 						>
 							dark
 						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Security API Settings -->
+		<div
+			class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+		>
+			<div class="divide-y divide-gray-200 dark:divide-gray-700">
+				<div class="py-3">
+					<div class="mb-3 text-[13px] font-semibold text-gray-800 dark:text-gray-200">
+						Security API Settings
+					</div>
+					<div class="space-y-3">
+						<div class="flex items-start justify-between">
+							<div class="flex-1">
+								<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+									Enable Security API
+								</div>
+								<p class="text-[12px] text-gray-500 dark:text-gray-400">
+									Route messages through security API before sending to LLM.
+								</p>
+							</div>
+							<Switch
+								name="securityApiEnabled"
+								bind:checked={$settings.securityApiEnabled}
+							/>
+						</div>
+
+						<div>
+							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+								Security API URL
+							</label>
+							<input
+								type="text"
+								bind:value={$settings.securityApiUrl}
+								oninput={() => {
+									settings.set({ securityApiUrl: $settings.securityApiUrl });
+								}}
+								placeholder="https://api.example.com/v1"
+								class="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-[12px] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+							/>
+						</div>
+
+						<div>
+							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+								Security API Key
+							</label>
+							<input
+								type="password"
+								bind:value={$settings.securityApiKey}
+								oninput={() => {
+									settings.set({ securityApiKey: $settings.securityApiKey });
+								}}
+								placeholder="sk-..."
+								class="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-[12px] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+							/>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- LLM API Override Settings -->
+		<div
+			class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+		>
+			<div class="divide-y divide-gray-200 dark:divide-gray-700">
+				<div class="py-3">
+					<div class="mb-3 text-[13px] font-semibold text-gray-800 dark:text-gray-200">
+						LLM API Override Settings (Optional)
+					</div>
+					<p class="mb-3 text-[12px] text-gray-500 dark:text-gray-400">
+						Override default LLM API settings. Leave empty to use model defaults.
+					</p>
+					<div class="space-y-3">
+						<div>
+							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+								LLM API URL
+							</label>
+							<input
+								type="text"
+								bind:value={$settings.llmApiUrl}
+								oninput={() => {
+									settings.set({ llmApiUrl: $settings.llmApiUrl });
+								}}
+								placeholder="https://api.openai.com/v1"
+								class="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-[12px] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+							/>
+						</div>
+
+						<div>
+							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+								LLM API Key
+							</label>
+							<input
+								type="password"
+								bind:value={$settings.llmApiKey}
+								oninput={() => {
+									settings.set({ llmApiKey: $settings.llmApiKey });
+								}}
+								placeholder="sk-..."
+								class="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-[12px] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+							/>
+						</div>
 					</div>
 				</div>
 			</div>

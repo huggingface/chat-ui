@@ -1,7 +1,5 @@
-import type { ObjectId } from "mongodb";
-
 export interface MigrationResult {
-	_id: ObjectId;
+	_id: string;
 	name: string;
 	status: "success" | "failure" | "ongoing";
 }

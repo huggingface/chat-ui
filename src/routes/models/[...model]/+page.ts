@@ -12,7 +12,7 @@ export async function load({ params, parent, fetch }) {
 
 	return {
 		settings: await parent().then((data) => ({
-			...data.settings,
+			...(data.settings || {}),
 			activeModel: params.model,
 		})),
 	};

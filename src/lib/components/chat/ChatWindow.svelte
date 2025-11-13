@@ -33,6 +33,9 @@
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import ChatSettingsPanel from "./ChatSettingsPanel.svelte";
+	import CarbonSettings from "~icons/carbon/settings";
+	import type { Conversation } from "$lib/types/Conversation";
 
 	interface Props {
 		messages?: Message[];
@@ -49,6 +52,8 @@
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 		draft?: string;
+		conversation?: Conversation | null;
+		onConversationUpdate?: (updates: Partial<Conversation>) => void;
 	}
 
 	let {
@@ -66,6 +71,8 @@
 		onstop,
 		onretry,
 		onshowAlternateMsg,
+		conversation = null,
+		onConversationUpdate,
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
@@ -73,6 +80,7 @@
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
+	let settingsPanelOpen = $state(false);
 
 	const handleSubmit = () => {
 		if (requireAuthUser() || loading || !draft) return;
@@ -382,6 +390,19 @@
 		<ScrollToPreviousBtn class="fixed bottom-48 right-4 lg:right-10" scrollNode={chatContainer} />
 
 		<ScrollToBottomBtn class="fixed bottom-36 right-4 lg:right-10" scrollNode={chatContainer} />
+
+		<!-- Settings Button -->
+		{#if !shared}
+			<button
+				onclick={() => {
+					settingsPanelOpen = !settingsPanelOpen;
+				}}
+				class="fixed bottom-24 right-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 lg:right-10"
+				aria-label="Open settings"
+			>
+				<CarbonSettings class="h-5 w-5 text-gray-600 dark:text-gray-400" />
+			</button>
+		{/if}
 	</div>
 
 	<div
@@ -586,6 +607,14 @@
 		</div>
 	</div>
 </div>
+
+<!-- Settings Panel -->
+<ChatSettingsPanel
+	bind:open={settingsPanelOpen}
+	onclose={() => (settingsPanelOpen = false)}
+	{conversation}
+	{onConversationUpdate}
+/>
 
 <style lang="postcss">
 	.paste-glow {

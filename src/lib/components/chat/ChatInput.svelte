@@ -141,6 +141,12 @@
 		});
 	}
 
+	function handleBeforeInput(e: InputEvent) {
+		if (requireAuthUser()) {
+			e.preventDefault();
+		}
+	}
+
 	// Tools removed; only show file upload when applicable
 	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
 	let showNoTools = $derived(!showFileUpload);
@@ -162,7 +168,7 @@
 		{disabled}
 		onfocus={handleFocus}
 		onblur={handleBlur}
-		onbeforeinput={requireAuthUser}
+		onbeforeinput={handleBeforeInput}
 	></textarea>
 
 	{#if !showNoTools}

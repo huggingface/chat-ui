@@ -5,6 +5,7 @@
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
+	import { browser } from "$app/environment";
 
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
@@ -14,7 +15,6 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import titleUpdate from "$lib/stores/titleUpdate";
-	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
@@ -23,6 +23,9 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import type { ConvSidebar } from "$lib/types/ConvSidebar";
+	import { getConversations, deleteConversation as deleteConversationFromStorage, getConversation, saveConversation } from "$lib/storage/conversations";
+	import { getSettings as getSettingsFromStorage } from "$lib/storage/settings";
 
 	let { data = $bindable(), children } = $props();
 
@@ -31,10 +34,7 @@
 	const publicConfig = data.publicConfig;
 	const client = useAPIClient();
 
-	let conversations = $state(data.conversations);
-	$effect(() => {
-		data.conversations && untrack(() => (conversations = data.conversations));
-	});
+	let conversations = $state<ConvSidebar[]>(data.conversations || []);
 
 	let isNavCollapsed = $state(false);
 
@@ -64,41 +64,37 @@
 	);
 
 	async function deleteConversation(id: string) {
-		client
-			.conversations({ id })
-			.delete()
-			.then(handleResponse)
-			.then(async () => {
+		if (browser) {
+			try {
+				await deleteConversationFromStorage(id);
 				conversations = conversations.filter((conv) => conv.id !== id);
 
 				if (page.params.id === id) {
 					await goto(`${base}/`, { invalidateAll: true });
 				}
-			})
-			.catch((err) => {
+			} catch (err) {
 				console.error(err);
 				$error = String(err);
-			});
+			}
+		}
 	}
 
 	async function editConversationTitle(id: string, title: string) {
-		client
-			.conversations({ id })
-			.patch({ title })
-			.then(handleResponse)
-			.then(async () => {
-				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
-			})
-			.catch((err) => {
+		if (browser) {
+			try {
+				const conv = await getConversation(id);
+				if (conv) {
+					conv.title = title;
+					await saveConversation(conv);
+					conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+				}
+			} catch (err) {
 				console.error(err);
 				$error = String(err);
-			});
+			}
+		}
 	}
 
-	function closeWelcomeModal() {
-		if (requireAuthUser()) return;
-		settings.set({ welcomeModalSeen: true });
-	}
 
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
@@ -120,9 +116,62 @@
 		}
 	});
 
-	const settings = createSettingsStore(data.settings);
+	let initialSettings = $state(data.settings);
+	
+	const settings = createSettingsStore(initialSettings || {
+		shareConversationsWithModelAuthors: true,
+		activeModel: data.models[0]?.id || "",
+		customPrompts: {},
+		multimodalOverrides: {},
+		hidePromptExamples: {},
+		disableStream: false,
+		directPaste: false,
+	});
 
+	// Global keyboard shortcut: New Chat (Ctrl/Cmd + Shift + O)
+	function onKeydown(e: KeyboardEvent) {
+		// Ignore when a modal has focus (app is inert)
+		const appEl = document.getElementById("app");
+		if (appEl?.hasAttribute("inert")) return;
+
+		const oPressed = e.key?.toLowerCase() === "o";
+		const metaOrCtrl = e.metaKey || e.ctrlKey;
+		if (oPressed && e.shiftKey && metaOrCtrl) {
+			e.preventDefault();
+			isAborted.set(true);
+			if (requireAuthUser()) return;
+			goto(`${base}/`, { invalidateAll: true });
+		}
+	}
+
+	// Load conversations and settings from IndexedDB on mount
 	onMount(async () => {
+		if (browser) {
+			// Load conversations
+			try {
+				const convs = await getConversations(0);
+				conversations = convs.map((conv) => ({
+					id: conv.id,
+					title: conv.title,
+					updatedAt: conv.updatedAt instanceof Date ? conv.updatedAt : new Date(conv.updatedAt),
+					model: conv.model,
+				}));
+			} catch (err) {
+				console.error("Failed to load conversations from IndexedDB:", err);
+			}
+
+			// Load settings if not provided
+			if (!initialSettings) {
+				try {
+					const loadedSettings = await getSettingsFromStorage();
+					settings.set(loadedSettings);
+				} catch (err) {
+					console.error("Failed to load settings from IndexedDB:", err);
+				}
+			}
+		}
+		
+		// Original onMount logic
 		if (page.url.searchParams.has("model")) {
 			await settings
 				.instantSet({
@@ -148,24 +197,13 @@
 			});
 		}
 
-		// Global keyboard shortcut: New Chat (Ctrl/Cmd + Shift + O)
-		const onKeydown = (e: KeyboardEvent) => {
-			// Ignore when a modal has focus (app is inert)
-			const appEl = document.getElementById("app");
-			if (appEl?.hasAttribute("inert")) return;
-
-			const oPressed = e.key?.toLowerCase() === "o";
-			const metaOrCtrl = e.metaKey || e.ctrlKey;
-			if (oPressed && e.shiftKey && metaOrCtrl) {
-				e.preventDefault();
-				isAborted.set(true);
-				if (requireAuthUser()) return;
-				goto(`${base}/`, { invalidateAll: true });
-			}
-		};
-
 		window.addEventListener("keydown", onKeydown, { capture: true });
-		onDestroy(() => window.removeEventListener("keydown", onKeydown, { capture: true }));
+	});
+
+	onDestroy(() => {
+		if (browser) {
+			window.removeEventListener("keydown", onKeydown, { capture: true });
+		}
 	});
 
 	let mobileNavTitle = $derived(
@@ -174,11 +212,8 @@
 			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
 
-	// Show the welcome modal once on first app load
-	let showWelcome = $derived(
-		!$settings.welcomeModalSeen &&
-			!(page.data.shared === true && page.route.id?.startsWith("/conversation/"))
-	);
+	// Welcome modal disabled - always hide
+	let showWelcome = $derived(false);
 </script>
 
 <svelte:head>
