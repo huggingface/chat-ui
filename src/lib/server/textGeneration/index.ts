@@ -42,7 +42,7 @@ async function* textGenerationWithoutTitle(
 	};
 
 	const { conv, messages } = ctx;
-	const convId = conv._id;
+	const convId = (conv as { _id?: unknown; id?: string }).id || String((conv as { _id?: unknown })._id);
 
 	const preprompt = conv.preprompt;
 

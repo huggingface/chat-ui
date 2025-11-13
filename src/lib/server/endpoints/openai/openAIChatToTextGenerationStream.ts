@@ -169,7 +169,17 @@ export async function* openAIChatToTextGenerationStream(
  */
 export async function* openAIChatToTextGenerationSingle(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
-	getRouterMetadata?: () => { route?: string; model?: string; provider?: string }
+	getRouterMetadata?: () => { route?: string; model?: string; provider?: string },
+	getDebugInfo?: () => {
+		originalRequest?: unknown;
+		securityResponse?: { action: string; reason?: string; modifiedKwargs?: unknown };
+		securityResponseTime?: number;
+		llmRequest?: unknown;
+		finalLlmResponse?: unknown;
+		llmResponseTime?: number;
+		totalTime?: number;
+		error?: string;
+	}
 ) {
 	const message: NonNullable<OpenAI.Chat.Completions.ChatCompletion.Choice>["message"] & {
 		reasoning?: string;
@@ -186,7 +196,36 @@ export async function* openAIChatToTextGenerationSingle(
 	if (r && r.length > 0) {
 		content = `<think>${r}</think>` + content;
 	}
-	const tokenId = 0;
+	let tokenId = 0;
+
+	// Yield debug information if available (always yield for visibility)
+	if (getDebugInfo) {
+		const debug = getDebugInfo();
+		if (debug && (debug.originalRequest || debug.securityResponse || debug.totalTime !== undefined)) {
+			yield {
+				token: {
+					id: tokenId++,
+					text: "",
+					logprob: 0,
+					special: true,
+				},
+				generated_text: null,
+				details: null,
+				debugInfo: debug,
+			} as TextGenerationStreamOutput & {
+				debugInfo?: {
+					originalRequest?: unknown;
+					securityResponse?: { action: string; reason?: string; modifiedKwargs?: unknown };
+					securityResponseTime?: number;
+					llmRequest?: unknown;
+					finalLlmResponse?: unknown;
+					llmResponseTime?: number;
+					totalTime?: number;
+					error?: string;
+				};
+			};
+		}
+	}
 
 	// Yield the content as a single token
 	yield {

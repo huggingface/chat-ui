@@ -1,102 +1,77 @@
 import type { RequestHandler } from "./$types";
-import { collections } from "$lib/server/database";
-import { ObjectId } from "mongodb";
 import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
-import type { Message } from "$lib/types/Message";
 import { models, validateModel } from "$lib/server/models";
-import { v4 } from "uuid";
-import { authCondition } from "$lib/server/auth";
-import { usageLimits } from "$lib/server/usageLimits";
+import { nanoid } from "nanoid";
 import { MetricsServer } from "$lib/server/metrics";
 
-export const POST: RequestHandler = async ({ locals, request }) => {
+// Dummy model for fallback
+const dummyModelId = "dummy-model";
+
+export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.text();
 
-	let title = "";
-
-	const parsedBody = z
-		.object({
-			fromShare: z.string().optional(),
-			model: validateModel(models),
-			preprompt: z.string().optional(),
-		})
-		.safeParse(JSON.parse(body));
-
-	if (!parsedBody.success) {
+	let parsedBody;
+	try {
+		parsedBody = z
+			.object({
+				fromShare: z.string().optional(),
+				model: z.string(),
+				preprompt: z.string().optional(),
+			})
+			.safeParse(JSON.parse(body));
+	} catch (e) {
 		error(400, "Invalid request");
 	}
+
+	if (!parsedBody.success) {
+		// If validation fails, allow dummy model
+		const fallbackBody = z
+			.object({
+				fromShare: z.string().optional(),
+				model: z.string().default(dummyModelId),
+				preprompt: z.string().optional(),
+			})
+			.parse(JSON.parse(body));
+		parsedBody = { success: true, data: fallbackBody };
+	}
+
 	const values = parsedBody.data;
 
-	const convCount = await collections.conversations.countDocuments(authCondition(locals));
-
-	if (usageLimits?.conversations && convCount > usageLimits?.conversations) {
-		error(429, "You have reached the maximum number of conversations. Delete some to continue.");
+	// Allow dummy model even if not in models list
+	let model = models.find((m) => (m.id || m.name) === values.model);
+	if (!model && values.model === dummyModelId) {
+		// Dummy model is allowed
+		model = {
+			id: dummyModelId,
+			name: dummyModelId,
+			displayName: "Dummy Model",
+			unlisted: false,
+		} as typeof model;
 	}
-
-	const model = models.find((m) => (m.id || m.name) === values.model);
 
 	if (!model) {
-		error(400, "Invalid model");
+		// Fallback to dummy model if model not found
+		model = {
+			id: dummyModelId,
+			name: dummyModelId,
+			displayName: "Dummy Model",
+			unlisted: false,
+		} as typeof model;
 	}
 
-	let messages: Message[] = [
-		{
-			id: v4(),
-			from: "system",
-			content: values.preprompt ?? "",
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			children: [],
-			ancestors: [],
-		},
-	];
-
-	let rootMessageId: Message["id"] = messages[0].id;
-
+	// Shared conversations are no longer supported
 	if (values.fromShare) {
-		const conversation = await collections.sharedConversations.findOne({
-			_id: values.fromShare,
-		});
-
-		if (!conversation) {
-			error(404, "Conversation not found");
-		}
-
-		// Strip <think> markers from imported titles
-		title = conversation.title.replace(/<\/?think>/gi, "").trim();
-		messages = conversation.messages;
-		rootMessageId = conversation.rootMessageId ?? rootMessageId;
-		values.model = conversation.model;
-		values.preprompt = conversation.preprompt;
+		error(404, "Shared conversations are no longer supported");
 	}
 
 	if (model.unlisted) {
 		error(400, "Can't start a conversation with an unlisted model");
 	}
 
-	// use provided preprompt or model preprompt
-	values.preprompt ??= model?.preprompt ?? "";
-
-	if (messages && messages.length > 0 && messages[0].from === "system") {
-		messages[0].content = values.preprompt;
-	}
-
-	const res = await collections.conversations.insertOne({
-		_id: new ObjectId(),
-		// Always store sanitized titles
-		title: (title || "New Chat").replace(/<\/?think>/gi, "").trim(),
-		rootMessageId,
-		messages,
-		model: values.model,
-		preprompt: values.preprompt,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		userAgent: request.headers.get("User-Agent") ?? undefined,
-		...(locals.user ? { userId: locals.user._id } : { sessionId: locals.sessionId }),
-		...(values.fromShare ? { meta: { fromShareId: values.fromShare } } : {}),
-	});
+	// Generate conversation ID - client will save to IndexedDB
+	const conversationId = nanoid();
 
 	if (MetricsServer.isEnabled()) {
 		MetricsServer.getMetrics().model.conversationsTotal.inc({ model: values.model });
@@ -104,7 +79,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	return new Response(
 		JSON.stringify({
-			conversationId: res.insertedId.toString(),
+			conversationId,
 		}),
 		{ headers: { "Content-Type": "application/json" } }
 	);

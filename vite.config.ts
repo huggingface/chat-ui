@@ -34,6 +34,10 @@ export default defineConfig({
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
 		allowedHosts: ["huggingface.ngrok.io"],
+		// Disable Vite error overlay/modal
+		hmr: {
+			overlay: false,
+		},
 	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "clsx"],

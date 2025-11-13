@@ -9,6 +9,7 @@
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
+	import type { Conversation } from "$lib/types/Conversation";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
@@ -28,6 +29,7 @@
 	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { requireAuthUser } from "$lib/utils/auth.js";
+	import { saveConversation } from "$lib/storage/conversations";
 
 	let { data = $bindable() } = $props();
 
@@ -240,6 +242,19 @@
 
 			const messageUpdatesAbortController = new AbortController();
 
+			// Prepare conversation data for server
+			const conversationData: Conversation = {
+				id: page.params.id,
+				model: data.model,
+				title: data.title,
+				messages: messages,
+				rootMessageId: data.rootMessageId,
+				preprompt: data.preprompt,
+				meta: data.meta,
+				createdAt: data.updatedAt,
+				updatedAt: new Date(),
+			};
+
 			const messageUpdatesIterator = await fetchMessageUpdates(
 				page.params.id,
 				{
@@ -248,6 +263,14 @@
 					messageId,
 					isRetry,
 					files: isRetry ? userMessage?.files : base64Files,
+					conversation: conversationData,
+					globalSettings: {
+						securityApiEnabled: $settings.securityApiEnabled,
+						securityApiUrl: $settings.securityApiUrl,
+						securityApiKey: $settings.securityApiKey,
+						llmApiUrl: $settings.llmApiUrl,
+						llmApiKey: $settings.llmApiKey,
+					},
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -305,12 +328,13 @@
 					const convInData = conversations.find(({ id }) => id === page.params.id);
 					if (convInData) {
 						convInData.title = update.title;
-
-						$titleUpdate = {
-							title: update.title,
-							convId: page.params.id,
-						};
+						data.title = update.title;
 					}
+
+					$titleUpdate = {
+						title: update.title,
+						convId: page.params.id,
+					};
 				} else if (update.type === MessageUpdateType.File) {
 					messageToWriteTo.files = [
 						...(messageToWriteTo.files ?? []),
@@ -336,6 +360,25 @@
 			}
 			console.error(err);
 		} finally {
+			// Save conversation to IndexedDB after message updates
+			if (browser) {
+				try {
+					const now = new Date();
+					await saveConversation({
+						id: page.params.id,
+						model: data.model,
+						title: data.title,
+						messages: messages,
+						rootMessageId: data.rootMessageId,
+						preprompt: data.preprompt,
+						meta: data.meta,
+						updatedAt: now,
+						createdAt: data.updatedAt || now,
+					});
+				} catch (err) {
+					console.error("Failed to save conversation:", err);
+				}
+			}
 			$loading = false;
 			pending = false;
 			await invalidateAll();
@@ -464,6 +507,45 @@
 	let messagesPath = $derived(createMessagesPath(messages));
 	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
 
+	// Create conversation object for ChatWindow
+	let conversation = $derived<Conversation>({
+		id: page.params.id,
+		model: data.model,
+		title: data.title,
+		messages: messages,
+		rootMessageId: data.rootMessageId,
+		preprompt: data.preprompt,
+		meta: data.meta,
+		createdAt: data.updatedAt || new Date(),
+		updatedAt: new Date(),
+	});
+
+	async function handleConversationUpdate(updates: Partial<Conversation>) {
+		if (!browser) return;
+
+		try {
+			const updatedConversation = {
+				...conversation,
+				...updates,
+			};
+			await saveConversation({
+				id: updatedConversation.id,
+				model: updatedConversation.model,
+				title: updatedConversation.title,
+				messages: updatedConversation.messages,
+				rootMessageId: updatedConversation.rootMessageId,
+				preprompt: updatedConversation.preprompt,
+				meta: updatedConversation.meta,
+				updatedAt: new Date(),
+				createdAt: updatedConversation.createdAt,
+			});
+			// Update local data
+			data.meta = updatedConversation.meta;
+		} catch (err) {
+			console.error("Failed to update conversation:", err);
+		}
+	}
+
 	$effect(() => {
 		if (browser && messagesPath.at(-1)?.id) {
 			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
@@ -510,6 +592,8 @@
 	onstop={stopGeneration}
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
+	{conversation}
+	onConversationUpdate={handleConversationUpdate}
 />
 
 {#if showSubscribeModal}

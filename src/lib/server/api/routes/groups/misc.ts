@@ -1,13 +1,7 @@
 import { Elysia } from "elysia";
 import { authPlugin } from "../../authPlugin";
 import { loginEnabled } from "$lib/server/auth";
-import { collections } from "$lib/server/database";
-import { authCondition } from "$lib/server/auth";
 import { config } from "$lib/server/config";
-import yazl from "yazl";
-import { downloadFile } from "$lib/server/files/downloadFile";
-import mimeTypes from "mime-types";
-import { logger } from "$lib/server/logger";
 
 export interface FeatureFlags {
 	enableAssistants: boolean;
@@ -26,29 +20,9 @@ export const misc = new Elysia()
 		} satisfies FeatureFlags;
 	})
 	.get("/export", async ({ locals }) => {
-		if (!locals.user) {
-			throw new Error("Not logged in");
-		}
-
-		if (!locals.isAdmin) {
-			throw new Error("Not admin");
-		}
-
-		if (config.ENABLE_DATA_EXPORT !== "true") {
-			throw new Error("Data export is not enabled");
-		}
-
-		const nExports = await collections.messageEvents.countDocuments({
-			userId: locals.user._id,
-			type: "export",
-			expiresAt: { $gt: new Date() },
-		});
-
-		if (nExports >= 1) {
-			throw new Error(
-				"You have already exported your data recently. Please wait 1 hour before exporting again."
-			);
-		}
+		// Data export functionality is not required
+		// Conversations and settings are stored client-side
+		throw new Error("Data export is not available - data is stored client-side");
 
 		const stats: {
 			nConversations: number;
@@ -86,7 +60,8 @@ export const misc = new Elysia()
 							const files = await Promise.all(
 								hashes.map(async (hash) => {
 									try {
-										const fileData = await downloadFile(hash, conversation._id);
+										const convId = (conversation as { _id?: unknown; id?: string }).id || String((conversation as { _id?: unknown })._id);
+										const fileData = await downloadFile(hash, convId);
 										return fileData;
 									} catch {
 										return null;

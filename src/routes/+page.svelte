@@ -15,6 +15,9 @@
 	import { onMount, tick } from "svelte";
 	import { loading } from "$lib/stores/loading.js";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+	import { saveConversation } from "$lib/storage/conversations";
+	import { v4 } from "uuid";
+	import { browser } from "$app/environment";
 
 	let { data } = $props();
 
@@ -59,6 +62,32 @@
 			}
 
 			const { conversationId } = await res.json();
+
+			// Create and save conversation to IndexedDB
+			if (browser) {
+				const now = new Date();
+				const rootMessageId = v4();
+				await saveConversation({
+					id: conversationId,
+					model,
+					title: "New Chat",
+					rootMessageId,
+					messages: [
+						{
+							id: rootMessageId,
+							from: "system",
+							content: $settings.customPrompts[model] || "",
+							createdAt: now,
+							updatedAt: now,
+							children: [],
+							ancestors: [],
+						},
+					],
+					preprompt: $settings.customPrompts[model],
+					createdAt: now,
+					updatedAt: now,
+				});
+			}
 
 			// Ugly hack to use a store as temp storage, feel free to improve ^^
 			pendingMessage.set({

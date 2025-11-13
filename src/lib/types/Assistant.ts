@@ -1,10 +1,9 @@
-import type { ObjectId } from "mongodb";
 import type { User } from "./User";
 import type { Timestamps } from "./Timestamps";
 import type { ReviewStatus } from "./Review";
 
 export interface Assistant extends Timestamps {
-	_id: ObjectId;
+	_id: string;
 	createdById: User["_id"] | string; // user id or session
 	createdByName?: User["username"];
 	avatar?: string;

@@ -35,7 +35,7 @@ MONGODB_URL=
 
 | 제공자 | 예시 `OPENAI_BASE_URL` | 예시 Key |
 |---|---|---|
-| Hugging Face Inference Providers router | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` (`HF_TOKEN` 과거 호환) |
+| Hugging Face Inference Providers router | `https://router.huggingface.co/v1` | `OPENAI_API_KEY=hf_xxx` |
 | llama.cpp server (`llama.cpp --server --api`) | `http://127.0.0.1:8080/v1` | `OPENAI_API_KEY=sk-local-demo` (임의 문자열) |
 | Ollama (OpenAI 호환 브릿지) | `http://127.0.0.1:11434/v1` | `OPENAI_API_KEY=ollama` |
 | OpenRouter | `https://openrouter.ai/api/v1` | `OPENAI_API_KEY=sk-or-v1-...` |
@@ -123,7 +123,7 @@ PUBLIC_APP_DATA_SHARING=
 
 ### 모델 (Models)
 
-이 빌드는 `MODELS` 환경 변수나 GGUF 디스커버리를 사용하지 않습니다. `OPENAI_BASE_URL`의 `/models` 응답으로 모델 목록을 구성합니다. 인증은 `OPENAI_API_KEY`(권장)이며, `HF_TOKEN`은 레거시 별칭입니다.
+이 빌드는 `MODELS` 환경 변수나 GGUF 디스커버리를 사용하지 않습니다. `OPENAI_BASE_URL`의 `/models` 응답으로 모델 목록을 구성합니다. 인증은 `OPENAI_API_KEY`를 사용합니다.
 
 ### LLM 라우터 (선택)
 

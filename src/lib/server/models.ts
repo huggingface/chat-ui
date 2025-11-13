@@ -291,20 +291,58 @@ const applyModelState = (newModels: ProcessedModel[], startedAt: number): Models
 	return summary;
 };
 
+// Create a dummy model for fallback when API calls fail
+const createDummyModel = async (): Promise<ProcessedModel> => {
+	const dummyConfig: ModelConfig = {
+		id: "dummy-model",
+		name: "dummy-model",
+		displayName: "Dummy Model",
+		description: "A dummy model for testing purposes",
+		logoUrl: undefined,
+		websiteUrl: "https://huggingface.co",
+		modelUrl: "https://huggingface.co",
+		preprompt: "",
+		promptExamples: [
+			{ title: "Example 1", prompt: "Hello, how are you?" },
+			{ title: "Example 2", prompt: "What is the weather today?" },
+		],
+		multimodal: false,
+		unlisted: false,
+		endpoints: [
+			{
+				type: "openai" as const,
+				baseURL: openaiBaseUrl || "https://api.openai.com/v1",
+			},
+		],
+		parameters: {
+			temperature: 0.7,
+			max_tokens: 1000,
+			top_p: 0.9,
+		},
+	};
+
+	const processed = await processModel(dummyConfig);
+	const withEndpoint = await addEndpoint(processed);
+	return {
+		...withEndpoint,
+		hasInferenceAPI: false,
+		isRouter: false,
+	} as ProcessedModel;
+};
+
 const buildModels = async (): Promise<ProcessedModel[]> => {
 	if (!openaiBaseUrl) {
-		logger.error(
-			"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
+		logger.warn(
+			"OPENAI_BASE_URL is not set. Using dummy model. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1) to load real models."
 		);
-		throw new Error("OPENAI_BASE_URL not set");
+		return [await createDummyModel()];
 	}
 
 	try {
 		const baseURL = openaiBaseUrl;
 		logger.info({ baseURL }, "[models] Using OpenAI-compatible base URL");
 
-		// Canonical auth token is OPENAI_API_KEY; keep HF_TOKEN as legacy alias
-		const authToken = config.OPENAI_API_KEY || config.HF_TOKEN;
+		const authToken = config.OPENAI_API_KEY;
 
 		// Use auth token from the start if available to avoid rate limiting issues
 		// Some APIs rate-limit unauthenticated requests more aggressively
@@ -314,14 +352,16 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 		logger.info({ status: response.status }, "[models] First fetch status");
 		if (!response.ok && response.status === 401 && !authToken) {
 			// If we get 401 and didn't have a token, there's nothing we can do
-			throw new Error(
-				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText} (no auth token available)`
+			logger.warn(
+				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText} (no auth token available). Using dummy model.`
 			);
+			return [await createDummyModel()];
 		}
 		if (!response.ok) {
-			throw new Error(
-				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}`
+			logger.warn(
+				`Failed to fetch ${baseURL}/models: ${response.status} ${response.statusText}. Using dummy model.`
 			);
+			return [await createDummyModel()];
 		}
 		const json = await response.json();
 		logger.info({ keys: Object.keys(json || {}) }, "[models] Response keys");
@@ -354,7 +394,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 					{
 						type: "openai" as const,
 						baseURL,
-						// apiKey will be taken from OPENAI_API_KEY or HF_TOKEN automatically
+						// apiKey will be taken from OPENAI_API_KEY automatically
 					},
 				],
 			} as ModelConfig;
@@ -447,8 +487,9 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 		return decorated;
 	} catch (e) {
-		logger.error(e, "Failed to load models from OpenAI base URL");
-		throw e;
+		logger.warn(e, "Failed to load models from OpenAI base URL. Using dummy model.");
+		// Return dummy model instead of throwing to allow server to start
+		return [await createDummyModel()];
 	}
 };
 

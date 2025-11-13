@@ -1,7 +1,6 @@
 import { env as publicEnv } from "$env/dynamic/public";
 import { env as serverEnv } from "$env/dynamic/private";
 import { building } from "$app/environment";
-import type { Collection } from "mongodb";
 import type { ConfigKey as ConfigKeyType } from "$lib/types/ConfigKey";
 import type { Semaphore } from "$lib/types/Semaphore";
 import { Semaphores } from "$lib/types/Semaphore";
@@ -14,8 +13,6 @@ class ConfigManager {
 	private keysFromDB: Partial<Record<ConfigKey, string>> = {};
 	private isInitialized = false;
 
-	private configCollection: Collection<ConfigKeyType> | undefined;
-	private semaphoreCollection: Collection<Semaphore> | undefined;
 	private lastConfigUpdate: Date | undefined;
 
 	async init() {
@@ -26,19 +23,14 @@ class ConfigManager {
 			return;
 		}
 
-		const { getCollectionsEarly } = await import("./database");
-		const collections = await getCollectionsEarly();
-
-		this.configCollection = collections.config;
-		this.semaphoreCollection = collections.semaphores;
-
-		await this.checkForUpdates().then(() => {
-			this.isInitialized = true;
-		});
+		// Config manager disabled - MongoDB removed
+		// Configuration is now managed via environment variables only
+		this.isInitialized = true;
 	}
 
 	get ConfigManagerEnabled() {
-		return serverEnv.ENABLE_CONFIG_MANAGER === "true" && import.meta.env.MODE !== "test";
+		// Config manager disabled - MongoDB removed
+		return false;
 	}
 
 	get isHuggingChat() {
@@ -52,26 +44,13 @@ class ConfigManager {
 	}
 
 	async isConfigStale(): Promise<boolean> {
-		if (!this.lastConfigUpdate || !this.isInitialized) {
-			return true;
-		}
-		const count = await this.semaphoreCollection?.countDocuments({
-			key: Semaphores.CONFIG_UPDATE,
-			updatedAt: { $gt: this.lastConfigUpdate },
-		});
-		return count !== undefined && count > 0;
+		// Config manager disabled - always return false
+		return false;
 	}
 
 	async updateConfig() {
-		const configs = (await this.configCollection?.find({}).toArray()) ?? [];
-		this.keysFromDB = configs.reduce(
-			(acc, curr) => {
-				acc[curr.key as ConfigKey] = curr.value;
-				return acc;
-			},
-			{} as Record<ConfigKey, string>
-		);
-
+		// Config manager disabled - no database updates
+		this.keysFromDB = {};
 		this.lastConfigUpdate = new Date();
 	}
 
@@ -83,39 +62,22 @@ class ConfigManager {
 	}
 
 	async updateSemaphore() {
-		await this.semaphoreCollection?.updateOne(
-			{ key: Semaphores.CONFIG_UPDATE },
-			{
-				$set: {
-					updatedAt: new Date(),
-				},
-				$setOnInsert: {
-					createdAt: new Date(),
-				},
-			},
-			{ upsert: true }
-		);
+		// Config manager disabled - no database updates
 	}
 
 	async set(key: ConfigKey, value: string) {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
-		await this.configCollection?.updateOne({ key }, { $set: { value } }, { upsert: true });
 		this.keysFromDB[key] = value;
-		await this.updateSemaphore();
 	}
 
 	async delete(key: ConfigKey) {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
-		await this.configCollection?.deleteOne({ key });
 		delete this.keysFromDB[key];
-		await this.updateSemaphore();
 	}
 
 	async clear() {
 		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
-		await this.configCollection?.deleteMany({});
 		this.keysFromDB = {};
-		await this.updateSemaphore();
 	}
 
 	getPublicConfig() {
@@ -151,12 +113,7 @@ export const ready = (async () => {
 	}
 })();
 
-type ExtraConfigKeys =
-	| "HF_TOKEN"
-	| "OLD_MODELS"
-	| "ENABLE_ASSISTANTS"
-	| "METRICS_ENABLED"
-	| "METRICS_PORT";
+type ExtraConfigKeys = "OLD_MODELS" | "ENABLE_ASSISTANTS" | "METRICS_ENABLED" | "METRICS_PORT";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 

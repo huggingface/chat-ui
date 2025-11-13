@@ -7,5 +7,5 @@ export function getApiToken(locals: App.Locals | undefined) {
 		}
 		return locals.token;
 	}
-	return config.OPENAI_API_KEY || config.HF_TOKEN;
+	return config.OPENAI_API_KEY;
 }

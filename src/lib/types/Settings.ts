@@ -1,10 +1,7 @@
-import { defaultModel } from "$lib/server/models";
 import type { Timestamps } from "./Timestamps";
-import type { User } from "./User";
 
 export interface Settings extends Timestamps {
-	userId?: User["_id"];
-	sessionId?: string;
+	id?: string;
 
 	shareConversationsWithModelAuthors: boolean;
 	/** One-time welcome modal acknowledgement */
@@ -29,16 +26,31 @@ export interface Settings extends Timestamps {
 
 	disableStream: boolean;
 	directPaste: boolean;
+
+	// Security API settings
+	securityApiEnabled?: boolean;
+	securityApiUrl?: string;
+	securityApiKey?: string;
+
+	// LLM API override settings
+	llmApiUrl?: string;
+	llmApiKey?: string;
 }
 
 export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;
 // TODO: move this to a constant file along with other constants
+// Note: activeModel is set to empty string - should be populated from models list on client side
 export const DEFAULT_SETTINGS = {
 	shareConversationsWithModelAuthors: true,
-	activeModel: defaultModel.id,
+	activeModel: "", // Will be set from models list on client side
 	customPrompts: {},
 	multimodalOverrides: {},
 	hidePromptExamples: {},
 	disableStream: false,
 	directPaste: false,
+	securityApiEnabled: false,
+	securityApiUrl: "",
+	securityApiKey: "",
+	llmApiUrl: "",
+	llmApiKey: "",
 } satisfies SettingsEditable;

@@ -26,11 +26,10 @@
 	import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 	import { browser } from "$app/environment";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
-	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { getConversations } from "$lib/storage/conversations";
 
 	const publicConfig = usePublicConfig();
-	const client = useAPIClient();
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -71,35 +70,48 @@
 	];
 
 	let groupedConversations = $derived({
-		today: conversations.filter(({ updatedAt }) => updatedAt.getTime() > dateRanges[0]),
-		week: conversations.filter(
-			({ updatedAt }) => updatedAt.getTime() > dateRanges[1] && updatedAt.getTime() < dateRanges[0]
-		),
-		month: conversations.filter(
-			({ updatedAt }) => updatedAt.getTime() > dateRanges[2] && updatedAt.getTime() < dateRanges[1]
-		),
-		older: conversations.filter(({ updatedAt }) => updatedAt.getTime() < dateRanges[2]),
+		today: conversations.filter(({ updatedAt }) => {
+			const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+			return date.getTime() > dateRanges[0];
+		}),
+		week: conversations.filter(({ updatedAt }) => {
+			const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+			return date.getTime() > dateRanges[1] && date.getTime() < dateRanges[0];
+		}),
+		month: conversations.filter(({ updatedAt }) => {
+			const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+			return date.getTime() > dateRanges[2] && date.getTime() < dateRanges[1];
+		}),
+		older: conversations.filter(({ updatedAt }) => {
+			const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+			return date.getTime() < dateRanges[2];
+		}),
 	});
 
 	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
 
 	async function handleVisible() {
+		if (!browser) return;
+		
 		p++;
-		const newConvs = await client.conversations
-			.get({
-				query: {
-					p,
-				},
-			})
-			.then(handleResponse)
-			.then((r) => r.conversations)
-			.catch((): ConvSidebar[] => []);
+		try {
+			const newConvs = await getConversations(p);
+			const convSidebar: ConvSidebar[] = newConvs.map((conv) => ({
+				id: conv.id,
+				title: conv.title,
+				updatedAt: conv.updatedAt instanceof Date ? conv.updatedAt : new Date(conv.updatedAt),
+				model: conv.model,
+			}));
 
-		if (newConvs.length === 0) {
+			if (convSidebar.length === 0) {
+				hasMore = false;
+			}
+
+			conversations = [...conversations, ...convSidebar];
+		} catch (err) {
+			console.error("Failed to load more conversations:", err);
 			hasMore = false;
 		}
-
-		conversations = [...conversations, ...newConvs];
 	}
 
 	$effect(() => {

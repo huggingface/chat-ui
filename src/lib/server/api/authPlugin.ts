@@ -11,8 +11,7 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
 	}> => {
 		const auth = await authenticateRequest(
 			{ type: "elysia", value: headers },
-			{ type: "elysia", value: cookie },
-			true
+			{ type: "elysia", value: cookie }
 		);
 		return {
 			locals: {

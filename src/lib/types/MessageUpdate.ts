@@ -7,7 +7,8 @@ export type MessageUpdate =
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
-	| MessageRouterMetadataUpdate;
+	| MessageRouterMetadataUpdate
+	| MessageDebugUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -17,6 +18,7 @@ export enum MessageUpdateType {
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
+	Debug = "debug",
 }
 
 // Status
@@ -77,4 +79,36 @@ export interface MessageRouterMetadataUpdate {
 	route: string;
 	model: string;
 	provider?: InferenceProvider;
+}
+
+export interface MessageDebugUpdate {
+	type: MessageUpdateType.Debug;
+	originalRequest?: {
+		model?: string;
+		messages?: unknown[];
+		[key: string]: unknown;
+	};
+	securityResponse?: {
+		action: "allow" | "block" | "modify";
+		reason?: string;
+		modifiedKwargs?: Record<string, unknown>;
+	};
+	securityResponseTime?: number;
+	llmRequest?: {
+		model?: string;
+		messages?: unknown[];
+		stream?: boolean;
+		_stream_overridden?: boolean;
+		[key: string]: unknown;
+	};
+	finalLlmResponse?: {
+		id?: string;
+		choices?: unknown[];
+		model?: string;
+		usage?: unknown;
+		[key: string]: unknown;
+	};
+	llmResponseTime?: number;
+	totalTime?: number;
+	error?: string;
 }
