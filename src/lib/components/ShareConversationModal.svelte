@@ -15,7 +15,7 @@
 		oncopied?: () => void;
 	}
 
-	const { open = false, onclose, oncopied }: Props = $props();
+	let { open = false, onclose, oncopied }: Props = $props();
 
 	let creating = $state(false);
 	let createdUrl: string | null = $state(null);

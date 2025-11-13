@@ -9,7 +9,7 @@
 		onsave?: (payload: { title: string }) => void;
 	}
 
-	const { open = false, title = "", onclose, onsave }: Props = $props();
+	let { open = false, title = "", onclose, onsave }: Props = $props();
 
 	let newTitle = $state(title);
 	let inputEl: HTMLInputElement | undefined = $state();
