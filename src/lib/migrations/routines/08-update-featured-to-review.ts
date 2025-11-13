@@ -1,7 +1,14 @@
 import type { Migration } from ".";
 import { collections } from "$lib/server/database";
-import { ObjectId } from "mongodb";
 import { ReviewStatus } from "$lib/types/Review";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
 
 const updateFeaturedToReview: Migration = {
 	_id: new ObjectId("000000000000000000000008"),

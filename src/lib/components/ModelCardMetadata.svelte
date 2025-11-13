@@ -13,7 +13,7 @@
 		variant?: "light" | "dark";
 	}
 
-	let { model, variant = "light" }: Props = $props();
+	const { model, variant = "light" }: Props = $props();
 </script>
 
 <div

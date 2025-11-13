@@ -18,10 +18,22 @@
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
-	let { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
+	const { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
 
 	let confirmDelete = $state(false);
 	let renameOpen = $state(false);
+
+	function formatDateTime(date: Date): string {
+		const d = date instanceof Date ? date : new Date(date);
+		const year = d.getFullYear();
+		const month = String(d.getMonth() + 1).padStart(2, "0");
+		const day = String(d.getDate()).padStart(2, "0");
+		const hours = String(d.getHours()).padStart(2, "0");
+		const minutes = String(d.getMinutes()).padStart(2, "0");
+		return `${year}-${month}-${day} ${hours}:${minutes}`;
+	}
+
+	const formattedDateTime = $derived(formatDateTime(conv.updatedAt));
 </script>
 
 <a
@@ -39,6 +51,7 @@
 				<span class="mr-1 font-semibold"> Delete? </span>
 			{/if}
 			{conv.title}
+			<span class="ml-1.5 text-xs text-gray-400 dark:text-gray-500">- {formattedDateTime}</span>
 		</span>
 	</div>
 
@@ -50,7 +63,9 @@
 				title="Cancel delete action"
 				onclick={(e) => {
 					e.preventDefault();
-					if (requireAuthUser()) return;
+					if (requireAuthUser()) {
+						return;
+					}
 					confirmDelete = false;
 				}}
 			>
@@ -62,7 +77,9 @@
 				title="Confirm delete action"
 				onclick={(e) => {
 					e.preventDefault();
-					if (requireAuthUser()) return;
+					if (requireAuthUser()) {
+						return;
+					}
 					confirmDelete = false;
 					ondeleteConversation?.(conv.id.toString());
 				}}
@@ -78,7 +95,9 @@
 				title="Edit conversation title"
 				onclick={(e) => {
 					e.preventDefault();
-					if (requireAuthUser()) return;
+					if (requireAuthUser()) {
+						return;
+					}
 					renameOpen = true;
 				}}
 			>
@@ -91,7 +110,9 @@
 				title="Delete conversation"
 				onclick={(event) => {
 					event.preventDefault();
-					if (requireAuthUser()) return;
+					if (requireAuthUser()) {
+						return;
+					}
 					if (event.shiftKey) {
 						ondeleteConversation?.(conv.id.toString());
 					} else {

@@ -29,7 +29,9 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 		const options = { force: false, ..._options };
 		const { force } = options;
 
-		if (!force && isDetached && !navigating.to) return;
+		if (!force && isDetached && !navigating.to) {
+			return;
+		}
 
 		// wait for the next tick to ensure that the DOM is updated
 		await tick();
@@ -67,7 +69,9 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 	if (typeof ResizeObserver !== "undefined") {
 		const target = node.firstElementChild ?? node;
 		resizeObserver = new ResizeObserver(() => {
-			if (isDetached && !navigating.to) return;
+			if (isDetached && !navigating.to) {
+				return;
+			}
 			scrollToBottom();
 		});
 		resizeObserver.observe(target);

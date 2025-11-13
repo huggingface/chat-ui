@@ -7,9 +7,9 @@
 	import { beforeNavigate, goto, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+	import type { Conversation } from "$lib/types/Conversation";
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
-	import type { Conversation } from "$lib/types/Conversation";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
@@ -57,7 +57,9 @@
 		}
 
 		const msg = messages.find((msg) => msg.id === msgId) ?? messages.at(-1);
-		if (!msg) return [];
+		if (!msg) {
+			return [];
+		}
 		// ancestor path
 		const { ancestors } = msg;
 		const path = [];
@@ -76,7 +78,7 @@
 		// children path
 		let childrenIds = msg.children;
 		while (childrenIds?.length) {
-			let lastChildId = childrenIds.at(-1);
+			const lastChildId = childrenIds.at(-1);
 			const lastChild = messages.find((msg) => msg.id === lastChildId);
 			if (lastChild) {
 				path.push(lastChild);
@@ -247,7 +249,7 @@
 				id: page.params.id,
 				model: data.model,
 				title: data.title,
-				messages: messages,
+				messages,
 				rootMessageId: data.rootMessageId,
 				preprompt: data.preprompt,
 				meta: data.meta,
@@ -276,7 +278,9 @@
 			).catch((err) => {
 				error.set(err.message);
 			});
-			if (messageUpdatesIterator === undefined) return;
+			if (messageUpdatesIterator === undefined) {
+				return;
+			}
 
 			files = [];
 			let buffer = "";
@@ -368,7 +372,7 @@
 						id: page.params.id,
 						model: data.model,
 						title: data.title,
-						messages: messages,
+						messages,
 						rootMessageId: data.rootMessageId,
 						preprompt: data.preprompt,
 						meta: data.meta,
@@ -437,7 +441,9 @@
 	}
 
 	async function onRetry(payload: { id: Message["id"]; content?: string }) {
-		if (requireAuthUser()) return;
+		if (requireAuthUser()) {
+			return;
+		}
 
 		const lastMsgId = payload.id;
 		messagesPath = createMessagesPath(messages, lastMsgId);
@@ -478,7 +484,9 @@
 
 	function isConversationStreaming(msgs: Message[]): boolean {
 		const lastAssistant = [...msgs].reverse().find((msg) => msg.from === "assistant");
-		if (!lastAssistant) return false;
+		if (!lastAssistant) {
+			return false;
+		}
 		const hasFinalAnswer =
 			lastAssistant.updates?.some((update) => update.type === MessageUpdateType.FinalAnswer) ??
 			false;
@@ -505,14 +513,14 @@
 
 	// create a linear list of `messagesPath` from `messages` that is a tree of threaded messages
 	let messagesPath = $derived(createMessagesPath(messages));
-	let messagesAlternatives = $derived(createMessagesAlternatives(messages));
+	const messagesAlternatives = $derived(createMessagesAlternatives(messages));
 
 	// Create conversation object for ChatWindow
-	let conversation = $derived<Conversation>({
+	const conversation = $derived<Conversation>({
 		id: page.params.id,
 		model: data.model,
 		title: data.title,
-		messages: messages,
+		messages,
 		rootMessageId: data.rootMessageId,
 		preprompt: data.preprompt,
 		meta: data.meta,
@@ -521,7 +529,9 @@
 	});
 
 	async function handleConversationUpdate(updates: Partial<Conversation>) {
-		if (!browser) return;
+		if (!browser) {
+			return;
+		}
 
 		try {
 			const updatedConversation = {
@@ -553,7 +563,9 @@
 	});
 
 	beforeNavigate((navigation) => {
-		if (!page.params.id) return;
+		if (!page.params.id) {
+			return;
+		}
 
 		const navigatingAway =
 			navigation.to?.route.id !== page.route.id || navigation.to?.params?.id !== page.params.id;
@@ -566,7 +578,7 @@
 		$loading = false;
 	});
 
-	let title = $derived.by(() => {
+	const title = $derived.by(() => {
 		const rawTitle = conversations.find((conv) => conv.id === page.params.id)?.title ?? data.title;
 		return rawTitle ? rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) : rawTitle;
 	});

@@ -18,7 +18,9 @@ export function addBackgroundGeneration(entry: BackgroundGeneration) {
 
 export function removeBackgroundGeneration(id: string) {
 	const index = backgroundGenerationEntries.findIndex((entry) => entry.id === id);
-	if (index === -1) return;
+	if (index === -1) {
+		return;
+	}
 
 	backgroundGenerationEntries.splice(index, 1);
 }

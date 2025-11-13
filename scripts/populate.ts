@@ -15,7 +15,7 @@ import type { User } from "../src/lib/types/User";
 import type { Assistant } from "../src/lib/types/Assistant";
 import type { Conversation } from "../src/lib/types/Conversation";
 import type { Settings } from "../src/lib/types/Settings";
-import { Message } from "../src/lib/types/Message.ts";
+import type { Message } from "../src/lib/types/Message.ts";
 
 import { addChildren } from "../src/lib/utils/tree/addChildren.ts";
 import { generateSearchTokens } from "../src/lib/utils/searchTokens.ts";

@@ -22,4 +22,3 @@ export async function saveSettings(settings: Settings): Promise<Settings> {
 	const stored = await storage.saveSettings(settings);
 	return stored;
 }
-

@@ -11,7 +11,7 @@
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
 
-	let {
+	const {
 		message,
 		alternatives = [],
 		loading = false,
@@ -19,7 +19,7 @@
 		onshowAlternateMsg,
 	}: Props = $props();
 
-	let currentIdx = $derived(alternatives.findIndex((id) => id === message.id));
+	const currentIdx = $derived(alternatives.findIndex((id) => id === message.id));
 
 	// API client removed as deletion UI is commented out
 </script>

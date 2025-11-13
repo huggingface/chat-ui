@@ -19,9 +19,9 @@
 	import { v4 } from "uuid";
 	import { browser } from "$app/environment";
 
-	let { data } = $props();
+	const { data } = $props();
 
-	let hasModels = $derived(Boolean(data.models?.length));
+	const hasModels = $derived(Boolean(data.models?.length));
 	let files: File[] = $state([]);
 	let draft = $state("");
 
@@ -151,7 +151,9 @@
 		}
 	});
 
-	let currentModel = $derived(findCurrentModel(data.models, data.oldModels, $settings.activeModel));
+	const currentModel = $derived(
+		findCurrentModel(data.models, data.oldModels, $settings.activeModel)
+	);
 </script>
 
 <svelte:head>

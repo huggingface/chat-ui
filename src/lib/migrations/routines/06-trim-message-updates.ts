@@ -1,7 +1,16 @@
 import type { Migration } from ".";
 import { collections } from "$lib/server/database";
-import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
+
+type WithId<T> = T & { _id: string };
 import type { Message } from "$lib/types/Message";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { logger } from "$lib/server/logger";

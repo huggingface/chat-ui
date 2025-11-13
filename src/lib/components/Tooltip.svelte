@@ -5,7 +5,7 @@
 		position?: string;
 	}
 
-	let {
+	const {
 		classNames = "",
 		label = "Copied",
 		position = "left-1/2 top-full transform -translate-x-1/2 translate-y-2",

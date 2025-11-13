@@ -1,10 +1,9 @@
 import { browser } from "$app/environment";
 import { invalidate } from "$app/navigation";
-import { base } from "$app/paths";
 import { UrlDependency } from "$lib/types/UrlDependency";
 import { getContext, setContext } from "svelte";
 import { type Writable, writable, get } from "svelte/store";
-import { saveSettings } from "$lib/storage/settings";
+import { saveSettings, getSettings } from "$lib/storage/settings";
 
 type SettingsStore = {
 	shareConversationsWithModelAuthors: boolean;
@@ -24,7 +23,8 @@ type SettingsStore = {
 	llmApiKey: string;
 };
 
-type SettingsStoreWritable = Writable<SettingsStore> & {
+type SettingsStoreWritable = Omit<Writable<SettingsStore>, "set"> & {
+	set: (settings: Partial<SettingsStore>) => Promise<void>;
 	instantSet: (settings: Partial<SettingsStore>) => Promise<void>;
 	initValue: <K extends keyof SettingsStore>(
 		key: K,
@@ -55,9 +55,12 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			timeoutId = setTimeout(async () => {
 				try {
 					const currentSettings = get(baseStore);
+					const existingSettings = await getSettings();
 					await saveSettings({
 						...currentSettings,
 						welcomeModalSeenAt: currentSettings.welcomeModalSeen ? new Date() : null,
+						createdAt: existingSettings.createdAt,
+						updatedAt: new Date(),
 					});
 
 					invalidate(UrlDependency.ConversationList);
@@ -115,9 +118,12 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 			timeoutId = setTimeout(async () => {
 				try {
 					const currentSettings = get(baseStore);
+					const existingSettings = await getSettings();
 					await saveSettings({
 						...currentSettings,
 						welcomeModalSeenAt: currentSettings.welcomeModalSeen ? new Date() : null,
+						createdAt: existingSettings.createdAt,
+						updatedAt: new Date(),
 					});
 
 					invalidate(UrlDependency.ConversationList);
@@ -151,9 +157,12 @@ export function createSettingsStore(initialValue: Omit<SettingsStore, "recentlyS
 		if (browser) {
 			try {
 				const currentSettings = get(baseStore);
+				const existingSettings = await getSettings();
 				await saveSettings({
 					...currentSettings,
 					welcomeModalSeenAt: currentSettings.welcomeModalSeen ? new Date() : null,
+					createdAt: existingSettings.createdAt,
+					updatedAt: new Date(),
 				});
 				invalidate(UrlDependency.ConversationList);
 			} catch (err) {

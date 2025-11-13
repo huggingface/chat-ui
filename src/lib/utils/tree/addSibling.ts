@@ -34,7 +34,9 @@ export function addSibling<T>(conv: Tree<T>, message: NewNode<T>, siblingId: Tre
 	if (nearestAncestor) {
 		if (nearestAncestor.children) {
 			nearestAncestor.children.push(messageId);
-		} else nearestAncestor.children = [messageId];
+		} else {
+			nearestAncestor.children = [messageId];
+		}
 	}
 
 	return messageId;

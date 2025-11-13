@@ -56,6 +56,7 @@
 		onConversationUpdate?: (updates: Partial<Conversation>) => void;
 	}
 
+	/* eslint-disable prefer-const */
 	let {
 		messages = [],
 		messagesAlternatives = [],
@@ -74,8 +75,9 @@
 		conversation = null,
 		onConversationUpdate,
 	}: Props = $props();
+	/* eslint-enable prefer-const */
 
-	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
+	const isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -83,7 +85,9 @@
 	let settingsPanelOpen = $state(false);
 
 	const handleSubmit = () => {
-		if (requireAuthUser() || loading || !draft) return;
+		if (requireAuthUser() || loading || !draft) {
+			return;
+		}
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -142,19 +146,19 @@
 		}
 	};
 
-	let lastMessage = $derived(browser && (messages.at(-1) as Message));
-	let scrollSignal = $derived.by(() => {
+	const lastMessage = $derived(browser && (messages.at(-1) as Message));
+	const scrollSignal = $derived.by(() => {
 		const last = messages.at(-1) as Message | undefined;
 		return last ? `${last.id}:${last.content.length}:${messages.length}` : `${messages.length}:0`;
 	});
-	let lastIsError = $derived(
+	const lastIsError = $derived(
 		lastMessage &&
 			!loading &&
 			(lastMessage.from === "user" ||
 				lastMessage.updates?.findIndex((u) => u.type === "status" && u.status === "error") !== -1)
 	);
 
-	let streamingAssistantMessage = $derived(
+	const streamingAssistantMessage = $derived(
 		(() => {
 			for (let i = messages.length - 1; i >= 0; i -= 1) {
 				const candidate = messages[i];
@@ -165,8 +169,8 @@
 			return undefined;
 		})()
 	);
-	let streamingRouterMetadata = $derived(streamingAssistantMessage?.routerMetadata ?? null);
-	let streamingRouterModelName = $derived(
+	const streamingRouterMetadata = $derived(streamingAssistantMessage?.routerMetadata ?? null);
+	const streamingRouterModelName = $derived(
 		streamingRouterMetadata?.model
 			? (streamingRouterMetadata.model.split("/").pop() ?? streamingRouterMetadata.model)
 			: ""
@@ -194,7 +198,7 @@
 		}, 500);
 	});
 
-	let sources = $derived(
+	const sources = $derived(
 		files?.map<Promise<MessageFile>>((file) =>
 			file2base64(file).then((value) => ({
 				type: "base64",
@@ -221,7 +225,9 @@
 
 	async function scrollToBottom() {
 		await tick();
-		if (!chatContainer) return;
+		if (!chatContainer) {
+			return;
+		}
 		chatContainer.scrollTop = chatContainer.scrollHeight;
 	}
 
@@ -233,29 +239,31 @@
 	});
 
 	const settings = useSettingsStore();
-	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
+	const hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
 
 	// Respect per‑model multimodal toggle from settings (force enable)
-	let modelIsMultimodalOverride = $derived($settings.multimodalOverrides?.[currentModel.id]);
-	let modelIsMultimodal = $derived((modelIsMultimodalOverride ?? currentModel.multimodal) === true);
-	let activeMimeTypes = $derived(
+	const modelIsMultimodalOverride = $derived($settings.multimodalOverrides?.[currentModel.id]);
+	const modelIsMultimodal = $derived(
+		(modelIsMultimodalOverride ?? currentModel.multimodal) === true
+	);
+	const activeMimeTypes = $derived(
 		Array.from(
 			new Set([
 				...(modelIsMultimodal ? (currentModel.multimodalAcceptedMimetypes ?? ["image/*"]) : []),
 			])
 		)
 	);
-	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
+	const isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
-	let routerFollowUps = $derived<RouterFollowUp[]>(
+	const routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
 			? (routerExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
 			: []
 	);
-	let routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
-	let shouldShowRouterFollowUps = $derived(
+	const routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
+	const shouldShowRouterFollowUps = $derived(
 		!draft.length &&
 			activeRouterExamplePrompt &&
 			routerFollowUps.length > 0 &&
@@ -282,13 +290,17 @@
 	});
 
 	function triggerPrompt(prompt: string) {
-		if (requireAuthUser() || loading) return;
+		if (requireAuthUser() || loading) {
+			return;
+		}
 		draft = prompt;
 		handleSubmit();
 	}
 
 	async function startExample(example: RouterExample) {
-		if (requireAuthUser()) return;
+		if (requireAuthUser()) {
+			return;
+		}
 		activeRouterExamplePrompt = example.prompt;
 
 		if (browser && example.attachments?.length) {
@@ -296,7 +308,9 @@
 			for (const attachment of example.attachments) {
 				try {
 					const response = await fetch(`${base}/${attachment.src}`);
-					if (!response.ok) continue;
+					if (!response.ok) {
+						continue;
+					}
 
 					const blob = await response.blob();
 					const name = attachment.src.split("/").pop() ?? "attachment";
@@ -342,7 +356,7 @@
 		<div
 			class="mx-auto flex h-full max-w-3xl flex-col gap-6 px-5 pt-6 sm:gap-8 xl:max-w-4xl xl:pt-10"
 		>
-			{#if preprompt && preprompt != currentModel.preprompt}
+			{#if preprompt && preprompt !== currentModel.preprompt}
 				<SystemPromptModal preprompt={preprompt ?? ""} />
 			{/if}
 

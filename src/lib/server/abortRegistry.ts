@@ -35,7 +35,9 @@ export class AbortRegistry {
 
 	public abort(conversationId: string) {
 		const set = this.controllers.get(conversationId);
-		if (!set?.size) return;
+		if (!set?.size) {
+			return;
+		}
 
 		logger.debug({ conversationId }, "Aborting active generation via AbortRegistry");
 		for (const controller of set) {
@@ -48,7 +50,9 @@ export class AbortRegistry {
 
 	public unregister(conversationId: string, controller: AbortController) {
 		const set = this.controllers.get(conversationId);
-		if (!set) return;
+		if (!set) {
+			return;
+		}
 		set.delete(controller);
 		if (set.size === 0) {
 			this.controllers.delete(conversationId);

@@ -10,7 +10,7 @@
 		onmessage?: (content: string) => void;
 	}
 
-	let { currentModel: _currentModel, onmessage }: Props = $props();
+	const { currentModel: _currentModel, onmessage }: Props = $props();
 
 	$effect(() => {
 		// referenced to appease linter while UI blocks are commented out
@@ -44,7 +44,7 @@
 		</div>
 	</div>
 	<div class="lg:col-span-2 lg:pl-24">
-		{#each JSON5.parse(publicConfig.PUBLIC_ANNOUNCEMENT_BANNERS || "[]") as banner}
+		{#each [] as banner}
 			<AnnouncementBanner classNames="mb-4" title={banner.title}>
 				<a
 					target={banner.external ? "_blank" : "_self"}

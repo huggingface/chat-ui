@@ -39,6 +39,7 @@
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
+	/* eslint-disable prefer-const */
 	let {
 		conversations = $bindable(),
 		user,
@@ -46,6 +47,7 @@
 		ondeleteConversation,
 		oneditConversationTitle,
 	}: Props = $props();
+	/* eslint-enable prefer-const */
 
 	let hasMore = $state(true);
 
@@ -69,7 +71,7 @@
 		new Date().setMonth(new Date().getMonth() - 1),
 	];
 
-	let groupedConversations = $derived({
+	const groupedConversations = $derived({
 		today: conversations.filter(({ updatedAt }) => {
 			const date = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
 			return date.getTime() > dateRanges[0];
@@ -91,8 +93,10 @@
 	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
 
 	async function handleVisible() {
-		if (!browser) return;
-		
+		if (!browser) {
+			return;
+		}
+
 		p++;
 		try {
 			const newConvs = await getConversations(p);
@@ -137,7 +141,7 @@
 </script>
 
 <div
-	class="sticky top-0 flex flex-none touch-none items-center justify-between px-1.5 py-3.5 max-sm:pt-0"
+	class="sticky top-0 flex flex-none touch-none flex-col items-center gap-2 px-1.5 py-3.5 max-sm:pt-0"
 >
 	<a
 		class="flex select-none items-center rounded-xl text-lg font-semibold"

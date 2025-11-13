@@ -4,7 +4,7 @@
 		onvisible?: () => void;
 	}
 
-	let { onvisible }: Props = $props();
+	const { onvisible }: Props = $props();
 
 	let loader: HTMLDivElement | undefined = $state();
 	let observer: IntersectionObserver;

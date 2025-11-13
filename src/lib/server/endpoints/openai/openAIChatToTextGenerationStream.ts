@@ -201,7 +201,10 @@ export async function* openAIChatToTextGenerationSingle(
 	// Yield debug information if available (always yield for visibility)
 	if (getDebugInfo) {
 		const debug = getDebugInfo();
-		if (debug && (debug.originalRequest || debug.securityResponse || debug.totalTime !== undefined)) {
+		if (
+			debug &&
+			(debug.originalRequest || debug.securityResponse || debug.totalTime !== undefined)
+		) {
 			yield {
 				token: {
 					id: tokenId++,

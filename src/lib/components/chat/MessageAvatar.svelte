@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 
-	let { animating = false, classNames = "" } = $props();
+	const { animating = false, classNames = "" } = $props();
 
 	let blobAnim: SVGAnimateElement | undefined = $state();
 	let svgEl: SVGSVGElement | undefined = $state();
@@ -11,10 +11,14 @@
 	let prevBlobAnim: SVGAnimateElement | undefined = undefined;
 
 	$effect(() => {
-		if (!blobAnim) return;
+		if (!blobAnim) {
+			return;
+		}
 		const blobChanged = blobAnim !== prevBlobAnim;
 		const animChanged = animating !== prevAnimating;
-		if (!(blobChanged || animChanged)) return;
+		if (!(blobChanged || animChanged)) {
+			return;
+		}
 
 		if (animating) {
 			// Resume animations and start once

@@ -14,7 +14,7 @@
 		data: PageData;
 	}
 
-	let { data }: Props = $props();
+	const { data }: Props = $props();
 
 	const settings = useSettingsStore();
 
@@ -23,7 +23,7 @@
 	// Local filter state for model search (hyphen/space insensitive)
 	let modelFilter = $state("");
 	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
+	const queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 </script>
 
 <svelte:head>

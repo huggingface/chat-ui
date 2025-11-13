@@ -60,9 +60,6 @@ const dummyPublicConfig: Record<string, string> = {
 	PUBLIC_APP_DESCRIPTION: "Chat UI",
 	PUBLIC_ORIGIN: "",
 	PUBLIC_APP_ASSETS: "",
-	PUBLIC_GOOGLE_ANALYTICS_ID: "",
-	PUBLIC_PLAUSIBLE_SCRIPT_URL: "",
-	PUBLIC_APPLE_APP_ID: "",
 };
 
 const dummyFeatureFlags = {
@@ -80,40 +77,49 @@ export const load = async ({ depends, fetch, url }) => {
 	// Only load server-side data here
 	// Use Promise.allSettled to handle failures gracefully
 	const results = await Promise.allSettled([
-		client.models.get().then(handleResponse).catch((err) => {
-			if (browser) {
-				console.warn("Failed to fetch models, using dummy data", err);
-			}
-			return dummyModels;
-		}),
-		client.user.get().then(handleResponse).catch((err) => {
-			if (browser) {
-				console.warn("Failed to fetch user, using dummy data", err);
-			}
-			return dummyUser;
-		}),
-		client["public-config"].get().then(handleResponse).catch((err) => {
-			if (browser) {
-				console.warn("Failed to fetch public config, using dummy data", err);
-			}
-			return dummyPublicConfig;
-		}),
-		client["feature-flags"].get().then(handleResponse).catch((err) => {
-			if (browser) {
-				console.warn("Failed to fetch feature flags, using dummy data", err);
-			}
-			return dummyFeatureFlags;
-		}),
+		client.models
+			.get()
+			.then(handleResponse)
+			.catch((err) => {
+				if (browser) {
+					console.warn("Failed to fetch models, using dummy data", err);
+				}
+				return dummyModels;
+			}),
+		client.user
+			.get()
+			.then(handleResponse)
+			.catch((err) => {
+				if (browser) {
+					console.warn("Failed to fetch user, using dummy data", err);
+				}
+				return dummyUser;
+			}),
+		client["public-config"]
+			.get()
+			.then(handleResponse)
+			.catch((err) => {
+				if (browser) {
+					console.warn("Failed to fetch public config, using dummy data", err);
+				}
+				return dummyPublicConfig;
+			}),
+		client["feature-flags"]
+			.get()
+			.then(handleResponse)
+			.catch((err) => {
+				if (browser) {
+					console.warn("Failed to fetch feature flags, using dummy data", err);
+				}
+				return dummyFeatureFlags;
+			}),
 	]);
 
 	// Extract results, using dummy data if promise was rejected
-	const models =
-		results[0].status === "fulfilled" ? results[0].value : dummyModels;
+	const models = results[0].status === "fulfilled" ? results[0].value : dummyModels;
 	const user = results[1].status === "fulfilled" ? results[1].value : dummyUser;
-	const publicConfig =
-		results[2].status === "fulfilled" ? results[2].value : dummyPublicConfig;
-	const featureFlags =
-		results[3].status === "fulfilled" ? results[3].value : dummyFeatureFlags;
+	const publicConfig = results[2].status === "fulfilled" ? results[2].value : dummyPublicConfig;
+	const featureFlags = results[3].status === "fulfilled" ? results[3].value : dummyFeatureFlags;
 
 	return {
 		nConversations: 0,

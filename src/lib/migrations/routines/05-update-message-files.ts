@@ -1,9 +1,18 @@
-import { ObjectId, type WithId } from "mongodb";
 import { collections } from "$lib/server/database";
 
 import type { Migration } from ".";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MessageFile } from "$lib/types/Message";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
+
+type WithId<T> = T & { _id: string };
 
 const updateMessageFiles: Migration = {
 	_id: new ObjectId("5f9f5f5f5f5f5f5f5f5f5f5f"),
@@ -16,7 +25,9 @@ const updateMessageFiles: Migration = {
 			const messages = conversation.messages.map((message) => {
 				const files = (message.files as string[] | undefined)?.map<MessageFile>((file) => {
 					// File is already in the new format
-					if (typeof file !== "string") return file;
+					if (typeof file !== "string") {
+						return file;
+					}
 
 					// File was a hash pointing to a file in the bucket
 					if (file.length === 64) {

@@ -1,6 +1,5 @@
 import type { Conversation } from "$lib/types/Conversation";
 import type { Settings } from "$lib/types/Settings";
-import type { MessageFile } from "$lib/types/Message";
 
 export interface StoredConversation extends Omit<Conversation, "_id" | "sessionId" | "userId"> {
 	id: string;
@@ -25,4 +24,3 @@ export interface StorageDatabase {
 	files: StoredFile[];
 	settings: StoredSettings[];
 }
-

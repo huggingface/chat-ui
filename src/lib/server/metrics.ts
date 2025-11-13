@@ -238,7 +238,9 @@ export class MetricsServer {
 		});
 
 		onExit(async () => {
-			if (!this.httpServer) return;
+			if (!this.httpServer) {
+				return;
+			}
 			logger.info("Shutting down metrics server...");
 			await new Promise<void>((resolve, reject) => {
 				this.httpServer?.close((err) => {

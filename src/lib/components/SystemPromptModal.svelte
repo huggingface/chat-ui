@@ -7,7 +7,7 @@
 		preprompt: string;
 	}
 
-	let { preprompt }: Props = $props();
+	const { preprompt }: Props = $props();
 
 	let isOpen = $state(false);
 </script>

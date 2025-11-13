@@ -4,7 +4,7 @@
 		name: string;
 	}
 
-	let { checked = $bindable(), name }: Props = $props();
+	const { checked = $bindable(), name }: Props = $props();
 
 	function toggle() {
 		checked = !checked;

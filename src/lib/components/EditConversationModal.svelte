@@ -9,7 +9,7 @@
 		onsave?: (payload: { title: string }) => void;
 	}
 
-	let { open = false, title = "", onclose, onsave }: Props = $props();
+	const { open = false, title = "", onclose, onsave }: Props = $props();
 
 	let newTitle = $state(title);
 	let inputEl: HTMLInputElement | undefined = $state();
@@ -28,7 +28,9 @@
 
 	function save() {
 		const trimmed = (newTitle ?? "").trim();
-		if (!trimmed) return;
+		if (!trimmed) {
+			return;
+		}
 		onsave?.({ title: trimmed });
 		close();
 	}

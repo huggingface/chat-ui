@@ -1,5 +1,4 @@
 import { storage } from "./indexedDB";
-import type { Conversation } from "$lib/types/Conversation";
 import type { StoredConversation } from "./types";
 import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
@@ -35,7 +34,9 @@ export async function getConversation(id: string): Promise<StoredConversation | 
 	return conv;
 }
 
-export async function saveConversation(conversation: StoredConversation | Omit<StoredConversation, "createdAt" | "updatedAt">): Promise<StoredConversation> {
+export async function saveConversation(
+	conversation: StoredConversation | Omit<StoredConversation, "createdAt" | "updatedAt">
+): Promise<StoredConversation> {
 	return await storage.saveConversation(conversation);
 }
 
@@ -46,4 +47,3 @@ export async function deleteConversation(id: string): Promise<void> {
 export async function deleteAllConversations(): Promise<void> {
 	await storage.deleteAllConversations();
 }
-

@@ -27,6 +27,10 @@ export enum MessageUpdateStatus {
 	Error = "error",
 	Finished = "finished",
 	KeepAlive = "keepAlive",
+	SecurityApiRequesting = "securityApiRequesting",
+	SecurityApiResponded = "securityApiResponded",
+	LlmRequesting = "llmRequesting",
+	LlmResponded = "llmResponded",
 }
 export interface MessageStatusUpdate {
 	type: MessageUpdateType.Status;
@@ -111,4 +115,5 @@ export interface MessageDebugUpdate {
 	llmResponseTime?: number;
 	totalTime?: number;
 	error?: string;
+	isDummyResponse?: boolean;
 }

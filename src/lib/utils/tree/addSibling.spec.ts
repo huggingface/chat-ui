@@ -30,7 +30,9 @@ describe("addSibling", async () => {
 	it("should fail on legacy conversations", async () => {
 		const convId = await insertLegacyConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		expect(() => addSibling(conv, newMessage, conv.messages[0].id)).toThrow(
 			"Cannot add a sibling to a legacy conversation"
@@ -40,7 +42,9 @@ describe("addSibling", async () => {
 	it("should fail if the sibling message doesn't exist", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		expect(() => addSibling(conv, newMessage, "not-a-real-id-test")).toThrow(
 			"The sibling message doesn't exist"
@@ -51,8 +55,12 @@ describe("addSibling", async () => {
 	it("should fail if the sibling message is the root message", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
-		if (!conv.rootMessageId) throw new Error("Root message not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
+		if (!conv.rootMessageId) {
+			throw new Error("Root message not found");
+		}
 
 		expect(() => addSibling(conv, newMessage, conv.rootMessageId as Message["id"])).toThrow(
 			"The sibling message is the root message, therefore we can't add a sibling"
@@ -62,7 +70,9 @@ describe("addSibling", async () => {
 	it("should add a sibling to a message", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		// add sibling and check children count for parnets
 
@@ -70,7 +80,9 @@ describe("addSibling", async () => {
 		const siblingId = addSibling(conv, newMessage, conv.messages[2].id);
 		const nChildrenNew = conv.messages[1].children?.length;
 
-		if (!nChildren) throw new Error("No children found");
+		if (!nChildren) {
+			throw new Error("No children found");
+		}
 
 		expect(nChildrenNew).toBe(nChildren + 1);
 

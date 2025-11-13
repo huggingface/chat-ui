@@ -19,6 +19,7 @@
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import DebugInfo from "./DebugInfo.svelte";
+	import SecurityApiProgress from "./SecurityApiProgress.svelte";
 	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 
 	interface Props {
@@ -34,6 +35,7 @@
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
 	}
 
+	/* eslint-disable prefer-const */
 	let {
 		message,
 		loading = false,
@@ -46,6 +48,7 @@
 		onretry,
 		onshowAlternateMsg,
 	}: Props = $props();
+	/* eslint-enable prefer-const */
 
 	let contentEl: HTMLElement | undefined = $state();
 	let isCopied = $state(false);
@@ -72,10 +75,10 @@
 
 	// Zero-config reasoning autodetection: detect <think> blocks in content
 	const THINK_BLOCK_REGEX = /(<think>[\s\S]*?(?:<\/think>|$))/gi;
-	let hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
+	const hasClientThink = $derived(message.content.split(THINK_BLOCK_REGEX).length > 1);
 
 	// Strip think blocks for clipboard copy (always, regardless of detection)
-	let contentWithoutThink = $derived.by(() =>
+	const contentWithoutThink = $derived.by(() =>
 		message.content.replace(THINK_BLOCK_REGEX, "").trim()
 	);
 
@@ -87,7 +90,7 @@
 		}
 	});
 
-	let editMode = $derived(editMsdgId === message.id);
+	const editMode = $derived(editMsdgId === message.id);
 	$effect(() => {
 		if (editMode) {
 			tick();
@@ -132,8 +135,11 @@
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 
+				<!-- Security API Progress (if enabled) -->
+				<SecurityApiProgress updates={message.updates || []} {loading} />
+
 				<!-- Debug Information (always visible) -->
-				{#each (message.updates || []) as update}
+				{#each message.updates || [] as update}
 					{#if update.type === MessageUpdateType.Debug}
 						<DebugInfo debugUpdate={update} />
 					{/if}
@@ -340,7 +346,9 @@
 						title="Edit"
 						type="button"
 						onclick={() => {
-							if (requireAuthUser()) return;
+							if (requireAuthUser()) {
+								return;
+							}
 							editMsdgId = message.id;
 						}}
 					>

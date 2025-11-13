@@ -17,7 +17,7 @@
 	import { getThemePreference, setTheme, type ThemePreference } from "$lib/switchTheme";
 
 	const publicConfig = usePublicConfig();
-	let settings = useSettingsStore();
+	const settings = useSettingsStore();
 
 	const client = useAPIClient();
 
@@ -125,35 +125,6 @@
 			class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 		>
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#if publicConfig.PUBLIC_APP_DATA_SHARING === "1"}
-					<div class="flex items-start justify-between py-3">
-						<div>
-							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-								Share with model authors
-							</div>
-							<p class="text-[12px] text-gray-500 dark:text-gray-400">
-								Sharing your data helps improve open models over time.
-							</p>
-						</div>
-						<Switch
-							name="shareConversationsWithModelAuthors"
-							bind:checked={$settings.shareConversationsWithModelAuthors}
-						/>
-					</div>
-				{/if}
-
-				<div class="flex items-start justify-between py-3">
-					<div>
-						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
-							Disable streaming tokens
-						</div>
-						<p class="text-[12px] text-gray-500 dark:text-gray-400">
-							Show responses only when complete.
-						</p>
-					</div>
-					<Switch name="disableStream" bind:checked={$settings.disableStream} />
-				</div>
-
 				<div class="flex items-start justify-between py-3">
 					<div>
 						<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
@@ -237,17 +208,18 @@
 									Route messages through security API before sending to LLM.
 								</p>
 							</div>
-							<Switch
-								name="securityApiEnabled"
-								bind:checked={$settings.securityApiEnabled}
-							/>
+							<Switch name="securityApiEnabled" bind:checked={$settings.securityApiEnabled} />
 						</div>
 
 						<div>
-							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+							<label
+								for="app-security-api-url"
+								class="block text-[12px] font-medium text-gray-700 dark:text-gray-300"
+							>
 								Security API URL
 							</label>
 							<input
+								id="app-security-api-url"
 								type="text"
 								bind:value={$settings.securityApiUrl}
 								oninput={() => {
@@ -259,10 +231,14 @@
 						</div>
 
 						<div>
-							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+							<label
+								for="app-security-api-key"
+								class="block text-[12px] font-medium text-gray-700 dark:text-gray-300"
+							>
 								Security API Key
 							</label>
 							<input
+								id="app-security-api-key"
 								type="password"
 								bind:value={$settings.securityApiKey}
 								oninput={() => {
@@ -291,10 +267,14 @@
 					</p>
 					<div class="space-y-3">
 						<div>
-							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+							<label
+								for="app-llm-api-url"
+								class="block text-[12px] font-medium text-gray-700 dark:text-gray-300"
+							>
 								LLM API URL
 							</label>
 							<input
+								id="app-llm-api-url"
 								type="text"
 								bind:value={$settings.llmApiUrl}
 								oninput={() => {
@@ -306,10 +286,14 @@
 						</div>
 
 						<div>
-							<label class="block text-[12px] font-medium text-gray-700 dark:text-gray-300">
+							<label
+								for="app-llm-api-key"
+								class="block text-[12px] font-medium text-gray-700 dark:text-gray-300"
+							>
 								LLM API Key
 							</label>
 							<input
+								id="app-llm-api-key"
 								type="password"
 								bind:value={$settings.llmApiKey}
 								oninput={() => {

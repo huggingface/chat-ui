@@ -5,7 +5,7 @@
 		classNames: string;
 	}
 
-	let { isCollapsed, classNames, onClick }: Props = $props();
+	const { isCollapsed, classNames, onClick }: Props = $props();
 </script>
 
 <button

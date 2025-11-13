@@ -3,17 +3,18 @@
 
 	import CarbonCopy from "~icons/carbon/copy";
 	import Tooltip from "./Tooltip.svelte";
+	import type { Snippet } from "svelte";
 
 	interface Props {
 		classNames?: string;
 		iconClassNames?: string;
 		value: string;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 		onClick?: () => void;
 		showTooltip?: boolean;
 	}
 
-	let {
+	const {
 		classNames = "",
 		iconClassNames = "",
 		value,

@@ -9,7 +9,7 @@
 		close: () => void;
 	}
 
-	let { close }: Props = $props();
+	const { close }: Props = $props();
 </script>
 
 <Modal closeOnBackdrop={false} onclose={close} width="!max-w-[420px] !m-4">

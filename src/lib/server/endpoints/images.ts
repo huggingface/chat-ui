@@ -49,9 +49,13 @@ export function makeImageProcessor<TMimeType extends string = string>(
 		let sharpInst = sharp(buffer);
 
 		const metadata = await sharpInst.metadata();
-		if (!metadata) throw Error("Failed to read image metadata");
+		if (!metadata) {
+			throw Error("Failed to read image metadata");
+		}
 		const { width, height } = metadata;
-		if (width === undefined || height === undefined) throw Error("Failed to read image size");
+		if (width === undefined || height === undefined) {
+			throw Error("Failed to read image size");
+		}
 
 		const tooLargeInSize = width > maxWidth || height > maxHeight;
 		const tooLargeInBytes = buffer.byteLength > maxSizeInMB * 1000 * 1000;
@@ -95,7 +99,9 @@ const isOutputFormat = (format: string): format is (typeof outputFormats)[number
 
 export function convertImage(sharpInst: Sharp, outputMime: string): Sharp {
 	const [type, format] = outputMime.split("/");
-	if (type !== "image") throw Error(`Requested non-image mime type: ${outputMime}`);
+	if (type !== "image") {
+		throw Error(`Requested non-image mime type: ${outputMime}`);
+	}
 	if (!isOutputFormat(format)) {
 		throw Error(`Requested to convert to an unsupported format: ${format}`);
 	}
@@ -137,11 +143,17 @@ function chooseMimeType<T extends readonly string[]>(
 	}
 
 	const [type] = mime.split("/");
-	if (type !== "image") throw Error(`Received non-image mime type: ${mime}`);
+	if (type !== "image") {
+		throw Error(`Received non-image mime type: ${mime}`);
+	}
 
-	if (supportedMimes.includes(mime) && !preferSizeReduction) return mime;
+	if (supportedMimes.includes(mime) && !preferSizeReduction) {
+		return mime;
+	}
 
-	if (blocklistedMimes.includes(mime)) throw Error(`Received blocklisted mime type: ${mime}`);
+	if (blocklistedMimes.includes(mime)) {
+		throw Error(`Received blocklisted mime type: ${mime}`);
+	}
 
 	const smallestMime = mimesBySizeDesc.findLast((m) => supportedMimes.includes(m));
 	return smallestMime ?? preferredMime;
@@ -197,7 +209,9 @@ const mimeToCompressionRatio: Record<string, number> = {
  **/
 function estimateImageSizeInBytes(mime: string, width: number, height: number): number {
 	const compressionRatio = mimeToCompressionRatio[mime];
-	if (!compressionRatio) throw Error(`Unsupported image format: ${mime}`);
+	if (!compressionRatio) {
+		throw Error(`Unsupported image format: ${mime}`);
+	}
 
 	const bitsPerPixel = 32; // Assuming 32-bit color depth for 8-bit R G B A
 	const bytesPerPixel = bitsPerPixel / 8;

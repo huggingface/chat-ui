@@ -3,6 +3,6 @@
 import { z } from "zod";
 
 export async function GET({ params }) {
-	const id = z.string().parse(params.id);
+	z.string().parse(params.id);
 	return Response.json({ message: "Conversation not found" }, { status: 404 });
 }

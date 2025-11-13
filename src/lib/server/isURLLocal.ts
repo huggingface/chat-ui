@@ -5,7 +5,9 @@ import { isIP } from "node:net";
 const dnsLookup = (hostname: string): Promise<{ address: string; family: number }> => {
 	return new Promise((resolve, reject) => {
 		dns.lookup(hostname, (err, address, family) => {
-			if (err) return reject(err);
+			if (err) {
+				return reject(err);
+			}
 			resolve({ address, family });
 		});
 	});
@@ -39,10 +41,18 @@ export function isURLStringLocal(url: string) {
 }
 
 export function isHostLocalhost(host: string): boolean {
-	if (host === "localhost") return true;
-	if (host === "::1" || host === "[::1]") return true;
-	if (host.startsWith("127.") && isIP(host)) return true;
-	if (host.endsWith(".localhost")) return true;
+	if (host === "localhost") {
+		return true;
+	}
+	if (host === "::1" || host === "[::1]") {
+		return true;
+	}
+	if (host.startsWith("127.") && isIP(host)) {
+		return true;
+	}
+	if (host.endsWith(".localhost")) {
+		return true;
+	}
 
 	return false;
 }

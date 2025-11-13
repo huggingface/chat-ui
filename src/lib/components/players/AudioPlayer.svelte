@@ -6,14 +6,16 @@
 		name: string;
 	}
 
-	let { src, name }: Props = $props();
+	const { src, name }: Props = $props();
 
 	let time = $state(0);
 	let duration = $state(0);
 	let paused = $state(true);
 
 	function format(time: number) {
-		if (isNaN(time)) return "...";
+		if (isNaN(time)) {
+			return "...";
+		}
 
 		const minutes = Math.floor(time / 60);
 		const seconds = Math.floor(time % 60);
@@ -22,12 +24,18 @@
 	}
 
 	function seek(e: PointerEvent) {
-		if (!e.currentTarget) return;
+		if (!e.currentTarget) {
+			return;
+		}
 		const { left, width } = (e.currentTarget as HTMLElement).getBoundingClientRect();
 
 		let p = (e.clientX - left) / width;
-		if (p < 0) p = 0;
-		if (p > 1) p = 1;
+		if (p < 0) {
+			p = 0;
+		}
+		if (p > 1) {
+			p = 1;
+		}
 
 		time = p * duration;
 	}

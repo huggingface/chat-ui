@@ -121,17 +121,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		refreshSessionCookie(event.cookies, auth.secretSessionId);
 	}
 
-	let replaced = false;
+	// const replaced = false; // Unused, kept for future use
 
 	const response = await resolve(event, {
 		transformPageChunk: (chunk) => {
-			// For some reason, Sveltekit doesn't let us load env variables from .env in the app.html template
-			if (replaced || !chunk.html.includes("%gaId%")) {
-				return chunk.html;
-			}
-			replaced = true;
-
-			return chunk.html.replace("%gaId%", config.PUBLIC_GOOGLE_ANALYTICS_ID);
+			return chunk.html;
 		},
 		filterSerializedResponseHeaders: (header) => {
 			return header.includes("content-type");
@@ -142,7 +136,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (config.ALLOW_IFRAME !== "true") {
 		response.headers.append("Content-Security-Policy", "frame-ancestors 'none';");
 	}
-
 
 	if (event.url.pathname.startsWith(`${base}/api/`)) {
 		// get origin from the request

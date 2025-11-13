@@ -5,8 +5,12 @@ import { v4 } from "uuid";
 export function convertLegacyConversation(
 	conv: Pick<Conversation, "messages" | "rootMessageId" | "preprompt">
 ): Pick<Conversation, "messages" | "rootMessageId" | "preprompt"> {
-	if (conv.rootMessageId) return conv; // not a legacy conversation
-	if (conv.messages.length === 0) return conv; // empty conversation
+	if (conv.rootMessageId) {
+		return conv;
+	} // not a legacy conversation
+	if (conv.messages.length === 0) {
+		return conv;
+	} // empty conversation
 	const messages = [
 		{
 			from: "system",

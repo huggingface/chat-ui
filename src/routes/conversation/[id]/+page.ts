@@ -1,5 +1,4 @@
 import { UrlDependency } from "$lib/types/UrlDependency";
-import { redirect } from "@sveltejs/kit";
 import { browser } from "$app/environment";
 import { getConversation } from "$lib/storage/conversations";
 
@@ -21,6 +20,7 @@ export const load = async ({ params, depends }) => {
 					id: conv.id,
 					updatedAt: conv.updatedAt,
 					modelId: conv.model,
+					meta: conv.meta,
 					shared: false,
 				};
 			}
@@ -39,6 +39,7 @@ export const load = async ({ params, depends }) => {
 		id: params.id,
 		updatedAt: new Date(),
 		modelId: "",
+		meta: undefined,
 		shared: false,
 	};
 };

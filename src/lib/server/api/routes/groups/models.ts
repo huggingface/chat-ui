@@ -38,7 +38,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 			try {
 				const { models } = await import("$lib/server/models");
 				return models
-					.filter((m) => m.unlisted == false)
+					.filter((m) => m.unlisted === false)
 					.map((model) => ({
 						id: model.id,
 						name: model.name,
@@ -150,7 +150,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 					return model;
 				})
 				.use(authPlugin)
-				.post("/subscribe", async ({ locals, model, error }) => {
+				.post("/subscribe", async ({ locals, model: _model, error }) => {
 					if (!locals.sessionId) {
 						return error(401, "Unauthorized");
 					}

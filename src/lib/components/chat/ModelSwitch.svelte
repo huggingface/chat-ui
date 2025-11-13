@@ -9,14 +9,16 @@
 		currentModel: Model;
 	}
 
-	let { models, currentModel }: Props = $props();
+	const { models, currentModel }: Props = $props();
 
 	let selectedModelId = $state(
 		models.map((m) => m.id).includes(currentModel.id) ? currentModel.id : models[0].id
 	);
 
 	async function handleModelChange() {
-		if (!page.params.id) return;
+		if (!page.params.id) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${base}/conversation/${page.params.id}`, {

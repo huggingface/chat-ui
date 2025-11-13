@@ -1,5 +1,4 @@
 import type { StoredConversation, StoredFile, StoredSettings } from "./types";
-import type { Conversation } from "$lib/types/Conversation";
 import type { Settings } from "$lib/types/Settings";
 import { nanoid } from "nanoid";
 import { browser } from "$app/environment";
@@ -118,8 +117,14 @@ class IndexedDBStorage {
 				const conversations = (deserializeDates(request.result) as StoredConversation[]) || [];
 				// Sort by updatedAt descending
 				conversations.sort((a, b) => {
-					const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : new Date(a.updatedAt as string).getTime();
-					const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : new Date(b.updatedAt as string).getTime();
+					const aTime =
+						a.updatedAt instanceof Date
+							? a.updatedAt.getTime()
+							: new Date(a.updatedAt as string).getTime();
+					const bTime =
+						b.updatedAt instanceof Date
+							? b.updatedAt.getTime()
+							: new Date(b.updatedAt as string).getTime();
 					return bTime - aTime;
 				});
 				resolve(conversations);
@@ -179,7 +184,9 @@ class IndexedDBStorage {
 		});
 	}
 
-	async saveConversation(conversation: StoredConversation | Omit<StoredConversation, "createdAt" | "updatedAt">): Promise<StoredConversation> {
+	async saveConversation(
+		conversation: StoredConversation | Omit<StoredConversation, "createdAt" | "updatedAt">
+	): Promise<StoredConversation> {
 		await this.init();
 		return new Promise((resolve, reject) => {
 			if (!this.db) {
@@ -223,7 +230,9 @@ class IndexedDBStorage {
 			};
 
 			request.onerror = () => {
-				reject(new Error(`Failed to save conversation: ${request.error?.message || "Unknown error"}`));
+				reject(
+					new Error(`Failed to save conversation: ${request.error?.message || "Unknown error"}`)
+				);
 			};
 		});
 	}
@@ -407,4 +416,3 @@ class IndexedDBStorage {
 }
 
 export const storage = new IndexedDBStorage();
-

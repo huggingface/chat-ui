@@ -14,17 +14,19 @@ export const misc = new Elysia()
 	.get("/public-config", async () => config.getPublicConfig())
 	.get("/feature-flags", async ({ locals }) => {
 		return {
-			enableAssistants: config.ENABLE_ASSISTANTS === "true",
+			enableAssistants: false,
 			loginEnabled, // login feature is on when OID is configured
 			isAdmin: locals.isAdmin,
 		} satisfies FeatureFlags;
 	})
-	.get("/export", async ({ locals }) => {
+	.get("/export", async ({ locals: _locals }) => {
 		// Data export functionality is not required
 		// Conversations and settings are stored client-side
 		throw new Error("Data export is not available - data is stored client-side");
 
-		const stats: {
+		// Deprecated code below - kept for reference but never executed
+		/* eslint-disable @typescript-eslint/no-unused-vars */
+		/* const stats: {
 			nConversations: number;
 			nMessages: number;
 			nFiles: number;
@@ -60,7 +62,9 @@ export const misc = new Elysia()
 							const files = await Promise.all(
 								hashes.map(async (hash) => {
 									try {
-										const convId = (conversation as { _id?: unknown; id?: string }).id || String((conversation as { _id?: unknown })._id);
+										const convId =
+											(conversation as { _id?: unknown; id?: string }).id ||
+											String((conversation as { _id?: unknown })._id);
 										const fileData = await downloadFile(hash, convId);
 										return fileData;
 									} catch {
@@ -71,7 +75,9 @@ export const misc = new Elysia()
 
 							const filenames: string[] = [];
 							files.forEach((file) => {
-								if (!file) return;
+								if (!file) {
+									return;
+								}
 
 								const extension = mimeTypes.extension(file.mime) || null;
 								const convId = conversation._id.toString();
@@ -110,7 +116,9 @@ export const misc = new Elysia()
 								const fileId = collections.bucket.find({ filename: assistant._id.toString() });
 
 								const content = await fileId.next().then(async (file) => {
-									if (!file?._id) return;
+									if (!file?._id) {
+										return;
+									}
 
 									const fileStream = collections.bucket.openDownloadStream(file?._id);
 
@@ -124,7 +132,9 @@ export const misc = new Elysia()
 									return fileBuffer;
 								});
 
-								if (!content) return;
+								if (!content) {
+									return;
+								}
 
 								zipfile.addBuffer(content, `avatar-${assistant._id.toString()}.jpg`);
 								stats.nAvatars++;
@@ -183,4 +193,5 @@ export const misc = new Elysia()
 				"Content-Disposition": 'attachment; filename="export.zip"',
 			},
 		});
+		*/
 	});

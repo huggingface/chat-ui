@@ -2,7 +2,7 @@ import type { RequestHandler } from "./$types";
 import { error, redirect } from "@sveltejs/kit";
 import { base } from "$app/paths";
 import { z } from "zod";
-import { models, validateModel } from "$lib/server/models";
+import { models } from "$lib/server/models";
 import { nanoid } from "nanoid";
 import { MetricsServer } from "$lib/server/metrics";
 

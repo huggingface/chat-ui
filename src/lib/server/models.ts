@@ -5,7 +5,6 @@ import endpoints, { endpointSchema, type Endpoint } from "./endpoints/endpoints"
 
 import JSON5 from "json5";
 import { logger } from "$lib/server/logger";
-import { makeRouterEndpoint } from "$lib/server/router/endpoint";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -47,6 +46,7 @@ const modelConfig = z.object({
 			truncate: z.number().int().positive().optional(),
 			max_tokens: z.number().int().positive().optional(),
 			stop: z.array(z.string()).optional(),
+			stop_sequences: z.array(z.string()).optional(),
 			top_p: z.number().positive().optional(),
 			top_k: z.number().positive().optional(),
 			frequency_penalty: z.number().min(-2).max(2).optional(),
@@ -106,7 +106,9 @@ function getChatPromptRender(_m: ModelConfig): (inputs: ChatTemplateInput) => st
 	// We avoid any tokenizer/Jinja usage in this build.
 	return ({ messages, preprompt }) => {
 		const parts: string[] = [];
-		if (preprompt) parts.push(`[SYSTEM]\n${preprompt}`);
+		if (preprompt) {
+			parts.push(`[SYSTEM]\n${preprompt}`);
+		}
 		for (const msg of messages) {
 			const role = msg.from === "assistant" ? "ASSISTANT" : msg.from.toUpperCase();
 			parts.push(`[${role}]\n${msg.content}`);
@@ -122,7 +124,9 @@ const processModel = async (m: ModelConfig) => ({
 	id: m.id || m.name,
 	displayName: m.displayName || m.name,
 	preprompt: m.prepromptUrl ? await fetch(m.prepromptUrl).then((r) => r.text()) : m.preprompt,
-	parameters: { ...m.parameters, stop_sequences: m.parameters?.stop },
+	parameters: m.parameters
+		? { ...m.parameters, stop_sequences: m.parameters.stop }
+		: { stop_sequences: undefined },
 	unlisted: m.unlisted ?? false,
 });
 
@@ -202,15 +206,6 @@ const createValidModelIdSchema = (modelList: ProcessedModel[]): z.ZodType<string
 const resolveTaskModel = (modelList: ProcessedModel[]) => {
 	if (modelList.length === 0) {
 		throw new Error("No models available to select task model");
-	}
-
-	if (config.TASK_MODEL) {
-		const preferred = modelList.find(
-			(m) => m.name === config.TASK_MODEL || m.id === config.TASK_MODEL
-		);
-		if (preferred) {
-			return preferred;
-		}
 	}
 
 	return modelList[0];
@@ -308,10 +303,25 @@ const createDummyModel = async (): Promise<ProcessedModel> => {
 		],
 		multimodal: false,
 		unlisted: false,
+		systemRoleSupported: true,
 		endpoints: [
 			{
 				type: "openai" as const,
+				weight: 1,
 				baseURL: openaiBaseUrl || "https://api.openai.com/v1",
+				apiKey: config.OPENAI_API_KEY || "sk-",
+				completion: "chat_completions" as const,
+				multimodal: {
+					image: {
+						supportedMimeTypes: ["image/png", "image/jpeg"],
+						preferredMimeType: "image/jpeg",
+						maxSizeInMB: 1,
+						maxWidth: 1024,
+						maxHeight: 1024,
+					},
+				},
+				useCompletionTokens: false,
+				streamingSupported: false,
 			},
 		],
 		parameters: {
@@ -407,13 +417,17 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			for (const override of overrides) {
 				for (const key of [override.id, override.name]) {
 					const trimmed = key?.trim();
-					if (trimmed) overrideMap.set(trimmed, override);
+					if (trimmed) {
+						overrideMap.set(trimmed, override);
+					}
 				}
 			}
 
 			modelsRaw = modelsRaw.map((model) => {
 				const override = overrideMap.get(model.id ?? "") ?? overrideMap.get(model.name ?? "");
-				if (!override) return model;
+				if (!override) {
+					return model;
+				}
 
 				const { id, name, ...rest } = override;
 				void id;
@@ -433,59 +447,12 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 					.then(async (m) => ({
 						...m,
 						hasInferenceAPI: inferenceApiIds.includes(m.id ?? m.name),
-						// router decoration added later
 						isRouter: false as boolean,
 					}))
 			)
 		);
 
-		const archBase = (config.LLM_ROUTER_ARCH_BASE_URL || "").trim();
-		const routerLabel = (config.PUBLIC_LLM_ROUTER_DISPLAY_NAME || "Omni").trim() || "Omni";
-		const routerLogo = (config.PUBLIC_LLM_ROUTER_LOGO_URL || "").trim();
-		const routerAliasId = (config.PUBLIC_LLM_ROUTER_ALIAS_ID || "omni").trim() || "omni";
-		const routerMultimodalEnabled =
-			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
-
-		let decorated = builtModels as ProcessedModel[];
-
-		if (archBase) {
-			// Build a minimal model config for the alias
-			const aliasRaw = {
-				id: routerAliasId,
-				name: routerAliasId,
-				displayName: routerLabel,
-				logoUrl: routerLogo || undefined,
-				preprompt: "",
-				endpoints: [
-					{
-						type: "openai" as const,
-						baseURL: openaiBaseUrl,
-					},
-				],
-				// Keep the alias visible
-				unlisted: false,
-			} as ModelConfig;
-
-			if (routerMultimodalEnabled) {
-				aliasRaw.multimodal = true;
-				aliasRaw.multimodalAcceptedMimetypes = ["image/*"];
-			}
-
-			const aliasBase = await processModel(aliasRaw);
-			// Create a self-referential ProcessedModel for the router endpoint
-			const aliasModel: ProcessedModel = {
-				...aliasBase,
-				isRouter: true,
-				hasInferenceAPI: false,
-				// getEndpoint uses the router wrapper regardless of the endpoints array
-				getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
-			} as ProcessedModel;
-
-			// Put alias first
-			decorated = [aliasModel, ...decorated];
-		}
-
-		return decorated;
+		return builtModels;
 	} catch (e) {
 		logger.warn(e, "Failed to load models from OpenAI base URL. Using dummy model.");
 		// Return dummy model instead of throwing to allow server to start

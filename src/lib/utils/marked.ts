@@ -146,7 +146,9 @@ function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): 
 		const indices: number[] = (match.match(/\d+/g) || []).map(Number);
 		const links: string = indices
 			.map((index: number) => {
-				if (index === 0) return false;
+				if (index === 0) {
+					return false;
+				}
 				const source = webSearchSources[index - 1];
 				if (source) {
 					return `<a href="${source.link}" target="_blank" rel="noreferrer" style="${linkStyle}">${index}</a>`;
@@ -175,7 +177,9 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 	});
 }
 function isFencedBlockClosed(raw?: string): boolean {
-	if (!raw) return true;
+	if (!raw) {
+		return true;
+	}
 	/* eslint-disable-next-line no-control-regex */
 	const trimmed = raw.replace(/[\s\u0000]+$/, "");
 	const openingFenceMatch = trimmed.match(/^([`~]{3,})/);

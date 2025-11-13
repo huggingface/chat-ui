@@ -86,7 +86,9 @@ function extractUpstreamError(error: unknown): { message: string; statusCode?: n
  * (vs transient errors that should trigger fallback)
  */
 function isPolicyError(statusCode?: number): boolean {
-	if (!statusCode) return false;
+	if (!statusCode) {
+		return false;
+	}
 	// 400: Bad Request, 402: Payment Required, 401: Unauthorized, 403: Forbidden
 	return statusCode === 400 || statusCode === 401 || statusCode === 402 || statusCode === 403;
 }
@@ -164,7 +166,9 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				details: null,
 				routerMetadata: { route: selectedRoute, model: actualModel },
 			};
-			for await (const ev of gen) yield ev;
+			for await (const ev of gen) {
+				yield ev;
+			}
 		}
 
 		async function findFirstMultimodalCandidateId(): Promise<string | undefined> {

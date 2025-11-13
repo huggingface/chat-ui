@@ -7,7 +7,7 @@
 		loading?: boolean;
 	}
 
-	let { tokens, loading = false }: Props = $props();
+	const { tokens, loading = false }: Props = $props();
 
 	// Derive rendered tokens for memoization
 	const renderedTokens = $derived(tokens);

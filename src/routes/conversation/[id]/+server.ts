@@ -1,5 +1,4 @@
-import { models, validModelIdSchema } from "$lib/server/models";
-import { ERROR_MESSAGES } from "$lib/stores/errors";
+import { models } from "$lib/server/models";
 import type { Message } from "$lib/types/Message";
 import type { Conversation } from "$lib/types/Conversation";
 import { error } from "@sveltejs/kit";
@@ -20,11 +19,9 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { MetricsServer } from "$lib/server/metrics";
-import {
-	callSecurityApi,
-	mergeSecurityApiConfig,
-} from "$lib/server/security/securityApi";
+import { callSecurityApi, mergeSecurityApiConfig } from "$lib/server/security/securityApi";
 import { endpoints } from "$lib/server/endpoints/endpoints";
+import { config } from "$lib/server/config";
 
 export async function POST({
 	request,
@@ -336,7 +333,9 @@ export async function POST({
 
 				// Add token to content or skip if empty
 				if (event.type === MessageUpdateType.Stream) {
-					if (event.token === "") return;
+					if (event.token === "") {
+						return;
+					}
 					messageToWriteTo.content += event.token;
 
 					if (metricsEnabled && metrics) {
@@ -431,7 +430,9 @@ export async function POST({
 				messageToWriteTo.updatedAt = new Date();
 
 				const enqueueUpdate = async () => {
-					if (clientDetached) return;
+					if (clientDetached) {
+						return;
+					}
 					try {
 						controller.enqueue(JSON.stringify(event) + "\n");
 						if (event.type === MessageUpdateType.FinalAnswer) {
@@ -448,7 +449,7 @@ export async function POST({
 				// Conversation persistence is handled client-side
 			}
 
-			let hasError = false;
+			const hasError = false;
 			const initialMessageContent = messageToWriteTo.content;
 
 			// Security API call and timing
@@ -457,12 +458,13 @@ export async function POST({
 				response: Awaited<ReturnType<typeof callSecurityApi>>["response"];
 				securityResponseTime: number;
 				error?: string;
+				isDummy?: boolean;
 			} | null = null;
 			let originalRequest: unknown = null;
-			let securityResponse: unknown = null;
 			let llmRequest: unknown = null;
 			let finalLlmResponse: unknown = null;
 			let llmResponseTime = 0;
+			let llmIsDummy = false;
 			const llmStartTime = Date.now();
 
 			try {
@@ -471,22 +473,41 @@ export async function POST({
 
 				if (securityConfig) {
 					// Prepare original request for security API
+					// Store only the current user message for debug info
+					const lastUserMessage = messagesForPrompt[messagesForPrompt.length - 1];
 					originalRequest = {
 						model: model.id ?? model.name,
-						messages: messagesForPrompt.map((msg) => ({
-							role: msg.from === "user" ? "user" : msg.from === "assistant" ? "assistant" : "system",
-							content: msg.content,
-						})),
+						messages:
+							lastUserMessage?.from === "user"
+								? [
+										{
+											role: "user" as const,
+											content: lastUserMessage.content,
+										},
+									]
+								: [],
 					};
 
-					// Call security API
-					securityApiResult = await callSecurityApi(
-						messagesForPrompt,
-						securityConfig,
-						ctrl.signal
-					);
+					// Send status update: Security API requesting
+					await update({
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.SecurityApiRequesting,
+						message: "Security API 요청 중...",
+					});
 
-					securityResponse = securityApiResult.response;
+					// Call security API
+					securityApiResult = await callSecurityApi(messagesForPrompt, securityConfig, ctrl.signal);
+
+					// securityResponse = securityApiResult.response; // Unused, kept for future use
+
+					// Send status update: Security API responded
+					await update({
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.SecurityApiResponded,
+						message: securityApiResult.isDummy
+							? "Security API 응답 수신 (더미)"
+							: "Security API 응답 수신",
+					});
 
 					// Handle security API response
 					if (securityApiResult.error) {
@@ -509,80 +530,173 @@ export async function POST({
 					}
 
 					// If security API returned a response, use it to modify messages
+					// Security API response content should be sent to LLM (both real and dummy responses)
 					if (securityApiResult.response?.choices?.[0]?.message?.content) {
-						// Security API modified the message - use the modified content
-						const modifiedContent = securityApiResult.response.choices[0].message.content;
-						// Update the last user message with modified content
+						// Security API returned a response - use its content for LLM
+						const securityApiContent = securityApiResult.response.choices[0].message.content;
+						// Update the last user message with Security API response content
 						if (messagesForPrompt.length > 0) {
 							const lastMessage = messagesForPrompt[messagesForPrompt.length - 1];
 							if (lastMessage.from === "user") {
 								messagesForPrompt = [
 									...messagesForPrompt.slice(0, -1),
-									{ ...lastMessage, content: modifiedContent },
+									{ ...lastMessage, content: securityApiContent },
 								];
 							}
 						}
 					}
 				}
 
-				// Get endpoint with user settings override if provided
-				let endpoint = await model.getEndpoint();
-				const llmApiUrl = conv.meta?.llmApiUrl ?? globalSettings.llmApiUrl;
-				const llmApiKey = conv.meta?.llmApiKey ?? globalSettings.llmApiKey;
+				// Always try LLM call (even if Security API returned dummy response)
+				try {
+					// Get endpoint with user settings override if provided
+					let endpoint = await model.getEndpoint();
+					const llmApiUrl = conv.meta?.llmApiUrl ?? globalSettings.llmApiUrl;
+					const llmApiKey = conv.meta?.llmApiKey ?? globalSettings.llmApiKey;
 
-				// Override endpoint with user-provided LLM API settings if available
-				if ((llmApiUrl || llmApiKey) && model.endpoints?.[0]?.type === "openai") {
-					const originalEndpoint = model.endpoints[0];
-					endpoint = await endpoints.openai({
-						type: "openai",
-						baseURL: llmApiUrl || originalEndpoint.baseURL || "https://api.openai.com/v1",
-						apiKey: llmApiKey || originalEndpoint.apiKey || config.OPENAI_API_KEY || "sk-",
-						model: model,
-						completion: originalEndpoint.completion || "chat_completions",
-						defaultHeaders: originalEndpoint.defaultHeaders,
-						defaultQuery: originalEndpoint.defaultQuery,
-						extraBody: originalEndpoint.extraBody,
-						multimodal: originalEndpoint.multimodal,
-						useCompletionTokens: originalEndpoint.useCompletionTokens,
-						streamingSupported: originalEndpoint.streamingSupported ?? false,
-					});
-				}
+					// Override endpoint with user-provided LLM API settings if available
+					if ((llmApiUrl || llmApiKey) && model.endpoints?.[0]?.type === "openai") {
+						const originalEndpoint = model.endpoints[0];
+						endpoint = await endpoints.openai({
+							type: "openai",
+							baseURL: llmApiUrl || originalEndpoint.baseURL || "https://api.openai.com/v1",
+							apiKey: llmApiKey || originalEndpoint.apiKey || config.OPENAI_API_KEY || "sk-",
+							model,
+							completion: originalEndpoint.completion || "chat_completions",
+							defaultHeaders: originalEndpoint.defaultHeaders,
+							defaultQuery: originalEndpoint.defaultQuery,
+							extraBody: originalEndpoint.extraBody,
+							multimodal: originalEndpoint.multimodal,
+							useCompletionTokens: originalEndpoint.useCompletionTokens,
+							streamingSupported: originalEndpoint.streamingSupported ?? false,
+						});
+					}
 
-				const ctx: TextGenerationContext = {
-					model,
-					endpoint,
-					conv,
-					messages: messagesForPrompt,
-					assistant: undefined,
-					promptedAt,
-					ip: getClientAddress(),
-					username: locals.user?.username,
-					// Settings are now client-side, multimodal override is not available server-side
-					forceMultimodal: false,
-					locals,
-					abortController: ctrl,
-				};
+					const ctx: TextGenerationContext = {
+						model,
+						endpoint,
+						conv,
+						messages: messagesForPrompt,
+						assistant: undefined,
+						promptedAt,
+						ip: getClientAddress(),
+						username: locals.user?.username,
+						// Settings are now client-side, multimodal override is not available server-side
+						forceMultimodal: false,
+						locals,
+						abortController: ctrl,
+					};
 
-				// Prepare LLM request (for debug info)
-				llmRequest = {
-					model: model.id ?? model.name,
-					messages: messagesForPrompt.map((msg) => ({
-						role: msg.from === "user" ? "user" : msg.from === "assistant" ? "assistant" : "system",
-						content: msg.content,
-					})),
-				};
+					// Prepare LLM request (for debug info)
+					// Store only the user message that will be sent to LLM (after Security API processing)
+					// This includes any modifications made by Security API (if Security API modified the message)
+					const lastUserMessageForLlm = messagesForPrompt[messagesForPrompt.length - 1];
+					llmRequest = {
+						model: model.id ?? model.name,
+						messages:
+							lastUserMessageForLlm?.from === "user"
+								? [
+										{
+											role: "user" as const,
+											content: lastUserMessageForLlm.content,
+										},
+									]
+								: [],
+					};
 
-				// run the text generation and send updates to the client
-				for await (const event of textGeneration(ctx)) {
-					// Capture final LLM response if available
-					if (event.type === MessageUpdateType.FinalAnswer) {
+					// Send status update: LLM requesting (only if Security API is enabled)
+					if (securityConfig) {
+						await update({
+							type: MessageUpdateType.Status,
+							status: MessageUpdateStatus.LlmRequesting,
+							message: "LLM 요청 중...",
+						});
+					}
+
+					// run the text generation and send updates to the client
+					for await (const event of textGeneration(ctx)) {
+						// Capture final LLM response if available
+						if (event.type === MessageUpdateType.FinalAnswer) {
+							finalLlmResponse = {
+								text: event.text,
+								interrupted: event.interrupted,
+							};
+							llmResponseTime = Date.now() - llmStartTime;
+							// Send status update: LLM responded (only if Security API is enabled)
+							if (securityConfig) {
+								await update({
+									type: MessageUpdateType.Status,
+									status: MessageUpdateStatus.LlmResponded,
+									message: "LLM 응답 수신",
+								});
+							}
+						}
+						await update(event);
+					}
+				} catch (llmError) {
+					// If LLM call failed, return dummy LLM response
+					const err = llmError as Error;
+					const isAbortError =
+						err?.name === "AbortError" ||
+						err?.name === "APIUserAbortError" ||
+						err?.message === "Request was aborted.";
+
+					if (!isAbortError && !ctrl.signal.aborted) {
+						// Generate dummy LLM response based on user message
+						// LLM 더미 응답: LLM API 호출 실패 시 반환
+						const lastUserMessage = messagesForPrompt[messagesForPrompt.length - 1];
+						const dummyLlmResponse =
+							lastUserMessage?.from === "user"
+								? `[LLM 더미 응답] LLM API가 사용 불가능하여 더미 응답을 반환합니다. 사용자 메시지: "${lastUserMessage.content.substring(0, 50)}${lastUserMessage.content.length > 50 ? "..." : ""}"`
+								: "[LLM 더미 응답] LLM API가 사용 불가능하여 더미 응답을 반환합니다.";
+
+						// Stream the dummy LLM response token by token
+						const tokens = dummyLlmResponse.split(" ");
+						for (let i = 0; i < tokens.length; i++) {
+							if (ctrl.signal.aborted) {
+								break;
+							}
+							const token = i === 0 ? tokens[i] : " " + tokens[i];
+							await update({
+								type: MessageUpdateType.Stream,
+								token,
+							});
+							await new Promise((resolve) => setTimeout(resolve, 50));
+						}
+
+						// Send final answer
 						finalLlmResponse = {
-							text: event.text,
-							interrupted: event.interrupted,
+							text: dummyLlmResponse,
+							interrupted: false,
 						};
 						llmResponseTime = Date.now() - llmStartTime;
+
+						await update({
+							type: MessageUpdateType.FinalAnswer,
+							text: dummyLlmResponse,
+							interrupted: false,
+						});
+
+						// Send status update: LLM responded (더미)
+						if (securityConfig) {
+							await update({
+								type: MessageUpdateType.Status,
+								status: MessageUpdateStatus.LlmResponded,
+								message: "LLM 응답 수신 (더미)",
+							});
+						}
+
+						finalAnswerReceived = true;
+						llmIsDummy = true;
+						logger.warn(
+							{ conversationId: conv.id },
+							"LLM call failed, returning dummy response",
+							err
+						);
+					} else {
+						// Re-throw abort errors to be handled by outer catch
+						throw llmError;
 					}
-					await update(event);
 				}
 
 				// Send debug info if security API was used
@@ -598,8 +712,10 @@ export async function POST({
 						securityResponse: securityApiResult.response
 							? {
 									action: "allow",
-									reason: "Security API approved",
-									modifiedKwargs: securityApiResult.response,
+									reason: securityApiResult.isDummy
+										? "Security API approved (더미 응답)"
+										: "Security API approved",
+									modifiedKwargs: securityApiResult.response as unknown as Record<string, unknown>,
 								}
 							: undefined,
 						securityResponseTime: securityApiResult.securityResponseTime,
@@ -617,6 +733,7 @@ export async function POST({
 						},
 						llmResponseTime,
 						totalTime,
+						isDummyResponse: (securityApiResult.isDummy ?? false) || llmIsDummy,
 					});
 				}
 				if (ctrl.signal.aborted) {
@@ -655,11 +772,13 @@ export async function POST({
 					// Stream the dummy response token by token for realistic behavior
 					const tokens = dummyResponse.split(" ");
 					for (let i = 0; i < tokens.length; i++) {
-						if (ctrl.signal.aborted) break;
+						if (ctrl.signal.aborted) {
+							break;
+						}
 						const token = i === 0 ? tokens[i] : " " + tokens[i];
 						await update({
 							type: MessageUpdateType.Stream,
-							token: token,
+							token,
 						});
 						// Small delay between tokens for realistic streaming
 						await new Promise((resolve) => setTimeout(resolve, 50));
@@ -691,7 +810,7 @@ export async function POST({
 						const token = i === 0 ? tokens[i] : " " + tokens[i];
 						await update({
 							type: MessageUpdateType.Stream,
-							token: token,
+							token,
 						});
 						await new Promise((resolve) => setTimeout(resolve, 50));
 					}
@@ -714,7 +833,9 @@ export async function POST({
 			}
 		},
 		async cancel() {
-			if (doneStreaming) return;
+			if (doneStreaming) {
+				return;
+			}
 			clientDetached = true;
 			// Conversation persistence is handled client-side
 		},
@@ -732,13 +853,13 @@ export async function POST({
 	});
 }
 
-export async function DELETE({ params }: { params: { id: string } }) {
+export async function DELETE({ params: _params }: { params: { id: string } }) {
 	// Conversation deletion is handled client-side
 	// This endpoint is kept for backward compatibility but does nothing
 	return new Response();
 }
 
-export async function PATCH({ request }: { request: Request; params: { id: string } }) {
+export async function PATCH({ request: _request }: { request: Request; params: { id: string } }) {
 	// Conversation updates are handled client-side
 	// This endpoint is kept for backward compatibility but does nothing
 	return new Response();

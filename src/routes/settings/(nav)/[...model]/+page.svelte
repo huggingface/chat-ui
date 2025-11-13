@@ -27,13 +27,13 @@
 		settings.initValue("customPrompts", page.params.model, defaultPreprompt);
 	});
 
-	let hasCustomPreprompt = $derived(
+	const hasCustomPreprompt = $derived(
 		$settings.customPrompts[page.params.model] !==
 			page.data.models.find((el: BackendModel) => el.id === page.params.model)?.preprompt
 	);
 
-	let model = $derived(page.data.models.find((el: BackendModel) => el.id === page.params.model));
-	let providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
+	const model = $derived(page.data.models.find((el: BackendModel) => el.id === page.params.model));
+	const providerList: RouterProvider[] = $derived((model?.providers ?? []) as RouterProvider[]);
 
 	// Initialize multimodal override for this model if not set yet
 	$effect(() => {

@@ -34,14 +34,19 @@ export function subscribeToTheme(subscriber: ThemeSubscriber) {
 
 function setMetaThemeColor(isDark: boolean) {
 	const metaTheme = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-	if (!metaTheme) return;
+	if (!metaTheme) {
+		return;
+	}
 	metaTheme.setAttribute("content", isDark ? "rgb(26, 36, 50)" : "rgb(249, 250, 251)");
 }
 
 function applyDarkClass(isDark: boolean) {
 	const { classList } = document.querySelector("html") as HTMLElement;
-	if (isDark) classList.add("dark");
-	else classList.remove("dark");
+	if (isDark) {
+		classList.add("dark");
+	} else {
+		classList.remove("dark");
+	}
 	setMetaThemeColor(isDark);
 	notify(currentPreference, isDark);
 }

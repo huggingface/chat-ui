@@ -16,12 +16,12 @@
 		onclose?: () => void;
 	}
 
-	let { file, canClose = true, onclose }: Props = $props();
+	const { file, canClose = true, onclose }: Props = $props();
 
 	let showModal = $state(false);
 
 	// Capture URL once at component creation to prevent reactive updates during navigation
-	let urlNotTrailing = page.url.pathname.replace(/\/$/, "");
+	const urlNotTrailing = page.url.pathname.replace(/\/$/, "");
 
 	function truncateMiddle(text: string, maxLength: number): string {
 		if (text.length <= maxLength) {
@@ -51,7 +51,7 @@
 		mime === "application/xml" ||
 		mime === "application/vnd.chatui.clipboard";
 
-	let isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
+	const isClickable = $derived(isImage(file.mime) || isPlainText(file.mime));
 </script>
 
 {#if showModal && isClickable}

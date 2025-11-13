@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from "svelte";
+	import { onMount, tick, type Snippet } from "svelte";
 
 	import { afterNavigate } from "$app/navigation";
 
@@ -18,12 +18,13 @@
 		disabled?: boolean;
 		// tools removed
 		modelIsMultimodal?: boolean;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
 		onsubmit?: () => void;
 	}
 
+	/* eslint-disable prefer-const */
 	let {
 		files = $bindable([]),
 		mimeTypes = [],
@@ -31,16 +32,18 @@
 		placeholder = "",
 		loading = false,
 		disabled = false,
-
 		modelIsMultimodal = false,
 		children,
 		onPaste,
 		focused = $bindable(false),
 		onsubmit,
 	}: Props = $props();
+	/* eslint-enable prefer-const */
 
 	const onFileChange = async (e: Event) => {
-		if (!e.target) return;
+		if (!e.target) {
+			return;
+		}
 		const target = e.target as HTMLInputElement;
 		files = [...files, ...(target.files ?? [])];
 	};
@@ -57,8 +60,12 @@
 			: Promise.resolve();
 
 	async function focusTextarea() {
-		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
-		if (typeof document !== "undefined" && document.activeElement === textareaElement) return;
+		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) {
+			return;
+		}
+		if (typeof document !== "undefined" && document.activeElement === textareaElement) {
+			return;
+		}
 
 		await tick();
 
@@ -67,7 +74,9 @@
 			await waitForAnimationFrame();
 		}
 
-		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
+		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) {
+			return;
+		}
 
 		try {
 			textareaElement.focus({ preventScroll: true });
@@ -98,7 +107,9 @@
 	}
 
 	$effect(() => {
-		if (!textareaElement) return;
+		if (!textareaElement) {
+			return;
+		}
 		void value;
 		adjustTextareaHeight();
 	});
@@ -148,8 +159,8 @@
 	}
 
 	// Tools removed; only show file upload when applicable
-	let showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
-	let showNoTools = $derived(!showFileUpload);
+	const showFileUpload = $derived(modelIsMultimodal && mimeTypes.length > 0);
+	const showNoTools = $derived(!showFileUpload);
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>

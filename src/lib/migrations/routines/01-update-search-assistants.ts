@@ -1,8 +1,28 @@
 import type { Migration } from ".";
 import { collections } from "$lib/server/database";
-import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import type { Assistant } from "$lib/types/Assistant";
 import { generateSearchTokens } from "$lib/utils/searchTokens";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
+
+type AnyBulkWriteOperation<T> = {
+	updateOne?: {
+		filter: unknown;
+		update: unknown;
+	};
+	deleteOne?: {
+		filter: unknown;
+	};
+	insertOne?: {
+		document: T;
+	};
+};
 
 const migration: Migration = {
 	_id: new ObjectId("5f9f3e3e3e3e3e3e3e3e3e3e"),

@@ -1,8 +1,5 @@
 import { Elysia, error, t } from "elysia";
 import { authPlugin } from "$api/authPlugin";
-import { validModelIdSchema } from "$lib/server/models";
-
-import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
 export const conversationGroup = new Elysia().use(authPlugin).group("/conversations", (app) => {
 	return (
@@ -17,7 +14,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			})
 			.get(
 				"",
-				async ({ query }) => {
+				async ({ query: _query }) => {
 					// Conversations are now stored client-side
 					// Return empty array - client loads from IndexedDB
 					return { conversations: [], nConversations: 0 };

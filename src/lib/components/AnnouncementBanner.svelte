@@ -1,11 +1,13 @@
 <script lang="ts">
+	import type { Snippet } from "svelte";
+
 	interface Props {
 		title?: string;
 		classNames?: string;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
-	let { title = "", classNames = "", children }: Props = $props();
+	const { title = "", classNames = "", children }: Props = $props();
 </script>
 
 <div class="flex items-center rounded-xl bg-gray-100 p-1 text-sm dark:bg-gray-800 {classNames}">

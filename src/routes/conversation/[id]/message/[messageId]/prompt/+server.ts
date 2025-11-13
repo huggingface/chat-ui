@@ -9,7 +9,7 @@ import { z } from "zod";
 export async function GET({ params, request }) {
 	// Get conversation data from query parameter (client-side storage)
 	const conversationJson = new URL(request.url).searchParams.get("conversation");
-	
+
 	if (!conversationJson) {
 		error(400, "Conversation data required");
 	}
@@ -24,7 +24,7 @@ export async function GET({ params, request }) {
 				preprompt: z.string().optional(),
 			})
 			.parse(JSON.parse(conversationJson)) as Conversation;
-		
+
 		if (conv.id !== params.id) {
 			error(400, "Conversation ID mismatch");
 		}

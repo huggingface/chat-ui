@@ -1,7 +1,6 @@
 // MongoDB has been removed - this file provides stub collections for backward compatibility
 // All data is now stored client-side in IndexedDB
 
-import { building } from "$app/environment";
 import type { Conversation } from "$lib/types/Conversation";
 import type { SharedConversation } from "$lib/types/SharedConversation";
 import type { AbortedGeneration } from "$lib/types/AbortedGeneration";
@@ -26,7 +25,9 @@ type StubCollection<T> = {
 		toArray: () => Promise<T[]>;
 		sort: (sort: unknown) => { toArray: () => Promise<T[]> };
 		project: <P>(projection: unknown) => {
-			sort: (sort: unknown) => { skip: (n: number) => { limit: (n: number) => { toArray: () => Promise<P[]> } } };
+			sort: (sort: unknown) => {
+				skip: (n: number) => { limit: (n: number) => { toArray: () => Promise<P[]> } };
+			};
 			toArray: () => Promise<P[]>;
 		};
 		skip: (n: number) => { limit: (n: number) => { toArray: () => Promise<T[]> } };
@@ -55,7 +56,7 @@ type StubGridFSBucket = {
 	};
 };
 
-type Collections = {
+export type Collections = {
 	conversations: StubCollection<Conversation>;
 	conversationStats: StubCollection<ConversationStats>;
 	assistants: StubCollection<Assistant>;

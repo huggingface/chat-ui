@@ -11,12 +11,14 @@
 		loading?: boolean;
 	}
 
-	let { code = "", rawCode = "", loading = false }: Props = $props();
+	const { code = "", rawCode = "", loading = false }: Props = $props();
 
 	let previewOpen = $state(false);
 
 	function hasStrictHtml5Doctype(input: string): boolean {
-		if (!input) return false;
+		if (!input) {
+			return false;
+		}
 		const withoutBOM = input.replace(/^\uFEFF/, "");
 		const trimmed = withoutBOM.trimStart();
 		// Strict HTML5 doctype: <!doctype html> with optional whitespace before >
@@ -28,7 +30,7 @@
 		return /^(?:<\?xml[^>]*>\s*)?(?:<!doctype\s+svg[^>]*>\s*)?<svg[\s>]/i.test(trimmed);
 	}
 
-	let showPreview = $derived(hasStrictHtml5Doctype(rawCode) || isSvgDocument(rawCode));
+	const showPreview = $derived(hasStrictHtml5Doctype(rawCode) || isSvgDocument(rawCode));
 </script>
 
 <div class="group relative my-4 rounded-lg">

@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
+	import type { Snippet } from "svelte";
+
 	interface Props {
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
-	let { children }: Props = $props();
+	const { children }: Props = $props();
 
 	let el: HTMLElement | undefined = $state();
 

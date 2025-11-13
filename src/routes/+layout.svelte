@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy, onMount, untrack } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
@@ -17,22 +17,26 @@
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { setContext } from "svelte";
-	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
+	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
-	import { getConversations, deleteConversation as deleteConversationFromStorage, getConversation, saveConversation } from "$lib/storage/conversations";
+	import {
+		getConversations,
+		deleteConversation as deleteConversationFromStorage,
+		getConversation,
+		saveConversation,
+	} from "$lib/storage/conversations";
 	import { getSettings as getSettingsFromStorage } from "$lib/storage/settings";
 
-	let { data = $bindable(), children } = $props();
+	const { data = $bindable(), children } = $props();
 
 	setContext("publicConfig", data.publicConfig);
 
 	const publicConfig = data.publicConfig;
-	const client = useAPIClient();
 
 	let conversations = $state<ConvSidebar[]>(data.conversations || []);
 
@@ -57,7 +61,7 @@
 		}, 5000);
 	}
 
-	let canShare = $derived(
+	const canShare = $derived(
 		publicConfig.isHuggingChat &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
@@ -95,20 +99,21 @@
 		}
 	}
 
-
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
 	});
 
 	$effect(() => {
-		if ($error) onError();
+		if ($error) {
+			onError();
+		}
 	});
 
 	$effect(() => {
 		if ($titleUpdate) {
 			const convIdx = conversations.findIndex(({ id }) => id === $titleUpdate?.convId);
 
-			if (convIdx != -1) {
+			if (convIdx !== -1) {
 				conversations[convIdx].title = $titleUpdate?.title ?? conversations[convIdx].title;
 			}
 
@@ -116,30 +121,36 @@
 		}
 	});
 
-	let initialSettings = $state(data.settings);
-	
-	const settings = createSettingsStore(initialSettings || {
-		shareConversationsWithModelAuthors: true,
-		activeModel: data.models[0]?.id || "",
-		customPrompts: {},
-		multimodalOverrides: {},
-		hidePromptExamples: {},
-		disableStream: false,
-		directPaste: false,
-	});
+	const initialSettings = $state(data.settings);
+
+	const settings = createSettingsStore(
+		initialSettings || {
+			shareConversationsWithModelAuthors: true,
+			activeModel: data.models[0]?.id || "",
+			customPrompts: {},
+			multimodalOverrides: {},
+			hidePromptExamples: {},
+			disableStream: false,
+			directPaste: false,
+		}
+	);
 
 	// Global keyboard shortcut: New Chat (Ctrl/Cmd + Shift + O)
 	function onKeydown(e: KeyboardEvent) {
 		// Ignore when a modal has focus (app is inert)
 		const appEl = document.getElementById("app");
-		if (appEl?.hasAttribute("inert")) return;
+		if (appEl?.hasAttribute("inert")) {
+			return;
+		}
 
 		const oPressed = e.key?.toLowerCase() === "o";
 		const metaOrCtrl = e.metaKey || e.ctrlKey;
 		if (oPressed && e.shiftKey && metaOrCtrl) {
 			e.preventDefault();
 			isAborted.set(true);
-			if (requireAuthUser()) return;
+			if (requireAuthUser()) {
+				return;
+			}
 			goto(`${base}/`, { invalidateAll: true });
 		}
 	}
@@ -170,7 +181,7 @@
 				}
 			}
 		}
-		
+
 		// Original onMount logic
 		if (page.url.searchParams.has("model")) {
 			await settings
@@ -206,14 +217,18 @@
 		}
 	});
 
-	let mobileNavTitle = $derived(
+	const mobileNavTitle = $derived(
 		["/models", "/privacy"].includes(page.route.id ?? "")
 			? ""
 			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
 
 	// Welcome modal disabled - always hide
-	let showWelcome = $derived(false);
+	const showWelcome = $derived(false);
+
+	function closeWelcomeModal() {
+		// Welcome modal is disabled, but function is required for component
+	}
 </script>
 
 <svelte:head>
@@ -250,14 +265,6 @@
 	{/if}
 	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
 	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
-
-	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		<script async src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}></script>
-	{/if}
-
-	{#if publicConfig.PUBLIC_APPLE_APP_ID}
-		<meta name="apple-itunes-app" content={`app-id=${publicConfig.PUBLIC_APPLE_APP_ID}`} />
-	{/if}
 </svelte:head>
 
 {#if showWelcome}
@@ -314,20 +321,4 @@
 		<Toast message={currentError} />
 	{/if}
 	{@render children?.()}
-
-	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		<script>
-			(window.plausible =
-				window.plausible ||
-				function () {
-					(plausible.q = plausible.q || []).push(arguments);
-				}),
-				(plausible.init =
-					plausible.init ||
-					function (i) {
-						plausible.o = i || {};
-					});
-			plausible.init();
-		</script>
-	{/if}
 </div>

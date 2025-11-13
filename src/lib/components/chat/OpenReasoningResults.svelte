@@ -8,7 +8,7 @@
 		loading?: boolean;
 	}
 
-	let { summary, content, loading = false }: Props = $props();
+	const { summary, content, loading = false }: Props = $props();
 	let isOpen = $state(loading);
 
 	$effect(() => {

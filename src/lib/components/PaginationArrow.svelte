@@ -8,7 +8,7 @@
 		isDisabled?: boolean;
 	}
 
-	let { href, direction, isDisabled = false }: Props = $props();
+	const { href, direction, isDisabled = false }: Props = $props();
 </script>
 
 <a

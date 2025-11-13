@@ -7,7 +7,7 @@
 		backgroundGenerationEntries,
 		removeBackgroundGeneration,
 	} from "$lib/stores/backgroundGenerations";
-	import { handleResponse, useAPIClient } from "$lib/APIClient";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
 	import { UrlDependency } from "$lib/types/UrlDependency";
 	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { Message } from "$lib/types/Message";
@@ -37,7 +37,9 @@
 
 		const stopPoller = (id: string, reason?: string) => {
 			const stop = pollers.get(id);
-			if (!stop) return;
+			if (!stop) {
+				return;
+			}
 
 			stop();
 			pollers.delete(id);
@@ -48,7 +50,9 @@
 		};
 
 		const pollOnce = async (id: string) => {
-			if (destroyed || inflight.has(id)) return;
+			if (destroyed || inflight.has(id)) {
+				return;
+			}
 
 			const entry = backgroundGenerationEntries.find((candidate) => candidate.id === id);
 			if (entry && Date.now() - entry.startedAt > MAX_POLL_DURATION_MS) {
@@ -133,7 +137,9 @@
 		};
 
 		const startPoller = (entry: BackgroundGeneration) => {
-			if (pollers.has(entry.id)) return;
+			if (pollers.has(entry.id)) {
+				return;
+			}
 
 			const intervalId = setInterval(() => {
 				void pollOnce(entry.id);
@@ -147,7 +153,9 @@
 		$effect(() => {
 			const entries = backgroundGenerationEntries;
 
-			if (destroyed) return;
+			if (destroyed) {
+				return;
+			}
 
 			const activeIds = new Set(entries.map((entry) => entry.id));
 
@@ -164,7 +172,9 @@
 
 		return () => {
 			destroyed = true;
-			for (const stop of pollers.values()) stop();
+			for (const stop of pollers.values()) {
+				stop();
+			}
 			pollers.clear();
 			inflight.clear();
 			assistantSnapshots.clear();

@@ -5,12 +5,12 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 	app
 		.get("/config", async () => {
 			const { models } = await import("$lib/server/models");
-		return {
-			OPENAI_BASE_URL: config.OPENAI_BASE_URL,
-			OPENAI_API_KEY_SET: Boolean(config.OPENAI_API_KEY),
-			MODELS_COUNT: models.length,
-			NODE_VERSION: process.versions.node,
-		};
+			return {
+				OPENAI_BASE_URL: config.OPENAI_BASE_URL,
+				OPENAI_API_KEY_SET: Boolean(config.OPENAI_API_KEY),
+				MODELS_COUNT: models.length,
+				NODE_VERSION: process.versions.node,
+			};
 		})
 		.get("/refresh", async () => {
 			const base = (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(

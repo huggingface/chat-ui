@@ -14,7 +14,7 @@
 		loading?: boolean;
 	}
 
-	let { content, sources = [], loading = false }: Props = $props();
+	const { content, sources = [], loading = false }: Props = $props();
 
 	let blocks: BlockToken[] = $state(processBlocksSync(content, sources));
 

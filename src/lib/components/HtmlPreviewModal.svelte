@@ -8,10 +8,10 @@
 		onclose?: () => void;
 	}
 
-	let { html, onclose }: Props = $props();
+	const { html, onclose }: Props = $props();
 
 	let iframeEl: HTMLIFrameElement | undefined = $state();
-	let channel = $state(`preview_${Math.random().toString(36).slice(2)}`);
+	const channel = $state(`preview_${Math.random().toString(36).slice(2)}`);
 	let errors: { message: string; stack?: string }[] = $state([]);
 
 	function buildSrcdoc(content: string, channel: string): string {
@@ -58,7 +58,7 @@
 		return "<head>" + baseTag + disabledLinkStyles + errorHook + "</head>\n" + content;
 	}
 
-	let srcdoc = $derived(buildSrcdoc(html, channel));
+	const srcdoc = $derived(buildSrcdoc(html, channel));
 
 	type PreviewMessage = {
 		type: string;
@@ -67,11 +67,17 @@
 	};
 
 	function onMessage(ev: MessageEvent) {
-		if (!iframeEl || ev.source !== iframeEl.contentWindow) return;
+		if (!iframeEl || ev.source !== iframeEl.contentWindow) {
+			return;
+		}
 		const raw = ev.data as unknown;
-		if (!raw || typeof raw !== "object") return;
+		if (!raw || typeof raw !== "object") {
+			return;
+		}
 		const data = raw as Partial<PreviewMessage>;
-		if (data.type !== "chatui.preview.error" || data.channel !== channel) return;
+		if (data.type !== "chatui.preview.error" || data.channel !== channel) {
+			return;
+		}
 		const detail = (data.detail ?? {}) as { message?: unknown; stack?: string };
 		errors = [...errors, { message: String(detail.message ?? "Error"), stack: detail.stack }];
 	}
@@ -81,7 +87,9 @@
 	});
 	onDestroy(() => {
 		window.removeEventListener("message", onMessage);
-		if (copyTimer) clearTimeout(copyTimer);
+		if (copyTimer) {
+			clearTimeout(copyTimer);
+		}
 	});
 
 	function composeText(): string {

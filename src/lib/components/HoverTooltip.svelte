@@ -1,12 +1,14 @@
 <script lang="ts">
+	import type { Snippet } from "svelte";
+
 	interface Props {
 		label?: string;
 		position?: "top" | "bottom" | "left" | "right";
 		TooltipClassNames?: string;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
-	let { label = "", position = "bottom", TooltipClassNames = "", children }: Props = $props();
+	const { label = "", position = "bottom", TooltipClassNames = "", children }: Props = $props();
 
 	const positionClasses = {
 		top: "bottom-full mb-2",

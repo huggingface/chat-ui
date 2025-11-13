@@ -7,7 +7,7 @@
 		showBorder?: boolean;
 	}
 
-	let { classNames = "", onClick, showBorder = false }: Props = $props();
+	const { classNames = "", onClick, showBorder = false }: Props = $props();
 </script>
 
 <button

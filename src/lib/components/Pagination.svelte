@@ -9,7 +9,7 @@
 		numTotalItems: number;
 	}
 
-	let { classNames = "", numItemsPerPage, numTotalItems }: Props = $props();
+	const { classNames = "", numItemsPerPage, numTotalItems }: Props = $props();
 
 	const ELLIPSIS_IDX = -1 as const;
 
@@ -52,9 +52,9 @@
 		}
 		return pageIdxs;
 	}
-	let numTotalPages = $derived(Math.ceil(numTotalItems / numItemsPerPage));
-	let pageIndex = $derived(parseInt(page.url.searchParams.get("p") ?? "0"));
-	let pageIndexes = $derived(getPageIndexes(pageIndex, numTotalPages));
+	const numTotalPages = $derived(Math.ceil(numTotalItems / numItemsPerPage));
+	const pageIndex = $derived(parseInt(page.url.searchParams.get("p") ?? "0"));
+	const pageIndexes = $derived(getPageIndexes(pageIndex, numTotalPages));
 </script>
 
 {#if numTotalPages > 1}

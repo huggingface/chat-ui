@@ -13,7 +13,9 @@ class ConfigManager {
 	private lastConfigUpdate: Date | undefined;
 
 	async init() {
-		if (this.isInitialized) {return;}
+		if (this.isInitialized) {
+			return;
+		}
 
 		if (import.meta.env.MODE === "test") {
 			this.isInitialized = true;
@@ -63,17 +65,23 @@ class ConfigManager {
 	}
 
 	async set(key: ConfigKey, value: string) {
-		if (!this.ConfigManagerEnabled) {throw new Error("Config manager is disabled");}
+		if (!this.ConfigManagerEnabled) {
+			throw new Error("Config manager is disabled");
+		}
 		this.keysFromDB[key] = value;
 	}
 
 	async delete(key: ConfigKey) {
-		if (!this.ConfigManagerEnabled) {throw new Error("Config manager is disabled");}
+		if (!this.ConfigManagerEnabled) {
+			throw new Error("Config manager is disabled");
+		}
 		delete this.keysFromDB[key];
 	}
 
 	async clear() {
-		if (!this.ConfigManagerEnabled) {throw new Error("Config manager is disabled");}
+		if (!this.ConfigManagerEnabled) {
+			throw new Error("Config manager is disabled");
+		}
 		this.keysFromDB = {};
 	}
 
@@ -110,7 +118,12 @@ export const ready = (async () => {
 	}
 })();
 
-type ExtraConfigKeys = "OLD_MODELS" | "ENABLE_ASSISTANTS" | "METRICS_ENABLED" | "METRICS_PORT";
+type ExtraConfigKeys =
+	| "METRICS_ENABLED"
+	| "METRICS_PORT"
+	| "ALLOW_INSECURE_COOKIES"
+	| "COOKIE_SAMESITE"
+	| "ALLOW_IFRAME";
 
 type ConfigProxy = ConfigManager & { [K in ConfigKey | ExtraConfigKeys]: string };
 

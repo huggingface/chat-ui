@@ -7,7 +7,7 @@
 		message?: string;
 	}
 
-	let { message = "" }: Props = $props();
+	const { message = "" }: Props = $props();
 </script>
 
 <Portal>

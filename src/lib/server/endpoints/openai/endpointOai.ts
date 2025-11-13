@@ -1,13 +1,7 @@
 import { z } from "zod";
 import { openAICompletionToTextGenerationStream } from "./openAICompletionToTextGenerationStream";
-import {
-	openAIChatToTextGenerationSingle,
-	openAIChatToTextGenerationStream,
-} from "./openAIChatToTextGenerationStream";
-import type {
-	ChatCompletionCreateParamsNonStreaming,
-	ChatCompletionCreateParamsStreaming,
-} from "openai/resources/chat/completions";
+import { openAIChatToTextGenerationSingle } from "./openAIChatToTextGenerationStream";
+import type { ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 import { buildPrompt } from "$lib/buildPrompt";
 import { config } from "$lib/server/config";
 import { env as serverEnv } from "$env/dynamic/private";
@@ -63,7 +57,9 @@ export async function endpointOai(
 		multimodal,
 		extraBody,
 		useCompletionTokens,
-		streamingSupported,
+		// streamingSupported is unused but kept for schema compatibility
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		streamingSupported: _streamingSupported,
 	} = endpointOAIParametersSchema.parse(input);
 
 	let OpenAI;
@@ -138,17 +134,18 @@ export async function endpointOai(
 					// If there's an error or blocked response, throw an error
 					if (jsonData.error) {
 						const errorMessage = jsonData.error;
-						const securityAction = jsonData.security_response?.action;
+						// const securityAction = jsonData.security_response?.action; // Unused, kept for future use
 
 						// Map security handler errors to appropriate status codes
-						let statusCode = 500;
-						if (securityAction === "block") {
-							statusCode = 403;
-						} else if (errorMessage.includes("missing") || errorMessage.includes("invalid")) {
-							statusCode = 400;
-						} else if (errorMessage.includes("upstream") || errorMessage.includes("502")) {
-							statusCode = 502;
-						}
+						// statusCode is kept for future use but not currently used
+						// let statusCode = 500;
+						// if (securityAction === "block") {
+						// 	statusCode = 403;
+						// } else if (errorMessage.includes("missing") || errorMessage.includes("invalid")) {
+						// 	statusCode = 400;
+						// } else if (errorMessage.includes("upstream") || errorMessage.includes("502")) {
+						// 	statusCode = 502;
+						// }
 
 						throw new Error(errorMessage);
 					}
@@ -166,7 +163,10 @@ export async function endpointOai(
 				}
 			} catch (e) {
 				// If JSON parsing fails or error extraction fails, continue with original response
-				if (e instanceof Error && (e.message.includes("blocked") || e.message.includes("Blocked"))) {
+				if (
+					e instanceof Error &&
+					(e.message.includes("blocked") || e.message.includes("Blocked"))
+				) {
 					throw e; // Re-throw security errors
 				}
 			}
@@ -295,18 +295,15 @@ export async function endpointOai(
 			// Force non-streaming mode for security handler compatibility
 			// Always use non-streaming to support custom JSON responses from litellm security handler
 			// When security is enabled, litellm handler will return a single JSON object, not a stream
-			const openChatAICompletion = await openai.chat.completions.create(
-				body,
-				{
-					body: { ...body, ...extraBody, ...securityPayload, stream: false }, // Always force non-streaming in request body
-					headers: {
-						"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
-						"X-use-cache": "false",
-						...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
-					},
-					signal: abortSignal,
-				}
-			);
+			const openChatAICompletion = await openai.chat.completions.create(body, {
+				body: { ...body, ...extraBody, ...securityPayload, stream: false }, // Always force non-streaming in request body
+				headers: {
+					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+					"X-use-cache": "false",
+					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+				},
+				signal: abortSignal,
+			});
 			return openAIChatToTextGenerationSingle(
 				openChatAICompletion,
 				() => routerMetadata,

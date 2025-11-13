@@ -10,12 +10,14 @@
 		onDragInner?: boolean;
 	}
 
+	/* eslint-disable prefer-const */
 	let {
 		files = $bindable(),
 		mimeTypes = [],
 		onDrag = $bindable(false),
 		onDragInner = $bindable(false),
 	}: Props = $props();
+	/* eslint-enable prefer-const */
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();

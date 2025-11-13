@@ -1,6 +1,13 @@
 import { collections } from "$lib/server/database";
 import type { Migration } from ".";
-import { ObjectId } from "mongodb";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
 
 const migration: Migration = {
 	_id: new ObjectId("000000000000000000000010"),

@@ -23,7 +23,7 @@ const dummyModel = {
 export async function GET() {
 	try {
 		const res = models
-			.filter((m) => m.unlisted == false)
+			.filter((m) => m.unlisted === false)
 			.map((model) => ({
 				id: model.id,
 				name: model.name,

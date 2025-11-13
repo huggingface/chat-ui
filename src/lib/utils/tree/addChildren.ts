@@ -41,7 +41,9 @@ export function addChildren<T>(conv: Tree<T>, message: NewNode<T>, parentId?: Tr
 	if (parent) {
 		if (parent.children) {
 			parent.children.push(messageId);
-		} else parent.children = [messageId];
+		} else {
+			parent.children = [messageId];
+		}
 	}
 
 	return messageId;

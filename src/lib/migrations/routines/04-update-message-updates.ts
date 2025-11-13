@@ -1,6 +1,5 @@
 import type { Migration } from ".";
 import { collections } from "$lib/server/database";
-import { ObjectId, type WithId } from "mongodb";
 import type { Conversation } from "$lib/types/Conversation";
 import {
 	MessageUpdateStatus,
@@ -8,6 +7,16 @@ import {
 	type MessageUpdate,
 } from "$lib/types/MessageUpdate";
 import type { Message } from "$lib/types/Message";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
+
+type WithId<T> = T & { _id: string };
 // isMessageWebSearchSourcesUpdate removed from utils; use inline predicate
 
 // -----------
@@ -88,7 +97,9 @@ function convertMessageUpdate(message: Message, update: OldMessageUpdate): Messa
 					title: update.message ?? "New Chat",
 				};
 			}
-			if (update.status === "pending") return null;
+			if (update.status === "pending") {
+				return null;
+			}
 
 			const status =
 				update.status === "started"

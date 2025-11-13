@@ -1,14 +1,41 @@
 import type { Migration } from ".";
 import { collections } from "$lib/server/database";
-import { Collection, FindCursor, ObjectId } from "mongodb";
 import { logger } from "$lib/server/logger";
 import type { Conversation } from "$lib/types/Conversation";
+
+// Stub types for MongoDB compatibility
+class ObjectId {
+	constructor(public id: string) {}
+	toString() {
+		return this.id;
+	}
+}
+
+type Collection<T> = {
+	find: (
+		query?: unknown,
+		options?: unknown
+	) => {
+		batchSize: (size: number) => AsyncIterable<T>;
+		hasNext: () => Promise<boolean>;
+		next: () => Promise<T | null>;
+	};
+	deleteMany: (query: unknown) => Promise<{ deletedCount: number }>;
+};
+
+type FindCursor<T> = AsyncIterable<T> & {
+	hasNext: () => Promise<boolean>;
+	next: () => Promise<T | null>;
+	batchSize: (size: number) => FindCursor<T>;
+};
 
 const BATCH_SIZE = 1000;
 const DELETE_THRESHOLD_MS = 60 * 60 * 1000;
 
 async function deleteBatch(conversations: Collection<Conversation>, ids: ObjectId[]) {
-	if (ids.length === 0) return 0;
+	if (ids.length === 0) {
+		return 0;
+	}
 	const deleteResult = await conversations.deleteMany({ _id: { $in: ids } });
 	return deleteResult.deletedCount;
 }
@@ -33,9 +60,9 @@ async function processCursor<T>(
 	}
 }
 
-export async function deleteConversations(
-	collections: typeof import("$lib/server/database").collections
-) {
+import type { Collections } from "$lib/server/database";
+
+export async function deleteConversations(collections: Collections) {
 	let deleteCount = 0;
 	const { conversations, sessions } = collections;
 

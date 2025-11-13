@@ -13,7 +13,9 @@ describe("buildSubtree", () => {
 	it("a subtree in a legacy conversation should be just a slice", async () => {
 		const convId = await insertLegacyConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		// check middle
 		const id = conv.messages[2].id;
@@ -34,7 +36,9 @@ describe("buildSubtree", () => {
 	it("a subtree in a linear branch conversation should be the ancestors and the message", async () => {
 		const convId = await insertLinearBranchConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		// check middle
 		const id = conv.messages[1].id;
@@ -55,7 +59,9 @@ describe("buildSubtree", () => {
 	it("should throw an error if the message is not found", async () => {
 		const convId = await insertLinearBranchConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		const id = "not-a-real-id-test";
 
@@ -65,7 +71,9 @@ describe("buildSubtree", () => {
 	it("should throw an error if the ancestor is not found", async () => {
 		const convId = await insertLinearBranchConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		const id = "1-1-1-1-2";
 
@@ -88,7 +96,9 @@ describe("buildSubtree", () => {
 	it("should work for conversation with subtrees", async () => {
 		const convId = await insertSideBranchesConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		const subtree = buildSubtree(conv, "1-1-1-1-2");
 		expect(subtree).toEqual([conv.messages[0], conv.messages[1]]);

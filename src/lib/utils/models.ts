@@ -7,7 +7,9 @@ export const findCurrentModel = (
 ): Model => {
 	if (id) {
 		const direct = models.find((m) => m.id === id);
-		if (direct) return direct;
+		if (direct) {
+			return direct;
+		}
 	}
 
 	return models[0];

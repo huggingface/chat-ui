@@ -13,7 +13,7 @@
 	import { sanitizeUrlParam } from "$lib/utils/urlParams";
 	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
 
-	let { data } = $props();
+	const { data } = $props();
 
 	let loading = $state(false);
 	let files: File[] = $state([]);

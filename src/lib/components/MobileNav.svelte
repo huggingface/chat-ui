@@ -18,14 +18,16 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import type { Snippet } from "svelte";
+
 	interface Props {
 		title: string | undefined;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
 	let { title = $bindable(), children }: Props = $props();
 
-	let closeEl: HTMLButtonElement | undefined = $state();
+	const closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
 
 	const isHuggingChat = $derived(Boolean(page.data?.publicConfig?.isHuggingChat));
@@ -57,8 +59,8 @@
 		isOpen = false;
 	});
 
-	let shouldFocusClose = $derived(isOpen && closeEl);
-	let shouldRefocusOpen = $derived(!isOpen && browser && document.activeElement === closeEl);
+	const shouldFocusClose = $derived(isOpen && closeEl);
+	const shouldRefocusOpen = $derived(!isOpen && browser && document.activeElement === closeEl);
 
 	$effect(() => {
 		if (shouldFocusClose) {
@@ -98,7 +100,9 @@
 				class="flex size-8 shrink-0 items-center justify-center text-lg"
 				disabled={!canShare}
 				onclick={() => {
-					if (!canShare) return;
+					if (!canShare) {
+						return;
+					}
 					shareModal.open();
 				}}
 				aria-label="Share conversation"

@@ -6,7 +6,7 @@
 		onClick?: () => void;
 	}
 
-	let { classNames = "", onClick }: Props = $props();
+	const { classNames = "", onClick }: Props = $props();
 </script>
 
 <button

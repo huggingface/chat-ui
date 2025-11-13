@@ -27,7 +27,9 @@ async function injectClipboardFiles(messages: EndpointMessage[]) {
 				?.filter((file) => file.mime === "application/vnd.chatui.clipboard")
 				.map((file) => Buffer.from(file.value, "base64").toString("utf-8"));
 
-			if (!plaintextFiles || plaintextFiles.length === 0) return message;
+			if (!plaintextFiles || plaintextFiles.length === 0) {
+				return message;
+			}
 
 			return {
 				...message,

@@ -1,7 +1,5 @@
 // Shouldn't be needed if we dove into sveltekit internals, see https://github.com/huggingface/chat-ui/pull/88#issuecomment-1523173850
 
-import { onExit } from "./exitHandler";
-
 export class AbortedGenerations {
 	private static instance: AbortedGenerations;
 

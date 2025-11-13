@@ -5,13 +5,17 @@ import { logger } from "$lib/server/logger";
 
 // Register Handlebars helpers
 Handlebars.registerHelper("ifUser", function (this: Pick<Message, "from" | "content">, options) {
-	if (this.from == "user") return options.fn(this);
+	if (this.from === "user") {
+		return options.fn(this);
+	}
 });
 
 Handlebars.registerHelper(
 	"ifAssistant",
 	function (this: Pick<Message, "from" | "content">, options) {
-		if (this.from == "assistant") return options.fn(this);
+		if (this.from === "assistant") {
+			return options.fn(this);
+		}
 	}
 );
 

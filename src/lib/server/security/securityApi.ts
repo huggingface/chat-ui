@@ -34,9 +34,67 @@ export async function callSecurityApi(
 	response: OpenAI.Chat.Completions.ChatCompletion | null;
 	securityResponseTime: number;
 	error?: string;
+	isDummy?: boolean;
 }> {
-	if (!config.enabled || !config.url || !config.apiKey) {
+	if (!config.enabled) {
 		return { response: null, securityResponseTime: 0 };
+	}
+
+	// If enabled but URL or API key is missing, return dummy response
+	if (!config.url || !config.apiKey) {
+		const startTime = Date.now();
+		// Simulate API delay
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		const securityResponseTime = Date.now() - startTime;
+
+		// Convert EndpointMessage[] to OpenAI format for dummy response
+		const messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = messages.map(
+			(msg) => ({
+				role: msg.from === "user" ? "user" : msg.from === "assistant" ? "assistant" : "system",
+				content: msg.content,
+			})
+		);
+
+		// Return dummy response in OpenAI ChatCompletion format
+		// Security API 더미 응답: Security API URL/Key가 없을 때 반환
+		const lastUserMessage = messagesOpenAI[messagesOpenAI.length - 1];
+		const contentPreview =
+			lastUserMessage?.role === "user" && typeof lastUserMessage.content === "string"
+				? lastUserMessage.content.substring(0, 100) +
+					(lastUserMessage.content.length > 100 ? "..." : "")
+				: "";
+		const securityDummyContent = contentPreview
+			? `[Security API 더미 응답] Security API가 설정되지 않아 더미 응답을 반환합니다. 원본 메시지: "${contentPreview}"`
+			: "[Security API 더미 응답] Security API가 설정되지 않아 더미 응답을 반환합니다.";
+
+		const dummyResponse: OpenAI.Chat.Completions.ChatCompletion = {
+			id: "dummy-security-response",
+			object: "chat.completion",
+			created: Math.floor(Date.now() / 1000),
+			model: "gpt-3.5-turbo",
+			choices: [
+				{
+					index: 0,
+					message: {
+						role: "assistant",
+						content: securityDummyContent,
+						refusal: null,
+					},
+					finish_reason: "stop",
+				},
+			],
+			usage: {
+				prompt_tokens: 0,
+				completion_tokens: 0,
+				total_tokens: 0,
+			},
+		};
+
+		return {
+			response: dummyResponse,
+			securityResponseTime,
+			isDummy: true,
+		};
 	}
 
 	const startTime = Date.now();
@@ -99,6 +157,7 @@ export async function callSecurityApi(
 /**
  * Merge security API settings from conversation meta and global settings
  * Priority: conversation meta > global settings
+ * Returns config even if URL or API key is missing (for dummy mode)
  */
 export function mergeSecurityApiConfig(
 	conversationMeta?: {
@@ -117,14 +176,15 @@ export function mergeSecurityApiConfig(
 	const url = conversationMeta?.securityApiUrl ?? globalSettings?.securityApiUrl ?? "";
 	const apiKey = conversationMeta?.securityApiKey ?? globalSettings?.securityApiKey ?? "";
 
-	if (!enabled || !url || !apiKey) {
+	// Return null only if disabled
+	if (!enabled) {
 		return null;
 	}
 
+	// Return config even if URL or API key is missing (for dummy mode)
 	return {
 		enabled,
 		url,
 		apiKey,
 	};
 }
-

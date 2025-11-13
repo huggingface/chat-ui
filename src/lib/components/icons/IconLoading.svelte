@@ -3,7 +3,7 @@
 		classNames?: string;
 	}
 
-	let { classNames = "" }: Props = $props();
+	const { classNames = "" }: Props = $props();
 </script>
 
 <div class={"inline-flex h-8 flex-none items-center gap-1 " + classNames}>

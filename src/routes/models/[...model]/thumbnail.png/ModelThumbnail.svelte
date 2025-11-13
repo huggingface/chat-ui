@@ -7,7 +7,7 @@
 		backgroundImage?: string;
 	}
 
-	let { name, isHuggingChat = false }: Props = $props();
+	const { name, isHuggingChat = false }: Props = $props();
 </script>
 
 <div

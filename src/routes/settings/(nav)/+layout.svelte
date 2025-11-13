@@ -16,12 +16,14 @@
 	import { isDesktop } from "$lib/utils/isDesktop";
 	import { debounce } from "$lib/utils/debounce";
 
+	import type { Snippet } from "svelte";
+
 	interface Props {
 		data: LayoutData;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
-	let { data, children }: Props = $props();
+	const { data, children }: Props = $props();
 
 	let previousPage: string = $state(base || "/");
 	let showContent: boolean = $state(false);
@@ -31,9 +33,13 @@
 	async function scrollSelectedModelIntoView() {
 		await tick();
 		const container = navContainer;
-		if (!container) return;
+		if (!container) {
+			return;
+		}
 		const currentModelId = page.params.model as string | undefined;
-		if (!currentModelId) return;
+		if (!currentModelId) {
+			return;
+		}
 		const buttons = container.querySelectorAll<HTMLButtonElement>("button[data-model-id]");
 		let target: HTMLElement | null = null;
 		for (const btn of buttons) {
@@ -42,7 +48,9 @@
 				break;
 			}
 		}
-		if (!target) return;
+		if (!target) {
+			return;
+		}
 		// Use minimal movement; keep within view if needed
 		target.scrollIntoView({ block: "nearest", inline: "nearest" });
 	}
@@ -92,7 +100,7 @@
 	// Local filter for model list (hyphen/space insensitive)
 	let modelFilter = $state("");
 	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
+	const queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 </script>
 
 <div

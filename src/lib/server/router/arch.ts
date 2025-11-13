@@ -15,7 +15,9 @@ const DEFAULT_LAST_TURNS = 16;
  * @returns Trimmed content with start, ellipsis, and end
  */
 function trimMiddle(content: string, maxLength: number): string {
-	if (content.length <= maxLength) return content;
+	if (content.length <= maxLength) {
+		return content;
+	}
 
 	const indicator = "…";
 	const availableLength = maxLength - indicator.length;
@@ -69,7 +71,9 @@ Based on your analysis, provide your response in the following JSON format if yo
 `.trim();
 
 function lastNTurns<T>(arr: T[], n = DEFAULT_LAST_TURNS) {
-	if (!Array.isArray(arr)) return [] as T[];
+	if (!Array.isArray(arr)) {
+		return [] as T[];
+	}
 	return arr.slice(-n);
 }
 
@@ -89,7 +93,9 @@ function toRouterPrompt(messages: EndpointMessage[], routes: Route[]) {
 	const lastUserIndex = convo.findLastIndex((m) => m.role === "user");
 
 	const trimmedConvo = convo.map((m, idx) => {
-		if (typeof m.content !== "string") return m;
+		if (typeof m.content !== "string") {
+			return m;
+		}
 
 		// Trim assistant messages to reduce routing prompt size and improve latency
 		// Keep start and end for better context understanding
@@ -119,16 +125,24 @@ function toRouterPrompt(messages: EndpointMessage[], routes: Route[]) {
 }
 
 function parseRouteName(text: string): string | undefined {
-	if (!text) return;
+	if (!text) {
+		return;
+	}
 	try {
 		const obj = JSON.parse(text);
-		if (typeof obj?.route === "string" && obj.route.trim()) return obj.route.trim();
+		if (typeof obj?.route === "string" && obj.route.trim()) {
+			return obj.route.trim();
+		}
 	} catch {}
 	const m = text.match(/["']route["']\s*:\s*["']([^"']+)["']/);
-	if (m?.[1]) return m[1].trim();
+	if (m?.[1]) {
+		return m[1].trim();
+	}
 	try {
 		const obj = JSON.parse(text.replace(/'/g, '"'));
-		if (typeof obj?.route === "string" && obj.route.trim()) return obj.route.trim();
+		if (typeof obj?.route === "string" && obj.route.trim()) {
+			return obj.route.trim();
+		}
 	} catch {}
 	return;
 }

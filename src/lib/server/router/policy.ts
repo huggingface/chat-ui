@@ -28,7 +28,9 @@ export async function loadPolicy(): Promise<Route[]> {
 }
 
 export async function getRoutes(): Promise<Route[]> {
-	if (!loaded) await loadPolicy();
+	if (!loaded) {
+		await loadPolicy();
+	}
 	return ROUTES;
 }
 
@@ -43,7 +45,9 @@ export function resolveRouteModels(
 	const sel =
 		routes.find((r) => r.name === routeName) ||
 		routes.find((r) => r.name === "casual_conversation");
-	if (!sel) return { candidates: [fallbackModel] };
+	if (!sel) {
+		return { candidates: [fallbackModel] };
+	}
 	const fallbacks = Array.isArray(sel.fallback_models) ? sel.fallback_models : [];
 	return { candidates: [sel.primary_model, ...fallbacks] };
 }

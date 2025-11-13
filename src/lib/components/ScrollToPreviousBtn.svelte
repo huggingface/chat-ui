@@ -9,18 +9,22 @@
 		class?: string;
 	}
 
-	let { scrollNode, class: className = "" }: Props = $props();
+	const { scrollNode, class: className = "" }: Props = $props();
 	let observer: ResizeObserver | null = $state(null);
 
 	function updateVisibility() {
-		if (!scrollNode) return;
+		if (!scrollNode) {
+			return;
+		}
 		visible =
 			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight &&
 			scrollNode.scrollTop > 200;
 	}
 
 	function scrollToPrevious() {
-		if (!scrollNode) return;
+		if (!scrollNode) {
+			return;
+		}
 		const messages = scrollNode.querySelectorAll("[data-message-id]");
 		const scrollTop = scrollNode.scrollTop;
 		let previousMessage: Element | null = null;

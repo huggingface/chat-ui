@@ -9,7 +9,9 @@ describe("convertLegacyConversation", () => {
 	it("should convert a legacy conversation", async () => {
 		const convId = await insertLegacyConversation();
 		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
-		if (!conv) throw new Error("Conversation not found");
+		if (!conv) {
+			throw new Error("Conversation not found");
+		}
 
 		const newConv = convertLegacyConversation(conv);
 

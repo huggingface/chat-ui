@@ -26,7 +26,8 @@ export async function* generate(
 		generateSettings: assistant?.generateSettings,
 		// Allow user-level override to force multimodal
 		isMultimodal: (forceMultimodal ?? false) || model.multimodal,
-		conversationId: (conv as { _id?: unknown; id?: string }).id || String((conv as { _id?: unknown })._id),
+		conversationId:
+			(conv as { _id?: unknown; id?: string }).id || String((conv as { _id?: unknown })._id),
 		locals,
 		abortSignal: abortController.signal,
 	});
@@ -100,7 +101,9 @@ export async function* generate(
 
 			let text = output.generated_text.trimEnd();
 			for (const stopToken of model.parameters.stop ?? []) {
-				if (!text.endsWith(stopToken)) continue;
+				if (!text.endsWith(stopToken)) {
+					continue;
+				}
 
 				interrupted = false;
 				text = text.slice(0, text.length - stopToken.length);
@@ -115,13 +118,16 @@ export async function* generate(
 		}
 
 		// ignore special tokens
-		if (output.token.special) continue;
+		if (output.token.special) {
+			continue;
+		}
 
 		// yield normal token
 		yield { type: MessageUpdateType.Stream, token: output.token.text };
 
 		// abort check
-		const convId = (conv as { _id?: unknown; id?: string }).id || String((conv as { _id?: unknown })._id);
+		const convId =
+			(conv as { _id?: unknown; id?: string }).id || String((conv as { _id?: unknown })._id);
 		const date = AbortedGenerations.getInstance().getAbortTime(convId);
 
 		if (date && date > promptedAt) {
@@ -133,6 +139,8 @@ export async function* generate(
 		}
 
 		// no output check
-		if (!output) break;
+		if (!output) {
+			break;
+		}
 	}
 }

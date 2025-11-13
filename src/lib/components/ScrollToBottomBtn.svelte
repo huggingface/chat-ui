@@ -7,13 +7,15 @@
 		class?: string;
 	}
 
-	let { scrollNode, class: className = "" }: Props = $props();
+	const { scrollNode, class: className = "" }: Props = $props();
 
 	let visible = $state(false);
 	let observer: ResizeObserver | null = $state(null);
 
 	function updateVisibility() {
-		if (!scrollNode) return;
+		if (!scrollNode) {
+			return;
+		}
 		visible =
 			Math.ceil(scrollNode.scrollTop) + 200 < scrollNode.scrollHeight - scrollNode.clientHeight;
 	}

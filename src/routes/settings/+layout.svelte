@@ -6,11 +6,13 @@
 
 	import Modal from "$lib/components/Modal.svelte";
 
+	import type { Snippet } from "svelte";
+
 	interface Props {
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
-	let { children }: Props = $props();
+	const { children }: Props = $props();
 
 	let previousPage: string = $state(base || "/");
 

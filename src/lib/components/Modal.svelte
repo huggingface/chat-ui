@@ -5,6 +5,7 @@
 	import Portal from "./Portal.svelte";
 	import { browser } from "$app/environment";
 	import CarbonClose from "~icons/carbon/close";
+	import type { Snippet } from "svelte";
 
 	interface Props {
 		width?: string;
@@ -13,10 +14,10 @@
 		/** When false, clicking backdrop will not close the modal */
 		closeOnBackdrop?: boolean;
 		onclose?: () => void;
-		children?: import("svelte").Snippet;
+		children?: Snippet;
 	}
 
-	let {
+	const {
 		width = "max-w-sm",
 		children,
 		closeButton = false,
@@ -53,7 +54,9 @@
 	});
 
 	onDestroy(() => {
-		if (!browser) return;
+		if (!browser) {
+			return;
+		}
 		document.getElementById("app")?.removeAttribute("inert");
 		window.removeEventListener("keydown", handleKeydown, { capture: true });
 	});
