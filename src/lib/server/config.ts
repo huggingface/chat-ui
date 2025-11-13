@@ -1,9 +1,6 @@
 import { env as publicEnv } from "$env/dynamic/public";
 import { env as serverEnv } from "$env/dynamic/private";
 import { building } from "$app/environment";
-import type { ConfigKey as ConfigKeyType } from "$lib/types/ConfigKey";
-import type { Semaphore } from "$lib/types/Semaphore";
-import { Semaphores } from "$lib/types/Semaphore";
 
 export type PublicConfigKey = keyof typeof publicEnv;
 const keysFromEnv = { ...publicEnv, ...serverEnv };
@@ -16,7 +13,7 @@ class ConfigManager {
 	private lastConfigUpdate: Date | undefined;
 
 	async init() {
-		if (this.isInitialized) return;
+		if (this.isInitialized) {return;}
 
 		if (import.meta.env.MODE === "test") {
 			this.isInitialized = true;
@@ -66,17 +63,17 @@ class ConfigManager {
 	}
 
 	async set(key: ConfigKey, value: string) {
-		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
+		if (!this.ConfigManagerEnabled) {throw new Error("Config manager is disabled");}
 		this.keysFromDB[key] = value;
 	}
 
 	async delete(key: ConfigKey) {
-		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
+		if (!this.ConfigManagerEnabled) {throw new Error("Config manager is disabled");}
 		delete this.keysFromDB[key];
 	}
 
 	async clear() {
-		if (!this.ConfigManagerEnabled) throw new Error("Config manager is disabled");
+		if (!this.ConfigManagerEnabled) {throw new Error("Config manager is disabled");}
 		this.keysFromDB = {};
 	}
 

@@ -15,6 +15,7 @@ db
 models/*
 !models/add-your-models-here.txt
 .cursor
+.codanna
 
 # Logs
 logs
