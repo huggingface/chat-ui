@@ -41,6 +41,90 @@ export default defineConfig({
 	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "clsx"],
+		// Exclude server-only dependencies from client bundle
+		exclude: [
+			"sharp",
+			"@resvg/resvg-js",
+			"satori",
+			"satori-html",
+			"parquetjs",
+			"yazl",
+			"pino",
+			"pino-pretty",
+			"prom-client",
+		],
+	},
+	build: {
+		rollupOptions: {
+			onwarn(warning, warn) {
+				// Suppress warnings from external dependencies about unused imports
+				// These are from elysia and exact-mirror, which we don't control
+				if (
+					warning.code === "UNUSED_EXTERNAL_IMPORT" &&
+					(warning.source?.includes("elysia") ||
+						warning.source?.includes("exact-mirror") ||
+						warning.source?.includes("@sinclair/typebox"))
+				) {
+					return;
+				}
+				// Show all other warnings
+				warn(warning);
+			},
+			output: {
+				manualChunks: (id) => {
+					// Server-only code should not be in client bundle
+					if (id.includes("/src/lib/server/") || id.includes("\\src\\lib\\server\\")) {
+						return;
+					}
+
+					// Vendor chunks for large libraries
+					if (id.includes("node_modules")) {
+						// Markdown and text processing
+						if (
+							id.includes("marked") ||
+							id.includes("highlight.js") ||
+							id.includes("katex") ||
+							id.includes("dompurify") ||
+							id.includes("isomorphic-dompurify")
+						) {
+							return "vendor-markdown";
+						}
+
+						// Hugging Face libraries
+						if (id.includes("@huggingface/")) {
+							return "vendor-huggingface";
+						}
+
+						// OpenAI SDK (should be server-only, but type imports might leak)
+						if (id.includes("openai")) {
+							return "vendor-openai";
+						}
+
+						// UI libraries
+						if (
+							id.includes("svelte") ||
+							id.includes("@sveltejs") ||
+							id.includes("unplugin-icons")
+						) {
+							return "vendor-svelte";
+						}
+
+						// Other large dependencies
+						if (
+							id.includes("date-fns") ||
+							id.includes("nanoid") ||
+							id.includes("superjson") ||
+							id.includes("zod")
+						) {
+							return "vendor-utils";
+						}
+
+						// Default vendor chunk for other node_modules
+						return "vendor";
+					}
+				},
+			},
+		},
 	},
 	test: {
 		workspace: [
