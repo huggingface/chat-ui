@@ -57,7 +57,6 @@
 		void _isAuthor;
 		void _readOnly;
 	});
-
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
@@ -65,6 +64,45 @@
 		if (e.key === "Escape") {
 			editMsdgId = null;
 		}
+	}
+
+	function handleCopy(event: ClipboardEvent) {
+		if (!contentEl) return;
+
+		const selection = window.getSelection();
+		if (!selection || selection.isCollapsed) return;
+		if (!selection.anchorNode || !selection.focusNode) return;
+
+		const anchorInside = contentEl.contains(selection.anchorNode);
+		const focusInside = contentEl.contains(selection.focusNode);
+		if (!anchorInside && !focusInside) return;
+
+		if (!event.clipboardData) return;
+
+		const range = selection.getRangeAt(0);
+		const wrapper = document.createElement("div");
+		wrapper.appendChild(range.cloneContents());
+
+		wrapper.querySelectorAll("*").forEach((el) => {
+			el.removeAttribute("style");
+			el.removeAttribute("class");
+			el.removeAttribute("color");
+			el.removeAttribute("bgcolor");
+			el.removeAttribute("background");
+
+			for (const attr of Array.from(el.attributes)) {
+				if (attr.name === "id" || attr.name.startsWith("data-")) {
+					el.removeAttribute(attr.name);
+				}
+			}
+		});
+
+		const html = wrapper.innerHTML;
+		const text = wrapper.textContent ?? "";
+
+		event.preventDefault();
+		event.clipboardData.setData("text/html", html);
+		event.clipboardData.setData("text/plain", text);
 	}
 
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
@@ -183,7 +221,7 @@
 				{/if}
 			{/if}
 
-			<div bind:this={contentEl}>
+			<div bind:this={contentEl} oncopy={handleCopy}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
