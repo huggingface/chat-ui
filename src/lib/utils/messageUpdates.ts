@@ -147,6 +147,16 @@ async function* streamMessageUpdatesToFullWords(
 
 	for await (const messageUpdate of iterator) {
 		if (messageUpdate.type !== "stream") {
+			// When a non-stream update (e.g. tool/status/final answer) arrives,
+			// flush any buffered stream tokens so the UI does not appear to
+			// "cut" mid-sentence while tools are running.
+			if (bufferedStreamUpdates.length > 0) {
+				yield {
+					type: MessageUpdateType.Stream,
+					token: bufferedStreamUpdates.map((u) => u.token).join(""),
+				};
+				bufferedStreamUpdates = [];
+			}
 			yield messageUpdate;
 			continue;
 		}
