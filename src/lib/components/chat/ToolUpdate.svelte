@@ -204,7 +204,7 @@
 				<ul class="py-1 text-sm">
 					{#each update.result.outputs as output}
 						{#each Object.entries(output) as [key, value]}
-							{#if value != null}
+							{#if value != null && key !== "content"}
 								<li>
 									<span class="font-semibold">{key}</span>:
 									<span class="whitespace-pre-wrap">{formatValue(value)}</span>
