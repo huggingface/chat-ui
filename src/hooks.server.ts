@@ -137,12 +137,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const auth = await authenticateRequest(
 		{ type: "svelte", value: event.request.headers },
-		{ type: "svelte", value: event.cookies }
+		{ type: "svelte", value: event.cookies },
+		event.url
 	);
 
 	event.locals.sessionId = auth.sessionId;
 
-	if (loginEnabled && !auth.user) {
+	if (loginEnabled && !auth.user && !event.url.pathname.startsWith(`${base}/.well-known/`)) {
 		if (config.AUTOMATIC_LOGIN === "true") {
 			// AUTOMATIC_LOGIN: always redirect to OAuth flow (unless already on login or healthcheck pages)
 			if (
@@ -151,11 +152,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			) {
 				// To get the same CSRF token after callback
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
-				return await triggerOauthFlow({
-					request: event.request,
-					url: event.url,
-					locals: event.locals,
-				});
+				return await triggerOauthFlow(event);
 			}
 		} else {
 			// Redirect to OAuth flow unless on the authorized pages (home, shared conversation, login, healthcheck, model thumbnails)
@@ -171,7 +168,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				!event.url.pathname.startsWith(`${base}/api`)
 			) {
 				refreshSessionCookie(event.cookies, auth.secretSessionId);
-				return triggerOauthFlow({ request: event.request, url: event.url, locals: event.locals });
+				return triggerOauthFlow(event);
 			}
 		}
 	}
