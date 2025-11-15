@@ -45,7 +45,7 @@
 		"eslint-config-prettier": "^8.5.0",
 		"eslint-plugin-svelte": "^2.45.1",
 		"isomorphic-dompurify": "2.13.0",
-		"js-yaml": "^4.1.0",
+		"js-yaml": "^4.1.1",
 		"minimist": "^1.2.8",
 		"mongodb-memory-server": "^10.1.2",
 		"playwright": "^1.55.1",
