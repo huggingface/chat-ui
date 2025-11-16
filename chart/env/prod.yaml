@@ -80,12 +80,10 @@ envVars:
   LLM_ROUTER_MULTIMODAL_MODEL: "Qwen/Qwen3-VL-30B-A3B-Instruct"
   LLM_ROUTER_ENABLE_TOOLS: "true"
   LLM_ROUTER_TOOLS_MODEL: "moonshotai/Kimi-K2-Instruct-0905"
-  MCP_SERVERS: >
-    [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
   PUBLIC_LLM_ROUTER_DISPLAY_NAME: "Omni"
   PUBLIC_LLM_ROUTER_LOGO_URL: "https://cdn-uploads.huggingface.co/production/uploads/5f17f0a0925b9863e28ad517/C5V0v1xZXv6M7FXsdJH9b.png"
   PUBLIC_LLM_ROUTER_ALIAS_ID: "omni"
-  MODELS: > 
+  MODELS: >
     [
       { "id": "deepseek-ai/DeepSeek-V3.2-Exp", "description": "Experimental V3.2 release focused on faster, lower-cost inference with strong general reasoning and tool use." },
       { "id": "zai-org/GLM-4.6", "description": "Next-gen GLM with very long context and solid multilingual reasoning; good for agents and tools." },

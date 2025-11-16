@@ -76,6 +76,7 @@
 
 <nav
 	class="flex h-12 items-center justify-between rounded-b-xl border-b bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-800/30 dark:shadow-xl md:hidden"
+	style="background: linear-gradient(185deg, #62d2 0%, #96f1 20%, #fdf0 60%);"
 >
 	<button
 		type="button"
@@ -138,7 +139,7 @@
 	)}%); width: {drawerWidthPercentage}%;"
 	class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen}
 	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-screen grid-cols-1
-	grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white pt-4 dark:bg-gray-900 md:hidden"
+	grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white dark:bg-gray-900 md:hidden"
 >
 	{@render children?.()}
 </nav>
