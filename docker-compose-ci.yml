@@ -4,5 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile-ci
     platform: linux/amd64
+    image: chat-ui:latest
     ports:
       - "3000:3000"
