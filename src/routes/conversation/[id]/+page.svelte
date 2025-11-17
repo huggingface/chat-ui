@@ -287,9 +287,7 @@
 					// final text once tools complete, while preserving any
 					// pre‑tool streamed content when appropriate.
 					const hadTools =
-						messageToWriteTo.updates?.some(
-							(u) => u.type === MessageUpdateType.Tool
-						) ?? false;
+						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
 
 					if (hadTools) {
 						const existing = messageToWriteTo.content;
@@ -316,10 +314,8 @@
 								messageToWriteTo.content = finalText;
 							} else {
 								// C. Merge with a paragraph break for readability.
-								const needsGap =
-									!/\n\n$/.test(existing) && !/^\n/.test(finalText ?? "");
-								messageToWriteTo.content =
-									existing + (needsGap ? "\n\n" : "") + finalText;
+								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(finalText ?? "");
+								messageToWriteTo.content = existing + (needsGap ? "\n\n" : "") + finalText;
 							}
 						} else {
 							messageToWriteTo.content = finalText;

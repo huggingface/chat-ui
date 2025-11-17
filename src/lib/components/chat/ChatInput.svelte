@@ -203,6 +203,9 @@
 	// Show file upload when any mime is allowed (text always; images if multimodal)
 	let showFileUpload = $derived(mimeTypes.length > 0);
 	let showNoTools = $derived(!showFileUpload);
+	let selectedServers = $derived(
+		$allMcpServers.filter((server) => $selectedServerIds.has(server.id))
+	);
 </script>
 
 <div class="flex min-h-full flex-1 flex-col" onpaste={onPaste}>
@@ -382,7 +385,7 @@
 
 					{#if $enabledServersCount > 0}
 						<div
-							class="ml-2 inline-flex h-7 items-center gap-1.5 rounded-full border border-blue-500/10 bg-blue-600/10 pl-3 pr-1 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400"
+							class="ml-2 inline-flex h-7 items-center gap-1.5 rounded-full border border-blue-500/10 bg-blue-600/10 pl-2 pr-1 text-xs font-semibold text-blue-700 dark:bg-blue-600/20 dark:text-blue-400"
 							class:grayscale={!modelSupportsTools}
 							class:opacity-60={!modelSupportsTools}
 							class:cursor-help={!modelSupportsTools}
@@ -391,12 +394,28 @@
 								: "Current model doesn’t support tools"}
 						>
 							<button
-								class="cursor-pointer select-none bg-transparent p-0 leading-none text-current focus:outline-none"
+								class="inline-flex cursor-pointer select-none items-center gap-1 bg-transparent p-0 leading-none text-current focus:outline-none"
 								type="button"
 								title="Manage MCP Servers"
 								onclick={() => (isMcpManagerOpen = true)}
 								class:line-through={!modelSupportsTools}
 							>
+								{#if selectedServers.length}
+									<span class="flex items-center -space-x-1">
+										{#each selectedServers.slice(0, 3) as server (server.id)}
+											<img
+												src={getMcpServerFaviconUrl(server.url)}
+												alt=""
+												class="size-4 rounded bg-white p-px shadow-sm ring-1 ring-black/5 dark:bg-gray-900 dark:ring-white/10"
+											/>
+										{/each}
+										{#if selectedServers.length > 3}
+											<span class="ml-1 text-[10px] font-semibold text-blue-800 dark:text-blue-200">
+												+{selectedServers.length - 3}
+											</span>
+										{/if}
+									</span>
+								{/if}
 								MCP ({$enabledServersCount})
 							</button>
 							<button
