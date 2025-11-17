@@ -1,0 +1,8 @@
+services:
+  chat-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile-ci
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
