@@ -94,7 +94,7 @@ export async function* executeToolCalls({
 		}
 		// Attach any resolved image payloads _after_ computing paramsClean so that
 		// logging / status updates continue to show only the lightweight primitive
-		// arguments (e.g. "latest") while the full data: URLs or image blobs are
+		// arguments (e.g. "image_1") while the full data: URLs or image blobs are
 		// only sent to the MCP tool server.
 		attachImageRefsToArgs(argsObj, resolveImageRef);
 		return { call, argsObj, paramsClean, uuid: randomUUID() };

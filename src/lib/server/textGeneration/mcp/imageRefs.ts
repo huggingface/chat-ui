@@ -11,9 +11,9 @@ export type ImageRefResolver = (ref: string) => ImageRefPayload | undefined;
 /**
  * Build a simple image reference resolver based on the latest user message
  * that has image/* files after preprocessing. This allows tools to accept
- * a lightweight string reference (e.g. "latest", "image_1") and receive
- * a resolved image payload in their arguments without exposing large data
- * URLs or binary blobs to the model itself.
+ * a lightweight string reference (e.g. "image_1") and receive a resolved image
+ * payload in their arguments without exposing large data URLs or binary blobs
+ * to the model itself.
  */
 export function buildImageRefResolver(messages: EndpointMessage[]): ImageRefResolver | undefined {
 	// Find the last user message that has at least one image file
@@ -45,11 +45,6 @@ export function buildImageRefResolver(messages: EndpointMessage[]): ImageRefReso
 	const resolver: ImageRefResolver = (ref) => {
 		if (!ref || typeof ref !== "string") return undefined;
 		const trimmed = ref.trim().toLowerCase();
-		if (trimmed === "latest") {
-			const f = imageFiles[imageFiles.length - 1];
-			if (!f) return undefined;
-			return { name: f.name, mime: f.mime, base64: f.value };
-		}
 		const match = /^image_(\d+)$/.exec(trimmed);
 		if (match) {
 			const idx = Number(match[1]) - 1;
@@ -116,9 +111,9 @@ export function attachImageRefsToArgs(
 
 			// Heuristic for third-party tools (e.g. Hugging Face Spaces via MCP)
 			// that expect a string URL in an image input field such as "input_image".
-			// When the model sets that field to "latest" / "image_1" / etc.,
-			// rewrite it to a data: URL so the remote tool sees a real image
-			// while the model only ever saw the short ref string.
+			// When the model sets that field to "image_1" / "image_2" / etc., rewrite
+			// it to a data: URL so the remote tool sees a real image while the model
+			// only ever saw the short ref string.
 			if (key === "input_image") {
 				obj[key] = `data:${resolved.mime};base64,${resolved.base64}`;
 				continue;
