@@ -24,10 +24,11 @@ const IMAGE_REF_KIND: RefKind = {
 const DEFAULT_REF_KINDS: RefKind[] = [IMAGE_REF_KIND];
 
 /**
- * Build a resolver that maps short ref strings (e.g. "image_1") to the
- * corresponding file payload for the latest user message containing files of
- * the allowed kinds. Currently only images are exposed to end users, but the
- * plumbing supports additional kinds later.
+ * Build a resolver that maps short ref strings (e.g. "image_1", "image_2") to the
+ * corresponding file payload across the whole conversation in chronological
+ * order of user uploads. (image_1 = first user-uploaded image, image_2 = second, etc.)
+ * Currently only images are exposed to end users, but the plumbing supports
+ * additional kinds later.
  */
 export function buildFileRefResolver(
 	messages: EndpointMessage[],
@@ -35,33 +36,19 @@ export function buildFileRefResolver(
 ): FileRefResolver | undefined {
 	if (!Array.isArray(refKinds) || refKinds.length === 0) return undefined;
 
-	// Find the newest user message that has at least one matching file
-	let lastUserWithFiles: EndpointMessage | undefined;
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const msg = messages[i];
-		if (msg.from !== "user") continue;
-		const hasMatch = (msg.files ?? []).some((file) => {
-			const mime = file?.mime;
-			return refKinds.some((kind) => kind.matches(mime ?? ""));
-		});
-		if (hasMatch) {
-			lastUserWithFiles = msg;
-			break;
-		}
-	}
-
-	if (!lastUserWithFiles) return undefined;
-
-	// Bucket matched files by ref kind while preserving order within the message
+	// Bucket matched files by ref kind preserving conversation order (oldest -> newest)
 	const buckets = new Map<RefKind, FileRefPayload[]>();
-	for (const file of lastUserWithFiles.files ?? []) {
-		const mime = file?.mime ?? "";
-		const kind = refKinds.find((k) => k.matches(mime));
-		if (!kind) continue;
-		const payload: FileRefPayload = { name: file.name, mime, base64: file.value };
-		const arr = buckets.get(kind) ?? [];
-		arr.push(payload);
-		buckets.set(kind, arr);
+	for (const msg of messages) {
+		if (msg.from !== "user") continue;
+		for (const file of msg.files ?? []) {
+			const mime = file?.mime ?? "";
+			const kind = refKinds.find((k) => k.matches(mime));
+			if (!kind) continue;
+			const payload: FileRefPayload = { name: file.name, mime, base64: file.value };
+			const arr = buckets.get(kind) ?? [];
+			arr.push(payload);
+			buckets.set(kind, arr);
+		}
 	}
 
 	if (buckets.size === 0) return undefined;

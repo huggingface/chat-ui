@@ -16,6 +16,6 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		`Today's date: ${currentDate}.`,
 		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
 		`If a tool needs to operate on an image, set its image input parameter (for example, "input_image") to an image reference string.`,
-		`Use "image_1", "image_2", etc. to point to a specific image from a user message with images. You can also reuse a direct image URL from a prior tool result instead of pasting new base64 data.`,
+		`Use "image_1", "image_2", etc. where the number equals the chronological order of user-uploaded images in this conversation (image_1 = first image uploaded, image_2 = second, and so on). You can also reuse a direct image URL from a prior tool result instead of pasting new base64 data.`,
 	].join(" ");
 }
