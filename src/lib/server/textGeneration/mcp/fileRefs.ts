@@ -91,7 +91,7 @@ const DEFAULT_FIELD_RULES: FieldRule[] = [
 		allowedPrefixes: ["image"],
 	},
 	{
-		keys: ["input_image"],
+		keys: ["input_image", "image", "image_url"],
 		action: "replaceWithDataUrl",
 		allowedPrefixes: ["image"],
 	},
