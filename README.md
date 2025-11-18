@@ -144,7 +144,7 @@ When you select Omni in the UI, Chat UI will:
 
 Tool and multimodal shortcuts:
 
-- Multimodal: If `LLM_ROUTER_ENABLE_MULTIMODAL=true` and the user sends an image, the router bypasses Arch and uses `LLM_ROUTER_MULTIMODAL_MODEL` (or the first multimodal model). Route name: `multimodal`.
+- Multimodal: If `LLM_ROUTER_ENABLE_MULTIMODAL=true` and the user sends an image, the router bypasses Arch and uses the model specified in `LLM_ROUTER_MULTIMODAL_MODEL`. Route name: `multimodal`.
 - Tools: If `LLM_ROUTER_ENABLE_TOOLS=true` and the user has at least one MCP server enabled, the router bypasses Arch and uses `LLM_ROUTER_TOOLS_MODEL`. If that model is missing or misconfigured, it falls back to Arch routing. Route name: `agentic`.
 
 ### MCP Tools (Optional)
