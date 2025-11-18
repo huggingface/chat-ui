@@ -241,6 +241,7 @@
 						class="absolute hidden size-0"
 						aria-label="Upload file"
 						type="file"
+						multiple
 						onchange={onFileChange}
 						onclick={(e) => {
 							if (requireAuthUser()) {
@@ -274,7 +275,7 @@
 										onSelect={() => openFilePickerImage()}
 									>
 										<CarbonImage class="size-4 opacity-90 dark:opacity-80" />
-										Add image
+										Add image(s)
 									</DropdownMenu.Item>
 								{/if}
 
