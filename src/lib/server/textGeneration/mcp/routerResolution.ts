@@ -7,6 +7,7 @@ import {
 	pickToolsCapableModel,
 	ROUTER_TOOLS_ROUTE,
 } from "$lib/server/router/toolsRoute";
+import { findConfiguredMultimodalModel } from "$lib/server/router/multimodal";
 import type { EndpointMessage } from "../../endpoints/endpoints";
 import { stripReasoningFromMessageForRouting } from "../utils/routing";
 import type { ProcessedModel } from "../../models";
@@ -48,15 +49,17 @@ export async function resolveRouterTarget({
 		const allModels = mod.models as ProcessedModel[];
 
 		if (hasImageInput) {
-			const multimodalCandidate = allModels?.find(
-				(candidate) => !candidate.isRouter && candidate.multimodal
-			);
-			if (multimodalCandidate) {
+			const multimodalCandidate = findConfiguredMultimodalModel(allModels);
+			if (!multimodalCandidate) {
+				runMcp = false;
+				logger.warn(
+					{ configuredModel: config.LLM_ROUTER_MULTIMODAL_MODEL },
+					"[mcp] multimodal input but configured model missing or invalid; skipping MCP route"
+				);
+			} else {
 				targetModel = multimodalCandidate;
 				candidateModelId = multimodalCandidate.id ?? multimodalCandidate.name;
 				resolvedRoute = "multimodal";
-			} else {
-				runMcp = false;
 			}
 		} else {
 			// If tools are enabled and at least one MCP server is active, prefer a tools-capable model

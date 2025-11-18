@@ -1,6 +1,5 @@
 import { config } from "$lib/server/config";
 import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
-import type { EndpointMessage } from "../../endpoints/endpoints";
 import { getMcpServers } from "$lib/server/mcp/registry";
 import { isValidUrl } from "$lib/server/urlSafety";
 import { resetMcpToolsCache } from "$lib/server/mcp/tools";
@@ -14,11 +13,13 @@ import type {
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
 import { buildToolPreprompt } from "../utils/toolPrompt";
+import type { EndpointMessage } from "../../endpoints/endpoints";
 import { resolveRouterTarget } from "./routerResolution";
 import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
 import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
+import { buildImageRefResolver } from "./fileRefs";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -199,6 +200,8 @@ export async function* runMcpFlow({
 	} catch {
 		// If anything goes wrong reading the flag, proceed (previous behavior)
 	}
+
+	const resolveFileRef = buildImageRefResolver(messages);
 
 	const hasImageInput = messages.some((msg) =>
 		(msg.files ?? []).some(
@@ -599,6 +602,7 @@ export async function* runMcpFlow({
 					mapping,
 					servers,
 					parseArgs,
+					resolveFileRef,
 					toPrimitive,
 					processToolOutput,
 					abortSignal,

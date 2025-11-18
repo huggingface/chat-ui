@@ -8,6 +8,7 @@ import type { McpToolMapping } from "$lib/server/mcp/tools";
 import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import { callMcpTool, type McpToolTextResponse } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
+import { attachFileRefsToArgs, type FileRefResolver } from "./fileRefs";
 import type { Client } from "@modelcontextprotocol/sdk/client";
 
 export type Primitive = string | number | boolean;
@@ -29,6 +30,7 @@ export interface ExecuteToolCallsParams {
 	mapping: Record<string, McpToolMapping>;
 	servers: McpServerConfig[];
 	parseArgs: (raw: unknown) => Record<string, unknown>;
+	resolveFileRef?: FileRefResolver;
 	toPrimitive: (value: unknown) => Primitive | undefined;
 	processToolOutput: (text: string) => {
 		annotated: string;
@@ -63,6 +65,7 @@ export async function* executeToolCalls({
 	mapping,
 	servers,
 	parseArgs,
+	resolveFileRef,
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
@@ -89,6 +92,11 @@ export async function* executeToolCalls({
 			const prim = toPrimitive(v);
 			if (prim !== undefined) paramsClean[k] = prim;
 		}
+		// Attach any resolved image payloads _after_ computing paramsClean so that
+		// logging / status updates continue to show only the lightweight primitive
+		// arguments (e.g. "image_1") while the full data: URLs or image blobs are
+		// only sent to the MCP tool server.
+		attachFileRefsToArgs(argsObj, resolveFileRef);
 		return { call, argsObj, paramsClean, uuid: randomUUID() };
 	});
 

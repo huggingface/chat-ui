@@ -11,5 +11,11 @@ export function buildToolPreprompt(tools: OpenAiTool[]): string {
 		month: "long",
 		day: "numeric",
 	});
-	return `You can use the following tools if helpful: ${names.join(", ")}. Today's date: ${currentDate}. If a tool generates an image, you can inline it directly: ![alt text](image_url).`;
+	return [
+		`You can use the following tools if helpful: ${names.join(", ")}.`,
+		`Today's date: ${currentDate}.`,
+		`If a tool generates an image, you can inline it directly: ![alt text](image_url).`,
+		`If a tool needs to operate on an image, set its image input parameter (for example, "input_image") to an image reference string.`,
+		`Use "image_1", "image_2", etc. to point to a specific image from a user message with images. You can also reuse a direct image URL from a prior tool result instead of pasting new base64 data.`,
+	].join(" ");
 }
