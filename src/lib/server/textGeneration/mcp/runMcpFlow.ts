@@ -8,7 +8,6 @@ import type {
 	ChatCompletionChunk,
 	ChatCompletionCreateParamsStreaming,
 	ChatCompletionMessageParam,
-	ChatCompletionContentPart,
 	ChatCompletionMessageToolCall,
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
@@ -20,6 +19,8 @@ import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
 import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
 import { buildImageRefResolver } from "./fileRefs";
+import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { makeImageProcessor } from "$lib/server/endpoints/images";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -202,6 +203,13 @@ export async function* runMcpFlow({
 	}
 
 	const resolveFileRef = buildImageRefResolver(messages);
+	const imageProcessor = makeImageProcessor({
+		supportedMimeTypes: ["image/png", "image/jpeg"],
+		preferredMimeType: "image/jpeg",
+		maxSizeInMB: 1,
+		maxWidth: 1024,
+		maxHeight: 1024,
+	});
 
 	const hasImageInput = messages.some((msg) =>
 		(msg.files ?? []).some(
@@ -270,34 +278,11 @@ export async function* runMcpFlow({
 			},
 			"[mcp] starting completion with tools"
 		);
-		const toOpenAiMessage = (msg: EndpointMessage): ChatCompletionMessageParam => {
-			if (msg.from === "user" && mmEnabled) {
-				const parts: ChatCompletionContentPart[] = [{ type: "text", text: msg.content }];
-				for (const file of msg.files ?? []) {
-					if (typeof file?.mime === "string" && file.mime.startsWith("image/")) {
-						const rawValue = file.value as unknown;
-						let encoded: string;
-						if (typeof rawValue === "string") {
-							encoded = rawValue;
-						} else if (rawValue instanceof Uint8Array) {
-							encoded = Buffer.from(rawValue).toString("base64");
-						} else if (rawValue instanceof ArrayBuffer) {
-							encoded = Buffer.from(rawValue).toString("base64");
-						} else {
-							encoded = String(rawValue ?? "");
-						}
-						const url = encoded.startsWith("data:")
-							? encoded
-							: `data:${file.mime};base64,${encoded}`;
-						parts.push({ type: "image_url", image_url: { url, detail: "auto" } });
-					}
-				}
-				return { role: msg.from, content: parts };
-			}
-			return { role: msg.from, content: msg.content };
-		};
-
-		let messagesOpenAI: ChatCompletionMessageParam[] = messages.map(toOpenAiMessage);
+		let messagesOpenAI: ChatCompletionMessageParam[] = await prepareMessagesWithFiles(
+			messages,
+			imageProcessor,
+			mmEnabled
+		);
 		const toolPreprompt = buildToolPreprompt(oaTools);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
