@@ -139,7 +139,7 @@
 		{#if server.errorMessage}
 			<div class="mb-2 flex items-center gap-2">
 				<div
-					class="rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
+					class="line-clamp-6 break-words rounded bg-red-50 px-2 py-1 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200"
 				>
 					{server.errorMessage}
 				</div>

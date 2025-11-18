@@ -18,19 +18,32 @@ export async function getClient(server: McpServerConfig, signal?: AbortSignal): 
 	const existing = pool.get(key);
 	if (existing) return existing;
 
+	let firstError: unknown;
 	const client = new Client({ name: "chat-ui-mcp", version: "0.1.0" });
 	const url = new URL(server.url);
 	const requestInit: RequestInit = { headers: server.headers, signal };
 	try {
 		try {
 			await client.connect(new StreamableHTTPClientTransport(url, { requestInit }));
-		} catch {
+		} catch (httpErr) {
+			// Remember the original HTTP transport error so we can surface it if the fallback also fails.
+			// Today we always show the SSE message, which is misleading when the real failure was HTTP (e.g. 500).
+			firstError = httpErr;
 			await client.connect(new SSEClientTransport(url, { requestInit }));
 		}
 	} catch (err) {
 		try {
 			await client.close?.();
 		} catch {}
+		// Prefer the HTTP error if both transports fail; otherwise fall back to the last error.
+		if (firstError) {
+			const message =
+				"HTTP transport failed: " +
+				String(firstError instanceof Error ? firstError.message : firstError) +
+				"; SSE fallback failed: " +
+				String(err instanceof Error ? err.message : err);
+			throw new Error(message, { cause: err instanceof Error ? err : undefined });
+		}
 		throw err;
 	}
 
