@@ -19,7 +19,7 @@ import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
 import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
-import { buildImageRefResolver } from "./imageRefs";
+import { buildImageRefResolver } from "./fileRefs";
 
 export type RunMcpFlowContext = Pick<
 	TextGenerationContext,
@@ -201,7 +201,7 @@ export async function* runMcpFlow({
 		// If anything goes wrong reading the flag, proceed (previous behavior)
 	}
 
-	const resolveImageRef = buildImageRefResolver(messages);
+	const resolveFileRef = buildImageRefResolver(messages);
 
 	const hasImageInput = messages.some((msg) =>
 		(msg.files ?? []).some(
@@ -602,7 +602,7 @@ export async function* runMcpFlow({
 					mapping,
 					servers,
 					parseArgs,
-					resolveImageRef,
+					resolveFileRef,
 					toPrimitive,
 					processToolOutput,
 					abortSignal,
