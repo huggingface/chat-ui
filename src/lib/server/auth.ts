@@ -512,7 +512,12 @@ export async function triggerOauthFlow({
 }): Promise<Response> {
 	// const referer = request.headers.get("referer");
 	// let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
+
 	let redirectURI = `${url.origin}${base}/login/callback`;
+	// if redirectUri is not local host set it to https
+	if (!redirectURI.includes("localhost")) {
+		redirectURI = redirectURI.replace("http://", "https://");
+	}
 
 	// TODO: Handle errors if provider is not responding
 
