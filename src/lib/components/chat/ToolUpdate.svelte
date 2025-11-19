@@ -38,6 +38,13 @@
 	let animation: Animation | undefined = $state(undefined);
 	let showingLoadingBar = $state(false);
 
+	type ToolOutput = Record<string, unknown>;
+	type McpImageContent = {
+		type: "image";
+		data: string;
+		mimeType: string;
+	};
+
 	const formatValue = (value: unknown): string => {
 		if (value == null) return "";
 		if (typeof value === "object") {
@@ -49,6 +56,47 @@
 		}
 		return String(value);
 	};
+
+	const getOutputText = (output: ToolOutput): string | undefined => {
+		const maybeText = output["text"];
+		if (typeof maybeText !== "string") return undefined;
+		return maybeText;
+	};
+
+	const isImageBlock = (value: unknown): value is McpImageContent => {
+		if (typeof value !== "object" || value === null) return false;
+		const obj = value as Record<string, unknown>;
+		return (
+			obj["type"] === "image" &&
+			typeof obj["data"] === "string" &&
+			typeof obj["mimeType"] === "string"
+		);
+	};
+
+	const getImageBlocks = (output: ToolOutput): McpImageContent[] => {
+		const blocks = output["content"];
+		if (!Array.isArray(blocks)) return [];
+		return blocks.filter(isImageBlock);
+	};
+
+	const getMetadataEntries = (output: ToolOutput): Array<[string, unknown]> => {
+		return Object.entries(output).filter(
+			([key, value]) => value != null && key !== "content" && key !== "text"
+		);
+	};
+
+	interface ParsedToolOutput {
+		text?: string;
+		images: McpImageContent[];
+		metadata: Array<[string, unknown]>;
+	}
+
+	const parseToolOutputs = (outputs: ToolOutput[]): ParsedToolOutput[] =>
+		outputs.map((output) => ({
+			text: getOutputText(output),
+			images: getImageBlocks(output),
+			metadata: getMetadataEntries(output),
+		}));
 
 	$effect(() => {
 		if (!toolError && !toolDone && loading && loadingBarEl && eta) {
@@ -201,18 +249,39 @@
 					<h3 class="text-sm">Result</h3>
 					<div class="h-px flex-1 bg-gradient-to-r from-gray-500/20"></div>
 				</div>
-				<ul class="py-1 text-sm">
-					{#each update.result.outputs as output}
-						{#each Object.entries(output) as [key, value]}
-							{#if value != null && key !== "content"}
-								<li>
-									<span class="font-semibold">{key}</span>:
-									<span class="whitespace-pre-wrap">{formatValue(value)}</span>
-								</li>
+				<div class="py-1 text-sm">
+					{#each parseToolOutputs(update.result.outputs) as parsedOutput}
+						<div class="space-y-2 py-2 first:pt-0 last:pb-0">
+							{#if parsedOutput.text}
+								<!-- prettier-ignore -->
+								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
 							{/if}
-						{/each}
+
+							{#if parsedOutput.images.length > 0}
+								<div class="flex flex-wrap gap-2">
+									{#each parsedOutput.images as image, imageIndex}
+										<img
+											alt={`Tool result image ${imageIndex + 1}`}
+											class="max-h-60 rounded border border-gray-200 dark:border-gray-800"
+											src={`data:${image.mimeType};base64,${image.data}`}
+										/>
+									{/each}
+								</div>
+							{/if}
+
+							{#if parsedOutput.metadata.length > 0}
+								<ul class="space-y-1">
+									{#each parsedOutput.metadata as [key, value]}
+										<li>
+											<span class="font-semibold">{key}</span>:
+											<span class="whitespace-pre-wrap">{formatValue(value)}</span>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
 					{/each}
-				</ul>
+				</div>
 			{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 				<div class="mt-1 flex items-center gap-2 opacity-80">
 					<h3 class="text-sm text-red-600 dark:text-red-400">Error</h3>
