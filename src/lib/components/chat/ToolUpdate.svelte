@@ -253,7 +253,8 @@
 					{#each parseToolOutputs(update.result.outputs) as parsedOutput}
 						<div class="space-y-2 py-2 first:pt-0 last:pb-0">
 							{#if parsedOutput.text}
-								<pre class="whitespace-pre-wrap break-all font-mono">{parsedOutput.text}</pre>
+								<!-- prettier-ignore -->
+								<pre class="whitespace-pre-wrap break-all font-mono text-xs">{parsedOutput.text}</pre>
 							{/if}
 
 							{#if parsedOutput.images.length > 0}
