@@ -8,6 +8,7 @@ type SimpleSource = {
 	link: string;
 };
 import hljs from "highlight.js/lib/core";
+import type { LanguageFn } from "highlight.js";
 import javascript from "highlight.js/lib/languages/javascript";
 import typescript from "highlight.js/lib/languages/typescript";
 import json from "highlight.js/lib/languages/json";
@@ -30,7 +31,7 @@ import plaintext from "highlight.js/lib/languages/plaintext";
 import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
 import { parseMarkdownIntoBlocks } from "./parseBlocks";
 
-[
+const bundledLanguages: [string, LanguageFn][] = [
 	["javascript", javascript],
 	["typescript", typescript],
 	["json", json],
@@ -51,7 +52,9 @@ import { parseMarkdownIntoBlocks } from "./parseBlocks";
 	["yaml", yaml],
 	["sql", sql],
 	["plaintext", plaintext],
-].forEach(([name, language]) => hljs.registerLanguage(name, language as unknown as hljs.LanguageFn));
+];
+
+bundledLanguages.forEach(([name, language]) => hljs.registerLanguage(name, language));
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
