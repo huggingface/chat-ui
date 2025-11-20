@@ -493,7 +493,7 @@ export async function* runMcpFlow({
 				// Merge reasoning + content into a single combined token stream, mirroring
 				// the OpenAI adapter so the UI can auto-detect <think> blocks.
 				let combined = "";
-				if (deltaReasoning && deltaReasoning.length > 0) {
+				if (deltaReasoning.trim().length > 0) {
 					if (!thinkOpen) {
 						combined += "<think>" + deltaReasoning;
 						thinkOpen = true;
