@@ -3,17 +3,19 @@ type SimpleSource = {
 	title?: string;
 	link: string;
 };
-import { processTokens, type Token } from "$lib/utils/marked";
+import { processBlocks, type BlockToken } from "$lib/utils/marked";
 
 export type IncomingMessage = {
 	type: "process";
 	content: string;
 	sources: SimpleSource[];
+	requestId: number;
 };
 
 export type OutgoingMessage = {
 	type: "processed";
-	tokens: Token[];
+	blocks: BlockToken[];
+	requestId: number;
 };
 
 // Flag to track if the worker is currently processing a message
@@ -31,9 +33,11 @@ async function processMessage() {
 		isProcessing = true;
 
 		try {
-			const { content, sources } = nextMessage;
-			const processedTokens = await processTokens(content, sources);
-			postMessage(JSON.parse(JSON.stringify({ type: "processed", tokens: processedTokens })));
+			const { content, sources, requestId } = nextMessage;
+			const processedBlocks = await processBlocks(content, sources);
+			postMessage(
+				JSON.parse(JSON.stringify({ type: "processed", blocks: processedBlocks, requestId }))
+			);
 		} finally {
 			isProcessing = false;
 
