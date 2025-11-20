@@ -7,9 +7,51 @@ type SimpleSource = {
 	title?: string;
 	link: string;
 };
-import hljs from "highlight.js";
+import hljs from "highlight.js/lib/core";
+import javascript from "highlight.js/lib/languages/javascript";
+import typescript from "highlight.js/lib/languages/typescript";
+import json from "highlight.js/lib/languages/json";
+import bash from "highlight.js/lib/languages/bash";
+import shell from "highlight.js/lib/languages/shell";
+import python from "highlight.js/lib/languages/python";
+import go from "highlight.js/lib/languages/go";
+import rust from "highlight.js/lib/languages/rust";
+import java from "highlight.js/lib/languages/java";
+import csharp from "highlight.js/lib/languages/csharp";
+import cpp from "highlight.js/lib/languages/cpp";
+import cLang from "highlight.js/lib/languages/c";
+import xml from "highlight.js/lib/languages/xml";
+import css from "highlight.js/lib/languages/css";
+import scss from "highlight.js/lib/languages/scss";
+import markdownLang from "highlight.js/lib/languages/markdown";
+import yaml from "highlight.js/lib/languages/yaml";
+import sql from "highlight.js/lib/languages/sql";
+import plaintext from "highlight.js/lib/languages/plaintext";
 import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
 import { parseMarkdownIntoBlocks } from "./parseBlocks";
+
+[
+	["javascript", javascript],
+	["typescript", typescript],
+	["json", json],
+	["bash", bash],
+	["shell", shell],
+	["python", python],
+	["go", go],
+	["rust", rust],
+	["java", java],
+	["csharp", csharp],
+	["cpp", cpp],
+	["c", cLang],
+	["xml", xml],
+	["html", xml],
+	["css", css],
+	["scss", scss],
+	["markdown", markdownLang],
+	["yaml", yaml],
+	["sql", sql],
+	["plaintext", plaintext],
+].forEach(([name, language]) => hljs.registerLanguage(name, language as unknown as hljs.LanguageFn));
 
 interface katexBlockToken extends Tokens.Generic {
 	type: "katexBlock";
@@ -159,6 +201,27 @@ function addInlineCitations(md: string, webSearchSources: SimpleSource[] = []): 
 	});
 }
 
+function sanitizeHref(href?: string | null): string | undefined {
+	if (!href) return undefined;
+	const trimmed = href.trim();
+	const lower = trimmed.toLowerCase();
+	if (lower.startsWith("javascript:") || lower.startsWith("data:text/html")) {
+		return undefined;
+	}
+	return trimmed.replace(/>$/, "");
+}
+
+function highlightCode(text: string, lang?: string): string {
+	if (lang && hljs.getLanguage(lang)) {
+		try {
+			return hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
+		} catch {
+			// fall through to auto-detect
+		}
+	}
+	return hljs.highlightAuto(text).value;
+}
+
 function createMarkedInstance(sources: SimpleSource[]): Marked {
 	return new Marked({
 		hooks: {
@@ -166,8 +229,12 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
-			link: (href, title, text) =>
-				`<a href="${href?.replace(/>$/, "")}" target="_blank" rel="noreferrer">${text}</a>`,
+			link: (href, title, text) => {
+				const safeHref = sanitizeHref(href);
+				return safeHref
+					? `<a href="${safeHref}" target="_blank" rel="noreferrer">${text}</a>`
+					: `<span>${escapeHTML(text ?? "")}</span>`;
+			},
 			html: (html) => escapeHTML(html),
 		},
 		gfm: true,
@@ -200,6 +267,13 @@ type TextToken = {
 	html: string | Promise<string>;
 };
 
+const blockCache = new Map<string, BlockToken>();
+
+function cacheKey(index: number, blockContent: string, sources: SimpleSource[]) {
+	const sourceKey = sources.map((s) => s.link).join("|");
+	return `${index}-${hashString(blockContent)}|${sourceKey}`;
+}
+
 export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
 	// Apply incomplete markdown preprocessing for smooth streaming
 	const processedContent = parseIncompleteMarkdown(content);
@@ -213,7 +287,7 @@ export async function processTokens(content: string, sources: SimpleSource[]): P
 				return {
 					type: "code" as const,
 					lang: token.lang,
-					code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+					code: highlightCode(token.text, token.lang),
 					rawCode: token.text,
 					isClosed: isFencedBlockClosed(token.raw ?? ""),
 				};
@@ -240,7 +314,7 @@ export function processTokensSync(content: string, sources: SimpleSource[]): Tok
 			return {
 				type: "code" as const,
 				lang: token.lang,
-				code: hljs.highlightAuto(token.text, hljs.getLanguage(token.lang)?.aliases).value,
+				code: highlightCode(token.text, token.lang),
 				rawCode: token.text,
 				isClosed: isFencedBlockClosed(token.raw ?? ""),
 			};
@@ -282,12 +356,18 @@ export async function processBlocks(
 
 	return await Promise.all(
 		blocks.map(async (blockContent, index) => {
+			const key = cacheKey(index, blockContent, sources);
+			const cached = blockCache.get(key);
+			if (cached) return cached;
+
 			const tokens = await processTokens(blockContent, sources);
-			return {
+			const block: BlockToken = {
 				id: `${index}-${hashString(blockContent)}`,
 				content: blockContent,
 				tokens,
 			};
+			blockCache.set(key, block);
+			return block;
 		})
 	);
 }
@@ -299,11 +379,17 @@ export function processBlocksSync(content: string, sources: SimpleSource[] = [])
 	const blocks = parseMarkdownIntoBlocks(content);
 
 	return blocks.map((blockContent, index) => {
+		const key = cacheKey(index, blockContent, sources);
+		const cached = blockCache.get(key);
+		if (cached) return cached;
+
 		const tokens = processTokensSync(blockContent, sources);
-		return {
+		const block: BlockToken = {
 			id: `${index}-${hashString(blockContent)}`,
 			content: blockContent,
 			tokens,
 		};
+		blockCache.set(key, block);
+		return block;
 	});
 }
