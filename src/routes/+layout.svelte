@@ -14,7 +14,6 @@
 	import NavMenu from "$lib/components/NavMenu.svelte";
 	import MobileNav from "$lib/components/MobileNav.svelte";
 	import titleUpdate from "$lib/stores/titleUpdate";
-	import WelcomeModal from "$lib/components/WelcomeModal.svelte";
 	import ExpandNavigation from "$lib/components/ExpandNavigation.svelte";
 	import { setContext } from "svelte";
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
@@ -95,10 +94,6 @@
 			});
 	}
 
-	function closeWelcomeModal() {
-		if (requireAuthUser()) return;
-		settings.set({ welcomeModalSeen: true });
-	}
 
 	onDestroy(() => {
 		clearTimeout(errorToastTimeout);
@@ -174,11 +169,6 @@
 			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
 
-	// Show the welcome modal once on first app load
-	let showWelcome = $derived(
-		!$settings.welcomeModalSeen &&
-			!(page.data.shared === true && page.route.id?.startsWith("/conversation/"))
-	);
 </script>
 
 <svelte:head>
@@ -224,10 +214,6 @@
 		<meta name="apple-itunes-app" content={`app-id=${publicConfig.PUBLIC_APPLE_APP_ID}`} />
 	{/if}
 </svelte:head>
-
-{#if showWelcome}
-	<WelcomeModal close={closeWelcomeModal} />
-{/if}
 
 <BackgroundGenerationPoller />
 
