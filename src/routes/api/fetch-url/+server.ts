@@ -1,35 +1,10 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
 import { fetch } from "undici";
+import { isValidUrl } from "$lib/server/urlSafety";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
-
-// Validate URL safety - HTTPS only
-function isValidUrl(urlString: string): boolean {
-	try {
-		const url = new URL(urlString);
-		// Only allow HTTPS protocol
-		if (url.protocol !== "https:") {
-			return false;
-		}
-		// Prevent localhost/private IPs (basic check)
-		const hostname = url.hostname.toLowerCase();
-		if (
-			hostname === "localhost" ||
-			hostname.startsWith("127.") ||
-			hostname.startsWith("192.168.") ||
-			hostname.startsWith("172.16.") ||
-			hostname === "[::1]" ||
-			hostname === "0.0.0.0"
-		) {
-			return false;
-		}
-		return true;
-	} catch {
-		return false;
-	}
-}
 
 export async function GET({ url }) {
 	const targetUrl = url.searchParams.get("url");

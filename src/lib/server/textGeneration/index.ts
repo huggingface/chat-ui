@@ -7,6 +7,7 @@ import {
 	MessageUpdateStatus,
 } from "$lib/types/MessageUpdate";
 import { generate } from "./generate";
+import { runMcpFlow } from "./mcp/runMcpFlow";
 import { mergeAsyncGenerators } from "$lib/utils/mergeAsyncGenerators";
 import type { TextGenerationContext } from "./types";
 import { handleWebSearch, enhanceMessageWithWebSearch } from "./webSearchIntegration";
@@ -86,5 +87,34 @@ async function* textGenerationWithoutTitle(
 	}
 
 	yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+
+	// Try MCP tool flow first; fall back to default generation if not selected/available
+	try {
+		const mcpGen = runMcpFlow({
+			model: ctx.model,
+			conv,
+			messages: processedMessages,
+			assistant: ctx.assistant,
+			forceMultimodal: ctx.forceMultimodal,
+			forceTools: ctx.forceTools,
+			locals: ctx.locals,
+			preprompt,
+			abortSignal: ctx.abortController.signal,
+		});
+
+		let step = await mcpGen.next();
+		while (!step.done) {
+			yield step.value;
+			step = await mcpGen.next();
+		}
+		const didRunMcp = Boolean(step.value);
+		if (!didRunMcp) {
+			// fallback to normal text generation
+			yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+		}
+	} catch {
+		// On any MCP error, fall back to normal generation
+		yield* generate({ ...ctx, messages: processedMessages }, preprompt);
+	}
 	done.abort();
 }

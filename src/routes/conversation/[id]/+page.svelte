@@ -17,6 +17,7 @@
 	import { fetchMessageUpdates } from "$lib/utils/messageUpdates";
 	import type { v4 } from "uuid";
 	import { useSettingsStore } from "$lib/stores/settings.js";
+	import { enabledServers } from "$lib/stores/mcpServers";
 	import { browser } from "$app/environment";
 	import {
 		addBackgroundGeneration,
@@ -219,6 +220,12 @@
 					messageId,
 					isRetry,
 					files: isRetry ? userMessage?.files : base64Files,
+					selectedMcpServerNames: $enabledServers.map((s) => s.name),
+					selectedMcpServers: $enabledServers.map((s) => ({
+						name: s.name,
+						url: s.url,
+						headers: s.headers,
+					})),
 				},
 				messageUpdatesAbortController.signal
 			).catch((err) => {
@@ -253,6 +260,19 @@
 				}
 				const currentTime = new Date();
 
+				// If we receive a non-stream update (e.g. tool/status/final answer),
+				// flush any buffered stream tokens so the UI doesn't appear to cut
+				// mid-sentence while tools are running or the final answer arrives.
+				if (
+					update.type !== MessageUpdateType.Stream &&
+					!$settings.disableStream &&
+					buffer.length > 0
+				) {
+					messageToWriteTo.content += buffer;
+					buffer = "";
+					lastUpdateTime = currentTime;
+				}
+
 				if (update.type === MessageUpdateType.Stream && !$settings.disableStream) {
 					buffer += update.token;
 					// Check if this is the first update or if enough time has passed
@@ -262,6 +282,49 @@
 						lastUpdateTime = currentTime;
 					}
 					pending = false;
+				} else if (update.type === MessageUpdateType.FinalAnswer) {
+					// Mirror server-side merge behavior so the UI reflects the
+					// final text once tools complete, while preserving any
+					// pre‑tool streamed content when appropriate.
+					const hadTools =
+						messageToWriteTo.updates?.some((u) => u.type === MessageUpdateType.Tool) ?? false;
+
+					if (hadTools) {
+						const existing = messageToWriteTo.content;
+						const finalText = update.text ?? "";
+						const trimmedExistingSuffix = existing.replace(/\s+$/, "");
+						const trimmedFinalPrefix = finalText.replace(/^\s+/, "");
+						const alreadyStreamed =
+							finalText &&
+							(existing.endsWith(finalText) ||
+								(trimmedFinalPrefix.length > 0 &&
+									trimmedExistingSuffix.endsWith(trimmedFinalPrefix)));
+
+						if (existing && existing.length > 0) {
+							if (alreadyStreamed) {
+								// A. Already streamed the same final text; keep as-is.
+								messageToWriteTo.content = existing;
+							} else if (
+								finalText &&
+								(finalText.startsWith(existing) ||
+									(trimmedExistingSuffix.length > 0 &&
+										trimmedFinalPrefix.startsWith(trimmedExistingSuffix)))
+							) {
+								// B. Final text already includes streamed prefix; use it verbatim.
+								messageToWriteTo.content = finalText;
+							} else {
+								// C. Merge with a paragraph break for readability.
+								const needsGap = !/\n\n$/.test(existing) && !/^\n/.test(finalText ?? "");
+								messageToWriteTo.content = existing + (needsGap ? "\n\n" : "") + finalText;
+							}
+						} else {
+							messageToWriteTo.content = finalText;
+						}
+					} else {
+						// No tools: final answer replaces streamed content so
+						// the provider's final text is authoritative.
+						messageToWriteTo.content = update.text ?? "";
+					}
 				} else if (
 					update.type === MessageUpdateType.Status &&
 					update.status === MessageUpdateStatus.Error

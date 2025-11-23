@@ -71,6 +71,7 @@ export const userGroup = new Elysia()
 
 					customPrompts: settings?.customPrompts ?? {},
 					multimodalOverrides: settings?.multimodalOverrides ?? {},
+					toolsOverrides: settings?.toolsOverrides ?? {},
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {
@@ -85,13 +86,12 @@ export const userGroup = new Elysia()
 						activeModel: z.string().default(DEFAULT_SETTINGS.activeModel),
 						customPrompts: z.record(z.string()).default({}),
 						multimodalOverrides: z.record(z.boolean()).default({}),
+						toolsOverrides: z.record(z.boolean()).default({}),
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
 						hidePromptExamples: z.record(z.boolean()).default({}),
 					})
 					.parse(body) satisfies SettingsEditable;
-
-				// Tools removed: ignore tools updates
 
 				await collections.settings.updateOne(
 					authCondition(locals),

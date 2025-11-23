@@ -12,6 +12,7 @@ type SettingsStore = {
 	activeModel: string;
 	customPrompts: Record<string, string>;
 	multimodalOverrides: Record<string, boolean>;
+	toolsOverrides: Record<string, boolean>;
 	recentlySaved: boolean;
 	disableStream: boolean;
 	directPaste: boolean;

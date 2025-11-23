@@ -23,6 +23,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 			.get(
 				"",
 				async ({ locals, query }) => {
+					const pageSize = CONV_NUM_PER_PAGE;
 					const convs = await collections.conversations
 						.find(authCondition(locals))
 						.project<Pick<Conversation, "_id" | "title" | "updatedAt" | "model">>({
@@ -31,15 +32,12 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 							model: 1,
 						})
 						.sort({ updatedAt: -1 })
-						.skip((query.p ?? 0) * CONV_NUM_PER_PAGE)
-						.limit(CONV_NUM_PER_PAGE)
+						.skip((query.p ?? 0) * pageSize)
+						.limit(pageSize + 1) // fetch one extra to detect next page
 						.toArray();
 
-					const nConversations = await collections.conversations.countDocuments(
-						authCondition(locals)
-					);
-
-					const res = convs.map((conv) => ({
+					const hasMore = convs.length > pageSize;
+					const res = (hasMore ? convs.slice(0, pageSize) : convs).map((conv) => ({
 						_id: conv._id,
 						id: conv._id, // legacy param iOS
 						title: conv.title,
@@ -48,7 +46,7 @@ export const conversationGroup = new Elysia().use(authPlugin).group("/conversati
 						modelId: conv.model, // legacy param iOS
 					}));
 
-					return { conversations: res, nConversations };
+					return { conversations: res, hasMore };
 				},
 				{
 					query: t.Object({

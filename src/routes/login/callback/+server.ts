@@ -52,10 +52,17 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		throw error(403, "Invalid or expired CSRF token");
 	}
 
+	const codeVerifier = cookies.get("hfChat-codeVerifier");
+	if (!codeVerifier) {
+		throw error(403, "Code verifier cookie not found");
+	}
+
 	const { userData, token } = await getOIDCUserData(
 		{ redirectURI: validatedToken.redirectUrl },
 		code,
-		iss
+		codeVerifier,
+		iss,
+		url
 	);
 
 	// Filter by allowed user emails or domains

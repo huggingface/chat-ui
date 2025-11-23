@@ -17,7 +17,7 @@
 		class="flex w-full flex-col gap-8 bg-white bg-gradient-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
 		<div
-			class="-mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
+			class="relative -mx-6 grid h-48 select-none place-items-center bg-gradient-to-t from-black/5 dark:from-white/10"
 		>
 			<video
 				class="size-full object-cover"
@@ -31,6 +31,11 @@
 				<Logo classNames="mr-2 size-12 dark:invert" />
 				{publicConfig.PUBLIC_APP_NAME}
 			</h2> -->
+			<div
+				class="absolute bottom-3 right-3 rounded-lg border border-blue-500/20 bg-blue-500/20 px-2 py-0.5 text-sm font-semibold text-blue-500"
+			>
+				Now with MCP!
+			</div>
 		</div>
 
 		<div class="text-gray-700 dark:text-gray-200">

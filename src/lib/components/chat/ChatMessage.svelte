@@ -18,6 +18,8 @@
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import ToolUpdate from "./ToolUpdate.svelte";
+	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 
 	interface Props {
 		message: Message;
@@ -55,7 +57,6 @@
 		void _isAuthor;
 		void _readOnly;
 	});
-
 	function handleKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 			editFormEl?.requestSubmit();
@@ -63,6 +64,45 @@
 		if (e.key === "Escape") {
 			editMsdgId = null;
 		}
+	}
+
+	function handleCopy(event: ClipboardEvent) {
+		if (!contentEl) return;
+
+		const selection = window.getSelection();
+		if (!selection || selection.isCollapsed) return;
+		if (!selection.anchorNode || !selection.focusNode) return;
+
+		const anchorInside = contentEl.contains(selection.anchorNode);
+		const focusInside = contentEl.contains(selection.focusNode);
+		if (!anchorInside && !focusInside) return;
+
+		if (!event.clipboardData) return;
+
+		const range = selection.getRangeAt(0);
+		const wrapper = document.createElement("div");
+		wrapper.appendChild(range.cloneContents());
+
+		wrapper.querySelectorAll("*").forEach((el) => {
+			el.removeAttribute("style");
+			el.removeAttribute("class");
+			el.removeAttribute("color");
+			el.removeAttribute("bgcolor");
+			el.removeAttribute("background");
+
+			for (const attr of Array.from(el.attributes)) {
+				if (attr.name === "id" || attr.name.startsWith("data-")) {
+					el.removeAttribute(attr.name);
+				}
+			}
+		});
+
+		const html = wrapper.innerHTML;
+		const text = wrapper.textContent ?? "";
+
+		event.preventDefault();
+		event.clipboardData.setData("text/html", html);
+		event.clipboardData.setData("text/plain", text);
 	}
 
 	let editContentEl: HTMLTextAreaElement | undefined = $state();
@@ -76,6 +116,41 @@
 	let contentWithoutThink = $derived.by(() =>
 		message.content.replace(THINK_BLOCK_REGEX, "").trim()
 	);
+
+	// Group tool updates (if any) by uuid for display
+	let toolUpdateGroups = $derived.by(() => {
+		const groups: Record<string, import("$lib/types/MessageUpdate").MessageToolUpdate[]> = {};
+		for (const u of message.updates ?? []) {
+			if (!isMessageToolUpdate(u)) continue;
+			(groups[u.uuid] ||= []).push(u);
+		}
+		return groups;
+	});
+	let hasToolUpdates = $derived(Object.keys(toolUpdateGroups).length > 0);
+
+	// Flatten to ordered array and keep a navigation index (defaults to last)
+	let toolGroups = $derived(Object.values(toolUpdateGroups));
+	let toolNavIndex = $state(0);
+	// Auto-follow newest tool group while streaming until user navigates manually
+	let toolAutoFollowLatest = $state(true);
+	$effect(() => {
+		const len = toolGroups.length;
+		if (len === 0) {
+			toolNavIndex = 0;
+			return;
+		}
+		// Clamp if groups shrink or grow
+		if (toolNavIndex > len - 1) toolNavIndex = len - 1;
+		// While streaming, default to most recent group unless user navigated away
+		if (isLast && loading && toolAutoFollowLatest) toolNavIndex = len - 1;
+	});
+
+	// When streaming ends, re-enable auto-follow for the next turn
+	$effect(() => {
+		if (!loading) {
+			toolAutoFollowLatest = true;
+		}
+	});
 
 	$effect(() => {
 		if (isCopied) {
@@ -125,7 +200,28 @@
 				</div>
 			{/if}
 
-			<div bind:this={contentEl}>
+			{#if hasToolUpdates}
+				{#if toolGroups.length}
+					{@const group = toolGroups[toolNavIndex]}
+					<ToolUpdate
+						tool={group}
+						{loading}
+						index={toolNavIndex}
+						total={toolGroups.length}
+						onprev={() => {
+							toolAutoFollowLatest = false;
+							toolNavIndex = Math.max(0, toolNavIndex - 1);
+						}}
+						onnext={() => {
+							toolNavIndex = Math.min(toolGroups.length - 1, toolNavIndex + 1);
+							// If user moves back to the newest group, resume auto-follow
+							toolAutoFollowLatest = toolNavIndex === toolGroups.length - 1;
+						}}
+					/>
+				{/if}
+			{/if}
+
+			<div bind:this={contentEl} oncopy={handleCopy}>
 				{#if isLast && loading && message.content.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
@@ -148,7 +244,7 @@
 							/>
 						{:else if part && part.trim().length > 0}
 							<div
-								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+								class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 							>
 								<MarkdownRenderer content={part} sources={message.webSearchSources} loading={isLast && loading} />
 							</div>
@@ -156,7 +252,7 @@
 					{/each}
 				{:else}
 					<div
-						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+						class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 prose-img:my-0 prose-img:rounded-lg dark:prose-pre:bg-gray-900"
 					>
 						<MarkdownRenderer content={message.content} sources={message.webSearchSources} loading={isLast && loading} />
 					</div>

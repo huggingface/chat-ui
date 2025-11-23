@@ -9,6 +9,8 @@ export type Message = Partial<Timestamps> & {
 	content: string;
 	updates?: MessageUpdate[];
 
+	// Optional server or client-side reasoning content (<think> blocks)
+	reasoning?: string;
 	score?: -1 | 0 | 1;
 	/**
 	 * Either contains the base64 encoded image data
