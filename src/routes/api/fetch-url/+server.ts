@@ -51,8 +51,7 @@ export async function GET({ url }) {
 		}
 
 		// Stream the response back
-		// Always return as text/plain to prevent any HTML/JS execution
-		const contentType = "text/plain; charset=utf-8";
+		const contentType = response.headers.get("content-type") || "application/octet-stream";
 		const contentDisposition = response.headers.get("content-disposition");
 
 		const headers: HeadersInit = {
