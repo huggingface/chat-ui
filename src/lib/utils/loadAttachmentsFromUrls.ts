@@ -1,4 +1,5 @@
 import { base } from "$app/paths";
+import { pickSafeMime } from "$lib/utils/mime";
 
 export interface AttachmentLoadResult {
 	files: File[];
@@ -31,10 +32,18 @@ function parseAttachmentUrls(searchParams: URLSearchParams): string[] {
 function extractFilename(url: string, contentDisposition?: string | null): string {
 	// Try to get filename from Content-Disposition header
 	if (contentDisposition) {
-		const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-		if (match && match[1]) {
-			return match[1].replace(/['"]/g, "");
+		const filenameStar = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+		if (filenameStar) {
+			const cleaned = filenameStar.trim().replace(/['"]/g, "");
+			try {
+				return decodeURIComponent(cleaned);
+			} catch {
+				return cleaned;
+			}
 		}
+
+		const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+		if (match && match[1]) return match[1].replace(/['"]/g, "");
 	}
 
 	// Fallback: extract from URL
@@ -82,13 +91,17 @@ export async function loadAttachmentsFromUrls(
 					return;
 				}
 
+				const forwardedType =
+					response.headers.get("x-forwarded-content-type") ||
+					response.headers.get("x-original-content-type");
 				const blob = await response.blob();
+				const mimeType = pickSafeMime(forwardedType, blob.type, url);
 				const contentDisposition = response.headers.get("content-disposition");
 				const filename = extractFilename(url, contentDisposition);
 
 				// Create File object
 				const file = new File([blob], filename, {
-					type: blob.type || "application/octet-stream",
+					type: mimeType,
 				});
 
 				files.push(file);
