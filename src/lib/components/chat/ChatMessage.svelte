@@ -129,42 +129,37 @@
 	let blocks = $derived.by(() => {
 		const updates = message.updates ?? [];
 		const res: Block[] = [];
-
 		const hasTools = updates.some(isMessageToolUpdate);
-		const hasStreamUpdates = updates.some((u) => u.type === MessageUpdateType.Stream);
+		let contentCursor = 0;
 
-		// Case 1: No tools. Use message.content as source of truth.
-		// This ensures FinalAnswer replacements (common in non-tool scenarios) are handled correctly.
-		if (!hasTools) {
-			if (message.content) {
-				return [{ type: "text", content: message.content }];
-			}
+		// Fast path: no tool updates at all
+		if (!hasTools && updates.length === 0) {
+			if (message.content) return [{ type: "text", content: message.content }];
 			return [];
 		}
 
-		// Case 2: Tools present but no stream updates. Legacy mode.
-		if (!hasStreamUpdates && message.content) {
-			const toolUpdates = updates.filter(isMessageToolUpdate);
-			const groups: Record<string, MessageToolUpdate[]> = {};
-			for (const u of toolUpdates) {
-				(groups[u.uuid] ||= []).push(u);
-			}
-			for (const [uuid, group] of Object.entries(groups)) {
-				res.push({ type: "tool", uuid, updates: group });
-			}
-			res.push({ type: "text", content: message.content });
-			return res;
-		}
-
-		// Case 3: Interleaved behavior (Tools + Stream updates)
 		for (const update of updates) {
 			if (update.type === MessageUpdateType.Stream) {
+				const token =
+					typeof update.token === "string" && update.token.length > 0
+						? update.token
+						: null;
+				const len =
+					token !== null
+						? token.length
+						: typeof (update as unknown as { len?: number }).len === "number"
+							? (update as unknown as { len?: number }).len ?? 0
+							: 0;
+				const chunk =
+					token ??
+					(message.content
+						? message.content.slice(contentCursor, contentCursor + len)
+						: "");
+				contentCursor += len;
+				if (!chunk) continue;
 				const last = res.at(-1);
-				if (last?.type === "text") {
-					last.content += update.token;
-				} else {
-					res.push({ type: "text", content: update.token });
-				}
+				if (last?.type === "text") last.content += chunk;
+				else res.push({ type: "text", content: chunk });
 			} else if (isMessageToolUpdate(update)) {
 				const last = res.at(-1);
 				if (last?.type === "tool" && last.uuid === update.uuid) {
@@ -183,7 +178,6 @@
 				if (finalText.startsWith(currentText)) {
 					addedText = finalText.slice(currentText.length);
 				} else if (!currentText.endsWith(finalText)) {
-					// If not a suffix and not a prefix match, append with newline if needed
 					const needsGap = !/\n\n$/.test(currentText) && !/^\n/.test(finalText);
 					addedText = (needsGap ? "\n\n" : "") + finalText;
 				}
@@ -198,6 +192,20 @@
 				}
 			}
 		}
+
+		// If content remains unmatched (e.g., persisted stream markers), append the remainder
+		if (message.content && contentCursor < message.content.length) {
+			const remaining = message.content.slice(contentCursor);
+			if (remaining.length > 0) {
+				const last = res.at(-1);
+				if (last?.type === "text") last.content += remaining;
+				else res.push({ type: "text", content: remaining });
+			}
+		} else if (!res.some((b) => b.type === "text") && message.content) {
+			// Fallback: no text produced at all
+			res.push({ type: "text", content: message.content });
+		}
+
 		return res;
 	});
 
@@ -253,7 +261,7 @@
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
-				{#each blocks as block, blockIndex (block.type === "tool" ? block.uuid : `text-${blockIndex}`)}
+				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
 					{#if block.type === "tool"}
 						<div data-exclude-from-copy>
 							<ToolUpdate tool={block.updates} {loading} />

@@ -330,19 +330,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	const metricsLabels = { model: metricsModelId };
 
 	const persistConversation = async () => {
-		// Stream tokens are ephemeral and already reflected in `content`.
-		// Persisting them doubles payload size and slows rehydration,
-		// so drop them (and keep-alives) when writing to the database.
 		const messagesForSave = conv.messages.map((msg) => {
 			const filteredUpdates =
-				msg.updates?.filter(
-					(u) =>
-						u.type !== MessageUpdateType.Stream &&
-						!(
-							u.type === MessageUpdateType.Status &&
-							u.status === MessageUpdateStatus.KeepAlive
-						)
-				) ?? [];
+				msg.updates
+					?.filter(
+						(u) =>
+							!(
+								u.type === MessageUpdateType.Status &&
+								u.status === MessageUpdateStatus.KeepAlive
+							)
+					)
+					.map((u) => {
+						if (u.type !== MessageUpdateType.Stream) return u;
+						const token = u.token ?? "";
+						const len = token.length;
+						// store a lightweight marker to preserve ordering without duplicating content
+						return { type: MessageUpdateType.Stream, token: "", len } as MessageUpdate;
+					}) ?? [];
 
 			return { ...msg, updates: filteredUpdates };
 		});
@@ -487,23 +491,16 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 
-				// Append to the persistent message updates
+				// Append updates for audit/replay (streams too, to preserve ordering)
 				if (
 					!(
 						event.type === MessageUpdateType.Status &&
 						event.status === MessageUpdateStatus.KeepAlive
 					)
 				) {
-					if (event.type === MessageUpdateType.Stream) {
-						const lastUpdate = messageToWriteTo?.updates?.at(-1);
-						if (lastUpdate?.type === MessageUpdateType.Stream) {
-							lastUpdate.token += event.token;
-						} else {
-							messageToWriteTo?.updates?.push({ ...event });
-						}
-					} else {
-						messageToWriteTo?.updates?.push(event);
-					}
+					messageToWriteTo?.updates?.push(
+						event.type === MessageUpdateType.Stream ? { ...event } : event
+					);
 				}
 
 				// Avoid remote keylogging attack executed by watching packet lengths
