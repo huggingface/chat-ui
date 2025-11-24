@@ -131,6 +131,7 @@
 		const res: Block[] = [];
 		const hasTools = updates.some(isMessageToolUpdate);
 		let contentCursor = 0;
+		let sawFinalAnswer = false;
 
 		// Fast path: no tool updates at all
 		if (!hasTools && updates.length === 0) {
@@ -168,6 +169,7 @@
 					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
 				}
 			} else if (update.type === MessageUpdateType.FinalAnswer) {
+				sawFinalAnswer = true;
 				const finalText = update.text ?? "";
 				const currentText = res
 					.filter((b) => b.type === "text")
@@ -194,11 +196,8 @@
 		}
 
 		// If content remains unmatched (e.g., persisted stream markers), append the remainder
-		// Only use this fallback if streams actually consumed some of message.content (contentCursor > 0)
-		// to avoid duplicating content when FinalAnswer already added it
-		const usedContent = contentCursor > 0;
-
-		if (message.content && contentCursor < message.content.length && usedContent) {
+		// Skip when a FinalAnswer already provided the authoritative text.
+		if (!sawFinalAnswer && message.content && contentCursor < message.content.length) {
 			const remaining = message.content.slice(contentCursor);
 			if (remaining.length > 0) {
 				const last = res.at(-1);
