@@ -51,12 +51,14 @@ export async function GET({ url }) {
 		}
 
 		// Stream the response back
-		// Always return as text/plain to prevent any HTML/JS execution
-		const contentType = "text/plain; charset=utf-8";
+		const originalContentType = response.headers.get("content-type") || "application/octet-stream";
+		// Send as text/plain for safety; expose the original type via secondary header
+		const safeContentType = "text/plain; charset=utf-8";
 		const contentDisposition = response.headers.get("content-disposition");
 
 		const headers: HeadersInit = {
-			"Content-Type": contentType,
+			"Content-Type": safeContentType,
+			"X-Forwarded-Content-Type": originalContentType,
 			"Cache-Control": "public, max-age=3600",
 			...(contentDisposition ? { "Content-Disposition": contentDisposition } : {}),
 			...SECURITY_HEADERS,
