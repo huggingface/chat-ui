@@ -260,7 +260,7 @@
 						const lastUpdate = existingUpdates.at(-1);
 						if (lastUpdate?.type === MessageUpdateType.Stream) {
 							// Create fresh objects/arrays so the UI reacts to merged tokens
-							const merged = { ...lastUpdate, token: lastUpdate.token + update.token };
+							const merged = { ...lastUpdate, token: (lastUpdate.token ?? "") + (update.token ?? "") };
 							messageToWriteTo.updates = [...existingUpdates.slice(0, -1), merged];
 						} else {
 							messageToWriteTo.updates = [...existingUpdates, update];

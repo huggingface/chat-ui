@@ -342,8 +342,11 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					)
 					.map((u) => {
 						if (u.type !== MessageUpdateType.Stream) return u;
-						const token = u.token ?? "";
-						const len = token.length;
+						// Preserve existing len if already compressed, otherwise compute from token
+						const len =
+							typeof (u as unknown as { len?: number }).len === "number"
+								? (u as unknown as { len?: number }).len
+								: (u.token ?? "").length;
 						// store a lightweight marker to preserve ordering without duplicating content
 						return { type: MessageUpdateType.Stream, token: "", len } as MessageUpdate;
 					}) ?? [];

@@ -134,7 +134,7 @@
 
 		// Fast path: no tool updates at all
 		if (!hasTools && updates.length === 0) {
-			if (message.content) return [{ type: "text", content: message.content }];
+			if (message.content) return [{ type: "text" as const, content: message.content }];
 			return [];
 		}
 
@@ -159,13 +159,13 @@
 				if (!chunk) continue;
 				const last = res.at(-1);
 				if (last?.type === "text") last.content += chunk;
-				else res.push({ type: "text", content: chunk });
+				else res.push({ type: "text" as const, content: chunk });
 			} else if (isMessageToolUpdate(update)) {
 				const last = res.at(-1);
 				if (last?.type === "tool" && last.uuid === update.uuid) {
 					last.updates.push(update);
 				} else {
-					res.push({ type: "tool", uuid: update.uuid, updates: [update] });
+					res.push({ type: "tool" as const, uuid: update.uuid, updates: [update] });
 				}
 			} else if (update.type === MessageUpdateType.FinalAnswer) {
 				const finalText = update.text ?? "";
@@ -187,23 +187,27 @@
 					if (last?.type === "text") {
 						last.content += addedText;
 					} else {
-						res.push({ type: "text", content: addedText });
+						res.push({ type: "text" as const, content: addedText });
 					}
 				}
 			}
 		}
 
 		// If content remains unmatched (e.g., persisted stream markers), append the remainder
-		if (message.content && contentCursor < message.content.length) {
+		// Only use this fallback if streams actually consumed some of message.content (contentCursor > 0)
+		// to avoid duplicating content when FinalAnswer already added it
+		const usedContent = contentCursor > 0;
+
+		if (message.content && contentCursor < message.content.length && usedContent) {
 			const remaining = message.content.slice(contentCursor);
 			if (remaining.length > 0) {
 				const last = res.at(-1);
 				if (last?.type === "text") last.content += remaining;
-				else res.push({ type: "text", content: remaining });
+				else res.push({ type: "text" as const, content: remaining });
 			}
 		} else if (!res.some((b) => b.type === "text") && message.content) {
 			// Fallback: no text produced at all
-			res.push({ type: "text", content: message.content });
+			res.push({ type: "text" as const, content: message.content });
 		}
 
 		return res;
