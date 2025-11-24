@@ -9,6 +9,10 @@
 	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
+	import { setTheme } from "$lib/switchTheme";
+	onMount(() => {
+	setTheme("light");
+	});
 
 	import Toast from "$lib/components/Toast.svelte";
 	import NavMenu from "$lib/components/NavMenu.svelte";
