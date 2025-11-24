@@ -92,8 +92,7 @@ export async function loadAttachmentsFromUrls(
 				}
 
 				const forwardedType =
-					response.headers.get("x-forwarded-content-type") ||
-					response.headers.get("x-original-content-type");
+					response.headers.get("x-forwarded-content-type");
 				const blob = await response.blob();
 				const mimeType = pickSafeMime(forwardedType, blob.type, url);
 				const contentDisposition = response.headers.get("content-disposition");
