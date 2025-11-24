@@ -250,13 +250,21 @@
 					update.token = update.token.replaceAll("\0", "");
 				}
 
-				const isHighFrequencyUpdate =
-					update.type === MessageUpdateType.Stream ||
-					(update.type === MessageUpdateType.Status &&
-						update.status === MessageUpdateStatus.KeepAlive);
+				const isKeepAlive =
+					update.type === MessageUpdateType.Status &&
+					update.status === MessageUpdateStatus.KeepAlive;
 
-				if (!isHighFrequencyUpdate) {
-					messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+				if (!isKeepAlive) {
+					if (update.type === MessageUpdateType.Stream) {
+						const lastUpdate = messageToWriteTo.updates?.at(-1);
+						if (lastUpdate?.type === MessageUpdateType.Stream) {
+							lastUpdate.token += update.token;
+						} else {
+							messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+						}
+					} else {
+						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+					}
 				}
 				const currentTime = new Date();
 

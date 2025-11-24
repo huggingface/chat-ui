@@ -130,10 +130,10 @@
 
 {#if toolFnName}
 	<details
-		class="group/tool my-2.5 w-fit max-w-full cursor-pointer rounded-lg border border-gray-200 bg-white px-1 {(total ??
+		class="group/tool my-1 w-fit max-w-full cursor-pointer rounded-lg border border-gray-200 bg-white px-1 {(total ??
 			0) > 1
 			? ''
-			: 'pr-2'} text-sm shadow-sm first:mt-0 open:mb-3 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-2"
+			: 'pr-2'} text-sm shadow-sm first:mt-0 open:mb-1 open:border-purple-500/10 open:bg-purple-600/5 open:shadow-sm dark:border-gray-800 dark:bg-gray-900 open:dark:border-purple-800/40 open:dark:bg-purple-800/10 [&+details]:-mt-0.5"
 	>
 		<summary
 			class="relative flex select-none list-none items-center gap-1.5 py-1 group-open/tool:text-purple-700 group-open/tool:dark:text-purple-300"

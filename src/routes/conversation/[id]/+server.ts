@@ -470,15 +470,23 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					}
 				}
 
-				// Append to the persistent message updates if it's not a stream update
+				// Append to the persistent message updates
 				if (
-					event.type !== MessageUpdateType.Stream &&
 					!(
 						event.type === MessageUpdateType.Status &&
 						event.status === MessageUpdateStatus.KeepAlive
 					)
 				) {
-					messageToWriteTo?.updates?.push(event);
+					if (event.type === MessageUpdateType.Stream) {
+						const lastUpdate = messageToWriteTo?.updates?.at(-1);
+						if (lastUpdate?.type === MessageUpdateType.Stream) {
+							lastUpdate.token += event.token;
+						} else {
+							messageToWriteTo?.updates?.push({ ...event });
+						}
+					} else {
+						messageToWriteTo?.updates?.push(event);
+					}
 				}
 
 				// Avoid remote keylogging attack executed by watching packet lengths
