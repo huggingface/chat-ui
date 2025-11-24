@@ -83,7 +83,7 @@
 				throw new Error(txt || `Failed to fetch (${res.status})`);
 			}
 			const forwardedType =
-				res.headers.get("x-forwarded-content-type") || res.headers.get("x-original-content-type");
+				res.headers.get("x-forwarded-content-type");
 			const blob = await res.blob();
 			const mimeType = pickSafeMime(forwardedType, blob.type, trimmed);
 			// Optional client-side mime filter (same wildcard semantics as dropzone)
