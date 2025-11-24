@@ -256,11 +256,14 @@
 
 				if (!isKeepAlive) {
 					if (update.type === MessageUpdateType.Stream) {
-						const lastUpdate = messageToWriteTo.updates?.at(-1);
+						const existingUpdates = messageToWriteTo.updates ?? [];
+						const lastUpdate = existingUpdates.at(-1);
 						if (lastUpdate?.type === MessageUpdateType.Stream) {
-							lastUpdate.token += update.token;
+							// Create fresh objects/arrays so the UI reacts to merged tokens
+							const merged = { ...lastUpdate, token: lastUpdate.token + update.token };
+							messageToWriteTo.updates = [...existingUpdates.slice(0, -1), merged];
 						} else {
-							messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
+							messageToWriteTo.updates = [...existingUpdates, update];
 						}
 					} else {
 						messageToWriteTo.updates = [...(messageToWriteTo.updates ?? []), update];
