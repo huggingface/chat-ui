@@ -40,7 +40,13 @@ export async function callMcpTool(
 	const response = await activeClient.callTool(
 		{ name: tool, arguments: normalizedArgs },
 		undefined,
-		{ signal, timeout: timeoutMs }
+		{
+			signal,
+			timeout: timeoutMs,
+			// Enable progress tokens so long-running tools keep extending the timeout.
+			onprogress: () => {},
+			resetTimeoutOnProgress: true,
+		}
 	);
 
 	const parts = Array.isArray(response?.content) ? (response.content as Array<unknown>) : [];
