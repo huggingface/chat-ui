@@ -41,13 +41,13 @@
 
 	const client = useAPIClient();
 
-	let OPENAI_BASE_URL: string | null = $state(null);
+	let OPENAI_BASE_URL = $state<string | null>(null);
 
 	// Billing organization state
 	type BillingOrg = { sub: string; name: string; preferred_username: string };
-	let billingOrgs: BillingOrg[] = $state([]);
-	let billingOrgsLoading: boolean = $state(false);
-	let billingOrgsError: string | null = $state(null);
+	let billingOrgs = $state<BillingOrg[]>([]);
+	let billingOrgsLoading = $state(false);
+	let billingOrgsError = $state<string | null>(null);
 
 	function getBillingOrganization() {
 		return $settings.billingOrganization ?? "";
@@ -87,11 +87,11 @@
 		}
 	});
 
-	let themePref: ThemePreference = $state(browser ? getThemePreference() : "system");
+	let themePref = $state<ThemePreference>(browser ? getThemePreference() : "system");
 
 	// Admin: model refresh UI state
-	let refreshing: boolean = $state(false);
-	let refreshMessage: string | null = $state(null);
+	let refreshing = $state(false);
+	let refreshMessage = $state<string | null>(null);
 </script>
 
 <div class="flex w-full flex-col gap-4">
