@@ -90,4 +90,6 @@ ENV BODY_SIZE_LIMIT=15728640
 COPY --from=builder --chown=1000 /app/build /app/build
 COPY --from=builder --chown=1000 /app/node_modules /app/node_modules
 
+RUN apt -y update && apt-get install -y curl dnsutils
+
 CMD ["/bin/bash", "-c", "/app/entrypoint.sh"]

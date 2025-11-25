@@ -25,6 +25,7 @@
 		toggleServer,
 	} from "$lib/stores/mcpServers";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
+	import { page } from "$app/state";
 
 	interface Props {
 		files?: File[];
@@ -76,6 +77,7 @@
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let isUrlModalOpen = $state(false);
 	let isMcpManagerOpen = $state(false);
+	let isDropdownOpen = $state(false);
 
 	function openPickerWithAccept(accept: string) {
 		if (!fileInputEl) return;
@@ -107,6 +109,7 @@
 			: Promise.resolve();
 
 	async function focusTextarea() {
+		if (page.data.shared && page.data.loginEnabled && !page.data.user) return;
 		if (!textareaElement || textareaElement.disabled || isVirtualKeyboard()) return;
 		if (typeof document !== "undefined" && document.activeElement === textareaElement) return;
 
@@ -177,6 +180,9 @@
 	}
 
 	function handleFocus() {
+		if (requireAuthUser()) {
+			return;
+		}
 		if (blurTimeout) {
 			clearTimeout(blurTimeout);
 			blurTimeout = null;
@@ -251,7 +257,16 @@
 						accept={mimeTypes.join(",")}
 					/>
 
-					<DropdownMenu.Root>
+					<DropdownMenu.Root
+						bind:open={isDropdownOpen}
+						onOpenChange={(open) => {
+							if (open && requireAuthUser()) {
+								isDropdownOpen = false;
+								return;
+							}
+							isDropdownOpen = open;
+						}}
+					>
 						<DropdownMenu.Trigger
 							class="btn size-7 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600"
 							disabled={loading}
