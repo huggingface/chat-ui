@@ -192,13 +192,11 @@ export async function updateUser(params: {
 
 		if (!matchedCount) {
 			// if no settings found for user, create default settings
-			const { billingOrganization: _billingOrg, ...defaultSettingsWithoutBilling } =
-				DEFAULT_SETTINGS;
 			await collections.settings.insertOne({
 				userId,
 				updatedAt: new Date(),
 				createdAt: new Date(),
-				...defaultSettingsWithoutBilling,
+				...DEFAULT_SETTINGS,
 			});
 		}
 	}

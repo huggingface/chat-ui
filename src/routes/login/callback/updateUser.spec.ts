@@ -99,7 +99,7 @@ describe("login", () => {
 		await updateUser({ userData, locals, cookies: cookiesMock, token });
 
 		// updateUser creates a new sessionId, so we need to use the updated value
-		const user = (await findUser(locals.sessionId)).user;
+		const user = (await findUser(locals.sessionId, undefined, new URL("http://localhost"))).user;
 
 		assert.exists(user);
 
