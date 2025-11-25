@@ -12,6 +12,13 @@ import { archSelectRoute } from "./arch";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
 import { ROUTER_FAILURE } from "./types";
+import {
+	hasActiveToolsSelection,
+	isRouterToolsBypassEnabled,
+	pickToolsCapableModel,
+	ROUTER_TOOLS_ROUTE,
+} from "./toolsRoute";
+import { getConfiguredMultimodalModelId } from "./multimodal";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -115,11 +122,14 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		const sanitizedMessages = params.messages.map(stripReasoningFromMessage);
 		const routerMultimodalEnabled =
 			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
+		const routerToolsEnabled = isRouterToolsBypassEnabled();
 		const hasImageInput = sanitizedMessages.some((message) =>
 			(message.files ?? []).some(
 				(file) => typeof file?.mime === "string" && file.mime.startsWith("image/")
 			)
 		);
+		// Tools are considered "active" if the client indicated any enabled MCP server
+		const hasToolsActive = hasActiveToolsSelection(params.locals);
 
 		// Helper to create an OpenAI endpoint for a specific candidate model id
 		async function createCandidateEndpoint(candidateModelId: string): Promise<Endpoint> {
@@ -167,43 +177,17 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			for await (const ev of gen) yield ev;
 		}
 
-		async function findFirstMultimodalCandidateId(): Promise<string | undefined> {
+		if (routerMultimodalEnabled && hasImageInput) {
+			let multimodalCandidate: string | undefined;
 			try {
 				const all = await getModels();
-
-				// Check if a specific multimodal model is configured via env variable
-				const preferredModelId = config.LLM_ROUTER_MULTIMODAL_MODEL;
-				if (preferredModelId) {
-					const preferredModel = all?.find(
-						(m) => (m.id === preferredModelId || m.name === preferredModelId) && m.multimodal
-					);
-					if (preferredModel) {
-						logger.info(
-							{ model: preferredModel.id ?? preferredModel.name },
-							"[router] using configured multimodal model"
-						);
-						return preferredModel.id ?? preferredModel.name;
-					}
-					logger.warn(
-						{ configuredModel: preferredModelId },
-						"[router] configured multimodal model not found or not multimodal, falling back to first available"
-					);
-				}
-
-				// Fallback to first multimodal model
-				const first = all?.find((m) => !m.isRouter && m.multimodal);
-				return first?.id ?? first?.name;
+				multimodalCandidate = getConfiguredMultimodalModelId(all);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for multimodal lookup");
-				return undefined;
 			}
-		}
-
-		if (routerMultimodalEnabled && hasImageInput) {
-			const multimodalCandidate = await findFirstMultimodalCandidateId();
 			if (!multimodalCandidate) {
 				throw new Error(
-					"No multimodal models are configured for the router. Remove the image or enable a multimodal model."
+					"Router multimodal is enabled but LLM_ROUTER_MULTIMODAL_MODEL is not correctly configured. Remove the image or configure a multimodal model via LLM_ROUTER_MULTIMODAL_MODEL."
 				);
 			}
 
@@ -227,6 +211,46 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					"[router] multimodal fallback failed"
 				);
 				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+			}
+		}
+
+		async function findToolsCandidateModel(): Promise<ProcessedModel | undefined> {
+			try {
+				const all = await getModels();
+				return pickToolsCapableModel(all);
+			} catch (e) {
+				logger.warn({ err: String(e) }, "[router] failed to load models for tools lookup");
+				return undefined;
+			}
+		}
+
+		if (routerToolsEnabled && hasToolsActive) {
+			const toolsModel = await findToolsCandidateModel();
+			const toolsCandidate = toolsModel?.id ?? toolsModel?.name;
+			if (!toolsCandidate) {
+				// No tool-capable model found — continue with normal routing instead of hard failing
+			} else {
+				try {
+					logger.info(
+						{ route: ROUTER_TOOLS_ROUTE, model: toolsCandidate },
+						"[router] tools active; bypassing Arch selection"
+					);
+					const ep = await createCandidateEndpoint(toolsCandidate);
+					const gen = await ep({ ...params });
+					return metadataThenStream(gen, toolsCandidate, ROUTER_TOOLS_ROUTE);
+				} catch (e) {
+					const { message, statusCode } = extractUpstreamError(e);
+					logger.error(
+						{
+							route: ROUTER_TOOLS_ROUTE,
+							model: toolsCandidate,
+							err: message,
+							...(statusCode && { status: statusCode }),
+						},
+						"[router] tools fallback failed"
+					);
+					throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+				}
 			}
 		}
 

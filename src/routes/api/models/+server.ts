@@ -17,6 +17,7 @@ export async function GET() {
 			promptExamples: model.promptExamples ?? [],
 			preprompt: model.preprompt ?? "",
 			multimodal: model.multimodal ?? false,
+			supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
 			unlisted: model.unlisted ?? false,
 			hasInferenceAPI: model.hasInferenceAPI ?? false,
 		}));

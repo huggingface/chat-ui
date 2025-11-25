@@ -1,35 +1,18 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
 import { fetch } from "undici";
+import { isValidUrl } from "$lib/server/urlSafety";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
-
-// Validate URL safety - HTTPS only
-function isValidUrl(urlString: string): boolean {
-	try {
-		const url = new URL(urlString);
-		// Only allow HTTPS protocol
-		if (url.protocol !== "https:") {
-			return false;
-		}
-		// Prevent localhost/private IPs (basic check)
-		const hostname = url.hostname.toLowerCase();
-		if (
-			hostname === "localhost" ||
-			hostname.startsWith("127.") ||
-			hostname.startsWith("192.168.") ||
-			hostname.startsWith("172.16.") ||
-			hostname === "[::1]" ||
-			hostname === "0.0.0.0"
-		) {
-			return false;
-		}
-		return true;
-	} catch {
-		return false;
-	}
-}
+const SECURITY_HEADERS: HeadersInit = {
+	// Prevent any active content from executing if someone navigates directly to this endpoint.
+	"Content-Security-Policy":
+		"default-src 'none'; frame-ancestors 'none'; sandbox; script-src 'none'; img-src 'none'; style-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+	"X-Content-Type-Options": "nosniff",
+	"X-Frame-Options": "DENY",
+	"Referrer-Policy": "no-referrer",
+};
 
 export async function GET({ url }) {
 	const targetUrl = url.searchParams.get("url");
@@ -68,17 +51,18 @@ export async function GET({ url }) {
 		}
 
 		// Stream the response back
-		const contentType = response.headers.get("content-type") || "application/octet-stream";
+		const originalContentType = response.headers.get("content-type") || "application/octet-stream";
+		// Send as text/plain for safety; expose the original type via secondary header
+		const safeContentType = "text/plain; charset=utf-8";
 		const contentDisposition = response.headers.get("content-disposition");
 
 		const headers: HeadersInit = {
-			"Content-Type": contentType,
+			"Content-Type": safeContentType,
+			"X-Forwarded-Content-Type": originalContentType,
 			"Cache-Control": "public, max-age=3600",
+			...(contentDisposition ? { "Content-Disposition": contentDisposition } : {}),
+			...SECURITY_HEADERS,
 		};
-
-		if (contentDisposition) {
-			headers["Content-Disposition"] = contentDisposition;
-		}
 
 		// Get the body as array buffer to check size
 		const arrayBuffer = await response.arrayBuffer();

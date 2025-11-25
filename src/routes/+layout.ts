@@ -21,7 +21,7 @@ export const load = async ({ depends, fetch, url }) => {
 
 	const defaultModel = models[0];
 
-	const { conversations: rawConversations, nConversations } = conversationsData;
+	const { conversations: rawConversations } = conversationsData;
 	const conversations = rawConversations.map((conv) => {
 		const trimmedTitle = conv.title.trim();
 
@@ -36,7 +36,6 @@ export const load = async ({ depends, fetch, url }) => {
 	});
 
 	return {
-		nConversations,
 		conversations,
 		models,
 		oldModels: [],

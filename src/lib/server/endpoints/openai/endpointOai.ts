@@ -14,9 +14,7 @@ import { config } from "$lib/server/config";
 import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
-import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
-import type { MessageFile } from "$lib/types/Message";
-import type { EndpointMessage } from "../endpoints";
+import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 // uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
@@ -168,15 +166,13 @@ export async function endpointOai(
 		}) => {
 			// Format messages for the chat API, handling multimodal content if supported
 			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor, isMultimodal ?? model.multimodal);
+				await prepareMessagesWithFiles(messages, imageProcessor, isMultimodal ?? model.multimodal);
 
 			// Normalize preprompt and handle empty values
-			const normalizedPreprompt =
-				typeof preprompt === "string" ? preprompt.trim() : "";
+			const normalizedPreprompt = typeof preprompt === "string" ? preprompt.trim() : "";
 
-				// Check if a system message already exists as the first message
-				const hasSystemMessage =
-					messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
+			// Check if a system message already exists as the first message
+			const hasSystemMessage = messagesOpenAI.length > 0 && messagesOpenAI[0]?.role === "system";
 
 			if (hasSystemMessage) {
 				// Prepend normalized preprompt to existing system content when non-empty
@@ -188,15 +184,12 @@ export async function endpointOai(
 					messagesOpenAI[0].content =
 						normalizedPreprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
 				}
-				} else {
-					// Insert a system message only if the preprompt is non-empty
-					if (normalizedPreprompt) {
-						messagesOpenAI = [
-							{ role: "system", content: normalizedPreprompt },
-							...messagesOpenAI,
-						];
-					}
+			} else {
+				// Insert a system message only if the preprompt is non-empty
+				if (normalizedPreprompt) {
+					messagesOpenAI = [{ role: "system", content: normalizedPreprompt }, ...messagesOpenAI];
 				}
+			}
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
@@ -249,89 +242,4 @@ export async function endpointOai(
 	} else {
 		throw new Error("Invalid completion type");
 	}
-}
-
-async function prepareMessages(
-	messages: EndpointMessage[],
-	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	isMultimodal: boolean
-): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
-	return Promise.all(
-		messages.map(async (message) => {
-			if (message.from === "user" && message.files && message.files.length > 0) {
-				const { imageParts, textContent } = await prepareFiles(
-					imageProcessor,
-					message.files,
-					isMultimodal
-				);
-
-				// If we have text files, prepend their content to the message
-				let messageText = message.content;
-				if (textContent.length > 0) {
-					messageText = textContent + "\n\n" + message.content;
-				}
-
-				// If we have images and multimodal is enabled, use structured content
-				if (imageParts.length > 0 && isMultimodal) {
-					const parts = [{ type: "text" as const, text: messageText }, ...imageParts];
-					return { role: message.from, content: parts };
-				}
-
-				// Otherwise just use the text (possibly with injected file content)
-				return { role: message.from, content: messageText };
-			}
-			return { role: message.from, content: message.content };
-		})
-	);
-}
-
-async function prepareFiles(
-	imageProcessor: ReturnType<typeof makeImageProcessor>,
-	files: MessageFile[],
-	isMultimodal: boolean
-): Promise<{
-	imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[];
-	textContent: string;
-}> {
-	// Separate image and text files
-	const imageFiles = files.filter((file) => file.mime.startsWith("image/"));
-	const textFiles = files.filter((file) => {
-		const mime = (file.mime || "").toLowerCase();
-		const [fileType, fileSubtype] = mime.split("/");
-		return TEXT_MIME_ALLOWLIST.some((allowed) => {
-			const [type, subtype] = allowed.toLowerCase().split("/");
-			const typeOk = type === "*" || type === fileType;
-			const subOk = subtype === "*" || subtype === fileSubtype;
-			return typeOk && subOk;
-		});
-	});
-
-	// Process images if multimodal is enabled
-	let imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
-	if (isMultimodal && imageFiles.length > 0) {
-		const processedFiles = await Promise.all(imageFiles.map(imageProcessor));
-		imageParts = processedFiles.map((file) => ({
-			type: "image_url" as const,
-			image_url: {
-				url: `data:${file.mime};base64,${file.image.toString("base64")}`,
-				// Improves compatibility with some OpenAI-compatible servers
-				// that expect an explicit detail setting.
-				detail: "auto",
-			},
-		}));
-	}
-
-	// Process text files - inject their content
-	let textContent = "";
-	if (textFiles.length > 0) {
-		const textParts = await Promise.all(
-			textFiles.map(async (file) => {
-				const content = Buffer.from(file.value, "base64").toString("utf-8");
-				return `<document name="${file.name}" type="${file.mime}">\n${content}\n</document>`;
-			})
-		);
-		textContent = textParts.join("\n\n");
-	}
-
-	return { imageParts, textContent };
 }

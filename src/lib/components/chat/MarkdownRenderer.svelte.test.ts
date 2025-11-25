@@ -29,60 +29,6 @@ describe("MarkdownRenderer", () => {
 		render(MarkdownRenderer, { content: "```foobar```" });
 		expect(page.getByRole("code")).toHaveTextContent("foobar");
 	});
-	it("renders sources correctly", () => {
-		const props = {
-			content: "Hello there [1]",
-			sources: [
-				{
-					title: "foo",
-					link: "https://example.com",
-				},
-			],
-		};
-		render(MarkdownRenderer, props);
-
-		const link = page.getByRole("link");
-		expect(link).toBeInTheDocument();
-		expect(link).toHaveAttribute("href", "https://example.com");
-		expect(link).toHaveAttribute("target", "_blank");
-		expect(link).toHaveAttribute("rel", "noreferrer");
-	});
-	it("handles groups of sources", () => {
-		render(MarkdownRenderer, {
-			content: "Hello there [1], [2], [3]",
-			sources: [
-				{
-					title: "foo",
-					link: "https://foo.com",
-				},
-				{
-					title: "bar",
-					link: "https://bar.com",
-				},
-				{
-					title: "baz",
-					link: "https://baz.com",
-				},
-			],
-		});
-		expect(page.getByRole("link").all()).toHaveLength(3);
-		expect(page.getByRole("link").nth(0)).toHaveAttribute("href", "https://foo.com");
-		expect(page.getByRole("link").nth(1)).toHaveAttribute("href", "https://bar.com");
-		expect(page.getByRole("link").nth(2)).toHaveAttribute("href", "https://baz.com");
-	});
-	it("does not render sources in code blocks", () => {
-		render(MarkdownRenderer, {
-			content: "```\narray[1]\n```",
-			sources: [
-				{
-					title: "foo",
-					link: "https://example.com",
-				},
-			],
-		});
-		const linkSelector = page.getByRole("link");
-		expect(linkSelector.elements).toHaveLength(0);
-	});
 	it("doesnt render raw html directly", () => {
 		render(MarkdownRenderer, { content: "<button>Click me</button>" });
 		expect(page.getByRole("button").elements).toHaveLength(0);

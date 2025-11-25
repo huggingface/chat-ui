@@ -21,6 +21,7 @@ export type GETModelsResponse = Array<{
 	preprompt?: string;
 	multimodal: boolean;
 	multimodalAcceptedMimetypes?: string[];
+	supportsTools?: boolean;
 	unlisted: boolean;
 	hasInferenceAPI: boolean;
 	// Mark router entry for UI decoration — always present
@@ -59,6 +60,7 @@ export const modelGroup = new Elysia().group("/models", (app) =>
 						preprompt: model.preprompt,
 						multimodal: model.multimodal,
 						multimodalAcceptedMimetypes: model.multimodalAcceptedMimetypes,
+						supportsTools: (model as unknown as { supportsTools?: boolean }).supportsTools ?? false,
 						unlisted: model.unlisted,
 						hasInferenceAPI: model.hasInferenceAPI,
 						isRouter: model.isRouter,

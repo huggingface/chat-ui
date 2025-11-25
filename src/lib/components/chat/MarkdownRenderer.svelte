@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { processBlocks, processBlocksSync, type BlockToken } from "$lib/utils/marked";
-	// import MarkdownWorker from "$lib/workers/markdownWorker?worker";
+	import MarkdownWorker from "$lib/workers/markdownWorker?worker";
 	import MarkdownBlock from "./MarkdownBlock.svelte";
 	import { browser } from "$app/environment";
 
-	import DOMPurify from "isomorphic-dompurify";
-	import { onMount } from "svelte";
+	import { onMount, onDestroy } from "svelte";
 	import { updateDebouncer } from "$lib/utils/updates";
 
 	interface Props {
@@ -17,53 +16,51 @@
 	let { content, sources = [], loading = false }: Props = $props();
 
 	let blocks: BlockToken[] = $state(processBlocksSync(content, sources));
+	let worker: Worker | null = null;
+	let latestRequestId = 0;
 
-	async function processContent(
-		content: string,
-		sources: { title?: string; link: string }[]
-	): Promise<BlockToken[]> {
-		// Note: Worker support for blocks can be added later if needed
-		// For now, use direct processing which is still efficient due to block memoization
-		return processBlocks(content, sources);
+	function handleBlocks(result: BlockToken[], requestId: number) {
+		if (requestId !== latestRequestId) return;
+		blocks = result;
+		updateDebouncer.endRender();
 	}
 
 	$effect(() => {
 		if (!browser) {
 			blocks = processBlocksSync(content, sources);
-		} else {
-			(async () => {
-				updateDebouncer.startRender();
-				blocks = await processContent(content, sources).then(async (processedBlocks) =>
-					Promise.all(
-						processedBlocks.map(async (block) => ({
-							...block,
-							tokens: await Promise.all(
-								block.tokens.map(async (token) => {
-									if (token.type === "text") {
-										token.html = DOMPurify.sanitize(await token.html);
-									}
-									return token;
-								})
-							),
-						}))
-					)
-				);
-
-				updateDebouncer.endRender();
-			})();
+			return;
 		}
+
+		const requestId = ++latestRequestId;
+
+		if (worker) {
+			updateDebouncer.startRender();
+			worker.postMessage({ type: "process", content, sources, requestId });
+			return;
+		}
+
+		(async () => {
+			updateDebouncer.startRender();
+			const processed = await processBlocks(content, sources);
+			// Only apply if this is still the latest request
+			handleBlocks(processed, requestId);
+		})();
 	});
 
 	onMount(() => {
-		// todo: fix worker, seems to be transmitting a lot of data
-		// worker = browser && window.Worker ? new MarkdownWorker() : null;
+		if (typeof Worker !== "undefined") {
+			worker = new MarkdownWorker();
+			worker.onmessage = (event: MessageEvent) => {
+				const data = event.data as { type?: string; blocks?: BlockToken[]; requestId?: number };
+				if (data?.type !== "processed" || !data.blocks || data.requestId === undefined) return;
+				handleBlocks(data.blocks, data.requestId);
+			};
+		}
+	});
 
-		DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-			if (node.tagName === "A") {
-				node.setAttribute("target", "_blank");
-				node.setAttribute("rel", "noreferrer");
-			}
-		});
+	onDestroy(() => {
+		worker?.terminate();
+		worker = null;
 	});
 </script>
 
