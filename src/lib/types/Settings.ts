@@ -54,5 +54,4 @@ export const DEFAULT_SETTINGS = {
 	hidePromptExamples: {},
 	disableStream: false,
 	directPaste: false,
-	billingOrganization: undefined,
 } satisfies SettingsEditable;
