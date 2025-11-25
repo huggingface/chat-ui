@@ -22,6 +22,7 @@ export const authPlugin = new Elysia({ name: "auth" }).derive(
 				user: auth?.user,
 				sessionId: auth?.sessionId,
 				isAdmin: auth?.isAdmin,
+				token: auth?.token,
 			},
 		};
 	}

@@ -41,21 +41,57 @@
 
 	const client = useAPIClient();
 
-	let OPENAI_BASE_URL: string | null = $state(null);
+	let OPENAI_BASE_URL = $state<string | null>(null);
+
+	// Billing organization state
+	type BillingOrg = { sub: string; name: string; preferred_username: string };
+	let billingOrgs = $state<BillingOrg[]>([]);
+	let billingOrgsLoading = $state(false);
+	let billingOrgsError = $state<string | null>(null);
+
+	function getBillingOrganization() {
+		return $settings.billingOrganization ?? "";
+	}
+	function setBillingOrganization(v: string) {
+		settings.update((s) => ({ ...s, billingOrganization: v || undefined }));
+	}
+
 	onMount(async () => {
+		// Fetch debug config
 		try {
 			const cfg = await client.debug.config.get().then(handleResponse);
 			OPENAI_BASE_URL = (cfg as { OPENAI_BASE_URL?: string }).OPENAI_BASE_URL || null;
 		} catch (e) {
 			// ignore if debug endpoint is unavailable
 		}
+
+		// Fetch billing organizations (only for HuggingChat + logged in users)
+		if (publicConfig.isHuggingChat && page.data.user) {
+			billingOrgsLoading = true;
+			try {
+				const data = (await client.user["billing-orgs"].get().then(handleResponse)) as {
+					userCanPay: boolean;
+					organizations: BillingOrg[];
+					currentBillingOrg?: string;
+				};
+				billingOrgs = data.organizations ?? [];
+				// Update settings if current billing org was cleared by server
+				if (data.currentBillingOrg !== getBillingOrganization()) {
+					setBillingOrganization(data.currentBillingOrg ?? "");
+				}
+			} catch {
+				billingOrgsError = "Failed to load billing options";
+			} finally {
+				billingOrgsLoading = false;
+			}
+		}
 	});
 
-	let themePref: ThemePreference = $state(browser ? getThemePreference() : "system");
+	let themePref = $state<ThemePreference>(browser ? getThemePreference() : "system");
 
 	// Admin: model refresh UI state
-	let refreshing: boolean = $state(false);
-	let refreshMessage: string | null = $state(null);
+	let refreshing = $state(false);
+	let refreshMessage = $state<string | null>(null);
 </script>
 
 <div class="flex w-full flex-col gap-4">
@@ -222,19 +258,70 @@
 			</div>
 		</div>
 
-		<div class="mt-6 flex flex-col gap-2 text-[13px]">
+		<!-- Billing section (HuggingChat only) -->
+		{#if publicConfig.isHuggingChat && page.data.user}
+			<div
+				class="rounded-xl border border-gray-200 bg-white px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+			>
+				<div class="divide-y divide-gray-200 dark:divide-gray-700">
+					<!-- Bill usage to -->
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">Billing</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								Select between personal or organization billing (for eligible organizations).
+							</p>
+						</div>
+						<div class="flex items-center">
+							{#if billingOrgsLoading}
+								<span class="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
+							{:else if billingOrgsError}
+								<span class="text-xs text-red-500">{billingOrgsError}</span>
+							{:else}
+								<select
+									class="rounded-md border border-gray-300 bg-white px-1 py-1 text-xs text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+									value={getBillingOrganization()}
+									onchange={(e) => setBillingOrganization(e.currentTarget.value)}
+								>
+									<option value="">Personal</option>
+									{#each billingOrgs as org}
+										<option value={org.preferred_username}>{org.name}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+					</div>
+					<!-- Providers Usage -->
+					<div class="flex items-start justify-between py-3">
+						<div>
+							<div class="text-[13px] font-medium text-gray-800 dark:text-gray-200">
+								Providers Usage
+							</div>
+							<p class="text-[12px] text-gray-500 dark:text-gray-400">
+								See which providers you use and choose your preferred ones.
+							</p>
+						</div>
+						<a
+							href={getBillingOrganization()
+								? `https://huggingface.co/organizations/${getBillingOrganization()}/settings/inference-providers/overview`
+								: "https://huggingface.co/settings/inference-providers/settings"}
+							target="_blank"
+							class="whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+						>
+							View Usage
+						</a>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<div class="mt-6 flex flex-col gap-2 self-start text-[13px]">
 			{#if publicConfig.isHuggingChat}
 				<a
 					href="https://github.com/huggingface/chat-ui"
 					target="_blank"
 					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
 					><CarbonLogoGithub class="mr-1.5 shrink-0 text-sm " /> Github repository</a
-				>
-				<a
-					href="https://huggingface.co/settings/inference-providers/settings"
-					target="_blank"
-					class="flex items-center underline decoration-gray-300 underline-offset-2 hover:decoration-gray-700 dark:decoration-gray-700 dark:hover:decoration-gray-400"
-					><CarbonArrowUpRight class="mr-1.5 shrink-0 text-sm " /> Providers settings</a
 				>
 				<a
 					href="https://huggingface.co/spaces/huggingchat/chat-ui/discussions/764"

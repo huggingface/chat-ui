@@ -35,6 +35,12 @@ export interface Settings extends Timestamps {
 
 	disableStream: boolean;
 	directPaste: boolean;
+
+	/**
+	 * Organization to bill inference requests to (HuggingChat only).
+	 * Stores the org's preferred_username. If empty/undefined, bills to personal account.
+	 */
+	billingOrganization?: string;
 }
 
 export type SettingsEditable = Omit<Settings, "welcomeModalSeenAt" | "createdAt" | "updatedAt">;

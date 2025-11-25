@@ -13,6 +13,8 @@ declare global {
 			user?: User;
 			isAdmin: boolean;
 			token?: string;
+			/** Organization to bill inference requests to (from settings) */
+			billingOrganization?: string;
 		}
 
 		interface Error {
