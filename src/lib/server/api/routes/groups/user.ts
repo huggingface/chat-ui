@@ -6,6 +6,8 @@ import { authCondition } from "$lib/server/auth";
 import { models, validateModel } from "$lib/server/models";
 import { DEFAULT_SETTINGS, type SettingsEditable } from "$lib/types/Settings";
 import { z } from "zod";
+import { config } from "$lib/server/config";
+import { logger } from "$lib/server/logger";
 
 export const userGroup = new Elysia()
 	.use(authPlugin)
@@ -72,6 +74,7 @@ export const userGroup = new Elysia()
 					customPrompts: settings?.customPrompts ?? {},
 					multimodalOverrides: settings?.multimodalOverrides ?? {},
 					toolsOverrides: settings?.toolsOverrides ?? {},
+					billingOrganization: settings?.billingOrganization ?? undefined,
 				};
 			})
 			.post("/settings", async ({ locals, request }) => {
@@ -90,6 +93,7 @@ export const userGroup = new Elysia()
 						disableStream: z.boolean().default(false),
 						directPaste: z.boolean().default(false),
 						hidePromptExamples: z.record(z.boolean()).default({}),
+						billingOrganization: z.string().optional(),
 					})
 					.parse(body) satisfies SettingsEditable;
 
@@ -123,5 +127,79 @@ export const userGroup = new Elysia()
 					})
 					.toArray();
 				return reports;
+			})
+			.get("/billing-orgs", async ({ locals, set }) => {
+				// Only available for HuggingChat
+				if (!config.isHuggingChat) {
+					set.status = 404;
+					return { error: "Not available" };
+				}
+
+				// Requires authenticated user with OAuth token
+				if (!locals.user) {
+					set.status = 401;
+					return { error: "Login required" };
+				}
+
+				if (!locals.token) {
+					set.status = 401;
+					return { error: "OAuth token not available. Please log out and log back in." };
+				}
+
+				try {
+					// Fetch billing info from HuggingFace OAuth userinfo
+					const response = await fetch("https://huggingface.co/oauth/userinfo", {
+						headers: { Authorization: `Bearer ${locals.token}` },
+					});
+
+					if (!response.ok) {
+						logger.error(`Failed to fetch billing orgs: ${response.status}`);
+						set.status = 502;
+						return { error: "Failed to fetch billing information" };
+					}
+
+					const data = await response.json();
+
+					// Get user's current billingOrganization setting
+					const settings = await collections.settings.findOne(authCondition(locals));
+					const currentBillingOrg = settings?.billingOrganization;
+
+					// Filter orgs to only those with canPay: true
+					const billingOrgs = (data.orgs ?? [])
+						.filter((org: { canPay?: boolean }) => org.canPay === true)
+						.map((org: { sub: string; name: string; preferred_username: string }) => ({
+							sub: org.sub,
+							name: org.name,
+							preferred_username: org.preferred_username,
+						}));
+
+					// Check if current billing org is still valid
+					const isCurrentOrgValid =
+						!currentBillingOrg ||
+						billingOrgs.some(
+							(org: { preferred_username: string }) => org.preferred_username === currentBillingOrg
+						);
+
+					// If current billing org is no longer valid, clear it
+					if (!isCurrentOrgValid && currentBillingOrg) {
+						logger.info(
+							`Clearing invalid billingOrganization '${currentBillingOrg}' for user ${locals.user._id}`
+						);
+						await collections.settings.updateOne(authCondition(locals), {
+							$unset: { billingOrganization: "" },
+							$set: { updatedAt: new Date() },
+						});
+					}
+
+					return {
+						userCanPay: data.canPay ?? false,
+						organizations: billingOrgs,
+						currentBillingOrg: isCurrentOrgValid ? currentBillingOrg : undefined,
+					};
+				} catch (err) {
+					logger.error("Error fetching billing orgs:", err);
+					set.status = 500;
+					return { error: "Internal server error" };
+				}
 			});
 	});

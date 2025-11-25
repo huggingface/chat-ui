@@ -517,6 +517,12 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			const initialMessageContent = messageToWriteTo.content;
 
 			try {
+				// Fetch user settings once for all overrides and billing org
+				const userSettings = await collections.settings.findOne(authCondition(locals));
+
+				// Add billing organization to locals for the endpoint to use
+				locals.billingOrganization = userSettings?.billingOrganization;
+
 				const ctx: TextGenerationContext = {
 					model,
 					endpoint: await model.getEndpoint(),
@@ -527,15 +533,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 					ip: getClientAddress(),
 					username: locals.user?.username,
 					// Force-enable multimodal if user settings say so for this model
-					forceMultimodal: Boolean(
-						(await collections.settings.findOne(authCondition(locals)))?.multimodalOverrides?.[
-							model.id
-						]
-					),
+					forceMultimodal: Boolean(userSettings?.multimodalOverrides?.[model.id]),
 					// Force-enable tools if user settings say so for this model
-					forceTools: Boolean(
-						(await collections.settings.findOne(authCondition(locals)))?.toolsOverrides?.[model.id]
-					),
+					forceTools: Boolean(userSettings?.toolsOverrides?.[model.id]),
 					locals,
 					abortController: ctrl,
 				};

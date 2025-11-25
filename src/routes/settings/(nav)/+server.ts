@@ -19,6 +19,7 @@ export async function POST({ request, locals }) {
 			disableStream: z.boolean().default(false),
 			directPaste: z.boolean().default(false),
 			hidePromptExamples: z.record(z.boolean()).default({}),
+			billingOrganization: z.string().optional(),
 		})
 		.parse(body) satisfies SettingsEditable;
 
