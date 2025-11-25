@@ -77,6 +77,7 @@
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let isUrlModalOpen = $state(false);
 	let isMcpManagerOpen = $state(false);
+	let isDropdownOpen = $state(false);
 
 	function openPickerWithAccept(accept: string) {
 		if (!fileInputEl) return;
@@ -256,7 +257,16 @@
 						accept={mimeTypes.join(",")}
 					/>
 
-					<DropdownMenu.Root>
+					<DropdownMenu.Root
+						bind:open={isDropdownOpen}
+						onOpenChange={(open) => {
+							if (open && requireAuthUser()) {
+								isDropdownOpen = false;
+								return;
+							}
+							isDropdownOpen = open;
+						}}
+					>
 						<DropdownMenu.Trigger
 							class="btn size-7 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600"
 							disabled={loading}
