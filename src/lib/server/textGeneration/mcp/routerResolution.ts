@@ -18,6 +18,7 @@ export interface RouterResolutionInput {
 	messages: EndpointMessage[];
 	conversationId: string;
 	hasImageInput: boolean;
+	hasAudioInput?: boolean;
 	locals: App.Locals | undefined;
 }
 
@@ -33,6 +34,7 @@ export async function resolveRouterTarget({
 	messages,
 	conversationId,
 	hasImageInput,
+	hasAudioInput,
 	locals,
 }: RouterResolutionInput): Promise<RouterResolutionResult> {
 	let targetModel = model;
@@ -48,7 +50,7 @@ export async function resolveRouterTarget({
 		const mod = await import("../../models");
 		const allModels = mod.models as ProcessedModel[];
 
-		if (hasImageInput) {
+		if (hasImageInput || hasAudioInput) {
 			const multimodalCandidate = findConfiguredMultimodalModel(allModels);
 			if (!multimodalCandidate) {
 				runMcp = false;

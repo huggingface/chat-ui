@@ -18,7 +18,7 @@ import { executeToolCalls, type NormalizedToolCall } from "./toolInvocation";
 import { drainPool } from "$lib/server/mcp/clientPool";
 import type { TextGenerationContext } from "../types";
 import { hasAuthHeader, isStrictHfMcpLogin, hasNonEmptyToken } from "$lib/server/mcp/hf";
-import { buildImageRefResolver } from "./fileRefs";
+import { buildImageRefResolver, buildAudioRefResolver } from "./fileRefs";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
 import { makeImageProcessor } from "$lib/server/endpoints/images";
 
@@ -202,7 +202,11 @@ export async function* runMcpFlow({
 		// If anything goes wrong reading the flag, proceed (previous behavior)
 	}
 
-	const resolveFileRef = buildImageRefResolver(messages);
+	const resolveFileRef = (ref: string) => {
+		const imageResolver = buildImageRefResolver(messages);
+		const audioResolver = buildAudioRefResolver(messages);
+		return imageResolver?.(ref) ?? audioResolver?.(ref);
+	};
 	const imageProcessor = makeImageProcessor({
 		supportedMimeTypes: ["image/png", "image/jpeg"],
 		preferredMimeType: "image/jpeg",
@@ -217,11 +221,18 @@ export async function* runMcpFlow({
 		)
 	);
 
+	const hasAudioInput = messages.some((msg) =>
+		(msg.files ?? []).some(
+			(file) => typeof file?.mime === "string" && file.mime.startsWith("audio/")
+		)
+	);
+
 	const { runMcp, targetModel, candidateModelId, resolvedRoute } = await resolveRouterTarget({
 		model,
 		messages,
 		conversationId: conv._id.toString(),
 		hasImageInput,
+		hasAudioInput,
 		locals,
 	});
 
@@ -353,6 +364,18 @@ export async function* runMcpFlow({
 			if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
 				return value;
 			}
+
+			// Handle Gradio Audio objects: {path, url, orig_name, mime_type, size, is_stream, meta}
+			if (
+				typeof value === "object" &&
+				value !== null &&
+				!Array.isArray(value) &&
+				"url" in value &&
+				typeof (value as { url?: unknown }).url === "string"
+			) {
+				return (value as { url: string }).url;
+			}
+
 			return undefined;
 		};
 
