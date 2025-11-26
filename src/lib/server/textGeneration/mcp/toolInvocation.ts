@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "../../logger";
+import { config } from "$lib/server/config";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { MessageToolUpdateType, MessageUpdateType } from "$lib/types/MessageUpdate";
 import { ToolResultStatus } from "$lib/types/Tool";
@@ -69,7 +70,7 @@ export async function* executeToolCalls({
 	toPrimitive,
 	processToolOutput,
 	abortSignal,
-	toolTimeoutMs = 30_000,
+	toolTimeoutMs = Number(config.MCP_TOOL_TIMEOUT_MS) || 30_000,
 }: ExecuteToolCallsParams): AsyncGenerator<ToolExecutionEvent, void, undefined> {
 	const toolMessages: ChatCompletionMessageParam[] = [];
 	const toolRuns: ToolRun[] = [];
