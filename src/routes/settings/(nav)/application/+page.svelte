@@ -304,7 +304,7 @@
 						<a
 							href={getBillingOrganization()
 								? `https://huggingface.co/organizations/${getBillingOrganization()}/settings/inference-providers/overview`
-								: "https://huggingface.co/settings/inference-providers/settings"}
+								: "https://huggingface.co/settings/inference-providers/overview"}
 							target="_blank"
 							class="whitespace-nowrap rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 						>
