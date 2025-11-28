@@ -33,7 +33,7 @@ export default defineConfig({
 		// Allow any ngrok-free.app subdomain (dynamic tunnels)
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
-		allowedHosts: ["xpartners-chat-ui.ommax-intelligence.de"],
+		allowedHosts: ["xpartners.ommax-intelligence.de"],
 	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "clsx"],
