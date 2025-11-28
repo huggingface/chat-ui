@@ -143,7 +143,8 @@
 	       class="flex rounded-lg border bg-white px-2 py-0.5 text-center shadow-sm hover:shadow-none dark:border-gray-600 dark:bg-gray-700 sm:text-smd"
 	       title="Ctrl/Cmd + Shift + O"
 	       style="
-		       transform: translateY(7px); margin-bottom: -30px; margin-left: -4px;
+		       transform: translateY(7px); margin-bottom: -30px;
+			   margin-right: 10px;
 			   box-shadow: 0 6px 24px 0 rgba(40,90,105,0.26), 0 5px 8px 0 rgba(255,255,255,0.48) inset, 0 0 12px 0 rgba(255,255,255,0.20);
 		       border: 1.5px solid rgba(122, 159, 215, 0.4);
 			   background: transparent;
