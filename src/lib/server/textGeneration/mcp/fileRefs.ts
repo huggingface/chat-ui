@@ -21,7 +21,15 @@ const IMAGE_REF_KIND: RefKind = {
 	toDataUrl: (payload) => `data:${payload.mime};base64,${payload.base64}`,
 };
 
-const DEFAULT_REF_KINDS: RefKind[] = [IMAGE_REF_KIND];
+const AUDIO_REF_KIND: RefKind = {
+	prefix: "audio",
+	matches: (mime) =>
+		typeof mime === "string" &&
+		(mime.startsWith("audio/") || mime === "mp3" || mime === "wav" || mime === "x-wav"),
+	toDataUrl: (payload) => `data:${payload.mime};base64,${payload.base64}`,
+};
+
+const DEFAULT_REF_KINDS: RefKind[] = [IMAGE_REF_KIND, AUDIO_REF_KIND];
 
 /**
  * Build a resolver that maps short ref strings (e.g. "image_1", "image_2") to the
@@ -76,6 +84,10 @@ export function buildImageRefResolver(messages: EndpointMessage[]): FileRefResol
 	return buildFileRefResolver(messages, [IMAGE_REF_KIND]);
 }
 
+export function buildAudioRefResolver(messages: EndpointMessage[]): FileRefResolver | undefined {
+	return buildFileRefResolver(messages, [AUDIO_REF_KIND]);
+}
+
 type FieldRule = {
 	keys: string[];
 	action: "attachPayload" | "replaceWithDataUrl";
@@ -94,6 +106,17 @@ const DEFAULT_FIELD_RULES: FieldRule[] = [
 		keys: ["input_image", "image", "image_url"],
 		action: "replaceWithDataUrl",
 		allowedPrefixes: ["image"],
+	},
+	{
+		keys: ["audio_ref"],
+		action: "attachPayload",
+		attachKey: "audio",
+		allowedPrefixes: ["audio"],
+	},
+	{
+		keys: ["input_audio", "audio", "audio_url"],
+		action: "replaceWithDataUrl",
+		allowedPrefixes: ["audio"],
 	},
 ];
 
