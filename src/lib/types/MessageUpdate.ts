@@ -9,7 +9,9 @@ export type MessageUpdate =
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
-	| MessageRouterMetadataUpdate;
+	| MessageRouterMetadataUpdate
+	| MessageWebSearchUpdate
+	| MessageWebSearchSourcesUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -20,6 +22,8 @@ export enum MessageUpdateType {
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
+	WebSearch = "webSearch",
+	WebSearchSources = "webSearchSources",
 }
 
 // Status
@@ -117,4 +121,17 @@ export interface MessageRouterMetadataUpdate {
 	route: string;
 	model: string;
 	provider?: InferenceProvider;
+}
+
+// Web Search Updates
+export interface MessageWebSearchUpdate {
+	type: MessageUpdateType.WebSearch;
+	status: "searching" | "completed" | "error";
+	query: string;
+	message?: string;
+}
+
+export interface MessageWebSearchSourcesUpdate {
+	type: MessageUpdateType.WebSearchSources;
+	sources: { title?: string; link: string }[];
 }

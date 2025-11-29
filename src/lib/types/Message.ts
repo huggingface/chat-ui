@@ -26,6 +26,9 @@ export type Message = Partial<Timestamps> & {
 		provider?: InferenceProvider;
 	};
 
+	// Web search sources for citations
+	webSearchSources?: { title?: string; link: string }[];
+
 	// needed for conversation trees
 	ancestors?: Message["id"][];
 
