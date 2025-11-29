@@ -53,7 +53,7 @@
 		return $settings.billingOrganization ?? "";
 	}
 	function setBillingOrganization(v: string) {
-		settings.update((s) => ({ ...s, billingOrganization: v || undefined }));
+		settings.update((s) => ({ ...s, billingOrganization: v }));
 	}
 
 	onMount(async () => {
