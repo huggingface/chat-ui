@@ -26,6 +26,7 @@
 
 <a
 	data-sveltekit-noscroll
+	data-sveltekit-preload-data="tap"
 	onmouseleave={() => {
 		confirmDelete = false;
 	}}
