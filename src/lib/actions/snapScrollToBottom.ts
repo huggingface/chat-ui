@@ -52,9 +52,13 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 		lastProgrammaticScrollTime = Date.now();
 		node.scrollTo({ top: node.scrollHeight });
 		// Reset flag after scroll completes
-		requestAnimationFrame(() => {
+		if (typeof requestAnimationFrame === "function") {
+			requestAnimationFrame(() => {
+				isProgrammaticScroll = false;
+			});
+		} else {
 			isProgrammaticScroll = false;
-		});
+		}
 	};
 
 	const distanceFromBottom = () => node.scrollHeight - node.scrollTop - node.clientHeight;
@@ -100,6 +104,10 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 			if (isAtBottom()) {
 				isDetached = false;
 			}
+			// Re-trigger scroll if still attached, to catch content that arrived during scrolling
+			if (!isDetached) {
+				scrollToBottom();
+			}
 		}, 150);
 	};
 
@@ -125,6 +133,10 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 			if (isAtBottom()) {
 				isDetached = false;
 			}
+			// Re-trigger scroll if still attached, to catch content that arrived during scrolling
+			if (!isDetached) {
+				scrollToBottom();
+			}
 		}, 150);
 
 		touchStartY = touchY;
@@ -135,24 +147,22 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 
 	// Handle scroll events to detect scrollbar usage and re-attach when at bottom
 	const handleScroll = () => {
-		// Skip programmatic scrolls and any scroll events shortly after (handles race conditions
-		// where browser adjusts scroll position due to content resize before our scrollToBottom runs)
 		const timeSinceLastProgrammaticScroll = Date.now() - lastProgrammaticScrollTime;
-		if (isProgrammaticScroll || timeSinceLastProgrammaticScroll < 100) {
-			prevScrollTop = node.scrollTop;
-			return;
-		}
+		const inGracePeriod = isProgrammaticScroll || timeSinceLastProgrammaticScroll < 100;
 
 		// If not from wheel/touch, this is likely a scrollbar drag
-		// Detect direction and detach if scrolling up
 		if (!userScrolling) {
 			const scrollingUp = node.scrollTop < prevScrollTop;
+			// Always allow detach (scrolling up) - don't ignore user intent
 			if (scrollingUp) {
 				isDetached = true;
 			}
-			// If user scrolled to bottom (manually via scrollbar or click), re-attach
-			if (isAtBottom()) {
+			// Only re-attach when at bottom if NOT in grace period
+			// (avoids false re-attach from content resize pushing scroll position)
+			if (!inGracePeriod && isAtBottom()) {
 				isDetached = false;
+				// Immediately scroll to catch up with any content that arrived while detached
+				scrollToBottom();
 			}
 		}
 
@@ -175,6 +185,8 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 				// If sentinel is visible and user isn't actively scrolling, we're at bottom
 				if (entry?.isIntersecting && !userScrolling) {
 					isDetached = false;
+					// Immediately scroll to catch up with any content that arrived while detached
+					scrollToBottom();
 				}
 			},
 			{
