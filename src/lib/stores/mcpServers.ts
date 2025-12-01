@@ -4,7 +4,7 @@
  * Stores custom servers and selection state in browser localStorage
  */
 
-import { writable, derived } from "svelte/store";
+import { writable, derived, get } from "svelte/store";
 import { base } from "$app/paths";
 import { env as publicEnv } from "$env/dynamic/public";
 import { browser } from "$app/environment";
@@ -23,6 +23,7 @@ const KEY_PREFIX = appLabel || baseLabel || "app";
 const STORAGE_KEYS = {
 	CUSTOM_SERVERS: `${KEY_PREFIX}:mcp:custom-servers`,
 	SELECTED_IDS: `${KEY_PREFIX}:mcp:selected-ids`,
+	DISABLED_BASE_IDS: `${KEY_PREFIX}:mcp:disabled-base-ids`,
 } as const;
 
 // No migration needed per request — read/write only namespaced keys
@@ -76,6 +77,30 @@ function saveSelectedIds(ids: Set<string>) {
 	}
 }
 
+// Load disabled base server IDs from localStorage (empty set if missing or on error)
+function loadDisabledBaseIds(): Set<string> {
+	if (!browser) return new Set();
+
+	try {
+		const json = localStorage.getItem(STORAGE_KEYS.DISABLED_BASE_IDS);
+		return new Set(json ? JSON.parse(json) : []);
+	} catch (error) {
+		console.error("Failed to load disabled base MCP server IDs from localStorage:", error);
+		return new Set();
+	}
+}
+
+// Save disabled base server IDs to localStorage
+function saveDisabledBaseIds(ids: Set<string>) {
+	if (!browser) return;
+
+	try {
+		localStorage.setItem(STORAGE_KEYS.DISABLED_BASE_IDS, JSON.stringify([...ids]));
+	} catch (error) {
+		console.error("Failed to save disabled base MCP server IDs to localStorage:", error);
+	}
+}
+
 // Store for all servers (base + custom)
 export const allMcpServers = writable<MCPServer[]>([]);
 
@@ -117,11 +142,30 @@ export async function refreshMcpServers() {
 		const merged = [...baseServers, ...customServers];
 		allMcpServers.set(merged);
 
-		// Prune selected IDs that no longer correspond to existing servers
+		// Load disabled base servers
+		const disabledBaseIds = loadDisabledBaseIds();
+
+		// Auto-enable all base servers that aren't explicitly disabled
+		// Plus keep any custom servers that were previously selected
 		const validIds = new Set(merged.map((s) => s.id));
-		selectedServerIds.update(($ids) => {
-			const filtered = new Set([...$ids].filter((id) => validIds.has(id)));
-			return filtered;
+		selectedServerIds.update(($currentIds) => {
+			const newSelection = new Set<string>();
+
+			// Add all base servers that aren't disabled
+			for (const server of baseServers) {
+				if (!disabledBaseIds.has(server.id)) {
+					newSelection.add(server.id);
+				}
+			}
+
+			// Keep custom servers that were selected and still exist
+			for (const id of $currentIds) {
+				if (validIds.has(id) && !id.startsWith("base-")) {
+					newSelection.add(id);
+				}
+			}
+
+			return newSelection;
 		});
 	} catch (error) {
 		console.error("Failed to refresh MCP servers:", error);
@@ -138,11 +182,38 @@ export function toggleServer(id: string) {
 		const newSet = new Set($ids);
 		if (newSet.has(id)) {
 			newSet.delete(id);
+			// Track if this is a base server being disabled
+			if (id.startsWith("base-")) {
+				const disabled = loadDisabledBaseIds();
+				disabled.add(id);
+				saveDisabledBaseIds(disabled);
+			}
 		} else {
 			newSet.add(id);
+			// Remove from disabled if re-enabling a base server
+			if (id.startsWith("base-")) {
+				const disabled = loadDisabledBaseIds();
+				disabled.delete(id);
+				saveDisabledBaseIds(disabled);
+			}
 		}
 		return newSet;
 	});
+}
+
+/**
+ * Disable all MCP servers (marks all base servers as disabled)
+ */
+export function disableAllServers() {
+	// Get current base server IDs and mark them all as disabled
+	const servers = get(allMcpServers);
+	const baseServerIds = servers.filter((s) => s.type === "base").map((s) => s.id);
+
+	// Save all base servers as disabled
+	saveDisabledBaseIds(new Set(baseServerIds));
+
+	// Clear the selection
+	selectedServerIds.set(new Set());
 }
 
 /**
