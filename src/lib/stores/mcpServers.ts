@@ -104,6 +104,9 @@ function saveDisabledBaseIds(ids: Set<string>) {
 // Store for all servers (base + custom)
 export const allMcpServers = writable<MCPServer[]>([]);
 
+// Track if initial server load has completed
+export const mcpServersLoaded = writable<boolean>(false);
+
 // Store for selected server IDs
 export const selectedServerIds = writable<Set<string>>(loadSelectedIds());
 
@@ -176,10 +179,12 @@ export async function refreshMcpServers() {
 
 			return newSelection;
 		});
+		mcpServersLoaded.set(true);
 	} catch (error) {
 		console.error("Failed to refresh MCP servers:", error);
 		// On error, just use custom servers
 		allMcpServers.set(loadCustomServers());
+		mcpServersLoaded.set(true);
 	}
 }
 
