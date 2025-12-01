@@ -23,6 +23,7 @@
 		selectedServerIds,
 		allMcpServers,
 		toggleServer,
+		disableAllServers,
 	} from "$lib/stores/mcpServers";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
 	import { page } from "$app/state";
@@ -437,7 +438,7 @@
 							<button
 								class="grid size-5 place-items-center rounded-full bg-blue-600/15 text-blue-700 transition-colors hover:bg-blue-600/25 dark:bg-blue-600/25 dark:text-blue-300 dark:hover:bg-blue-600/35"
 								aria-label="Disable all MCP servers"
-								onclick={() => selectedServerIds.set(new Set())}
+								onclick={() => disableAllServers()}
 								type="button"
 							>
 								<CarbonClose class="size-3.5" />
