@@ -24,6 +24,8 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 	let userScrollTimeout: ReturnType<typeof setTimeout> | undefined;
 	// Track programmatic scrolls to avoid treating them as user scrolls
 	let isProgrammaticScroll = false;
+	// Timestamp of last programmatic scroll to handle race conditions
+	let lastProgrammaticScrollTime = 0;
 
 	let resizeObserver: ResizeObserver | undefined;
 	let intersectionObserver: IntersectionObserver | undefined;
@@ -47,6 +49,7 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 
 	const scrollToBottom = () => {
 		isProgrammaticScroll = true;
+		lastProgrammaticScrollTime = Date.now();
 		node.scrollTo({ top: node.scrollHeight });
 		// Reset flag after scroll completes
 		requestAnimationFrame(() => {
@@ -127,15 +130,33 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 		touchStartY = touchY;
 	};
 
-	// Handle scroll events to re-attach when user scrolls back to bottom
-	const handleScroll = () => {
-		// Skip programmatic scrolls
-		if (isProgrammaticScroll) return;
+	// Track previous scroll position to detect scrollbar drags
+	let prevScrollTop = node.scrollTop;
 
-		// If user scrolled to bottom (manually or via click), re-attach
-		if (isAtBottom() && !userScrolling) {
-			isDetached = false;
+	// Handle scroll events to detect scrollbar usage and re-attach when at bottom
+	const handleScroll = () => {
+		// Skip programmatic scrolls and any scroll events shortly after (handles race conditions
+		// where browser adjusts scroll position due to content resize before our scrollToBottom runs)
+		const timeSinceLastProgrammaticScroll = Date.now() - lastProgrammaticScrollTime;
+		if (isProgrammaticScroll || timeSinceLastProgrammaticScroll < 100) {
+			prevScrollTop = node.scrollTop;
+			return;
 		}
+
+		// If not from wheel/touch, this is likely a scrollbar drag
+		// Detect direction and detach if scrolling up
+		if (!userScrolling) {
+			const scrollingUp = node.scrollTop < prevScrollTop;
+			if (scrollingUp) {
+				isDetached = true;
+			}
+			// If user scrolled to bottom (manually via scrollbar or click), re-attach
+			if (isAtBottom()) {
+				isDetached = false;
+			}
+		}
+
+		prevScrollTop = node.scrollTop;
 	};
 
 	// Set up event listeners
