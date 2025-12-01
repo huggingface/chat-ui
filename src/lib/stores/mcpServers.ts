@@ -122,6 +122,15 @@ export const enabledServers = derived([allMcpServers, selectedServerIds], ([$all
 // Derived store: count of enabled servers
 export const enabledServersCount = derived(enabledServers, ($enabled) => $enabled.length);
 
+// Derived store: true if all base servers are enabled
+export const allBaseServersEnabled = derived(
+	[allMcpServers, selectedServerIds],
+	([$all, $selected]) => {
+		const baseServers = $all.filter((s) => s.type === "base");
+		return baseServers.length > 0 && baseServers.every((s) => $selected.has(s.id));
+	}
+);
+
 // Note: Authorization overlay (with user's HF token) for the Hugging Face MCP host
 // is applied server-side when enabled via MCP_FORWARD_HF_USER_TOKEN.
 
