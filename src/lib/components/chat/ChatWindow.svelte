@@ -143,9 +143,16 @@
 	};
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
+	// Scroll signal includes tool updates and thinking blocks to trigger scroll on all content changes
 	let scrollSignal = $derived.by(() => {
 		const last = messages.at(-1) as Message | undefined;
-		return last ? `${last.id}:${last.content.length}:${messages.length}` : `${messages.length}:0`;
+		if (!last) return `${messages.length}:0`;
+
+		// Count tool updates to trigger scroll when new tools are called or complete
+		const toolUpdateCount = last.updates?.length ?? 0;
+
+		// Include content length, tool count, and message count in signal
+		return `${last.id}:${last.content.length}:${messages.length}:${toolUpdateCount}`;
 	});
 	let streamingAssistantMessage = $derived(
 		(() => {
