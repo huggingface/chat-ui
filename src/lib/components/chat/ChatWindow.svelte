@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, tick } from "svelte";
+	import { onDestroy } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
@@ -248,18 +248,29 @@
 
 	let chatContainer: HTMLElement | undefined = $state();
 
-	async function scrollToBottom() {
-		await tick();
-		if (!chatContainer) return;
-		chatContainer.scrollTop = chatContainer.scrollHeight;
-	}
-
-	// If last message is from user, scroll to bottom
+	// Force scroll to bottom when user sends a new message
+	// Pattern: user message + empty assistant message are added together
+	let prevMessageCount = $state(messages.length);
+	let forceReattach = $state(0);
 	$effect(() => {
-		if (lastMessage && lastMessage.from === "user") {
-			scrollToBottom();
+		if (messages.length > prevMessageCount) {
+			const last = messages.at(-1);
+			const secondLast = messages.at(-2);
+			const userJustSentMessage =
+				messages.length === prevMessageCount + 2 &&
+				secondLast?.from === "user" &&
+				last?.from === "assistant" &&
+				last?.content === "";
+
+			if (userJustSentMessage) {
+				forceReattach++;
+			}
 		}
+		prevMessageCount = messages.length;
 	});
+
+	// Combined scroll dependency for the action
+	let scrollDependency = $derived({ signal: scrollSignal, forceReattach });
 
 	const settings = useSettingsStore();
 	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
@@ -382,7 +393,7 @@
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
-		use:snapScrollToBottom={scrollSignal}
+		use:snapScrollToBottom={scrollDependency}
 		bind:this={chatContainer}
 	>
 		<div
