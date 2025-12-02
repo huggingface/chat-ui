@@ -137,7 +137,7 @@
 		Math.min(0, tween.current)
 	)}%); width: {drawerWidthPercentage}%;"
 	class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen}
-	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-screen grid-cols-1
+	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-dvh grid-cols-1
 	grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white pt-4 dark:bg-gray-900 md:hidden"
 >
 	{@render children?.()}
