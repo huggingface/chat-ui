@@ -50,7 +50,7 @@
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
-			<h1 class="text-2xl font-bold">Models</h1>
+			<h1 class="text-xl font-bold sm:text-2xl">Models</h1>
 			{#if publicConfig.isHuggingChat}
 				<a
 					href="https://huggingface.co/docs/inference-providers"
@@ -92,7 +92,7 @@
 					<a
 						href="{base}/models/{model.id}"
 						aria-label="Model card for {model.displayName}"
-						class="group flex cursor-pointer items-center gap-4 p-4
+						class="group flex cursor-pointer items-center gap-2 p-3 sm:gap-4 sm:p-4
 							{isActive
 							? 'bg-gray-50 dark:bg-gray-800'
 							: 'bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800'}
@@ -103,7 +103,7 @@
 							{#if model.logoUrl}
 								<img
 									alt={model.displayName}
-									class="h-10 w-10 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100"
+									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100 sm:size-10"
 									src={model.logoUrl}
 								/>
 							{:else}
@@ -118,7 +118,7 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
 								<h3
-									class="truncate font-medium text-gray-900 dark:text-gray-200"
+									class="truncate font-medium text-gray-900 dark:text-gray-200 max-sm:text-xs"
 									class:font-bold={isActive}
 									class:dark:text-white={isActive}
 								>
@@ -132,7 +132,7 @@
 									</span>
 								{/if}
 							</div>
-							<p class="truncate pr-4 text-[13px] text-gray-500 dark:text-gray-400">
+							<p class="truncate pr-4 text-xs text-gray-500 dark:text-gray-400 sm:text-[13px]">
 								{model.isRouter
 									? "Routes your messages to the best model for your request."
 									: model.description || "-"}
@@ -152,7 +152,7 @@
 									goto(`${base}/settings/${model.id}`);
 								}}
 							>
-								<LucideSettings class="h-3.5 w-3.5" />
+								<LucideSettings class="size-3 sm:size-3.5" />
 							</button>
 							<div class="flex items-center gap-1.5">
 								{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
@@ -160,7 +160,7 @@
 										title="This model supports tool calling (functions)."
 										class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
 									>
-										<LucideHammer class="h-3.5 w-3.5" />
+										<LucideHammer class="size-3 sm:size-3.5" />
 									</div>
 								{/if}
 								{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
@@ -168,7 +168,7 @@
 										title="This model is multimodal and supports image inputs natively."
 										class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
 									>
-										<LucideImage class="h-3.5 w-3.5" />
+										<LucideImage class="size-3 sm:size-3.5" />
 									</div>
 								{/if}
 							</div>
