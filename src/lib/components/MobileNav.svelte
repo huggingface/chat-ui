@@ -72,10 +72,10 @@
 	// Swipe gesture support for opening/closing the nav with live feedback
 	// Thresholds from vaul drawer library
 	const VELOCITY_THRESHOLD = 0.4; // px/ms - if exceeded, snap in swipe direction
-	const CLOSE_THRESHOLD = 0.25; // 25% position threshold
 	const DIRECTION_LOCK_THRESHOLD = 10; // px - movement needed to lock direction
 
 	let touchstart: Touch | null = null;
+	let lastTouchX: number | null = null;
 	let dragStartTime: number = 0;
 	let isDragging = $state(false);
 	let dragOffset = $state(-100); // percentage: -100 (closed) to 0 (open)
@@ -164,6 +164,8 @@
 		} else {
 			dragOffset = Math.max(-100, Math.min(0, -100 + (deltaX / drawerWidth) * 100));
 		}
+
+		lastTouchX = touch.clientX;
 	}
 
 	function onTouchEnd(e: TouchEvent) {
@@ -179,12 +181,13 @@
 		const distMoved = touch.clientX - touchstart.clientX;
 		const velocity = Math.abs(distMoved) / timeTaken;
 
-		// Determine snap direction based on velocity first, then position
+		// Determine snap direction based on velocity first, then final movement direction
 		if (velocity > VELOCITY_THRESHOLD) {
 			isOpen = distMoved > 0;
 		} else {
-			const openThreshold = -100 + CLOSE_THRESHOLD * 100;
-			isOpen = dragOffset > openThreshold;
+			// For slow drags, use the final movement direction (allows "change of mind")
+			const finalDirection = lastTouchX !== null ? touch.clientX - lastTouchX : distMoved;
+			isOpen = finalDirection > 0;
 		}
 
 		resetDragState();
@@ -201,6 +204,7 @@
 		isDragging = false;
 		potentialDrag = false;
 		touchstart = null;
+		lastTouchX = null;
 		directionLock = null;
 	}
 
