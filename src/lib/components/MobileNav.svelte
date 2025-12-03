@@ -23,6 +23,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
 	import { requireAuthUser } from "$lib/utils/auth";
+
 	interface Props {
 		title: string | undefined;
 		children?: import("svelte").Snippet;
@@ -43,16 +44,6 @@
 
 	// Define the width for the drawer (less than 100% to create the gap)
 	const drawerWidthPercentage = 85;
-
-	const tween = Spring.of(
-		() => {
-			if (isOpen) {
-				return 0 as number;
-			}
-			return -100 as number;
-		},
-		{ stiffness: 0.2, damping: 0.8 }
-	);
 
 	$effect(() => {
 		title ??= "New Chat";
@@ -78,48 +69,146 @@
 		isOpen = false;
 	}
 
-	// Swipe gesture support for opening/closing the nav
+	// Swipe gesture support for opening/closing the nav with live feedback
+	// Thresholds from vaul drawer library
+	const VELOCITY_THRESHOLD = 0.4; // px/ms - if exceeded, snap in swipe direction
+	const CLOSE_THRESHOLD = 0.25; // 25% position threshold
+	const DIRECTION_LOCK_THRESHOLD = 10; // px - movement needed to lock direction
+
 	let touchstart: Touch | null = null;
-	let touchend: Touch | null = null;
+	let dragStartTime: number = 0;
+	let isDragging = $state(false);
+	let dragOffset = $state(-100); // percentage: -100 (closed) to 0 (open)
+	let dragStartedOpen = false;
 
-	function checkDirection() {
-		if (!touchstart || !touchend) return;
+	// Direction lock: null = undecided, 'horizontal' = drawer drag, 'vertical' = scroll
+	let directionLock: "horizontal" | "vertical" | null = null;
+	let potentialDrag = false;
 
-		const screenWidth = window.innerWidth;
-		const swipeDistance = touchend.screenX - touchstart.screenX;
-		const absSwipeDistance = Math.abs(swipeDistance);
+	// Spring target: follows dragOffset during drag, follows isOpen after drag ends
+	const springTarget = $derived(isDragging ? dragOffset : isOpen ? 0 : -100);
+	const tween = Spring.of(() => springTarget, { stiffness: 0.2, damping: 0.8 });
 
-		// Only trigger if swipe is significant (1/8 of screen width)
-		if (absSwipeDistance < screenWidth / 8) return;
+	function onTouchStart(e: TouchEvent) {
+		const touch = e.changedTouches[0];
+		touchstart = touch;
+		dragStartTime = Date.now();
+		directionLock = null;
 
-		// Swipe right from left edge (within 40px) -> open
-		if (touchstart.clientX < 40 && swipeDistance > 0 && !isOpen) {
-			isOpen = true;
-		}
-		// Swipe left while open -> close
-		else if (swipeDistance < 0 && isOpen) {
-			isOpen = false;
+		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
+		const touchOnDrawer = isOpen && touch.clientX < drawerWidth;
+
+		// Potential drag scenarios - never start isDragging until direction is locked
+		// Exception: overlay tap (no scroll content, so no direction conflict)
+		if (!isOpen && touch.clientX < 40) {
+			// Opening gesture - wait for direction lock before starting drag
+			potentialDrag = true;
+			dragStartedOpen = false;
+		} else if (isOpen && !touchOnDrawer) {
+			// Touch on overlay - can start immediately (no scroll conflict)
+			potentialDrag = true;
+			isDragging = true;
+			dragStartedOpen = true;
+			dragOffset = 0;
+			directionLock = "horizontal";
+		} else if (isOpen && touchOnDrawer) {
+			// Touch on drawer content - wait for direction lock
+			potentialDrag = true;
+			dragStartedOpen = true;
 		}
 	}
 
-	function onTouchStart(e: TouchEvent) {
-		touchstart = e.changedTouches[0];
+	function onTouchMove(e: TouchEvent) {
+		if (!touchstart || !potentialDrag) return;
+
+		const touch = e.changedTouches[0];
+		const deltaX = touch.clientX - touchstart.clientX;
+		const deltaY = touch.clientY - touchstart.clientY;
+
+		// Determine direction lock if not yet decided
+		if (directionLock === null) {
+			const absX = Math.abs(deltaX);
+			const absY = Math.abs(deltaY);
+
+			if (absX > DIRECTION_LOCK_THRESHOLD || absY > DIRECTION_LOCK_THRESHOLD) {
+				if (absX > absY) {
+					// Horizontal movement - commit to drawer drag
+					directionLock = "horizontal";
+					isDragging = true;
+					dragOffset = dragStartedOpen ? 0 : -100;
+				} else {
+					// Vertical movement - abort potential drag, let content scroll
+					directionLock = "vertical";
+					potentialDrag = false;
+					return;
+				}
+			} else {
+				return;
+			}
+		}
+
+		if (directionLock !== "horizontal") return;
+
+		const drawerWidth = window.innerWidth * (drawerWidthPercentage / 100);
+
+		if (dragStartedOpen) {
+			dragOffset = Math.max(-100, Math.min(0, (deltaX / drawerWidth) * 100));
+		} else {
+			dragOffset = Math.max(-100, Math.min(0, -100 + (deltaX / drawerWidth) * 100));
+		}
 	}
 
 	function onTouchEnd(e: TouchEvent) {
-		touchend = e.changedTouches[0];
-		checkDirection();
+		if (!potentialDrag) return;
+
+		if (!isDragging || !touchstart) {
+			resetDragState();
+			return;
+		}
+
+		const touch = e.changedTouches[0];
+		const timeTaken = Date.now() - dragStartTime;
+		const distMoved = touch.clientX - touchstart.clientX;
+		const velocity = Math.abs(distMoved) / timeTaken;
+
+		// Determine snap direction based on velocity first, then position
+		if (velocity > VELOCITY_THRESHOLD) {
+			isOpen = distMoved > 0;
+		} else {
+			const openThreshold = -100 + CLOSE_THRESHOLD * 100;
+			isOpen = dragOffset > openThreshold;
+		}
+
+		resetDragState();
+	}
+
+	function onTouchCancel() {
+		if (isDragging) {
+			isOpen = dragStartedOpen;
+		}
+		resetDragState();
+	}
+
+	function resetDragState() {
+		isDragging = false;
+		potentialDrag = false;
+		touchstart = null;
+		directionLock = null;
 	}
 
 	onMount(() => {
-		window.addEventListener("touchstart", onTouchStart);
-		window.addEventListener("touchend", onTouchEnd);
+		window.addEventListener("touchstart", onTouchStart, { passive: true });
+		window.addEventListener("touchmove", onTouchMove, { passive: true });
+		window.addEventListener("touchend", onTouchEnd, { passive: true });
+		window.addEventListener("touchcancel", onTouchCancel, { passive: true });
 	});
 
 	onDestroy(() => {
 		if (browser) {
 			window.removeEventListener("touchstart", onTouchStart);
+			window.removeEventListener("touchmove", onTouchMove);
 			window.removeEventListener("touchend", onTouchEnd);
+			window.removeEventListener("touchcancel", onTouchCancel);
 		}
 	});
 </script>
@@ -170,23 +259,22 @@
 	</div>
 </nav>
 
-<!-- Mobile drawer overlay - shows when drawer is open -->
-{#if isOpen}
+<!-- Mobile drawer overlay - shows when drawer is open or dragging -->
+{#if isOpen || isDragging}
 	<button
 		type="button"
 		class="fixed inset-0 z-20 cursor-default bg-black/30 md:hidden"
-		style="opacity: {Math.max(0, Math.min(1, (100 + tween.current) / 100))};"
+		style="opacity: {Math.max(0, Math.min(1, (100 + tween.current) / 100))}; will-change: opacity;"
 		onclick={closeDrawer}
 		aria-label="Close mobile navigation"
 	></button>
 {/if}
 
 <nav
-	style="transform: translateX({Math.max(
-		-100,
-		Math.min(0, tween.current)
-	)}%); width: {drawerWidthPercentage}%;"
-	class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen}
+	style="transform: translateX({isDragging
+		? dragOffset
+		: tween.current}%); width: {drawerWidthPercentage}%; will-change: transform;"
+	class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen || isDragging}
 	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-dvh grid-cols-1
 	grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white pt-4 dark:bg-gray-900 md:hidden"
 >
