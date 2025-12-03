@@ -102,6 +102,8 @@
 		// Exception: overlay tap (no scroll content, so no direction conflict)
 		if (!isOpen && touch.clientX < 40) {
 			// Opening gesture - wait for direction lock before starting drag
+			// Prevent Safari's back navigation gesture on iOS
+			e.preventDefault();
 			potentialDrag = true;
 			dragStartedOpen = false;
 		} else if (isOpen && !touchOnDrawer) {
@@ -197,7 +199,8 @@
 	}
 
 	onMount(() => {
-		window.addEventListener("touchstart", onTouchStart, { passive: true });
+		// touchstart needs passive: false to allow preventDefault() for Safari back gesture
+		window.addEventListener("touchstart", onTouchStart, { passive: false });
 		window.addEventListener("touchmove", onTouchMove, { passive: true });
 		window.addEventListener("touchend", onTouchEnd, { passive: true });
 		window.addEventListener("touchcancel", onTouchCancel, { passive: true });
