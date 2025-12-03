@@ -192,7 +192,7 @@
 				classNames="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700/60"
 			>
 				<div class="flex items-center gap-1.5">
-					<CarbonCopy class="shrink-0 text-xs" />Copy new chat link
+					<CarbonCopy class="shrink-0 text-xs" />Copy direct link
 				</div>
 			</CopyToClipBoardBtn>
 		{/if}
@@ -305,7 +305,7 @@
 							>
 								{#if hubOrg}
 									<img
-										src="https://huggingface.co/api/organizations/{hubOrg}/avatar"
+										src="https://huggingface.co/api/avatars/{hubOrg}"
 										alt="{prov.provider} logo"
 										class="size-2.5 flex-none rounded-sm"
 										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}

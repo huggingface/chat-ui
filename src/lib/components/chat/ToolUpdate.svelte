@@ -5,7 +5,7 @@
 		isMessageToolErrorUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
-	import CarbonTools from "~icons/carbon/tools";
+	import LucideHammer from "~icons/lucide/hammer";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import { onDestroy } from "svelte";
@@ -165,7 +165,7 @@
 						id="shape"
 					/>
 				</svg>
-				<CarbonTools class="text-xs text-purple-700 dark:text-purple-500" />
+				<LucideHammer class="size-3.5 text-purple-700 dark:text-purple-500" />
 			</div>
 
 			<span class="relative">

@@ -8,8 +8,8 @@
 	import CarbonClose from "~icons/carbon/close";
 	import CarbonTextLongParagraph from "~icons/carbon/text-long-paragraph";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
-	import CarbonView from "~icons/carbon/view";
-	import CarbonTools from "~icons/carbon/tools";
+	import LucideImage from "~icons/lucide/image";
+	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
 
 	import type { LayoutData } from "../$types";
@@ -181,7 +181,7 @@
 							aria-label="Model supports tools"
 							role="img"
 						>
-							<CarbonTools class="text-xxs" />
+							<LucideHammer class="size-3" />
 						</span>
 					{/if}
 
@@ -192,7 +192,7 @@
 							aria-label="Model is multimodal"
 							role="img"
 						>
-							<CarbonView class="text-xxs" />
+							<LucideImage class="size-3" />
 						</span>
 					{/if}
 

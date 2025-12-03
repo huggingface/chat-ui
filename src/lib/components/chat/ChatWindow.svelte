@@ -29,7 +29,7 @@
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
 	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
-	import CarbonTools from "~icons/carbon/tools";
+	import LucideHammer from "~icons/lucide/hammer";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -600,7 +600,7 @@
 				{#if models.find((m) => m.id === currentModel.id)}
 					{#if loading && streamingToolCallName}
 						<span class="inline-flex items-center gap-1 whitespace-nowrap text-xs">
-							<CarbonTools class="text-[11px]" />
+							<LucideHammer class="size-3" />
 							Calling tool
 							<span class="loading-dots font-medium">
 								{availableTools.find((t) => t.name === streamingToolCallName)?.displayName ??

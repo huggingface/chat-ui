@@ -14,7 +14,7 @@
 	import type { KeyValuePair } from "$lib/types/Tool";
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
-	import IconTools from "~icons/carbon/tools";
+	import LucideHammer from "~icons/lucide/hammer";
 	import IconMCP from "$lib/components/icons/IconMCP.svelte";
 
 	const publicConfig = usePublicConfig();
@@ -143,7 +143,7 @@
 						<div
 							class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-8 dark:border-gray-700"
 						>
-							<IconTools class="mb-3 size-12 text-gray-400" />
+							<LucideHammer class="mb-3 size-12 text-gray-400" />
 							<p class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100">
 								No custom servers yet
 							</p>

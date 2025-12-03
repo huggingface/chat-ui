@@ -300,7 +300,7 @@
 								class="flex items-center gap-1 truncate rounded bg-gray-100 px-1 font-mono hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 max-sm:hidden sm:py-px"
 							>
 								<img
-									src="https://huggingface.co/api/organizations/{hubOrg}/avatar"
+									src="https://huggingface.co/api/avatars/{hubOrg}"
 									alt="{message.routerMetadata.provider} logo"
 									class="size-2.5 flex-none rounded-sm"
 									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}

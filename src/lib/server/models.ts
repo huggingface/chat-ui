@@ -336,7 +336,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			let logoUrl: string | undefined = undefined;
 			if (isHFRouter && m.id.includes("/")) {
 				const org = m.id.split("/")[0];
-				logoUrl = `https://huggingface.co/api/organizations/${encodeURIComponent(org)}/avatar?redirect=true`;
+				logoUrl = `https://huggingface.co/api/avatars/${encodeURIComponent(org)}`;
 			}
 
 			const inputModalities = (m.architecture?.input_modalities ?? []).map((modality) =>
