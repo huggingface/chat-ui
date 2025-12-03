@@ -92,7 +92,7 @@
 					<a
 						href="{base}/models/{model.id}"
 						aria-label="Model card for {model.displayName}"
-						class="group flex cursor-pointer items-center gap-4 p-4
+						class="group flex cursor-pointer items-center gap-2 p-3 sm:gap-4 sm:p-4
 							{isActive
 							? 'bg-gray-50 dark:bg-gray-800'
 							: 'bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800'}
@@ -132,7 +132,7 @@
 									</span>
 								{/if}
 							</div>
-							<p class="truncate pr-4 text-[13px] text-gray-500 dark:text-gray-400">
+							<p class="truncate pr-4 text-xs text-gray-500 dark:text-gray-400 sm:text-[13px]">
 								{model.isRouter
 									? "Routes your messages to the best model for your request."
 									: model.description || "-"}
