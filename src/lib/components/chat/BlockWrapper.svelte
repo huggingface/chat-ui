@@ -40,7 +40,7 @@
 						width="23"
 						height="23"
 						rx="7.5"
-						class="loading-path stroke-current text-purple-500"
+						class="loading-path stroke-current text-purple-500/20"
 						stroke-width="1"
 						fill="none"
 					/>

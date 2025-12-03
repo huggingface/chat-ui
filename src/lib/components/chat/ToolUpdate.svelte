@@ -6,6 +6,7 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import LucideHammer from "~icons/lucide/hammer";
+	import LucideCheck from "~icons/lucide/check";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
 	import { page } from "$app/state";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
@@ -31,6 +32,7 @@
 	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let isExecuting = $derived(!toolDone && !toolError && loading);
+	let toolSuccess = $derived(toolDone && !toolError);
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
@@ -107,11 +109,15 @@
 </script>
 
 {#snippet icon()}
-	<LucideHammer
-		class="size-3.5 {toolError
-			? 'text-red-500 dark:text-red-400'
-			: 'text-purple-600 dark:text-purple-400'}"
-	/>
+	{#if toolSuccess}
+		<LucideCheck class="size-3.5 text-purple-600 dark:text-purple-400" />
+	{:else}
+		<LucideHammer
+			class="size-3.5 {toolError
+				? 'text-red-500 dark:text-red-400'
+				: 'text-purple-600 dark:text-purple-400'}"
+		/>
+	{/if}
 {/snippet}
 
 {#if toolFnName}
