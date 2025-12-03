@@ -72,7 +72,7 @@
 				class:animate-pulse={loading}
 			>
 				{content
-					.replace(/[#*_`~\[\]]/g, "")
+					.replace(/[#*_`~[\]]/g, "")
 					.replace(/\n+/g, " ")
 					.trim()}
 			</div>
