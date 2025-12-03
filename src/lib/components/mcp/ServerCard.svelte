@@ -6,7 +6,7 @@
 	import IconPending from "~icons/carbon/pending-filled";
 	import IconRefresh from "~icons/carbon/renew";
 	import IconTrash from "~icons/carbon/trash-can";
-	import IconTools from "~icons/carbon/tools";
+	import LucideHammer from "~icons/lucide/hammer";
 	import IconSettings from "~icons/carbon/settings";
 	import Switch from "$lib/components/Switch.svelte";
 	import { getMcpServerFaviconUrl } from "$lib/utils/favicon";
@@ -127,7 +127,7 @@
 
 				{#if server.tools && server.tools.length > 0}
 					<span class="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-						<IconTools class="size-3" />
+						<LucideHammer class="size-3" />
 						{server.tools.length}
 						{server.tools.length === 1 ? "tool" : "tools"}
 					</span>

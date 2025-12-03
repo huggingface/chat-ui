@@ -6,9 +6,9 @@
 	import { page } from "$app/state";
 
 	import CarbonHelpFilled from "~icons/carbon/help-filled";
-	import CarbonView from "~icons/carbon/view";
-	import CarbonTools from "~icons/carbon/tools";
-	import CarbonSettings from "~icons/carbon/settings";
+	import LucideHammer from "~icons/lucide/hammer";
+	import LucideImage from "~icons/lucide/image";
+	import LucideSettings from "~icons/lucide/settings";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
 	interface Props {
@@ -25,6 +25,16 @@
 	let modelFilter = $state("");
 	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
 	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
+
+	// Filtered models list
+	let filteredModels = $derived(
+		data.models
+			.filter((el) => !el.unlisted)
+			.filter((el) => {
+				const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
+				return queryTokens.every((q) => haystack.includes(q));
+			})
+	);
 </script>
 
 <svelte:head>
@@ -40,7 +50,7 @@
 <div class="scrollbar-custom h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
-			<h1 class="text-2xl font-bold">Models</h1>
+			<h1 class="text-xl font-bold sm:text-2xl">Models</h1>
 			{#if publicConfig.isHuggingChat}
 				<a
 					href="https://huggingface.co/docs/inference-providers"
@@ -71,119 +81,106 @@
 				placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300
 				dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-gray-700"
 		/>
-		<div class="mt-6 grid grid-cols-1 gap-3 sm:gap-5 xl:grid-cols-2">
-			{#each data.models
-				.filter((el) => !el.unlisted)
-				.filter((el) => {
-					const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
-					return queryTokens.every((q) => haystack.includes(q));
-				}) as model, index (model.id)}
-				<a
-					href="{base}/models/{model.id}"
-					aria-label="Model card"
-					class="relative flex flex-col gap-2 overflow-hidden rounded-xl border bg-gray-50/50 px-6 py-5 shadow hover:bg-gray-50 hover:shadow-inner dark:border-gray-800/70 dark:bg-gray-950/20 dark:hover:bg-gray-950/40"
-					class:omni-gradient={model.isRouter}
-					class:active-model={model.id === $settings.activeModel}
-				>
-					<div class="flex items-center justify-between gap-1">
-						{#if model.logoUrl}
-							<img
-								class="aspect-square size-6 rounded border bg-white dark:border-gray-700"
-								src={model.logoUrl}
-								alt=""
-							/>
-						{:else}
-							<div
-								class="size-6 rounded border border-transparent bg-gray-300 dark:bg-gray-800"
-								aria-hidden="true"
-							></div>
-						{/if}
-						<div class="flex items-center gap-1">
-							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
-								<span
-									title="This model supports tool calling (functions)."
-									class="background ml-auto flex size-[21px] items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-500"
-									aria-label="Model supports tools"
-									role="img"
+
+		<div class="mt-6 min-h-[50vh]">
+			<div
+				class="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+			>
+				{#each filteredModels as model, index (model.id)}
+					{@const isActive = model.id === $settings.activeModel}
+					{@const isLast = index === filteredModels.length - 1}
+					<a
+						href="{base}/models/{model.id}"
+						aria-label="Model card for {model.displayName}"
+						class="group flex cursor-pointer items-center gap-2 p-3 sm:gap-4 sm:p-4
+							{isActive
+							? 'bg-gray-50 dark:bg-gray-800'
+							: 'bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800'}
+							{isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}"
+					>
+						<!-- Avatar -->
+						<div class="flex-shrink-0">
+							{#if model.logoUrl}
+								<img
+									alt={model.displayName}
+									class="size-8 rounded-lg border border-gray-100 bg-gray-50 object-cover dark:border-gray-700 dark:bg-gray-100 sm:size-10"
+									src={model.logoUrl}
+								/>
+							{:else}
+								<div
+									class="h-10 w-10 rounded-lg border border-gray-100 bg-gray-200 dark:border-gray-700 dark:bg-gray-700"
+									aria-hidden="true"
+								></div>
+							{/if}
+						</div>
+
+						<!-- Content -->
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								<h3
+									class="truncate font-medium text-gray-900 dark:text-gray-200 max-sm:text-xs"
+									class:font-bold={isActive}
+									class:dark:text-white={isActive}
 								>
-									<CarbonTools class="text-xxs" />
-								</span>
+									{model.displayName}
+								</h3>
+								{#if index === 0 && model.isRouter && !isActive}
+									<span
+										class="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400"
+									>
+										Default
+									</span>
+								{/if}
+							</div>
+							<p class="truncate pr-4 text-xs text-gray-500 dark:text-gray-400 sm:text-[13px]">
+								{model.isRouter
+									? "Routes your messages to the best model for your request."
+									: model.description || "-"}
+							</p>
+						</div>
+
+						<!-- Icons and badges -->
+						<div class="flex flex-shrink-0 items-center gap-1.5">
+							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
+								<div
+									title="This model supports tool calling (functions)."
+									class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+								>
+									<LucideHammer class="size-3 sm:size-3.5" />
+								</div>
 							{/if}
 							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
-								<span
+								<div
 									title="This model is multimodal and supports image inputs natively."
-									class="flex size-[21px] items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-500"
-									aria-label="Model is multimodal"
-									role="img"
+									class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
 								>
-									<CarbonView class="text-xxs" />
-								</span>
+									<LucideImage class="size-3 sm:size-3.5" />
+								</div>
 							{/if}
 							<button
 								type="button"
 								title="Model settings"
 								aria-label="Model settings for {model.displayName}"
-								class="flex size-[21px] items-center justify-center rounded-md border border-gray-300 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+								class="rounded-md border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
 								onclick={(e) => {
 									e.preventDefault();
 									e.stopPropagation();
 									goto(`${base}/settings/${model.id}`);
 								}}
 							>
-								<CarbonSettings class="text-xs" />
+								<LucideSettings class="size-3 sm:size-3.5" />
 							</button>
-							{#if model.id === $settings.activeModel}
+							{#if isActive}
 								<span
-									class="rounded-full bg-black px-2 py-0.5 text-xs text-white dark:bg-white dark:text-black"
+									class="rounded-full bg-black px-2.5 py-1 text-xs font-bold text-white shadow-md dark:bg-white dark:text-black"
 								>
 									Active
 								</span>
-							{:else if index === 0 && model.id === "omni"}
-								<span
-									class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-500 dark:border-gray-500 dark:text-gray-400"
-								>
-									Default
-								</span>
 							{/if}
 						</div>
-					</div>
-					<span class="flex items-center gap-2 font-semibold">
-						{model.displayName}
-					</span>
-					<span class="line-clamp-4 whitespace-pre-wrap text-sm text-gray-500 dark:text-gray-400">
-						{model.isRouter
-							? "Routes your messages to the best model for your request."
-							: model.description || "-"}
-					</span>
-				</a>
-			{/each}
+					</a>
+				{/each}
+			</div>
 		</div>
 	</div>
 </div>
-
-<style>
-	/* Subtle highlight for the router (Omni) tile */
-	.omni-gradient {
-		/* layered gradients to keep readable on both themes */
-		background-image:
-			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.16), transparent 60%),
-			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.16), transparent 60%),
-			linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(59, 130, 246, 0.08));
-		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.06),
-			0 6px 18px rgba(59, 130, 246, 0.12),
-			0 2px 8px rgba(236, 72, 153, 0.1);
-	}
-
-	:global(.dark) .omni-gradient {
-		background-image:
-			radial-gradient(900px 300px at -10% -20%, rgba(59, 130, 246, 0.12), transparent 60%),
-			radial-gradient(700px 240px at 110% 120%, rgba(16, 185, 129, 0.12), transparent 60%),
-			linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(59, 130, 246, 0.06));
-		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.04),
-			0 10px 28px rgba(0, 0, 0, 0.25);
-	}
-
-	/* Active border handled via Tailwind utilities (see .active-model in src/styles/main.css) */
-</style>

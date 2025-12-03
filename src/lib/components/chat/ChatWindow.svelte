@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, tick } from "svelte";
+	import { onDestroy } from "svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
+	import IconArrowUp from "~icons/lucide/arrow-up";
 
 	import ChatInput from "./ChatInput.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
@@ -25,9 +26,11 @@
 	import { useSettingsStore } from "$lib/stores/settings";
 	import ModelSwitch from "./ModelSwitch.svelte";
 	import { routerExamples } from "$lib/constants/routerExamples";
+	import { mcpExamples } from "$lib/constants/mcpExamples";
 	import type { RouterFollowUp, RouterExample } from "$lib/constants/routerExamples";
+	import { allBaseServersEnabled, mcpServersLoaded } from "$lib/stores/mcpServers";
 	import { shareModal } from "$lib/stores/shareModal";
-	import CarbonTools from "~icons/carbon/tools";
+	import LucideHammer from "~icons/lucide/hammer";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -143,9 +146,16 @@
 	};
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
+	// Scroll signal includes tool updates and thinking blocks to trigger scroll on all content changes
 	let scrollSignal = $derived.by(() => {
 		const last = messages.at(-1) as Message | undefined;
-		return last ? `${last.id}:${last.content.length}:${messages.length}` : `${messages.length}:0`;
+		if (!last) return `${messages.length}:0`;
+
+		// Count tool updates to trigger scroll when new tools are called or complete
+		const toolUpdateCount = last.updates?.length ?? 0;
+
+		// Include content length, tool count, and message count in signal
+		return `${last.id}:${last.content.length}:${messages.length}:${toolUpdateCount}`;
 	});
 	let streamingAssistantMessage = $derived(
 		(() => {
@@ -239,18 +249,29 @@
 
 	let chatContainer: HTMLElement | undefined = $state();
 
-	async function scrollToBottom() {
-		await tick();
-		if (!chatContainer) return;
-		chatContainer.scrollTop = chatContainer.scrollHeight;
-	}
-
-	// If last message is from user, scroll to bottom
+	// Force scroll to bottom when user sends a new message
+	// Pattern: user message + empty assistant message are added together
+	let prevMessageCount = $state(messages.length);
+	let forceReattach = $state(0);
 	$effect(() => {
-		if (lastMessage && lastMessage.from === "user") {
-			scrollToBottom();
+		if (messages.length > prevMessageCount) {
+			const last = messages.at(-1);
+			const secondLast = messages.at(-2);
+			const userJustSentMessage =
+				messages.length === prevMessageCount + 2 &&
+				secondLast?.from === "user" &&
+				last?.from === "assistant" &&
+				last?.content === "";
+
+			if (userJustSentMessage) {
+				forceReattach++;
+			}
 		}
+		prevMessageCount = messages.length;
 	});
+
+	// Combined scroll dependency for the action
+	let scrollDependency = $derived({ signal: scrollSignal, forceReattach });
 
 	const settings = useSettingsStore();
 	let hideRouterExamples = $derived($settings.hidePromptExamples?.[currentModel.id] ?? false);
@@ -282,9 +303,13 @@
 	let focused = $state(false);
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
+	// Use MCP examples when all base servers are enabled, otherwise use router examples
+	let activeExamples = $derived<RouterExample[]>(
+		$allBaseServersEnabled ? mcpExamples : routerExamples
+	);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
-			? (routerExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
+			? (activeExamples.find((ex) => ex.prompt === activeRouterExamplePrompt)?.followUps ?? [])
 			: []
 	);
 	let routerUserMessages = $derived(messages.filter((msg) => msg.from === "user"));
@@ -310,7 +335,7 @@
 			return;
 		}
 
-		const match = routerExamples.find((ex) => ex.prompt.trim() === firstUserMessage.content.trim());
+		const match = activeExamples.find((ex) => ex.prompt.trim() === firstUserMessage.content.trim());
 		activeRouterExamplePrompt = match ? match.prompt : null;
 	});
 
@@ -369,7 +394,7 @@
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
-		use:snapScrollToBottom={scrollSignal}
+		use:snapScrollToBottom={scrollDependency}
 		bind:this={chatContainer}
 	>
 		<div
@@ -432,11 +457,11 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-		{#if !draft.length && !messages.length && !sources.length && !loading && currentModel.isRouter && routerExamples.length && !hideRouterExamples && !lastIsError}
+		{#if !draft.length && !messages.length && !sources.length && !loading && currentModel.isRouter && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 			<div
 				class="no-scrollbar mb-3 flex w-full select-none justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 dark:text-gray-500"
 			>
-				{#each routerExamples as ex}
+				{#each activeExamples as ex}
 					<button
 						class="flex items-center rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
 						onclick={() => startExample(ex)}>{ex.title}</button
@@ -535,11 +560,11 @@
 							<StopGeneratingBtn
 								onClick={() => onstop?.()}
 								showBorder={true}
-								classNames="absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
 							/>
 						{:else}
 							<button
-								class="btn absolute bottom-2 right-2 size-7 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+								class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
 								isReadOnly
 									? ''
 									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
@@ -548,20 +573,7 @@
 								aria-label="Send message"
 								name="submit"
 							>
-								<svg
-									width="1em"
-									height="1em"
-									viewBox="0 0 32 32"
-									fill="none"
-									xmlns="http://www.w3.org/2000/svg"
-								>
-									<path
-										fill-rule="evenodd"
-										clip-rule="evenodd"
-										d="M17.0606 4.23197C16.4748 3.64618 15.525 3.64618 14.9393 4.23197L5.68412 13.4871C5.09833 14.0729 5.09833 15.0226 5.68412 15.6084C6.2699 16.1942 7.21965 16.1942 7.80544 15.6084L14.4999 8.91395V26.7074C14.4999 27.5359 15.1715 28.2074 15.9999 28.2074C16.8283 28.2074 17.4999 27.5359 17.4999 26.7074V8.91395L24.1944 15.6084C24.7802 16.1942 25.7299 16.1942 26.3157 15.6084C26.9015 15.0226 26.9015 14.0729 26.3157 13.4871L17.0606 4.23197Z"
-										fill="currentColor"
-									/>
-								</svg>
+								<IconArrowUp />
 							</button>
 						{/if}
 					</div>
@@ -576,7 +588,7 @@
 				{#if models.find((m) => m.id === currentModel.id)}
 					{#if loading && streamingToolCallName}
 						<span class="inline-flex items-center gap-1 whitespace-nowrap text-xs">
-							<CarbonTools class="text-[11px]" />
+							<LucideHammer class="size-3" />
 							Calling tool
 							<span class="loading-dots font-medium">
 								{availableTools.find((t) => t.name === streamingToolCallName)?.displayName ??

@@ -264,6 +264,12 @@ export async function* runMcpFlow({
 			apiKey: config.OPENAI_API_KEY || config.HF_TOKEN || "sk-",
 			baseURL: config.OPENAI_BASE_URL,
 			fetch: captureProviderFetch,
+			defaultHeaders: {
+				// Bill to organization if configured (HuggingChat only)
+				...(config.isHuggingChat && locals?.billingOrganization
+					? { "X-HF-Bill-To": locals.billingOrganization }
+					: {}),
+			},
 		});
 
 		const mmEnabled = (forceMultimodal ?? false) || targetModel.multimodal;
