@@ -141,6 +141,22 @@
 
 						<!-- Icons and badges -->
 						<div class="flex flex-shrink-0 items-center gap-1.5">
+							{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
+								<div
+									title="This model supports tool calling (functions)."
+									class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+								>
+									<LucideHammer class="size-3 sm:size-3.5" />
+								</div>
+							{/if}
+							{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
+								<div
+									title="This model is multimodal and supports image inputs natively."
+									class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+								>
+									<LucideImage class="size-3 sm:size-3.5" />
+								</div>
+							{/if}
 							<button
 								type="button"
 								title="Model settings"
@@ -154,24 +170,6 @@
 							>
 								<LucideSettings class="size-3 sm:size-3.5" />
 							</button>
-							<div class="flex items-center gap-1.5">
-								{#if $settings.toolsOverrides?.[model.id] ?? (model as { supportsTools?: boolean }).supportsTools}
-									<div
-										title="This model supports tool calling (functions)."
-										class="rounded-md bg-purple-50 p-1.5 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
-									>
-										<LucideHammer class="size-3 sm:size-3.5" />
-									</div>
-								{/if}
-								{#if $settings.multimodalOverrides?.[model.id] ?? model.multimodal}
-									<div
-										title="This model is multimodal and supports image inputs natively."
-										class="rounded-md bg-blue-50 p-1.5 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-									>
-										<LucideImage class="size-3 sm:size-3.5" />
-									</div>
-								{/if}
-							</div>
 							{#if isActive}
 								<span
 									class="rounded-full bg-black px-2.5 py-1 text-xs font-bold text-white shadow-md dark:bg-white dark:text-black"
