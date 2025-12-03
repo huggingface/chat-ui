@@ -11,6 +11,7 @@ import {
 	MessageUpdateType,
 	MessageReasoningUpdateType,
 	type MessageUpdate,
+	type MessageStreamUpdate,
 } from "$lib/types/MessageUpdate";
 import { uploadFile } from "$lib/server/files/uploadFile";
 import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversation";
@@ -335,20 +336,14 @@ export async function POST({ request, locals, params, getClientAddress }) {
 				msg.updates
 					?.filter(
 						(u) =>
-							!(
-								u.type === MessageUpdateType.Status &&
-								u.status === MessageUpdateStatus.KeepAlive
-							)
+							!(u.type === MessageUpdateType.Status && u.status === MessageUpdateStatus.KeepAlive)
 					)
 					.map((u) => {
 						if (u.type !== MessageUpdateType.Stream) return u;
 						// Preserve existing len if already compressed, otherwise compute from token
-						const len =
-							typeof (u as unknown as { len?: number }).len === "number"
-								? (u as unknown as { len?: number }).len
-								: (u.token ?? "").length;
+						const len = u.len ?? (u.token ?? "").length;
 						// store a lightweight marker to preserve ordering without duplicating content
-						return { type: MessageUpdateType.Stream, token: "", len } as MessageUpdate;
+						return { type: MessageUpdateType.Stream, token: "", len } satisfies MessageStreamUpdate;
 					}) ?? [];
 
 			return { ...msg, updates: filteredUpdates };

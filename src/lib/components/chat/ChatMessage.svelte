@@ -142,20 +142,11 @@
 		for (const update of updates) {
 			if (update.type === MessageUpdateType.Stream) {
 				const token =
-					typeof update.token === "string" && update.token.length > 0
-						? update.token
-						: null;
-				const len =
-					token !== null
-						? token.length
-						: typeof (update as unknown as { len?: number }).len === "number"
-							? (update as unknown as { len?: number }).len ?? 0
-							: 0;
+					typeof update.token === "string" && update.token.length > 0 ? update.token : null;
+				const len = token !== null ? token.length : (update.len ?? 0);
 				const chunk =
 					token ??
-					(message.content
-						? message.content.slice(contentCursor, contentCursor + len)
-						: "");
+					(message.content ? message.content.slice(contentCursor, contentCursor + len) : "");
 				contentCursor += len;
 				if (!chunk) continue;
 				const last = res.at(-1);
@@ -265,9 +256,11 @@
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 				{#each blocks as block, blockIndex (block.type === "tool" ? `${block.uuid}-${blockIndex}` : `text-${blockIndex}`)}
+					{@const nextBlock = blocks[blockIndex + 1]}
+					{@const nextIsLinkable = nextBlock?.type === "tool"}
 					{#if block.type === "tool"}
-						<div data-exclude-from-copy>
-							<ToolUpdate tool={block.updates} {loading} />
+						<div data-exclude-from-copy class="[.prose+&]:mt-3">
+							<ToolUpdate tool={block.updates} {loading} hasNext={nextIsLinkable} />
 						</div>
 					{:else if block.type === "text"}
 						{#if isLast && loading && block.content.length === 0}
@@ -275,7 +268,11 @@
 						{/if}
 
 						{#if hasClientThink}
-							{#each block.content.split(THINK_BLOCK_REGEX) as part, _i}
+							{@const parts = block.content.split(THINK_BLOCK_REGEX)}
+							{#each parts as part, partIndex}
+								{@const remainingParts = parts.slice(partIndex + 1)}
+								{@const hasMoreLinkable =
+									remainingParts.some((p) => p?.startsWith("<think>")) || nextIsLinkable}
 								{#if part && part.startsWith("<think>")}
 									{@const isClosed = part.endsWith("</think>")}
 									{@const thinkContent = part.slice(7, isClosed ? -8 : undefined)}
@@ -289,6 +286,7 @@
 										{summary}
 										content={thinkContent}
 										loading={isLast && loading && !isClosed}
+										hasNext={hasMoreLinkable}
 									/>
 								{:else if part && part.trim().length > 0}
 									<div
