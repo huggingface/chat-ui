@@ -4,11 +4,16 @@
 	export function closeMobileNav() {
 		isOpen = false;
 	}
+
+	export function openMobileNav() {
+		isOpen = true;
+	}
 </script>
 
 <script lang="ts">
 	import { browser } from "$app/environment";
 	import { beforeNavigate } from "$app/navigation";
+	import { onMount, onDestroy } from "svelte";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import IconNew from "$lib/components/icons/IconNew.svelte";
@@ -72,6 +77,51 @@
 	function closeDrawer() {
 		isOpen = false;
 	}
+
+	// Swipe gesture support for opening/closing the nav
+	let touchstart: Touch | null = null;
+	let touchend: Touch | null = null;
+
+	function checkDirection() {
+		if (!touchstart || !touchend) return;
+
+		const screenWidth = window.innerWidth;
+		const swipeDistance = touchend.screenX - touchstart.screenX;
+		const absSwipeDistance = Math.abs(swipeDistance);
+
+		// Only trigger if swipe is significant (1/8 of screen width)
+		if (absSwipeDistance < screenWidth / 8) return;
+
+		// Swipe right from left edge (within 40px) -> open
+		if (touchstart.clientX < 40 && swipeDistance > 0 && !isOpen) {
+			isOpen = true;
+		}
+		// Swipe left while open -> close
+		else if (swipeDistance < 0 && isOpen) {
+			isOpen = false;
+		}
+	}
+
+	function onTouchStart(e: TouchEvent) {
+		touchstart = e.changedTouches[0];
+	}
+
+	function onTouchEnd(e: TouchEvent) {
+		touchend = e.changedTouches[0];
+		checkDirection();
+	}
+
+	onMount(() => {
+		window.addEventListener("touchstart", onTouchStart);
+		window.addEventListener("touchend", onTouchEnd);
+	});
+
+	onDestroy(() => {
+		if (browser) {
+			window.removeEventListener("touchstart", onTouchStart);
+			window.removeEventListener("touchend", onTouchEnd);
+		}
+	});
 </script>
 
 <nav
