@@ -4,7 +4,7 @@
 	import { afterNavigate } from "$app/navigation";
 
 	import { DropdownMenu } from "bits-ui";
-	import CarbonAdd from "~icons/carbon/add";
+	import IconPlus from "~icons/lucide/plus";
 	import CarbonImage from "~icons/carbon/image";
 	import CarbonDocument from "~icons/carbon/document";
 	import CarbonUpload from "~icons/carbon/upload";
@@ -273,7 +273,7 @@
 							disabled={loading}
 							aria-label="Add attachment"
 						>
-							<CarbonAdd class="text-base" />
+							<IconPlus class="text-base" />
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Portal>
 							<DropdownMenu.Content
